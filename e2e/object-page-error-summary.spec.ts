@@ -27,7 +27,7 @@ const setArgs = (page: Page, updatedArgs: Record<string, unknown>) =>
   }, updatedArgs);
 
 test.describe('getErrorSummary in ObjectPageFooter: stories', () => {
-  for (const name of ['form-flow', 'error-summary', 'save-error-over-summary']) {
+  for (const name of ['form-flow', 'error-summary', 'save-error-over-summary', 'root-error']) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
     });
@@ -131,6 +131,52 @@ test.describe('getErrorSummary in ObjectPageFooter: behavior in a real browser',
     await save(page).click();
     await expect(status(page)).toHaveText('Error: 1 invalid field');
     await expect(noteInput(page)).toBeFocused();
+  });
+
+  test('only a root error (formErrors): its message in an alert strip at the top of the form, the count in the footer', async ({
+    page,
+  }) => {
+    await gotoStory(page, STORY('root-error-manual'));
+    const height = await footerHeight(page);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.getByLabel('VAT number').fill('');
+    await page.getByLabel('Email').fill('');
+    await save(page).click();
+
+    const alert = page.getByRole('alert');
+    await expect(alert).toHaveCount(1);
+    await expect(alert).toContainText('Enter a VAT number or an email.');
+    // At the top of the form: above the first section's first field.
+    const [alertBox, firstField] = await Promise.all([alert.boundingBox(), page.getByLabel('Supplier').boundingBox()]);
+    expect(alertBox!.y + alertBox!.height).toBeLessThanOrEqual(firstField!.y);
+    // The footer counts it, with a text that does not speak of fields, and does not repeat it.
+    await expect(status(page)).toHaveText('Error: 1 error');
+    await expect(footer(page)).not.toContainText('Enter a VAT number');
+    // No field is marked invalid, so the focus stays on Save.
+    await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
+    await expect(save(page)).toBeFocused();
+    expect(await footerHeight(page)).toBe(height);
+    await expectNoA11yViolations(page);
+
+    // The first edit clears the root error: strip unmounted, summary empty.
+    await page.getByLabel('Email').fill('billing@acme.example');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(status(page)).toBeEmpty();
+  });
+
+  test('a save error with an empty text does not hide the summary', async ({ page }) => {
+    await gotoStory(page, STORY('save-error-over-summary-manual'));
+    // The server rejects with `new Error()`: no text to show, the status region stays empty.
+    await page.getByLabel('Supplier').fill('fail-silent');
+    await save(page).click();
+    await expect(save(page)).not.toHaveAttribute('aria-disabled');
+    await expect(status(page)).toBeEmpty();
+
+    // The rules tighten with no edit: the empty save error is still there, but the count is shown.
+    await page.getByRole('checkbox', { name: /Require a note/ }).check();
+    await save(page).click();
+    await expect(noteInput(page)).toBeFocused();
+    await expect(status(page)).toHaveText('Error: 1 invalid field');
   });
 
   test('axe: the summary in the footer and the invalid fields', async ({ page }) => {

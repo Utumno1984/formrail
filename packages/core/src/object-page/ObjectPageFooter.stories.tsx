@@ -6,6 +6,7 @@ import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
 import { Input } from '../input/Input';
+import { MessageStrip } from '../message-strip/MessageStrip';
 import { getErrorSummary } from './error-summary';
 import { ObjectPage } from './ObjectPage';
 import { ObjectPageFooter } from './ObjectPageFooter';
@@ -254,6 +255,7 @@ interface SupplierArgs {
 type SupplierStory = StoryObj<PlaygroundArgs & SupplierArgs>;
 
 const SERVER_ERROR = 'The server rejected the save.';
+const ROOT_ERROR = 'Enter a VAT number or an email.';
 
 /** `getErrorSummary`'s `message` option from the two text controls; `undefined` = library default. */
 const summaryText = (one: string, other: string) =>
@@ -271,12 +273,15 @@ function SupplierForm({
   baseline,
   footer,
   serverRule = false,
+  rootRule = false,
 }: SupplierArgs & {
   baseline: keyof typeof SUPPLIER_BASELINES;
   /** `dirty`: shown while the form is dirty (a real save-bar). `always`: also before any edit, to Save an empty form. */
   footer: 'dirty' | 'always';
   /** A toolbar switch that tightens the rules without editing the form (as a rule changed on the server would). */
   serverRule?: boolean;
+  /** A root rule (`refine` without `path`): VAT number or email. Its message goes to `formErrors`, not to a field. */
+  rootRule?: boolean;
 }) {
   const [noteRequired, setNoteRequired] = useState(false);
   // Any Standard Schema works (Zod here: a devDependency, the core imports no schema library).
@@ -287,16 +292,21 @@ function SupplierForm({
       shape[field.key] = z.string().trim().min(1, `${field.label} is required.`);
     }
     if (noteRequired) shape['note'] = z.string().trim().min(1, 'Note is required.');
-    return z.object(shape);
-  }, [requiredFields, noteRequired]);
+    if (!rootRule) return z.object(shape);
+    // `z.object` drops unknown keys before `refine` runs: declare the two the rule reads.
+    return z
+      .object({ vat: z.string(), email: z.string(), ...shape })
+      .refine((v) => v.vat.trim() !== '' || v.email.trim() !== '', ROOT_ERROR);
+  }, [requiredFields, noteRequired, rootRule]);
   const form = useObjectPageForm<SupplierValues>({ baseline: SUPPLIER_BASELINES[baseline], schema });
   const frameRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
 
   // The rule of the levels: the save error, when there is one, wins over the validation summary;
   // the field messages stay on the fields (never in the footer).
+  // `||`, not `??`: a save error with an empty text (`new Error()`) must not hide the summary.
   const message =
-    errorText(form.saveError) ??
+    errorText(form.saveError) ||
     getErrorSummary(form.fieldErrors, { formErrors: form.formErrors, message: summaryText(summaryOne, summaryOther) });
 
   const section = (name: 'general' | 'address') =>
@@ -332,6 +342,8 @@ function SupplierForm({
               onClick={() =>
                 void form.save(async (values) => {
                   if (values.supplier === 'fail') throw new Error(SERVER_ERROR);
+                  // A rejection with no text: the footer then falls back to the summary.
+                  if (values.supplier === 'fail-silent') throw new Error();
                   onSaved(values);
                 })
               }
@@ -343,6 +355,9 @@ function SupplierForm({
               Discard changes
             </Button>
           </ObjectPageFooter>
+          {/* Root errors belong to no Field: the form shows them itself, at the top, in an alert
+              strip mounted already filled (so it is announced). The footer only counts them. */}
+          {form.formErrors.length > 0 ? <MessageStrip tone="error">{form.formErrors.join(' ')}</MessageStrip> : null}
           <ObjectPageSection id="general" title="General data">
             <div style={STACK}>{section('general')}</div>
           </ObjectPageSection>
@@ -539,4 +554,50 @@ export const SaveErrorOverSummaryManual: SupplierStory = {
   argTypes: SUPPLIER_ARG_TYPES,
   args: SUPPLIER_ARGS,
   render: (args) => <SupplierForm {...args} baseline="filled" footer="always" serverRule />,
+};
+
+// A root error is not a field: the summary text speaks of errors, not of fields.
+const ROOT_RULE_ARGS: Partial<SupplierArgs> = { ...SUPPLIER_ARGS, summaryOne: '1 error', summaryOther: '{count} errors' };
+
+/**
+ * A root rule: the schema's `refine` without `path` ("Enter a VAT number or an email.") puts its
+ * message in `formErrors`, which no Field shows. The form renders it itself, at the top, in a
+ * `MessageStrip` `tone="error"` (`role="alert"`, mounted already filled so it is announced), and the
+ * footer's summary counts it ("1 error": with root rules pass a `message` that does not say
+ * "fields"). Clear both VAT number and Email and Save; the first edit clears the root error.
+ */
+export const RootError: SupplierStory = {
+  argTypes: SUPPLIER_ARG_TYPES,
+  args: ROOT_RULE_ARGS,
+  render: (args) => <SupplierForm {...args} baseline="filled" footer="always" rootRule />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const status = footerStatus(canvasElement);
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.clear(canvas.getByRole('textbox', { name: 'VAT number' }));
+    await userEvent.clear(canvas.getByRole('textbox', { name: 'Email' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+
+    // The root message is in the alert strip at the top of the form, not on a field nor in the footer.
+    const alert = await canvas.findByRole('alert');
+    await expect(alert).toHaveTextContent(ROOT_ERROR);
+    await expect(status).toHaveTextContent('Error: 1 error');
+    await expect(status).not.toHaveTextContent(ROOT_ERROR);
+    for (const textbox of canvas.getAllByRole('textbox')) await expect(textbox).not.toHaveAttribute('aria-invalid');
+    await expect(args.onSaved).not.toHaveBeenCalled();
+
+    // An edit leaves no field error, so the root error goes too: strip unmounted, summary empty.
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Email' }), 'billing@acme.example');
+    await expect(canvas.queryByRole('alert')).not.toBeInTheDocument();
+    await expect(status).toBeEmptyDOMElement();
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(args.onSaved).toHaveBeenCalledWith({ ...FILLED_SUPPLIER, vat: '', email: 'billing@acme.example' }));
+  },
+};
+
+/** `RootError` without a `play` function, for the e2e. */
+export const RootErrorManual: SupplierStory = {
+  argTypes: SUPPLIER_ARG_TYPES,
+  args: ROOT_RULE_ARGS,
+  render: (args) => <SupplierForm {...args} baseline="filled" footer="always" rootRule />,
 };
