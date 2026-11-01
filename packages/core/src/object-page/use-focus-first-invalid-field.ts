@@ -19,9 +19,20 @@ export interface UseFocusFirstInvalidFieldOptions {
    * Explicit trigger that **replaces** the identity of `fieldErrors`: when it is not `undefined`,
    * the focus moves only when `trigger` changes (`Object.is`), using the `fieldErrors` of that
    * render; a new `fieldErrors` object alone (an edit, a derived copy) never moves it. Meant for
-   * `useObjectPageForm().validationAttempt`, which changes once per failed `validate`. Needed when
-   * `fieldErrors` is not the form's own object (e.g. a `useMemo` that translates the messages).
-   * Omitted (or `undefined`): the identity of `fieldErrors` is the trigger, as described below.
+   * `useObjectPageForm().validationAttempt`, which changes once per failed `schema`/`validate`.
+   * Needed when `fieldErrors` is not the form's own object (e.g. a `useMemo` that translates the
+   * messages). Omitted (or `undefined`): the identity of `fieldErrors` is the trigger, as described
+   * below.
+   *
+   * Derive such a `fieldErrors` **during render** (`useMemo`), never in an effect (`useEffect` +
+   * `setState`): the hook reads the `fieldErrors` of the render in which `trigger` changes, and a
+   * copy made in an effect is still the previous one in that render (the focus would go to the
+   * errors of the previous attempt, or nowhere).
+   *
+   * Switching between modes counts as a change: going from `undefined` to a value (or back) runs
+   * the focus logic once more with the `fieldErrors` of that render, even if no save failed. Keep
+   * the mode fixed for the life of the component (pass `form.validationAttempt` from the first
+   * render; it is `0` at mount, never `undefined`).
    */
   trigger?: unknown;
 }
