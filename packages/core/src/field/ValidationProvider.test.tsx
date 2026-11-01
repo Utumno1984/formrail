@@ -1,9 +1,10 @@
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { memo, useContext, useState, type ReactNode } from 'react';
+import { memo, useContext, useRef, useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Combobox } from '../combobox/Combobox';
 import { Input } from '../input/Input';
 import type { FieldErrors } from '../object-page/field-errors';
+import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { useObjectPageForm } from '../object-page/use-object-page-form';
 import { Select } from '../select/Select';
 import { Field } from './Field';
@@ -65,16 +66,31 @@ describe('ValidationProvider', () => {
     expectInvalid(screen.getByRole('textbox', { name: 'Supplier' }), 'Supplier is required');
   });
 
-  it('an absent key, undefined or an empty string: no error', () => {
+  it('an absent key or undefined: no error, no warning', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     render(
-      <ValidationProvider fieldErrors={{ b: undefined, c: '', d: '   ' }}>
+      <ValidationProvider fieldErrors={{ b: undefined }}>
         <Field label="A" name="a">
           <Input />
         </Field>
         <Field label="B" name="b">
           <Input />
         </Field>
-        <Field label="C" name="c">
+      </ValidationProvider>,
+    );
+    for (const name of ['A', 'B']) {
+      const control = screen.getByRole('textbox', { name });
+      expectValid(control);
+      expect(control).not.toHaveAttribute('aria-describedby');
+    }
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it('an empty or blank message is invalid like for the form (aria-invalid), with no message node and a dev error', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <ValidationProvider fieldErrors={{ c: '', d: '   ' }}>
+        <Field label="C" name="c" help="Help C">
           <Input />
         </Field>
         <Field label="D" name="d">
@@ -82,11 +98,98 @@ describe('ValidationProvider', () => {
         </Field>
       </ValidationProvider>,
     );
-    for (const name of ['A', 'B', 'C', 'D']) {
-      const control = screen.getByRole('textbox', { name });
-      expectValid(control);
-      expect(control).not.toHaveAttribute('aria-describedby');
+    const c = screen.getByRole('textbox', { name: 'C' });
+    const d = screen.getByRole('textbox', { name: 'D' });
+    for (const control of [c, d]) {
+      expect(control).toHaveAttribute('aria-invalid', 'true');
+      expect(errorOf(control)).toBeNull();
     }
+    // aria-describedby points only to nodes that exist: the help of C, nothing for D.
+    expect(c.getAttribute('aria-describedby')).toMatch(/-help$/);
+    expect(document.getElementById(c.getAttribute('aria-describedby')!)).not.toBeNull();
+    expect(d).not.toHaveAttribute('aria-describedby');
+    expect(consoleError).toHaveBeenCalledTimes(2);
+    expect(consoleError.mock.calls.map((call) => String(call[0]))).toEqual([
+      expect.stringContaining('Field "c"'),
+      expect.stringContaining('Field "d"'),
+    ]);
+  });
+
+  it('the dev error is not repeated on re-renders with the same blank message, and stops when the message gets a text', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tree = (errors: FieldErrors) => (
+      <ValidationProvider fieldErrors={errors}>
+        <Field label="C" name="c">
+          <Input />
+        </Field>
+      </ValidationProvider>
+    );
+    const { rerender } = render(tree({ c: '' }));
+    rerender(tree({ c: '' }));
+    rerender(tree({ c: ' ' }));
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    rerender(tree({ c: 'C!' }));
+    expectInvalid(screen.getByRole('textbox', { name: 'C' }), 'C!');
+    expect(consoleError).toHaveBeenCalledTimes(1);
+  });
+
+  it('no dev error for a blank message in production', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      render(
+        <ValidationProvider fieldErrors={{ c: '' }}>
+          <Field label="C" name="c">
+            <Input />
+          </Field>
+        </ValidationProvider>,
+      );
+      expect(screen.getByRole('textbox', { name: 'C' })).toHaveAttribute('aria-invalid', 'true');
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('an empty explicit error and a blank provider message: still invalid (the provider decides)', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <ValidationProvider fieldErrors={{ c: '' }}>
+        <Field label="C" name="c" error="">
+          <Input />
+        </Field>
+      </ValidationProvider>,
+    );
+    expect(screen.getByRole('textbox', { name: 'C' })).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('a blank provider message on a path the form considers invalid: save blocked, focus and aria-invalid on the same field', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    Element.prototype.scrollIntoView = vi.fn();
+    function Blank() {
+      const form = useObjectPageForm<{ c: string }>({ baseline: { c: '' }, validate: () => ({ c: '' }) });
+      const ref = useRef<HTMLDivElement>(null);
+      useFocusFirstInvalidField({ containerRef: ref, fieldErrors: form.fieldErrors });
+      return (
+        <div ref={ref}>
+          <ValidationProvider fieldErrors={form.fieldErrors}>
+            <Field label="C" name="c">
+              <Input />
+            </Field>
+          </ValidationProvider>
+          <button type="button" onClick={() => void form.save(() => undefined)}>
+            Save
+          </button>
+        </div>
+      );
+    }
+    render(<Blank />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    });
+    const c = screen.getByRole('textbox', { name: 'C' });
+    expect(c).toHaveFocus();
+    expect(c).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('reaches Select, Combobox, a render-prop and useFieldControl alike', () => {

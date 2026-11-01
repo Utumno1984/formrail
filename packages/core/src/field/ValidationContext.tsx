@@ -20,7 +20,11 @@ export interface ValidationProviderProps {
  * message, its id in `aria-describedby`), so the key is written once, as `name`.
  *
  * - The lookup is by exact path (`address.city` never sees `address` nor `address.city.zip`); an
- *   absent key, `undefined`, or an empty string means no error.
+ *   absent key or `undefined` means no error. "Invalid" is the form's rule (any value other than
+ *   `undefined`): an empty or blank message still sets `aria-invalid`, but renders no message node
+ *   (so no id in `aria-describedby`) and logs a `console.error` in development: always give a text.
+ * - Wrap only the Fields of this form: any `Field` with a matching `name` below the provider, even
+ *   an unrelated one, reads its error.
  * - A `Field` `error` with content wins over the provider; an empty or absent `error` falls back
  *   to it. A `Field` without `name`, or outside any provider, ignores it.
  * - Nested providers: the innermost is the only source (no merge with the outer ones).
