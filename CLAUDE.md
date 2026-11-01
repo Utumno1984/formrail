@@ -149,7 +149,13 @@ va bene procedere ticket per ticket senza fretta.
   Storybook per demo/documentazione con visual regression attiva da subito. Vitest per gli unit
   test, Playwright per gli e2e (incluso touch via CDP dove rilevante). Changesets per
   versionamento/release.
-- Codice, nomi e commenti in inglese; demo/Storybook può avere testi in italiano o inglese.
+- Codice, nomi e commenti in inglese. **Testo di Storybook/demo solo in inglese (decisione di
+  Daniele del 2026-11-01, sostituisce la vecchia regola "italiano o inglese")**: il prodotto punta
+  a una platea internazionale, quindi ogni stringa visibile in una story (label, placeholder,
+  messaggi, testo delle fixture) va in inglese, non più mista italiano/inglese. Si applica da ora
+  in avanti alle story nuove e a quelle toccate per altri motivi; non richiede una traduzione
+  retroattiva sistematica di tutte le story esistenti in un solo colpo (valutare un ticket dedicato
+  se serve farlo in modo organico).
 - **Storybook: Controls/Actions/Interactions usati sul serio, non per scrupolo (decisione di
   Daniele del 2026-10-25)**. Per ogni componente con una story non puramente interna/fixture:
   `argTypes` che rispecchiano davvero l'API pubblica (controllo giusto per tipo — `radio`/
