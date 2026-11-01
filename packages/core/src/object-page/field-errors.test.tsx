@@ -3,7 +3,7 @@ import { useRef, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
-import { invalidPaths, type FieldErrors } from './field-errors';
+import { errorAt, invalidPaths, type FieldErrors } from './field-errors';
 import { useFocusFirstInvalidField } from './use-focus-first-invalid-field';
 import { useObjectPageForm } from './use-object-page-form';
 
@@ -32,6 +32,36 @@ describe('invalidPaths', () => {
   it('returns nothing for an empty object or only undefined values', () => {
     expect(invalidPaths({})).toEqual([]);
     expect(invalidPaths({ a: undefined })).toEqual([]);
+  });
+});
+
+describe('errorAt', () => {
+  it('returns the message of the exact path', () => {
+    const errors: FieldErrors = { 'address.city': 'City', 'lines.10.qty': 'Ten' };
+    expect(errorAt(errors, 'address.city')).toBe('City');
+    expect(errorAt(errors, 'lines.10.qty')).toBe('Ten');
+  });
+  it('never matches a prefix, a descendant or an ancestor', () => {
+    const errors: FieldErrors = { 'address.city': 'City', 'lines.10.qty': 'Ten' };
+    expect(errorAt(errors, 'address')).toBeUndefined();
+    expect(errorAt(errors, 'address.city.zip')).toBeUndefined();
+    expect(errorAt(errors, 'lines.1.qty')).toBeUndefined();
+    expect(errorAt(errors, 'lines.1')).toBeUndefined();
+  });
+  it('an absent key and an undefined value both give undefined', () => {
+    expect(errorAt({}, 'a')).toBeUndefined();
+    expect(errorAt({ a: undefined }, 'a')).toBeUndefined();
+  });
+  it('never reads Object.prototype (constructor, toString, __proto__)', () => {
+    for (const path of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(errorAt({}, path)).toBeUndefined();
+    }
+    expect(errorAt({ constructor: 'Own' }, 'constructor')).toBe('Own');
+  });
+  it('works on an object without a prototype', () => {
+    const errors = Object.assign(Object.create(null) as Record<string, string>, { a: 'x' });
+    expect(errorAt(errors, 'a')).toBe('x');
+    expect(errorAt(errors, 'b')).toBeUndefined();
   });
 });
 

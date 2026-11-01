@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { FieldMessage } from '../field-message/FieldMessage';
 import { defineHidden } from '../internal/define-hidden';
 import { hasContent } from '../internal/react-nodes';
+import { errorAt } from '../object-page/field-errors';
 import { cn } from '../utils/cn';
 import { FieldContext, type FieldControlProps } from './FieldContext';
+import { ValidationContext } from './ValidationContext';
 
 /**
  * `forced`: the value is decided by a business rule. `locked`: not editable because of
@@ -23,10 +25,14 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
     /**
      * Logical name of the field (the key used in the form's errors). Exposed on the control as
      * `data-rop-name` (all controls, `Select` included) and, on `Input` and `Combobox`, also as the
-     * native `name` unless they get their own. Never set on the Field's `<div>`.
+     * native `name` unless they get their own. Never set on the Field's `<div>`. Inside a
+     * `ValidationProvider` it is also the path whose error the Field shows (exact match).
      */
     name?: string;
-    /** Non-empty: the control gets `aria-invalid`. Empty is the same as absent. */
+    /**
+     * Non-empty: the control gets `aria-invalid`. Empty is the same as absent. With content it wins
+     * over the error of a `ValidationProvider`; empty or absent, the provider's (if any) is used.
+     */
     error?: ReactNode;
     required?: boolean;
     /**
@@ -122,7 +128,10 @@ export function Field(props: FieldProps) {
   useKeyboardSafe(focused, rootRef, onFocusLost);
 
   const hasReason = state !== 'default' && hasContent(stateReason);
-  const hasError = hasContent(error);
+  // An explicit error with content wins; otherwise the nearest ValidationProvider's, by exact path.
+  const fieldErrors = useContext(ValidationContext);
+  const shownError = hasContent(error) ? error : name && fieldErrors ? errorAt(fieldErrors, name) : undefined;
+  const hasError = hasContent(shownError);
   const hasHelp = hasContent(help);
   const labelId = `${id}-label`;
   const reasonId = `${id}-reason`;
@@ -181,7 +190,7 @@ export function Field(props: FieldProps) {
           </FieldMessage>
         ) : null}
         <FieldMessage id={errorId} tone="error">
-          {error}
+          {shownError}
         </FieldMessage>
         <FieldMessage id={helpId} tone="help">
           {help}
