@@ -11,6 +11,7 @@ const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
 
 interface PlaygroundArgs {
   label: string;
+  name: string;
   help: string;
   error: string;
   required: boolean;
@@ -26,6 +27,7 @@ const meta: Meta<PlaygroundArgs> = {
   parameters: { layout: 'padded' },
   argTypes: {
     label: { control: 'text' },
+    name: { control: 'text', description: 'Nome logico: data-rop-name sul controllo (e name nativo su Input/Combobox)' },
     help: { control: 'text' },
     error: { control: 'text' },
     required: { control: 'boolean' },
@@ -39,6 +41,7 @@ const meta: Meta<PlaygroundArgs> = {
   },
   args: {
     label: 'Ragione sociale',
+    name: 'ragioneSociale',
     help: '',
     error: '',
     required: false,
@@ -65,9 +68,9 @@ const stateProps = (state: FieldState, stateReason: string) => ({ state, stateRe
  */
 export const Playground: Story = {
   args: { help: 'Come appare in fattura.' },
-  render: ({ label, help, error, required, hideLabel, state, stateReason, placeholder, onChange }) => (
+  render: ({ label, name, help, error, required, hideLabel, state, stateReason, placeholder, onChange }) => (
     <div style={column}>
-      <Field label={label} help={help} error={error} required={required} hideLabel={hideLabel} {...stateProps(state, stateReason)}>
+      <Field label={label} name={name} help={help} error={error} required={required} hideLabel={hideLabel} {...stateProps(state, stateReason)}>
         <Input placeholder={placeholder} onChange={onChange} />
       </Field>
     </div>
@@ -79,6 +82,9 @@ export const Playground: Story = {
     await expect(input).toHaveValue('Acme');
     await expect(args.onChange).toHaveBeenCalledTimes(4);
     await expect(input).toHaveAccessibleDescription('Come appare in fattura.');
+    // The `name` control reaches the control as `data-rop-name` (and the native `name`).
+    await expect(input).toHaveAttribute('data-rop-name', args.name);
+    await expect(input).toHaveAttribute('name', args.name);
   },
 };
 

@@ -195,8 +195,8 @@
       "limit": 215
     },
     "useFocusFirstInvalidField": {
-      "baseline": 535,
-      "limit": 589
+      "baseline": 591,
+      "limit": 651
     },
     "useListReport": {
       "baseline": 2609,

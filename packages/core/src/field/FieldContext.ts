@@ -30,6 +30,12 @@ export interface FieldControlProps {
   /** `forced` / `locked`: focusable but not editable. */
   readOnly?: true;
   'aria-readonly'?: true;
+  /**
+   * The Field's logical `name`, as a DOM attribute valid on any element (a `<button>` trigger
+   * included), so `useFocusFirstInvalidField` can find the control whatever it is. Absent (never
+   * `undefined`) when the Field has no `name`. A render-prop control must spread it to be found.
+   */
+  'data-rop-name'?: string;
   /** Not enumerable. */
   readonly state: FieldState;
   /** Not enumerable. True when the user must not be able to change the value. */

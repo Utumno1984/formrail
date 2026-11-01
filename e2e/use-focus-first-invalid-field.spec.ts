@@ -8,6 +8,9 @@ const TYPING = 'internal-useobjectpageformfixture--focus-first-invalid-typing-cl
 const LONG_EMPTY = 'internal-useobjectpageformfixture--long-form-all-empty';
 const LONG_VALID = 'internal-useobjectpageformfixture--long-form-valid-above';
 
+const SELECT_PLAY = 'internal-useobjectpageformfixture--focus-first-invalid-select';
+const LONG_MIXED = 'internal-useobjectpageformfixture--long-form-mixed-controls';
+
 const save = (page: Page) => page.getByRole('button', { name: 'Save' });
 const inViewport = (page: Page, label: string) =>
   page.getByLabel(label).evaluate((el) => {
@@ -16,7 +19,7 @@ const inViewport = (page: Page, label: string) =>
   });
 
 test.describe('useFocusFirstInvalidField: stories', () => {
-  for (const id of [ALL_EMPTY, SKIPS_VALID, TYPING]) {
+  for (const id of [ALL_EMPTY, SKIPS_VALID, TYPING, SELECT_PLAY]) {
     test(`${id}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, id);
     });
@@ -63,6 +66,46 @@ test.describe('useFocusFirstInvalidField: behavior in a real browser', () => {
     await page.keyboard.type('x');
     await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 0');
     await expect(page.getByText('is required')).toHaveCount(0);
+  });
+
+  test('an invalid Select (no native name) gets the focus and is scrolled into view', async ({ page }) => {
+    await gotoStory(page, LONG_MIXED);
+    await page.getByLabel('Field A').fill('filled');
+    await save(page).click();
+    const trigger = page.getByRole('combobox', { name: 'Field B' });
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute('data-rop-name', 'b');
+    await expect(trigger).not.toHaveAttribute('name');
+    expect(
+      await trigger.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top >= 0 && r.bottom <= window.innerHeight;
+      }),
+    ).toBe(true);
+  });
+
+  test('Select and Combobox are reached once the earlier fields are valid, in visual order', async ({ page }) => {
+    await gotoStory(page, LONG_MIXED);
+    await page.getByLabel('Field A').fill('filled');
+    await save(page).click();
+    await expect(page.getByRole('combobox', { name: 'Field B' })).toBeFocused();
+    await page.getByRole('combobox', { name: 'Field B' }).click();
+    await page.getByRole('option', { name: 'Italia' }).click();
+    await save(page).click();
+    await expect(page.getByRole('combobox', { name: 'Field C' })).toBeFocused();
+  });
+
+  test('mobile viewport: the invalid Select takes the focus and is inside the viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 700 });
+    await gotoStory(page, LONG_MIXED);
+    await page.getByLabel('Field A').fill('filled');
+    await save(page).click();
+    const trigger = page.getByRole('combobox', { name: 'Field B' });
+    await expect(trigger).toBeFocused();
+    const box = await trigger.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(700);
   });
 
   test('the focused field is centered, not stuck at an edge', async ({ page }) => {
