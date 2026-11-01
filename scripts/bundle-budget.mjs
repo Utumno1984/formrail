@@ -89,7 +89,27 @@ export async function listPublicExports(distEntry) {
     .sort();
 }
 
-export async function measureExport(distEntry, name) {
+/**
+ * dist/index.js keeps one `import ... from "react"` per original module. With a plain `external`,
+ * esbuild retains every one of those imports even when its bindings are unused after tree-shaking,
+ * so each new module adds a fixed ~40 B of measurement overhead to EVERY entry (e.g. composeRefs
+ * grew with no code change). Marking the externals side-effect-free drops the unused imports and
+ * keeps the ones the export really uses, so the measure reflects shipped code only. Real growth of
+ * the export (or of anything it pulls in) is still counted in full.
+ */
+export const sideEffectFreeExternals = {
+  name: 'side-effect-free-externals',
+  setup(b) {
+    // Every react / react-dom specifier (incl. subpaths such as react-dom/client) stays external.
+    b.onResolve({ filter: /^react(-dom)?(\/.*)?$/ }, (args) => ({
+      path: args.path,
+      external: true,
+      sideEffects: false,
+    }));
+  },
+};
+
+export async function bundleExport(distEntry, name) {
   const result = await build({
     stdin: {
       contents: `import { ${name} } from ${JSON.stringify(distEntry)};\nglobalThis.__budget = ${name};`,
@@ -102,11 +122,15 @@ export async function measureExport(distEntry, name) {
     format: 'esm',
     platform: 'browser',
     target: 'es2022',
-    external: ['react', 'react-dom', 'react/jsx-runtime'],
+    plugins: [sideEffectFreeExternals],
     write: false,
     logLevel: 'silent',
   });
-  return gzipBytes(result.outputFiles[0].contents);
+  return result.outputFiles[0].text;
+}
+
+export async function measureExport(distEntry, name) {
+  return gzipBytes(await bundleExport(distEntry, name));
 }
 
 export async function measureAll(distEntry) {

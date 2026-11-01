@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildBaseline, compareBudget, limitFor, runCheck, runUpdate } from './bundle-budget.mjs';
+import { bundleExport, buildBaseline, compareBudget, limitFor, runCheck, runUpdate } from './bundle-budget.mjs';
 
 describe('compareBudget', () => {
   const budget = { version: 1, exports: { a: { baseline: 100, limit: 120 } } };
@@ -166,5 +166,84 @@ describe('CLI on a fixture package', () => {
     await runUpdate({ packageDir: dir });
     rmSync(join(dir, 'dist'), { recursive: true });
     await expect(runCheck({ packageDir: dir })).rejects.toThrow(/npm run build/);
+  });
+});
+
+describe('react externals measurement (#34)', () => {
+  let dir;
+  const entry = (extra = '') =>
+    [
+      `import { forwardRef } from "react";`,
+      `import { jsx } from "react/jsx-runtime";`,
+      `export const composeRefs = (a, b) => (n) => { if (a) a.current = n; if (b) b.current = n; ${extra} };`,
+      `export const Comp = forwardRef((p, r) => jsx("div", { ref: r, ...p }));`,
+      '',
+    ].join('\n');
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'budget-react-'));
+    mkdirSync(join(dir, 'dist'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('does not charge an export for react imports it does not use, however many modules import them', async () => {
+    writeFileSync(join(dir, 'dist/index.js'), entry());
+    const before = (await runUpdate({ packageDir: dir })).composeRefs;
+    const extraModules = Array.from(
+      { length: 30 },
+      (_, i) =>
+        `import { useState as u${i}, useEffect as e${i} } from "react";\nimport { jsx as j${i} } from "react/jsx-runtime";\nexport const M${i} = () => j${i}("p", { c: u${i}, d: e${i} });\n`,
+    ).join('');
+    writeFileSync(join(dir, 'dist/index.js'), entry() + extraModules);
+    const after = (await runUpdate({ packageDir: dir })).composeRefs;
+    expect(after).toBe(before);
+  });
+
+  it('still charges react bindings an export really uses', async () => {
+    const comp = (hooks) =>
+      `import { forwardRef, ${hooks.join(', ')} } from "react";\nexport const Comp = forwardRef(() => [${hooks.map((h) => `${h}()`).join(', ')}]);\n`;
+    writeFileSync(join(dir, 'dist/index.js'), comp([]));
+    const none = (await runUpdate({ packageDir: dir })).Comp;
+    writeFileSync(join(dir, 'dist/index.js'), comp(['useState', 'useEffect', 'useMemo']));
+    const used = (await runUpdate({ packageDir: dir })).Comp;
+    expect(used).toBeGreaterThan(none);
+    // Discriminating: the minified output keeps the react import for used bindings...
+    expect(await bundleExport(join(dir, 'dist/index.js'), 'Comp')).toContain('from"react"');
+    // ...and drops it when nothing from react is used.
+    writeFileSync(
+      join(dir, 'dist/index.js'),
+      'import { useState } from "react";\nexport const Plain = () => 1;\nexport const Hook = () => useState;\n',
+    );
+    expect(await bundleExport(join(dir, 'dist/index.js'), 'Plain')).not.toContain('react');
+    expect(await bundleExport(join(dir, 'dist/index.js'), 'Hook')).toContain('from"react"');
+  });
+
+  it('keeps react subpaths (react-dom/client, jsx-dev-runtime) external instead of bundling them', async () => {
+    writeFileSync(
+      join(dir, 'dist/index.js'),
+      [
+        'import { createRoot } from "react-dom/client";',
+        'import { jsxDEV } from "react/jsx-dev-runtime";',
+        'export const mount = (el) => createRoot(el);',
+        'export const dev = () => jsxDEV("p", {});',
+        '',
+      ].join('\n'),
+    );
+    const measured = await runUpdate({ packageDir: dir });
+    expect(measured.mount).toBeLessThan(1024);
+    expect(measured.dev).toBeLessThan(1024);
+  });
+
+  it('still detects a real size increase of composeRefs against the committed baseline', async () => {
+    writeFileSync(join(dir, 'dist/index.js'), entry());
+    await runUpdate({ packageDir: dir });
+    expect((await runCheck({ packageDir: dir })).ok).toBe(true);
+    const bloat = Array.from(
+      { length: 12 },
+      (_, i) => `if (a && n === ${i}) console.log("branch-${i}", a, b);`,
+    ).join(' ');
+    writeFileSync(join(dir, 'dist/index.js'), entry(bloat));
+    const result = await runCheck({ packageDir: dir });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/composeRefs:.*OVER LIMIT/);
   });
 });
