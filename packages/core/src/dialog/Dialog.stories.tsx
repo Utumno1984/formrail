@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { settleMotion } from '../internal/settle-motion';
 import {
   Dialog,
   DialogBody,
@@ -154,6 +155,7 @@ const renderOpen: Story['render'] = ({ size, dismissible, onOpenChange }) => (
 
 const playOpen: Story['play'] = async () => {
   const dialog = await within(document.body).findByRole('dialog', { name: 'Modifica fornitore' });
+  await settleMotion(); // measure the final state, not a frame of the entry
   await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(window.innerWidth);
 };
 
@@ -180,6 +182,7 @@ export const LongContent: Story = {
   ),
   play: async () => {
     const dialog = await within(document.body).findByRole('dialog');
+    await settleMotion();
     const scroller = dialog.querySelector<HTMLElement>('[tabindex="0"]');
     await expect(scroller).not.toBeNull();
     await expect(scroller!.scrollHeight).toBeGreaterThan(scroller!.clientHeight);
@@ -216,6 +219,7 @@ export const WideTable: Story = {
   ),
   play: async ({ args }) => {
     const dialog = await within(document.body).findByRole('dialog');
+    await settleMotion();
     await expect(args.size).toBe('sm');
     await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(400);
   },
@@ -384,6 +388,7 @@ export const ClassOverride: Story = {
   ),
   play: async () => {
     const dialog = await within(document.body).findByRole('dialog');
+    await settleMotion();
     await expect(Math.round(dialog.getBoundingClientRect().width)).toBeLessThanOrEqual(400);
   },
 };
@@ -436,5 +441,81 @@ export const WithForm: Story = {
     const field = await within(document.body).findByRole('textbox', { name: 'Ragione sociale' });
     await userEvent.type(field, 'Rossi S.r.l.');
     await expect(field).toHaveValue('Rossi S.r.l.');
+  },
+};
+
+/**
+ * A chain: "Continua" closes the first dialog and opens a second one in the same handler, and the
+ * second has a field that takes the focus at once. The first one animates out while the second is
+ * already open: its delayed focus return must not pull the focus away from the second (it would
+ * select the text typed in the field). The play function types straight after the click.
+ */
+export const Chained: Story = {
+  render: ({ size, dismissible }) => {
+    function Host() {
+      const [first, setFirst] = useState(false);
+      const [second, setSecond] = useState(false);
+      return (
+        <Page>
+          <Button variant="primary" onClick={() => setFirst(true)}>
+            Apri la procedura
+          </Button>
+          <Dialog open={first} onOpenChange={setFirst}>
+            <DialogContent size={size} dismissible={dismissible}>
+              <DialogHeader>
+                <DialogTitle>Passo uno</DialogTitle>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setFirst(false);
+                    setSecond(true);
+                  }}
+                >
+                  Continua
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={second} onOpenChange={setSecond}>
+            <DialogContent size={size} dismissible={dismissible}>
+              <DialogHeader>
+                <DialogTitle>Passo due</DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                <Field label="Nome">
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the autoFocus field is the case under test */}
+                  <Input autoFocus />
+                </Field>
+              </DialogBody>
+            </DialogContent>
+          </Dialog>
+        </Page>
+      );
+    }
+    return <Host />;
+  },
+  play: async ({ canvasElement }) => {
+    const opener = within(canvasElement).getByRole('button', { name: 'Apri la procedura' });
+    await userEvent.click(opener);
+    const body = within(document.body);
+    await userEvent.click(await body.findByRole('button', { name: 'Continua' }));
+    // From here on the first dialog's opener must never get the focus back: the second one has it.
+    let bounced = false;
+    opener.addEventListener('focus', () => {
+      bounced = true;
+    });
+    const field = await body.findByRole('textbox', { name: 'Nome' });
+    await expect(field).toHaveFocus();
+    await userEvent.keyboard('Mario');
+    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Passo uno' })).toBeNull(), { timeout: 5000 });
+    await settleMotion();
+    // One more frame: the (skipped) focus return of the first dialog is scheduled after its unmount.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await expect(bounced).toBe(false);
+    await expect(field).toHaveFocus();
+    await userEvent.keyboard('X');
+    await expect(field).toHaveValue('MarioX');
   },
 };

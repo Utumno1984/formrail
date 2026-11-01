@@ -5,6 +5,7 @@ import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { settleMotion } from '../internal/settle-motion';
 import {
   Sheet,
   SheetBody,
@@ -115,6 +116,7 @@ export const Playground: Story = {
     const sheet = await body.findByRole('dialog', { name: 'Dettaglio fornitore' });
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(true);
+    await settleMotion(); // measure the final state, not a frame of the slide-in
     const box = sheet.getBoundingClientRect();
     await expect(box.top).toBe(0);
     await expect(box.height).toBe(window.innerHeight);
@@ -152,6 +154,7 @@ const renderOpen: Story['render'] = ({ side, size, dismissible, onOpenChange }) 
 
 const playOpen: Story['play'] = async ({ args }) => {
   const sheet = await within(document.body).findByRole('dialog', { name: 'Dettaglio fornitore' });
+  await settleMotion();
   const box = sheet.getBoundingClientRect();
   await expect(box.width).toBeLessThanOrEqual(window.innerWidth);
   if (args.side === 'right') await expect(box.right).toBe(window.innerWidth);
@@ -181,6 +184,7 @@ export const LongContent: Story = {
   ),
   play: async () => {
     const sheet = await within(document.body).findByRole('dialog');
+    await settleMotion();
     const scroller = sheet.querySelector<HTMLElement>('[tabindex="0"]');
     await expect(scroller).not.toBeNull();
     await expect(scroller!.scrollHeight).toBeGreaterThan(scroller!.clientHeight);

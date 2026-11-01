@@ -82,6 +82,8 @@ export interface UseDirtyGuardReturn {
 export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardReturn {
   const { when, labels } = options;
   const [open, setOpen] = useState(false);
+  // True only while "leave" commits and runs the action: the dialog content is not rendered at all.
+  const [leaving, setLeaving] = useState(false);
   const whenRef = useRef(when);
   const pendingRef = useRef<(() => void) | null>(null);
   const stayRef = useRef<HTMLElement | null>(null);
@@ -119,9 +121,18 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     const action = pendingRef.current;
     pendingRef.current = null;
     // Commit the closing first: the action may unmount the page, which must not find an open modal
-    // (scroll lock, inert siblings) to leave behind.
-    flushSync(() => setOpen(false));
-    action?.();
+    // (scroll lock, inert siblings) to leave behind, nor a dialog still mounted for its exit
+    // animation (#76): on this path the panel is removed outright (`leaving`), with no exit, because
+    // the page is about to change anyway. The other ways out ("stay", Escape, the X) do animate out.
+    flushSync(() => {
+      setOpen(false);
+      setLeaving(true);
+    });
+    try {
+      action?.();
+    } finally {
+      setLeaving(false);
+    }
   }, []);
 
   const text = { ...DEFAULT_LABELS };
@@ -139,32 +150,34 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
           if (!next) stay();
         }}
       >
-        <DialogContent
-          size="sm"
-          onOpenAutoFocus={(event) => {
-            event.preventDefault();
-            stayRef.current?.focus();
-          }}
-        >
-          <DialogHeader>
-            <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>{description}</DialogDescription>
-            </div>
-            <DialogClose />
-          </DialogHeader>
-          <DialogFooter>
-            <Button ref={stayRef} variant="primary" onClick={stay}>
-              {stayLabel}
-            </Button>
-            <Button variant="ghost" onClick={leave}>
-              {leaveLabel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        {!leaving && (
+          <DialogContent
+            size="sm"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              stayRef.current?.focus();
+            }}
+          >
+            <DialogHeader>
+              <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
+              </div>
+              <DialogClose />
+            </DialogHeader>
+            <DialogFooter>
+              <Button ref={stayRef} variant="primary" onClick={stay}>
+                {stayLabel}
+              </Button>
+              <Button variant="ghost" onClick={leave}>
+                {leaveLabel}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
       </Dialog>
     ),
-    [open, stay, leave, title, description, stayLabel, leaveLabel],
+    [open, leaving, stay, leave, title, description, stayLabel, leaveLabel],
   );
 
   return { guard, dialog };

@@ -249,20 +249,33 @@ test.describe('side changed while open', () => {
 });
 
 test.describe('motion', () => {
-  test('nothing animates, with or without prefers-reduced-motion', async ({ page }) => {
-    for (const reducedMotion of ['reduce', 'no-preference'] as const) {
-      await page.emulateMedia({ reducedMotion });
-      await gotoStory(page, STORY('size-md'));
-      await expect(sheetOf(page)).toBeVisible();
-      const running = await page.evaluate(() => document.getAnimations().length);
-      expect(running).toBe(0);
-      const style = await sheetOf(page).evaluate((el) => {
-        const s = getComputedStyle(el);
-        return { transition: s.transitionDuration, animation: s.animationName };
-      });
-      expect(style.transition.split(',').every((d) => parseFloat(d) === 0)).toBe(true);
-      expect(style.animation).toBe('none');
-    }
+  // #76 added the slide-in / slide-out, so "nothing animates with no preference" is no longer true
+  // (the reduced-motion half is unchanged); the animated case is covered in `overlay-motion.spec.ts`.
+  test('with prefers-reduced-motion nothing animates: no animation, no transition', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await gotoStory(page, STORY('size-md'));
+    await expect(sheetOf(page)).toBeVisible();
+    const running = await page.evaluate(() => document.getAnimations().length);
+    expect(running).toBe(0);
+    const style = await sheetOf(page).evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { transition: s.transitionDuration, animation: s.animationName };
+    });
+    expect(style.transition.split(',').every((d) => parseFloat(d) === 0)).toBe(true);
+    expect(style.animation).toBe('none');
+  });
+
+  test('without the preference the panel settles after its slide-in: nothing keeps running', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await gotoStory(page, STORY('size-md'));
+    await expect(sheetOf(page)).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.getAnimations().length)).toBe(0);
+    const style = await sheetOf(page).evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { transition: s.transitionDuration, opacity: s.opacity };
+    });
+    expect(style.transition.split(',').every((d) => parseFloat(d) === 0)).toBe(true);
+    expect(style.opacity).toBe('1');
   });
 });
 

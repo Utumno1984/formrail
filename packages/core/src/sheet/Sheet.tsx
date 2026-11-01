@@ -31,13 +31,13 @@ const SIZE_CLASS: Record<SheetSize, string> = {
 };
 
 const SIDE_CLASS: Record<SheetSide, string> = {
-  right: 'right-0 [box-shadow:-10px_0_30px_rgb(0_0_0/0.25)]',
-  left: 'left-0 [box-shadow:10px_0_30px_rgb(0_0_0/0.25)]',
+  right: 'right-0 [--rop-modal-from-translate:100%_0] [box-shadow:-10px_0_30px_rgb(0_0_0/0.25)]',
+  left: 'left-0 [--rop-modal-from-translate:-100%_0] [box-shadow:10px_0_30px_rgb(0_0_0/0.25)]',
 };
 
 // Anchored to one edge, as tall as the visual viewport (`top`/`height` follow it, see
-// `modalPanelClass`), so an on-screen keyboard does not hide the active field. No entry or exit
-// animation: nothing moves, so nothing depends on `prefers-reduced-motion` or on timing.
+// `modalPanelClass`), so an on-screen keyboard does not hide the active field. It slides in from
+// its edge and out again (`--rop-modal-from-translate` in SIDE_CLASS); instant under reduced motion.
 const BASE = /* @__PURE__ */ modalPanelClass('fixed top-[var(--rop-vv-top)] h-[var(--rop-vv-h)] max-w-full');
 
 const NAMES = { part: 'SheetContent', root: 'Sheet', title: 'SheetTitle' };

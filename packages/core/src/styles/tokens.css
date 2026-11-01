@@ -83,4 +83,52 @@
      (the stylesheet has no un-layered rule, so the preference cannot be handled here). */
   --motion-rop-feedback-duration: 120ms;
   --motion-rop-feedback-easing: ease-out;
+
+  /* Motion: enter / exit of a modal panel (Dialog, Sheet) and its backdrop. They are CSS keyframe
+     animations (not transitions) because Radix's Presence keeps a node mounted until its exit
+     animation ends: the focus trap and the focus return follow the real unmount. Every use site
+     applies the animation only under `motion-safe:`, so with prefers-reduced-motion the panel
+     appears and disappears at once, as it did before the animation existed. */
+  --motion-rop-overlay-duration: 160ms;
+  --motion-rop-overlay-easing: cubic-bezier(0.2, 0, 0, 1);
+  --animate-rop-overlay-in: rop-overlay-in var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing);
+  --animate-rop-overlay-out: rop-overlay-out var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing) forwards;
+  --animate-rop-modal-in: rop-modal-in var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing);
+  --animate-rop-modal-out: rop-modal-out var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing) forwards;
+  /* Invisible (no visual change): only keeps the wrapper of the portal mounted for as long as its
+     children animate out. */
+  --animate-rop-modal-hold: rop-modal-hold var(--motion-rop-overlay-duration) linear forwards;
+
+  /* The panel animates the individual `scale` / `translate` properties, never `transform`: the
+     Dialog centres itself with `transform`, which must stay untouched. `--rop-modal-from-*` are set
+     by the component (a Dialog scales in, a Sheet slides in from its edge). */
+  @keyframes rop-overlay-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rop-overlay-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes rop-modal-in {
+    from {
+      opacity: 0;
+      scale: var(--rop-modal-from-scale, 1);
+      translate: var(--rop-modal-from-translate, 0 0);
+    }
+  }
+  @keyframes rop-modal-out {
+    to {
+      opacity: 0;
+      scale: var(--rop-modal-from-scale, 1);
+      translate: var(--rop-modal-from-translate, 0 0);
+    }
+  }
+  @keyframes rop-modal-hold {
+    to {
+      opacity: 1;
+    }
+  }
 }

@@ -34,7 +34,7 @@ const SIZE_CLASS: Record<DialogSize, string> = {
 // arbitrary declaration (the named utilities of that family emit global `--tw-*` defaults, see the
 // README; the Tailwind scan also reads comments, so they are not named here).
 const BASE = /* @__PURE__ */ modalPanelClass(
-  'fixed inset-x-0 mx-auto top-[calc(var(--rop-vv-top)_+_var(--rop-vv-h)_/_2)] [transform:translateY(-50%)] ' +
+  '[--rop-modal-from-scale:0.96] fixed inset-x-0 mx-auto top-[calc(var(--rop-vv-top)_+_var(--rop-vv-h)_/_2)] [transform:translateY(-50%)] ' +
     'w-[calc(100%-2rem)] max-h-[calc(var(--rop-vv-h)_-_2rem)] rounded-rop-lg ' +
     '[box-shadow:0_10px_30px_rgb(0_0_0/0.25)]',
 );

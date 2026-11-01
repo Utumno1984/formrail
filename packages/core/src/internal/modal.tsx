@@ -40,9 +40,19 @@ interface ModalContextValue {
   fallbackHolder: { current: RefObject<HTMLElement | null> | undefined };
   /** The trigger node, if any: the last-resort target when the focus never sat on the opener. */
   triggerHolder: { current: HTMLElement | null };
+  /** Whether the panel is open (the requested state, not whether its node is still mounted). */
+  open: boolean;
+  /** Reported by the portal's content: true while the panel node exists, including its exit animation. */
+  setPanelMounted: (mounted: boolean) => void;
 }
 
-const ModalContext = /* @__PURE__ */ createContext<ModalContextValue | null>(null);
+/** True when the focus sits inside a modal that is open (not one that is exiting). */
+function focusIsInOpenModal(): boolean {
+  const active = document.activeElement;
+  return !!active?.closest('[role="dialog"][data-state="open"]');
+}
+
+const ModalContext =/* @__PURE__ */ createContext<ModalContextValue | null>(null);
 
 function useModalContext(part: string, root: string): ModalContextValue {
   const ctx = useContext(ModalContext);
@@ -69,6 +79,9 @@ export interface ModalRootProps {
 export function ModalRoot({ open, defaultOpen = false, onOpenChange, children }: ModalRootProps) {
   const [innerOpen, setInnerOpen] = useState(defaultOpen);
   const current = open ?? innerOpen;
+  // True from the moment the panel's portal mounts until it has really unmounted, i.e. including
+  // the exit animation: Radix's `Presence` keeps the nodes in the DOM until the animation ends.
+  const [panelMounted, setPanelMounted] = useState(false);
   const fallbackHolder = useRef<RefObject<HTMLElement | null> | undefined>(undefined);
   const triggerHolder = useRef<HTMLElement | null>(null);
   // Stable object whose `current` is resolved when the focus is returned, i.e. after the content
@@ -88,7 +101,15 @@ export function ModalRoot({ open, defaultOpen = false, onOpenChange, children }:
     }),
     [],
   );
-  useReturnFocus({ open: current, fallbackRef });
+  // The focus must come back after the exit animation, not in the middle of it: `useReturnFocus`
+  // gets "open or still on screen". The opener is still captured at the moment `current` turns true
+  // (`panelMounted` is only set once the portal has mounted), and the focus returns in the frame
+  // after the panel has really unmounted. Without an animation (reduced motion) the panel unmounts
+  // in the same commit as the close, so the timing is the one from before the animation existed.
+  // `skipWhen`: with the exit delayed, another modal may have opened in the meantime (a chain "close
+  // this one, open that one" in one handler). The focus then belongs to it: pulling it back to this
+  // panel's opener would make the other panel's focus trap bounce it back and select its text.
+  useReturnFocus({ open: current || panelMounted, fallbackRef, skipWhen: focusIsInOpenModal });
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -98,7 +119,10 @@ export function ModalRoot({ open, defaultOpen = false, onOpenChange, children }:
     [open, onOpenChange],
   );
 
-  const ctx = useMemo(() => ({ fallbackHolder, triggerHolder }), []);
+  const ctx = useMemo(
+    () => ({ fallbackHolder, triggerHolder, open: current, setPanelMounted }),
+    [current],
+  );
   return (
     <ModalContext.Provider value={ctx}>
       <RadixDialog.Root open={current} onOpenChange={handleOpenChange}>
@@ -132,8 +156,16 @@ export function createModalTrigger(part: string, root: string) {
 // The backdrop and the content sit in one fixed wrapper at the `modal` level, which is the stacking
 // unit: a second (nested) panel's wrapper comes later in the DOM at the same level, so its backdrop
 // covers the first, while its popovers (level `popover`) still sit above both.
-export const MODAL_WRAPPER = 'fixed inset-0';
-export const MODAL_BACKDROP = 'fixed inset-0 bg-[rgb(0_0_0/0.4)]';
+// Enter / exit are keyframe animations (tokens in `tokens.css`), applied only under `motion-safe:`: with
+// prefers-reduced-motion there is no `animation` at all, so Radix's Presence unmounts at once. (Not
+// `motion-reduce:animate-none`: in the compiled CSS it loses to the `data-[state]` variants.)
+// While closing, the wrapper and its parts let the pointer through: the exit must not swallow a click.
+// The wrapper's own `hold` animation is invisible: it keeps the portal mounted until its children
+// have finished animating out (Radix's Presence of the portal watches the wrapper, not the children).
+export const MODAL_WRAPPER =
+  'fixed inset-0 data-[state=closed]:pointer-events-none motion-safe:data-[state=closed]:animate-rop-modal-hold';
+export const MODAL_BACKDROP =
+  'fixed inset-0 bg-[rgb(0_0_0/0.4)] motion-safe:data-[state=open]:animate-rop-overlay-in motion-safe:data-[state=closed]:animate-rop-overlay-out';
 // `--rop-vv-top` / `--rop-vv-h` follow the visual viewport (kept by `trackVisualViewport`, defaulting
 // to the layout viewport; no comma in a class name: the stylesheet leak check splits selectors on
 // commas), so an on-screen keyboard does not hide the active field. The surface is shared by every
@@ -146,8 +178,30 @@ export function modalPanelClass(placement: string): string {
   return (
     `[--rop-vv-top:0px] [--rop-vv-h:100dvh] ${placement} ` +
     'flex flex-col overflow-hidden bg-rop-surface font-rop-sans text-rop-text ' +
+    'motion-safe:data-[state=open]:animate-rop-modal-in motion-safe:data-[state=closed]:animate-rop-modal-out data-[state=closed]:pointer-events-none ' +
     '[outline:1px_solid_var(--color-rop-border)] [outline-offset:-1px]'
   );
+}
+
+/** Longest animation duration + delay in effect on the node, in ms (0 when it has none). */
+function animationTotalMs(node: HTMLElement): number {
+  const ms = (list: string) =>
+    list.split(',').map((item) => {
+      const value = parseFloat(item);
+      if (!Number.isFinite(value)) return 0;
+      return item.trim().endsWith('ms') ? value : value * 1000;
+    });
+  const style = getComputedStyle(node);
+  return Math.max(0, ...ms(style.animationDuration)) + Math.max(0, ...ms(style.animationDelay));
+}
+
+/** Tells the root that the portal's content is in the DOM (see `panelMounted`); renders nothing. */
+function MountedReporter({ report }: { report: (mounted: boolean) => void }) {
+  useLayoutEffect(() => {
+    report(true);
+    return () => report(false);
+  }, [report]);
+  return null;
 }
 
 /** Keeps `--rop-vv-top` / `--rop-vv-h` on the node in sync with `window.visualViewport`. */
@@ -210,14 +264,26 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     },
     forwardedRef,
   ) {
-    const { fallbackHolder } = useModalContext(part, root);
+    const { fallbackHolder, open, setPanelMounted } = useModalContext(part, root);
     useLayoutEffect(() => {
       fallbackHolder.current = returnFocusRef;
     });
+    // When the panel was last (re)opened. Radix can deliver a "pointer down outside" late (a touch
+    // is dispatched on the following `click`): with the exit animation, a tap on the opener while
+    // the panel is leaving reopens it, and the late dismissal of that same tap would close it again.
+    // An outside interaction that began before the current opening is not a dismissal of it.
+    const openedAt = useRef(0);
+    useLayoutEffect(() => {
+      if (open) openedAt.current = performance.now();
+    }, [open]);
+    const beganBeforeOpening = (event: CustomEvent<{ originalEvent: Event }>) =>
+      event.detail.originalEvent.timeStamp < openedAt.current;
 
     const cleanupRef = useRef<(() => void) | null>(null);
+    const contentNode = useRef<HTMLDivElement | null>(null);
     const setNode = useCallback(
       (node: HTMLDivElement | null) => {
+        contentNode.current = node;
         cleanupRef.current?.();
         cleanupRef.current = null;
         if (typeof forwardedRef === 'function') forwardedRef(node);
@@ -243,9 +309,48 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
       [forwardedRef, part, title],
     );
 
+    // While the panel exits (state closed, nodes still mounted) the whole wrapper is `inert`: Radix
+    // leaves the backdrop with an inline `pointer-events: auto` and the panel focusable, so a CSS
+    // class cannot make it transparent to the pointer, the keyboard and the accessibility tree.
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const wasOpen = useRef(open);
+    const wasMounted = useRef(false);
+    useLayoutEffect(() => {
+      wrapperRef.current?.toggleAttribute('inert', !open);
+      // Reopened while it was still leaving: the nodes never remounted, so Radix does not run its
+      // opening focus again and the focus (on the opener that was just clicked, or lost to `body`
+      // when the panel became inert) would stay outside the modal. Bring it back in.
+      const reopened = open && !wasOpen.current && wasMounted.current;
+      const content = contentNode.current;
+      if (reopened && content && !content.contains(document.activeElement)) content.focus();
+      wasOpen.current = open;
+      wasMounted.current = wrapperRef.current !== null;
+    });
+    // Safety net: Radix's Presence unmounts on `animationend` / `animationcancel` only. If the
+    // animation never ends (paused by the host, a stylesheet that names the animation without
+    // defining it) the page would stay locked behind a closed panel for good: after the animation's
+    // own duration plus a margin the panel is removed outright.
+    const [expired, setExpired] = useState(false);
+    useEffect(() => {
+      if (open) {
+        setExpired(false);
+        return undefined;
+      }
+      const wrapper = wrapperRef.current;
+      if (!wrapper) return undefined;
+      const timer = setTimeout(() => setExpired(true), animationTotalMs(wrapper) + 500);
+      return () => clearTimeout(timer);
+    }, [open]);
+    if (expired && !open) return null;
+
     return (
       <RadixDialog.Portal>
-        <div className={cn(MODAL_WRAPPER, overlayLayer.modal)}>
+        <div
+          ref={wrapperRef}
+          className={cn(MODAL_WRAPPER, overlayLayer.modal)}
+          data-state={open ? 'open' : 'closed'}
+        >
+          <MountedReporter report={setPanelMounted} />
           <RadixDialog.Overlay className={cn(MODAL_BACKDROP, overlayLayer.backdrop)} />
           <RadixDialog.Content
             aria-modal="true"
@@ -262,11 +367,11 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               onEscapeKeyDown?.(event);
             }}
             onPointerDownOutside={(event) => {
-              if (!dismissible) event.preventDefault();
+              if (!dismissible || beganBeforeOpening(event)) event.preventDefault();
               onPointerDownOutside?.(event);
             }}
             onInteractOutside={(event) => {
-              if (!dismissible) event.preventDefault();
+              if (!dismissible || beganBeforeOpening(event)) event.preventDefault();
               onInteractOutside?.(event);
             }}
           >

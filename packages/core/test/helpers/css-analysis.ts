@@ -49,6 +49,8 @@ function selectorsIn(blocks: CssBlock[]): { selector: string; body: string }[] {
   const out: { selector: string; body: string }[] = [];
   for (const block of blocks) {
     if (block.statement) continue;
+    // The frames of a `rop-` keyframes (`from`, `to`, `50%`) are not selectors.
+    if (isRopKeyframes(block.prelude)) continue;
     if (block.prelude.startsWith('@')) {
       out.push(...selectorsIn(topLevel(block.body)));
     } else {
@@ -57,6 +59,14 @@ function selectorsIn(blocks: CssBlock[]): { selector: string; body: string }[] {
     }
   }
   return out;
+}
+
+/**
+ * `@keyframes rop-*`: a keyframes rule cannot live inside `@layer` (Tailwind emits it at the top
+ * level), so the only guarantee is the namespace: a name that cannot collide with the host's.
+ */
+export function isRopKeyframes(prelude: string): boolean {
+  return /^@keyframes\s+rop-[a-z0-9-]+$/.test(prelude);
 }
 
 function declaresOnlyTailwindInternals(body: string): boolean {
@@ -87,6 +97,7 @@ export function findGlobalLeaks(css: string): string[] {
     if (prelude.startsWith('@layer')) continue;
     // `@property --tw-*` registrations are inert Tailwind internals (see below), not a reset.
     if (/^@property\s+--tw-/.test(prelude)) continue;
+    if (isRopKeyframes(prelude)) continue;
     problems.push(`rule outside @layer: ${prelude}`);
   }
 
