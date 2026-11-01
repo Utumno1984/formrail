@@ -20,6 +20,12 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
     /** Accessible name of the control. A required marker is added visually, never to the name. */
     label: ReactNode;
     help?: ReactNode;
+    /**
+     * Logical name of the field (the key used in the form's errors). Exposed on the control as
+     * `data-rop-name` (all controls, `Select` included) and, on `Input` and `Combobox`, also as the
+     * native `name` unless they get their own. Never set on the Field's `<div>`.
+     */
+    name?: string;
     /** Non-empty: the control gets `aria-invalid`. Empty is the same as absent. */
     error?: ReactNode;
     required?: boolean;
@@ -94,6 +100,7 @@ export function Field(props: FieldProps) {
   const {
     label,
     help,
+    name,
     error,
     required,
     hideLabel,
@@ -131,6 +138,7 @@ export function Field(props: FieldProps) {
     });
     // Assigned only when set: an absent key cannot override the control's own prop on spread.
     if (describedBy) c['aria-describedby'] = describedBy;
+    if (name) c['data-rop-name'] = name;
     if (hasError) c['aria-invalid'] = true;
     if (required) c['aria-required'] = true;
     if (state === 'disabled') c.disabled = true;
@@ -139,7 +147,7 @@ export function Field(props: FieldProps) {
       c['aria-readonly'] = true;
     }
     return c;
-  }, [id, labelId, state, describedBy, hasError, required, readOnly]);
+  }, [id, labelId, name, state, describedBy, hasError, required, readOnly]);
 
   return (
     <FieldContext.Provider value={control}>

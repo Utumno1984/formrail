@@ -8,6 +8,7 @@ import { ObjectPage } from './ObjectPage';
 import { ObjectPageFooter } from './ObjectPageFooter';
 import { ObjectPageHeader } from './ObjectPageHeader';
 import { ObjectPageSection } from './ObjectPageSection';
+import { useFocusFirstInvalidField } from './use-focus-first-invalid-field';
 import { useObjectPageForm } from './use-object-page-form';
 
 interface PlaygroundArgs {
@@ -217,7 +218,7 @@ export const LongError: Story = {
  * Wired to `useObjectPageForm`: the footer shows only while the form is dirty and its message is the
  * general `saveError`. Per-field validation is the demo's own state (`fieldErrors`), shown on the Field
  * and never in the footer; on a failed validation the demo moves the focus to the first invalid field
- * through a ref it owns (neither the hook nor the footer touch the DOM for that).
+ * through `useFocusFirstInvalidField`, which finds it by the `name` of its Field.
  * Type "fail" in the supplier to get a save error.
  */
 export const FormFlow: Story = {
@@ -225,22 +226,21 @@ export const FormFlow: Story = {
   render: function Render() {
     const form = useObjectPageForm({ baseline: { supplier: 'ACME srl', note: '' } });
     const [fieldErrors, setFieldErrors] = useState<{ supplier?: string }>({});
-    const supplierRef = useRef<HTMLInputElement>(null);
+    const frameRef = useRef<HTMLDivElement>(null);
+    // The first invalid control is found through the `name` of its Field.
+    useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors });
 
     const submit = async () => {
       const errors: { supplier?: string } = form.values.supplier.trim() === '' ? { supplier: 'Il fornitore è obbligatorio.' } : {};
       setFieldErrors(errors);
-      if (errors.supplier) {
-        supplierRef.current?.focus();
-        return;
-      }
+      if (errors.supplier) return;
       await form.save(async (values) => {
         if (values.supplier === 'fail') throw new Error('Il server ha rifiutato il salvataggio.');
       });
     };
 
     return (
-      <div style={FRAME}>
+      <div ref={frameRef} style={FRAME}>
         <ObjectPage>
           <ObjectPageHeader title="Fattura 2026/0142" />
           <ObjectPageFooter
@@ -262,8 +262,8 @@ export const FormFlow: Story = {
             </Button>
           </ObjectPageFooter>
           <ObjectPageSection id="dati" title="Dati generali">
-            <Field label="Fornitore" required error={fieldErrors.supplier}>
-              <Input ref={supplierRef} value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
+            <Field label="Fornitore" name="supplier" required error={fieldErrors.supplier}>
+              <Input value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
             </Field>
             <Field label="Note">
               <Input value={form.values.note} onChange={(e) => form.setValue('note', e.target.value)} />

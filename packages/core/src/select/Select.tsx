@@ -203,6 +203,7 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
         aria-invalid={fieldProps['aria-invalid']}
         aria-required={fieldProps['aria-required']}
         aria-readonly={fieldProps['aria-readonly']}
+        data-rop-name={fieldProps['data-rop-name']}
         // Radix hides everything outside the open list with `aria-hidden`, trigger included; a
         // focusable control under `aria-hidden` is an axe violation. The focus is in the list while
         // open and comes back to the trigger on close (a programmatic focus ignores tabindex).

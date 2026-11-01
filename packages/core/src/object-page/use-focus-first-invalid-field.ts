@@ -18,10 +18,12 @@ export interface UseFocusFirstInvalidFieldOptions {
 
 /**
  * Every time a new non-empty `fieldErrors` object arrives, scrolls the first invalid control into
- * view (`block: 'center'`) and focuses it. Controls are looked up as `[name="<key>"]` inside the
- * container, and "first" is the **visual (document) order** of the matches, never the order of the
+ * view (`block: 'center'`) and focuses it. Controls are looked up inside the container by
+ * `data-rop-name="<key>"` (what a `<Field name>` puts on its control, `Select` included) and, for the
+ * keys no such control answers to, by the native `name="<key>"`. A render-prop control that does not
+ * spread `data-rop-name` falls in the second case. "First" is the **visual (document) order** of the matches, never the order of the
  * keys of `fieldErrors`. A match that cannot take focus (`type="hidden"`, disabled, not rendered,
- * inert) is skipped in favor of the next one. If no key matches a focusable `[name]` element nothing
+ * inert) is skipped in favor of the next one. If no key matches a focusable element nothing
  * happens (one `console.error` in development). A key whose value is `undefined` is not an error.
  * Runs in an effect, so it is inert on the server.
  *
@@ -39,8 +41,19 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocu
     const candidates: HTMLElement[] = [];
     if (container) {
       // Attribute comparison instead of a `[name="..."]` selector: no escaping of exotic names.
-      for (const el of container.querySelectorAll<HTMLElement>('[name]')) {
-        if (wanted.has(el.getAttribute('name') ?? '')) candidates.push(el);
+      const found = new Set<string>();
+      for (const el of container.querySelectorAll<HTMLElement>('[data-rop-name]')) {
+        const key = el.getAttribute('data-rop-name') ?? '';
+        if (!wanted.has(key)) continue;
+        found.add(key);
+        candidates.push(el);
+      }
+      // Keys no Field-wired control answers to: own controls with only a native `name`.
+      if (found.size < wanted.size) {
+        for (const el of container.querySelectorAll<HTMLElement>('[name]')) {
+          const key = el.getAttribute('name') ?? '';
+          if (wanted.has(key) && !found.has(key)) candidates.push(el);
+        }
       }
     }
     // Document order, never the order of the keys of `fieldErrors`.
@@ -60,7 +73,7 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocu
 
     if (isDev()) {
       console.error(
-        '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[name]` element inside the container, nothing was focused.',
+        '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]` or `[name]` element inside the container, nothing was focused.',
       );
     }
   }, [fieldErrors, containerRef]);

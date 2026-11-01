@@ -3,6 +3,10 @@
 import { useRef, type ComponentProps } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { Combobox } from '../combobox/Combobox';
+import { Field } from '../field/Field';
+import { Input } from '../input/Input';
+import { Select } from '../select/Select';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { useObjectPageForm } from '../object-page/use-object-page-form';
 
@@ -58,8 +62,13 @@ function FormDemo() {
   );
 }
 
-type Scenario = 'all-empty' | 'valid-above-invalid';
+type Scenario = 'all-empty' | 'valid-above-invalid' | 'mixed-controls';
 type Long = { a: string; b: string; c: string; d: string };
+
+const OPTIONS = [
+  { value: 'it', label: 'Italia' },
+  { value: 'fr', label: 'Francia' },
+];
 
 const SPACER = { height: '110vh', background: 'repeating-linear-gradient(#f4f4f4 0 40px, #fff 40px 80px)' } as const;
 
@@ -79,21 +88,20 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
   });
   const containerRef = useRef<HTMLFormElement>(null);
   useFocusFirstInvalidField({ containerRef, fieldErrors: form.fieldErrors });
+  // `mixed-controls`: B is a Select and C a Combobox, the rest are Inputs. All wired by `Field name`.
+  const control = (k: keyof Long) => {
+    if (scenario === 'mixed-controls' && k === 'b') {
+      return <Select options={OPTIONS} value={form.values.b || undefined} onValueChange={(v) => form.setValue('b', v)} />;
+    }
+    if (scenario === 'mixed-controls' && k === 'c') {
+      return <Combobox options={OPTIONS} value={form.values.c || undefined} onValueChange={(v) => form.setValue('c', v ?? '')} />;
+    }
+    return <Input value={form.values[k]} onChange={(e) => form.setValue(k, e.target.value)} />;
+  };
   const field = (k: keyof Long) => (
-    <div style={{ display: 'grid', gap: 4 }}>
-      <label htmlFor={`focus-${k}`}>Field {k.toUpperCase()}</label>
-      <input
-        id={`focus-${k}`}
-        name={k}
-        value={form.values[k]}
-        aria-invalid={k in form.fieldErrors}
-        aria-describedby={`focus-${k}-error`}
-        onChange={(e) => form.setValue(k, e.target.value)}
-      />
-      <span id={`focus-${k}-error`} style={{ color: '#b00020', minHeight: '1lh' }}>
-        {form.fieldErrors[k] ?? ''}
-      </span>
-    </div>
+    <Field label={`Field ${k.toUpperCase()}`} name={k} error={form.fieldErrors[k]}>
+      {control(k)}
+    </Field>
   );
   return (
     <form
@@ -133,7 +141,7 @@ const focusMeta = {
   component: FocusDemo,
   render: (args: ComponentProps<typeof FocusDemo>) => <FocusDemo {...args} />,
   argTypes: {
-    scenario: { control: 'radio', options: ['all-empty', 'valid-above-invalid'] satisfies Scenario[] },
+    scenario: { control: 'radio', options: ['all-empty', 'valid-above-invalid', 'mixed-controls'] satisfies Scenario[] },
     onSave: { action: 'save' },
   },
   args: { scenario: 'all-empty', onSave: fn() },
@@ -149,6 +157,9 @@ const inViewport = (el: HTMLElement) => {
 export const LongFormAllEmpty: FocusStory = { ...focusMeta };
 /** No `play`: field A is already valid. */
 export const LongFormValidAbove: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'valid-above-invalid' } };
+
+/** No `play`: B (Select) and C (Combobox) sit among Inputs, all invalid; the e2e drives Save itself. */
+export const LongFormMixedControls: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'mixed-controls' } };
 
 /** Save with nothing filled in: focus and scroll go to the first field in visual order (A), though the errors are keyed D, C, B, A. */
 export const FocusFirstInvalidAllEmpty: FocusStory = {
@@ -188,5 +199,21 @@ export const FocusFirstInvalidTypingClears: FocusStory = {
     await userEvent.keyboard('x');
     await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 0');
     await expect(args.onSave).not.toHaveBeenCalled();
+  },
+};
+
+/** A is filled in, so the focus lands on B, a Select: its trigger is found by `data-rop-name`, not by a native `name`. */
+export const FocusFirstInvalidSelect: FocusStory = {
+  ...focusMeta,
+  args: { ...focusMeta.args, scenario: 'mixed-controls' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText('Field A'), 'filled');
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    const trigger = canvas.getByRole('combobox', { name: 'Field B' });
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await expect(trigger).toHaveAttribute('data-rop-name', 'b');
+    await expect(trigger).not.toHaveAttribute('name');
+    await expect(trigger).toHaveAttribute('aria-invalid', 'true');
   },
 };
