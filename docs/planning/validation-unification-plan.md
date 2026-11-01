@@ -213,7 +213,9 @@ parte validazione). Il footer **resta presentazionale** (non legge il form): ric
 ### 2.6 Pulizia errori (§5 Q6, chiude F10)
 
 Raccomandazione: `setValue(name)` cancella solo l'errore del percorso toccato (e dei suoi
-discendenti/antenati); `reset` e `save` riuscito azzerano tutto; un nuovo `save` ricalcola tutto. Questo
+discendenti/antenati); `reset` e `save` riuscito azzerano tutto; un nuovo `save` ricalcola tutto.
+*Implementato in #102 (ticket prevale sul piano):* solo il percorso e i **discendenti**, mai gli antenati
+(un errore su `address` resta finché non si scrive `address` o si ripete il `save`). Questo
 **cambia un comportamento documentato e una story-test esistente** ("clears every field error at
 once"): per la regola di regressione del progetto (nessun test indebolito) va approvato da Daniele e
 spiegato nella PR, non fatto di nascosto.
