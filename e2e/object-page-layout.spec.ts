@@ -71,15 +71,35 @@ test.describe('Floorplans/Object Page/Layout', () => {
   });
 
   test('text-only content: Tab reaches the scroller and PageDown/Space scroll it, not the document', async ({ page }) => {
-    await page.setViewportSize({ width: 1024, height: 600 });
+    // Short viewport: the content is longer than two keyboard pages, so PageDown and Space both have room to scroll.
+    await page.setViewportSize({ width: 1024, height: 300 });
     await gotoStory(page, STORY('text-and-wide-content'));
     await expectNoA11yViolations(page);
     const scroller = page.locator(SCROLLER);
+    // Resolves with the final scrollTop once it has not changed for several consecutive frames (end of the scroll).
+    const settledScrollTop = () =>
+      scroller.evaluate(
+        (el) =>
+          new Promise<number>((resolve) => {
+            let last = el.scrollTop;
+            let stable = 0;
+            const tick = () => {
+              if (el.scrollTop === last) stable += 1;
+              else {
+                last = el.scrollTop;
+                stable = 0;
+              }
+              if (stable >= 10) resolve(last);
+              else requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
     await page.keyboard.press('Tab');
     await expect(scroller).toBeFocused();
     await page.keyboard.press('PageDown');
     await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
-    const afterPageDown = await scroller.evaluate((el) => el.scrollTop);
+    const afterPageDown = await settledScrollTop();
     await page.keyboard.press('Space');
     await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(afterPageDown);
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
