@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildBaseline, compareBudget, limitFor, runCheck, runUpdate } from './bundle-budget.mjs';
+import { bundleExport, buildBaseline, compareBudget, limitFor, runCheck, runUpdate } from './bundle-budget.mjs';
 
 describe('compareBudget', () => {
   const budget = { version: 1, exports: { a: { baseline: 100, limit: 120 } } };
@@ -206,6 +206,31 @@ describe('react externals measurement (#34)', () => {
     writeFileSync(join(dir, 'dist/index.js'), comp(['useState', 'useEffect', 'useMemo']));
     const used = (await runUpdate({ packageDir: dir })).Comp;
     expect(used).toBeGreaterThan(none);
+    // Discriminating: the minified output keeps the react import for used bindings...
+    expect(await bundleExport(join(dir, 'dist/index.js'), 'Comp')).toContain('from"react"');
+    // ...and drops it when nothing from react is used.
+    writeFileSync(
+      join(dir, 'dist/index.js'),
+      'import { useState } from "react";\nexport const Plain = () => 1;\nexport const Hook = () => useState;\n',
+    );
+    expect(await bundleExport(join(dir, 'dist/index.js'), 'Plain')).not.toContain('react');
+    expect(await bundleExport(join(dir, 'dist/index.js'), 'Hook')).toContain('from"react"');
+  });
+
+  it('keeps react subpaths (react-dom/client, jsx-dev-runtime) external instead of bundling them', async () => {
+    writeFileSync(
+      join(dir, 'dist/index.js'),
+      [
+        'import { createRoot } from "react-dom/client";',
+        'import { jsxDEV } from "react/jsx-dev-runtime";',
+        'export const mount = (el) => createRoot(el);',
+        'export const dev = () => jsxDEV("p", {});',
+        '',
+      ].join('\n'),
+    );
+    const measured = await runUpdate({ packageDir: dir });
+    expect(measured.mount).toBeLessThan(1024);
+    expect(measured.dev).toBeLessThan(1024);
   });
 
   it('still detects a real size increase of composeRefs against the committed baseline', async () => {
