@@ -126,6 +126,57 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
   );
 }
 
+type Order = { supplier: string; address: { city: string }; lines: { qty: string }[] };
+
+/**
+ * Nested Object Page form: errors keyed by dot-notation path (`address.city`, `lines.0.qty`).
+ * `validate` returns them in reverse order on purpose: only the DOM order decides the focus.
+ */
+function NestedDemo({ onSave }: { onSave: (v: Order) => void }) {
+  const form = useObjectPageForm<Order>({
+    baseline: { supplier: 'ACME srl', address: { city: '' }, lines: [{ qty: '' }, { qty: '' }] },
+    validate: (v) => {
+      const errors: Record<string, string | undefined> = {};
+      v.lines.forEach((line, i) => {
+        errors[`lines.${i}.qty`] = line.qty === '' ? 'Quantity is required' : undefined;
+      });
+      errors['address.city'] = v.address.city === '' ? 'City is required' : undefined;
+      return errors;
+    },
+  });
+  const containerRef = useRef<HTMLFormElement>(null);
+  useFocusFirstInvalidField({ containerRef, fieldErrors: form.fieldErrors });
+  const setQty = (i: number, qty: string) =>
+    form.setValue(
+      'lines',
+      form.values.lines.map((line, j) => (j === i ? { qty } : line)),
+    );
+  return (
+    <form
+      ref={containerRef}
+      noValidate
+      style={{ fontFamily: 'sans-serif', display: 'grid', gap: 16, justifyItems: 'start' }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.save(async (v) => onSave(v));
+      }}
+    >
+      <Field label="Supplier" name="supplier" error={form.fieldErrors['supplier']}>
+        <Input value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
+      </Field>
+      <Field label="City" name="address.city" error={form.fieldErrors['address.city']}>
+        <Input value={form.values.address.city} onChange={(e) => form.setValue('address', { city: e.target.value })} />
+      </Field>
+      {form.values.lines.map((line, i) => (
+        <Field key={i} label={`Quantity ${i + 1}`} name={`lines.${i}.qty`} error={form.fieldErrors[`lines.${i}.qty`]}>
+          <Input value={line.qty} onChange={(e) => setQty(i, e.target.value)} />
+        </Field>
+      ))}
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+
 const meta = {
   title: 'Internal/UseObjectPageFormFixture',
   component: FormDemo,
@@ -199,6 +250,37 @@ export const FocusFirstInvalidTypingClears: FocusStory = {
     await userEvent.keyboard('x');
     await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 0');
     await expect(args.onSave).not.toHaveBeenCalled();
+  },
+};
+
+const nestedMeta = {
+  component: NestedDemo,
+  render: (args: ComponentProps<typeof NestedDemo>) => <NestedDemo {...args} />,
+  argTypes: { onSave: { action: 'save' } },
+  args: { onSave: fn() },
+} satisfies Meta<typeof NestedDemo>;
+type NestedStory = StoryObj<typeof nestedMeta>;
+
+/** Object Page nidificato: Save with empty nested fields focuses them in visual order, one message each; the handler runs only once all are valid. */
+export const ObjectPageNested: NestedStory = {
+  ...nestedMeta,
+  name: 'Object Page nidificato',
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(canvas.getByLabelText('City')).toHaveFocus());
+    await expect(canvas.getByText('City is required')).toBeVisible();
+    await expect(canvas.getAllByText('Quantity is required')).toHaveLength(2);
+    await expect(canvas.getByLabelText('Quantity 1')).toHaveAttribute('data-rop-name', 'lines.0.qty');
+    await expect(canvas.getByLabelText('Quantity 1')).toHaveAttribute('aria-invalid', 'true');
+    await expect(args.onSave).not.toHaveBeenCalled();
+    await userEvent.type(canvas.getByLabelText('City'), 'Roma');
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(canvas.getByLabelText('Quantity 1')).toHaveFocus());
+    await userEvent.type(canvas.getByLabelText('Quantity 1'), '1');
+    await userEvent.type(canvas.getByLabelText('Quantity 2'), '2');
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(args.onSave).toHaveBeenCalledTimes(1));
   },
 };
 

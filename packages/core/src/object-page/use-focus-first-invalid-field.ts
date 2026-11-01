@@ -2,18 +2,19 @@ import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { isDev } from '../internal/is-dev';
 
-// A key whose value is `undefined` is "no error", like in `useObjectPageForm`.
-const invalidKeys = (fieldErrors: Partial<Record<string, string>>): string[] =>
-  Object.keys(fieldErrors).filter((key) => fieldErrors[key] !== undefined);
+import { invalidPaths } from './field-errors';
+import type { FieldErrors } from './field-errors';
 
 export interface UseFocusFirstInvalidFieldOptions {
   /** Container of the form controls. Only descendants of `containerRef.current` are considered. */
   containerRef: RefObject<HTMLElement | null>;
   /**
-   * Errors keyed by field `name` (for example `useObjectPageForm().fieldErrors`). Only the keys are
-   * read; this hook knows nothing about the form hook.
+   * Errors keyed by dot-notation path (`address.city`, `lines.0.qty`; see `FieldErrors`), for
+   * example `useObjectPageForm().fieldErrors`. Each path is compared **by exact equality** with the
+   * control's `data-rop-name`/`name` (no prefix search: an error on `address` does not reach
+   * `address.city`). Only the keys are read; this hook knows nothing about the form hook.
    */
-  fieldErrors: Partial<Record<string, string>>;
+  fieldErrors: FieldErrors;
 }
 
 /**
@@ -34,9 +35,10 @@ export interface UseFocusFirstInvalidFieldOptions {
  */
 export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocusFirstInvalidFieldOptions): void {
   useEffect(() => {
-    if (invalidKeys(fieldErrors).length === 0) return;
+    const invalid = invalidPaths(fieldErrors);
+    if (invalid.length === 0) return;
 
-    const wanted = new Set(invalidKeys(fieldErrors));
+    const wanted = new Set(invalid);
     const container = containerRef.current;
     const candidates: HTMLElement[] = [];
     if (container) {

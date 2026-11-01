@@ -98,6 +98,7 @@ export { ObjectPageSection } from './object-page/ObjectPageSection';
 export type { ObjectPageSectionProps } from './object-page/ObjectPageSection';
 export { useObjectPageForm } from './object-page/use-object-page-form';
 export type { UseObjectPageFormOptions, UseObjectPageFormReturn } from './object-page/use-object-page-form';
+export type { FieldErrors } from './object-page/field-errors';
 export { useFocusFirstInvalidField } from './object-page/use-focus-first-invalid-field';
 export type { UseFocusFirstInvalidFieldOptions } from './object-page/use-focus-first-invalid-field';
 export { useDirtyGuard } from './object-page/use-dirty-guard';
