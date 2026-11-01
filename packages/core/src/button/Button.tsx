@@ -52,7 +52,12 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
   // `max-w-full` while `whitespace-nowrap` keeps it from wrapping would otherwise overflow
   // symmetrically on both sides, pushing roughly half the label off-screen to the left (invisible,
   // not just "overflowing" as documented below).
-  inline: 'h-[1lh] whitespace-nowrap justify-start px-1 align-baseline text-[length:inherit] leading-[inherit]',
+  // `underline`: inline sits inside running text, where `text-rop-primary` on `text-rop-text` only
+  // measures ~2.8:1 (WCAG 1.4.1/technique G183 wants 3:1 to rely on color alone) — permanent, not
+  // `hover:`, since the indicator must be visible without interacting. SVG icons ignore
+  // text-decoration, so a leading/trailing icon is unaffected.
+  inline:
+    'h-[1lh] whitespace-nowrap justify-start px-1 align-baseline text-[length:inherit] leading-[inherit] underline underline-offset-2',
   'icon-xs': 'size-6 p-0',
   'icon-sm': 'size-8 p-0',
   'icon-md': 'size-9 p-0',

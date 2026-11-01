@@ -79,6 +79,19 @@ describe('Button', () => {
       );
       expect(screen.getByRole('button').className).toBe(defaults);
     });
+
+    it('inline is underlined (the only non-color cue it is a link, inside running text); other sizes are not', () => {
+      const inline = render(<Button size="inline">x</Button>);
+      expect(screen.getByRole('button')).toHaveClass('underline');
+      expect(screen.getByRole('button')).not.toHaveClass('no-underline');
+      inline.unmount();
+      for (const size of ['sm', 'md', 'lg'] as const) {
+        const { unmount } = render(<Button size={size}>x</Button>);
+        expect(screen.getByRole('button')).toHaveClass('no-underline');
+        expect(screen.getByRole('button')).not.toHaveClass('underline');
+        unmount();
+      }
+    });
   });
 
   describe('icon-only accessible name', () => {
