@@ -7,6 +7,7 @@ const TYPING = 'internal-useobjectpageformfixture--focus-first-invalid-typing-cl
 // Same fixture without a play function: the test itself clicks Save.
 const LONG_EMPTY = 'internal-useobjectpageformfixture--long-form-all-empty';
 const LONG_VALID = 'internal-useobjectpageformfixture--long-form-valid-above';
+const LONG_TRANSLATED = 'internal-useobjectpageformfixture--long-form-translated-messages';
 
 const SELECT_PLAY = 'internal-useobjectpageformfixture--focus-first-invalid-select';
 const LONG_MIXED = 'internal-useobjectpageformfixture--long-form-mixed-controls';
@@ -145,6 +146,27 @@ test.describe('useFocusFirstInvalidField: behavior in a real browser', () => {
     await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
     await expect(page.getByLabel('Field B')).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByRole('button', { name: 'Re-apply current values' })).toBeFocused();
+  });
+
+  test('translated messages (a useMemo copy) with trigger: validationAttempt, typing keeps the focus, a failed Save refocuses', async ({
+    page,
+  }) => {
+    await gotoStory(page, LONG_TRANSLATED);
+    await save(page).click();
+    await expect(page.getByLabel('Field A')).toBeFocused();
+    await expect(page.getByText('Please fill in C')).toHaveCount(1);
+    await page.getByLabel('Field C').click();
+    await page.keyboard.type('hello');
+    await expect(page.getByLabel('Field C')).toHaveValue('hello');
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await expect(page.getByText('Please fill in C')).toHaveCount(0);
+    await expect(page.getByLabel('Field C')).toBeFocused();
+    expect(await inViewport(page, 'Field A')).toBe(false);
+    await save(page).click();
+    await expect(page.getByLabel('Field A')).toBeFocused();
+    expect(await inViewport(page, 'Field A')).toBe(true);
+    await save(page).click(); // identical errors
+    await expect(page.getByLabel('Field A')).toBeFocused();
   });
 
   test('the nested form: typing in City clears City only and the focus stays in City', async ({ page }) => {

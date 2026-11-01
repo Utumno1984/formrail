@@ -1,6 +1,6 @@
 // Internal fixture for `useObjectPageForm`: bare `<input>`s, no style. Not exported from the
 // package and never to be re-exported from it.
-import { useRef, type ComponentProps } from 'react';
+import { useMemo, useRef, type ComponentProps } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Combobox } from '../combobox/Combobox';
@@ -9,6 +9,7 @@ import { Input } from '../input/Input';
 import { Select } from '../select/Select';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { useObjectPageForm } from '../object-page/use-object-page-form';
+import type { FieldErrors } from '../object-page/field-errors';
 
 type Invoice = { supplier: string; amount: string };
 
@@ -62,7 +63,7 @@ function FormDemo() {
   );
 }
 
-type Scenario = 'all-empty' | 'valid-above-invalid' | 'mixed-controls';
+type Scenario = 'all-empty' | 'valid-above-invalid' | 'mixed-controls' | 'translated-messages';
 type Long = { a: string; b: string; c: string; d: string };
 
 const OPTIONS = [
@@ -87,7 +88,20 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
     },
   });
   const containerRef = useRef<HTMLFormElement>(null);
-  useFocusFirstInvalidField({ containerRef, fieldErrors: form.fieldErrors });
+  // `translated-messages`: the errors shown (and handed to the focus hook) are a `useMemo` copy of
+  // `fieldErrors` with rewritten messages, so the focus hook is driven by `validationAttempt`.
+  const translated = scenario === 'translated-messages';
+  const shownErrors = useMemo<FieldErrors>(() => {
+    if (!translated) return form.fieldErrors;
+    const out: Record<string, string | undefined> = {};
+    for (const [path, message] of Object.entries(form.fieldErrors)) out[path] = message && `Please fill in ${path.toUpperCase()}`;
+    return out;
+  }, [translated, form.fieldErrors]);
+  useFocusFirstInvalidField({
+    containerRef,
+    fieldErrors: shownErrors,
+    trigger: translated ? form.validationAttempt : undefined,
+  });
   // `mixed-controls`: B is a Select and C a Combobox, the rest are Inputs. All wired by `Field name`.
   const control = (k: keyof Long) => {
     if (scenario === 'mixed-controls' && k === 'b') {
@@ -99,7 +113,7 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
     return <Input value={form.values[k]} onChange={(e) => form.setValue(k, e.target.value)} />;
   };
   const field = (k: keyof Long) => (
-    <Field label={`Field ${k.toUpperCase()}`} name={k} error={form.fieldErrors[k]}>
+    <Field label={`Field ${k.toUpperCase()}`} name={k} error={shownErrors[k]}>
       {control(k)}
     </Field>
   );
@@ -196,7 +210,10 @@ const focusMeta = {
   component: FocusDemo,
   render: (args: ComponentProps<typeof FocusDemo>) => <FocusDemo {...args} />,
   argTypes: {
-    scenario: { control: 'radio', options: ['all-empty', 'valid-above-invalid', 'mixed-controls'] satisfies Scenario[] },
+    scenario: {
+      control: 'radio',
+      options: ['all-empty', 'valid-above-invalid', 'mixed-controls', 'translated-messages'] satisfies Scenario[],
+    },
     onSave: { action: 'save' },
   },
   args: { scenario: 'all-empty', onSave: fn() },
@@ -212,6 +229,12 @@ const inViewport = (el: HTMLElement) => {
 export const LongFormAllEmpty: FocusStory = { ...focusMeta };
 /** No `play`: field A is already valid. */
 export const LongFormValidAbove: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'valid-above-invalid' } };
+
+/**
+ * No `play`: the messages are a translated `useMemo` copy of `fieldErrors`, so the focus hook gets
+ * `trigger: form.validationAttempt`; the e2e drives Save and the typing itself.
+ */
+export const LongFormTranslatedMessages: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'translated-messages' } };
 
 /** No `play`: B (Select) and C (Combobox) sit among Inputs, all invalid; the e2e drives Save itself. */
 export const LongFormMixedControls: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'mixed-controls' } };

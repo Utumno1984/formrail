@@ -119,10 +119,20 @@ export interface UseObjectPageFormReturn<Values extends object> {
    *   errors" never re-renders a consumer. Every failed `validate` produces a **new** object, even
    *   with content identical to the previous attempt; a partial clearing produces a new object too,
    *   but one that `useFocusFirstInvalidField` recognizes and ignores (typing never moves the
-   *   focus, a failed save always does). The hook never touches the DOM: pair it with
-   *   `useFocusFirstInvalidField` to scroll/focus.
+   *   focus, a failed save always does). That recognition is lost on a copy or a derived object:
+   *   then drive the focus hook with `validationAttempt` (its `trigger` option). The hook never
+   *   touches the DOM: pair it with `useFocusFirstInvalidField` to scroll/focus.
    */
   fieldErrors: FieldErrors;
+  /**
+   * Number of save attempts rejected by `validate` since mount (`0` at mount). It changes **only**
+   * when a `validate` fails, by exactly one per failed attempt (also with errors identical to the
+   * previous ones), never on an edit, a clearing, a `reset` or a successful save. Pass it as
+   * `useFocusFirstInvalidField({ trigger })` when the errors you give that hook are not
+   * `fieldErrors` itself (e.g. a `useMemo` that translates the messages), so that typing never
+   * moves the focus and every failed save does.
+   */
+  validationAttempt: number;
 }
 
 // Shared identity so "no errors" never re-renders consumers that depend on `fieldErrors`.
@@ -146,6 +156,7 @@ export function useObjectPageForm<Values extends object>(
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<{ error: unknown } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
+  const [validationAttempt, setValidationAttempt] = useState(0);
 
   // Synchronous mirror of the state, so several updates in one event compose and `save` reads the
   // very latest values without being recreated.
@@ -261,6 +272,7 @@ export function useObjectPageForm<Values extends object>(
           for (const path of invalid) next[path] = errors[path];
           // Always a new object, even with identical content: a new attempt, never a clearing.
           setErrors(next);
+          setValidationAttempt((n) => n + 1);
           return false;
         }
         setErrors(NO_ERRORS); // stale errors of a previous attempt
@@ -322,5 +334,6 @@ export function useObjectPageForm<Values extends object>(
     isSaving,
     saveError: saveError ? saveError.error : null,
     fieldErrors,
+    validationAttempt,
   };
 }

@@ -1,6 +1,6 @@
 import { act, cleanup, render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Profiler, useRef } from 'react';
+import { Profiler, useMemo, useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
@@ -247,8 +247,22 @@ describe('useObjectPageForm: per-path clearing of fieldErrors', () => {
 type Abc = { a: string; b: string; c: string };
 type ThreeFieldsForm = ReturnType<typeof useObjectPageForm<Abc>>;
 
-/** Real DOM: a form with three invalid fields wired to both hooks. */
-function ThreeFields({ onRender, formRef }: { onRender?: () => void; formRef?: { current: ThreeFieldsForm | null } }) {
+/**
+ * Real DOM: a form with three invalid fields wired to both hooks. `derived` hands the focus hook a
+ * `useMemo` copy with translated messages (not the form's own object); `withTrigger` passes
+ * `trigger: form.validationAttempt`.
+ */
+function ThreeFields({
+  onRender,
+  formRef,
+  derived = false,
+  withTrigger = false,
+}: {
+  onRender?: () => void;
+  formRef?: { current: ThreeFieldsForm | null };
+  derived?: boolean;
+  withTrigger?: boolean;
+}) {
   const form = useObjectPageForm<Abc>({
     baseline: { a: '', b: '', c: '' },
     validate: (v) => {
@@ -259,7 +273,16 @@ function ThreeFields({ onRender, formRef }: { onRender?: () => void; formRef?: {
   });
   if (formRef) formRef.current = form;
   const ref = useRef<HTMLFormElement>(null);
-  useFocusFirstInvalidField({ containerRef: ref, fieldErrors: form.fieldErrors });
+  const translated = useMemo(() => {
+    const out: Record<string, string | undefined> = {};
+    for (const [path, message] of Object.entries(form.fieldErrors)) out[path] = message?.replace('is required', '(translated)');
+    return out;
+  }, [form.fieldErrors]);
+  useFocusFirstInvalidField({
+    containerRef: ref,
+    fieldErrors: derived ? translated : form.fieldErrors,
+    trigger: withTrigger ? form.validationAttempt : undefined,
+  });
   return (
     <Profiler id="form" onRender={() => onRender?.()}>
       <form
@@ -336,5 +359,113 @@ describe('per-path clearing with useFocusFirstInvalidField (real DOM)', () => {
     expect(screen.getByLabelText('Field B')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByText('B is required')).toBeVisible();
     expect(screen.getByLabelText('Field A')).toHaveFocus();
+  });
+});
+
+describe('validationAttempt', () => {
+  it('starts at 0 and grows by one per failed validate only, also with identical errors', async () => {
+    let strict = true;
+    const { result } = setup({ validate: () => (strict ? { name: 'Name', amount: 'Amount' } : {}) });
+    expect(result.current.validationAttempt).toBe(0);
+    await fail(result);
+    expect(result.current.validationAttempt).toBe(1);
+    await fail(result);
+    expect(result.current.validationAttempt).toBe(2);
+    act(() => result.current.setValue('name', 'x')); // a clearing
+    act(() => result.current.setValue('name', 'x')); // nothing
+    act(() => result.current.reset());
+    act(() => result.current.reset({ ...BASE }));
+    expect(result.current.validationAttempt).toBe(2);
+    strict = false;
+    await act(async () => {
+      expect(await result.current.save(async () => undefined)).toBe(true); // passing validate
+    });
+    await act(async () => {
+      await result.current.save(async () => {
+        throw new Error('net'); // server failure
+      });
+    });
+    expect(result.current.validationAttempt).toBe(2);
+  });
+
+  it('a throwing validate is a saveError, not a failed validation: the counter does not move', async () => {
+    const { result } = setup({
+      validate: () => {
+        throw new Error('boom');
+      },
+    });
+    await fail(result);
+    expect(result.current.validationAttempt).toBe(0);
+  });
+});
+
+describe('a derived fieldErrors object (useMemo) with the explicit trigger (real DOM)', () => {
+  it('without trigger the derived object re-focuses while typing (why the trigger exists)', async () => {
+    const user = userEvent.setup();
+    render(<ThreeFields derived />);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByLabelText('Field C'));
+    await user.keyboard('y');
+    expect(screen.getByLabelText('Field A')).toHaveFocus(); // documented limit of the identity trigger
+  });
+
+  it('with trigger: the focus stays in C while typing and goes back to A on an identical failed save', async () => {
+    const user = userEvent.setup();
+    render(<ThreeFields derived withTrigger />);
+    const a = screen.getByLabelText('Field A');
+    const c = screen.getByLabelText('Field C');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(a).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    await user.click(c);
+    await user.keyboard('yz');
+    expect(c).toHaveFocus();
+    expect(c).toHaveValue('yz');
+    expect(c).not.toHaveAttribute('aria-invalid', 'true');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(a).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole('button', { name: 'Save' })); // identical errors (A, B)
+    expect(a).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(3);
+  });
+
+  it('with trigger on the form object itself: same behavior (typing never re-focuses)', async () => {
+    const user = userEvent.setup();
+    render(<ThreeFields withTrigger />);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByLabelText('Field B'));
+    await user.keyboard('q');
+    expect(screen.getByLabelText('Field B')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a failed save and an edit of an invalid field in the same event (real DOM)', () => {
+  it.each<[string, boolean, string]>([
+    // One batch: the errors of the failed attempt never render on their own, only the clearing
+    // that follows. The identity trigger sees a clearing and stays put (documented); the counter
+    // moved, so `trigger` focuses the first field still invalid.
+    ['without trigger the focus does not move (documented)', false, 'Elsewhere'],
+    ['with trigger the focus goes to the first field still invalid', true, 'Field B'],
+  ])('%s', async (_label, withTrigger, focused) => {
+    const formRef: { current: ThreeFieldsForm | null } = { current: null };
+    render(
+      <>
+        <button type="button">Elsewhere</button>
+        <ThreeFields formRef={formRef} withTrigger={withTrigger} />
+      </>,
+    );
+    screen.getByRole('button', { name: 'Elsewhere' }).focus();
+    await act(async () => {
+      const pending = formRef.current!.save(async () => undefined);
+      formRef.current!.setValue('a', 'x');
+      expect(await pending).toBe(false);
+    });
+    expect(screen.getByLabelText('Field A')).not.toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Field B')).toHaveAttribute('aria-invalid', 'true');
+    const target = focused === 'Elsewhere' ? screen.getByRole('button', { name: 'Elsewhere' }) : screen.getByLabelText(focused);
+    expect(target).toHaveFocus();
   });
 });

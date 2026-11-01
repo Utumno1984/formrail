@@ -87,6 +87,45 @@ describe('useFocusFirstInvalidField', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
   });
 
+  it('with trigger, only a change of trigger fires: a new fieldErrors object alone does not', () => {
+    function Triggered({ errors, trigger }: { errors: Partial<Record<string, string>>; trigger: unknown }) {
+      const ref = useRef<HTMLDivElement>(null);
+      useFocusFirstInvalidField({ containerRef: ref, fieldErrors: errors, trigger });
+      return (
+        <div ref={ref}>
+          {['a', 'b', 'c'].map((n) => (
+            <input key={n} name={n} aria-label={n} />
+          ))}
+        </div>
+      );
+    }
+    const { rerender, getByLabelText } = render(<Triggered errors={{}} trigger={0} />);
+    rerender(<Triggered errors={{ b: 'x' }} trigger={1} />);
+    expect(getByLabelText('b')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    getByLabelText('c').focus();
+    // new objects (derived copies, edits), same trigger: nothing
+    rerender(<Triggered errors={{ b: 'x' }} trigger={1} />);
+    rerender(<Triggered errors={{ a: 'y', b: 'x' }} trigger={1} />);
+    expect(getByLabelText('c')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    // new trigger, identical content: fires, reading the errors of that render
+    rerender(<Triggered errors={{ a: 'y', b: 'x' }} trigger={2} />);
+    expect(getByLabelText('a')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    // with trigger, even a clearing object is focused when the trigger changes
+    getByLabelText('c').focus();
+    rerender(<Triggered errors={withoutPaths({ a: 'y', b: 'x' }, ['a'])} trigger={3} />);
+    expect(getByLabelText('b')).toHaveFocus();
+  });
+
+  it('trigger undefined keeps the identity behavior', () => {
+    const { rerender, getByLabelText } = render(<Form errors={{ b: 'x' }} />);
+    getByLabelText('c').focus();
+    rerender(<Form errors={{ b: 'x' }} />);
+    expect(getByLabelText('b')).toHaveFocus();
+  });
+
   it('works inside an open ShadowRoot, where document.activeElement is the host', () => {
     const host = document.createElement('div');
     document.body.append(host);
