@@ -1,14 +1,6 @@
 import { createContext, useContext, type RefObject } from 'react';
+import { isDev } from '../internal/is-dev';
 import type { TitleLevel } from '../typography/Title';
-
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-export const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
 
 /** One entry of the section registry: what an Anchor Bar needs to list and reach a section. */
 export interface ObjectPageSectionInfo {

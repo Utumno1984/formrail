@@ -11,7 +11,9 @@ import {
 } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { FieldContext } from '../field/FieldContext';
+import { useFieldControlProps } from '../field/useFieldControlProps';
 import { Icon } from '../icon/Icon';
+import { CONTROL_INVALID } from '../internal/field-control-styles';
 import {
   COMBOBOX_ANCHOR,
   COMBOBOX_INPUT,
@@ -182,7 +184,7 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
     else if (o.bottom > l.bottom) list.scrollTop += o.bottom - l.bottom;
   }, [activeValue, listEl]);
 
-  const describedBy = [control?.['aria-describedby'], rest['aria-describedby']].filter(Boolean).join(' ') || undefined;
+  const fieldProps = useFieldControlProps(rest);
   const inputProps = combobox.getInputProps({
     ...rest,
     ref,
@@ -210,16 +212,9 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
         <div ref={anchorRef} className={COMBOBOX_ANCHOR}>
           <input
             {...inputProps}
-            id={control?.id ?? rest.id}
+            {...fieldProps}
             ref={inputProps.ref}
-            aria-describedby={describedBy}
-            aria-labelledby={control?.['aria-labelledby'] ?? rest['aria-labelledby']}
-            aria-invalid={control?.['aria-invalid'] ?? rest['aria-invalid']}
-            aria-required={control?.['aria-required'] ?? rest['aria-required']}
-            aria-readonly={control?.['aria-readonly'] ?? rest['aria-readonly']}
-            disabled={control?.disabled ?? rest.disabled}
-            readOnly={control?.readOnly ?? rest.readOnly}
-            className={cn(COMBOBOX_INPUT, COMBOBOX_SIZE[size], className)}
+            className={cn(COMBOBOX_INPUT, CONTROL_INVALID, COMBOBOX_SIZE[size], className)}
           />
         </div>
       </Popover.Anchor>

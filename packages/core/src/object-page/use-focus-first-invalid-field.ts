@@ -1,14 +1,6 @@
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
-
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
+import { isDev } from '../internal/is-dev';
 
 // A key whose value is `undefined` is "no error", like in `useObjectPageForm`.
 const invalidKeys = (fieldErrors: Partial<Record<string, string>>): string[] =>
