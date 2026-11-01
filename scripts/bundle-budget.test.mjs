@@ -168,3 +168,57 @@ describe('CLI on a fixture package', () => {
     await expect(runCheck({ packageDir: dir })).rejects.toThrow(/npm run build/);
   });
 });
+
+describe('react externals measurement (#34)', () => {
+  let dir;
+  const entry = (extra = '') =>
+    [
+      `import { forwardRef } from "react";`,
+      `import { jsx } from "react/jsx-runtime";`,
+      `export const composeRefs = (a, b) => (n) => { if (a) a.current = n; if (b) b.current = n; ${extra} };`,
+      `export const Comp = forwardRef((p, r) => jsx("div", { ref: r, ...p }));`,
+      '',
+    ].join('\n');
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'budget-react-'));
+    mkdirSync(join(dir, 'dist'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('does not charge an export for react imports it does not use, however many modules import them', async () => {
+    writeFileSync(join(dir, 'dist/index.js'), entry());
+    const before = (await runUpdate({ packageDir: dir })).composeRefs;
+    const extraModules = Array.from(
+      { length: 30 },
+      (_, i) =>
+        `import { useState as u${i}, useEffect as e${i} } from "react";\nimport { jsx as j${i} } from "react/jsx-runtime";\nexport const M${i} = () => j${i}("p", { c: u${i}, d: e${i} });\n`,
+    ).join('');
+    writeFileSync(join(dir, 'dist/index.js'), entry() + extraModules);
+    const after = (await runUpdate({ packageDir: dir })).composeRefs;
+    expect(after).toBe(before);
+  });
+
+  it('still charges react bindings an export really uses', async () => {
+    const comp = (hooks) =>
+      `import { forwardRef, ${hooks.join(', ')} } from "react";\nexport const Comp = forwardRef(() => [${hooks.map((h) => `${h}()`).join(', ')}]);\n`;
+    writeFileSync(join(dir, 'dist/index.js'), comp([]));
+    const none = (await runUpdate({ packageDir: dir })).Comp;
+    writeFileSync(join(dir, 'dist/index.js'), comp(['useState', 'useEffect', 'useMemo']));
+    const used = (await runUpdate({ packageDir: dir })).Comp;
+    expect(used).toBeGreaterThan(none);
+  });
+
+  it('still detects a real size increase of composeRefs against the committed baseline', async () => {
+    writeFileSync(join(dir, 'dist/index.js'), entry());
+    await runUpdate({ packageDir: dir });
+    expect((await runCheck({ packageDir: dir })).ok).toBe(true);
+    const bloat = Array.from(
+      { length: 12 },
+      (_, i) => `if (a && n === ${i}) console.log("branch-${i}", a, b);`,
+    ).join(' ');
+    writeFileSync(join(dir, 'dist/index.js'), entry(bloat));
+    const result = await runCheck({ packageDir: dir });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/composeRefs:.*OVER LIMIT/);
+  });
+});

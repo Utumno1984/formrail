@@ -3,208 +3,208 @@
   "version": 1,
   "exports": {
     "Button": {
-      "baseline": 13072,
-      "limit": 14380
+      "baseline": 13146,
+      "limit": 14461
     },
     "Combobox": {
-      "baseline": 38295,
-      "limit": 42125
+      "baseline": 38186,
+      "limit": 42005
     },
     "DescriptionList": {
-      "baseline": 10941,
-      "limit": 12036
+      "baseline": 10421,
+      "limit": 11464
     },
     "DescriptionListItem": {
-      "baseline": 11233,
-      "limit": 12357
+      "baseline": 10852,
+      "limit": 11938
     },
     "DescriptionListStatus": {
-      "baseline": 31908,
-      "limit": 35099
+      "baseline": 31406,
+      "limit": 34547
     },
     "Dialog": {
-      "baseline": 5247,
-      "limit": 5772
+      "baseline": 4895,
+      "limit": 5385
     },
     "DialogBody": {
-      "baseline": 10666,
-      "limit": 11733
+      "baseline": 10555,
+      "limit": 11611
     },
     "DialogClose": {
-      "baseline": 15105,
-      "limit": 16616
+      "baseline": 15251,
+      "limit": 16777
     },
     "DialogContent": {
-      "baseline": 24099,
-      "limit": 26509
+      "baseline": 24385,
+      "limit": 26824
     },
     "DialogDescription": {
-      "baseline": 12794,
-      "limit": 14074
+      "baseline": 12671,
+      "limit": 13939
     },
     "DialogFooter": {
-      "baseline": 10438,
-      "limit": 11482
+      "baseline": 10325,
+      "limit": 11358
     },
     "DialogHeader": {
-      "baseline": 10442,
-      "limit": 11487
+      "baseline": 10329,
+      "limit": 11362
     },
     "DialogTitle": {
-      "baseline": 12838,
-      "limit": 14122
+      "baseline": 12716,
+      "limit": 13988
     },
     "DialogTrigger": {
-      "baseline": 3610,
-      "limit": 3972
+      "baseline": 3152,
+      "limit": 3468
     },
     "Field": {
-      "baseline": 12405,
-      "limit": 13646
+      "baseline": 12355,
+      "limit": 13591
     },
     "FieldMessage": {
-      "baseline": 11370,
-      "limit": 12508
+      "baseline": 11262,
+      "limit": 12389
     },
     "Icon": {
-      "baseline": 10873,
-      "limit": 11961
+      "baseline": 10717,
+      "limit": 11789
     },
     "Input": {
-      "baseline": 10724,
-      "limit": 11797
+      "baseline": 10552,
+      "limit": 11608
     },
     "ListReport": {
-      "baseline": 38685,
-      "limit": 42554
+      "baseline": 39264,
+      "limit": 43191
     },
     "ListReportFilterBar": {
-      "baseline": 16096,
-      "limit": 17706
+      "baseline": 16278,
+      "limit": 17906
     },
     "ListReportTable": {
-      "baseline": 35745,
-      "limit": 39320
+      "baseline": 35958,
+      "limit": 39554
     },
     "MessageStrip": {
-      "baseline": 13891,
-      "limit": 15281
+      "baseline": 13984,
+      "limit": 15383
     },
     "ObjectPage": {
-      "baseline": 14069,
-      "limit": 15476
+      "baseline": 13708,
+      "limit": 15079
     },
     "ObjectPageFooter": {
-      "baseline": 33190,
-      "limit": 36509
+      "baseline": 32873,
+      "limit": 36161
     },
     "ObjectPageHeader": {
-      "baseline": 11428,
-      "limit": 12571
+      "baseline": 11015,
+      "limit": 12117
     },
     "ObjectPageSection": {
-      "baseline": 11344,
-      "limit": 12479
+      "baseline": 11247,
+      "limit": 12372
     },
     "Select": {
-      "baseline": 43775,
-      "limit": 48153
+      "baseline": 43643,
+      "limit": 48008
     },
     "Sheet": {
-      "baseline": 5246,
-      "limit": 5771
+      "baseline": 4895,
+      "limit": 5385
     },
     "SheetBody": {
-      "baseline": 10666,
-      "limit": 11733
+      "baseline": 10555,
+      "limit": 11611
     },
     "SheetClose": {
-      "baseline": 15105,
-      "limit": 16616
+      "baseline": 15251,
+      "limit": 16777
     },
     "SheetContent": {
-      "baseline": 24070,
-      "limit": 26478
+      "baseline": 24362,
+      "limit": 26799
     },
     "SheetDescription": {
-      "baseline": 12794,
-      "limit": 14074
+      "baseline": 12670,
+      "limit": 13938
     },
     "SheetFooter": {
-      "baseline": 10438,
-      "limit": 11482
+      "baseline": 10325,
+      "limit": 11358
     },
     "SheetHeader": {
-      "baseline": 10442,
-      "limit": 11487
+      "baseline": 10329,
+      "limit": 11362
     },
     "SheetTitle": {
-      "baseline": 12838,
-      "limit": 14122
+      "baseline": 12716,
+      "limit": 13988
     },
     "SheetTrigger": {
-      "baseline": 3614,
-      "limit": 3976
+      "baseline": 3156,
+      "limit": 3472
     },
     "StatusBadge": {
-      "baseline": 11338,
-      "limit": 12472
+      "baseline": 10811,
+      "limit": 11893
     },
     "Text": {
-      "baseline": 10484,
-      "limit": 11533
+      "baseline": 10292,
+      "limit": 11322
     },
     "Title": {
-      "baseline": 10482,
-      "limit": 11531
+      "baseline": 10291,
+      "limit": 11321
     },
     "Tooltip": {
-      "baseline": 30969,
-      "limit": 34066
+      "baseline": 30788,
+      "limit": 33867
     },
     "TooltipProvider": {
-      "baseline": 3741,
-      "limit": 4116
+      "baseline": 3262,
+      "limit": 3589
     },
     "TruncatedText": {
-      "baseline": 31305,
-      "limit": 34436
+      "baseline": 31188,
+      "limit": 34307
     },
     "cn": {
-      "baseline": 10352,
-      "limit": 11388
+      "baseline": 10115,
+      "limit": 11127
     },
     "composeRefs": {
-      "baseline": 972,
-      "limit": 1070
+      "baseline": 201,
+      "limit": 222
     },
     "defaultComboboxFilter": {
-      "baseline": 938,
-      "limit": 1032
+      "baseline": 169,
+      "limit": 189
     },
     "useCombobox": {
-      "baseline": 2772,
-      "limit": 3050
+      "baseline": 1989,
+      "limit": 2188
     },
     "useDirtyGuard": {
-      "baseline": 28344,
-      "limit": 31179
+      "baseline": 29007,
+      "limit": 31908
     },
     "useFieldControl": {
-      "baseline": 925,
-      "limit": 1018
+      "baseline": 195,
+      "limit": 215
     },
     "useFocusFirstInvalidField": {
-      "baseline": 1243,
-      "limit": 1368
+      "baseline": 535,
+      "limit": 589
     },
     "useListReport": {
-      "baseline": 3382,
-      "limit": 3721
+      "baseline": 2609,
+      "limit": 2870
     },
     "useObjectPageForm": {
-      "baseline": 2153,
-      "limit": 2369
+      "baseline": 1432,
+      "limit": 1576
     }
   }
 }
