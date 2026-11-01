@@ -536,7 +536,7 @@ describe('ValidationProvider with useObjectPageForm', () => {
     );
   }
 
-  it('a failed save shows each message on its own Field; typing clears them as the form does today', async () => {
+  it('a failed save shows each message on its own Field; typing clears only the Field written (per path, #102)', async () => {
     render(<Demo />);
     const supplier = screen.getByRole('textbox', { name: 'Supplier' });
     const city = screen.getByRole('textbox', { name: 'City' });
@@ -547,8 +547,11 @@ describe('ValidationProvider with useObjectPageForm', () => {
     });
     expectInvalid(supplier, 'Supplier is required');
     expectInvalid(city, 'City is required');
-    // Current behavior of useObjectPageForm: any setValue clears every field error at once.
+    // #102: a setValue clears only the error of the field it writes; the other Field stays invalid.
     fireEvent.change(supplier, { target: { value: 'ACME' } });
+    expectValid(supplier);
+    expectInvalid(city, 'City is required');
+    fireEvent.change(city, { target: { value: 'Rome' } });
     expectValid(supplier);
     expectValid(city);
   });

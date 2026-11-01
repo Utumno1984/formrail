@@ -191,8 +191,11 @@ describe('useObjectPageForm: schema (Standard Schema)', () => {
   });
 
   it.each<[string, (r: Result) => void]>([
-    ['setValue', (r) => r.current.setValue('amount', 11)],
-    ['setValues', (r) => r.current.setValues({ amount: 12 })],
+    // #102: an edit clears only the errors of the paths it changes, and `formErrors` go with the
+    // last field error. So the edit targets the only invalid field (`supplier`), not `amount`;
+    // editing an unrelated field is covered in `use-object-page-form.clear-paths.test.tsx`.
+    ['setValue of the only invalid field', (r) => r.current.setValue('supplier', 'ACME')],
+    ['setValues touching the only invalid field', (r) => r.current.setValues({ supplier: 'ACME', amount: 12 })],
     ['reset()', (r) => r.current.reset()],
     ['reset(newBaseline)', (r) => r.current.reset(VALID)],
   ])('%s clears fieldErrors and formErrors together', async (_label, mutate) => {

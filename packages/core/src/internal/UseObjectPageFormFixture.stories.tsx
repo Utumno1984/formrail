@@ -1,6 +1,6 @@
 // Internal fixture for `useObjectPageForm`: bare `<input>`s, no style. Not exported from the
 // package and never to be re-exported from it.
-import { useRef, type ComponentProps } from 'react';
+import { useMemo, useRef, type ComponentProps } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Combobox } from '../combobox/Combobox';
@@ -10,6 +10,7 @@ import { Input } from '../input/Input';
 import { Select } from '../select/Select';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { useObjectPageForm } from '../object-page/use-object-page-form';
+import type { FieldErrors } from '../object-page/field-errors';
 
 type Invoice = { supplier: string; amount: string };
 
@@ -63,7 +64,7 @@ function FormDemo() {
   );
 }
 
-type Scenario = 'all-empty' | 'valid-above-invalid' | 'mixed-controls';
+type Scenario = 'all-empty' | 'valid-above-invalid' | 'mixed-controls' | 'translated-messages';
 type Long = { a: string; b: string; c: string; d: string };
 
 const OPTIONS = [
@@ -88,7 +89,20 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
     },
   });
   const containerRef = useRef<HTMLFormElement>(null);
-  useFocusFirstInvalidField({ containerRef, fieldErrors: form.fieldErrors });
+  // `translated-messages`: the errors shown (and handed to the focus hook) are a `useMemo` copy of
+  // `fieldErrors` with rewritten messages, so the focus hook is driven by `validationAttempt`.
+  const translated = scenario === 'translated-messages';
+  const shownErrors = useMemo<FieldErrors>(() => {
+    if (!translated) return form.fieldErrors;
+    const out: Record<string, string | undefined> = {};
+    for (const [path, message] of Object.entries(form.fieldErrors)) out[path] = message && `Please fill in ${path.toUpperCase()}`;
+    return out;
+  }, [translated, form.fieldErrors]);
+  useFocusFirstInvalidField({
+    containerRef,
+    fieldErrors: shownErrors,
+    trigger: translated ? form.validationAttempt : undefined,
+  });
   // `mixed-controls`: B is a Select and C a Combobox, the rest are Inputs. All wired by `Field name`.
   const control = (k: keyof Long) => {
     if (scenario === 'mixed-controls' && k === 'b') {
@@ -99,7 +113,8 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
     }
     return <Input value={form.values[k]} onChange={(e) => form.setValue(k, e.target.value)} />;
   };
-  // The error of each Field comes from the ValidationProvider, by its `name`.
+  // The error of each Field comes from the ValidationProvider, by its `name` (the translated copy in
+  // `translated-messages`).
   const field = (k: keyof Long) => (
     <Field label={`Field ${k.toUpperCase()}`} name={k}>
       {control(k)}
@@ -115,7 +130,7 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
         void form.save(async (v) => onSave(v));
       }}
     >
-      <ValidationProvider fieldErrors={form.fieldErrors}>
+      <ValidationProvider fieldErrors={shownErrors}>
         {field('a')}
         <div style={SPACER} />
         {field('b')}
@@ -125,6 +140,10 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
         {field('d')}
       </ValidationProvider>
       <button type="submit">Save</button>
+      {/* Writes every field back with the value it already has: no real change, so no clearing. */}
+      <button type="button" onClick={() => form.setValues({ ...form.values })}>
+        Re-apply current values
+      </button>
       <p data-testid="field-error-count">field errors: {Object.keys(form.fieldErrors).length}</p>
     </form>
   );
@@ -198,7 +217,10 @@ const focusMeta = {
   component: FocusDemo,
   render: (args: ComponentProps<typeof FocusDemo>) => <FocusDemo {...args} />,
   argTypes: {
-    scenario: { control: 'radio', options: ['all-empty', 'valid-above-invalid', 'mixed-controls'] satisfies Scenario[] },
+    scenario: {
+      control: 'radio',
+      options: ['all-empty', 'valid-above-invalid', 'mixed-controls', 'translated-messages'] satisfies Scenario[],
+    },
     onSave: { action: 'save' },
   },
   args: { scenario: 'all-empty', onSave: fn() },
@@ -214,6 +236,12 @@ const inViewport = (el: HTMLElement) => {
 export const LongFormAllEmpty: FocusStory = { ...focusMeta };
 /** No `play`: field A is already valid. */
 export const LongFormValidAbove: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'valid-above-invalid' } };
+
+/**
+ * No `play`: the messages are a translated `useMemo` copy of `fieldErrors`, so the focus hook gets
+ * `trigger: form.validationAttempt`; the e2e drives Save and the typing itself.
+ */
+export const LongFormTranslatedMessages: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'translated-messages' } };
 
 /** No `play`: B (Select) and C (Combobox) sit among Inputs, all invalid; the e2e drives Save itself. */
 export const LongFormMixedControls: FocusStory = { ...focusMeta, args: { ...focusMeta.args, scenario: 'mixed-controls' } };
@@ -246,15 +274,46 @@ export const FocusFirstInvalidSkipsValid: FocusStory = {
   },
 };
 
-/** Typing after a failure clears every field error at once (no per-field clearing in this version). */
-export const FocusFirstInvalidTypingClears: FocusStory = {
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+/**
+ * Typing after a failure clears only the error of the field being edited: the other fields keep
+ * `aria-invalid` and their message, and the focus stays where the user types (a clearing never
+ * re-focuses). A new Save with the remaining errors, even identical ones, moves the focus again.
+ * (Until #102 this story was "Typing after a failure clears every field error at once".)
+ */
+export const FocusFirstInvalidTypingClearsOnlyThatField: FocusStory = {
   ...focusMeta,
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
+    const field = (k: string) => canvas.getByLabelText(`Field ${k}`);
+    const [a, b, c, d] = [field('A'), field('B'), field('C'), field('D')];
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(canvas.getByLabelText('Field A')).toHaveFocus());
+    await waitFor(() => expect(a).toHaveFocus());
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 4');
+
+    // Typing in A clears A only; B, C and D stay invalid with their message.
     await userEvent.keyboard('x');
-    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 0');
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 3');
+    await expect(a).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(canvas.queryByText('A is required')).toBeNull();
+    for (const el of [b, c, d]) await expect(el).toHaveAttribute('aria-invalid', 'true');
+    await expect(canvas.getByText('B is required')).toBeInTheDocument();
+
+    // Typing in C (not the first invalid one): the focus stays in C, it does not jump to B.
+    await userEvent.click(c);
+    await userEvent.keyboard('y');
+    await nextFrame();
+    await expect(c).toHaveFocus();
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 2');
+    await expect(b).toHaveAttribute('aria-invalid', 'true');
+
+    // Save again: the first field still invalid (B) takes the focus, and again with identical errors.
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(b).toHaveFocus());
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(b).toHaveFocus());
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 2');
     await expect(args.onSave).not.toHaveBeenCalled();
   },
 };

@@ -94,12 +94,13 @@ test.describe('ValidationProvider in a real browser', () => {
     expect(d.allExist).toBe(true);
     expect(d.errorIds).toHaveLength(1);
 
-    // Typing keeps the current rule of the form (every field error cleared at once).
+    // Typing clears only the error of the field written (per-path clearing, #102): Country keeps its.
     await page.keyboard.type('A');
     await expect(supplier).toBeFocused();
     await expect(supplier).not.toHaveAttribute('aria-invalid');
     await expect(page.getByText('Supplier is required')).toHaveCount(0);
-    await expect(countryOf(page)).not.toHaveAttribute('aria-invalid');
+    await expect(countryOf(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(countryOf(page)).toHaveAccessibleDescription('Country is required');
     d = await describedBy(supplier);
     expect(d.allExist).toBe(true);
     expect(d.errorIds).toHaveLength(0);

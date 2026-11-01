@@ -3,10 +3,11 @@ import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const ALL_EMPTY = 'internal-useobjectpageformfixture--focus-first-invalid-all-empty';
 const SKIPS_VALID = 'internal-useobjectpageformfixture--focus-first-invalid-skips-valid';
-const TYPING = 'internal-useobjectpageformfixture--focus-first-invalid-typing-clears';
+const TYPING = 'internal-useobjectpageformfixture--focus-first-invalid-typing-clears-only-that-field';
 // Same fixture without a play function: the test itself clicks Save.
 const LONG_EMPTY = 'internal-useobjectpageformfixture--long-form-all-empty';
 const LONG_VALID = 'internal-useobjectpageformfixture--long-form-valid-above';
+const LONG_TRANSLATED = 'internal-useobjectpageformfixture--long-form-translated-messages';
 
 const SELECT_PLAY = 'internal-useobjectpageformfixture--focus-first-invalid-select';
 const LONG_MIXED = 'internal-useobjectpageformfixture--long-form-mixed-controls';
@@ -90,13 +91,93 @@ test.describe('useFocusFirstInvalidField: behavior in a real browser', () => {
     await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 4');
   });
 
-  test('typing after a failure clears every field error at once', async ({ page }) => {
+  // Until #102 this test was "typing after a failure clears every field error at once" (the
+  // all-or-nothing clearing). Decision of Daniele (validation plan, F10): typing clears the edited
+  // field only, so the test now pins the per-field clearing and the absence of any refocus.
+  test('typing after a failure clears only the edited field, the others stay invalid and the focus stays put', async ({ page }) => {
     await gotoStory(page, LONG_EMPTY);
     await save(page).click();
     await expect(page.getByLabel('Field A')).toBeFocused();
+    await page.keyboard.type('xyz');
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await expect(page.getByLabel('Field A')).toBeFocused();
+    await expect(page.getByLabel('Field A')).toHaveValue('xyz');
+    await expect(page.getByLabel('Field A')).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByText('A is required')).toHaveCount(0);
+    for (const k of ['B', 'C', 'D']) {
+      await expect(page.getByLabel(`Field ${k}`)).toHaveAttribute('aria-invalid', 'true');
+      await expect(page.getByText(`${k} is required`)).toHaveCount(1);
+    }
+  });
+
+  test('typing in a later invalid field keeps the focus (and the scroll) there, not on the first invalid one', async ({ page }) => {
+    await gotoStory(page, LONG_EMPTY);
+    await save(page).click();
+    await expect(page.getByLabel('Field A')).toBeFocused();
+    await page.getByLabel('Field C').click();
+    await page.keyboard.type('hello');
+    await expect(page.getByLabel('Field C')).toHaveValue('hello');
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await expect(page.getByLabel('Field C')).toBeFocused();
+    expect(await inViewport(page, 'Field C')).toBe(true);
+    expect(await inViewport(page, 'Field A')).toBe(false);
+    await expect(page.getByLabel('Field A')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  test('after a partial clearing a new Save refocuses the first invalid field, again with identical errors', async ({ page }) => {
+    await gotoStory(page, LONG_EMPTY);
+    await save(page).click();
+    await page.keyboard.type('x'); // A valid now
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await save(page).click();
+    await expect(page.getByLabel('Field B')).toBeFocused();
+    expect(await inViewport(page, 'Field B')).toBe(true);
+    await save(page).click();
+    await expect(page.getByLabel('Field B')).toBeFocused();
+    expect(await inViewport(page, 'Field B')).toBe(true);
+  });
+
+  test('writing back the values the fields already have clears nothing', async ({ page }) => {
+    await gotoStory(page, LONG_EMPTY);
+    await save(page).click();
     await page.keyboard.type('x');
-    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 0');
-    await expect(page.getByText('is required')).toHaveCount(0);
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await page.getByRole('button', { name: 'Re-apply current values' }).click();
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await expect(page.getByLabel('Field B')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByRole('button', { name: 'Re-apply current values' })).toBeFocused();
+  });
+
+  test('translated messages (a useMemo copy) with trigger: validationAttempt, typing keeps the focus, a failed Save refocuses', async ({
+    page,
+  }) => {
+    await gotoStory(page, LONG_TRANSLATED);
+    await save(page).click();
+    await expect(page.getByLabel('Field A')).toBeFocused();
+    await expect(page.getByText('Please fill in C')).toHaveCount(1);
+    await page.getByLabel('Field C').click();
+    await page.keyboard.type('hello');
+    await expect(page.getByLabel('Field C')).toHaveValue('hello');
+    await expect(page.getByTestId('field-error-count')).toHaveText('field errors: 3');
+    await expect(page.getByText('Please fill in C')).toHaveCount(0);
+    await expect(page.getByLabel('Field C')).toBeFocused();
+    expect(await inViewport(page, 'Field A')).toBe(false);
+    await save(page).click();
+    await expect(page.getByLabel('Field A')).toBeFocused();
+    expect(await inViewport(page, 'Field A')).toBe(true);
+    await save(page).click(); // identical errors
+    await expect(page.getByLabel('Field A')).toBeFocused();
+  });
+
+  test('the nested form: typing in City clears City only and the focus stays in City', async ({ page }) => {
+    await gotoStory(page, NESTED_NO_PLAY);
+    await save(page).click();
+    await expect(page.getByLabel('City')).toBeFocused();
+    await page.keyboard.type('Roma');
+    await expect(page.getByLabel('City')).toBeFocused();
+    await expect(page.getByText('City is required')).toHaveCount(0);
+    await expect(page.getByText('Quantity is required')).toHaveCount(2);
+    await expect(page.getByLabel('Quantity 1')).toHaveAttribute('aria-invalid', 'true');
   });
 
   test('an invalid Select (no native name) gets the focus and is scrolled into view', async ({ page }) => {

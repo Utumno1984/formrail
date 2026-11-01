@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { isDev } from '../internal/is-dev';
 
-import { invalidPaths } from './field-errors';
+import { invalidPaths, isClearing } from './field-errors';
 import type { FieldErrors } from './field-errors';
 
 export interface UseFocusFirstInvalidFieldOptions {
@@ -15,6 +15,26 @@ export interface UseFocusFirstInvalidFieldOptions {
    * `address.city`). Only the keys are read; this hook knows nothing about the form hook.
    */
   fieldErrors: FieldErrors;
+  /**
+   * Explicit trigger that **replaces** the identity of `fieldErrors`: when it is not `undefined`,
+   * the focus moves only when `trigger` changes (`Object.is`), using the `fieldErrors` of that
+   * render; a new `fieldErrors` object alone (an edit, a derived copy) never moves it. Meant for
+   * `useObjectPageForm().validationAttempt`, which changes once per failed `schema`/`validate`.
+   * Needed when `fieldErrors` is not the form's own object (e.g. a `useMemo` that translates the
+   * messages). Omitted (or `undefined`): the identity of `fieldErrors` is the trigger, as described
+   * below.
+   *
+   * Derive such a `fieldErrors` **during render** (`useMemo`), never in an effect (`useEffect` +
+   * `setState`): the hook reads the `fieldErrors` of the render in which `trigger` changes, and a
+   * copy made in an effect is still the previous one in that render (the focus would go to the
+   * errors of the previous attempt, or nowhere).
+   *
+   * Switching between modes counts as a change: going from `undefined` to a value (or back) runs
+   * the focus logic once more with the `fieldErrors` of that render, even if no save failed. Keep
+   * the mode fixed for the life of the component (pass `form.validationAttempt` from the first
+   * render; it is `0` at mount, never `undefined`).
+   */
+  trigger?: unknown;
 }
 
 /**
@@ -30,11 +50,22 @@ export interface UseFocusFirstInvalidFieldOptions {
  *
  * The trigger is the **identity** of `fieldErrors`, not its content: a second failed attempt with
  * identical errors (`useObjectPageForm` builds a new object per failed `save`) moves the focus
- * again, so the user always gets a reaction. Pass a referentially stable object: one recreated on
- * every render (`{ ...errors }` inline) would re-focus on every render.
+ * again, so the user always gets a reaction. The one exception is the object `useObjectPageForm`
+ * produces when an edit removes some errors and others remain (per-path clearing on
+ * `setValue`/`setValues`): it is recognized and ignored, so typing in a field never moves the focus
+ * to another invalid field. That recognition only works on `form.fieldErrors` itself: a copy or a
+ * derived object (`{ ...errors }`, a `useMemo` that translates the messages) re-focuses on every
+ * change of identity (an inline copy, on every render). For those, pass
+ * `trigger: form.validationAttempt`. Also without `trigger`: a failed `save` and an edit of an
+ * invalid field in the **same** event (same batch) produce a single clearing object, so the focus
+ * does not move; with `trigger` it does.
  */
-export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocusFirstInvalidFieldOptions): void {
+export function useFocusFirstInvalidField({ containerRef, fieldErrors, trigger }: UseFocusFirstInvalidFieldOptions): void {
+  const explicit = trigger !== undefined;
   useEffect(() => {
+    // A partial clearing after an edit, not a new validation result: the focus stays with the user.
+    // With an explicit `trigger` only the trigger decides (a clearing never changes it).
+    if (!explicit && isClearing(fieldErrors)) return;
     const invalid = invalidPaths(fieldErrors);
     if (invalid.length === 0) return;
 
@@ -74,5 +105,7 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocu
         '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]`/`[name]` element inside the container, nothing was focused.',
       );
     }
-  }, [fieldErrors, containerRef]);
+    // With `trigger`, a new `fieldErrors` alone must not re-run the effect: it is read, not watched.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [explicit ? trigger : fieldErrors, containerRef]);
 }
