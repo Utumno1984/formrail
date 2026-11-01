@@ -244,6 +244,7 @@ describe('internal icons', () => {
       'Tooltip',
       'TooltipProvider',
       'TruncatedText',
+      'ValidationProvider',
       'cn',
       'composeRefs',
       'defaultComboboxFilter',

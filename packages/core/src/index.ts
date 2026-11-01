@@ -19,6 +19,8 @@ export { Field } from './field/Field';
 export type { FieldProps, FieldStateProps } from './field/Field';
 export { useFieldControl } from './field/useFieldControl';
 export type { FieldControlProps, FieldState } from './field/FieldContext';
+export { ValidationProvider } from './field/ValidationContext';
+export type { ValidationProviderProps } from './field/ValidationContext';
 export { Input } from './input/Input';
 export type { InputProps, InputSize } from './input/Input';
 export {

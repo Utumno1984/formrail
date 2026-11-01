@@ -5,6 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Combobox } from '../combobox/Combobox';
 import { Field } from '../field/Field';
+import { ValidationProvider } from '../field/ValidationContext';
 import { Input } from '../input/Input';
 import { Select } from '../select/Select';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
@@ -98,8 +99,9 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
     }
     return <Input value={form.values[k]} onChange={(e) => form.setValue(k, e.target.value)} />;
   };
+  // The error of each Field comes from the ValidationProvider, by its `name`.
   const field = (k: keyof Long) => (
-    <Field label={`Field ${k.toUpperCase()}`} name={k} error={form.fieldErrors[k]}>
+    <Field label={`Field ${k.toUpperCase()}`} name={k}>
       {control(k)}
     </Field>
   );
@@ -113,13 +115,15 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
         void form.save(async (v) => onSave(v));
       }}
     >
-      {field('a')}
-      <div style={SPACER} />
-      {field('b')}
-      <div style={SPACER} />
-      {field('c')}
-      <div style={SPACER} />
-      {field('d')}
+      <ValidationProvider fieldErrors={form.fieldErrors}>
+        {field('a')}
+        <div style={SPACER} />
+        {field('b')}
+        <div style={SPACER} />
+        {field('c')}
+        <div style={SPACER} />
+        {field('d')}
+      </ValidationProvider>
       <button type="submit">Save</button>
       <p data-testid="field-error-count">field errors: {Object.keys(form.fieldErrors).length}</p>
     </form>
@@ -161,17 +165,19 @@ function NestedDemo({ onSave }: { onSave: (v: Order) => void }) {
         void form.save(async (v) => onSave(v));
       }}
     >
-      <Field label="Supplier" name="supplier" error={form.fieldErrors['supplier']}>
-        <Input value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
-      </Field>
-      <Field label="City" name="address.city" error={form.fieldErrors['address.city']}>
-        <Input value={form.values.address.city} onChange={(e) => form.setValue('address', { city: e.target.value })} />
-      </Field>
-      {form.values.lines.map((line, i) => (
-        <Field key={i} label={`Quantity ${i + 1}`} name={`lines.${i}.qty`} error={form.fieldErrors[`lines.${i}.qty`]}>
-          <Input value={line.qty} onChange={(e) => setQty(i, e.target.value)} />
+      <ValidationProvider fieldErrors={form.fieldErrors}>
+        <Field label="Supplier" name="supplier">
+          <Input value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
         </Field>
-      ))}
+        <Field label="City" name="address.city">
+          <Input value={form.values.address.city} onChange={(e) => form.setValue('address', { city: e.target.value })} />
+        </Field>
+        {form.values.lines.map((line, i) => (
+          <Field key={i} label={`Quantity ${i + 1}`} name={`lines.${i}.qty`}>
+            <Input value={line.qty} onChange={(e) => setQty(i, e.target.value)} />
+          </Field>
+        ))}
+      </ValidationProvider>
       <button type="submit">Save</button>
     </form>
   );
@@ -261,10 +267,10 @@ const nestedMeta = {
 } satisfies Meta<typeof NestedDemo>;
 type NestedStory = StoryObj<typeof nestedMeta>;
 
-/** Object Page nidificato: Save with empty nested fields focuses them in visual order, one message each; the handler runs only once all are valid. */
+/** Nested Object Page: Save with empty nested fields focuses them in visual order, one message each; the handler runs only once all are valid. */
 export const ObjectPageNested: NestedStory = {
   ...nestedMeta,
-  name: 'Object Page nidificato',
+  name: 'Nested Object Page',
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
@@ -285,7 +291,7 @@ export const ObjectPageNested: NestedStory = {
 };
 
 /** No `play`: the e2e drives Save itself (the `play` of `ObjectPageNested` would race with it). */
-export const ObjectPageNestedNoPlay: NestedStory = { ...nestedMeta, name: 'Object Page nidificato (senza play)' };
+export const ObjectPageNestedNoPlay: NestedStory = { ...nestedMeta, name: 'Nested Object Page (no play)' };
 
 /** A is filled in, so the focus lands on B, a Select: its trigger is found by `data-rop-name`, not by a native `name`. */
 export const FocusFirstInvalidSelect: FocusStory = {
