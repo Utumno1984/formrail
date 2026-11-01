@@ -87,10 +87,12 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * | Field | the `Field` error (`FieldMessage`), `aria-invalid` + `aria-describedby` on the control | not live: after a failed save `useFocusFirstInvalidField` moves the focus to the first invalid field and the screen reader reads its error there |
  * | Form summary | this footer: `message={getErrorSummary(...)}`, `messageTone="error"` | `role="status"`, polite, one line: the count only ("3 campi non validi"), never the field messages |
  * | Save error (network/server) | this footer: `message` = the text of `saveError`, `messageTone="error"` | the same `role="status"`, polite; when present it has priority over the summary (pass one, never both) |
+ * | Root error (`formErrors`: issues with no path, e.g. `z.object(...).refine(...)` without `path`) | no `Field` shows it: the consumer renders the messages, e.g. a `MessageStrip` `tone="error"` at the top of the form; this footer's summary counts them too | the strip's `role="alert"` |
  * | Blocking page error | `MessageStrip` `tone="error"` | `role="alert"` |
  *
  * The footer does not read the form: the consumer computes the message and passes it, e.g.
- * `message={saveErrorText ?? getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })}`.
+ * `message={saveErrorText || getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })}`
+ * (`||`, not `??`: a save error with an empty text must not hide the summary).
  * With no error the message is `undefined`: the status region stays mounted and empty and the footer
  * keeps its height. A field the focus cannot reach (`forced`/`locked`/`disabled`, or with no control
  * on the page) still counts in the summary, which is then the only announcement of that error.
