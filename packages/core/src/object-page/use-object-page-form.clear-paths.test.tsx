@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { isClearing, withoutPaths, type FieldErrors } from './field-errors';
+import type { StandardSchemaIssue, StandardSchemaLike } from './standard-schema';
 import { useFocusFirstInvalidField } from './use-focus-first-invalid-field';
 import { useObjectPageForm, type UseObjectPageFormOptions } from './use-object-page-form';
 
@@ -247,6 +248,16 @@ describe('useObjectPageForm: per-path clearing of fieldErrors', () => {
 type Abc = { a: string; b: string; c: string };
 type ThreeFieldsForm = ReturnType<typeof useObjectPageForm<Abc>>;
 
+const ABC_SCHEMA: StandardSchemaLike = {
+  '~standard': {
+    validate: (value: unknown) => {
+      const v = value as Abc;
+      const issues = (['a', 'b', 'c'] as const).filter((k) => v[k] === '').map((k) => ({ message: `${k.toUpperCase()} is required`, path: [k] }));
+      return issues.length > 0 ? { issues } : { value };
+    },
+  },
+};
+
 /**
  * Real DOM: a form with three invalid fields wired to both hooks. `derived` hands the focus hook a
  * `useMemo` copy with translated messages (not the form's own object); `withTrigger` passes
@@ -257,19 +268,26 @@ function ThreeFields({
   formRef,
   derived = false,
   withTrigger = false,
+  withSchema = false,
 }: {
   onRender?: () => void;
   formRef?: { current: ThreeFieldsForm | null };
   derived?: boolean;
   withTrigger?: boolean;
+  /** The same rule as a Standard Schema instead of `validate`. */
+  withSchema?: boolean;
 }) {
   const form = useObjectPageForm<Abc>({
     baseline: { a: '', b: '', c: '' },
-    validate: (v) => {
-      const errors: Record<string, string | undefined> = {};
-      for (const k of ['a', 'b', 'c'] as const) errors[k] = v[k] === '' ? `${k.toUpperCase()} is required` : undefined;
-      return errors;
-    },
+    ...(withSchema
+      ? { schema: ABC_SCHEMA }
+      : {
+          validate: (v: Abc) => {
+            const errors: Record<string, string | undefined> = {};
+            for (const k of ['a', 'b', 'c'] as const) errors[k] = v[k] === '' ? `${k.toUpperCase()} is required` : undefined;
+            return errors;
+          },
+        }),
   });
   if (formRef) formRef.current = form;
   const ref = useRef<HTMLFormElement>(null);
@@ -397,6 +415,156 @@ describe('validationAttempt', () => {
     await fail(result);
     expect(result.current.validationAttempt).toBe(0);
   });
+
+  it('a failed schema grows it by one, also with only root issues and with identical issues', async () => {
+    let issues: StandardSchemaIssue[] = [{ message: 'Name', path: ['name'] }];
+    const validate = vi.fn(() => ({}));
+    const { result } = setup({ schema: handSchema(() => issues), validate });
+    await fail(result);
+    expect(result.current.validationAttempt).toBe(1);
+    await fail(result); // identical issues
+    expect(result.current.validationAttempt).toBe(2);
+    issues = [{ message: 'Root' }]; // only root issues: fieldErrors empty, formErrors not
+    await fail(result);
+    expect(result.current.fieldErrors).toEqual({});
+    expect(result.current.formErrors).toEqual(['Root']);
+    expect(result.current.validationAttempt).toBe(3);
+    await fail(result); // identical root issues
+    expect(result.current.validationAttempt).toBe(4);
+    expect(validate).not.toHaveBeenCalled(); // skipped on a failed schema: counted once, not twice
+  });
+
+  it('a passing schema then a failing validate grows it by one (one attempt, one step)', async () => {
+    const { result } = setup({ schema: handSchema(() => []), validate: () => ({ name: 'Name' }) });
+    await fail(result);
+    expect(result.current.validationAttempt).toBe(1);
+  });
+
+  it('a throwing schema is a saveError: the counter does not move', async () => {
+    const schema: StandardSchemaLike = {
+      '~standard': {
+        validate: () => {
+          throw new Error('boom');
+        },
+      },
+    };
+    const { result } = setup({ schema, validate: undefined });
+    await fail(result);
+    expect(result.current.saveError).toEqual(new Error('boom'));
+    expect(result.current.validationAttempt).toBe(0);
+  });
+
+  it('an asynchronous schema is a saveError: the counter does not move', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const schema: StandardSchemaLike = { '~standard': { validate: () => Promise.resolve({ issues: [{ message: 'X' }] }) } };
+    const { result } = setup({ schema, validate: undefined });
+    await fail(result);
+    expect(result.current.saveError).toBeInstanceOf(Error);
+    expect(result.current.formErrors).toEqual([]);
+    expect(result.current.validationAttempt).toBe(0);
+  });
+});
+
+/** A hand-written synchronous Standard Schema: `check` returns the issues (none = valid). */
+function handSchema(check: (value: Order) => StandardSchemaIssue[]): StandardSchemaLike {
+  return {
+    '~standard': {
+      validate: (value: unknown) => {
+        const issues = check(value as Order);
+        return issues.length > 0 ? { issues } : { value };
+      },
+    },
+  };
+}
+
+describe('per-path clearing and formErrors (root issues of a schema)', () => {
+  const FIELD_AND_ROOT: StandardSchemaIssue[] = [
+    { message: 'Name', path: ['name'] },
+    { message: 'City', path: ['address', 'city'] },
+    { message: 'Root' },
+  ];
+
+  it('a clearing that empties fieldErrors clears formErrors too: both back to the shared empty values', async () => {
+    const { result } = setup({ schema: handSchema(() => FIELD_AND_ROOT), validate: undefined });
+    const emptyFields = result.current.fieldErrors;
+    const emptyForm = result.current.formErrors;
+    await fail(result);
+    expect(result.current.formErrors).toEqual(['Root']);
+    act(() => result.current.setValue('name', 'ACME'));
+    act(() => result.current.setValue('address', { city: 'Rome', zip: '' }));
+    expect(result.current.fieldErrors).toBe(emptyFields);
+    expect(result.current.formErrors).toBe(emptyForm);
+    expect(result.current.formErrors).toEqual([]);
+  });
+
+  it('setValues clearing every field error at once clears formErrors in the same update', async () => {
+    const { result } = setup({ schema: handSchema(() => FIELD_AND_ROOT), validate: undefined });
+    const emptyFields = result.current.fieldErrors;
+    await fail(result);
+    act(() => result.current.setValues({ name: 'ACME', address: { city: 'Rome', zip: '' } }));
+    expect(result.current.fieldErrors).toBe(emptyFields);
+    expect(result.current.formErrors).toEqual([]);
+  });
+
+  it('a partial clearing leaves formErrors unchanged (same array)', async () => {
+    const { result } = setup({ schema: handSchema(() => FIELD_AND_ROOT), validate: undefined });
+    await fail(result);
+    const formErrors = result.current.formErrors;
+    act(() => result.current.setValue('name', 'ACME'));
+    expect(result.current.fieldErrors).toEqual({ 'address.city': 'City' });
+    expect(result.current.formErrors).toBe(formErrors);
+    expect(result.current.formErrors).toEqual(['Root']);
+  });
+
+  it('an edit of a field without errors leaves both untouched (same objects)', async () => {
+    const { result } = setup({ schema: handSchema(() => FIELD_AND_ROOT), validate: undefined });
+    await fail(result);
+    const { fieldErrors, formErrors } = result.current;
+    act(() => result.current.setValue('amount', 5));
+    expect(result.current.fieldErrors).toBe(fieldErrors);
+    expect(result.current.formErrors).toBe(formErrors);
+  });
+
+  it('only root issues: a real edit clears them, writing the same value does not', async () => {
+    const { result } = setup({ schema: handSchema(() => [{ message: 'Root' }]), validate: undefined });
+    const emptyFields = result.current.fieldErrors;
+    await fail(result);
+    const formErrors = result.current.formErrors;
+    act(() => result.current.setValue('name', '')); // same value: no change, no clearing
+    expect(result.current.formErrors).toBe(formErrors);
+    act(() => result.current.setValue('amount', 3));
+    expect(result.current.formErrors).toEqual([]);
+    expect(result.current.fieldErrors).toBe(emptyFields);
+  });
+
+  it.each<[string, (r: ReturnType<typeof setup>['result']) => void]>([
+    ['reset()', (r) => r.current.reset()],
+    ['reset(newBaseline)', (r) => r.current.reset({ ...BASE, name: 'Loaded' })],
+  ])('%s after a partial clearing clears fieldErrors and formErrors', async (_label, doReset) => {
+    const { result } = setup({ schema: handSchema(() => FIELD_AND_ROOT), validate: undefined });
+    const emptyFields = result.current.fieldErrors;
+    const emptyForm = result.current.formErrors;
+    await fail(result);
+    act(() => result.current.setValue('name', 'ACME'));
+    act(() => doReset(result));
+    expect(result.current.fieldErrors).toBe(emptyFields);
+    expect(result.current.formErrors).toBe(emptyForm);
+  });
+
+  it('a successful save after a partial clearing clears fieldErrors and formErrors', async () => {
+    let strict = true;
+    const { result } = setup({ schema: handSchema(() => (strict ? FIELD_AND_ROOT : [])), validate: undefined });
+    const emptyFields = result.current.fieldErrors;
+    const emptyForm = result.current.formErrors;
+    await fail(result);
+    act(() => result.current.setValue('name', 'ACME'));
+    strict = false;
+    await act(async () => {
+      expect(await result.current.save(async () => undefined)).toBe(true);
+    });
+    expect(result.current.fieldErrors).toBe(emptyFields);
+    expect(result.current.formErrors).toBe(emptyForm);
+  });
 });
 
 describe('a derived fieldErrors object (useMemo) with the explicit trigger (real DOM)', () => {
@@ -427,6 +595,27 @@ describe('a derived fieldErrors object (useMemo) with the explicit trigger (real
     expect(a).toHaveFocus();
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
     await user.click(screen.getByRole('button', { name: 'Save' })); // identical errors (A, B)
+    expect(a).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(3);
+  });
+
+  it('with trigger and a failing schema: every failed save moves the focus, typing never does', async () => {
+    const user = userEvent.setup();
+    render(<ThreeFields derived withTrigger withSchema />);
+    const a = screen.getByLabelText('Field A');
+    const c = screen.getByLabelText('Field C');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(a).toHaveFocus();
+    expect(a).toHaveAttribute('aria-invalid', 'true');
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    await user.click(c);
+    await user.keyboard('y');
+    expect(c).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(a).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole('button', { name: 'Save' })); // identical schema issues (A, B)
     expect(a).toHaveFocus();
     expect(scrollIntoView).toHaveBeenCalledTimes(3);
   });
