@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import { isDev } from '../internal/is-dev';
 import { deepEqual } from './equal';
+import { invalidPaths } from './field-errors';
+import type { FieldErrors } from './field-errors';
 
 export interface UseObjectPageFormOptions<Values extends object> {
   /**
@@ -19,13 +21,14 @@ export interface UseObjectPageFormOptions<Values extends object> {
   /**
    * Field-level validation, supplied by the consumer (the core depends on no schema library).
    * Called synchronously by `save` with the current values, before the handler. Return one message
-   * per invalid field (`{}` when valid). If the result has at least one key, `fieldErrors` is
+   * per invalid field (`{}` when valid), keyed by dot-notation path (`FieldErrors`: `supplier`,
+   * `address.city`, `lines.0.qty`; the paths need not be keys of `Values`). If the result has at least one key, `fieldErrors` is
    * updated, the handler is not called and `save` resolves `false` (`isSaving` is never touched).
    * A key whose value is `undefined` counts as no error. If `validate` throws, it is treated like a
    * throwing handler: `saveError` is set and `save` resolves `false`. The latest function passed is
    * used, so an inline function is fine.
    */
-  validate?: (values: Values) => Partial<Record<keyof Values, string>>;
+  validate?: (values: Values) => FieldErrors | Partial<Record<keyof Values, string>>;
 }
 
 export interface UseObjectPageFormReturn<Values extends object> {
@@ -95,11 +98,11 @@ export interface UseObjectPageFormReturn<Values extends object> {
    * (`useFocusFirstInvalidField` relies on this identity). The hook never
    * touches the DOM: pair it with `useFocusFirstInvalidField` to scroll/focus.
    */
-  fieldErrors: Partial<Record<keyof Values, string>>;
+  fieldErrors: FieldErrors;
 }
 
 // Shared identity so "no errors" never re-renders consumers that depend on `fieldErrors`.
-const NO_ERRORS: Record<never, never> = /* @__PURE__ */ Object.freeze({});
+const NO_ERRORS: FieldErrors = /* @__PURE__ */ Object.freeze({});
 
 interface FormState<Values> {
   baseline: Values;
@@ -118,7 +121,7 @@ export function useObjectPageForm<Values extends object>(
   const [state, setState] = useState<FormState<Values>>(() => ({ baseline: baselineOption, values: baselineOption }));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<{ error: unknown } | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof Values, string>>>(NO_ERRORS);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
 
   // Synchronous mirror of the state, so several updates in one event compose and `save` reads the
   // very latest values without being recreated.
@@ -209,7 +212,7 @@ export function useObjectPageForm<Values extends object>(
       const validateFn = validateRef.current;
       if (validateFn) {
         // Synchronous, before any async work: `isSaving` is never touched on a validation failure.
-        let errors: Partial<Record<keyof Values, string>>;
+        let errors: FieldErrors;
         try {
           errors = validateFn(stateRef.current.values);
         } catch (thrown) {
@@ -221,10 +224,10 @@ export function useObjectPageForm<Values extends object>(
           return false;
         }
         // A key whose value is `undefined` is "no error" (`{ name: ok ? undefined : 'Required' }`).
-        const invalid = (Object.keys(errors) as (keyof Values)[]).filter((key) => errors[key] !== undefined);
+        const invalid = invalidPaths(errors);
         if (invalid.length > 0) {
-          const next: Partial<Record<keyof Values, string>> = {};
-          for (const key of invalid) next[key] = errors[key];
+          const next: Record<string, string | undefined> = {};
+          for (const path of invalid) next[path] = errors[path];
           fieldErrorsRef.current = true;
           setFieldErrors(next);
           return false;

@@ -26,6 +26,37 @@ test.describe('useFocusFirstInvalidField: stories', () => {
   }
 });
 
+const NESTED = 'internal-useobjectpageformfixture--object-page-nested';
+// Same fixture without a play function: the tests themselves click Save.
+const NESTED_NO_PLAY = 'internal-useobjectpageformfixture--object-page-nested-no-play';
+
+test.describe('useFocusFirstInvalidField: nested dot-notation paths', () => {
+  test(`${NESTED}: the play function passes`, async ({ page }) => {
+    await expectPlayToPass(page, NESTED);
+  });
+
+  test('Save with empty nested fields: focus on address.city, a message on every invalid field', async ({ page }) => {
+    await gotoStory(page, NESTED_NO_PLAY);
+    await save(page).click();
+    await expect(page.getByLabel('City')).toBeFocused();
+    await expect(page.getByLabel('City')).toHaveAttribute('data-rop-name', 'address.city');
+    await expect(page.getByText('City is required')).toBeVisible();
+    await expect(page.getByText('Quantity is required')).toHaveCount(2);
+    await expect(page.getByLabel('Supplier')).not.toHaveAttribute('aria-invalid', 'true');
+  });
+
+  test('with city filled in the focus moves to lines.0.qty, then to lines.1.qty (exact paths)', async ({ page }) => {
+    await gotoStory(page, NESTED_NO_PLAY);
+    await page.getByLabel('City').fill('Roma');
+    await save(page).click();
+    await expect(page.getByLabel('Quantity 1')).toBeFocused();
+    await page.getByLabel('Quantity 1').fill('3');
+    await save(page).click();
+    await expect(page.getByLabel('Quantity 2')).toBeFocused();
+    await expect(page.getByText('Quantity is required')).toHaveCount(1);
+  });
+});
+
 test.describe('useFocusFirstInvalidField: behavior in a real browser', () => {
   test('all empty: focus and scroll go to the first field in visual order, even though the errors are keyed D, C, B, A', async ({
     page,
