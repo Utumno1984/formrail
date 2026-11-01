@@ -87,4 +87,33 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
       /__SECRET_INTERNALS_DO_NOT_USE|react\.production|ReactCurrentOwner|react-dom\.production/,
     );
   });
+
+  // `useObjectPageForm({ schema })` speaks Standard Schema through structural types only: no schema
+  // library (nor `@standard-schema/spec`) may become a runtime or peer dependency, or reach dist.
+  it('depends on no schema library: zod is a test-only devDependency and never reaches dist', () => {
+    for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies']) {
+      const deps = (pkg[field] ?? {}) as Record<string, string>;
+      expect(Object.keys(deps).filter((d) => /zod|valibot|arktype|standard-schema/.test(d))).toEqual([]);
+    }
+    const bundled = readdirSync(distDir)
+      .filter((f) => /\.(js|cjs|d\.ts|d\.cts)$/.test(f))
+      .map((f) => readFileSync(join(distDir, f), 'utf8'))
+      .join('\n');
+    expect(bundled).not.toMatch(/from ['"]zod|require\(['"]zod|@standard-schema\/spec/);
+  });
+
+  it('no non-test, non-story module under src imports zod', () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(entry.name) && !/\.(test|stories)\.tsx?$/.test(entry.name)) {
+          if (/from ['"]zod(\/[^'"]*)?['"]|import\(['"]zod/.test(readFileSync(full, 'utf8'))) offenders.push(full);
+        }
+      }
+    };
+    walk(join(packageDir, 'src'));
+    expect(offenders).toEqual([]);
+  });
 });

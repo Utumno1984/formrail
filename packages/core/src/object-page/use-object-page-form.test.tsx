@@ -251,7 +251,7 @@ describe('useObjectPageForm: reset and hydration', () => {
   it('exposes no change callback', () => {
     const { result } = setup();
     expect(Object.keys(result.current).sort()).toEqual(
-      ['baseline', 'fieldErrors', 'isDirty', 'isSaving', 'reset', 'save', 'saveError', 'setValue', 'setValues', 'values'].sort(),
+      ['baseline', 'fieldErrors', 'formErrors', 'isDirty', 'isSaving', 'reset', 'save', 'saveError', 'setValue', 'setValues', 'values'].sort(),
     );
   });
 
