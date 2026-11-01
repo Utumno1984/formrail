@@ -41,18 +41,14 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocu
     const candidates: HTMLElement[] = [];
     if (container) {
       // Attribute comparison instead of a `[name="..."]` selector: no escaping of exotic names.
+      // `data-rop-name` first; `[name]` only for the keys no `data-rop-name` control answers to.
       const found = new Set<string>();
-      for (const el of container.querySelectorAll<HTMLElement>('[data-rop-name]')) {
-        const key = el.getAttribute('data-rop-name') ?? '';
-        if (!wanted.has(key)) continue;
-        found.add(key);
-        candidates.push(el);
-      }
-      // Keys no Field-wired control answers to: own controls with only a native `name`.
-      if (found.size < wanted.size) {
-        for (const el of container.querySelectorAll<HTMLElement>('[name]')) {
-          const key = el.getAttribute('name') ?? '';
-          if (wanted.has(key) && !found.has(key)) candidates.push(el);
+      for (const attr of ['data-rop-name', 'name']) {
+        for (const el of container.querySelectorAll<HTMLElement>(`[${attr}]`)) {
+          const key = el.getAttribute(attr) as string;
+          if (!wanted.has(key) || (attr === 'name' && found.has(key))) continue;
+          candidates.push(el);
+          found.add(key);
         }
       }
     }
@@ -73,7 +69,7 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocu
 
     if (isDev()) {
       console.error(
-        '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]` or `[name]` element inside the container, nothing was focused.',
+        '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]`/`[name]` element inside the container, nothing was focused.',
       );
     }
   }, [fieldErrors, containerRef]);
