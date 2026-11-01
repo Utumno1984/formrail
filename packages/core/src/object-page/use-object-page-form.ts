@@ -3,6 +3,10 @@ import { isDev } from '../internal/is-dev';
 import { deepEqual } from './equal';
 import { invalidPaths } from './field-errors';
 import type { FieldErrors } from './field-errors';
+import { issuesToErrors } from './standard-schema';
+import type { SchemaErrors, StandardSchemaLike, StandardSchemaResult } from './standard-schema';
+
+const ASYNC_SCHEMA_MESSAGE = 'asynchronous schema not supported: validation is synchronous in v1';
 
 export interface UseObjectPageFormOptions<Values extends object> {
   /**
@@ -29,6 +33,29 @@ export interface UseObjectPageFormOptions<Values extends object> {
    * used, so an inline function is fine.
    */
   validate?: (values: Values) => FieldErrors | Partial<Record<keyof Values, string>>;
+  /**
+   * A [Standard Schema](https://standardschema.dev) (Zod >= 3.24 / 4, Valibot, ArkType, or any object
+   * with a `~standard.validate` function); the core imports no schema library. `save` calls
+   * `schema['~standard'].validate(values)` **synchronously**, before `validate` and the handler.
+   *
+   * - Issues with a path become `fieldErrors`: the path is joined with dots (`address.city`,
+   *   `lines.0.qty`; `{ key }` segments unwrapped, symbols through `String()`) and only the **first**
+   *   message per path is kept. Issues with an empty/absent path (a rule on the whole object) go to
+   *   `formErrors`. Any issue makes the save fail like a failing `validate`: the handler is not
+   *   called, `save` resolves `false`, `isSaving` is never touched and `saveError` stays `null`.
+   * - When the schema fails, `validate` is **not** called: it only ever receives values that pass the
+   *   schema, so it can hold the extra (e.g. cross-field) rules. When the schema passes, `validate`
+   *   runs as usual.
+   * - The handler always receives the **raw** values, never the schema output: transformations and
+   *   coercions of the schema do not change `Values` (v1).
+   * - An asynchronous schema (its `validate` returns a `Promise`) is not supported in v1: `save`
+   *   resolves `false` at once with a `saveError` (and a `console.error` in development).
+   * - A schema that throws is treated like a throwing `validate`: `saveError` is set, `save` resolves
+   *   `false`.
+   *
+   * The latest schema passed is used, so an inline schema is fine.
+   */
+  schema?: StandardSchemaLike;
 }
 
 export interface UseObjectPageFormReturn<Values extends object> {
@@ -45,11 +72,11 @@ export interface UseObjectPageFormReturn<Values extends object> {
    * original value makes the form clean again.
    */
   isDirty: boolean;
-  /** Sets one top-level field. Clears `saveError` and `fieldErrors`. Stable identity. */
+  /** Sets one top-level field. Clears `saveError`, `fieldErrors` and `formErrors`. Stable identity. */
   setValue: <K extends keyof Values>(name: K, value: Values[K]) => void;
   /**
    * Merges several top-level fields in a single update (shallow merge, like `Object.assign`).
-   * Clears `saveError` and `fieldErrors`. Stable identity.
+   * Clears `saveError`, `fieldErrors` and `formErrors`. Stable identity.
    *
    * Explicitly passing `undefined` for a field sets its value to `undefined`, same as any merge
    * patch — this library does not (and structurally cannot) forbid it at the type level for a
@@ -63,7 +90,7 @@ export interface UseObjectPageFormReturn<Values extends object> {
   /**
    * `reset(newBaseline)` hydrates: baseline and values become `newBaseline` and the form is clean,
    * without any user-gesture signal (the hook exposes no change callback). `reset()` discards the
-   * edits and returns the values to the current baseline. Both clear `saveError` and `fieldErrors`. During a save
+   * edits and returns the values to the current baseline. Both clear `saveError`, `fieldErrors` and `formErrors`. During a save
    * in flight the reset wins: the later success of that save does not overwrite the new baseline.
    * Stable identity.
    */
@@ -90,19 +117,33 @@ export interface UseObjectPageFormReturn<Values extends object> {
    */
   saveError: unknown;
   /**
-   * Field-level errors of the last save attempt, as returned by `validate` (`{}` when there are none
-   * or no `validate` was passed). Distinct from `saveError` (network/server). Cleared as a whole by
-   * `setValue`, `setValues`, `reset` and a successful save, and replaced/cleared by every new save
-   * attempt that gets past a passing `validate`; per-field clearing is not supported. Every failed
-   * `validate` produces a **new** object, even with content identical to the previous attempt
+   * Field-level errors of the last save attempt, as produced by `schema` (its issues with a path) or
+   * returned by `validate` (`{}` when there are none or neither was passed). Distinct from
+   * `saveError` (network/server). Cleared as a whole by `setValue`, `setValues`, `reset` and a
+   * successful save, and replaced/cleared by every new save attempt that gets past a passing
+   * `schema`/`validate`; per-field clearing is not supported. Every failed `schema` or `validate`
+   * produces a **new** object (empty when a failed schema only had root issues, see `formErrors`),
+   * even with content identical to the previous attempt
    * (`useFocusFirstInvalidField` relies on this identity). The hook never
    * touches the DOM: pair it with `useFocusFirstInvalidField` to scroll/focus.
    */
   fieldErrors: FieldErrors;
+  /**
+   * Root-level (form-wide) messages of the last save attempt: the `schema` issues with an empty
+   * path, such as a rule on the whole object, in issue order (empty when there are none or no
+   * `schema` was passed). They have no field, so they are not in `fieldErrors`, but they make `save`
+   * fail in the same way. Cleared by the same rules as `fieldErrors`; a failed schema with at least
+   * one root issue produces a **new** array every time.
+   */
+  formErrors: readonly string[];
 }
 
 // Shared identity so "no errors" never re-renders consumers that depend on `fieldErrors`.
-const NO_ERRORS: FieldErrors = /* @__PURE__ */ Object.freeze({});
+const NO_FORM_ERRORS: readonly string[] = /* @__PURE__ */ Object.freeze([]);
+const NO_SCHEMA_ERRORS: SchemaErrors = /* @__PURE__ */ Object.freeze({
+  fieldErrors: /* @__PURE__ */ Object.freeze({}),
+  formErrors: NO_FORM_ERRORS,
+});
 
 interface FormState<Values> {
   baseline: Values;
@@ -116,12 +157,13 @@ interface FormState<Values> {
 export function useObjectPageForm<Values extends object>(
   options: UseObjectPageFormOptions<Values>,
 ): UseObjectPageFormReturn<Values> {
-  const { baseline: baselineOption, isEqual = deepEqual, validate } = options;
+  const { baseline: baselineOption, isEqual = deepEqual } = options;
 
   const [state, setState] = useState<FormState<Values>>(() => ({ baseline: baselineOption, values: baselineOption }));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<{ error: unknown } | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>(NO_ERRORS);
+  // `fieldErrors` and `formErrors` are always set and cleared together: one state for both.
+  const [errors, setErrors] = useState<SchemaErrors>(NO_SCHEMA_ERRORS);
 
   // Synchronous mirror of the state, so several updates in one event compose and `save` reads the
   // very latest values without being recreated.
@@ -132,11 +174,12 @@ export function useObjectPageForm<Values extends object>(
   const epochRef = useRef(0);
   const saveErrorRef = useRef(false);
   const fieldErrorsRef = useRef(false);
-  const validateRef = useRef(validate);
+  // Latest options, read by `save` for `schema` and `validate`.
+  const optionsRef = useRef(options);
   // Insertion effect: runs before any layout/passive effect of the same commit (so a `save` called
-  // from one sees the latest `validate`) and, unlike a layout effect, does not warn during SSR.
+  // from one sees the latest `validate`/`schema`) and, unlike a layout effect, does not warn during SSR.
   useInsertionEffect(() => {
-    validateRef.current = validate;
+    optionsRef.current = options;
   });
   const initialBaselineRef = useRef(baselineOption);
   const warnedRef = useRef(false);
@@ -165,7 +208,7 @@ export function useObjectPageForm<Values extends object>(
   const clearFieldErrors = useCallback(() => {
     if (!fieldErrorsRef.current) return;
     fieldErrorsRef.current = false;
-    setFieldErrors(NO_ERRORS);
+    setErrors(NO_SCHEMA_ERRORS);
   }, []);
 
   const clearSaveError = useCallback(() => {
@@ -209,31 +252,50 @@ export function useObjectPageForm<Values extends object>(
   const save = useCallback(
     async (handler: (values: Values) => Promise<Values | void> | Values | void): Promise<boolean> => {
       if (savingRef.current) return false;
-      const validateFn = validateRef.current;
-      if (validateFn) {
-        // Synchronous, before any async work: `isSaving` is never touched on a validation failure.
-        let errors: FieldErrors;
-        try {
-          errors = validateFn(stateRef.current.values);
-        } catch (thrown) {
-          // A `validate` that throws (e.g. `schema.parse`) follows the same contract as a throwing
-          // handler: `saveError` is set and `save` resolves `false`.
-          clearFieldErrors();
-          saveErrorRef.current = true;
-          setSaveError({ error: thrown ?? new Error('Validation failed') });
-          return false;
+      // Schema first, then `validate`: both synchronous, before any async work, so `isSaving` is
+      // never touched on a validation failure. `failed` = the errors of a failed attempt.
+      let failed: SchemaErrors | undefined;
+      try {
+        const values = stateRef.current.values;
+        const { schema, validate } = optionsRef.current;
+        if (schema) {
+          const result = schema['~standard'].validate(values);
+          // A `null`/`undefined` result (not a Standard Schema) throws here: a loud saveError.
+          if (typeof (result as { then?: unknown }).then == 'function') {
+            // Never awaited (v1 is synchronous); a later rejection must not surface as unhandled.
+            (result as PromiseLike<unknown>).then(undefined, () => undefined);
+            const error = new Error(ASYNC_SCHEMA_MESSAGE);
+            if (isDev()) console.error('[react-object-page] useObjectPageForm:', error);
+            throw error;
+          }
+          const issues = (result as StandardSchemaResult).issues;
+          // On any issue `validate` is skipped: it only ever sees schema-valid values.
+          if (issues?.length) failed = issuesToErrors(issues);
         }
-        // A key whose value is `undefined` is "no error" (`{ name: ok ? undefined : 'Required' }`).
-        const invalid = invalidPaths(errors);
-        if (invalid.length > 0) {
-          const next: Record<string, string | undefined> = {};
-          for (const path of invalid) next[path] = errors[path];
-          fieldErrorsRef.current = true;
-          setFieldErrors(next);
-          return false;
+        if (!failed && validate) {
+          const returned: FieldErrors = validate(values);
+          // A key whose value is `undefined` is "no error" (`{ name: ok ? undefined : 'Required' }`).
+          const invalid = invalidPaths(returned);
+          if (invalid.length > 0) {
+            const next: Record<string, string | undefined> = {};
+            for (const path of invalid) next[path] = returned[path];
+            failed = { fieldErrors: next, formErrors: NO_FORM_ERRORS };
+          }
         }
-        clearFieldErrors(); // stale errors of a previous attempt
+      } catch (thrown) {
+        // A schema or `validate` that throws (a bug, or `schema.parse`) follows the same contract as
+        // a throwing handler: `saveError` is set and `save` resolves `false`.
+        clearFieldErrors();
+        saveErrorRef.current = true;
+        setSaveError({ error: thrown ?? new Error('Validation failed') });
+        return false;
       }
+      if (failed) {
+        fieldErrorsRef.current = true;
+        setErrors(failed); // new objects on every failed attempt
+        return false;
+      }
+      clearFieldErrors(); // stale errors of a previous attempt
       savingRef.current = true;
       const epoch = epochRef.current;
       const sent = stateRef.current.values;
@@ -289,6 +351,7 @@ export function useObjectPageForm<Values extends object>(
     save,
     isSaving,
     saveError: saveError ? saveError.error : null,
-    fieldErrors,
+    fieldErrors: errors.fieldErrors,
+    formErrors: errors.formErrors,
   };
 }

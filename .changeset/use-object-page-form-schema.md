@@ -1,0 +1,5 @@
+---
+'@react-object-page/core': minor
+---
+
+`useObjectPageForm({ schema })`: validation with any [Standard Schema](https://standardschema.dev) (Zod >= 3.24 / 4, Valibot, ArkType or a hand-written object with `~standard.validate`). The core declares only the structural types (new exported types `StandardSchemaLike`, `StandardSchemaIssue`, `StandardSchemaResult`, `StandardSchemaPathSegment`) and adds no dependency. On `save` the schema runs synchronously before `validate` and the handler: issues with a path become `fieldErrors` (dot-notation path, first message per path), issues on the root become the new `formErrors: readonly string[]` return; either makes `save` resolve `false` without calling the handler, without touching `isSaving` and without a `saveError`. When the schema fails `validate` is not called. The handler still receives the raw values (never the schema output). An asynchronous schema is not supported in v1 (`saveError` + `console.error` in development); a schema that throws is reported as a `saveError`, like a throwing `validate`.
