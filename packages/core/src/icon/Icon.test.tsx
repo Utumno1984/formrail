@@ -248,6 +248,7 @@ describe('internal icons', () => {
       'cn',
       'composeRefs',
       'defaultComboboxFilter',
+      'getErrorSummary',
       'useCombobox',
       'useDirtyGuard',
       'useFieldControl',

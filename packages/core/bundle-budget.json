@@ -186,6 +186,10 @@
       "baseline": 169,
       "limit": 189
     },
+    "getErrorSummary": {
+      "baseline": 205,
+      "limit": 226
+    },
     "useCombobox": {
       "baseline": 1989,
       "limit": 2188
