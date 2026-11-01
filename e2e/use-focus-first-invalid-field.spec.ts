@@ -27,6 +27,8 @@ test.describe('useFocusFirstInvalidField: stories', () => {
 });
 
 const NESTED = 'internal-useobjectpageformfixture--object-page-nested';
+// Same fixture without a play function: the tests themselves click Save.
+const NESTED_NO_PLAY = 'internal-useobjectpageformfixture--object-page-nested-no-play';
 
 test.describe('useFocusFirstInvalidField: nested dot-notation paths', () => {
   test(`${NESTED}: the play function passes`, async ({ page }) => {
@@ -34,7 +36,7 @@ test.describe('useFocusFirstInvalidField: nested dot-notation paths', () => {
   });
 
   test('Save with empty nested fields: focus on address.city, a message on every invalid field', async ({ page }) => {
-    await gotoStory(page, NESTED);
+    await gotoStory(page, NESTED_NO_PLAY);
     await save(page).click();
     await expect(page.getByLabel('City')).toBeFocused();
     await expect(page.getByLabel('City')).toHaveAttribute('data-rop-name', 'address.city');
@@ -44,7 +46,7 @@ test.describe('useFocusFirstInvalidField: nested dot-notation paths', () => {
   });
 
   test('with city filled in the focus moves to lines.0.qty, then to lines.1.qty (exact paths)', async ({ page }) => {
-    await gotoStory(page, NESTED);
+    await gotoStory(page, NESTED_NO_PLAY);
     await page.getByLabel('City').fill('Roma');
     await save(page).click();
     await expect(page.getByLabel('Quantity 1')).toBeFocused();
