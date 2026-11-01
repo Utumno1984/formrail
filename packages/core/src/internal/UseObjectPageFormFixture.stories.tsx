@@ -121,6 +121,10 @@ function FocusDemo({ scenario, onSave }: { scenario: Scenario; onSave: (v: Long)
       <div style={SPACER} />
       {field('d')}
       <button type="submit">Save</button>
+      {/* Writes every field back with the value it already has: no real change, so no clearing. */}
+      <button type="button" onClick={() => form.setValues({ ...form.values })}>
+        Re-apply current values
+      </button>
       <p data-testid="field-error-count">field errors: {Object.keys(form.fieldErrors).length}</p>
     </form>
   );
@@ -240,15 +244,46 @@ export const FocusFirstInvalidSkipsValid: FocusStory = {
   },
 };
 
-/** Typing after a failure clears every field error at once (no per-field clearing in this version). */
-export const FocusFirstInvalidTypingClears: FocusStory = {
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+/**
+ * Typing after a failure clears only the error of the field being edited: the other fields keep
+ * `aria-invalid` and their message, and the focus stays where the user types (a clearing never
+ * re-focuses). A new Save with the remaining errors, even identical ones, moves the focus again.
+ * (Until #102 this story was "Typing after a failure clears every field error at once".)
+ */
+export const FocusFirstInvalidTypingClearsOnlyThatField: FocusStory = {
   ...focusMeta,
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
+    const field = (k: string) => canvas.getByLabelText(`Field ${k}`);
+    const [a, b, c, d] = [field('A'), field('B'), field('C'), field('D')];
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(canvas.getByLabelText('Field A')).toHaveFocus());
+    await waitFor(() => expect(a).toHaveFocus());
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 4');
+
+    // Typing in A clears A only; B, C and D stay invalid with their message.
     await userEvent.keyboard('x');
-    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 0');
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 3');
+    await expect(a).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(canvas.queryByText('A is required')).toBeNull();
+    for (const el of [b, c, d]) await expect(el).toHaveAttribute('aria-invalid', 'true');
+    await expect(canvas.getByText('B is required')).toBeInTheDocument();
+
+    // Typing in C (not the first invalid one): the focus stays in C, it does not jump to B.
+    await userEvent.click(c);
+    await userEvent.keyboard('y');
+    await nextFrame();
+    await expect(c).toHaveFocus();
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 2');
+    await expect(b).toHaveAttribute('aria-invalid', 'true');
+
+    // Save again: the first field still invalid (B) takes the focus, and again with identical errors.
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(b).toHaveFocus());
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(b).toHaveFocus());
+    await expect(canvas.getByTestId('field-error-count')).toHaveTextContent('field errors: 2');
     await expect(args.onSave).not.toHaveBeenCalled();
   },
 };

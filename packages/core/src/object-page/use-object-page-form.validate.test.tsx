@@ -86,9 +86,34 @@ describe('useObjectPageForm: validate / fieldErrors', () => {
     expect(result.current.fieldErrors).toEqual({});
   });
 
+  // Until #102 `setValue`/`setValues` were rows of the "clears fieldErrors as a whole" table below
+  // (all-or-nothing clearing). Decision of Daniele (validation plan, F10): they now clear only the
+  // paths they write, so those rows became the per-path tests that follow; `reset` is unchanged.
   it.each<[string, (r: Result) => void]>([
     ['setValue', (r) => r.current.setValue('amount', 11)],
     ['setValues', (r) => r.current.setValues({ amount: 12 })],
+  ])('%s on a field without errors leaves the errors of the other fields in place', async (_label, mutate) => {
+    const { result } = setup({ validate: requireName });
+    await failValidation(result);
+    const before = result.current.fieldErrors;
+    act(() => mutate(result));
+    expect(result.current.fieldErrors).toBe(before);
+    expect(result.current.fieldErrors).toEqual({ name: 'Required' });
+  });
+
+  it.each<[string, (r: Result) => void]>([
+    ['setValue', (r) => r.current.setValue('name', 'x')],
+    ['setValues', (r) => r.current.setValues({ name: 'x' })],
+  ])('%s on the invalid field clears its error (the shared empty object once none is left)', async (_label, mutate) => {
+    const { result } = setup({ validate: requireName });
+    const empty = result.current.fieldErrors;
+    await failValidation(result);
+    act(() => mutate(result));
+    expect(result.current.fieldErrors).toEqual({});
+    expect(result.current.fieldErrors).toBe(empty);
+  });
+
+  it.each<[string, (r: Result) => void]>([
     ['reset()', (r) => r.current.reset()],
     ['reset(newBaseline)', (r) => r.current.reset({ name: 'N', amount: 1 })],
   ])('%s clears fieldErrors as a whole', async (_label, mutate) => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import { isDev } from '../internal/is-dev';
 import { deepEqual } from './equal';
-import { invalidPaths } from './field-errors';
+import { invalidPaths, withoutPaths } from './field-errors';
 import type { FieldErrors } from './field-errors';
 
 export interface UseObjectPageFormOptions<Values extends object> {
@@ -45,11 +45,18 @@ export interface UseObjectPageFormReturn<Values extends object> {
    * original value makes the form clean again.
    */
   isDirty: boolean;
-  /** Sets one top-level field. Clears `saveError` and `fieldErrors`. Stable identity. */
+  /**
+   * Sets one top-level field. Clears `saveError`. When the value really changes (`Object.is`, or
+   * the key was missing) it also removes from `fieldErrors` the error of the path `name` and of
+   * every descendant path (`name.*`); the errors of the other paths stay (see `fieldErrors`).
+   * Stable identity.
+   */
   setValue: <K extends keyof Values>(name: K, value: Values[K]) => void;
   /**
    * Merges several top-level fields in a single update (shallow merge, like `Object.assign`).
-   * Clears `saveError` and `fieldErrors`. Stable identity.
+   * Clears `saveError`. Removes from `fieldErrors` the errors within each key whose value really
+   * changes (the union of what `setValue` would remove for each of them); keys of the patch whose
+   * value is unchanged clear nothing. Stable identity.
    *
    * Explicitly passing `undefined` for a field sets its value to `undefined`, same as any merge
    * patch — this library does not (and structurally cannot) forbid it at the type level for a
@@ -63,7 +70,8 @@ export interface UseObjectPageFormReturn<Values extends object> {
   /**
    * `reset(newBaseline)` hydrates: baseline and values become `newBaseline` and the form is clean,
    * without any user-gesture signal (the hook exposes no change callback). `reset()` discards the
-   * edits and returns the values to the current baseline. Both clear `saveError` and `fieldErrors`. During a save
+   * edits and returns the values to the current baseline. Both clear `saveError` and **all** the
+   * `fieldErrors` (also after a partial clearing in the same event). During a save
    * in flight the reset wins: the later success of that save does not overwrite the new baseline.
    * Stable identity.
    */
@@ -91,12 +99,28 @@ export interface UseObjectPageFormReturn<Values extends object> {
   saveError: unknown;
   /**
    * Field-level errors of the last save attempt, as returned by `validate` (`{}` when there are none
-   * or no `validate` was passed). Distinct from `saveError` (network/server). Cleared as a whole by
-   * `setValue`, `setValues`, `reset` and a successful save, and replaced/cleared by every new save
-   * attempt that gets past a passing `validate`; per-field clearing is not supported. Every failed
-   * `validate` produces a **new** object, even with content identical to the previous attempt
-   * (`useFocusFirstInvalidField` relies on this identity). The hook never
-   * touches the DOM: pair it with `useFocusFirstInvalidField` to scroll/focus.
+   * or no `validate` was passed). Distinct from `saveError` (network/server).
+   *
+   * - **Per-path clearing on edit**: `setValue(name)` / `setValues(patch)` remove only the errors
+   *   of the changed fields: the path `name` and its descendants (`address` also removes
+   *   `address.city`; `lines` removes every `lines.*`, so editing one line clears the errors of all
+   *   the lines). The errors of the other paths, and of **ancestor** paths, stay with their
+   *   message: an error keyed `address` is removed by writing `address` or by a new save, never by
+   *   a path below it. Setting a field to the value it already has removes nothing (and causes no
+   *   re-render).
+   * - **Known limit, cross-field errors**: an error that depends on several fields (e.g. "the
+   *   passwords do not match" keyed `passwordConfirm`) is not re-evaluated on edit: changing the
+   *   *other* field (`password`) leaves it in place until the next save. Only keys are compared,
+   *   never the rule that produced them.
+   * - **Cleared as a whole** by `reset()`, `reset(newBaseline)` and a successful save; replaced or
+   *   cleared by every new save attempt (a passing `validate` clears the stale errors before the
+   *   handler runs).
+   * - **Identity**: once no error is left, this is always the same shared empty object, so "no
+   *   errors" never re-renders a consumer. Every failed `validate` produces a **new** object, even
+   *   with content identical to the previous attempt; a partial clearing produces a new object too,
+   *   but one that `useFocusFirstInvalidField` recognizes and ignores (typing never moves the
+   *   focus, a failed save always does). The hook never touches the DOM: pair it with
+   *   `useFocusFirstInvalidField` to scroll/focus.
    */
   fieldErrors: FieldErrors;
 }
@@ -131,7 +155,8 @@ export function useObjectPageForm<Values extends object>(
   const mountedRef = useRef(true);
   const epochRef = useRef(0);
   const saveErrorRef = useRef(false);
-  const fieldErrorsRef = useRef(false);
+  // Synchronous mirror of `fieldErrors`: several edits in one event compose their clearings.
+  const fieldErrorsRef = useRef<FieldErrors>(NO_ERRORS);
   const validateRef = useRef(validate);
   // Insertion effect: runs before any layout/passive effect of the same commit (so a `save` called
   // from one sees the latest `validate`) and, unlike a layout effect, does not warn during SSR.
@@ -162,29 +187,34 @@ export function useObjectPageForm<Values extends object>(
     setState(next);
   }, []);
 
-  const clearFieldErrors = useCallback(() => {
-    if (!fieldErrorsRef.current) return;
-    fieldErrorsRef.current = false;
-    setFieldErrors(NO_ERRORS);
+  // No re-render when the object does not change; an empty result becomes the shared `NO_ERRORS`.
+  const setErrors = useCallback((next: FieldErrors) => {
+    if (Object.keys(next).length === 0) next = NO_ERRORS;
+    if (fieldErrorsRef.current === next) return;
+    fieldErrorsRef.current = next;
+    setFieldErrors(next);
   }, []);
 
   const clearSaveError = useCallback(() => {
-    clearFieldErrors();
     if (!saveErrorRef.current) return;
     saveErrorRef.current = false;
     setSaveError(null);
-  }, [clearFieldErrors]);
+  }, []);
 
   const setValues = useCallback(
     (patch: Partial<Values>) => {
       const current = stateRef.current;
-      const keys = Object.keys(patch) as (keyof Values)[];
-      if (keys.some((key) => !Object.is(current.values[key], patch[key]) || !(key in current.values))) {
+      const changed = Object.keys(patch).filter(
+        (key) => !Object.is(current.values[key as keyof Values], patch[key as keyof Values]) || !(key in current.values),
+      );
+      if (changed.length > 0) {
         commit({ baseline: current.baseline, values: { ...current.values, ...patch } });
+        // Only the paths of the fields that really changed (and their descendants) lose their error.
+        setErrors(withoutPaths(fieldErrorsRef.current, changed));
       }
       clearSaveError();
     },
-    [commit, clearSaveError],
+    [commit, setErrors, clearSaveError],
   );
 
   const setValue = useCallback(
@@ -201,9 +231,10 @@ export function useObjectPageForm<Values extends object>(
       epochRef.current += 1;
       const baseline = newBaseline ?? stateRef.current.baseline;
       commit({ baseline, values: baseline });
+      setErrors(NO_ERRORS);
       clearSaveError();
     },
-    [commit, clearSaveError],
+    [commit, setErrors, clearSaveError],
   );
 
   const save = useCallback(
@@ -218,7 +249,7 @@ export function useObjectPageForm<Values extends object>(
         } catch (thrown) {
           // A `validate` that throws (e.g. `schema.parse`) follows the same contract as a throwing
           // handler: `saveError` is set and `save` resolves `false`.
-          clearFieldErrors();
+          setErrors(NO_ERRORS);
           saveErrorRef.current = true;
           setSaveError({ error: thrown ?? new Error('Validation failed') });
           return false;
@@ -228,11 +259,11 @@ export function useObjectPageForm<Values extends object>(
         if (invalid.length > 0) {
           const next: Record<string, string | undefined> = {};
           for (const path of invalid) next[path] = errors[path];
-          fieldErrorsRef.current = true;
-          setFieldErrors(next);
+          // Always a new object, even with identical content: a new attempt, never a clearing.
+          setErrors(next);
           return false;
         }
-        clearFieldErrors(); // stale errors of a previous attempt
+        setErrors(NO_ERRORS); // stale errors of a previous attempt
       }
       savingRef.current = true;
       const epoch = epochRef.current;
@@ -273,10 +304,11 @@ export function useObjectPageForm<Values extends object>(
       const current = stateRef.current;
       const untouched = current.values === sent || deepEqual(current.values, sent);
       commit({ baseline, values: untouched ? baseline : current.values });
+      setErrors(NO_ERRORS);
       clearSaveError();
       return true;
     },
-    [commit, clearSaveError, clearFieldErrors],
+    [commit, setErrors, clearSaveError],
   );
 
   return {

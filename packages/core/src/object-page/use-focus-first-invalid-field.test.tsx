@@ -1,6 +1,7 @@
 import { cleanup, render } from '@testing-library/react';
 import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { withoutPaths } from './field-errors';
 import { useFocusFirstInvalidField } from './use-focus-first-invalid-field';
 
 const scrollIntoView = vi.fn();
@@ -69,6 +70,21 @@ describe('useFocusFirstInvalidField', () => {
     rerender(<Form errors={{}} />);
     expect(getByLabelText('c')).toHaveFocus();
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the object of a partial clearing (withoutPaths), then fires again for a new attempt', () => {
+    const attempt = { a: 'x', b: 'y', c: 'z' };
+    const { rerender, getByLabelText } = render(<Form errors={attempt} />);
+    expect(getByLabelText('a')).toHaveFocus();
+    // the user types in c: a and b are still invalid, but the focus must stay in c
+    getByLabelText('c').focus();
+    rerender(<Form errors={withoutPaths(attempt, ['c'])} />);
+    expect(getByLabelText('c')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    // a new failed attempt (plain object, same content as what is left) moves it again
+    rerender(<Form errors={{ a: 'x', b: 'y' }} />);
+    expect(getByLabelText('a')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
   });
 
   it('works inside an open ShadowRoot, where document.activeElement is the host', () => {

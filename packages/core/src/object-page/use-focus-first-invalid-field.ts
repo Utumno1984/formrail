@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { RefObject } from 'react';
 import { isDev } from '../internal/is-dev';
 
-import { invalidPaths } from './field-errors';
+import { invalidPaths, isClearing } from './field-errors';
 import type { FieldErrors } from './field-errors';
 
 export interface UseFocusFirstInvalidFieldOptions {
@@ -30,11 +30,17 @@ export interface UseFocusFirstInvalidFieldOptions {
  *
  * The trigger is the **identity** of `fieldErrors`, not its content: a second failed attempt with
  * identical errors (`useObjectPageForm` builds a new object per failed `save`) moves the focus
- * again, so the user always gets a reaction. Pass a referentially stable object: one recreated on
- * every render (`{ ...errors }` inline) would re-focus on every render.
+ * again, so the user always gets a reaction. The one exception is the object `useObjectPageForm`
+ * produces when an edit removes some errors and others remain (per-path clearing on
+ * `setValue`/`setValues`): it is recognized and ignored, so typing in a field never moves the focus
+ * to another invalid field. Pass `form.fieldErrors` itself: a copy or a derived object (`{ ...errors }`,
+ * a `useMemo` that adds keys) loses that recognition and re-focuses on every change of identity (an
+ * inline copy, on every render).
  */
 export function useFocusFirstInvalidField({ containerRef, fieldErrors }: UseFocusFirstInvalidFieldOptions): void {
   useEffect(() => {
+    // A partial clearing after an edit, not a new validation result: the focus stays with the user.
+    if (isClearing(fieldErrors)) return;
     const invalid = invalidPaths(fieldErrors);
     if (invalid.length === 0) return;
 
