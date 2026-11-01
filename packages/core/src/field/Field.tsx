@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { FieldMessage } from '../field-message/FieldMessage';
 import { defineHidden } from '../internal/define-hidden';
+import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
+import { errorAt } from '../object-page/field-errors';
 import { cn } from '../utils/cn';
 import { FieldContext, type FieldControlProps } from './FieldContext';
+import { ValidationContext } from './ValidationContext';
 
 /**
  * `forced`: the value is decided by a business rule. `locked`: not editable because of
@@ -23,10 +26,16 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
     /**
      * Logical name of the field (the key used in the form's errors). Exposed on the control as
      * `data-rop-name` (all controls, `Select` included) and, on `Input` and `Combobox`, also as the
-     * native `name` unless they get their own. Never set on the Field's `<div>`.
+     * native `name` unless they get their own. Never set on the Field's `<div>`. Inside a
+     * `ValidationProvider` it is also the path whose error the Field shows (exact match).
      */
     name?: string;
-    /** Non-empty: the control gets `aria-invalid`. Empty is the same as absent. */
+    /**
+     * Non-empty: the control gets `aria-invalid`. Empty is the same as absent. With content it wins
+     * over the error of a `ValidationProvider`; empty or absent, the provider's (if any) is used.
+     * A provider value other than `undefined` always sets `aria-invalid` (same rule as the form),
+     * even if blank; the message is rendered only when it has content (blank: `console.error` in dev).
+     */
     error?: ReactNode;
     required?: boolean;
     /**
@@ -122,7 +131,24 @@ export function Field(props: FieldProps) {
   useKeyboardSafe(focused, rootRef, onFocusLost);
 
   const hasReason = state !== 'default' && hasContent(stateReason);
-  const hasError = hasContent(error);
+  // An explicit error with content wins; otherwise the nearest ValidationProvider's, by exact path.
+  // From the provider, "invalid" follows the form's rule (`invalidPaths`: anything but `undefined`),
+  // so a path that blocks the save is never shown as valid; the message node (and its id in
+  // aria-describedby) exists only when it has content.
+  const fieldErrors = useContext(ValidationContext);
+  const explicitError = hasContent(error);
+  const providerError = !explicitError && name && fieldErrors ? errorAt(fieldErrors, name) : undefined;
+  const shownError = explicitError ? error : providerError;
+  const hasError = hasContent(shownError);
+  const invalid = explicitError || providerError !== undefined;
+  const emptyProviderError = providerError !== undefined && !hasError;
+  useEffect(() => {
+    if (emptyProviderError && isDev()) {
+      console.error(
+        `[react-object-page] Field "${name}": the ValidationProvider error for this path is empty or blank. The control is marked aria-invalid (the form treats the path as invalid), but no message is shown: give it a text.`,
+      );
+    }
+  }, [emptyProviderError, name]);
   const hasHelp = hasContent(help);
   const labelId = `${id}-label`;
   const reasonId = `${id}-reason`;
@@ -139,7 +165,7 @@ export function Field(props: FieldProps) {
     // Assigned only when set: an absent key cannot override the control's own prop on spread.
     if (describedBy) c['aria-describedby'] = describedBy;
     if (name) c['data-rop-name'] = name;
-    if (hasError) c['aria-invalid'] = true;
+    if (invalid) c['aria-invalid'] = true;
     if (required) c['aria-required'] = true;
     if (state === 'disabled') c.disabled = true;
     if (readOnly) {
@@ -147,7 +173,7 @@ export function Field(props: FieldProps) {
       c['aria-readonly'] = true;
     }
     return c;
-  }, [id, labelId, name, state, describedBy, hasError, required, readOnly]);
+  }, [id, labelId, name, state, describedBy, invalid, required, readOnly]);
 
   return (
     <FieldContext.Provider value={control}>
@@ -181,7 +207,7 @@ export function Field(props: FieldProps) {
           </FieldMessage>
         ) : null}
         <FieldMessage id={errorId} tone="error">
-          {error}
+          {shownError}
         </FieldMessage>
         <FieldMessage id={helpId} tone="help">
           {help}

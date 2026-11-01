@@ -254,6 +254,7 @@ describe('useObjectPageForm: reset and hydration', () => {
       [
         'baseline',
         'fieldErrors',
+        'formErrors',
         'isDirty',
         'isSaving',
         'reset',

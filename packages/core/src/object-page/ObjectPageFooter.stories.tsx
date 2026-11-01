@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
+import { ValidationProvider } from '../field/ValidationContext';
 import { Input } from '../input/Input';
 import { ObjectPage } from './ObjectPage';
 import { ObjectPageFooter } from './ObjectPageFooter';
@@ -216,72 +217,69 @@ export const LongError: Story = {
 
 /**
  * Wired to `useObjectPageForm`: the footer shows only while the form is dirty and its message is the
- * general `saveError`. Per-field validation is the demo's own state (`fieldErrors`), shown on the Field
- * and never in the footer; on a failed validation the demo moves the focus to the first invalid field
- * through `useFocusFirstInvalidField`, which finds it by the `name` of its Field.
+ * general `saveError`. Per-field validation is the form's own `validate`: its `fieldErrors` reach each
+ * Field through a `ValidationProvider` (the key is written once, as the Field's `name`), shown on the
+ * Field and never in the footer; on a failed validation `useFocusFirstInvalidField` moves the focus to
+ * the first invalid field, found by the same `name`.
  * Type "fail" in the supplier to get a save error.
  */
 export const FormFlow: Story = {
   args: { visible: true },
   render: function Render() {
-    const form = useObjectPageForm({ baseline: { supplier: 'ACME srl', note: '' } });
-    const [fieldErrors, setFieldErrors] = useState<{ supplier?: string }>({});
+    const form = useObjectPageForm({
+      baseline: { supplier: 'ACME srl', note: '' },
+      validate: (values) => (values.supplier.trim() === '' ? { supplier: 'Supplier is required.' } : {}),
+    });
     const frameRef = useRef<HTMLDivElement>(null);
-    // The first invalid control is found through the `name` of its Field.
-    useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors });
-
-    const submit = async () => {
-      const errors: { supplier?: string } = form.values.supplier.trim() === '' ? { supplier: 'Il fornitore è obbligatorio.' } : {};
-      setFieldErrors(errors);
-      if (errors.supplier) return;
-      await form.save(async (values) => {
-        if (values.supplier === 'fail') throw new Error('Il server ha rifiutato il salvataggio.');
-      });
-    };
+    useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
 
     return (
       <div ref={frameRef} style={FRAME}>
-        <ObjectPage>
-          <ObjectPageHeader title="Fattura 2026/0142" />
-          <ObjectPageFooter
-            visible={form.isDirty}
-            message={form.saveError ? (form.saveError instanceof Error ? form.saveError.message : String(form.saveError)) : undefined}
-            messageTone="error"
-          >
-            <Button onClick={submit} aria-disabled={form.isSaving || undefined}>
-              Salva
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setFieldErrors({});
-                form.reset();
-              }}
+        <ValidationProvider fieldErrors={form.fieldErrors}>
+          <ObjectPage>
+            <ObjectPageHeader title="Invoice 2026/0142" />
+            <ObjectPageFooter
+              visible={form.isDirty}
+              label="Save actions"
+              message={form.saveError ? (form.saveError instanceof Error ? form.saveError.message : String(form.saveError)) : undefined}
+              messageTone="error"
             >
-              Annulla modifiche
-            </Button>
-          </ObjectPageFooter>
-          <ObjectPageSection id="dati" title="Dati generali">
-            <Field label="Fornitore" name="supplier" required error={fieldErrors.supplier}>
-              <Input value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
-            </Field>
-            <Field label="Note">
-              <Input value={form.values.note} onChange={(e) => form.setValue('note', e.target.value)} />
-            </Field>
-          </ObjectPageSection>
-        </ObjectPage>
+              <Button
+                onClick={() =>
+                  void form.save(async (values) => {
+                    if (values.supplier === 'fail') throw new Error('The server rejected the save.');
+                  })
+                }
+                aria-disabled={form.isSaving || undefined}
+              >
+                Save
+              </Button>
+              <Button variant="secondary" onClick={() => form.reset()}>
+                Discard changes
+              </Button>
+            </ObjectPageFooter>
+            <ObjectPageSection id="general" title="General data">
+              <Field label="Supplier" name="supplier" required>
+                <Input value={form.values.supplier} onChange={(e) => form.setValue('supplier', e.target.value)} />
+              </Field>
+              <Field label="Note">
+                <Input value={form.values.note} onChange={(e) => form.setValue('note', e.target.value)} />
+              </Field>
+            </ObjectPageSection>
+          </ObjectPage>
+        </ValidationProvider>
       </div>
     );
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const supplier = canvas.getByRole('textbox', { name: 'Fornitore' });
-    await expect(canvas.queryByRole('region', { name: 'Azioni di salvataggio' })).not.toBeInTheDocument();
+    const supplier = canvas.getByRole('textbox', { name: 'Supplier' });
+    await expect(canvas.queryByRole('region', { name: 'Save actions' })).not.toBeInTheDocument();
     await userEvent.clear(supplier);
-    await userEvent.click(await canvas.findByRole('button', { name: 'Salva' }));
+    await userEvent.click(await canvas.findByRole('button', { name: 'Save' }));
     // The validation error is on the field, not in the footer; the focus went back to the field.
-    await expect(await canvas.findByText('Il fornitore è obbligatorio.')).toBeInTheDocument();
+    await expect(await canvas.findByText('Supplier is required.')).toBeInTheDocument();
     await expect(supplier).toHaveFocus();
-    await expect(within(canvas.getByRole('region', { name: 'Azioni di salvataggio' })).queryByText(/obbligatorio/)).not.toBeInTheDocument();
+    await expect(within(canvas.getByRole('region', { name: 'Save actions' })).queryByText(/required/)).not.toBeInTheDocument();
   },
 };

@@ -170,6 +170,10 @@
       "baseline": 31188,
       "limit": 34307
     },
+    "ValidationProvider": {
+      "baseline": 164,
+      "limit": 184
+    },
     "cn": {
       "baseline": 10115,
       "limit": 11127
@@ -203,8 +207,8 @@
       "limit": 2870
     },
     "useObjectPageForm": {
-      "baseline": 1432,
-      "limit": 1576
+      "baseline": 1716,
+      "limit": 1888
     }
   }
 }

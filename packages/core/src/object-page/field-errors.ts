@@ -7,6 +7,15 @@
  */
 export type FieldErrors = Readonly<Record<string, string | undefined>>;
 
+/**
+ * The message for exactly `path` (string equality, never a prefix: `address` does not see
+ * `address.city`). Only own keys count, so a path such as `constructor` or `toString` never reads
+ * `Object.prototype`.
+ */
+export function errorAt(errors: FieldErrors, path: string): string | undefined {
+  return Object.prototype.hasOwnProperty.call(errors, path) ? errors[path] : undefined;
+}
+
 /** The single definition of "invalid": the keys whose value is not `undefined`. */
 export function invalidPaths(errors: FieldErrors): string[] {
   return Object.keys(errors).filter((path) => errors[path] !== undefined);
