@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Icon } from '../icon/Icon';
+import { Input } from '../input/Input';
 import { internalIcons } from '../internal/icons';
 import { Text } from './Text';
 import { Title } from './Title';
@@ -133,7 +134,7 @@ export const AsLabel: TextStory = {
   render: (args) => (
     <div style={{ display: 'grid', gap: 4, maxWidth: 240 }}>
       <Text {...args} />
-      <input id="ty-field" style={{ font: 'inherit', padding: 4 }} />
+      <Input id="ty-field" />
     </div>
   ),
   play: async ({ canvasElement }) => {
