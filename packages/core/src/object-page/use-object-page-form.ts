@@ -201,6 +201,40 @@ interface FormState<Values> {
 /**
  * Headless state of a simple Object Page form: values, baseline, dirty flag and save cycle.
  * SSR-safe (no effect-only state, no DOM access).
+ *
+ * **Error announcements: which level uses which channel** (the same rule is on `ObjectPageFooter`):
+ *
+ * | Level | Source | Where | Announcement |
+ * |---|---|---|---|
+ * | Field | `fieldErrors` | the `Field` error (through `ValidationProvider` or `error`): `aria-invalid` + `aria-describedby` on the control | not live: after a failed save `useFocusFirstInvalidField` moves the focus to the first invalid field and the screen reader reads its error there |
+ * | Form summary | `fieldErrors` + `formErrors` | `ObjectPageFooter` `message={getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })}`, `messageTone="error"` | footer `role="status"`, polite, one line: the count only ("3 campi non validi"), never the field messages |
+ * | Save error (network/server) | `saveError` | `ObjectPageFooter` `message` = its text, `messageTone="error"` | the same footer `role="status"`, polite; when present it has priority over the summary (pass one, never both) |
+ * | Root error | `formErrors` (issues with no path, e.g. `z.object(...).refine(...)` without `path`) | no `Field` shows it: the consumer renders the messages, e.g. a `MessageStrip` `tone="error"` at the top of the form, mounted while `formErrors` is not empty; the footer summary counts them too | the strip's `role="alert"` (mounted already filled, so it is announced) |
+ * | Blocking page error | the consumer's own state | `MessageStrip` `tone="error"` | `role="alert"` |
+ *
+ * ```tsx
+ * const saveErrorText =
+ *   form.saveError === null ? undefined : form.saveError instanceof Error ? form.saveError.message : String(form.saveError);
+ * <ObjectPageFooter
+ *   visible={form.isDirty}
+ *   message={saveErrorText || getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })}
+ *   messageTone="error"
+ * >
+ *   ...
+ * </ObjectPageFooter>
+ * {form.formErrors.length > 0 ? (
+ *   <MessageStrip tone="error">{form.formErrors.join(' ')}</MessageStrip>
+ * ) : null}
+ * ```
+ *
+ * `||`, not `??`: a save error with an empty text (`new Error()`, `throw ''`) would otherwise hide
+ * the summary behind an empty message. Give such an error your own text if you want it shown.
+ *
+ * A failed validation does not clear an earlier `saveError` (only an edit, a `reset` or a successful
+ * save does), so both can be present at once: hence the priority above. An invalid path with no
+ * focusable control (`forced`/`locked`/`disabled`, or not on the page) still counts in the summary.
+ * The library does not translate validation texts: the field messages come from your
+ * `schema`/`validate` and the summary text from `getErrorSummary`'s `message` option.
  */
 export function useObjectPageForm<Values extends object>(
   options: UseObjectPageFormOptions<Values>,

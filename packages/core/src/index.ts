@@ -101,6 +101,8 @@ export type { ObjectPageSectionProps } from './object-page/ObjectPageSection';
 export { useObjectPageForm } from './object-page/use-object-page-form';
 export type { UseObjectPageFormOptions, UseObjectPageFormReturn } from './object-page/use-object-page-form';
 export type { FieldErrors } from './object-page/field-errors';
+export { getErrorSummary } from './object-page/error-summary';
+export type { GetErrorSummaryOptions } from './object-page/error-summary';
 export type {
   StandardSchemaIssue,
   StandardSchemaLike,
