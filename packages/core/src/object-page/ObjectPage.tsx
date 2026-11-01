@@ -8,12 +8,12 @@ import {
   type HTMLAttributes,
   type ReactNode,
 } from 'react';
+import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import { ObjectPageAnchorBar } from './ObjectPageAnchorBar';
 import {
   ObjectPageContext,
-  isDev,
   type ObjectPageContextValue,
   type ObjectPageSectionEntry,
   type ObjectPageSectionInfo,

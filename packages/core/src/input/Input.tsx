@@ -1,5 +1,6 @@
-import { forwardRef, useContext, type InputHTMLAttributes } from 'react';
-import { FieldContext } from '../field/FieldContext';
+import { forwardRef, type InputHTMLAttributes } from 'react';
+import { useFieldControlProps } from '../field/useFieldControlProps';
+import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { cn } from '../utils/cn';
 
 export type InputSize = 'sm' | 'md';
@@ -18,7 +19,7 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
 const BASE =
   'block max-w-full min-w-0 rounded-rop-md border border-rop-border bg-rop-surface px-3 font-rop-sans text-rop-body text-rop-text ' +
   'placeholder:text-rop-text-muted focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
-  'read-only:bg-rop-surface-subtle disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-rop-error';
+  'read-only:bg-rop-surface-subtle disabled:cursor-not-allowed disabled:opacity-50';
 const SIZE_CLASS: Record<InputSize, string> = {
   sm: 'py-[5px]',
   md: 'py-[7px]',
@@ -34,21 +35,13 @@ const SIZE_CLASS: Record<InputSize, string> = {
  */
 export const Input = /* @__PURE__ */ forwardRef<HTMLInputElement, InputProps>(function Input(props, ref) {
   const { size = 'md', className, ...rest } = props;
-  const control = useContext(FieldContext);
-  const describedBy = [control?.['aria-describedby'], rest['aria-describedby']].filter(Boolean).join(' ') || undefined;
+  const fieldProps = useFieldControlProps(rest);
   return (
     <input
       {...rest}
+      {...fieldProps}
       ref={ref}
-      id={control?.id ?? rest.id}
-      aria-describedby={describedBy}
-      aria-labelledby={control?.['aria-labelledby'] ?? rest['aria-labelledby']}
-      aria-invalid={control?.['aria-invalid'] ?? rest['aria-invalid']}
-      aria-required={control?.['aria-required'] ?? rest['aria-required']}
-      aria-readonly={control?.['aria-readonly'] ?? rest['aria-readonly']}
-      disabled={control?.disabled ?? rest.disabled}
-      readOnly={control?.readOnly ?? rest.readOnly}
-      className={cn(BASE, SIZE_CLASS[size], className)}
+      className={cn(BASE, CONTROL_INVALID, SIZE_CLASS[size], className)}
     />
   );
 });

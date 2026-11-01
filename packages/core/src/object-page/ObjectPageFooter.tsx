@@ -15,7 +15,8 @@ import { hasContent } from '../internal/react-nodes';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
-import { isDev, useObjectPageContext } from './ObjectPageContext';
+import { isDev } from '../internal/is-dev';
+import { useObjectPageContext } from './ObjectPageContext';
 import {
   footerActionsClass,
   footerClass,

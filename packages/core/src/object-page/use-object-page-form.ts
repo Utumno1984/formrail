@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
+import { isDev } from '../internal/is-dev';
 import { deepEqual } from './equal';
-
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
 
 export interface UseObjectPageFormOptions<Values extends object> {
   /**

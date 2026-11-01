@@ -11,6 +11,8 @@ import {
 } from 'react';
 import * as RadixSelect from '@radix-ui/react-select';
 import { FieldContext } from '../field/FieldContext';
+import { useFieldControlProps } from '../field/useFieldControlProps';
+import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { Icon } from '../icon/Icon';
 import { internalIcons } from '../internal/icons';
 import {
@@ -70,7 +72,7 @@ const TRIGGER =
   'flex max-w-full min-w-0 items-center justify-between gap-2 rounded-rop-md border border-rop-border bg-rop-surface px-3 ' +
   'font-rop-sans text-rop-body text-rop-text text-start focus-visible:[outline:2px_solid_var(--color-rop-primary)] ' +
   'focus-visible:outline-offset-2 data-[placeholder]:text-rop-text-muted disabled:cursor-not-allowed disabled:opacity-50 ' +
-  'aria-invalid:border-rop-error aria-readonly:bg-rop-surface-subtle';
+  'aria-readonly:bg-rop-surface-subtle';
 const SIZE_CLASS: Record<SelectSize, string> = {
   sm: 'py-[5px]',
   md: 'py-[7px]',
@@ -168,7 +170,7 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
   }, [options]);
 
   const selected = current === undefined || current === '' ? undefined : byValue.get(current);
-  const describedBy = [control?.['aria-describedby'], rest['aria-describedby']].filter(Boolean).join(' ') || undefined;
+  const fieldProps = useFieldControlProps(rest);
   // `forced`/`locked`: the list never opens, whatever asks (the trigger keeps the focus).
   const shown = blocked ? false : open;
 
@@ -190,22 +192,22 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
       onOpenChange={(next) => {
         if (!blocked) setOpen(next);
       }}
-      disabled={control?.disabled ?? rest.disabled}
+      disabled={fieldProps.disabled}
     >
       <RadixSelect.Trigger
         {...rest}
         ref={ref}
-        id={control?.id ?? rest.id}
-        aria-describedby={describedBy}
-        aria-labelledby={control?.['aria-labelledby'] ?? rest['aria-labelledby']}
-        aria-invalid={control?.['aria-invalid'] ?? rest['aria-invalid']}
-        aria-required={control?.['aria-required'] ?? rest['aria-required']}
-        aria-readonly={control?.['aria-readonly'] ?? rest['aria-readonly']}
+        id={fieldProps.id}
+        aria-describedby={fieldProps['aria-describedby']}
+        aria-labelledby={fieldProps['aria-labelledby']}
+        aria-invalid={fieldProps['aria-invalid']}
+        aria-required={fieldProps['aria-required']}
+        aria-readonly={fieldProps['aria-readonly']}
         // Radix hides everything outside the open list with `aria-hidden`, trigger included; a
         // focusable control under `aria-hidden` is an axe violation. The focus is in the list while
         // open and comes back to the trigger on close (a programmatic focus ignores tabindex).
         tabIndex={shown ? -1 : rest.tabIndex}
-        className={cn(TRIGGER, SIZE_CLASS[size], className)}
+        className={cn(TRIGGER, CONTROL_INVALID, SIZE_CLASS[size], className)}
         {...gestureProps}
         // Blocked (forced/locked): the events never reach Radix's trigger, which would otherwise
         // run its typeahead (and fire a native `change` from its hidden select) on a refused value.
