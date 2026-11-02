@@ -201,6 +201,40 @@ test.describe('Floorplans/List Report: UrlState', () => {
     expect((await own(page)).q).toBe('ross');
   });
 
+  test('Back that moves only the sort while the user is typing: no write and no onSearchQueryChange', async ({ page }) => {
+    const actions = await recordActions(page);
+    await page.clock.install();
+    await gotoStory(page, FIXTURE, 'history:push');
+    await amount(page).click(); // asc
+    await amount(page).click(); // desc
+    expect(await actions()).toEqual(['onSortChange', 'onSortChange']);
+    const length = await historyLength(page);
+    await page.evaluate(() => {
+      const w = window as unknown as { __writes: string[] };
+      w.__writes = [];
+      for (const method of ['pushState', 'replaceState'] as const) {
+        const original = window.history[method].bind(window.history);
+        window.history[method] = (...args: Parameters<History['pushState']>) => {
+          w.__writes.push(method);
+          original(...args);
+        };
+      }
+    });
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+    await search(page).pressSequentially('ross');
+    await page.goBack();
+    await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'ascending');
+    await page.clock.runFor(2_000);
+    await page.clock.resume();
+    expect(await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes)).toEqual([]);
+    expect((await own(page)).q).toBeNull();
+    await expect(search(page)).toHaveValue('ross');
+    expect(await actions()).toEqual(['onSortChange', 'onSortChange']);
+    expect(await historyLength(page)).toBe(length);
+    await page.goForward();
+    await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
+  });
+
   test('Back while the user is typing: the field keeps the text, the table follows the URL, the pending commit is dropped', async ({
     page,
   }) => {
