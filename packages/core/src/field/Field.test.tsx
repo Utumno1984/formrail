@@ -485,7 +485,7 @@ describe('Field message area', () => {
     const area = container.querySelector('[data-field-error-slot]') as HTMLElement;
     expect(area).not.toBeNull();
     expect(area).toBeEmptyDOMElement();
-    expect(area.className).toContain('min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]');
+    expect(area.className).toContain('min-h-[calc(var(--text-rop-caption--line-height)+0.5rem)]');
     expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-describedby');
   });
 
