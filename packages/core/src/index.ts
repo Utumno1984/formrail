@@ -82,6 +82,7 @@ export type { ListReportProps, ListReportLabels } from './list-report/ListReport
 export { useListReport } from './list-report/use-list-report';
 export { useListReportUrlState } from './list-report/use-list-report-url-state';
 export type {
+  ListReportUrlAdapter,
   UseListReportUrlStateOptions,
   UseListReportUrlStateReturn,
 } from './list-report/use-list-report-url-state';

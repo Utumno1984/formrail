@@ -11,6 +11,7 @@ import {
 import { ListReport } from './ListReport';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
 import { useListReport } from './use-list-report';
+import { createMemoryUrlAdapter } from '../internal/memory-url-adapter';
 import { useListReportUrlState } from './use-list-report-url-state';
 
 /** How long "Simula caricamento" keeps the report in `loading`. */
@@ -534,5 +535,211 @@ export const UrlState: StoryObj<UrlStateArgs> = {
 /** Fixture of the e2e suite: `UrlState` without the play function (the e2e drives the URL on its own). */
 export const UrlStateNoPlay: StoryObj<UrlStateArgs> = {
   ...UrlState,
+  play: undefined,
+};
+
+interface UrlStateRouterRecipeArgs {
+  history: 'replace' | 'push';
+  onFilterChange: (filter: string) => void;
+  onSearchQueryChange: (query: string) => void;
+  onSortChange: (sort: ListReportSort) => void;
+  /** Tracks the calls `useListReportUrlState` makes to `adapter.write`. */
+  onWrite: (search: string, mode: 'replace' | 'push') => void;
+}
+
+function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange, onSortChange, onWrite }: UrlStateRouterRecipeArgs) {
+  const latestOnWrite = useRef(onWrite);
+  latestOnWrite.current = onWrite;
+  // One simulated router per story: the real URL of the frame is never touched.
+  const [adapter] = useState(() => createMemoryUrlAdapter({ onWrite: (s, m) => latestOnWrite.current(s, m) }));
+  const [, setVersion] = useState(0);
+  useEffect(() => adapter.subscribe(() => setVersion((v) => v + 1)), [adapter]);
+  const url = useListReportUrlState({ filters: URL_FILTERS, sortableColumnIds: URL_SORTABLE, history, adapter });
+  const table = useListReport<DemoInvoice>({
+    rows: URL_ROWS,
+    columns: URL_COLUMNS,
+    getRowId: (r) => r.id,
+    filters: URL_FILTERS,
+    ...url,
+    onFilterChange: (id) => {
+      url.onFilterChange(id);
+      onFilterChange(id);
+    },
+    onSearchQueryChange: (query) => {
+      url.onSearchQueryChange(query);
+      onSearchQueryChange(query);
+    },
+    onSortChange: (sort) => {
+      url.onSortChange(sort);
+      onSortChange(sort);
+    },
+  });
+  const query = adapter.read().toString();
+  return (
+    <div style={PAGE}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <Button variant="secondary" disabled={adapter.index === 0} onClick={() => adapter.go(-1)}>
+          Back
+        </Button>
+        <Button variant="secondary" disabled={adapter.index >= adapter.entries.length - 1} onClick={() => adapter.go(1)}>
+          Forward
+        </Button>
+        <p style={{ margin: 0, fontSize: 14, overflowWrap: 'anywhere' }}>
+          Current query: <code data-testid="router-query">{query || '(empty)'}</code>
+        </p>
+      </div>
+      <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 140px))' }}>
+        <ListReport title="Invoices" table={table} labels={URL_LABELS} filtersLabel="Filters" searchLabel="Search" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Recipe for a client-side router: `useListReportUrlState` with an `adapter` (`{ read, write, subscribe }`)
+ * instead of `window.location`. Here the "router" is an in-memory query string with a simulated history
+ * (the Back/Forward buttons): the real URL of the frame never changes. Copy the adapter below, swapping
+ * the memory for your router.
+ *
+ * ### React Router (v6.4+/v7), covered by a unit test
+ *
+ * ```tsx
+ * import { useMemo } from 'react';
+ * import { useLocation, useNavigate, useSearchParams } from 'react-router';
+ * import type { ListReportUrlAdapter } from '@react-object-page/core';
+ *
+ * function useReactRouterAdapter(): ListReportUrlAdapter {
+ *   const [searchParams] = useSearchParams();
+ *   const { hash, state } = useLocation();
+ *   const navigate = useNavigate();
+ *   // Rebuilt on every navigation; the re-render is the notification, so `subscribe` does nothing.
+ *   // The hash and the location `state` are carried over (`navigate({ search })` alone drops them).
+ *   return useMemo(
+ *     () => ({
+ *       read: () => new URLSearchParams(searchParams),
+ *       write: (next, mode) => {
+ *         void navigate({ search: next.toString(), hash }, { replace: mode === 'replace', state });
+ *       },
+ *       subscribe: () => () => undefined,
+ *     }),
+ *     [searchParams, hash, state, navigate],
+ *   );
+ * }
+ *
+ * const adapter = useReactRouterAdapter();
+ * const url = useListReportUrlState({ filters: FILTERS, adapter, history: 'push' });
+ * ```
+ *
+ * ### TanStack Router (not covered by an automated test)
+ *
+ * ```tsx
+ * import { useMemo } from 'react';
+ * import { useRouter } from '@tanstack/react-router';
+ * import type { ListReportUrlAdapter } from '@react-object-page/core';
+ *
+ * function useTanStackAdapter(): ListReportUrlAdapter {
+ *   const router = useRouter();
+ *   return useMemo(
+ *     () => ({
+ *       read: () => new URLSearchParams(router.state.location.searchStr),
+ *       write: (next, mode) => {
+ *         // Untyped search: the router keeps the query as the object it parses from the string.
+ *         void router.navigate({
+ *           to: '.',
+ *           search: Object.fromEntries(next) as never,
+ *           hash: true, // keep the current hash
+ *           replace: mode === 'replace',
+ *         });
+ *       },
+ *       subscribe: (listener) => router.subscribe('onResolved', listener),
+ *     }),
+ *     [router],
+ *   );
+ * }
+ *
+ * // TanStack's default search serializer JSON-encodes values: a search "2024" would land in the URL as
+ * // `q="2024"`. Give the router plain-string (de)serialization for the query:
+ * const router = createRouter({
+ *   routeTree,
+ *   parseSearch: (searchStr) => Object.fromEntries(new URLSearchParams(searchStr)),
+ *   stringifySearch: (search) => {
+ *     const query = new URLSearchParams(Object.entries(search).map(([k, v]) => [k, String(v)])).toString();
+ *     return query ? `?${query}` : '';
+ *   },
+ * });
+ * ```
+ *
+ * Limits of the TanStack snippet: a parameter repeated in the query (`tag=a&tag=b`) keeps only its last
+ * value through `Object.fromEntries`; keep the page's other parameters single-valued.
+ *
+ * Notes: `write` receives every parameter of the page (not only the report's) and replaces the query string.
+ * Keep the adapter stable (`useMemo`, as above): a new object re-subscribes and re-reads, with no write and
+ * no callback. `subscribe` may notify synchronously or later, and for the hook's own writes too: the
+ * values update with no callback and no response write. `read()` may lag behind `write()` until the router
+ * renders (two writes of one gesture, as in "Clear filters", still add up). If `write` throws, the error
+ * reaches the caller. With server rendering the hook returns the defaults and reads the adapter after hydration.
+ * With TanStack Router, a route with typed `validateSearch` may parse values (numbers, JSON) that the
+ * hook then reads back as strings: keep this report's parameters as plain strings.
+ *
+ * The play function picks "Open", sorts by "Amount", picks "Approved", presses "Back" and checks that the
+ * pill returns to "Open" while `onFilterChange` was called only for the two clicks.
+ */
+export const UrlStateRouterRecipe: StoryObj<UrlStateRouterRecipeArgs> = {
+  argTypes: {
+    history: {
+      control: 'radio',
+      options: ['replace', 'push'],
+      description: '`history` of `useListReportUrlState`: `replace` leaves Back with nothing to go back to',
+    },
+    onFilterChange: { control: false },
+    onSearchQueryChange: { control: false },
+    onSortChange: { control: false },
+    onWrite: { control: false, description: 'Calls the hook makes to `adapter.write` (search, mode)' },
+    ...{ status: HIDDEN, dataset: HIDDEN, firstSortDirection: HIDDEN, containerWidth: HIDDEN, onRetry: HIDDEN },
+  },
+  args: {
+    history: 'push',
+    onFilterChange: fn(),
+    onSearchQueryChange: fn(),
+    onSortChange: fn(),
+    onWrite: fn(),
+  },
+  render: (args) => <UrlStateRouterRecipeDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('UrlStateRouterRecipe: no window');
+    const frameSearch = win.location.search;
+    const query = () => canvas.getByTestId('router-query');
+
+    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
+    await expect(query()).toHaveTextContent('filter=open&sort=amount.asc');
+    await userEvent.click(canvas.getByRole('radio', { name: 'Approved' }));
+    await expect(query()).toHaveTextContent('filter=approved&sort=amount.asc');
+    await expect(args.onFilterChange).toHaveBeenCalledTimes(2);
+    await expect(args.onWrite).toHaveBeenCalledTimes(3);
+    await expect(args.onWrite).toHaveBeenLastCalledWith('filter=approved&sort=amount.asc', args.history);
+
+    if (args.history === 'push') {
+      await userEvent.click(canvas.getByRole('button', { name: 'Back' }));
+      await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
+      await expect(query()).toHaveTextContent('filter=open&sort=amount.asc');
+      // Navigation is not a gesture: no callback, no write.
+      await expect(args.onFilterChange).toHaveBeenCalledTimes(2);
+      await expect(args.onWrite).toHaveBeenCalledTimes(3);
+      await userEvent.click(canvas.getByRole('button', { name: 'Forward' }));
+      await expect(canvas.getByRole('radio', { name: 'Approved' })).toBeChecked();
+    } else {
+      await expect(canvas.getByRole('button', { name: 'Back' })).toBeDisabled();
+    }
+    // The simulated router never touches the real URL.
+    await expect(win.location.search).toBe(frameSearch);
+  },
+};
+
+/** Fixture of the e2e suite: `UrlStateRouterRecipe` without the play function. */
+export const UrlStateRouterRecipeNoPlay: StoryObj<UrlStateRouterRecipeArgs> = {
+  ...UrlStateRouterRecipe,
   play: undefined,
 };
