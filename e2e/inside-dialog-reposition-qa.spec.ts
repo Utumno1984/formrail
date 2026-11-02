@@ -18,7 +18,6 @@ for (const kind of ['select', 'combobox'] as const) {
         const l = document.querySelector('[role="listbox"]')!.getBoundingClientRect();
         return { tTop: t.top, tBottom: t.bottom, tLeft: t.left, lTop: l.top, lBottom: l.bottom, lLeft: l.left };
       });
-      console.log(kind, reduced, JSON.stringify(g));
       expect(Math.min(Math.abs(g.lTop - g.tBottom), Math.abs(g.tTop - g.lBottom))).toBeLessThan(12);
       expect(Math.abs(g.lLeft - g.tLeft)).toBeLessThan(4);
     });
