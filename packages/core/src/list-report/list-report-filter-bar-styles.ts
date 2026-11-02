@@ -1,5 +1,3 @@
-import { OPTICAL_LABEL_TYPOGRAPHY } from '../utils/OpticalLabel';
-
 // Class names of ListReportFilterBar, kept apart from its logic (some words in the component would be
 // taken for utilities by the CSS build). Full literals on purpose, and no bare utility name in a
 // comment. Logical properties so that the right-to-left direction mirrors the bar.
@@ -17,8 +15,10 @@ export const pillClass =
   'aria-checked:border-rop-primary aria-checked:bg-rop-primary aria-checked:text-rop-primary-contrast ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
 
-// Optical centering comes from the shared `OpticalLabel` wrapper (same as Button); this adds wrapping.
-export const pillLabelClass = `${OPTICAL_LABEL_TYPOGRAPHY} text-start [overflow-wrap:anywhere]`;
+// Optical centering comes from the shared `OpticalLabel` wrapper (same 1px offset as Button). Unlike
+// Button, the label keeps the pill's 20px line height (no line-height 1): a long label wraps onto
+// several lines and 14px lines would be cramped.
+export const pillLabelClass = 'text-start [overflow-wrap:anywhere]';
 
 export const searchFieldClass = 'w-full min-w-0 sm:w-72';
 

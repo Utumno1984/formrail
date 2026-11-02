@@ -58,7 +58,7 @@ test.describe('pills', () => {
       });
       expect(m.boxHeight).toBe(32); // 20px line box + 2 * 5px padding + 2px border: unchanged by the fix
       expect(m.fontSize).toBe('14px');
-      expect(m.lineHeight).toBe('14px'); // line-height: 1 on the label only
+      expect(m.lineHeight).toBe('20px'); // keeps the normal line height (wrapped labels stay readable)
       expect(Math.abs(m.textCenter - m.boxCenter)).toBeLessThanOrEqual(1); // centering threshold of the optical QA
       expect(Math.abs(m.textCenter - (m.boxCenter - 1))).toBeLessThanOrEqual(0.5); // same 1px offset as Button
     }
