@@ -5,7 +5,7 @@ import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const STORY = (name: string) => `data-listreportfilterbar--${name}`;
 const pill = (page: Page, name: string | RegExp): Locator => page.getByRole('radio', { name });
-const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Cerca' });
+const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 const rows = (page: Page): Locator => page.getByTestId('rows').getByRole('listitem');
 const checked = (page: Page): Promise<string[]> =>
   page.getByRole('radio').evaluateAll((els) => els.filter((el) => el.getAttribute('aria-checked') === 'true').map((el) => el.textContent ?? ''));
@@ -28,9 +28,9 @@ test.describe('accessibility', () => {
 
   test('the bar is a named search landmark with a named radiogroup', async ({ page }) => {
     await gotoStory(page, STORY('active-filter'));
-    const landmark = page.getByRole('search', { name: 'Filtri e ricerca' });
-    await expect(landmark.getByRole('radiogroup', { name: 'Filtri' }).getByRole('radio')).toHaveCount(3);
-    await expect(landmark.getByRole('searchbox', { name: 'Cerca' })).toBeVisible();
+    const landmark = page.getByRole('search', { name: 'Filters and search' });
+    await expect(landmark.getByRole('radiogroup', { name: 'Filters' }).getByRole('radio')).toHaveCount(3);
+    await expect(landmark.getByRole('searchbox', { name: 'Search' })).toBeVisible();
   });
 });
 
@@ -127,11 +127,11 @@ test.describe('search', () => {
   test('the clear button empties draft and committed query at once and puts the focus back in the input', async ({ page }) => {
     await expectPlayToPass(page, STORY('search-with-text'));
     await expect(rows(page)).toHaveCount(3);
-    await page.getByRole('button', { name: 'Svuota ricerca' }).click();
+    await page.getByRole('button', { name: 'Clear search' }).click();
     await expect(search(page)).toHaveValue('');
     await expect(search(page)).toBeFocused();
     await expect(rows(page)).toHaveCount(8);
-    await expect(page.getByRole('button', { name: 'Svuota ricerca' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Clear search' })).toHaveCount(0);
   });
 
   test('Escape with a draft clears it (and keeps the focus); with an empty draft it does nothing', async ({ page }) => {
