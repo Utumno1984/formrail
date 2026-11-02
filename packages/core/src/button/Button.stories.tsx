@@ -215,3 +215,53 @@ export const InlineNarrow: Story = {
     </div>
   ),
 };
+
+/**
+ * Fixture for the `text-decoration` e2e (#115): inline with and without icons, every other size,
+ * icon-only buttons and `asChild` links. Not photographed.
+ */
+export const TextDecoration: Story = {
+  render: () => (
+    <div style={{ display: 'grid', gap: 12, color: 'var(--color-rop-text)' }}>
+      <div style={row}>
+        {(['sm', 'md', 'lg', 'inline'] as const).map((size) => (
+          <Button key={size} size={size} variant="ghost" data-testid={`deco-${size}`}>
+            {size} label
+          </Button>
+        ))}
+      </div>
+      <div style={row}>
+        <Button size="inline" variant="ghost" leadingIcon={internalIcons.check} data-testid="deco-inline-lead">
+          Inline lead
+        </Button>
+        <Button
+          size="inline"
+          variant="ghost"
+          trailingIcon={internalIcons['chevron-down']}
+          data-testid="deco-inline-trail"
+        >
+          Inline trail
+        </Button>
+      </div>
+      <div style={row}>
+        {ICON_SIZES.map((size) => (
+          <Button key={size} size={size} variant="ghost" aria-label={`Close ${size}`} data-testid={`deco-${size}`}>
+            {internalIcons.close}
+          </Button>
+        ))}
+      </div>
+      <div style={row}>
+        <Button asChild size="inline" variant="ghost">
+          <a href="#target" data-testid="deco-aschild-inline">
+            Inline link
+          </a>
+        </Button>
+        <Button asChild size="md" variant="ghost">
+          <a href="#target" data-testid="deco-aschild-md">
+            Medium link
+          </a>
+        </Button>
+      </div>
+    </div>
+  ),
+};
