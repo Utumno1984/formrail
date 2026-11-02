@@ -22,9 +22,25 @@ async function openAndScroll(page: Page, name: string, top: number): Promise<num
   const actual = await scrollTop(page);
   // Let the throttled write happen, then go to the detail through the real UI.
   await page.waitForTimeout(300);
-  await page.getByRole('button', { name: /^FT-2026-/ }).first().click();
+  await clickVisibleRow(page);
   await expect(detailTitle(page)).toBeVisible();
   return actual;
+}
+
+/** Clicks an invoice link that is already inside the scroller's viewport: Playwright would otherwise scroll one into view (and move the position under test). */
+async function clickVisibleRow(page: Page): Promise<void> {
+  const links = page.getByRole('button', { name: /^FT-2026-/ });
+  const box = await scroller(page).boundingBox();
+  const index = await links.evaluateAll(
+    (els, area) =>
+      els.findIndex((el) => {
+        const r = el.getBoundingClientRect();
+        return area !== null && r.top >= area.y + 60 && r.bottom <= area.y + area.height - 10;
+      }),
+    box,
+  );
+  expect(index).toBeGreaterThanOrEqual(0);
+  await links.nth(index).click();
 }
 
 test.describe('Floorplans/List Report: ScrollRestoration', () => {
@@ -36,7 +52,7 @@ test.describe('Floorplans/List Report: ScrollRestoration', () => {
     await gotoStory(page, FIXTURE, DELAY);
     const saved = await openAndScroll(page, 'Open', 600);
     await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByText('Loading…').first()).toBeVisible();
+    await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     expect(await scrollTop(page)).toBe(0);
     await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
     await expect.poll(async () => Math.abs((await scrollTop(page)) - saved)).toBeLessThanOrEqual(1);
