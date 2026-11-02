@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { listReportParamKeys, type ListReportParamNames } from './param-keys';
 import type { ListReportSort, ListReportSortDirection } from './types';
 
@@ -22,6 +22,30 @@ export interface UseListReportUrlStateOptions {
   prefix?: string;
   /** How a gesture writes the URL. `'replace'` (default) leaves the history alone; `'push'` adds one entry per gesture. */
   history?: 'replace' | 'push';
+  /**
+   * Where the query string lives, instead of `window.location`/`history` (see `ListReportUrlAdapter`):
+   * a client-side router. Without it the hook uses the browser APIs.
+   */
+  adapter?: ListReportUrlAdapter;
+}
+
+/**
+ * The query string of a router (or of any store), as three functions. The core depends on no router:
+ * wrap yours in this shape (recipes for React Router and TanStack Router in the List Report docs).
+ */
+export interface ListReportUrlAdapter {
+  /** The current query string. Must return `URLSearchParams` (a string is rejected at compile time). */
+  read(): URLSearchParams;
+  /** Replaces the query string (`next` holds every parameter, the ones of the page included). Throwing propagates to the caller. */
+  write(next: URLSearchParams, mode: 'replace' | 'push'): void;
+  /**
+   * Calls `listener` whenever the query string may have changed: a navigation, or the echo of `write`
+   * (sync or later). Returns the unsubscribe. A router whose hook re-renders the component on every
+   * navigation may implement it as a no-op (the re-render is the notification, see the React Router
+   * recipe) as long as `read()` then returns the new query. `read()` may lag behind `write()` until the
+   * router renders: the hook builds consecutive writes of one gesture on its own last write.
+   */
+  subscribe(listener: () => void): () => void;
 }
 
 /** The controlled values and callbacks to hand to `useListReport` (spread them in its options). */
@@ -75,6 +99,16 @@ const browserSource: UrlSource = {
     };
   },
 };
+
+/** The string-based source the hook works on, over an adapter. */
+const fromAdapter = (adapter: ListReportUrlAdapter): UrlSource => ({
+  read: () => {
+    const query = adapter.read().toString();
+    return query === '' ? '' : `?${query}`;
+  },
+  write: (search, mode) => adapter.write(new URLSearchParams(search), mode),
+  subscribe: (listener) => adapter.subscribe(listener),
+});
 
 const DIRECTIONS: readonly string[] = ['asc', 'desc'];
 
@@ -159,9 +193,14 @@ const getServerSnapshot = (): string => EMPTY_SNAPSHOT;
  *   report's pill, search or sort, `useListReport` also drops its pending commit, so the entry the user
  *   went back to is not rewritten behind them. A navigation that moves none of them (only other
  *   parameters, another prefix, the hash) leaves the pending commit alone: the user's typing goes on.
- * - Next to a router: the hook writes with the History API directly and keeps `history.state`, but the
- *   router is not told (it may not re-render, and a router that rewrites the URL from its own state can
- *   drop these parameters). Use it where the page owns the query string; an adapter is a separate step.
+ * - Next to a router: without `adapter` the hook writes with the History API directly and keeps
+ *   `history.state`, but the router is not told (it may not re-render, and a router that rewrites the URL
+ *   from its own state can drop these parameters). With a router, pass an `adapter`.
+ * - `adapter` (`ListReportUrlAdapter`: `read`/`write`/`subscribe`) moves the state to a client-side router:
+ *   the hook then never touches `window.location`, `history` or `popstate`. A notification of `subscribe`
+ *   (the echo of its own write, sync or async, or a router navigation) updates the values with no callback
+ *   and no write. A query the router re-orders or re-encodes is read as is and not rewritten. If `write`
+ *   throws the error propagates and nothing is kept. Changing the adapter re-reads the state.
  * - Server rendering returns the defaults (no `window` access); the client reads the URL right after
  *   hydration, with no mismatch. In the browser the URL is read at the first render (no flash of defaults).
  * - Memoization: `filters` and `sortableColumnIds` may be new arrays every render (only their ids count).
@@ -176,8 +215,11 @@ export function useListReportUrlState(options: UseListReportUrlStateOptions): Us
     params,
     prefix,
     history = 'replace',
+    adapter,
   } = options;
-  const source = browserSource;
+  // Keyed on the adapter's identity: a new object (a different router, or an inline literal) re-subscribes
+  // and re-reads, with no write and no callback. Memoize the adapter to avoid the re-subscription.
+  const source = useMemo(() => (adapter ? fromAdapter(adapter) : browserSource), [adapter]);
   const [filterKey, searchKey, sortKey] = listReportParamKeys(prefix, params);
 
   // The snapshot is only this instance's raw values: a write of another instance (or of the page) to
@@ -216,13 +258,25 @@ export function useListReportUrlState(options: UseListReportUrlStateOptions): Us
   const latest = useRef({ filterKey, searchKey, sortKey, defaultFilterId, defaultSearchQuery, defaultSort, history });
   latest.current = { filterKey, searchKey, sortKey, defaultFilterId, defaultSearchQuery, defaultSort, history };
 
+  // The query written by this instance in the current tick. A router may apply a `write` only at its next
+  // render, so `read()` is still the old query when a second write of the same gesture (e.g. "clear
+  // filters": pill, then search) starts: that one builds on this, not on the stale read.
+  const written = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    written.current = undefined; // another source: nothing written to it yet
+  }, [source]);
+
   const write = useCallback(
     (key: string, value: string | null) => {
-      const current = source.read();
+      const current = written.current ?? source.read();
       const next = updateSearch(current, { [key]: value });
       // Nothing changes: no write, and above all no history entry.
       if (next === current || (next === '' && current === '?')) return;
-      source.write(next, latest.current.history);
+      source.write(next, latest.current.history); // may throw: then nothing is remembered
+      written.current = next;
+      queueMicrotask(() => {
+        if (written.current === next) written.current = undefined;
+      });
     },
     [source],
   );
