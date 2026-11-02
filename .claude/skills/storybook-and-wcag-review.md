@@ -22,6 +22,31 @@ Ogni volta che lavori su un componente o sulla sua story, verifica:
 - Nessuna violazione axe sulla story (il harness e2e la verifica già via
   `expectNoA11yViolations`): una story nuova ci deve passare attraverso, non esserne esclusa.
 
+## QA ottico
+
+Un controllo "a occhio" o una baseline visiva già verde non bastano a intercettare un difetto di
+rifinitura: la regressione visiva confronta solo con uno screenshot precedente, che può già
+contenere il difetto. Per ogni componente con testo in un box ad altezza fissa (bottoni, pillole/
+chip, badge, tab) o con elementi contigui (etichetta/controllo, bordo/contenuto, due controlli
+affiancati), misura con uno script Playwright contro Storybook (`getBoundingClientRect`, mai una
+lettura visiva o uno screenshot):
+
+- **Centratura verticale del testo** nel suo box (scarto ≤ 1px tra lo spazio sopra e sotto il
+  testo misurato, salvo un valore diverso dichiarato nel design — non "sembra centrato").
+- **Distanza minima tra elementi contigui** rispetto a quella dichiarata nel design (nessun
+  overlap reale misurato) — l'anello di `:focus-visible` di un controllo conta come elemento che
+  può toccare quello sopra/accanto, verificalo anche a fuoco attivo.
+
+Tre casi reali che questa regola avrebbe dovuto intercettare prima che arrivassero a Daniele:
+cornice demo di una story senza padding che si accavalla al contenuto; il focus ring di `Input`
+che tocca l'etichetta sovrastante (gap misurato: 0px); il testo di una pillola di
+`ListReportFilterBar` non centrato otticamente, perché il trattamento già applicato a `Button`
+(wrapper `TextLabel`, line-height 1 + offset ottico di 1px, commit `5cb1df1`) non era stato esteso
+alla pillola.
+
+Lo script di misura può restare temporaneo (fuori dal repository, o cancellato a fine lavoro); se
+il controllo deve restare permanente, promuovilo a un test e2e vero in `e2e/`.
+
 ## Test e QA
 
 Prima di aprire o aggiornare una PR:

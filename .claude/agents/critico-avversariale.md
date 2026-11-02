@@ -35,6 +35,10 @@ comunque con lo stesso rigore.
      ARIA? Il fuoco torna all'elemento giusto alla chiusura (non a un nodo dentro l'overlay
      stesso)? C'è un leak di proprietà di controllo non valide come attributo HTML nel markup
      reso (ispeziona il DOM reale, non solo il codice)?
+   - **Rifinitura visiva ottica**: se il ticket tocca testo in un box ad altezza fissa o
+     elementi contigui (etichetta/controllo, bordo/contenuto), il tester ha davvero misurato con
+     bounding box reali, o si è fidato dello screenshot/baseline visiva (che può già contenere il
+     difetto)?
    - **Performance**: operazioni O(n²) dove potrebbero essere O(n) (filtri, ricerca, diff);
      chiamate di misura DOM in loop non throttolate/cacheate.
    - **Accessibilità**: ruoli ARIA corretti, navigazione da tastiera, nome accessibile stabile
