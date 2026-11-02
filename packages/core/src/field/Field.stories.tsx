@@ -254,6 +254,44 @@ export const KeyboardSafe: Story = {
   ),
 };
 
+const SHORT_ERROR = 'Enter a valid VAT number.';
+const LONG_ERROR = 'Enter a valid VAT number: eleven digits, no country prefix, no spaces, and it must match the registered company name.';
+
+/**
+ * Space for the message is always reserved: a one-line error appearing under the first field does
+ * not move the second one (a longer error wraps and does push it down, by the extra height only).
+ * The play function shows the error and checks the next field has not moved.
+ */
+export const ErrorReservesSpace: Story = {
+  tags: ['visual'],
+  render: function Render() {
+    const [error, setError] = useState('');
+    return (
+      <div style={{ ...column, color: 'var(--color-rop-text)' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button onClick={() => setError(SHORT_ERROR)}>Show error</Button>
+          <Button onClick={() => setError(LONG_ERROR)}>Show long error</Button>
+          <Button onClick={() => setError('')}>Clear</Button>
+        </div>
+        <Field label="VAT number" error={error} data-testid="er-first">
+          <Input defaultValue="12345" />
+        </Field>
+        <Field label="Company name" data-testid="er-second">
+          <Input defaultValue="Acme" />
+        </Field>
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const second = canvas.getByTestId('er-second');
+    const before = second.getBoundingClientRect().top;
+    await userEvent.click(canvas.getByRole('button', { name: 'Show error' }));
+    await expect(canvas.getByRole('textbox', { name: 'VAT number' })).toHaveAccessibleDescription(SHORT_ERROR);
+    await expect(second.getBoundingClientRect().top).toBe(before);
+  },
+};
+
 /**
  * Visual matrix: plain, help, error, required, disabled, forced, locked, a custom control through
  * the render-prop, and a 240px column with a long label and a long reason.

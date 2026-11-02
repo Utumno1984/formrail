@@ -22,6 +22,8 @@ interface Measure {
   /** Top of the control relative to the top of its Field. */
   controlOffset: number;
   messageSpace: number;
+  /** Height the Field always reserves for its messages (the empty message area). */
+  reserved: number;
 }
 
 /** Everything the three controls must agree on, measured in the browser. */
@@ -49,6 +51,7 @@ function measure(page: Page, kind: Kind, variant: Variant): Promise<Measure> {
       fieldHeight: field.getBoundingClientRect().height,
       controlOffset: rect.top - field.getBoundingClientRect().top,
       messageSpace,
+      reserved: parseFloat(getComputedStyle(root.querySelector<HTMLElement>('[data-field-messages]')!).minHeight),
     };
   }, kind);
 }
@@ -107,9 +110,10 @@ for (const [name, viewport] of [
         // (Sub-pixel tolerance: the two cells are different tracks of a fractional grid.)
         expect(Math.abs(withMessage.width - without.width), kind).toBeLessThan(0.5);
         expect(withMessage.height, kind).toBe(without.height);
-        // The Field grows by the message's box (height + margins) and by nothing else.
+        // The Field grows only by what the message needs beyond the reserved room (#140: nothing for one line).
         expect(withMessage.messageSpace, kind).toBeGreaterThan(0);
-        expect(withMessage.fieldHeight - without.fieldHeight, kind).toBeCloseTo(withMessage.messageSpace, 1);
+        expect(without.reserved, kind).toBeGreaterThan(0);
+        expect(withMessage.fieldHeight - without.fieldHeight, kind).toBeCloseTo(Math.max(0, withMessage.messageSpace - without.reserved), 1);
         expect(without.messageSpace, kind).toBe(0);
       }
       // The same extra room on the three controls.

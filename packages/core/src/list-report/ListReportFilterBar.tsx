@@ -180,7 +180,7 @@ function ListReportFilterBarImpl<Row>(props: ListReportFilterBarProps<Row>, ref:
         </div>
       ) : null}
       {showSearch ? (
-        <Field label={searchLabel} hideLabel className={searchFieldClass}>
+        <Field label={searchLabel} hideLabel reserveMessageSpace={false} className={searchFieldClass}>
           <div className={searchBoxClass}>
             <Input
               ref={inputRef}

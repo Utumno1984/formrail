@@ -39,6 +39,12 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
     error?: ReactNode;
     required?: boolean;
     /**
+     * Default `true`: the area under the control always holds one caption line, so a one-line
+     * error (or reason, or help) appearing later moves nothing below the Field. Set `false` for a
+     * Field that never shows a message (e.g. a search box) and must not take that room.
+     */
+    reserveMessageSpace?: boolean;
+    /**
      * Hides the label visually (it stays in the DOM as the accessible name, `sr-only`). For controls
      * that already show what they are, e.g. a search box with a placeholder.
      */
@@ -53,6 +59,10 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
 // scrollIntoView stop above the virtual keyboard.
 const ROOT = 'flex min-w-0 flex-col font-rop-sans';
 const SCROLL_MARGIN = { scrollMarginTop: '0.5rem', scrollMarginBottom: 'calc(var(--rop-keyboard-inset, 0px) + 0.5rem)' };
+// One message area under the control, shared by reason, error and help: it always holds one caption
+// line plus the 4px gap of the first message (`mt-1`), so any single message appearing or going away
+// moves nothing below the Field. Longer or stacked messages grow it: accepted, never clamped.
+const MESSAGES = 'min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]';
 const LABEL_HIDDEN = 'sr-only';
 const LABEL = 'mb-1 text-rop-label text-rop-text [overflow-wrap:anywhere]';
 const KEYBOARD_INSET = '--rop-keyboard-inset';
@@ -112,6 +122,7 @@ export function Field(props: FieldProps) {
     name,
     error,
     required,
+    reserveMessageSpace = true,
     hideLabel,
     id: idProp,
     state = 'default',
@@ -201,17 +212,19 @@ export function Field(props: FieldProps) {
           ) : null}
         </label>
         {typeof children === 'function' ? children(control) : children}
-        {hasReason ? (
-          <FieldMessage id={reasonId} tone="help" data-field-reason={state}>
-            {stateReason}
+        <div data-field-messages="" className={reserveMessageSpace ? MESSAGES : undefined}>
+          {hasReason ? (
+            <FieldMessage id={reasonId} tone="help" data-field-reason={state}>
+              {stateReason}
+            </FieldMessage>
+          ) : null}
+          <FieldMessage id={errorId} tone="error">
+            {shownError}
           </FieldMessage>
-        ) : null}
-        <FieldMessage id={errorId} tone="error">
-          {shownError}
-        </FieldMessage>
-        <FieldMessage id={helpId} tone="help">
-          {help}
-        </FieldMessage>
+          <FieldMessage id={helpId} tone="help">
+            {help}
+          </FieldMessage>
+        </div>
       </div>
     </FieldContext.Provider>
   );

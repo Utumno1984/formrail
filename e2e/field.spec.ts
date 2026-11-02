@@ -126,6 +126,40 @@ test.describe('Forms/Field', () => {
   });
 });
 
+test.describe('Forms/Field: reserved message space', () => {
+  const STORY = 'forms-field--error-reserves-space';
+  const metrics = async (page: Page) => ({
+    secondTop: (await page.getByTestId('er-second').boundingBox())!.y,
+    firstHeight: (await page.getByTestId('er-first').boundingBox())!.height,
+  });
+
+  test('a one-line error appearing or going away does not move the next field', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const before = await metrics(page);
+    await page.getByRole('button', { name: 'Show error', exact: true }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
+    expect(await metrics(page)).toEqual(before);
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toHaveCount(0);
+    expect(await metrics(page)).toEqual(before);
+  });
+
+  test('a wrapped error moves the next field by exactly the extra height', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const before = await metrics(page);
+    await page.getByRole('button', { name: 'Show long error' }).click();
+    const box = (await page.locator('[id$="-error"]').boundingBox())!;
+    expect(box.height).toBeGreaterThan(32); // two lines or more
+    const after = await metrics(page);
+    // Reserved: 4px gap + 16px line. Actual: 4px gap + the message height (the gap is outside the box).
+    expect(after.secondTop - before.secondTop).toBe(box.height - 16);
+  });
+
+  test('the play function passes', async ({ page }) => {
+    await expectPlayToPass(page, STORY);
+  });
+});
+
 // Keyboard-safe focus (spec §1.10). A desktop browser has no on-screen keyboard, so the visual
 // viewport is replaced by a controllable stand-in: `__setKeyboard(px)` shrinks it from the bottom
 // and fires `resize`, which is what a real virtual keyboard does to `window.visualViewport`.

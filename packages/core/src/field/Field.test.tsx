@@ -473,3 +473,38 @@ describe('keyboard-safe focus', () => {
     expect(() => act(() => screen.getByRole('textbox').focus())).not.toThrow();
   });
 });
+
+describe('Field message area', () => {
+  it('always renders the reserved area, empty and silent when there is no message', () => {
+    const { container } = render(
+      <Field label="Nome">
+        <Input />
+      </Field>,
+    );
+    const area = container.querySelector('[data-field-messages]') as HTMLElement;
+    expect(area).not.toBeNull();
+    expect(area).toBeEmptyDOMElement();
+    expect(area.className).toContain('min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]');
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('reserveMessageSpace={false} takes no room when there is no message', () => {
+    const { container } = render(
+      <Field label="Search" hideLabel reserveMessageSpace={false}>
+        <Input />
+      </Field>,
+    );
+    expect((container.querySelector('[data-field-messages]') as HTMLElement).className).toBe('');
+  });
+
+  it('puts reason, error and help inside the same area', () => {
+    const { container } = render(
+      <Field label="Nome" state="locked" stateReason="Locked." error="Bad." help="Hint.">
+        <Input />
+      </Field>,
+    );
+    const area = container.querySelector('[data-field-messages]') as HTMLElement;
+    expect(area.children).toHaveLength(3);
+    expect(screen.getByRole('textbox')).toHaveAccessibleDescription('Locked. Bad. Hint.');
+  });
+});
