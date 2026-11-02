@@ -517,6 +517,10 @@ describe('Field message area', () => {
     const slot = container.querySelector('[data-field-error-slot]') as HTMLElement;
     expect(slot.children).toHaveLength(1);
     expect(slot).toHaveTextContent('Bad.');
+    // Visual order: reason and help next to the control, the reserved error slot last.
+    const field = slot.parentElement as HTMLElement;
+    const order = Array.from(field.children).map((el) => el.id || (el as HTMLElement).dataset.fieldErrorSlot);
+    expect(order.slice(-3)).toEqual([expect.stringMatching(/-reason$/), expect.stringMatching(/-help$/), '']);
     expect(screen.getByRole('textbox')).toHaveAccessibleDescription('Locked. Bad. Hint.');
   });
 });

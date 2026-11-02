@@ -305,7 +305,7 @@ export const ErrorReservesSpace: Story = {
     const second = canvas.getByTestId('er-second');
     const before = second.getBoundingClientRect().top;
     await userEvent.click(canvas.getByRole('button', { name: 'Show error' }));
-    await expect(canvas.getByRole('textbox', { name: 'VAT number' })).toHaveAccessibleDescription(new RegExp(SHORT_ERROR));
+    await expect(canvas.getByRole('textbox', { name: 'VAT number' })).toHaveAccessibleDescription(expect.stringContaining(SHORT_ERROR));
     const moved = second.getBoundingClientRect().top - before;
     // Reserved: nothing moves. With the control off, the error takes its own room.
     if (args.reserveMessageSpace) await expect(moved).toBe(0);

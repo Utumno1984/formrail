@@ -221,14 +221,15 @@ export function Field(props: FieldProps) {
             {stateReason}
           </FieldMessage>
         ) : null}
+        <FieldMessage id={helpId} tone="help">
+          {help}
+        </FieldMessage>
+        {/* Last, so reason and help stay next to their control and the reserved room reads as the gap to the next field. */}
         <div data-field-error-slot="" className={reserveMessageSpace ? ERROR_SLOT : undefined}>
           <FieldMessage id={errorId} tone="error">
             {shownError}
           </FieldMessage>
         </div>
-        <FieldMessage id={helpId} tone="help">
-          {help}
-        </FieldMessage>
       </div>
     </FieldContext.Provider>
   );

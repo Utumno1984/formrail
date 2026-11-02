@@ -161,6 +161,18 @@ test.describe('Forms/Field: reserved message space', () => {
     expect(after.secondTop - before.secondTop).toBe(box.height + gap - reserved);
   });
 
+  test('the help sits next to its own control: closer to it than to the next field (no error shown)', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const first = page.getByTestId('er-first');
+    const input = (await first.getByRole('textbox').boundingBox())!;
+    const help = (await first.locator('[id$="-help"]').boundingBox())!;
+    const nextLabel = (await page.getByTestId('er-second').locator('label').boundingBox())!;
+    const toControl = help.y - (input.y + input.height);
+    const toNextField = nextLabel.y - (help.y + help.height);
+    expect(toControl).toBeGreaterThanOrEqual(0);
+    expect(toControl).toBeLessThan(toNextField);
+  });
+
   test('the error line stays reserved with no help text too, and without the control it is not', async ({ page }) => {
     await gotoStory(page, STORY, 'help:');
     const before = await metrics(page);
