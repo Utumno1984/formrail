@@ -481,11 +481,22 @@ describe('Field message area', () => {
         <Input />
       </Field>,
     );
-    const area = container.querySelector('[data-field-messages]') as HTMLElement;
+    const area = container.querySelector('[data-field-error-slot]') as HTMLElement;
     expect(area).not.toBeNull();
     expect(area).toBeEmptyDOMElement();
     expect(area.className).toContain('min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]');
     expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('keeps the error slot reserved when the Field also has a reason and help', () => {
+    const { container } = render(
+      <Field label="Nome" state="locked" stateReason="Locked." help="Hint.">
+        <Input />
+      </Field>,
+    );
+    const slot = container.querySelector('[data-field-error-slot]') as HTMLElement;
+    expect(slot).toBeEmptyDOMElement();
+    expect(slot.className).toContain('min-h-');
   });
 
   it('reserveMessageSpace={false} takes no room when there is no message', () => {
@@ -494,17 +505,18 @@ describe('Field message area', () => {
         <Input />
       </Field>,
     );
-    expect((container.querySelector('[data-field-messages]') as HTMLElement).className).toBe('');
+    expect((container.querySelector('[data-field-error-slot]') as HTMLElement).className).toBe('');
   });
 
-  it('puts reason, error and help inside the same area', () => {
+  it('renders the error inside the slot; reason and help stay outside it, in the same order', () => {
     const { container } = render(
       <Field label="Nome" state="locked" stateReason="Locked." error="Bad." help="Hint.">
         <Input />
       </Field>,
     );
-    const area = container.querySelector('[data-field-messages]') as HTMLElement;
-    expect(area.children).toHaveLength(3);
+    const slot = container.querySelector('[data-field-error-slot]') as HTMLElement;
+    expect(slot.children).toHaveLength(1);
+    expect(slot).toHaveTextContent('Bad.');
     expect(screen.getByRole('textbox')).toHaveAccessibleDescription('Locked. Bad. Hint.');
   });
 });

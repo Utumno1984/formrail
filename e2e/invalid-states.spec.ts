@@ -22,7 +22,7 @@ interface Measure {
   /** Top of the control relative to the top of its Field. */
   controlOffset: number;
   messageSpace: number;
-  /** Height the Field always reserves for its messages (the empty message area). */
+  /** Height the Field always reserves for its error (the empty error slot). */
   reserved: number;
 }
 
@@ -51,7 +51,7 @@ function measure(page: Page, kind: Kind, variant: Variant): Promise<Measure> {
       fieldHeight: field.getBoundingClientRect().height,
       controlOffset: rect.top - field.getBoundingClientRect().top,
       messageSpace,
-      reserved: parseFloat(getComputedStyle(root.querySelector<HTMLElement>('[data-field-messages]')!).minHeight),
+      reserved: parseFloat(getComputedStyle(root.querySelector<HTMLElement>('[data-field-error-slot]')!).minHeight),
     };
   }, kind);
 }

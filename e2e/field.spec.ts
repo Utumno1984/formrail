@@ -148,11 +148,31 @@ test.describe('Forms/Field: reserved message space', () => {
     await gotoStory(page, STORY);
     const before = await metrics(page);
     await page.getByRole('button', { name: 'Show long error' }).click();
-    const box = (await page.locator('[id$="-error"]').boundingBox())!;
+    const message = page.locator('[id$="-error"]');
+    const box = (await message.boundingBox())!;
     expect(box.height).toBeGreaterThan(32); // two lines or more
+    const { reserved, gap } = await message.evaluate((el) => ({
+      reserved: parseFloat(getComputedStyle(el.closest('[data-field-error-slot]')!).minHeight),
+      gap: parseFloat(getComputedStyle(el).marginTop),
+    }));
+    expect(reserved).toBeGreaterThan(0);
     const after = await metrics(page);
-    // Reserved: 4px gap + 16px line. Actual: 4px gap + the message height (the gap is outside the box).
-    expect(after.secondTop - before.secondTop).toBe(box.height - 16);
+    // The message needs gap + its height (the gap is outside the box); the slot already holds `reserved`.
+    expect(after.secondTop - before.secondTop).toBe(box.height + gap - reserved);
+  });
+
+  test('the error line stays reserved with no help text too, and without the control it is not', async ({ page }) => {
+    await gotoStory(page, STORY, 'help:');
+    const before = await metrics(page);
+    await page.getByRole('button', { name: 'Show error', exact: true }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
+    expect(await metrics(page)).toEqual(before);
+
+    await gotoStory(page, STORY, 'help:;reserveMessageSpace:!false');
+    const bare = await metrics(page);
+    await page.getByRole('button', { name: 'Show error', exact: true }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
+    expect((await metrics(page)).secondTop).toBeGreaterThan(bare.secondTop);
   });
 
   test('the play function passes', async ({ page }) => {

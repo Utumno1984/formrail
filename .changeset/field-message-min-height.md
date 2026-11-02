@@ -1,5 +1,5 @@
 ---
-'@react-object-page/core': patch
+'@react-object-page/core': minor
 ---
 
-`Field`: the area under the control (state reason, error, help) always reserves the height of one caption line, so an error of one line appearing or disappearing no longer pushes the fields below it down. A message that wraps (or several stacked messages) still grows the area. New prop `reserveMessageSpace` (default `true`): set it to `false` on a Field that never shows a message (the `ListReportFilterBar` search box does) so it does not take that room.
+`Field`: the error line is always reserved. The Field keeps one caption line of height under the control for its error slot, with or without a help text or a state reason, so a one-line error appearing or disappearing no longer pushes the fields below it down. A wrapped error still grows the slot. Reason and help are static descriptions and take room only while present. This adds about 20px under every Field: a Field in an inline row (e.g. next to a `Button`, aligned at the bottom) should pass the new prop `reserveMessageSpace={false}`, as the `ListReportFilterBar` search box now does.
