@@ -605,22 +605,24 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
  *
  * ```tsx
  * import { useMemo } from 'react';
- * import { useNavigate, useSearchParams } from 'react-router';
+ * import { useLocation, useNavigate, useSearchParams } from 'react-router';
  * import type { ListReportUrlAdapter } from '@react-object-page/core';
  *
  * function useReactRouterAdapter(): ListReportUrlAdapter {
  *   const [searchParams] = useSearchParams();
+ *   const { hash, state } = useLocation();
  *   const navigate = useNavigate();
  *   // Rebuilt on every navigation; the re-render is the notification, so `subscribe` does nothing.
+ *   // The hash and the location `state` are carried over (`navigate({ search })` alone drops them).
  *   return useMemo(
  *     () => ({
  *       read: () => new URLSearchParams(searchParams),
  *       write: (next, mode) => {
- *         void navigate({ search: next.toString() }, { replace: mode === 'replace' });
+ *         void navigate({ search: next.toString(), hash }, { replace: mode === 'replace', state });
  *       },
  *       subscribe: () => () => undefined,
  *     }),
- *     [searchParams, navigate],
+ *     [searchParams, hash, state, navigate],
  *   );
  * }
  *
@@ -642,19 +644,40 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
  *       read: () => new URLSearchParams(router.state.location.searchStr),
  *       write: (next, mode) => {
  *         // Untyped search: the router keeps the query as the object it parses from the string.
- *         void router.navigate({ to: '.', search: Object.fromEntries(next) as never, replace: mode === 'replace' });
+ *         void router.navigate({
+ *           to: '.',
+ *           search: Object.fromEntries(next) as never,
+ *           hash: true, // keep the current hash
+ *           replace: mode === 'replace',
+ *         });
  *       },
  *       subscribe: (listener) => router.subscribe('onResolved', listener),
  *     }),
  *     [router],
  *   );
  * }
+ *
+ * // TanStack's default search serializer JSON-encodes values: a search "2024" would land in the URL as
+ * // `q="2024"`. Give the router plain-string (de)serialization for the query:
+ * const router = createRouter({
+ *   routeTree,
+ *   parseSearch: (searchStr) => Object.fromEntries(new URLSearchParams(searchStr)),
+ *   stringifySearch: (search) => {
+ *     const query = new URLSearchParams(Object.entries(search).map(([k, v]) => [k, String(v)])).toString();
+ *     return query ? `?${query}` : '';
+ *   },
+ * });
  * ```
+ *
+ * Limits of the TanStack snippet: a parameter repeated in the query (`tag=a&tag=b`) keeps only its last
+ * value through `Object.fromEntries`; keep the page's other parameters single-valued.
  *
  * Notes: `write` receives every parameter of the page (not only the report's) and replaces the query string.
  * Keep the adapter stable (`useMemo`, as above): a new object re-subscribes and re-reads, with no write and
  * no callback. `subscribe` may notify synchronously or later, and for the hook's own writes too: the
- * values update with no callback and no response write. If `write` throws, the error reaches the caller.
+ * values update with no callback and no response write. `read()` may lag behind `write()` until the router
+ * renders (two writes of one gesture, as in "Clear filters", still add up). If `write` throws, the error
+ * reaches the caller. With server rendering the hook returns the defaults and reads the adapter after hydration.
  * With TanStack Router, a route with typed `validateSearch` may parse values (numbers, JSON) that the
  * hook then reads back as strings: keep this report's parameters as plain strings.
  *

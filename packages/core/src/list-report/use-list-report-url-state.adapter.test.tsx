@@ -1,6 +1,5 @@
 import { StrictMode } from 'react';
 import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryUrlAdapter } from '../internal/memory-url-adapter';
 import { ListReport } from './ListReport';
@@ -126,20 +125,33 @@ describe('useListReportUrlState with an adapter', () => {
   });
 
   it('an asynchronous echo does not overwrite the text typed in the meantime', async () => {
-    const adapter = createMemoryUrlAdapter({ notify: 'microtask' });
+    // `lag`: read() only sees the write when the (microtask) echo lands, like a router that updates in a transition.
+    const adapter = createMemoryUrlAdapter({ lag: true });
     const onSearchQueryChange = vi.fn();
     render(<Host adapter={adapter} onSearchQueryChange={onSearchQueryChange} />);
-    const user = userEvent.setup();
-    await user.type(searchBox(), 'ros{Enter}');
-    expect(adapter.read().get('q')).toBe('ros');
-    // Keeps typing before the echo of the next commit lands.
-    await user.type(searchBox(), 's');
-    expect(searchBox().value).toBe('ross');
     await act(async () => {
-      await Promise.resolve();
+      // Commit "ros" with Enter, then type one more character before the echo can land (same tick).
+      fireEvent.change(searchBox(), { target: { value: 'ros' } });
+      fireEvent.keyDown(searchBox(), { key: 'Enter' });
+      expect(adapter.read().get('q')).toBeNull(); // the echo is still pending
+      fireEvent.change(searchBox(), { target: { value: 'ross' } });
     });
-    expect(searchBox().value).toBe('ross');
+    expect(adapter.read().get('q')).toBe('ros'); // the echo landed
+    expect(searchBox().value).toBe('ross'); // ...and did not overwrite the draft
     expect(onSearchQueryChange).toHaveBeenCalledTimes(1);
+    expect(onSearchQueryChange).toHaveBeenCalledWith('ros');
+  });
+
+  it('two writes of one gesture build on each other even if read() lags behind write() (clear filters)', async () => {
+    const adapter = createMemoryUrlAdapter({ initial: '?filter=open&q=zzz&page=2', lag: true });
+    render(<Host adapter={adapter} history="push" />);
+    expect(pill('Open')).toBeChecked();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    });
+    expect(adapter.read().toString()).toBe('page=2');
+    expect(pill('All')).toBeChecked();
+    expect(searchBox().value).toBe('');
   });
 
   it('an external change updates the state with no callback and no write', () => {

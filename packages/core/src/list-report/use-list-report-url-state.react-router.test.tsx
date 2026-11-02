@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter, RouterProvider, useNavigate, useSearchParams } from 'react-router';
+import { createMemoryRouter, RouterProvider, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -29,18 +29,20 @@ const FILTERS: ListReportFilter<Row>[] = [
 // --- The documented recipe (keep in sync with the List Report docs) -------------------------------
 function useReactRouterAdapter(): ListReportUrlAdapter {
   const [searchParams] = useSearchParams();
+  const { hash, state } = useLocation();
   const navigate = useNavigate();
   // `useSearchParams` re-renders on every navigation, so the adapter is rebuilt with the new
-  // location; `subscribe` is a no-op because the re-render is the notification.
+  // location; `subscribe` is a no-op because the re-render is the notification. `read()` may lag
+  // behind `write()` until that render: the hook copes. The hash and `state` are carried over.
   return useMemo(
     () => ({
       read: () => new URLSearchParams(searchParams),
       write: (next, mode) => {
-        void navigate({ search: next.toString() }, { replace: mode === 'replace' });
+        void navigate({ search: next.toString(), hash }, { replace: mode === 'replace', state });
       },
       subscribe: () => () => undefined,
     }),
-    [searchParams, navigate],
+    [searchParams, hash, state, navigate],
   );
 }
 // ---------------------------------------------------------------------------------------------------
@@ -86,6 +88,18 @@ describe('useListReportUrlState: React Router recipe', () => {
     expect(router.state.location.search).toBe('?filter=open');
     expect(pill('Open')).toBeChecked();
     expect(onFilterChange).not.toHaveBeenCalled();
+  });
+
+  it('keeps the hash, and "Clear filters" resets pill and search in one go (two writes in one gesture)', async () => {
+    const router = createMemoryRouter([{ path: '/', element: <Page /> }], {
+      initialEntries: ['/?filter=open&q=zzz&page=2#section'],
+    });
+    render(<RouterProvider router={router} />);
+    expect(pill('Open')).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    expect(router.state.location.search).toBe('?page=2');
+    expect(router.state.location.hash).toBe('#section');
+    expect(pill('All')).toBeChecked();
   });
 });
 

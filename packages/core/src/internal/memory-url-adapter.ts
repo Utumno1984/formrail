@@ -14,8 +14,13 @@ export interface MemoryUrlAdapter extends ListReportUrlAdapter {
 
 export interface MemoryUrlAdapterOptions {
   initial?: string;
-  /** How subscribers hear about a change: right away (default), in a microtask, or not at all by `write`. */
+  /** How subscribers hear about a change made by `write`: right away (default) or in a microtask. */
   notify?: 'sync' | 'microtask';
+  /**
+   * A router that applies a `write` only at its next render: with `true`, `read()` returns the old query
+   * until the (microtask) notification, as `useSearchParams` does. Implies `notify: 'microtask'`.
+   */
+  lag?: boolean;
   /** Called after every `write` of the hook. */
   onWrite?: (search: string, mode: 'replace' | 'push') => void;
   /** Re-encodes what `write` stores, like a router that normalizes the query. */
@@ -24,16 +29,21 @@ export interface MemoryUrlAdapterOptions {
 
 /** A router-like query string in memory with a simulated history. Fixture of tests and of the recipe story. */
 export function createMemoryUrlAdapter(options: MemoryUrlAdapterOptions = {}): MemoryUrlAdapter {
-  const { initial = '', notify = 'sync', onWrite, normalize = (s) => s } = options;
+  const { initial = '', lag = false, onWrite, normalize = (s) => s } = options;
+  const notify = lag ? 'microtask' : (options.notify ?? 'sync');
   const entries: string[] = [initial];
   let index = 0;
   const listeners = new Set<() => void>();
   const emit = () => {
     for (const listener of [...listeners]) listener();
   };
-  const emitLater = () => {
-    if (notify === 'sync') emit();
-    else queueMicrotask(emit);
+  const apply = (search: string, mode: 'replace' | 'push') => {
+    if (mode === 'push') {
+      entries.splice(index + 1, entries.length, search);
+      index += 1;
+    } else {
+      entries[index] = search;
+    }
   };
   return {
     get entries() {
@@ -46,13 +56,16 @@ export function createMemoryUrlAdapter(options: MemoryUrlAdapterOptions = {}): M
     write: (next, mode) => {
       const search = normalize(next.toString());
       onWrite?.(search, mode);
-      if (mode === 'push') {
-        entries.splice(index + 1, entries.length, search);
-        index += 1;
-      } else {
-        entries[index] = search;
+      if (lag) {
+        queueMicrotask(() => {
+          apply(search, mode);
+          emit();
+        });
+        return;
       }
-      emitLater();
+      apply(search, mode);
+      if (notify === 'sync') emit();
+      else queueMicrotask(emit);
     },
     subscribe: (listener) => {
       listeners.add(listener);

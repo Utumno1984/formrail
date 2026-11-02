@@ -38,7 +38,7 @@ test.describe('Floorplans/List Report: UrlStateRouterRecipe', () => {
     await expect(pill(page, 'Open')).toBeChecked();
     await expect(query(page)).toHaveText('filter=open&sort=amount.asc');
     expect(page.url()).toBe(before);
-    // The real browser history did not move either.
+    // Back moved only the simulated history: Forward is now available.
     await expect(page.getByRole('button', { name: 'Forward' })).toBeEnabled();
   });
 });

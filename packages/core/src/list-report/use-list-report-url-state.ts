@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { ListReportSort, ListReportSortDirection } from './types';
 
 export interface UseListReportUrlStateOptions {
@@ -37,7 +37,13 @@ export interface ListReportUrlAdapter {
   read(): URLSearchParams;
   /** Replaces the query string (`next` holds every parameter, the ones of the page included). Throwing propagates to the caller. */
   write(next: URLSearchParams, mode: 'replace' | 'push'): void;
-  /** Calls `listener` whenever the query string may have changed (also, synchronously, after `write`). Returns the unsubscribe. */
+  /**
+   * Calls `listener` whenever the query string may have changed: a navigation, or the echo of `write`
+   * (sync or later). Returns the unsubscribe. A router whose hook re-renders the component on every
+   * navigation may implement it as a no-op (the re-render is the notification, see the React Router
+   * recipe) as long as `read()` then returns the new query. `read()` may lag behind `write()` until the
+   * router renders: the hook builds consecutive writes of one gesture on its own last write.
+   */
   subscribe(listener: () => void): () => void;
 }
 
@@ -254,13 +260,25 @@ export function useListReportUrlState(options: UseListReportUrlStateOptions): Us
   const latest = useRef({ filterKey, searchKey, sortKey, defaultFilterId, defaultSearchQuery, defaultSort, history });
   latest.current = { filterKey, searchKey, sortKey, defaultFilterId, defaultSearchQuery, defaultSort, history };
 
+  // The query written by this instance in the current tick. A router may apply a `write` only at its next
+  // render, so `read()` is still the old query when a second write of the same gesture (e.g. "clear
+  // filters": pill, then search) starts: that one builds on this, not on the stale read.
+  const written = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    written.current = undefined; // another source: nothing written to it yet
+  }, [source]);
+
   const write = useCallback(
     (key: string, value: string | null) => {
-      const current = source.read();
+      const current = written.current ?? source.read();
       const next = updateSearch(current, { [key]: value });
       // Nothing changes: no write, and above all no history entry.
       if (next === current || (next === '' && current === '?')) return;
-      source.write(next, latest.current.history);
+      source.write(next, latest.current.history); // may throw: then nothing is remembered
+      written.current = next;
+      queueMicrotask(() => {
+        if (written.current === next) written.current = undefined;
+      });
     },
     [source],
   );
