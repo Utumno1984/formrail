@@ -694,7 +694,7 @@ export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
     scroller().scrollTop = 600;
     await waitFor(() => expect(scroller().scrollTop).toBe(600));
     // The position is stored (throttled); then the user opens an invoice and the list unmounts.
-    const storedKey = `rop:list-report-scroll:${win.location.pathname}?filter=open`;
+    const storedKey = `rop:list-report-scroll:#${win.location.pathname}?filter=open`;
     await waitFor(() => expect(win.sessionStorage.getItem(storedKey)).not.toBeNull(), { timeout: 3000 });
     const windowScroll = win.scrollY;
     await userEvent.click(canvas.getAllByRole('button', { name: /^FT-2026-/ })[0]!);

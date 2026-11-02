@@ -37,7 +37,7 @@ function Report({ title, prefix, delay, empty }: { title: string; prefix?: strin
       <ListReport
         title={title}
         table={table}
-        status={loaded ? (empty ? 'empty' : 'ready') : 'loading'}
+        status={loaded ? 'ready' : 'loading'}
         labels={LABELS}
         filtersLabel="Filters"
         searchLabel="Search"

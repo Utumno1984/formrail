@@ -78,6 +78,9 @@ function defaultStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> |
  * - Storage missing, throwing (quota, private mode) or holding a corrupt value: no error, no restore.
  * - Server rendering touches nothing (all browser access is lazy).
  * - Two reports in a page: give them different `prefix` (or `key`).
+ * - Hand `scroll.ref` to `scrollerRef` as it is (a new inline wrapper at every render detaches and re-attaches it).
+ * - Changing pill does not reset the container's scroll by itself; a position is saved per URL, so coming
+ *   back to a view you did not scroll starts at the top.
  */
 export function useListReportScrollRestoration(
   options: UseListReportScrollRestorationOptions,
@@ -89,6 +92,7 @@ export function useListReportScrollRestoration(
   const elementRef = useRef<HTMLElement | null>(null);
   const restored = useRef(false);
   const touched = useRef(false);
+  const echo = useRef<Position | null>(null);
   const pending = useRef<{ storageKey: string; position: Position } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -100,7 +104,8 @@ export function useListReportScrollRestoration(
     const own = new URLSearchParams();
     for (const name of listReportParamKeys(p, names)) for (const value of query.getAll(name)) own.append(name, value);
     own.sort();
-    return `${STORAGE_PREFIX}${window.location.pathname}?${own.toString()}`;
+    // The prefix is part of the key: two reports in their default state have no parameter in the URL.
+    return `${STORAGE_PREFIX}${p ?? ''}#${window.location.pathname}?${own.toString()}`;
   }, []);
 
   const flush = useCallback(() => {
@@ -128,16 +133,27 @@ export function useListReportScrollRestoration(
       return;
     }
     if (!saved) return;
+    const before = { top: element.scrollTop, left: element.scrollLeft };
     element.scrollTop = saved.top;
     element.scrollLeft = saved.left;
+    const after = { top: element.scrollTop, left: element.scrollLeft };
+    // The browser reports our own assignment with a `scroll` event: it is not a gesture and must not be
+    // saved (a position cut short by a momentarily shorter dataset would otherwise overwrite the good one).
+    echo.current = after.top !== before.top || after.left !== before.left ? after : null;
   }, [resolveKey]);
 
   const onScroll = useCallback(
     (event: Event) => {
       const element = event.currentTarget as HTMLElement;
+      const expected = echo.current;
+      echo.current = null;
+      if (expected && expected.top === element.scrollTop && expected.left === element.scrollLeft) return;
       // A scroll before the restoration is the user's: it cancels the restoration.
       if (!restored.current) touched.current = true;
-      pending.current = { storageKey: resolveKey(), position: { top: element.scrollTop, left: element.scrollLeft } };
+      const storageKey = resolveKey();
+      // The URL moved inside the throttle window: the last position of the previous view is written first.
+      if (pending.current && pending.current.storageKey !== storageKey) flush();
+      pending.current = { storageKey, position: { top: element.scrollTop, left: element.scrollLeft } };
       if (timer.current === undefined) timer.current = setTimeout(flush, SAVE_INTERVAL_MS);
     },
     [flush, resolveKey],

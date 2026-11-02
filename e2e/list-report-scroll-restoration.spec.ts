@@ -90,10 +90,36 @@ test.describe('Floorplans/List Report: ScrollRestoration', () => {
     await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
     await pill(page, 'Rejected').click();
     await expect(pill(page, 'Rejected')).toBeChecked();
-    await page.getByRole('button', { name: /^FT-2026-/ }).first().click();
+    // The container keeps its position when the pill changes; the user opens a row without scrolling.
+    await page.waitForTimeout(300);
+    await clickVisibleRow(page);
     await expect(detailTitle(page)).toBeVisible();
+    const keys = await page.evaluate(() => Object.keys(window.sessionStorage));
+    expect(keys.some((k) => k.includes('filter=open'))).toBe(true);
+    expect(keys.some((k) => k.includes('filter=rejected'))).toBe(false); // nothing was scrolled for this view
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+    await expect(pill(page, 'Rejected')).toBeChecked();
     expect(await scrollTop(page)).toBe(0);
   });
 });
+
+// The same round trip on tablet and mobile viewports (the project runs Desktop Chrome; the viewport is set here).
+for (const [name, width, height] of [
+  ['tablet', 768, 1024],
+  ['mobile', 375, 667],
+] as const) {
+  test.describe(`Floorplans/List Report: ScrollRestoration (${name})`, () => {
+    test.use({ viewport: { width, height } });
+
+    test('Cancel restores the position after the data arrives', async ({ page }) => {
+      await gotoStory(page, FIXTURE, DELAY);
+      const saved = await openAndScroll(page, 'Open', 500);
+      await page.getByRole('button', { name: 'Cancel' }).click();
+      await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
+      await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+      await expect.poll(async () => Math.abs((await scrollTop(page)) - saved)).toBeLessThanOrEqual(1);
+      await expect(pill(page, 'Open')).toBeChecked();
+    });
+  });
+}

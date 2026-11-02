@@ -15,21 +15,38 @@ type Opts = UseListReportScrollRestorationOptions;
 function makeScrollable(el: HTMLElement, max = { top: 5000, left: 0 }) {
   let top = 0;
   let left = 0;
+  let scheduled = false;
+  // Like a browser: a change of position (whoever makes it) is reported by one `scroll` event, later.
+  const report = () => {
+    if (scheduled) return;
+    scheduled = true;
+    queueMicrotask(() => {
+      scheduled = false;
+      el.dispatchEvent(new Event('scroll'));
+    });
+  };
   Object.defineProperty(el, 'scrollTop', {
     configurable: true,
     get: () => top,
     set: (v: number) => {
-      top = Math.min(Math.max(0, v), max.top);
+      const next = Math.min(Math.max(0, v), max.top);
+      if (next !== top) report();
+      top = next;
     },
   });
   Object.defineProperty(el, 'scrollLeft', {
     configurable: true,
     get: () => left,
     set: (v: number) => {
-      left = Math.min(Math.max(0, v), max.left);
+      const next = Math.min(Math.max(0, v), max.left);
+      if (next !== left) report();
+      left = next;
     },
   });
 }
+
+/** Lets the pending `scroll` events (and effects) land. */
+const settle = () => act(async () => void (await Promise.resolve()));
 
 /** What a user's scroll does: moves, then the browser fires `scroll`. */
 function userScroll(el: HTMLElement, top: number, left = 0) {
@@ -81,7 +98,7 @@ describe('useListReportScrollRestoration', () => {
     const first = render(<Scroller ready storage={storage} />);
     userScroll(scroller(first.container), 1200);
     first.unmount(); // flushes the pending value
-    expect(storage.data.get(KEY('/list?filter=open'))).toBe('{"top":1200,"left":0}');
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe('{"top":1200,"left":0}');
 
     const second = render(<Scroller ready={false} storage={storage} />);
     expect(scroller(second.container).scrollTop).toBe(0); // not ready: the skeleton is not scrolled
@@ -92,7 +109,7 @@ describe('useListReportScrollRestoration', () => {
   });
 
   it('restores in the first commit where ready is true, not before', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":300,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":300,"left":0}' });
     const view = render(<Scroller ready={false} storage={storage} />);
     expect(storage.getItem).not.toHaveBeenCalled();
     view.rerender(<Scroller ready storage={storage} />);
@@ -100,14 +117,14 @@ describe('useListReportScrollRestoration', () => {
   });
 
   it('uses a different key for different list parameters', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":300,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":300,"left":0}' });
     window.history.replaceState(null, '', '/list?filter=closed');
     const view = render(<Scroller ready storage={storage} />);
     expect(scroller(view.container).scrollTop).toBe(0);
   });
 
   it('ignores parameters that are not the report\'s own, and their order', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open&q=a')]: '{"top":70,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open&q=a')]: '{"top":70,"left":0}' });
     window.history.replaceState(null, '', '/list?x=1&q=a&filter=open#h');
     const view = render(<Scroller ready storage={storage} />);
     expect(scroller(view.container).scrollTop).toBe(70);
@@ -137,7 +154,7 @@ describe('useListReportScrollRestoration', () => {
   });
 
   it('does not override a scroll of the user made before the data arrived', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":1200,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":1200,"left":0}' });
     const view = render(<Scroller ready={false} storage={storage} />);
     userScroll(scroller(view.container), 40);
     view.rerender(<Scroller ready storage={storage} />);
@@ -145,7 +162,7 @@ describe('useListReportScrollRestoration', () => {
   });
 
   it('restores at most once: a later ready cycle does not scroll again', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":500,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":500,"left":0}' });
     const view = render(<Scroller ready storage={storage} />);
     expect(scroller(view.container).scrollTop).toBe(500);
     userScroll(scroller(view.container), 20);
@@ -155,20 +172,20 @@ describe('useListReportScrollRestoration', () => {
   });
 
   it('stops at the maximum for a shorter dataset, without errors, and saves the clamped value at the next scroll', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":1200,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":1200,"left":0}' });
     const view = render(<Scroller ready storage={storage} max={{ top: 300, left: 0 }} />);
     expect(scroller(view.container).scrollTop).toBe(300);
     userScroll(scroller(view.container), 250);
     act(() => void vi.advanceTimersByTime(200));
-    expect(storage.data.get(KEY('/list?filter=open'))).toBe('{"top":250,"left":0}');
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe('{"top":250,"left":0}');
   });
 
   it('does not clear the stored value when ready but the user has not scrolled (empty or error views)', () => {
     const stored = '{"top":1200,"left":0}';
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: stored });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: stored });
     const view = render(<Scroller ready storage={storage} max={{ top: 0, left: 0 }} />);
     view.unmount();
-    expect(storage.data.get(KEY('/list?filter=open'))).toBe(stored);
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe(stored);
     expect(storage.removeItem).not.toHaveBeenCalled();
     expect(storage.setItem).not.toHaveBeenCalled();
   });
@@ -184,7 +201,7 @@ describe('useListReportScrollRestoration', () => {
     expect(storage.setItem.mock.calls.length).toBeLessThanOrEqual(2);
     userScroll(el, 777);
     view.unmount();
-    expect(storage.data.get(KEY('/list?filter=open'))).toBe('{"top":777,"left":0}');
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe('{"top":777,"left":0}');
   });
 
   it('flushes on pagehide', () => {
@@ -193,7 +210,7 @@ describe('useListReportScrollRestoration', () => {
     userScroll(scroller(view.container), 640);
     expect(storage.setItem).not.toHaveBeenCalled();
     window.dispatchEvent(new Event('pagehide'));
-    expect(storage.data.get(KEY('/list?filter=open'))).toBe('{"top":640,"left":0}');
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe('{"top":640,"left":0}');
   });
 
   it('saves and restores scrollLeft with the same contract', () => {
@@ -230,7 +247,7 @@ describe('useListReportScrollRestoration', () => {
   it.each(['abc', '{bad json', '-5', '{"top":-1,"left":0}', '{"top":"7","left":0}', 'null', '[]', '{"top":1}'])(
     'ignores a corrupt stored value (%s)',
     (raw) => {
-      const storage = memoryStorage({ [KEY('/list?filter=open')]: raw });
+      const storage = memoryStorage({ [KEY('#/list?filter=open')]: raw });
       const view = render(<Scroller ready storage={storage} />);
       expect(scroller(view.container).scrollTop).toBe(0);
     },
@@ -242,8 +259,73 @@ describe('useListReportScrollRestoration', () => {
     expect(scroller(view.container).scrollTop).toBe(55);
   });
 
+  it('keeps two reports apart even with no parameter in the URL (default state)', () => {
+    const storage = memoryStorage();
+    window.history.replaceState(null, '', '/list');
+    const pair = () => (
+      <>
+        <Scroller ready prefix="a" storage={storage} />
+        <Scroller ready prefix="b" storage={storage} />
+      </>
+    );
+    const first = render(pair());
+    const [a, b] = Array.from(first.container.querySelectorAll<HTMLElement>('[data-testid="scroller"]'));
+    userScroll(a!, 100);
+    userScroll(b!, 900);
+    first.unmount();
+    expect(storage.data.size).toBe(2);
+    const again = render(pair());
+    const [a2, b2] = Array.from(again.container.querySelectorAll<HTMLElement>('[data-testid="scroller"]'));
+    expect([a2!.scrollTop, b2!.scrollTop]).toEqual([100, 900]);
+  });
+
+  it('does not save the browser echo of its own restoration (a momentarily shorter dataset keeps the good position)', async () => {
+    const stored = '{"top":1200,"left":0}';
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: stored });
+    const view = render(<Scroller ready storage={storage} max={{ top: 300, left: 0 }} />);
+    expect(scroller(view.container).scrollTop).toBe(300);
+    await settle(); // the echo `scroll` event lands
+    act(() => void vi.advanceTimersByTime(500));
+    view.unmount();
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe(stored);
+  });
+
+  it('keeps the stored value when ready on an empty list that still scrolls sideways', async () => {
+    const stored = '{"top":1200,"left":300}';
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: stored });
+    const view = render(<Scroller ready storage={storage} max={{ top: 0, left: 800 }} />);
+    expect(scroller(view.container).scrollLeft).toBe(300);
+    await settle();
+    act(() => void vi.advanceTimersByTime(500));
+    view.unmount();
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe(stored);
+  });
+
+  it('a gesture right after the echo is saved as usual', async () => {
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":500,"left":0}' });
+    const view = render(<Scroller ready storage={storage} />);
+    await settle();
+    userScroll(scroller(view.container), 520);
+    view.unmount();
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe('{"top":520,"left":0}');
+  });
+
+  it('writes the last position of the previous view when the URL changes inside the throttle window', () => {
+    const storage = memoryStorage();
+    const view = render(<Scroller ready storage={storage} />);
+    const el = scroller(view.container);
+    userScroll(el, 1200);
+    act(() => void vi.advanceTimersByTime(50));
+    window.history.replaceState(null, '', '/list?filter=rejected');
+    userScroll(el, 0);
+    view.unmount();
+    expect(storage.data.get(KEY('#/list?filter=open'))).toBe('{"top":1200,"left":0}');
+    expect(storage.data.get(KEY('#/list?filter=rejected'))).toBe('{"top":0,"left":0}');
+  });
+
   it('works in StrictMode: the double mount does not consume the restoration', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":900,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":900,"left":0}' });
     const view = render(
       <StrictMode>
         <Scroller ready={false} storage={storage} />
@@ -284,7 +366,7 @@ describe('ListReport scrollerRef', () => {
   });
 
   it('works with the hook ref (callback)', () => {
-    const storage = memoryStorage({ [KEY('/list?filter=open')]: '{"top":10,"left":0}' });
+    const storage = memoryStorage({ [KEY('#/list?filter=open')]: '{"top":10,"left":0}' });
     function Wired() {
       const scroll = useListReportScrollRestoration({ ready: true, storage });
       return <Report scrollerRef={(el) => { if (el) makeScrollable(el); scroll.ref(el); }} />;
