@@ -29,13 +29,13 @@ import type { UseListReportReturn } from './types';
 export type ListReportFilterBarProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   /** What `useListReport` returned: the bar only renders it and calls its setters. */
   table: UseListReportReturn<Row>;
-  /** Accessible name of the group of pills. Default "Filtri". */
+  /** Accessible name of the group of pills. Default "Filters". */
   filtersLabel?: string;
-  /** Accessible name of the search box (visually hidden). Default "Cerca". */
+  /** Accessible name of the search box (visually hidden). Default "Search". */
   searchLabel?: string;
   /** Placeholder of the search box. Default: `searchLabel`. */
   searchPlaceholder?: string;
-  /** Accessible name of the button that clears the search. Default "Svuota ricerca". */
+  /** Accessible name of the button that clears the search. Default "Clear search". */
   clearSearchLabel?: string;
   /** Renders the search box. Default `true`. */
   showSearch?: boolean;
@@ -60,10 +60,10 @@ const isComposing = (event: KeyboardEvent | globalThis.KeyboardEvent): boolean =
 function ListReportFilterBarImpl<Row>(props: ListReportFilterBarProps<Row>, ref: Ref<HTMLDivElement>) {
   const {
     table,
-    filtersLabel = 'Filtri',
-    searchLabel = 'Cerca',
+    filtersLabel = 'Filters',
+    searchLabel = 'Search',
     searchPlaceholder,
-    clearSearchLabel = 'Svuota ricerca',
+    clearSearchLabel = 'Clear search',
     showSearch = true,
     className,
     'aria-label': ariaLabel,
@@ -155,7 +155,7 @@ function ListReportFilterBarImpl<Row>(props: ListReportFilterBarProps<Row>, ref:
   return (
     <div
       role="search"
-      aria-label={ariaLabel ?? (ariaLabelledby ? undefined : 'Filtri e ricerca')}
+      aria-label={ariaLabel ?? (ariaLabelledby ? undefined : 'Filters and search')}
       aria-labelledby={ariaLabelledby}
       {...rest}
       ref={ref}
@@ -225,7 +225,7 @@ function ListReportFilterBarImpl<Row>(props: ListReportFilterBarProps<Row>, ref:
  *   clear button and Escape (with a non-empty draft, consumed so that a Dialog around the bar stays
  *   open) empty draft and committed query together and keep the focus in the input.
  * - The search box is a `Field` + `Input`: it keeps itself clear of the on-screen keyboard.
- * - The bar is a `search` landmark; name it with `aria-label` / `aria-labelledby` (default "Filtri e ricerca").
+ * - The bar is a `search` landmark; name it with `aria-label` / `aria-labelledby` (default "Filters and search").
  * - From 640px the search box is a 18rem column next to the pills; below, it takes the whole row.
  */
 export const ListReportFilterBar = /* @__PURE__ */ forwardRef(ListReportFilterBarImpl) as <Row>(

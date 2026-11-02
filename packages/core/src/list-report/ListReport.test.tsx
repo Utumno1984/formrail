@@ -88,12 +88,28 @@ describe('<ListReport> header', () => {
     render(<Host />);
     const pending = ROWS.filter((r) => r.status === 'pending').length;
     await user.click(screen.getByRole('radio', { name: 'Da approvare' }));
-    expect(heading()).toHaveTextContent(`Fatture (${pending} di 40)`);
+    expect(heading()).toHaveTextContent(`Fatture (${pending} of 40)`);
     await user.click(screen.getByRole('radio', { name: 'Tutte' }));
     expect(heading()).toHaveTextContent('Fatture (40)');
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'Ferrari{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
     const matching = ROWS.filter((r) => r.supplier.includes('Ferrari')).length;
-    expect(heading()).toHaveTextContent(`Fatture (${matching} di 40)`);
+    expect(heading()).toHaveTextContent(`Fatture (${matching} of 40)`);
+  });
+
+  it('uses the English count "(n of m)" by default, "(0 of 40)" when nothing matches, and no "of" when n equals m', async () => {
+    const user = userEvent.setup();
+    render(<Host />);
+    expect(heading()).toHaveAccessibleName('Fatture (40)');
+    expect(heading().textContent).not.toMatch(/\bof\b/);
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
+    expect(heading()).toHaveAccessibleName('Fatture (0 of 40)');
+    // the table keeps the title alone as its name, without the count
+    expect(screen.getByRole('table', { name: 'Fatture' })).toBeInTheDocument();
+  });
+
+  it('shows "(0)" with an empty dataset (totalCount 0), never "(0 of 0)"', () => {
+    render(<Host rows={[]} status="ready" />);
+    expect(heading()).toHaveAccessibleName('Fatture (0)');
   });
 
   it('formats the count with labels.count', () => {
@@ -170,7 +186,7 @@ describe('<ListReport> announcements', () => {
     const { container } = render(<Host />);
     const live = () => container.querySelectorAll('[aria-live], [role="status"], [role="alert"], [role="log"]');
     expect(live()).toHaveLength(1);
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'zzz{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
     expect(live()).toHaveLength(1);
     // the table announces its change of state; the count in the heading is not a second announcement
     const region = live()[0] as HTMLElement;
@@ -185,13 +201,13 @@ describe('<ListReport> clear filters', () => {
     const user = userEvent.setup();
     render(<Host />);
     await user.click(screen.getByRole('radio', { name: 'Da approvare' }));
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'zzz{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
     expect(within(screen.getByRole('table')).getByText('Nessun risultato per i filtri correnti')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
     expect(heading()).toHaveTextContent('Fatture (40)');
     expect(screen.getByRole('radio', { name: 'Tutte' })).toBeChecked();
-    expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveValue('');
-    expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveFocus();
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveFocus();
     expect(document.body).not.toHaveFocus();
   });
 
@@ -225,9 +241,9 @@ describe('<ListReport> clear filters', () => {
   it('with a search and an empty default pill: the first click clears the search, then the unfiltered pill', async () => {
     const user = userEvent.setup();
     render(<Host showSearch defaultFilter="pending" rows={ROWS.filter((r) => r.status !== 'pending')} />);
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'Ferrari{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
     await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
-    expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveValue('');
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
     expect(screen.getByRole('radio', { name: 'Tutte' })).toBeChecked();
     expect(screen.queryByRole('button', { name: 'Azzera filtri' })).toBeNull();
   });
@@ -235,16 +251,16 @@ describe('<ListReport> clear filters', () => {
   it('the focus goes to the search box of the bar, not to an input in the actions slot', async () => {
     const user = userEvent.setup();
     render(<Host actions={<input type="search" aria-label="Altro" />} />);
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'zzz{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
     await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
-    expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveFocus();
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveFocus();
   });
 
   it('a custom onClearFilters replaces the default', async () => {
     const user = userEvent.setup();
     const onClearFilters = vi.fn();
     render(<Host onClearFilters={onClearFilters} />);
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'zzz{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
     await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
     // not cleared: only the consumer's callback ran
@@ -277,11 +293,11 @@ describe('<ListReport> state props', () => {
     const user = userEvent.setup();
     const { rerender } = render(<Host />);
     await user.click(screen.getByRole('radio', { name: 'Da approvare' }));
-    await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'Fer');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Fer');
     rerender(<Host rows={[]} status="loading" />);
     rerender(<Host />);
     expect(screen.getByRole('radio', { name: 'Da approvare' })).toBeChecked();
-    expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveValue('Fer');
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('Fer');
   });
 });
 

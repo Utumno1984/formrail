@@ -26,14 +26,14 @@ import {
 import type { UseListReportReturn } from './types';
 import { useChangeFlash } from './use-change-flash';
 
-/** Texts of `ListReport`: those of `ListReportTable` plus the count in the header (Italian defaults). */
+/** Texts of `ListReport`: those of `ListReportTable` plus the count in the header (the count default is English). */
 export interface ListReportLabels extends ListReportTableLabels {
-  /** The count next to the title. Default: `(n)`, and `(n di m)` when a pill or the search hide some of the rows. */
+  /** The count next to the title. Default: `(n)`, and `(n of m)` when a pill or the search hide some of the rows. */
   count: (resultCount: number, totalCount: number) => string;
 }
 
 const DEFAULT_COUNT = (resultCount: number, totalCount: number): string =>
-  resultCount === totalCount ? `(${resultCount})` : `(${resultCount} di ${totalCount})`;
+  resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`;
 
 export type ListReportProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'title'> & {
   /** Heading of the report. Its text (and only its text) is the accessible name of the table. */
@@ -154,12 +154,12 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  *   table scrolls. In the normal flow of the document (no height) it does not collapse: the table grows
  *   with its rows and the page scrolls. Either way there is one scroller.
  * - The table is named by the title text (`aria-labelledby`, no duplicated text; a title with an icon
- *   still names it by its text). The count `(n)` / `(n di m)` is part of the heading and **not** a live
+ *   still names it by its text). The count `(n)` / `(n of m)` is part of the heading and **not** a live
  *   region. The only live region is the table's: it announces its changes of state (loading, empty, no
  *   results, error, data back), not a change of the number of results while the data stays on screen.
  * - "Azzera filtri" works without wiring (`table.clearFilters()`; when the default pill itself leaves no
  *   result the hook goes to the unfiltered pill), then the focus goes to the search box or the first pill of the bar.
- * - The count is part of the heading's name ("Fatture (12 di 40)"); the table's name stays "Fatture".
+ * - The count is part of the heading's name ("Fatture (12 of 40)"); the table's name stays "Fatture".
  * - `status`, `errorMessage`, `onRetry`, `loadingRowCount` and `labels` reach `ListReportTable` unchanged;
  *   `filtersLabel`, `searchLabel` and `showSearch` reach `ListReportFilterBar`. The other props go on the root.
  *

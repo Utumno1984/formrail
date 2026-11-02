@@ -105,8 +105,8 @@ const meta: Meta<PlaygroundArgs> = {
   args: {
     searchCommitDelay: 300,
     showSearch: true,
-    filtersLabel: 'Filtri',
-    searchLabel: 'Cerca',
+    filtersLabel: 'Filters',
+    searchLabel: 'Search',
     dir: 'ltr',
     onFilterChange: fn(),
     onSearchQueryChange: fn(),
@@ -137,7 +137,7 @@ export const Playground: Story = {
   play: async ({ args, canvasElement }) => {
     // Written for the default configuration: with another label or without the search box (picked in
     // Controls or by a test) the scenario has nothing to type into.
-    if (!args.showSearch || args.filtersLabel !== 'Filtri' || args.searchLabel !== 'Cerca' || args.dir !== 'ltr') return;
+    if (!args.showSearch || args.filtersLabel !== 'Filters' || args.searchLabel !== 'Search' || args.dir !== 'ltr') return;
     const canvas = within(canvasElement);
     canvas.getByRole('radio', { name: 'Tutte' }).focus();
     await userEvent.keyboard('{ArrowRight}');
@@ -146,7 +146,7 @@ export const Playground: Story = {
     await expect(args.onFilterChange).toHaveBeenCalledWith('pending');
     await expect(customers(canvas)).toHaveLength(4);
 
-    const search = canvas.getByRole('searchbox', { name: 'Cerca' });
+    const search = canvas.getByRole('searchbox', { name: 'Search' });
     await userEvent.click(search);
     await userEvent.type(search, 'rossi');
     await userEvent.keyboard('{Enter}');
@@ -190,7 +190,7 @@ export const SearchWithText: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('searchbox')).toHaveValue('rossi');
-    await expect(canvas.getByRole('button', { name: 'Svuota ricerca' })).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Clear search' })).toBeVisible();
     await expect(customers(canvas)).toHaveLength(3);
   },
 };

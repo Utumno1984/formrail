@@ -182,7 +182,7 @@ const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row
  * riempie lo spazio con un solo scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
  * `firstSortDirection` della colonna "Data" e larghezza del contenitore; le callback compaiono in Actions.
  * La play function sceglie "Da approvare", cerca un fornitore, ordina per importo decrescente, controlla
- * le prime righe e il conteggio "n di 200", poi cerca un testo inesistente, clicca "Azzera filtri" e
+ * le prime righe e il conteggio "n of 200", poi cerca un testo inesistente, clicca "Azzera filtri" e
  * verifica che tornino 200 righe e che il fuoco sia sul campo di ricerca.
  */
 export const Playground: Story = {
@@ -196,14 +196,14 @@ export const Playground: Story = {
 
     await userEvent.click(canvas.getByRole('radio', { name: 'Da approvare' }));
     await expect(args.onFilterChange).toHaveBeenLastCalledWith('pending');
-    await expect(heading(canvas)).toHaveTextContent(`Fatture (${pending.length} di 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Fatture (${pending.length} of 200)`);
 
-    const search = canvas.getByRole('searchbox', { name: 'Cerca' });
+    const search = canvas.getByRole('searchbox', { name: 'Search' });
     await userEvent.type(search, 'Ferrari{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
     const found = pending.filter((r) => r.supplier.includes('Ferrari'));
     await expect(found.length).toBeGreaterThan(2);
-    await expect(heading(canvas)).toHaveTextContent(`Fatture (${found.length} di 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Fatture (${found.length} of 200)`);
 
     await userEvent.click(canvas.getByRole('button', { name: 'Importo' }));
     await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
@@ -226,7 +226,7 @@ export const Playground: Story = {
   },
 };
 
-/** Filtro attivo ("Da approvare"): il conteggio dice "n di 200". */
+/** Filtro attivo ("Da approvare"): il conteggio dice "n of 200". */
 export const WithActiveFilter: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
@@ -235,7 +235,7 @@ export const WithActiveFilter: Story = {
     const canvas = within(canvasElement);
     const pending = makeDemoInvoices(200).filter((r) => r.status === 'pending').length;
     await expect(canvas.getByRole('radio', { name: 'Da approvare' })).toBeChecked();
-    await expect(heading(canvas)).toHaveTextContent(`Fatture (${pending} di 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Fatture (${pending} of 200)`);
     await expect(bodyRows(canvas)).toHaveLength(pending);
   },
 };
@@ -273,7 +273,7 @@ export const NoResults: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Nessun risultato per i filtri correnti', { selector: 'p' })).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'Azzera filtri' })).toBeVisible();
-    await expect(heading(canvas)).toHaveTextContent('Fatture (0 di 200)');
+    await expect(heading(canvas)).toHaveTextContent('Fatture (0 of 200)');
   },
 };
 
@@ -306,7 +306,7 @@ export const CountPill: Story = {
     const pending = makeDemoInvoices(200).filter((r) => r.status === 'pending').length;
 
     await userEvent.click(canvas.getByRole('radio', { name: 'Da approvare' }));
-    await expect(pill).toHaveTextContent(`(${pending} di 200)`);
+    await expect(pill).toHaveTextContent(`(${pending} of 200)`);
     await expect(pill).toHaveAttribute('data-changed');
     await waitFor(() => expect(pill).not.toHaveAttribute('data-changed'));
 
