@@ -49,15 +49,33 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
     expect(errors).toEqual([]);
   });
 
-  test('history: push: Back/Forward move the view', async ({ page }) => {
+  test('history: push: Back/Forward move the view and add nothing to Actions', async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as {
+        __actions: unknown[];
+        __STORYBOOK_ADDONS_CHANNEL__?: { on: (e: string, cb: (p: unknown) => void) => void };
+      };
+      w.__actions = [];
+      const timer = setInterval(() => {
+        if (!w.__STORYBOOK_ADDONS_CHANNEL__) return;
+        clearInterval(timer);
+        w.__STORYBOOK_ADDONS_CHANNEL__.on('storybook/actions/action-event', (p) => w.__actions.push(p));
+      }, 1);
+    });
+    const actions = (): Promise<number> =>
+      page.evaluate(() => (window as unknown as { __actions: unknown[] }).__actions.length);
     await gotoStory(page, FIXTURE, 'history:push');
     await expect(table(page)).toBeVisible();
     await pill(page, 'Open').click();
     await expect(pill(page, 'Open')).toBeChecked();
+    // The gesture is reported once: the probe works.
+    await expect.poll(actions).toBe(1);
     await page.goBack();
     await expect(pill(page, 'All')).toBeChecked();
     await page.goForward();
     await expect(pill(page, 'Open')).toBeChecked();
+    await page.waitForTimeout(300);
+    expect(await actions()).toBe(1);
   });
 
   test('no layout jump between loading, empty and data (table container size)', async ({ page }) => {
@@ -87,7 +105,10 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
     await scroller(page).evaluate((el) => void (el.scrollTop = 500));
     await expect.poll(() => scrollTop(page)).toBe(500);
     // Let the throttled write to sessionStorage happen, then reload the same view with late data.
-    await page.waitForTimeout(500);
+    await expect
+      .poll(() => page.evaluate(() => Object.keys(sessionStorage).some((k) => k.startsWith('rop:list-report-scroll:'))))
+      .toBe(true);
+    await page.waitForTimeout(300);
     await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=open&args=loadDelayMs:600`);
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     expect(await scrollTop(page)).toBe(0);
@@ -145,7 +166,17 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
       await expect
         .poll(async () => (await input.boundingBox())!.y + (await input.boundingBox())!.height)
         .toBeLessThanOrEqual(limit);
+      // The Sheet itself shrinks above the keyboard and its actions stay reachable (a field at the top of a
+      // 844px-high Sheet would pass the check above even if the keyboard were ignored).
+      await expect
+        .poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height)
+        .toBeLessThanOrEqual(limit);
+      const create = sheet.getByRole('button', { name: 'Create' });
+      expect((await create.boundingBox())!.y + (await create.boundingBox())!.height).toBeLessThanOrEqual(limit);
       await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(0));
+      await expect
+        .poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height)
+        .toBeGreaterThan(limit);
       await sheet.getByRole('button', { name: 'Cancel' }).click();
       await expect(sheet).toHaveCount(0);
       await expect(newButton).toBeFocused();

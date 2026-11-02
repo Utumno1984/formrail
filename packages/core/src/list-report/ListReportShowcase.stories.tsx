@@ -94,7 +94,22 @@ const COLUMNS: ListReportColumn<DemoInvoice>[] = [
   { id: 'status', header: 'Status', accessor: (r) => STATUS_LABEL[r.status], searchable: false, width: 150 },
 ];
 const SORTABLE = COLUMNS.map((c) => c.id);
-const ROWS = makeDemoInvoices(200);
+// Supplier names in English (surnames kept, so a search for "rossi" still matches).
+const SUPPLIER_EN: Record<string, string> = {
+  'Rossi Costruzioni S.r.l.': 'Rossi Construction Ltd',
+  'Bianchi Forniture': 'Bianchi Supplies',
+  'Verdi Impianti': 'Verdi Installations',
+  'Neri Trasporti': 'Neri Transport',
+  'Gialli Ufficio': 'Gialli Office',
+  'Esposito Servizi': 'Esposito Services',
+  'Ferrari Meccanica': 'Ferrari Mechanics',
+  'Romano Logistica': 'Romano Logistics',
+  'Colombo Informatica': 'Colombo Computing',
+  'Ricci Arredi': 'Ricci Furnishings',
+  'Marino Energia': 'Marino Energy',
+  'Greco Consulenze': 'Greco Consulting',
+};
+const ROWS = makeDemoInvoices(200).map((r) => ({ ...r, supplier: SUPPLIER_EN[r.supplier] ?? r.supplier }));
 
 const PAGE: CSSProperties = {
   boxSizing: 'border-box',
@@ -127,7 +142,7 @@ function NewForm({ kind }: { kind: 'dialog' | 'sheet' }) {
     <DialogContent>
       <DialogHeader>
         <DialogTitle>New invoice</DialogTitle>
-        <DialogClose />
+        <DialogClose aria-label="Close" />
       </DialogHeader>
       <DialogBody>{field}</DialogBody>
       <DialogFooter>
@@ -141,7 +156,7 @@ function NewForm({ kind }: { kind: 'dialog' | 'sheet' }) {
     <SheetContent>
       <SheetHeader>
         <SheetTitle>New invoice</SheetTitle>
-        <SheetClose />
+        <SheetClose aria-label="Close" />
       </SheetHeader>
       <SheetBody>{field}</SheetBody>
       <SheetFooter>
@@ -315,8 +330,12 @@ export const SmartFilterBarShowcase: Story = {
     const win = canvasElement.ownerDocument.defaultView;
     if (!win) throw new Error('SmartFilterBarShowcase: no window');
     resetBrowserState(win);
-    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10));
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
     await expect(canvas.getByRole('radio', { name: 'All' })).toBeChecked();
+    // Resetting the URL (a navigation, not a gesture) must not be reported in Actions.
+    await expect(args.onFilterChange).not.toHaveBeenCalled();
+    await expect(args.onSearchQueryChange).not.toHaveBeenCalled();
+    await expect(args.onSortChange).not.toHaveBeenCalled();
 
     await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
     await expect(args.onFilterChange).toHaveBeenLastCalledWith('open');
@@ -324,7 +343,7 @@ export const SmartFilterBarShowcase: Story = {
     await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'FT-2026-00{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('FT-2026-00');
     await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
-    await expect(args.onSortChange).toHaveBeenCalled();
+    await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
     const firstRow = () => canvas.getAllByRole('row')[1]!.textContent;
     const rowBefore = firstRow();
 
