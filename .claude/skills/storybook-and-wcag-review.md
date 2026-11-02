@@ -31,8 +31,8 @@ chip, badge, tab) o con elementi contigui (etichetta/controllo, bordo/contenuto,
 affiancati), misura con uno script Playwright contro Storybook (`getBoundingClientRect`, mai una
 lettura visiva o uno screenshot):
 
-- **Centratura verticale del testo** nel suo box (scarto di pochi px tra lo spazio sopra e sotto
-  il testo misurato, non "sembra centrato").
+- **Centratura verticale del testo** nel suo box (scarto ≤ 1px tra lo spazio sopra e sotto il
+  testo misurato, salvo un valore diverso dichiarato nel design — non "sembra centrato").
 - **Distanza minima tra elementi contigui** rispetto a quella dichiarata nel design (nessun
   overlap reale misurato) — l'anello di `:focus-visible` di un controllo conta come elemento che
   può toccare quello sopra/accanto, verificalo anche a fuoco attivo.
