@@ -2,7 +2,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StrictMode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../dialog/Dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../dialog/Dialog';
 import { useDirtyGuard, type UseDirtyGuardOptions } from './use-dirty-guard';
 
 afterEach(() => {
@@ -295,6 +295,98 @@ describe('useDirtyGuard: labels and DOM', () => {
     for (const forbidden of ['when', 'labels', 'open', 'size', 'dismissible', 'returnfocusref']) {
       expect(names).not.toContain(forbidden);
     }
+  });
+
+  it('labels.close names the X verbatim; no node of the dialog contains "Chiudi"', async () => {
+    const user = userEvent.setup();
+    render(
+      <Host
+        when
+        action={vi.fn()}
+        labels={{ title: 'Unsaved', description: 'Lose changes?', stay: 'Keep', leave: 'Discard', close: ' Close ' }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.querySelector('[aria-label=" Close "]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    const nodes = [dialog, ...Array.from(dialog.querySelectorAll('*'))];
+    for (const node of nodes) {
+      expect(node.textContent ?? '').not.toContain('Chiudi');
+      for (const attr of node.getAttributeNames()) expect(node.getAttribute(attr)).not.toContain('Chiudi');
+    }
+    // the key never leaks as an attribute
+    expect(nodes.flatMap((el) => el.getAttributeNames())).not.toContain('close');
+  });
+
+  it.each([
+    ['absent', {}],
+    ['undefined', { close: undefined }],
+    ['empty', { close: '' }],
+    ['whitespace', { close: '   ' }],
+  ])('close %s keeps the default name "Chiudi: <title>" and no nameless button', async (_n, labels) => {
+    const user = userEvent.setup();
+    render(<Host when action={vi.fn()} labels={labels} />);
+    await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
+    expect(screen.getByRole('button', { name: 'Chiudi: Modifiche non salvate' })).toBeInTheDocument();
+    for (const b of screen.getByRole('dialog').querySelectorAll('button')) {
+      expect(b.getAttribute('aria-label') ?? b.textContent ?? '').not.toBe('');
+    }
+  });
+
+  it('the X with labels.close still means stay and returns the focus to the opener', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn();
+    render(<Host when action={action} labels={{ close: 'Close' }} />);
+    const opener = screen.getByRole('button', { name: 'Torna alla lista' });
+    await user.click(opener);
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(action).not.toHaveBeenCalled();
+    await waitFor(() => expect(opener).toHaveFocus());
+  });
+
+  it('a close label that changes while the dialog is open updates the X name', async () => {
+    const user = userEvent.setup();
+    function Changing() {
+      const [close, setClose] = useState('Close');
+      return (
+        <>
+          <button onClick={() => setClose('Dismiss')}>rename</button>
+          <Host when action={vi.fn()} labels={{ close }} />
+        </>
+      );
+    }
+    render(<Changing />);
+    await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    await act(async () => {
+      screen.getByRole('button', { name: 'rename', hidden: true }).click();
+    });
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+  });
+
+  it('a confirmation stacked in another Dialog: the two X have distinct names', async () => {
+    const user = userEvent.setup();
+    function Nested() {
+      const { guard, dialog } = useDirtyGuard({ when: true, labels: { close: 'Close confirmation' } });
+      return (
+        <Dialog open>
+          <DialogContent>
+            <DialogTitle>Esterno</DialogTitle>
+            <DialogDescription>Descrizione</DialogDescription>
+            <DialogClose />
+            <button onClick={() => guard(vi.fn())}>Chiudi pagina</button>
+            {dialog}
+          </DialogContent>
+        </Dialog>
+      );
+    }
+    render(<Nested />);
+    await user.click(screen.getByRole('button', { name: 'Chiudi pagina' }));
+    expect(screen.getByRole('button', { name: 'Close confirmation' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Chiudi: Esterno', hidden: true })).toBeInTheDocument();
   });
 
   it('the two actions have distinct accessible names, distinct from a save-bar "Annulla"', async () => {

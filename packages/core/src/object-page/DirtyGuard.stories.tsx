@@ -11,6 +11,7 @@ interface DemoArgs {
   description: string;
   stay: string;
   leave: string;
+  close: string;
   /** The guarded exit action: it shows up in Actions only when the exit is confirmed. */
   action: () => void;
 }
@@ -24,6 +25,7 @@ const meta: Meta<DemoArgs> = {
     description: { control: 'text' },
     stay: { control: 'text' },
     leave: { control: 'text' },
+    close: { control: 'text' },
     action: { control: false },
   },
   args: {
@@ -32,6 +34,7 @@ const meta: Meta<DemoArgs> = {
     description: 'Ci sono modifiche non salvate: se esci ora andranno perse.',
     stay: 'Continua a modificare',
     leave: 'Esci senza salvare',
+    close: '',
     action: fn(),
   },
 };
@@ -39,8 +42,8 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
-function Demo({ when, title, description, stay, leave, action }: DemoArgs) {
-  const { guard, dialog } = useDirtyGuard({ when, labels: { title, description, stay, leave } });
+function Demo({ when, title, description, stay, leave, close, action }: DemoArgs) {
+  const { guard, dialog } = useDirtyGuard({ when, labels: { title, description, stay, leave, close } });
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
       <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Fornitore ACME</h1>
@@ -74,6 +77,10 @@ export const Playground: Story = {
     await expect(dialog).toHaveAttribute('aria-modal', 'true');
     await expect(dialog).toHaveAccessibleDescription(args.description);
     await waitFor(() => expect(body.getByRole('button', { name: args.stay })).toHaveFocus());
+    // The X is named by the `close` control when set, else by the default "Chiudi: <title>".
+    await expect(
+      body.getByRole('button', { name: args.close.trim() ? args.close : `Chiudi: ${args.title}` }),
+    ).toBeInTheDocument();
 
     await userEvent.click(body.getByRole('button', { name: args.stay }));
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());

@@ -20,9 +20,14 @@ export interface DirtyGuardLabels {
   stay: string;
   /** Destructive action: closes the dialog and runs the guarded action. */
   leave: string;
+  /**
+   * Accessible name of the close button (X) of the dialog, used verbatim (e.g. `Close`).
+   * Optional: when absent, empty or whitespace-only the X keeps the default "Chiudi: <title>".
+   */
+  close?: string;
 }
 
-const DEFAULT_LABELS: DirtyGuardLabels = {
+const DEFAULT_LABELS: Omit<DirtyGuardLabels, 'close'> = {
   title: 'Modifiche non salvate',
   description: 'Ci sono modifiche non salvate: se esci ora andranno perse.',
   stay: 'Continua a modificare',
@@ -136,12 +141,13 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
   }, []);
 
   const text = { ...DEFAULT_LABELS };
-  for (const key of Object.keys(DEFAULT_LABELS) as (keyof DirtyGuardLabels)[]) {
+  for (const key of Object.keys(DEFAULT_LABELS) as (keyof typeof DEFAULT_LABELS)[]) {
     const value = labels?.[key];
     if (value !== undefined) text[key] = value;
   }
 
   const { title, description, stay: stayLabel, leave: leaveLabel } = text;
+  const closeLabel = labels?.close?.trim() ? labels.close : undefined;
   const dialog = useMemo(
     () => (
       <Dialog
@@ -163,7 +169,8 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
               </div>
-              <DialogClose />
+              {/* No `aria-label` key when unset: an explicit undefined would override the default name. */}
+              <DialogClose {...(closeLabel ? { 'aria-label': closeLabel } : {})} />
             </DialogHeader>
             <DialogFooter>
               <Button ref={stayRef} variant="primary" onClick={stay}>
@@ -177,7 +184,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
         )}
       </Dialog>
     ),
-    [open, leaving, stay, leave, title, description, stayLabel, leaveLabel],
+    [open, leaving, stay, leave, title, description, stayLabel, leaveLabel, closeLabel],
   );
 
   return { guard, dialog };
