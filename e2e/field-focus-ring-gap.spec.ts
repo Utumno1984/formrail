@@ -3,9 +3,8 @@ import { gotoStory } from './helpers/story';
 
 /** Gap in px between the label's bottom and the focus ring's top (outline width + offset). */
 async function ringGap(page: Page, control: Locator, label: Locator): Promise<number> {
+  await page.keyboard.press('Shift'); // keyboard modality so :focus-visible matches
   await control.focus();
-  await page.keyboard.press('Shift+Tab');
-  await page.keyboard.press('Tab'); // keyboard modality so :focus-visible matches
   const outline = await control.evaluate((el) => {
     const s = getComputedStyle(el);
     return { w: parseFloat(s.outlineWidth), o: parseFloat(s.outlineOffset), style: s.outlineStyle };
@@ -25,8 +24,8 @@ test.describe('Field focus ring vs label (#138)', () => {
   });
 
   test('Select: the ring keeps >=4px from the label', async ({ page }) => {
-    await gotoStory(page, 'forms-select--base');
-    const trigger = page.getByRole('combobox').first();
+    await gotoStory(page, 'forms-select--manual');
+    const trigger = page.locator('button[role="combobox"]').first();
     const label = page.locator(`label[for="${await trigger.getAttribute('id')}"]`);
     expect(await ringGap(page, trigger, label)).toBeGreaterThanOrEqual(4);
   });
