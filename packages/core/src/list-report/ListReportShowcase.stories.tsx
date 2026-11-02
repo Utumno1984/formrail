@@ -14,7 +14,8 @@ import {
 } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
-import { formatEuro, makeDemoInvoices, type DemoInvoice } from '../internal/demo-invoices';
+import { formatEuro, type DemoInvoice } from '../internal/demo-invoices';
+import { makeShowcaseInvoices, STATUS_LABEL } from '../showcase/showcase-data';
 import { repositionAfterMotion, settleMotion } from '../internal/settle-motion';
 import {
   Sheet,
@@ -64,12 +65,6 @@ const LABELS = {
     resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`,
 };
 
-const STATUS_LABEL: Record<DemoInvoice['status'], string> = {
-  pending: 'Open',
-  approved: 'Approved',
-  rejected: 'Rejected',
-};
-
 const FILTERS: ListReportFilter<DemoInvoice>[] = [
   { id: 'all', label: 'All' },
   { id: 'open', label: 'Open', predicate: (r) => r.status === 'pending' },
@@ -94,22 +89,7 @@ const COLUMNS: ListReportColumn<DemoInvoice>[] = [
   { id: 'status', header: 'Status', accessor: (r) => STATUS_LABEL[r.status], searchable: false, width: 150 },
 ];
 const SORTABLE = COLUMNS.map((c) => c.id);
-// Supplier names in English (surnames kept, so a search for "rossi" still matches).
-const SUPPLIER_EN: Record<string, string> = {
-  'Rossi Costruzioni S.r.l.': 'Rossi Construction Ltd',
-  'Bianchi Forniture': 'Bianchi Supplies',
-  'Verdi Impianti': 'Verdi Installations',
-  'Neri Trasporti': 'Neri Transport',
-  'Gialli Ufficio': 'Gialli Office',
-  'Esposito Servizi': 'Esposito Services',
-  'Ferrari Meccanica': 'Ferrari Mechanics',
-  'Romano Logistica': 'Romano Logistics',
-  'Colombo Informatica': 'Colombo Computing',
-  'Ricci Arredi': 'Ricci Furnishings',
-  'Marino Energia': 'Marino Energy',
-  'Greco Consulenze': 'Greco Consulting',
-};
-const ROWS = makeDemoInvoices(200).map((r) => ({ ...r, supplier: SUPPLIER_EN[r.supplier] ?? r.supplier }));
+const ROWS = makeShowcaseInvoices(200);
 
 const PAGE: CSSProperties = {
   boxSizing: 'border-box',

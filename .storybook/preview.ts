@@ -5,6 +5,8 @@ import '../packages/core/src/styles/index.css';
 const preview: Preview = {
   parameters: {
     layout: 'padded',
+    // `Showcase` first; the sections not listed keep their relative order.
+    options: { storySort: { order: ['Showcase'] } },
   },
 };
 
