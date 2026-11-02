@@ -3,9 +3,9 @@ import { listReportParamKeys, type ListReportParamNames } from './param-keys';
 
 export interface UseListReportScrollRestorationOptions {
   /**
-   * Identifies the view. Default: the pathname plus this report's own parameters (`filter`, `q`,
-   * `sort`, same names and `prefix` as `useListReportUrlState`) read from the URL **when the scroll is
-   * saved or restored**: `?filter=open` and `?filter=closed` have each their own position.
+   * Identifies the view. Default: the pathname plus this report's own parameters (pill, search and
+   * sort, same names and `prefix` as `useListReportUrlState`) read from the URL **when the scroll is
+   * saved or restored**: two different pills have each their own position.
    */
   key?: string;
   /** Same as in `useListReportUrlState`: namespace of the parameters, for two reports in a page. */
