@@ -15,6 +15,7 @@ import {
 import { Field, type FieldStateProps } from '../field/Field';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import type { FieldState } from '../field/FieldContext';
+import { repositionAfterMotion } from '../internal/settle-motion';
 import { Select, type SelectOption, type SelectSize } from './Select';
 
 const SIZES: SelectSize[] = ['sm', 'md'];
@@ -378,5 +379,6 @@ export const InsideDialog: Story = {
       await expect(option.contains(hit)).toBe(true);
     }
     await expect(args.onValueChange).not.toHaveBeenCalled();
+    await repositionAfterMotion();
   },
 };

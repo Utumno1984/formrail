@@ -15,6 +15,7 @@ import {
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
+import { repositionAfterMotion } from '../internal/settle-motion';
 import { Combobox, type ComboboxOption, type ComboboxSize } from './Combobox';
 
 const SIZES: ComboboxSize[] = ['sm', 'md'];
@@ -427,6 +428,7 @@ export const InsideDialog: Story = {
       await expect(option.contains(hit)).toBe(true);
     }
     await expect(args.onValueChange).not.toHaveBeenCalled();
+    await repositionAfterMotion();
   },
 };
 
