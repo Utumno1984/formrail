@@ -78,6 +78,8 @@ function defaultStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> |
  * - Storage missing, throwing (quota, private mode) or holding a corrupt value: no error, no restore.
  * - Server rendering touches nothing (all browser access is lazy).
  * - Two reports in a page: give them different `prefix` (or `key`).
+ * - The default key reads `window.location`; with a router `adapter` in `useListReportUrlState` (a URL that is
+ *   not the browser's) pass your own `key`.
  * - Hand `scroll.ref` to `scrollerRef` as it is (a new inline wrapper at every render detaches and re-attaches it).
  * - Changing pill does not reset the container's scroll by itself; a position is saved per URL, so coming
  *   back to a view you did not scroll starts at the top.
