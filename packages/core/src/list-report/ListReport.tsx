@@ -65,6 +65,11 @@ export type ListReportProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'childre
   searchLabel?: string;
   /** Renders the search box. Default `true`. Without it and without `filters` there is no bar at all. */
   showSearch?: boolean;
+  /**
+   * Ref of the element that scrolls: the table's container (`overflow: auto`), the one `ListReportTable`
+   * forwards its `ref` to. Give it `useListReportScrollRestoration().ref`. Never reaches the DOM as an attribute.
+   */
+  scrollerRef?: Ref<HTMLDivElement>;
 };
 
 function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElement>) {
@@ -82,6 +87,7 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
     filtersLabel,
     searchLabel,
     showSearch = true,
+    scrollerRef,
     className,
     ...rest
   } = props;
@@ -131,6 +137,7 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
         />
       ) : null}
       <ListReportTable
+        ref={scrollerRef}
         table={table}
         aria-labelledby={nameId}
         className={tableClass}

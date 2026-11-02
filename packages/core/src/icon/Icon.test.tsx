@@ -254,6 +254,7 @@ describe('internal icons', () => {
       'useFieldControl',
       'useFocusFirstInvalidField',
       'useListReport',
+      'useListReportScrollRestoration',
       'useListReportUrlState',
       'useObjectPageForm',
     ]);
