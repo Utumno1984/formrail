@@ -35,6 +35,35 @@ test.describe('accessibility', () => {
 });
 
 test.describe('pills', () => {
+  test('pill label is optically centered like Button: box unchanged, text 1px up (real bounding boxes)', async ({ page }) => {
+    await gotoStory(page, STORY('playground'));
+    const pills = page.getByRole('radio');
+    const count = await pills.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const m = await pills.nth(i).evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        const span = el.querySelector(':scope > span') as HTMLElement;
+        const range = document.createRange();
+        range.selectNodeContents(span.firstChild!);
+        const text = range.getBoundingClientRect();
+        const cs = getComputedStyle(span);
+        return {
+          boxHeight: box.height,
+          boxCenter: box.top + box.height / 2,
+          textCenter: text.top + text.height / 2,
+          lineHeight: cs.lineHeight,
+          fontSize: cs.fontSize,
+        };
+      });
+      expect(m.boxHeight).toBe(32); // 20px line box + 2 * 5px padding + 2px border: unchanged by the fix
+      expect(m.fontSize).toBe('14px');
+      expect(m.lineHeight).toBe('14px'); // line-height: 1 on the label only
+      expect(Math.abs(m.textCenter - m.boxCenter)).toBeLessThanOrEqual(1); // centering threshold of the optical QA
+      expect(Math.abs(m.textCenter - (m.boxCenter - 1))).toBeLessThanOrEqual(0.5); // same 1px offset as Button
+    }
+  });
+
   test('a click selects exactly that pill and the rows follow', async ({ page }) => {
     await gotoStory(page, STORY('active-filter'));
     await pill(page, 'Da approvare').click();

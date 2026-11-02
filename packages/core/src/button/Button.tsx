@@ -15,6 +15,7 @@ import {
 import { Slot, Slottable } from '@radix-ui/react-slot';
 import { Icon, type IconSize } from '../icon/Icon';
 import { cn } from '../utils/cn';
+import { OPTICAL_LABEL_TYPOGRAPHY, OpticalLabel } from '../utils/OpticalLabel';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonTextSize = 'sm' | 'md' | 'lg' | 'inline';
@@ -63,23 +64,17 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
   'icon-md': 'size-9 p-0',
 };
 
-// Label typography. A plain-text label (wrapped in `TextLabel`) uses `line-height: 1`; the 20px line
+// Label typography. A plain-text label (wrapped in `OpticalLabel`) uses `line-height: 1`; the 20px line
 // box the sizes above are tuned for is restored by the wrapper's `min-h-5`, so heights do not change.
 // Anything else (asChild, element children, mixed content) keeps the `text-rop-label` size + line height.
 const TEXT_SIZES = new Set<ButtonSize>(['sm', 'md', 'lg']);
 const LABEL_PLAIN = 'text-rop-label';
-const LABEL_WRAPPED = 'text-[length:var(--text-rop-label)] leading-none';
+const LABEL_WRAPPED = OPTICAL_LABEL_TYPOGRAPHY;
 
 const isPlainText = (node: ReactNode): boolean =>
   typeof node === 'string' ||
   typeof node === 'number' ||
   (Array.isArray(node) && node.length > 0 && node.every((n) => typeof n === 'string' || typeof n === 'number'));
-
-// Optical correction: the system font stack sits ~1px low in its line box, so only the text node
-// moves up 1px. Never applied to the button box or to the icons.
-function TextLabel({ children }: { children: ReactNode }) {
-  return <span className="relative -top-px grid min-h-5 min-w-0 content-center">{children}</span>;
-}
 
 const ICON_SIZE: Record<ButtonSize, IconSize> = {
   inline: 'xs',
@@ -227,7 +222,7 @@ export const Button = /* @__PURE__ */ forwardRef<HTMLElement, ButtonProps>(funct
       className={classes}
     >
       {leading}
-      {wrapLabel ? <TextLabel>{content}</TextLabel> : content}
+      {wrapLabel ? <OpticalLabel>{content}</OpticalLabel> : content}
       {trailing}
     </button>
   );

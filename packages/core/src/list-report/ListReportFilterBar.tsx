@@ -14,6 +14,7 @@ import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { internalIcons } from '../internal/icons';
 import { cn } from '../utils/cn';
+import { OpticalLabel } from '../utils/OpticalLabel';
 import {
   barClass,
   clearButtonClass,
@@ -174,7 +175,7 @@ function ListReportFilterBarImpl<Row>(props: ListReportFilterBarProps<Row>, ref:
               onClick={() => setFilter(f.id)}
               onKeyDown={onPillKeyDown}
             >
-              <span className={pillLabelClass}>{f.label}</span>
+              <OpticalLabel className={pillLabelClass}>{f.label}</OpticalLabel>
             </button>
           ))}
         </div>
