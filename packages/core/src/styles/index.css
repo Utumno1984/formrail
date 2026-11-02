@@ -24,6 +24,7 @@
 @source not '../combobox/filter.ts';
 /* Same for the headless List Report (no class names, a `filter` option) and the text helper. */
 @source not '../list-report/use-list-report.ts';
+@source not '../list-report/use-list-report-url-state.ts';
 @source not '../list-report/types.ts';
 @source not '../list-report/search.ts';
 @source not '../list-report/use-change-flash.ts';

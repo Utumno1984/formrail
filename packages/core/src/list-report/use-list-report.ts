@@ -30,6 +30,17 @@ const isSortable = <Row,>(column: ListReportColumn<Row>): boolean =>
 const opposite = (direction: ListReportSortDirection): ListReportSortDirection =>
   direction === 'asc' ? 'desc' : 'asc';
 
+/** A comparable key for a sort (`''` = none). */
+const sortToKey = (sort: ListReportSort | undefined): string => (sort ? `${sort.columnId}\u0000${sort.direction}` : '');
+
+/** `value` is one we emitted: forget it and the older ones, true. Otherwise forget them all, false. */
+const acknowledge = (emitted: string[], value: string): boolean => {
+  const index = emitted.indexOf(value);
+  if (index >= 0) emitted.splice(0, index + 1);
+  else emitted.length = 0;
+  return index >= 0;
+};
+
 /**
  * Headless List Report engine (columns + single-column sort). No DOM, no style.
  *
@@ -55,7 +66,9 @@ const opposite = (direction: ListReportSortDirection): ListReportSortDirection =
  *   set by `commitSearch()` or `searchCommitDelay` ms after the last draft edit. The committed query is
  *   trimmed and split on whitespace; every term must be a case/diacritics-insensitive substring of a
  *   searchable column (or of `getSearchText`). A committed query changed from outside never overwrites
- *   a draft the user is editing.
+ *   a draft the user is editing, and drops its pending delayed commit (the draft is committed at the
+ *   next edit or `commitSearch()`). So does a controlled `filter` or `sort` that changes from outside
+ *   (not as the echo of a value the hook reported), e.g. Back in the browser moving only the pill.
  * - `onFilterChange`/`onSearchQueryChange` are called only for gestures, never for outside changes.
  * - Controlled `searchQuery`: the hook assumes the parent applies what `onSearchQueryChange` reports. A
  *   late echo of a reported value (e.g. a router that applies it asynchronously) never overwrites the
@@ -122,18 +135,47 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
   const [seenCommitted, setSeenCommitted] = useState(committed);
   // Controlled mode: queries this hook emitted that the parent has not applied yet, oldest first.
   const inflight = useRef<string[]>([]);
+  // Set when the committed query changed from outside: the effect below drops a pending commit.
+  const outsideChange = useRef(false);
   // The committed query changed. A value we emitted coming back (a late echo) never touches the draft:
   // the user may have kept typing, or cleared the field, in the meantime. An outside change makes the
   // draft follow it if the user was not editing (draft equal to the previous committed query); if they
-  // typed something else, their text stays: no "going back".
+  // typed something else, their text stays: no "going back". Its pending delayed commit is dropped,
+  // though: the outside value (e.g. Back in the browser) wins until the user edits again or commits,
+  // so the timer does not overwrite it behind the user's back.
   if (committed !== seenCommitted) {
     setSeenCommitted(committed);
     const echo = inflight.current.indexOf(committed);
     if (echo >= 0) inflight.current.splice(0, echo + 1);
     else {
       inflight.current = [];
+      // Uncontrolled, only our own commits move the committed query (they are not tracked in `inflight`).
+      if (searchControlled) outsideChange.current = true;
       if (draft === seenCommitted) setDraft(committed);
     }
+  }
+
+  // Controlled filter and sort: the values this hook emitted that the parent has not applied yet (oldest
+  // first) and the last value seen. A change that is not one of them comes from outside (e.g. Back that
+  // only moves the pill): like an outside change of the query, it drops the pending delayed commit, so
+  // the timer does not write the search on top of the navigation. The draft itself is left alone.
+  const emittedFilters = useRef<string[]>([]);
+  const emittedSorts = useRef<string[]>([]);
+  const filterKey = controlledFilter !== undefined ? controlledFilter : null;
+  const sortKey = controlledSort !== undefined ? sortToKey(controlledSort) : null;
+  const seenControlled = useRef({ filter: filterKey, sort: sortKey });
+  if (filterKey !== seenControlled.current.filter) {
+    // Going from uncontrolled to controlled (or back) is not a change of value.
+    if (filterKey !== null && seenControlled.current.filter !== null && !acknowledge(emittedFilters.current, filterKey)) {
+      outsideChange.current = true;
+    }
+    seenControlled.current.filter = filterKey;
+  }
+  if (sortKey !== seenControlled.current.sort) {
+    if (sortKey !== null && seenControlled.current.sort !== null && !acknowledge(emittedSorts.current, sortKey)) {
+      outsideChange.current = true;
+    }
+    seenControlled.current.sort = sortKey;
   }
 
   const terms = useMemo(() => parseSearchTerms(committed), [committed]);
@@ -170,10 +212,12 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
 
   /** The last query committed or emitted, whether or not the parent has applied it yet. */
   const lastCommitted = useCallback((): string => inflight.current.at(-1) ?? fs.current.committed, []);
-  // The committed query moved under a draft that now equals it: nothing left to commit.
+  // The committed query moved under a draft that now equals it, or the query, the filter or the sort
+  // changed from outside: nothing left to commit on a timer.
   useEffect(() => {
-    if (fs.current.draft === lastCommitted()) clearTimer();
-  }, [committed, draft, clearTimer, lastCommitted]);
+    if (outsideChange.current || fs.current.draft === lastCommitted()) clearTimer();
+    outsideChange.current = false;
+  }, [committed, draft, filterKey, sortKey, clearTimer, lastCommitted]);
 
   const commitSearch = useCallback(() => {
     clearTimer();
@@ -202,7 +246,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
     if (!current.filterControlled) {
       setInternalFilter(id);
       current.filter = id;
-    }
+    } else emittedFilters.current.push(id);
     current.onFilterChange?.(id);
   }, []);
 
@@ -271,7 +315,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
       // Make a second gesture in the same batch start from this one, before the next render.
       const column = next && latest.current.columns.find((c) => c.id === next.columnId);
       latest.current.sort = column && isSortable(column) ? next : null;
-    }
+    } else emittedSorts.current.push(sortToKey(next));
     latest.current.onSortChange?.(next);
   }, []);
 
