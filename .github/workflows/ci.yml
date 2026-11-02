@@ -5,6 +5,8 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual run: lets the Pages deploy be exercised for real before merging (see deploy-pages).
+  workflow_dispatch:
 
 # Read-only token: the workflow never writes (also safe for PRs from forks).
 permissions:
@@ -157,3 +159,37 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # Publishes the static Storybook to GitHub Pages. Runs only after every gate above is green, and
+  # only on push to main (or a manual dispatch) - never on pull requests. The workflow-level token
+  # stays read-only; this job alone gets the Pages permissions. Only the Free core stories are built
+  # (.storybook/main.ts globs packages/core); a future packages/pro demo needs its own build.
+  deploy-pages:
+    name: deploy storybook
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [lint, typecheck, build, unit-test, bundle, e2e, visual]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build-storybook
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: storybook-static
+      - id: deployment
+        uses: actions/deploy-pages@v5

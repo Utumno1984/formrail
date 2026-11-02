@@ -23,6 +23,10 @@ critico-avversariale) e le regole di dominio.
 
 ### Storybook ed e2e
 
+- **Demo pubblica**: https://utumno1984.github.io/react-object-page/ — Storybook del solo core
+  (Free), ripubblicato su GitHub Pages a ogni push su `main` con CI verde (job `deploy-pages` in
+  `.github/workflows/ci.yml`; esiste anche l'avvio manuale con `workflow_dispatch`).
+
 - `npm run storybook` avvia Storybook; `npm run test:e2e` ricostruisce Storybook e lancia
   Playwright contro la build statica sulla porta 6007.
 - In locale `reuseExistingServer` è attivo: se qualcosa ascolta già sulla porta 6007, Playwright
