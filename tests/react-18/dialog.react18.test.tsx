@@ -47,7 +47,7 @@ describe('Dialog on React 18', () => {
     expect(dialog.getAttribute('aria-labelledby')).toBeTruthy();
     await act(async () => undefined);
     const close = dialog.querySelector('button') as HTMLButtonElement;
-    expect(close.getAttribute('aria-label')).toBe('Chiudi:');
+    expect(close.getAttribute('aria-label')).toBe('Close:');
     expect(close.getAttribute('aria-labelledby')).toContain(dialog.getAttribute('aria-labelledby') as string);
 
     act(() => close.click());

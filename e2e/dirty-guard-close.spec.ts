@@ -3,11 +3,11 @@ import { expectPlayToPass } from './helpers/story';
 
 const PLAYGROUND = 'patterns-dirtyguard--playground';
 const confirmDialog = (page: import('@playwright/test').Page) =>
-  page.getByRole('dialog', { name: 'Modifiche non salvate' });
+  page.getByRole('dialog', { name: 'Unsaved changes' });
 const opener = (page: import('@playwright/test').Page) => page.getByRole('button', { name: 'Torna alla lista' });
 
 test.describe('useDirtyGuard labels.close (#148)', () => {
-  test('close="Close": X named "Close", no "Chiudi" in the dialog DOM, X = stay with focus back, no attribute leak', async ({
+  test('close="Close": X named "Close", no default "Close:" in the dialog DOM, X = stay with focus back, no attribute leak', async ({
     page,
   }) => {
     await expectPlayToPass(page, PLAYGROUND, 'when:!true;close:Close');
@@ -17,7 +17,7 @@ test.describe('useDirtyGuard labels.close (#148)', () => {
     const x = dialog.getByRole('button', { name: 'Close', exact: true });
     await expect(x).toBeVisible();
     const html = await dialog.evaluate((el) => el.outerHTML);
-    expect(html).not.toContain('Chiudi');
+    expect(html).not.toContain('Close:');
     expect(html).not.toMatch(/\sclose=/i);
     for (const b of await dialog.getByRole('button').all()) {
       await expect(b).not.toHaveAccessibleName('');
@@ -36,9 +36,9 @@ test.describe('useDirtyGuard labels.close (#148)', () => {
     await expect(opener(page)).toBeFocused();
   });
 
-  test('empty close falls back to "Chiudi: <title>"', async ({ page }) => {
+  test('empty close falls back to "Close: <title>"', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND, 'when:!true;close:');
     await opener(page).click();
-    await expect(confirmDialog(page).getByRole('button', { name: 'Chiudi: Modifiche non salvate' })).toBeVisible();
+    await expect(confirmDialog(page).getByRole('button', { name: 'Close: Unsaved changes' })).toBeVisible();
   });
 });

@@ -121,7 +121,7 @@ export type DialogCloseProps = ModalCloseProps;
 
 /**
  * Closes the dialog. With no children and no `asChild` it renders the default close button: a ghost
- * `icon-xs` `Button` with the close icon, named "Chiudi: <title>" (from the dialog's title) unless
+ * `icon-xs` `Button` with the close icon, named "Close: <title>" (from the dialog's title) unless
  * you pass `aria-label` / `aria-labelledby`. With `children` / `asChild` it is Radix's plain Close.
  */
 export const DialogClose = ModalClose;

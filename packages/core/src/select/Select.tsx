@@ -59,7 +59,7 @@ export interface SelectProps
   placeholder?: string;
   /** Shown in the trigger when `value` matches no option. Default: the raw value. */
   unknownValueLabel?: ReactNode;
-  /** Shown in the open list when `options` is empty. Default `Nessuna opzione`. */
+  /** Shown in the open list when `options` is empty. Default `No options`. */
   emptyLabel?: ReactNode;
   /** Height scale. Default `md`. */
   size?: SelectSize;
@@ -111,7 +111,7 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
     onValueChange,
     placeholder,
     unknownValueLabel,
-    emptyLabel = 'Nessuna opzione',
+    emptyLabel = 'No options',
     size = 'md',
     className,
     ...rest

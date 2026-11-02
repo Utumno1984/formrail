@@ -206,7 +206,15 @@ describe('Select', () => {
     render(<Select aria-label="Paese" options={[]} placeholder="Seleziona" />);
     expect(screen.getByRole('combobox')).toHaveTextContent('Seleziona');
     await user.click(screen.getByRole('combobox'));
+    expect(screen.getByText('No options')).toBeInTheDocument();
+  });
+
+  it('an explicit emptyLabel (any language) replaces the English default', async () => {
+    const user = userEvent.setup();
+    render(<Select aria-label="Paese" options={[]} emptyLabel="Nessuna opzione" />);
+    await user.click(screen.getByRole('combobox'));
     expect(screen.getByText('Nessuna opzione')).toBeInTheDocument();
+    expect(screen.queryByText('No options')).toBeNull();
   });
 
   it('options removed while the list is open do not crash it', async () => {

@@ -12,7 +12,7 @@ import {
 } from '../dialog/Dialog';
 
 export interface DirtyGuardLabels {
-  /** Dialog title (its accessible name). Default "Modifiche non salvate". */
+  /** Dialog title (its accessible name). Default "Unsaved changes". */
   title: string;
   /** Dialog description (`aria-describedby`). */
   description: string;
@@ -22,16 +22,16 @@ export interface DirtyGuardLabels {
   leave: string;
   /**
    * Accessible name of the close button (X) of the dialog, used verbatim (e.g. `Close`).
-   * Optional: when absent, empty or whitespace-only the X keeps the default "Chiudi: <title>".
+   * Optional: when absent, empty or whitespace-only the X keeps the default "Close: <title>".
    */
   close?: string;
 }
 
 const DEFAULT_LABELS: Omit<DirtyGuardLabels, 'close'> = {
-  title: 'Modifiche non salvate',
-  description: 'Ci sono modifiche non salvate: se esci ora andranno perse.',
-  stay: 'Continua a modificare',
-  leave: 'Esci senza salvare',
+  title: 'Unsaved changes',
+  description: 'You have unsaved changes: leaving now will lose them.',
+  stay: 'Keep editing',
+  leave: 'Leave without saving',
 };
 
 export interface UseDirtyGuardOptions {

@@ -205,13 +205,13 @@ describe.each(KITS)('$name: shared modal behaviour', ({ name, Root, Trigger, Pan
     expect(document.querySelector('[data-state="open"].z-rop-overlay')).not.toBeNull();
   });
 
-  it('the default close button is named "Chiudi: <title>"', async () => {
+  it('the default close button is named "Close: <title>"', async () => {
     render(
       <Root defaultOpen>
         <Panel />
       </Root>,
     );
-    const close = await screen.findByRole('button', { name: 'Chiudi: Modifica fornitore' });
+    const close = await screen.findByRole('button', { name: 'Close: Modifica fornitore' });
     expect(close).toHaveClass('size-6');
     expect(close.querySelector('svg')).not.toBeNull();
   });

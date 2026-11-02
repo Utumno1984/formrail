@@ -15,7 +15,7 @@ async function gotoStory(page: Page, id: string, args?: string): Promise<void> {
 }
 const openPlayground = (page: Page, args?: string) => gotoStory(page, PLAYGROUND, args);
 
-const confirmDialog = (page: Page) => page.getByRole('dialog', { name: 'Modifiche non salvate' });
+const confirmDialog = (page: Page) => page.getByRole('dialog', { name: 'Unsaved changes' });
 const opener = (page: Page) => page.getByRole('button', { name: 'Torna alla lista' });
 const noOrphans = (page: Page) =>
   page.evaluate(() => ({
@@ -82,26 +82,26 @@ test.describe('beforeunload (real browser dialog)', () => {
 });
 
 test.describe('guard with changes', () => {
-  test('opens the dialog (modal, named, described) with the focus on "Continua a modificare"', async ({ page }) => {
+  test('opens the dialog (modal, named, described) with the focus on "Keep editing"', async ({ page }) => {
     await gotoStory(page, PLAYGROUND, 'when:!true');
     await opener(page).click();
     const dialog = confirmDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute('aria-modal', 'true');
-    await expect(dialog).toHaveAccessibleDescription(/andranno perse/);
-    await expect(page.getByRole('button', { name: 'Continua a modificare' })).toBeFocused();
+    await expect(dialog).toHaveAccessibleDescription(/leaving now will lose them/);
+    await expect(page.getByRole('button', { name: 'Keep editing' })).toBeFocused();
     expect(await noOrphans(page)).toMatchObject({ locked: true, dialogs: 1 });
   });
 
-  test('"Continua a modificare", Escape, the backdrop and the close button return the focus to the opener', async ({
+  test('"Keep editing", Escape, the backdrop and the close button return the focus to the opener', async ({
     page,
   }) => {
     await gotoStory(page, PLAYGROUND, 'when:!true');
     const closers: Array<() => Promise<void>> = [
-      () => page.getByRole('button', { name: 'Continua a modificare' }).click(),
+      () => page.getByRole('button', { name: 'Keep editing' }).click(),
       () => page.keyboard.press('Escape'),
       () => page.mouse.click(4, 4),
-      () => page.getByRole('button', { name: 'Chiudi: Modifiche non salvate' }).click(),
+      () => page.getByRole('button', { name: 'Close: Unsaved changes' }).click(),
     ];
     for (const close of closers) {
       await opener(page).click();
@@ -113,10 +113,10 @@ test.describe('guard with changes', () => {
     }
   });
 
-  test('"Esci senza salvare" runs the action after closing, with no orphan overlay left', async ({ page }) => {
+  test('"Leave without saving" runs the action after closing, with no orphan overlay left', async ({ page }) => {
     await gotoStory(page, PLAYGROUND, 'when:!true');
     await opener(page).click();
-    await page.getByRole('button', { name: 'Esci senza salvare' }).click();
+    await page.getByRole('button', { name: 'Leave without saving' }).click();
     await expect(confirmDialog(page)).toHaveCount(0);
     expect(await noOrphans(page)).toEqual({ locked: false, hidden: 0, dialogs: 0 });
     await expect(opener(page)).toBeVisible();
@@ -126,7 +126,7 @@ test.describe('guard with changes', () => {
     // The story's action unmounts the whole page and records how many dialogs were in the DOM when it ran.
     await gotoStory(page, 'patterns-dirtyguard--unmounts-page');
     await opener(page).click();
-    await page.getByRole('button', { name: 'Esci senza salvare' }).click();
+    await page.getByRole('button', { name: 'Leave without saving' }).click();
     await expect(page.getByText('Pagina chiusa')).toBeVisible();
     expect(await noOrphans(page)).toEqual({ locked: false, hidden: 0, dialogs: 0 });
     const inert = await page.evaluate(() => document.querySelectorAll('[inert]').length);
@@ -144,7 +144,7 @@ test.describe('guard with changes', () => {
     await openPlayground(page, 'when:!true');
     await opener(page).focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('button', { name: 'Continua a modificare' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Keep editing' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(confirmDialog(page)).toHaveCount(0);
     await expect(opener(page)).toBeFocused();
@@ -159,7 +159,7 @@ test.describe('guard with changes', () => {
     await expect(confirmDialog(page)).toBeVisible();
     const topIsConfirm = await page.evaluate(() => {
       const confirm = [...document.querySelectorAll<HTMLElement>('[role=dialog]')].find(
-        (d) => d.getAttribute('aria-labelledby') && d.textContent?.includes('Esci senza salvare'),
+        (d) => d.getAttribute('aria-labelledby') && d.textContent?.includes('Leave without saving'),
       )!;
       const r = confirm.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + 8);

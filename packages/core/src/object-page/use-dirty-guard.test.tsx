@@ -113,29 +113,29 @@ describe('useDirtyGuard: guard', () => {
     render(<Host when action={action} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
     expect(action).not.toHaveBeenCalled();
-    const dialog = screen.getByRole('dialog', { name: 'Modifiche non salvate' });
+    const dialog = screen.getByRole('dialog', { name: 'Unsaved changes' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveAccessibleDescription(/andranno perse/);
+    expect(dialog).toHaveAccessibleDescription(/leaving now will lose them/);
   });
 
-  it('puts the initial focus on "Continua a modificare"', async () => {
+  it('puts the initial focus on "Keep editing"', async () => {
     const user = userEvent.setup();
     render(<Host when action={vi.fn()} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Continua a modificare' })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep editing' })).toHaveFocus());
   });
 
-  it('"Continua a modificare" closes without running the action', async () => {
+  it('"Keep editing" closes without running the action', async () => {
     const user = userEvent.setup();
     const action = vi.fn();
     render(<Host when action={action} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    await user.click(screen.getByRole('button', { name: 'Continua a modificare' }));
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(action).not.toHaveBeenCalled();
   });
 
-  it('Escape and the close button are equivalent to "Continua a modificare"', async () => {
+  it('Escape and the close button are equivalent to "Keep editing"', async () => {
     const user = userEvent.setup();
     const action = vi.fn();
     render(<Host when action={action} />);
@@ -143,7 +143,7 @@ describe('useDirtyGuard: guard', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    await user.click(screen.getByRole('button', { name: 'Chiudi: Modifiche non salvate' }));
+    await user.click(screen.getByRole('button', { name: 'Close: Unsaved changes' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(action).not.toHaveBeenCalled();
   });
@@ -155,7 +155,7 @@ describe('useDirtyGuard: guard', () => {
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
     await user.keyboard('{Escape}');
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    await user.click(screen.getByRole('button', { name: 'Esci senza salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Leave without saving' }));
     expect(action).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -168,7 +168,7 @@ describe('useDirtyGuard: guard', () => {
     };
     render(<Host when action={action} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    await user.click(screen.getByRole('button', { name: 'Esci senza salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Leave without saving' }));
     expect(dialogsWhenRun).toBe(0);
   });
 
@@ -191,7 +191,7 @@ describe('useDirtyGuard: guard', () => {
     // The page is inert behind the modal: call guard from a native event on the (hidden) button.
     act(() => screen.getByRole('button', { name: 'Seconda', hidden: true }).click());
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Esci senza salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Leave without saving' }));
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).not.toHaveBeenCalled();
   });
@@ -204,7 +204,7 @@ describe('useDirtyGuard: guard', () => {
     rerender(<Host when={false} action={action} />);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(action).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Esci senza salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Leave without saving' }));
     expect(action).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -225,7 +225,7 @@ describe('useDirtyGuard: guard', () => {
     });
     render(<Host when action={action} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    await user.click(screen.getByRole('button', { name: 'Esci senza salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Leave without saving' }));
     window.removeEventListener('error', onError);
     expect(action).toHaveBeenCalledTimes(1);
     expect(errors).toContain(boom);
@@ -233,7 +233,7 @@ describe('useDirtyGuard: guard', () => {
     throwing = false;
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Esci senza salvare' }));
+    await user.click(screen.getByRole('button', { name: 'Leave without saving' }));
     expect(action).toHaveBeenCalledTimes(2);
   });
 
@@ -283,7 +283,7 @@ describe('useDirtyGuard: labels and DOM', () => {
     render(<Host when action={vi.fn()} labels={{ leave: 'Scarta', stay: undefined }} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
     expect(screen.getByRole('button', { name: 'Scarta' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Continua a modificare' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
   });
 
   it('control props never reach the DOM', async () => {
@@ -297,7 +297,7 @@ describe('useDirtyGuard: labels and DOM', () => {
     }
   });
 
-  it('labels.close names the X verbatim; no node of the dialog contains "Chiudi"', async () => {
+  it('labels.close names the X verbatim; no node of the dialog contains the default "Close:"', async () => {
     const user = userEvent.setup();
     render(
       <Host
@@ -312,8 +312,8 @@ describe('useDirtyGuard: labels and DOM', () => {
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     const nodes = [dialog, ...Array.from(dialog.querySelectorAll('*'))];
     for (const node of nodes) {
-      expect(node.textContent ?? '').not.toContain('Chiudi');
-      for (const attr of node.getAttributeNames()) expect(node.getAttribute(attr)).not.toContain('Chiudi');
+      expect(node.textContent ?? '').not.toContain('Close:');
+      for (const attr of node.getAttributeNames()) expect(node.getAttribute(attr)).not.toContain('Close:');
     }
     // the key never leaks as an attribute
     expect(nodes.flatMap((el) => el.getAttributeNames())).not.toContain('close');
@@ -324,11 +324,11 @@ describe('useDirtyGuard: labels and DOM', () => {
     ['undefined', { close: undefined }],
     ['empty', { close: '' }],
     ['whitespace', { close: '   ' }],
-  ])('close %s keeps the default name "Chiudi: <title>" and no nameless button', async (_n, labels) => {
+  ])('close %s keeps the default name "Close: <title>" and no nameless button', async (_n, labels) => {
     const user = userEvent.setup();
     render(<Host when action={vi.fn()} labels={labels} />);
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
-    expect(screen.getByRole('button', { name: 'Chiudi: Modifiche non salvate' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close: Unsaved changes' })).toBeInTheDocument();
     for (const b of screen.getByRole('dialog').querySelectorAll('button')) {
       expect(b.getAttribute('aria-label') ?? b.textContent ?? '').not.toBe('');
     }
@@ -386,7 +386,7 @@ describe('useDirtyGuard: labels and DOM', () => {
     render(<Nested />);
     await user.click(screen.getByRole('button', { name: 'Chiudi pagina' }));
     expect(screen.getByRole('button', { name: 'Close confirmation' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Chiudi: Esterno', hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close: Esterno', hidden: true })).toBeInTheDocument();
   });
 
   it('the two actions have distinct accessible names, distinct from a save-bar "Annulla"', async () => {
@@ -399,7 +399,7 @@ describe('useDirtyGuard: labels and DOM', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Torna alla lista' }));
     const names = screen.getAllByRole('button').map((b) => b.textContent);
-    expect(names).toEqual(expect.arrayContaining(['Continua a modificare', 'Esci senza salvare']));
+    expect(names).toEqual(expect.arrayContaining(['Keep editing', 'Leave without saving']));
     expect(screen.getAllByRole('button', { name: 'Annulla', hidden: true })).toHaveLength(1);
     expect(screen.getByRole('dialog').querySelectorAll('button')).toHaveLength(3);
   });
@@ -427,7 +427,7 @@ describe('useDirtyGuard: other overlays and real DOM bookkeeping', () => {
     await user.click(screen.getByRole('button', { name: 'Chiudi pagina' }));
     expect(screen.getAllByRole('dialog', { hidden: true })).toHaveLength(2);
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Modifiche non salvate' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).toBeNull());
     expect(screen.getByRole('dialog', { name: 'Esterno' })).toBeInTheDocument();
     expect(action).not.toHaveBeenCalled();
   });
