@@ -30,13 +30,23 @@ async function recordActions(page: Page): Promise<() => Promise<string[]>> {
   await page.addInitScript(() => {
     const w = window as unknown as {
       __actions: string[];
-      __STORYBOOK_ADDONS_CHANNEL__?: { on: (e: string, cb: (p: { data?: { name?: string } }) => void) => void };
+      __STORYBOOK_ADDONS_CHANNEL__?: { on: (e: string, cb: (p: { id?: string; data?: { name?: string } }) => void) => void };
     };
     w.__actions = [];
+    let seen: Set<string> | undefined;
     const timer = setInterval(() => {
       if (!w.__STORYBOOK_ADDONS_CHANNEL__) return;
       clearInterval(timer);
-      w.__STORYBOOK_ADDONS_CHANNEL__.on('storybook/actions/action-event', (p) => w.__actions.push(p.data?.name ?? '?'));
+      // Once, and each event once by id: with `page.clock` installed the polling interval above is a fake
+      // timer, and the listener could otherwise be attached more than once (each event then counted N times).
+      if (seen) return;
+      seen = new Set();
+      const ids = seen;
+      w.__STORYBOOK_ADDONS_CHANNEL__.on('storybook/actions/action-event', (p) => {
+        if (p.id !== undefined && ids.has(p.id)) return;
+        if (p.id !== undefined) ids.add(p.id);
+        w.__actions.push(p.data?.name ?? '?');
+      });
     }, 1);
   });
   return () => page.evaluate(() => [...(window as unknown as { __actions: string[] }).__actions]);
@@ -124,6 +134,7 @@ test.describe('Floorplans/List Report: UrlState', () => {
   });
 
   test('push: five typed characters committed by the delay add one entry; the draft never reaches the URL', async ({ page }) => {
+    await page.clock.install();
     await gotoStory(page, FIXTURE, 'history:push');
     await page.evaluate(() => {
       const w = window as unknown as { __urls: string[] };
@@ -137,9 +148,14 @@ test.describe('Floorplans/List Report: UrlState', () => {
       }
     });
     const length = await historyLength(page);
-    await search(page).pressSequentially('rossi', { delay: 20 });
+    // The page's clock stands still while typing, so the five keystrokes surely fall within the 300 ms
+    // commit delay however loaded the machine is; then it runs past the delay.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+    await search(page).pressSequentially('rossi');
+    await expect(search(page)).toHaveValue('rossi');
+    expect(await page.evaluate(() => (window as unknown as { __urls: string[] }).__urls)).toEqual([]);
+    await page.clock.runFor(1_000);
     await expect.poll(async () => (await own(page)).q).toBe('rossi');
-    await page.waitForTimeout(500); // longer than the commit delay: nothing else is written
     const urls = await page.evaluate(() => (window as unknown as { __urls: string[] }).__urls);
     expect(urls).toHaveLength(1);
     expect(new URLSearchParams(urls[0]).get('q')).toBe('rossi');
@@ -150,7 +166,7 @@ test.describe('Floorplans/List Report: UrlState', () => {
     page,
   }) => {
     const actions = await recordActions(page);
-    // 800 ms of commit delay: Back surely arrives while the commit of the draft is still pending.
+    await page.clock.install();
     await gotoStory(page, FIXTURE, 'history:push;searchCommitDelay:800');
     await search(page).fill('bianchi');
     await search(page).press('Enter');
@@ -158,13 +174,16 @@ test.describe('Floorplans/List Report: UrlState', () => {
     await search(page).press('Enter');
     expect((await own(page)).q).toBe('rossi');
     const length = await historyLength(page);
+    // The page's clock stands still: Back surely arrives while the 800 ms commit of the draft is pending.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
     await search(page).press('Backspace'); // draft "ross", committed "rossi"
     await page.goBack();
     await expect(search(page)).toHaveValue('ross');
     const bianchi = ALL.filter((r) => r.supplier.toLowerCase().includes('bianchi')).length;
     await expect(bodyRows(page)).toHaveCount(bianchi);
     await expect(heading(page)).toHaveText(`Invoices (${bianchi} of 200)`);
-    await page.waitForTimeout(1200); // past the commit delay
+    await page.clock.runFor(2_000); // well past the commit delay
+    await page.clock.resume();
     expect((await own(page)).q).toBe('bianchi');
     await expect(search(page)).toHaveValue('ross');
     expect(await historyLength(page)).toBe(length);
