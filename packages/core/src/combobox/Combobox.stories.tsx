@@ -15,7 +15,7 @@ import {
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
-import { settleMotion } from '../internal/settle-motion';
+import { repositionAfterMotion } from '../internal/settle-motion';
 import { Combobox, type ComboboxOption, type ComboboxSize } from './Combobox';
 
 const SIZES: ComboboxSize[] = ['sm', 'md'];
@@ -420,9 +420,6 @@ export const InsideDialog: Story = {
     const dialog = await body.findByRole('dialog', {
       name: 'Modifica fornitore',
     });
-    // The panel scales in (160ms): open the popover on its FINAL geometry. Radix Popper measures the
-    // trigger when it opens; opened mid-scale it lands sub-pixels off (visual flake, #111).
-    await settleMotion();
     await userEvent.type(within(dialog).getByRole('combobox', { name: 'Comune' }), 'm');
     const list = await listbox();
     for (const option of within(list).getAllByRole('option')) {
@@ -431,6 +428,7 @@ export const InsideDialog: Story = {
       await expect(option.contains(hit)).toBe(true);
     }
     await expect(args.onValueChange).not.toHaveBeenCalled();
+    await repositionAfterMotion();
   },
 };
 
