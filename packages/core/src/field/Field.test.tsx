@@ -145,7 +145,8 @@ describe('Field', () => {
     expect(label.tagName).toBe('LABEL');
     expect(label).toHaveAttribute('for', input.id);
     expect(label.className).toContain('sr-only');
-    expect(label.className).not.toContain('mb-1');
+    // The visible label's margin (`mb-2`, was `mb-1` before #138) must not apply to the hidden one.
+    expect(label.className).not.toMatch(/\bmb-\d/);
   });
 
   it('required: aria-required, a hidden marker, and the accessible name stays the label', () => {
