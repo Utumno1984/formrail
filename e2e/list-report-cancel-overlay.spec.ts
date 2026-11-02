@@ -17,23 +17,32 @@ const searchbox = (page: Page): Locator => page.getByRole('searchbox', { name: '
 const heading = (page: Page): Locator => page.locator('#storybook-root h2');
 const overlay = (page: Page): Locator => page.getByRole('dialog', { name: 'New invoice' });
 
-const open = async (page: Page, story = STORY, overlayKind: 'dialog' | 'sheet' = 'dialog'): Promise<void> => {
-  await gotoStory(page, story, `overlay:${overlayKind}`);
+const TALL_STORY = 'floorplans-list-report--cancel-action-overlay-tall-page';
+
+const open = async (
+  page: Page,
+  story = STORY,
+  overlayKind: 'dialog' | 'sheet' = 'dialog',
+  extraArgs = '',
+): Promise<void> => {
+  await gotoStory(page, story, `overlay:${overlayKind}${extraArgs ? `;${extraArgs}` : ''}`);
   await expect(table(page)).toBeVisible();
 };
 
-/** Pill, committed search and sort, then scroll the table. */
+/** Pill, committed search and sort, then scroll the table (down, and sideways where it is wider than its box). */
 async function prepare(page: Page): Promise<void> {
   await page.getByRole('radio', { name: 'Open' }).click();
   await searchbox(page).fill(SEARCH);
   await searchbox(page).press('Enter');
   await page.getByRole('button', { name: 'Amount' }).click();
-  await expect(heading(page)).toContainText(' di 200)');
-  await scroller(page).evaluate((el) => {
+  await expect(heading(page)).toContainText(' of 200)');
+  const left = await scroller(page).evaluate((el) => {
     el.scrollTop = 700;
-    el.scrollLeft = 0;
+    el.scrollLeft = Math.min(120, el.scrollWidth - el.clientWidth);
+    return el.scrollLeft;
   });
   await expect.poll(() => scroller(page).evaluate((el) => el.scrollTop)).toBe(700);
+  await expect.poll(() => scroller(page).evaluate((el) => el.scrollLeft)).toBe(left);
 }
 
 interface State {
@@ -134,10 +143,11 @@ for (const kind of ['dialog', 'sheet'] as const) {
 
     for (const closer of ['Cancel', 'Escape'] as const) {
       test(`search text typed and not committed survives opening "New" and closing with ${closer}`, async ({ page }) => {
-        await open(page, STORY, kind);
+        // A commit delay of a minute: effectively "Enter only" for the length of the test.
+        await open(page, STORY, kind, 'searchCommitDelay:60000');
         await prepare(page);
         const before = await snapshot(page);
-        // Typed, and "New" is clicked at once: no Enter, and the story commits on Enter only (no delay).
+        // Typed, and "New" is clicked at once: no Enter.
         await searchbox(page).press('End');
         await searchbox(page).pressSequentially('1');
         await newButton(page).click();
@@ -154,6 +164,31 @@ for (const kind of ['dialog', 'sheet'] as const) {
       });
     }
 
+    test('text typed inside the debounce window: the commit fires behind the open overlay, the text and the scroll stay', async ({
+      page,
+    }) => {
+      // Default delay (300 ms). A trailing space changes the draft but not the matching rows, so the
+      // scroll position stays comparable whether or not the commit happens.
+      await open(page, STORY, kind);
+      await prepare(page);
+      const before = await snapshot(page);
+      await searchbox(page).press('End');
+      await searchbox(page).pressSequentially(' ');
+      await newButton(page).click();
+      await expect(overlay(page)).toBeVisible();
+      // Wait well past the debounce with the overlay open.
+      await page.waitForTimeout(900);
+      await expect(overlay(page)).toBeVisible();
+      expect(await snapshot(page)).toEqual(before);
+      await CLOSERS.Escape!(page);
+      await expect(overlay(page)).toHaveCount(0);
+      // Documented outcome: the draft is still in the field (the commit did not clear or rewrite it),
+      // the rows and the scroll are those of the query (whitespace does not change the match).
+      await expect(searchbox(page)).toHaveValue(`${SEARCH} `);
+      expect(await snapshot(page)).toEqual(before);
+      await expect(newButton(page)).toBeFocused();
+    });
+
     test('the report loading when "New" opens: data arriving behind the overlay, the focus still returns to "New"', async ({
       page,
     }) => {
@@ -161,6 +196,8 @@ for (const kind of ['dialog', 'sheet'] as const) {
       await expect(table(page).locator('[data-rop-skeleton]').first()).toBeVisible();
       await newButton(page).click();
       await expect(overlay(page)).toBeVisible();
+      // Precondition: the data has not arrived yet when the overlay is up (it arrives 1.5 s after mount).
+      await expect(page.locator('#storybook-root [data-rop-skeleton]').first()).toBeVisible();
       // The rows arrive (1.5 s after mount) while the overlay is open.
       await expect(heading(page)).toContainText('(200)');
       await expect(overlay(page)).toBeVisible();
@@ -189,6 +226,8 @@ for (const vp of VIEWPORTS) {
         await open(page, STORY, 'sheet');
         await prepare(page);
         const before = await snapshot(page);
+        // The table is wider than its box on a phone: the horizontal position is a real value to preserve.
+        if (vp.width < 480) expect(before.left).toBeGreaterThan(0);
         await newButton(page).click();
         await expect(overlay(page)).toBeVisible();
         expect(await snapshot(page)).toEqual(before);
@@ -218,6 +257,31 @@ for (const kind of ['dialog', 'sheet'] as const) {
     await expectPlayToPass(page, 'floorplans-list-report--cancel-action-overlay', `overlay:${kind}`);
   });
 }
+
+// Headless Chromium hides scrollbars by default (`--hide-scrollbars`), which would make the scroll-lock
+// layout-shift check vacuous: here they are visible, and the page really scrolls.
+// `launchOptions` cannot be set per describe group, so the whole file runs with visible scrollbars.
+test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
+
+test.describe('visible page scrollbar: the scroll-lock does not shift the table container', () => {
+  for (const kind of ['dialog', 'sheet'] as const) {
+    test(`${kind}: container width identical before, during and after`, async ({ page }) => {
+      await open(page, TALL_STORY, kind);
+      // Precondition: a classic scrollbar takes space from the viewport (otherwise the test proves nothing).
+      const bar = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
+      expect(bar).toBeGreaterThan(0);
+      await prepare(page);
+      const before = await snapshot(page);
+      await newButton(page).click();
+      await expect(overlay(page)).toBeVisible();
+      const during = await snapshot(page);
+      expect(during.width).toBe(before.width);
+      expect(during).toEqual(before);
+      await overlay(page).getByRole('button', { name: 'Cancel' }).click();
+      await expectRestored(page, before);
+    });
+  }
+});
 
 test('the Dialog field keeps the table scroll too', async ({ page }) => {
   await open(page, STORY, 'dialog');

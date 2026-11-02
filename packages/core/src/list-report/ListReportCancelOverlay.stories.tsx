@@ -39,7 +39,23 @@ interface CancelOverlayArgs {
   onOpenChange: (open: boolean) => void;
   /** Fixture (not in Controls): the rows arrive this many ms after mount; the report is `loading` until then. */
   loadMs?: number;
+  /** Fixture (not in Controls): `searchCommitDelay` of `useListReport` in ms. Default 300 (the hook's own default). */
+  searchCommitDelay?: number;
+  /** Fixture (not in Controls): content below the report, so the document is taller than the viewport and the page scrolls. */
+  tallPage?: boolean;
 }
+
+const LABELS = {
+  loading: 'Loading…',
+  empty: 'No data',
+  noResults: 'No results for the current filters',
+  error: 'Could not load the data',
+  retry: 'Retry',
+  clearFilters: 'Clear filters',
+  resultCount: (count: number) => (count === 1 ? '1 result' : `${count} results`),
+  count: (resultCount: number, totalCount: number) =>
+    resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`,
+};
 
 const STATUS_LABEL: Record<DemoInvoice['status'], string> = {
   pending: 'Open',
@@ -117,7 +133,14 @@ function NewForm({ kind }: { kind: OverlayKind }) {
   );
 }
 
-function CancelOverlayDemo({ overlay, onClick, onOpenChange, loadMs = 0 }: CancelOverlayArgs) {
+function CancelOverlayDemo({
+  overlay,
+  onClick,
+  onOpenChange,
+  loadMs = 0,
+  searchCommitDelay = 300,
+  tallPage = false,
+}: CancelOverlayArgs) {
   const all = useMemo(() => makeDemoInvoices(200), []);
   const [loaded, setLoaded] = useState(loadMs === 0);
   useEffect(() => {
@@ -131,8 +154,7 @@ function CancelOverlayDemo({ overlay, onClick, onOpenChange, loadMs = 0 }: Cance
     columns: COLUMNS,
     getRowId: (r) => r.id,
     filters: FILTERS,
-    // Enter-only commit: text typed and not yet committed stays a draft for as long as the test needs.
-    searchCommitDelay: null,
+    searchCommitDelay,
   });
 
   const newButton = (
@@ -154,8 +176,8 @@ function CancelOverlayDemo({ overlay, onClick, onOpenChange, loadMs = 0 }: Cance
     );
 
   return (
-    <div style={PAGE}>
-      <div style={{ flex: 1, minHeight: 0 }}>
+    <div style={tallPage ? { ...PAGE, height: 'auto' } : PAGE}>
+      <div style={tallPage ? { flex: 'none', height: '70dvh' } : { flex: 1, minHeight: 0 }}>
         <ListReport
           title="Invoices"
           table={table}
@@ -163,9 +185,11 @@ function CancelOverlayDemo({ overlay, onClick, onOpenChange, loadMs = 0 }: Cance
           status={loaded ? 'ready' : 'loading'}
           filtersLabel="Filters"
           searchLabel="Search"
+          labels={LABELS}
           style={{ height: '100%' }}
         />
       </div>
+      {tallPage ? <div aria-hidden style={{ flex: 'none', height: 1600 }} /> : null}
     </div>
   );
 }
@@ -182,6 +206,8 @@ const meta: Meta<CancelOverlayArgs> = {
     onClick: { control: false },
     onOpenChange: { control: false },
     loadMs: { control: false, table: { disable: true } },
+    searchCommitDelay: { control: false, table: { disable: true } },
+    tallPage: { control: false, table: { disable: true } },
   },
   args: { overlay: 'dialog', onClick: fn(), onOpenChange: fn() },
   render: (args) => <CancelOverlayDemo {...args} />,
@@ -212,7 +238,8 @@ export const CancelActionOverlay: Story = {
     const rowBefore = firstRow();
 
     scroller.scrollTop = 600;
-    scroller.scrollLeft = 0;
+    // Horizontal scroll too, where the table is wider than its container (narrow viewports).
+    scroller.scrollLeft = Math.min(120, scroller.scrollWidth - scroller.clientWidth);
     await waitFor(() => expect(scroller.scrollTop).toBe(600));
     const before = { top: scroller.scrollTop, left: scroller.scrollLeft };
 
@@ -239,6 +266,12 @@ export const CancelActionOverlay: Story = {
 /** Fixture of the e2e suite: the same page without the play function. */
 export const CancelActionOverlayNoPlay: Story = {
   parameters: { controls: { disable: true } },
+};
+
+/** Fixture of the e2e suite: the document is taller than the viewport, so the page has a scrollbar. */
+export const CancelActionOverlayTallPage: Story = {
+  parameters: { controls: { disable: true } },
+  args: { tallPage: true },
 };
 
 /** Fixture of the e2e suite: the rows arrive 1.5 s after mount (the report is loading until then). */
