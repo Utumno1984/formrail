@@ -194,6 +194,9 @@ test.describe('select QA', () => {
 
 test.describe('select QA race', () => {
   test('ArrowDown then immediate typeahead + Enter (burst) ends on Francia', async ({ page }) => {
+    // 25 sequential gotoStory() page loads take 23-31s, which exceeds the default 30s
+    // test timeout. The iteration count is the point of the race test, so raise the budget.
+    test.setTimeout(90_000);
     const results: Record<string, number> = {};
     for (let i = 0; i < 25; i += 1) {
       await gotoStory(page, STORY('manual'));
