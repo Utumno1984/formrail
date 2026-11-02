@@ -18,30 +18,57 @@ async function ringGap(page: Page, control: Locator, label: Locator): Promise<nu
 
 /** Gap in px between the focus ring's bottom and the top of the FieldMessage text under it (#147). */
 async function bottomGap(page: Page, control: Locator, message: Locator): Promise<number> {
-  await page.keyboard.press('Shift');
+  await page.keyboard.press('Shift'); // keyboard modality so :focus-visible matches
   await control.focus();
-  const w = await control.evaluate((el) => {
+  expect(await control.evaluate((el) => el.matches(':focus-visible'))).toBe(true);
+  const outline = await control.evaluate((el) => {
     const s = getComputedStyle(el);
-    return { w: parseFloat(s.outlineWidth), o: parseFloat(s.outlineOffset) };
+    return { w: parseFloat(s.outlineWidth), o: parseFloat(s.outlineOffset), style: s.outlineStyle };
   });
+  expect(outline.style).toBe('solid');
+  expect(outline.w).toBeGreaterThanOrEqual(2); // WCAG 2.4.11: indicator not thinned to gain space
   const c = (await control.boundingBox())!;
   const m = (await message.boundingBox())!;
-  return m.y - (c.y + c.height + w.w + w.o);
+  return m.y - (c.y + c.height + outline.w + outline.o);
 }
 
-test.describe('Field focus ring vs FieldMessage (#147)', () => {
-  for (const [testId, suffix] of [
-    ['f-help', 'help'],
-    ['f-error', 'error'],
-  ] as const) {
-    test(`${suffix}: the ring keeps >=4px from the message text`, async ({ page }) => {
-      await gotoStory(page, 'forms-field--overview');
-      const field = page.getByTestId(testId);
-      const gap = await bottomGap(page, field.getByRole('textbox'), field.locator(`[id$="-${suffix}"]`));
-      expect(gap).toBeGreaterThanOrEqual(4);
+const VIEWPORTS = [
+  ['desktop', { width: 1280, height: 800 }],
+  ['tablet', { width: 768, height: 1024 }],
+  ['mobile', { width: 375, height: 667 }],
+] as const;
+
+for (const [vp, size] of VIEWPORTS) {
+  test.describe(`Field focus ring vs FieldMessage (#147) ${vp}`, () => {
+    test.use({ viewport: size });
+
+    for (const [testId, suffix] of [
+      ['f-help', 'help'],
+      ['f-error', 'error'],
+      ['f-forced', 'reason'],
+      ['f-locked', 'reason'],
+    ] as const) {
+      test(`Input ${testId}: the ring keeps >=4px from the ${suffix} text`, async ({ page }) => {
+        await gotoStory(page, 'forms-field--overview');
+        const field = page.getByTestId(testId);
+        const gap = await bottomGap(page, field.getByRole('textbox'), field.locator(`[id$="-${suffix}"]`));
+        expect(gap).toBeGreaterThanOrEqual(4);
+      });
+    }
+
+    test('Select: the ring keeps >=4px from the reason text', async ({ page }) => {
+      await gotoStory(page, 'forms-select--forced');
+      const trigger = page.locator('button[role="combobox"]').first();
+      expect(await bottomGap(page, trigger, page.locator('[id$="-reason"]').first())).toBeGreaterThanOrEqual(4);
     });
-  }
-});
+
+    test('Combobox: the ring keeps >=4px from the reason text', async ({ page }) => {
+      await gotoStory(page, 'forms-combobox--forced');
+      const input = page.getByRole('combobox').first();
+      expect(await bottomGap(page, input, page.locator('[id$="-reason"]').first())).toBeGreaterThanOrEqual(4);
+    });
+  });
+}
 
 test.describe('Field focus ring vs label (#138)', () => {
   test('Input: the ring keeps >=4px from the label', async ({ page }) => {

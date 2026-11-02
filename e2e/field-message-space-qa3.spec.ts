@@ -57,7 +57,7 @@ for (const [vp, size, dir] of VPS) {
         let prev = r.boxBottom;
         for (const m of r.msgs) {
           expect(m.top).toBeGreaterThanOrEqual(prev - 0.5);
-          expect(m.top - prev).toBeLessThan(8.5); // exactly the 8px message gap (mt-2), no more
+          expect(m.top - prev).toBeCloseTo(8, 0); // exactly the 8px message gap (mt-2)
           prev = m.bottom;
         }
         expect(r.slotTop).toBeGreaterThanOrEqual(prev - 0.5);
