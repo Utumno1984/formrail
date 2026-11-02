@@ -1,13 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-} from "react";
-import { flushSync } from "react-dom";
-import { Button } from "../button/Button";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { flushSync } from 'react-dom';
+import { Button } from '../button/Button';
 import {
   Dialog,
   DialogClose,
@@ -16,7 +9,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../dialog/Dialog";
+} from '../dialog/Dialog';
 
 export interface DirtyGuardLabels {
   /** Dialog title (its accessible name). Default "Modifiche non salvate". */
@@ -28,17 +21,17 @@ export interface DirtyGuardLabels {
   /** Destructive action: closes the dialog and runs the guarded action. */
   leave: string;
   /**
-   * Accessible name of the close button (X) of the dialog, used exactly as given (e.g. `Close`).
+   * Accessible name of the close button (X) of the dialog, used verbatim (e.g. `Close`).
    * Optional: when absent, empty or whitespace-only the X keeps the default "Chiudi: <title>".
    */
   close?: string;
 }
 
-const DEFAULT_LABELS: Omit<DirtyGuardLabels, "close"> = {
-  title: "Modifiche non salvate",
-  description: "Ci sono modifiche non salvate: se esci ora andranno perse.",
-  stay: "Continua a modificare",
-  leave: "Esci senza salvare",
+const DEFAULT_LABELS: Omit<DirtyGuardLabels, 'close'> = {
+  title: 'Modifiche non salvate',
+  description: 'Ci sono modifiche non salvate: se esci ora andranno perse.',
+  stay: 'Continua a modificare',
+  leave: 'Esci senza salvare',
 };
 
 export interface UseDirtyGuardOptions {
@@ -91,9 +84,7 @@ export interface UseDirtyGuardReturn {
  * );
  * ```
  */
-export function useDirtyGuard(
-  options: UseDirtyGuardOptions,
-): UseDirtyGuardReturn {
+export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardReturn {
   const { when, labels } = options;
   const [open, setOpen] = useState(false);
   // True only while "leave" commits and runs the action: the dialog content is not rendered at all.
@@ -110,10 +101,10 @@ export function useDirtyGuard(
     if (!when) return undefined;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
-      event.returnValue = "";
+      event.returnValue = '';
     };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [when]);
 
   const guard = useCallback((action: () => void) => {
@@ -150,15 +141,13 @@ export function useDirtyGuard(
   }, []);
 
   const text = { ...DEFAULT_LABELS };
-  for (const key of Object.keys(
-    DEFAULT_LABELS,
-  ) as (keyof typeof DEFAULT_LABELS)[]) {
+  for (const key of Object.keys(DEFAULT_LABELS) as (keyof typeof DEFAULT_LABELS)[]) {
     const value = labels?.[key];
     if (value !== undefined) text[key] = value;
   }
 
   const { title, description, stay: stayLabel, leave: leaveLabel } = text;
-  const closeLabel = labels?.close?.trim() || undefined;
+  const closeLabel = labels?.close?.trim() ? labels.close : undefined;
   const dialog = useMemo(
     () => (
       <Dialog
@@ -176,14 +165,12 @@ export function useDirtyGuard(
             }}
           >
             <DialogHeader>
-              <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
+              <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
               </div>
               {/* No `aria-label` key when unset: an explicit undefined would override the default name. */}
-              <DialogClose
-                {...(closeLabel ? { "aria-label": closeLabel } : {})}
-              />
+              <DialogClose {...(closeLabel ? { 'aria-label': closeLabel } : {})} />
             </DialogHeader>
             <DialogFooter>
               <Button ref={stayRef} variant="primary" onClick={stay}>
@@ -197,17 +184,7 @@ export function useDirtyGuard(
         )}
       </Dialog>
     ),
-    [
-      open,
-      leaving,
-      stay,
-      leave,
-      title,
-      description,
-      stayLabel,
-      leaveLabel,
-      closeLabel,
-    ],
+    [open, leaving, stay, leave, title, description, stayLabel, leaveLabel, closeLabel],
   );
 
   return { guard, dialog };
