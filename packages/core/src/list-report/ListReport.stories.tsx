@@ -11,6 +11,7 @@ import {
 import { ListReport } from './ListReport';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
 import { useListReport } from './use-list-report';
+import { useListReportUrlState } from './use-list-report-url-state';
 
 /** How long "Simula caricamento" keeps the report in `loading`. */
 const LOADING_MS = 800;
@@ -326,4 +327,210 @@ export const NoPlay: Story = {
 export const FlowLayout: Story = {
   parameters: NO_CONTROLS,
   args: { flow: true },
+};
+
+// --- URL state ---------------------------------------------------------------------------------
+
+const URL_STATUS_LABEL: Record<DemoInvoice['status'], string> = {
+  pending: 'Open',
+  approved: 'Approved',
+  rejected: 'Rejected',
+};
+
+const URL_FILTERS: ListReportFilter<DemoInvoice>[] = [
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open', predicate: (r) => r.status === 'pending' },
+  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
+  { id: 'rejected', label: 'Rejected', predicate: (r) => r.status === 'rejected' },
+];
+
+const URL_COLUMNS: ListReportColumn<DemoInvoice>[] = [
+  { id: 'number', header: 'Number', accessor: (r) => r.number, width: 150 },
+  { id: 'supplier', header: 'Supplier', accessor: (r) => r.supplier, minWidth: 200 },
+  { id: 'date', header: 'Date', accessor: (r) => r.date, width: 130 },
+  {
+    id: 'amount',
+    header: 'Amount',
+    accessor: (r) => r.amount,
+    cell: (r) => formatEuro(r.amount),
+    align: 'end',
+    searchable: false,
+    width: 140,
+  },
+  { id: 'status', header: 'Status', accessor: (r) => URL_STATUS_LABEL[r.status], searchable: false, width: 150 },
+];
+const URL_SORTABLE = URL_COLUMNS.map((c) => c.id);
+const URL_ROWS = makeDemoInvoices(200);
+
+const URL_LABELS = {
+  loading: 'Loading…',
+  empty: 'No data',
+  noResults: 'No results for the current filters',
+  error: 'Could not load the data',
+  retry: 'Retry',
+  clearFilters: 'Clear filters',
+  resultCount: (count: number) => (count === 1 ? '1 result' : `${count} results`),
+  count: (resultCount: number, totalCount: number) =>
+    resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`,
+};
+
+/** Strings, so that the e2e can pick one through the URL args of Storybook (`searchCommitDelay:800`). */
+type UrlDelayChoice = '0' | '300' | '800' | 'Enter only';
+
+interface UrlStateArgs {
+  history: 'replace' | 'push';
+  prefix: string;
+  searchCommitDelay: UrlDelayChoice;
+  onFilterChange: (filter: string) => void;
+  onSearchQueryChange: (query: string) => void;
+  onSortChange: (sort: ListReportSort) => void;
+}
+
+function UrlStateDemo({ history, prefix, searchCommitDelay, onFilterChange, onSearchQueryChange, onSortChange }: UrlStateArgs) {
+  const url = useListReportUrlState({
+    filters: URL_FILTERS,
+    sortableColumnIds: URL_SORTABLE,
+    prefix: prefix || undefined,
+    history,
+  });
+  const table = useListReport<DemoInvoice>({
+    rows: URL_ROWS,
+    columns: URL_COLUMNS,
+    getRowId: (r) => r.id,
+    filters: URL_FILTERS,
+    searchCommitDelay: searchCommitDelay === 'Enter only' ? null : Number(searchCommitDelay),
+    ...url,
+    // The URL is written first, then the story's callbacks are told (they show up in Actions).
+    onFilterChange: (id) => {
+      url.onFilterChange(id);
+      onFilterChange(id);
+    },
+    onSearchQueryChange: (query) => {
+      url.onSearchQueryChange(query);
+      onSearchQueryChange(query);
+    },
+    onSortChange: (sort) => {
+      url.onSortChange(sort);
+      onSortChange(sort);
+    },
+  });
+  // Read at render: the story re-renders whenever the hook's values change.
+  const search = typeof window === 'undefined' ? '' : window.location.search;
+  return (
+    <div style={PAGE}>
+      <p style={{ margin: 0, fontSize: 14, overflowWrap: 'anywhere' }}>
+        Query string of this frame: <code data-testid="url-search">{search || '(empty)'}</code>
+      </p>
+      <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
+        <ListReport title="Invoices" table={table} labels={URL_LABELS} filtersLabel="Filters" searchLabel="Search" />
+      </div>
+    </div>
+  );
+}
+
+const HIDDEN = { control: false, table: { disable: true } } as const;
+
+/**
+ * `useListReportUrlState` wired into `useListReport`: the active pill, the committed search and the sort
+ * live in the query string of the frame (shown above the report; open the story in its own tab to see
+ * the address bar, then reload or use Back/Forward). The text being typed never goes in the URL.
+ * Controls: `history` (`replace` keeps the history as it is, `push` adds one entry per gesture), `prefix`
+ * (parameters become `<prefix>.filter`, `<prefix>.q`, `<prefix>.sort`) and the search commit delay; the
+ * callbacks show up in Actions only for gestures, never for Back/Forward.
+ * The play function starts from a URL without the report's parameters (as Back would: no callback),
+ * picks "Open", searches "rossi" with Enter, clicks "Amount" twice and checks the query string, the
+ * selected pill, the sorted rows and the history length.
+ */
+export const UrlState: StoryObj<UrlStateArgs> = {
+  argTypes: {
+    history: {
+      control: 'radio',
+      options: ['replace', 'push'],
+      description: '`history` of `useListReportUrlState`: how a gesture writes the URL',
+    },
+    prefix: { control: 'text', description: '`prefix` of `useListReportUrlState` (empty = none)' },
+    searchCommitDelay: {
+      control: 'select',
+      options: ['0', '300', '800', 'Enter only'],
+      description: '`searchCommitDelay` of `useListReport` (ms); "Enter only" commits on Enter only',
+    },
+    onFilterChange: { control: false },
+    onSearchQueryChange: { control: false },
+    onSortChange: { control: false },
+    // The showcase's other controls do not apply here.
+    ...{ status: HIDDEN, dataset: HIDDEN, firstSortDirection: HIDDEN, containerWidth: HIDDEN, onRetry: HIDDEN },
+  },
+  args: {
+    history: 'replace',
+    prefix: '',
+    searchCommitDelay: '300',
+    onFilterChange: fn(),
+    onSearchQueryChange: fn(),
+    onSortChange: fn(),
+  },
+  render: (args) => <UrlStateDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('UrlState: no window');
+    const keys = ['filter', 'q', 'sort'].map((name) => (args.prefix ? `${args.prefix}.${name}` : name));
+    const [filterKey, searchKey, sortKey] = keys as [string, string, string];
+    /** The report's own parameters, as `filter=..&q=..&sort=..` (empty when missing). */
+    const own = () => {
+      const params = new URLSearchParams(win.location.search);
+      return keys.map((k) => `${k}=${params.get(k) ?? ''}`).join('&');
+    };
+
+    // Start from a URL without the report's parameters, the way Back would: no callback is called.
+    const start = new URLSearchParams(win.location.search);
+    for (const k of keys) start.delete(k);
+    const clean = start.toString();
+    win.history.replaceState(win.history.state, '', `${win.location.pathname}${clean ? `?${clean}` : ''}${win.location.hash}`);
+    win.dispatchEvent(new PopStateEvent('popstate', { state: win.history.state }));
+    const search = canvas.getByRole('searchbox', { name: 'Search' });
+    await waitFor(() => expect(canvas.getByRole('radio', { name: 'All' })).toBeChecked());
+    await waitFor(() => expect(search).toHaveValue(''));
+    await expect(args.onFilterChange).not.toHaveBeenCalled();
+    await expect(args.onSearchQueryChange).not.toHaveBeenCalled();
+    await expect(args.onSortChange).not.toHaveBeenCalled();
+    const length = win.history.length;
+    const step = args.history === 'push' ? 1 : 0;
+
+    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await expect(args.onFilterChange).toHaveBeenLastCalledWith('open');
+    await expect(own()).toBe(`${filterKey}=open&${searchKey}=&${sortKey}=`);
+    await expect(win.history.length).toBe(length + step);
+
+    await userEvent.type(search, 'rossi{Enter}');
+    await expect(args.onSearchQueryChange).toHaveBeenCalledOnce();
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('rossi');
+    await expect(own()).toBe(`${filterKey}=open&${searchKey}=rossi&${sortKey}=`);
+    await expect(win.history.length).toBe(length + 2 * step);
+
+    const amount = canvas.getByRole('button', { name: 'Amount' });
+    await userEvent.click(amount);
+    await userEvent.click(amount);
+    await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
+    await expect(win.location.search).toContain(`${filterKey}=open&${searchKey}=rossi&${sortKey}=amount.desc`);
+    await expect(win.history.length).toBe(length + 4 * step);
+
+    // The report shows what the URL says.
+    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
+    await expect(canvas.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
+    const expected = URL_ROWS.filter((r) => r.status === 'pending' && r.supplier.startsWith('Rossi')).sort(
+      (a, b) => b.amount - a.amount,
+    );
+    await expect(expected.length).toBeGreaterThan(2);
+    const rows = canvas.getAllByRole('row').slice(1);
+    await expect(rows).toHaveLength(expected.length);
+    await expect(rows[0]).toHaveTextContent(expected[0]!.number);
+    await expect(rows[1]).toHaveTextContent(expected[1]!.number);
+    await expect(canvas.getByTestId('url-search')).toHaveTextContent(`${sortKey}=amount.desc`);
+  },
+};
+
+/** Fixture of the e2e suite: `UrlState` without the play function (the e2e drives the URL on its own). */
+export const UrlStateNoPlay: StoryObj<UrlStateArgs> = {
+  ...UrlState,
+  play: undefined,
 };

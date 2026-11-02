@@ -1,7 +1,7 @@
 import { StrictMode, useEffect } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { act, cleanup, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ListReport } from './ListReport';
@@ -269,23 +269,32 @@ describe('writing on a gesture', () => {
     const urls: string[] = [];
     const record = () => urls.push(window.location.search);
     for (const commit of ['debounce', 'enter'] as const) {
+      // Fake timers and synchronous keystrokes: the five characters are typed within the 300 ms commit
+      // delay whatever the load of the machine (the e2e types them for real in a browser).
+      vi.useFakeTimers();
       setUrl('');
       cleanup();
-      render(<Host history="push" searchCommitDelay={commit === 'debounce' ? 50 : null} />);
+      render(<Host history="push" searchCommitDelay={commit === 'debounce' ? 300 : null} />);
       spyWrites();
       pushSpy.mockImplementation(function (this: History, ...args: Parameters<History['pushState']>) {
         History.prototype.pushState.apply(this, args);
         record();
       });
       const length = window.history.length;
-      await userEvent.type(searchBox(), commit === 'debounce' ? 'rossi' : 'rossi{Enter}');
-      await waitFor(() => expect(window.location.search).toBe('?q=rossi'));
-      await new Promise((r) => setTimeout(r, 100));
+      for (const typed of ['r', 'ro', 'ros', 'ross', 'rossi']) {
+        fireEvent.change(searchBox(), { target: { value: typed } });
+        act(() => void vi.advanceTimersByTime(50));
+      }
+      if (commit === 'enter') fireEvent.keyDown(searchBox(), { key: 'Enter' });
+      expect(urls).toEqual(commit === 'debounce' ? [] : ['?q=rossi']);
+      act(() => void vi.advanceTimersByTime(1000));
+      expect(window.location.search).toBe('?q=rossi');
       expect(window.history.length).toBe(length + 1);
       expect(pushSpy).toHaveBeenCalledTimes(1);
       expect(urls).toEqual(['?q=rossi']);
       urls.length = 0;
       vi.restoreAllMocks();
+      vi.useRealTimers();
     }
   });
 
