@@ -473,3 +473,54 @@ describe('keyboard-safe focus', () => {
     expect(() => act(() => screen.getByRole('textbox').focus())).not.toThrow();
   });
 });
+
+describe('Field message area', () => {
+  it('always renders the reserved area, empty and silent when there is no message', () => {
+    const { container } = render(
+      <Field label="Nome">
+        <Input />
+      </Field>,
+    );
+    const area = container.querySelector('[data-field-error-slot]') as HTMLElement;
+    expect(area).not.toBeNull();
+    expect(area).toBeEmptyDOMElement();
+    expect(area.className).toContain('min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]');
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('keeps the error slot reserved when the Field also has a reason and help', () => {
+    const { container } = render(
+      <Field label="Nome" state="locked" stateReason="Locked." help="Hint.">
+        <Input />
+      </Field>,
+    );
+    const slot = container.querySelector('[data-field-error-slot]') as HTMLElement;
+    expect(slot).toBeEmptyDOMElement();
+    expect(slot.className).toContain('min-h-');
+  });
+
+  it('reserveMessageSpace={false} takes no room when there is no message', () => {
+    const { container } = render(
+      <Field label="Search" hideLabel reserveMessageSpace={false}>
+        <Input />
+      </Field>,
+    );
+    expect((container.querySelector('[data-field-error-slot]') as HTMLElement).className).toBe('');
+  });
+
+  it('renders the error inside the slot; reason and help stay outside it, in the same order', () => {
+    const { container } = render(
+      <Field label="Nome" state="locked" stateReason="Locked." error="Bad." help="Hint.">
+        <Input />
+      </Field>,
+    );
+    const slot = container.querySelector('[data-field-error-slot]') as HTMLElement;
+    expect(slot.children).toHaveLength(1);
+    expect(slot).toHaveTextContent('Bad.');
+    // Visual order: reason and help next to the control, the reserved error slot last.
+    const field = slot.parentElement as HTMLElement;
+    const order = Array.from(field.children).map((el) => el.id || (el as HTMLElement).dataset.fieldErrorSlot);
+    expect(order.slice(-3)).toEqual([expect.stringMatching(/-reason$/), expect.stringMatching(/-help$/), '']);
+    expect(screen.getByRole('textbox')).toHaveAccessibleDescription('Locked. Bad. Hint.');
+  });
+});

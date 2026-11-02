@@ -16,6 +16,7 @@ interface PlaygroundArgs {
   error: string;
   required: boolean;
   hideLabel: boolean;
+  reserveMessageSpace: boolean;
   state: FieldState;
   stateReason: string;
   placeholder: string;
@@ -32,6 +33,10 @@ const meta: Meta<PlaygroundArgs> = {
     error: { control: 'text' },
     required: { control: 'boolean' },
     hideLabel: { control: 'boolean', description: 'Etichetta nascosta alla vista, ma nome accessibile del campo' },
+    reserveMessageSpace: {
+      control: 'boolean',
+      description: 'Reserve one caption line for the error, so a one-line error appearing moves nothing below. Turn off for a Field that never shows one.',
+    },
     // forced = value decided by a business rule; locked = not editable (permissions / record status).
     // Same interaction: focusable, read-only, reason read by the screen reader.
     state: { control: 'radio', options: STATES },
@@ -46,6 +51,7 @@ const meta: Meta<PlaygroundArgs> = {
     error: '',
     required: false,
     hideLabel: false,
+    reserveMessageSpace: true,
     state: 'default',
     stateReason: '',
     placeholder: 'Es. Rossi S.r.l.',
@@ -68,9 +74,18 @@ const stateProps = (state: FieldState, stateReason: string) => ({ state, stateRe
  */
 export const Playground: Story = {
   args: { help: 'Come appare in fattura.' },
-  render: ({ label, name, help, error, required, hideLabel, state, stateReason, placeholder, onChange }) => (
+  render: ({ label, name, help, error, required, hideLabel, reserveMessageSpace, state, stateReason, placeholder, onChange }) => (
     <div style={column}>
-      <Field label={label} name={name} help={help} error={error} required={required} hideLabel={hideLabel} {...stateProps(state, stateReason)}>
+      <Field
+        label={label}
+        name={name}
+        help={help}
+        error={error}
+        required={required}
+        hideLabel={hideLabel}
+        reserveMessageSpace={reserveMessageSpace}
+        {...stateProps(state, stateReason)}
+      >
         <Input placeholder={placeholder} onChange={onChange} />
       </Field>
     </div>
@@ -252,6 +267,53 @@ export const KeyboardSafe: Story = {
       <div style={{ height: '100dvh' }} />
     </div>
   ),
+};
+
+const SHORT_ERROR = 'Enter a valid VAT number.';
+const LONG_ERROR = 'Enter a valid VAT number: eleven digits, no country prefix, no spaces, and it must match the registered company name.';
+
+/**
+ * The error line is always reserved, with or without a help text: a one-line error appearing under
+ * the first field does not move the second one (a longer error wraps and pushes it down by the
+ * extra height only). Controls: `help`, and `reserveMessageSpace` (turn it off to see the jump).
+ * The play function shows and clears the error and checks the next field against the control.
+ */
+export const ErrorReservesSpace: Story = {
+  tags: ['visual'],
+  args: { help: 'Eleven digits, as printed on the invoice.' },
+  parameters: { controls: { include: ['help', 'reserveMessageSpace'] } },
+  render: function Render({ help, reserveMessageSpace }) {
+    const [error, setError] = useState('');
+    return (
+      <div style={{ ...column, color: 'var(--color-rop-text)' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button onClick={() => setError(SHORT_ERROR)}>Show error</Button>
+          <Button onClick={() => setError(LONG_ERROR)}>Show long error</Button>
+          <Button onClick={() => setError('')}>Clear</Button>
+        </div>
+        <Field label="VAT number" error={error} help={help} reserveMessageSpace={reserveMessageSpace} data-testid="er-first">
+          <Input defaultValue="12345" />
+        </Field>
+        <Field label="Company name" data-testid="er-second">
+          <Input defaultValue="Acme" />
+        </Field>
+      </div>
+    );
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const second = canvas.getByTestId('er-second');
+    const before = second.getBoundingClientRect().top;
+    await userEvent.click(canvas.getByRole('button', { name: 'Show error' }));
+    await expect(canvas.getByRole('textbox', { name: 'VAT number' })).toHaveAccessibleDescription(expect.stringContaining(SHORT_ERROR));
+    const moved = second.getBoundingClientRect().top - before;
+    // Reserved: nothing moves. With the control off, the error takes its own room.
+    if (args.reserveMessageSpace) await expect(moved).toBe(0);
+    else await expect(moved).toBeGreaterThan(0);
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+    await expect(canvas.queryByText(SHORT_ERROR)).toBeNull();
+    await expect(second.getBoundingClientRect().top).toBe(before);
+  },
 };
 
 /**

@@ -87,9 +87,14 @@ test.describe('ValidationProvider in a real browser', () => {
       return { height: r.height, marginTop: parseFloat(getComputedStyle(el).marginTop), top: r.top };
     });
     const invalid = { control: await top(supplier), next: await top(countryLabel) };
-    // The control stays where it was; the next field moves down by the message alone.
+    // The control stays where it was; the next field moves down only by what the message needs
+    // beyond the reserved one-line room (#140: a one-line message moves nothing).
+    const reserved = await supplier
+      .locator('xpath=ancestor::div[@data-state][1]//div[@data-field-error-slot]')
+      .evaluate((el) => parseFloat(getComputedStyle(el).minHeight));
+    expect(reserved).toBeGreaterThan(0);
     expect(Math.abs(invalid.control - before.control)).toBeLessThanOrEqual(0.5);
-    expect(Math.abs(invalid.next - before.next - (messageBox.height + messageBox.marginTop))).toBeLessThanOrEqual(1);
+    expect(Math.abs(invalid.next - before.next - Math.max(0, messageBox.height + messageBox.marginTop - reserved))).toBeLessThanOrEqual(1);
     let d = await describedBy(supplier);
     expect(d.allExist).toBe(true);
     expect(d.errorIds).toHaveLength(1);

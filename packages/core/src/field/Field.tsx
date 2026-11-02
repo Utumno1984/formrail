@@ -39,6 +39,13 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
     error?: ReactNode;
     required?: boolean;
     /**
+     * Default `true`: the Field always reserves one caption line for its error, even with no
+     * error and whatever reason or help it shows, so a one-line error appearing later moves
+     * nothing below it (a wrapped error still grows it). Set `false` for a Field that never shows
+     * an error (e.g. a search box) or sits inline and must not take that room.
+     */
+    reserveMessageSpace?: boolean;
+    /**
      * Hides the label visually (it stays in the DOM as the accessible name, `sr-only`). For controls
      * that already show what they are, e.g. a search box with a placeholder.
      */
@@ -53,6 +60,13 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
 // scrollIntoView stop above the virtual keyboard.
 const ROOT = 'flex min-w-0 flex-col font-rop-sans';
 const SCROLL_MARGIN = { scrollMarginTop: '0.5rem', scrollMarginBottom: 'calc(var(--rop-keyboard-inset, 0px) + 0.5rem)' };
+// The error slot always holds one caption line plus the gap of the message (`mt-1` = 0.25rem, a
+// literal on purpose: the design system exposes no global spacing variable), whatever else the Field shows (reason, help): a
+// one-line error appearing or going away moves nothing below the Field. A wrapped error grows it:
+// accepted, never clamped. Reason and help are static descriptions of the field's configuration,
+// not transient feedback: they take room only while present (reserving them too would add three
+// empty lines under every Field).
+const ERROR_SLOT = 'min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]';
 const LABEL_HIDDEN = 'sr-only';
 const LABEL = 'mb-1 text-rop-label text-rop-text [overflow-wrap:anywhere]';
 const KEYBOARD_INSET = '--rop-keyboard-inset';
@@ -112,6 +126,7 @@ export function Field(props: FieldProps) {
     name,
     error,
     required,
+    reserveMessageSpace = true,
     hideLabel,
     id: idProp,
     state = 'default',
@@ -206,12 +221,15 @@ export function Field(props: FieldProps) {
             {stateReason}
           </FieldMessage>
         ) : null}
-        <FieldMessage id={errorId} tone="error">
-          {shownError}
-        </FieldMessage>
         <FieldMessage id={helpId} tone="help">
           {help}
         </FieldMessage>
+        {/* Last, so reason and help stay next to their control and the reserved room reads as the gap to the next field. */}
+        <div data-field-error-slot="" className={reserveMessageSpace ? ERROR_SLOT : undefined}>
+          <FieldMessage id={errorId} tone="error">
+            {shownError}
+          </FieldMessage>
+        </div>
       </div>
     </FieldContext.Provider>
   );

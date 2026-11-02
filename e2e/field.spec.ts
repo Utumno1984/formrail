@@ -126,6 +126,72 @@ test.describe('Forms/Field', () => {
   });
 });
 
+test.describe('Forms/Field: reserved message space', () => {
+  const STORY = 'forms-field--error-reserves-space';
+  const metrics = async (page: Page) => ({
+    secondTop: (await page.getByTestId('er-second').boundingBox())!.y,
+    firstHeight: (await page.getByTestId('er-first').boundingBox())!.height,
+  });
+
+  test('a one-line error appearing or going away does not move the next field', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const before = await metrics(page);
+    await page.getByRole('button', { name: 'Show error', exact: true }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
+    expect(await metrics(page)).toEqual(before);
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toHaveCount(0);
+    expect(await metrics(page)).toEqual(before);
+  });
+
+  test('a wrapped error moves the next field by exactly the extra height', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const before = await metrics(page);
+    await page.getByRole('button', { name: 'Show long error' }).click();
+    const message = page.locator('[id$="-error"]');
+    const box = (await message.boundingBox())!;
+    expect(box.height).toBeGreaterThan(32); // two lines or more
+    const { reserved, gap } = await message.evaluate((el) => ({
+      reserved: parseFloat(getComputedStyle(el.closest('[data-field-error-slot]')!).minHeight),
+      gap: parseFloat(getComputedStyle(el).marginTop),
+    }));
+    expect(reserved).toBeGreaterThan(0);
+    const after = await metrics(page);
+    // The message needs gap + its height (the gap is outside the box); the slot already holds `reserved`.
+    expect(after.secondTop - before.secondTop).toBe(box.height + gap - reserved);
+  });
+
+  test('the help sits next to its own control: closer to it than to the next field (no error shown)', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const first = page.getByTestId('er-first');
+    const input = (await first.getByRole('textbox').boundingBox())!;
+    const help = (await first.locator('[id$="-help"]').boundingBox())!;
+    const nextLabel = (await page.getByTestId('er-second').locator('label').boundingBox())!;
+    const toControl = help.y - (input.y + input.height);
+    const toNextField = nextLabel.y - (help.y + help.height);
+    expect(toControl).toBeGreaterThanOrEqual(0);
+    expect(toControl).toBeLessThan(toNextField);
+  });
+
+  test('the error line stays reserved with no help text too, and without the control it is not', async ({ page }) => {
+    await gotoStory(page, STORY, 'help:');
+    const before = await metrics(page);
+    await page.getByRole('button', { name: 'Show error', exact: true }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
+    expect(await metrics(page)).toEqual(before);
+
+    await gotoStory(page, STORY, 'help:;reserveMessageSpace:!false');
+    const bare = await metrics(page);
+    await page.getByRole('button', { name: 'Show error', exact: true }).click();
+    await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
+    expect((await metrics(page)).secondTop).toBeGreaterThan(bare.secondTop);
+  });
+
+  test('the play function passes', async ({ page }) => {
+    await expectPlayToPass(page, STORY);
+  });
+});
+
 // Keyboard-safe focus (spec §1.10). A desktop browser has no on-screen keyboard, so the visual
 // viewport is replaced by a controllable stand-in: `__setKeyboard(px)` shrinks it from the bottom
 // and fires `resize`, which is what a real virtual keyboard does to `window.visualViewport`.
