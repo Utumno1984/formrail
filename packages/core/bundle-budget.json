@@ -210,6 +210,10 @@
       "baseline": 2806,
       "limit": 3087
     },
+    "useListReportScrollRestoration": {
+      "baseline": 1066,
+      "limit": 1173
+    },
     "useListReportUrlState": {
       "baseline": 1451,
       "limit": 1597

@@ -12,6 +12,7 @@ import { ListReport } from './ListReport';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
 import { useListReport } from './use-list-report';
 import { createMemoryUrlAdapter } from '../internal/memory-url-adapter';
+import { useListReportScrollRestoration } from './use-list-report-scroll-restoration';
 import { useListReportUrlState } from './use-list-report-url-state';
 
 /** How long "Simula caricamento" keeps the report in `loading`. */
@@ -741,5 +742,186 @@ export const UrlStateRouterRecipe: StoryObj<UrlStateRouterRecipeArgs> = {
 /** Fixture of the e2e suite: `UrlStateRouterRecipe` without the play function. */
 export const UrlStateRouterRecipeNoPlay: StoryObj<UrlStateRouterRecipeArgs> = {
   ...UrlStateRouterRecipe,
+  play: undefined,
+};
+
+// --- Scroll restoration ------------------------------------------------------------------------
+
+interface ScrollRestorationArgs {
+  loadDelayMs: number;
+  history: 'replace' | 'push';
+  onOpenDetail: (invoiceId: string) => void;
+  onCancel: () => void;
+}
+
+const scrollColumns = (open: (id: string) => void): ListReportColumn<DemoInvoice>[] =>
+  URL_COLUMNS.map((c) =>
+    c.id === 'number'
+      ? {
+          ...c,
+          cell: (r: DemoInvoice) => (
+            <button
+              type="button"
+              onClick={() => open(r.id)}
+              style={{ all: 'unset', cursor: 'pointer', textDecoration: 'underline', color: 'inherit' }}
+            >
+              {r.number}
+            </button>
+          ),
+        }
+      : c,
+  );
+
+/** The "list page": mounts with no data and gets it after `loadDelayMs`, like a route that fetches on entry. */
+function ScrollRestorationList({
+  loadDelayMs,
+  history,
+  onOpen,
+}: {
+  loadDelayMs: number;
+  history: 'replace' | 'push';
+  onOpen: (invoiceId: string) => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setLoaded(true), loadDelayMs);
+    return () => clearTimeout(timer);
+  }, [loadDelayMs]);
+  const url = useListReportUrlState({ filters: URL_FILTERS, sortableColumnIds: URL_SORTABLE, history });
+  const scroll = useListReportScrollRestoration({ ready: loaded });
+  const columns = useMemo(() => scrollColumns(onOpen), [onOpen]);
+  const table = useListReport<DemoInvoice>({
+    rows: loaded ? URL_ROWS : [],
+    columns,
+    getRowId: (r) => r.id,
+    filters: URL_FILTERS,
+    ...url,
+  });
+  return (
+    <ListReport
+      title="Invoices"
+      table={table}
+      status={loaded ? 'ready' : 'loading'}
+      labels={URL_LABELS}
+      filtersLabel="Filters"
+      searchLabel="Search"
+      scrollerRef={scroll.ref}
+    />
+  );
+}
+
+const readView = (): string | null =>
+  typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('view');
+
+function ScrollRestorationDemo({ loadDelayMs, history, onOpenDetail, onCancel }: ScrollRestorationArgs) {
+  const [detail, setDetail] = useState(() => readView() === 'detail');
+  useEffect(() => {
+    const onPop = () => setDetail(readView() === 'detail');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const open = useMemo(
+    () => (invoiceId: string) => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('view', 'detail');
+      const url = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+      window.history.pushState(window.history.state, '', url);
+      setDetail(true);
+      onOpenDetail(invoiceId);
+    },
+    [onOpenDetail],
+  );
+  return (
+    <div style={PAGE}>
+      {detail ? (
+        <div>
+          <p style={{ marginTop: 0 }}>Invoice detail (a page of its own: the list is unmounted).</p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onCancel();
+              window.history.back();
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <div style={{ width: 1100, maxWidth: '100%', height: 'min(400px, calc(100dvh - 104px))' }}>
+          <ScrollRestorationList loadDelayMs={loadDelayMs} history={history} onOpen={open} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * `useListReportScrollRestoration` with `useListReportUrlState`: the list and an invoice "detail" are two
+ * pages of a mini-router (the detail is pushed to the history, so Cancel and the browser's Back both
+ * return). Going to the detail unmounts the list; coming back mounts it with no data and, `loadDelayMs`
+ * later, with the data: only then is the table's container scrolled where it was, with the same pill
+ * selected. Another pill (another URL) starts at the top. The position lives in `sessionStorage`, never in the URL.
+ * Controls: the load delay (a range) and how the pills write the URL (`history`).
+ * The play function picks "Open", scrolls the table, opens an invoice, presses Cancel, waits for the data
+ * and checks the scroll position and the pill.
+ */
+export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
+  argTypes: {
+    loadDelayMs: {
+      control: { type: 'range', min: 0, max: 2000, step: 100 },
+      description: 'Time the list takes to get its data after (re)mounting, in ms',
+    },
+    history: {
+      control: 'radio',
+      options: ['replace', 'push'],
+      description: '`history` of `useListReportUrlState`: how a pill writes the URL',
+    },
+    onOpenDetail: { control: false },
+    onCancel: { control: false },
+    ...{ status: HIDDEN, dataset: HIDDEN, searchCommitDelay: HIDDEN, firstSortDirection: HIDDEN, containerWidth: HIDDEN, onRetry: HIDDEN },
+  },
+  args: { loadDelayMs: 400, history: 'replace', onOpenDetail: fn(), onCancel: fn() },
+  render: (args) => <ScrollRestorationDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('ScrollRestoration: no window');
+    // Start clean: no report parameters, the list page, nothing stored by an earlier run.
+    for (const key of Object.keys(win.sessionStorage)) {
+      if (key.startsWith('rop:list-report-scroll:')) win.sessionStorage.removeItem(key);
+    }
+    win.history.replaceState(win.history.state, '', win.location.pathname);
+    win.dispatchEvent(new PopStateEvent('popstate', { state: win.history.state }));
+
+    const scroller = () => canvas.getByRole('table', { name: 'Invoices' }).parentElement as HTMLElement;
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await waitFor(() => expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked());
+
+    scroller().scrollTop = 600;
+    await waitFor(() => expect(scroller().scrollTop).toBe(600));
+    // The position is stored (throttled); then the user opens an invoice and the list unmounts.
+    const storedKey = `rop:list-report-scroll:#${win.location.pathname}?filter=open`;
+    await waitFor(() => expect(win.sessionStorage.getItem(storedKey)).not.toBeNull(), { timeout: 3000 });
+    const windowScroll = win.scrollY;
+    await userEvent.click(canvas.getAllByRole('button', { name: /^FT-2026-/ })[0]!);
+    await expect(args.onOpenDetail).toHaveBeenCalledOnce();
+    await expect(canvas.queryByRole('table')).toBeNull();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }));
+    await expect(args.onCancel).toHaveBeenCalledOnce();
+    // First the loading state (the skeleton is not scrolled), then the data and the saved position, with the same pill.
+    await waitFor(() => expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked());
+    await waitFor(() => expect(scroller()).toHaveAttribute('aria-busy', 'true'));
+    await expect(scroller().scrollTop).toBe(0);
+    await waitFor(() => expect(Math.abs(scroller().scrollTop - 600)).toBeLessThanOrEqual(1), { timeout: 5000 });
+    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
+    await expect(win.scrollY).toBe(windowScroll);
+  },
+};
+
+/** Fixture of the e2e suite: `ScrollRestoration` without the play function. */
+export const ScrollRestorationNoPlay: StoryObj<ScrollRestorationArgs> = {
+  ...ScrollRestoration,
   play: undefined,
 };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { listReportParamKeys, type ListReportParamNames } from './param-keys';
 import type { ListReportSort, ListReportSortDirection } from './types';
 
 export interface UseListReportUrlStateOptions {
@@ -16,7 +17,7 @@ export interface UseListReportUrlStateOptions {
   /** Default sort. Default `null` (none). */
   defaultSort?: ListReportSort;
   /** Names of the parameters. Default `filter`, `q`, `sort`. */
-  params?: { filter?: string; search?: string; sort?: string };
+  params?: ListReportParamNames;
   /** Namespace of the parameters, for two reports in the same page: `'inv'` gives `inv.filter`, `inv.q`, `inv.sort`. */
   prefix?: string;
   /** How a gesture writes the URL. `'replace'` (default) leaves the history alone; `'push'` adds one entry per gesture. */
@@ -219,10 +220,7 @@ export function useListReportUrlState(options: UseListReportUrlStateOptions): Us
   // Keyed on the adapter's identity: a new object (a different router, or an inline literal) re-subscribes
   // and re-reads, with no write and no callback. Memoize the adapter to avoid the re-subscription.
   const source = useMemo(() => (adapter ? fromAdapter(adapter) : browserSource), [adapter]);
-  const scope = prefix ? `${prefix}.` : '';
-  const filterKey = scope + (params?.filter ?? 'filter');
-  const searchKey = scope + (params?.search ?? 'q');
-  const sortKey = scope + (params?.sort ?? 'sort');
+  const [filterKey, searchKey, sortKey] = listReportParamKeys(prefix, params);
 
   // The snapshot is only this instance's raw values: a write of another instance (or of the page) to
   // other parameters gives the same string and no render.

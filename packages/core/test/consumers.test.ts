@@ -67,6 +67,7 @@ const EXPORTS = [
   'useFieldControl',
   'useFocusFirstInvalidField',
   'useListReport',
+  'useListReportScrollRestoration',
   'useListReportUrlState',
   'useObjectPageForm',
 ];
