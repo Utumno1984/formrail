@@ -15,7 +15,10 @@ export const pillClass =
   'aria-checked:border-rop-primary aria-checked:bg-rop-primary aria-checked:text-rop-primary-contrast ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
 
-export const pillLabelClass = 'min-w-0 text-start [overflow-wrap:anywhere]';
+// Optical centering comes from the shared `OpticalLabel` wrapper (same 1px offset as Button). Unlike
+// Button, the label keeps the pill's 20px line height (no line-height 1): a long label wraps onto
+// several lines and 14px lines would be cramped.
+export const pillLabelClass = 'text-start [overflow-wrap:anywhere]';
 
 export const searchFieldClass = 'w-full min-w-0 sm:w-72';
 
