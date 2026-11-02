@@ -703,8 +703,10 @@ export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }));
     await expect(args.onCancel).toHaveBeenCalledOnce();
-    // First the loading state (no scroll), then the data and the saved position, with the same pill.
+    // First the loading state (the skeleton is not scrolled), then the data and the saved position, with the same pill.
     await waitFor(() => expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked());
+    await waitFor(() => expect(scroller()).toHaveAttribute('aria-busy', 'true'));
+    await expect(scroller().scrollTop).toBe(0);
     await waitFor(() => expect(Math.abs(scroller().scrollTop - 600)).toBeLessThanOrEqual(1), { timeout: 5000 });
     await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
     await expect(win.scrollY).toBe(windowScroll);
