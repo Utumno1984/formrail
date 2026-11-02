@@ -8,7 +8,10 @@ import { TruncatedText } from './TruncatedText';
 
 const LONG =
   'Fornitore Bianchi & Associati S.r.l. - fattura 2026/0142 in attesa di approvazione da parte dell’ufficio acquisti';
-const BORDER = '1px dashed #94a3b8';
+const BORDER = '1px dashed var(--color-rop-border)';
+// Demo frame: generous padding so the dashed border never touches the content (content-box keeps the
+// content width the stories measure). Table cells use BORDER alone: tight on purpose.
+const FRAME = { border: BORDER, padding: 16, boxSizing: 'content-box' as const };
 
 interface DemoArgs {
   children: string;
@@ -64,7 +67,7 @@ async function settle(trigger: HTMLElement) {
 export const Playground: Story = {
   render: ({ children, width, tabIndex, onFocus }) => (
     <Page>
-      <div data-testid="container" style={{ width, border: BORDER }}>
+      <div data-testid="container" style={{ width, ...FRAME }}>
         <TruncatedText data-testid="text" tabIndex={tabIndex === '0' ? 0 : undefined} onFocus={onFocus}>
           {children}
         </TruncatedText>
@@ -104,7 +107,7 @@ export const Block: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <Page>
-      <div data-testid="container" style={{ width: 200, border: BORDER }}>
+      <div data-testid="container" style={{ width: 200, ...FRAME }}>
         <TruncatedText data-testid="text">{LONG}</TruncatedText>
       </div>
     </Page>
@@ -122,7 +125,7 @@ export const InFlexRow: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <Page>
-      <div data-testid="container" style={{ display: 'flex', alignItems: 'center', gap: 8, width: 240, border: BORDER }}>
+      <div data-testid="container" style={{ display: 'flex', alignItems: 'center', gap: 8, width: 240, ...FRAME }}>
         <TruncatedText data-testid="text">{LONG}</TruncatedText>
         <Button size="sm">Apri</Button>
       </div>
@@ -142,7 +145,7 @@ export const NotTruncated: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <Page>
-      <div data-testid="container" style={{ width: 320, border: BORDER }}>
+      <div data-testid="container" style={{ width: 320, ...FRAME }}>
         <TruncatedText data-testid="text">Fattura 2026/0142</TruncatedText>
       </div>
     </Page>
@@ -194,7 +197,7 @@ export const Rtl: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <Page>
-      <div dir="rtl" data-testid="container" style={{ width: 160, border: BORDER }}>
+      <div dir="rtl" data-testid="container" style={{ width: 160, ...FRAME }}>
         <TruncatedText data-testid="text">{'هذا نص طويل جدا يتجاوز عرض الحاوية بكثير ويجب أن يقتطع'}</TruncatedText>
       </div>
     </Page>
@@ -214,7 +217,7 @@ export const RichChildren: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <Page>
-      <div style={{ width: 160, border: BORDER, display: 'grid', gap: 8 }}>
+      <div style={{ width: 160, ...FRAME, display: 'grid', gap: 8 }}>
         <TruncatedText data-testid="plain">
           <strong>Fornitore</strong> Bianchi &amp; <em>Associati</em> S.r.l., sede legale di Milano
         </TruncatedText>
@@ -254,7 +257,7 @@ export const AutoFocus: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <Page>
-      <div style={{ width: 160, border: BORDER }}>
+      <div style={{ width: 160, ...FRAME }}>
         <TruncatedText data-testid="text" tabIndex={0} ref={(el) => el?.focus()}>
           {LONG}
         </TruncatedText>
@@ -283,7 +286,7 @@ export const InsideDialog: Story = {
             <DialogTitle>Dettaglio</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <div style={{ width: 160, border: BORDER }}>
+            <div style={{ width: 160, ...FRAME }}>
               <TruncatedText data-testid="text" tabIndex={0}>
                 {LONG}
               </TruncatedText>
@@ -313,7 +316,7 @@ export const ChangesWhileOpen: Story = {
       const [short, setShort] = useState(false);
       return (
         <Page>
-          <div style={{ width: 160, border: BORDER }}>
+          <div style={{ width: 160, ...FRAME }}>
             <TruncatedText
               data-testid="text"
               tabIndex={0}
@@ -363,7 +366,7 @@ export const ChangesWhileOpenInDialog: Story = {
                 <Button size="sm" data-testid="before">
                   Prima
                 </Button>
-                <div style={{ width: 160, border: BORDER }}>
+                <div style={{ width: 160, ...FRAME }}>
                   <TruncatedText
                     data-testid="text"
                     tabIndex={0}
@@ -404,7 +407,7 @@ export const ChangesWhileOpenSharedProvider: Story = {
       return (
         <Page>
           <TooltipProvider>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: 360, border: BORDER }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: 360, ...FRAME }}>
               <div style={{ width: 160 }}>
                 <TruncatedText
                   data-testid="text"
@@ -457,7 +460,7 @@ export const SharedProvider: Story = {
   render: () => (
     <Page>
       <TooltipProvider>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: 320, border: BORDER }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: 320, ...FRAME }}>
           <TruncatedText data-testid="text">Breve</TruncatedText>
           <Tooltip content="Apri il dettaglio">
             <Button size="sm">Apri</Button>

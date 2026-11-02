@@ -87,7 +87,7 @@ function Demo({ layout, width, valueKind, emptyLabel, onOpen }: DemoProps) {
   return (
     <div
       data-testid="container"
-      style={{ width, maxWidth: '100%', border: BORDER, padding: 8, boxSizing: 'content-box' }}
+      style={{ width, maxWidth: '100%', border: BORDER, padding: 16, boxSizing: 'content-box' }}
     >
       <DescriptionList layout={layout} emptyLabel={emptyLabel} data-testid="list">
         <Items kind={valueKind} onOpen={onOpen} />
@@ -167,7 +167,7 @@ export const AutoSideBySide: Story = {
   render: ({ valueKind, emptyLabel }) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
       {[600, 280].map((w) => (
-        <div key={w} data-testid={`box-${w}`} style={{ width: w, maxWidth: '100%', border: BORDER, padding: 8 }}>
+        <div key={w} data-testid={`box-${w}`} style={{ width: w, maxWidth: '100%', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
           <DescriptionList emptyLabel={emptyLabel} data-testid={`list-${w}`}>
             <Items kind={valueKind} />
           </DescriptionList>
@@ -197,7 +197,7 @@ export const AutoSideBySide: Story = {
 
 function LongAndEmptyList({ width, layout }: { width: number; layout: DescriptionListLayout }) {
   return (
-    <div data-testid={`box-${width}`} style={{ width, maxWidth: '100%', border: BORDER, padding: 8 }}>
+    <div data-testid={`box-${width}`} style={{ width, maxWidth: '100%', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
       <DescriptionList layout={layout} data-testid={`list-${width}`}>
         <DescriptionListItem label={LONG_WORD}>Valore con etichetta lunghissima</DescriptionListItem>
         <DescriptionListItem label="Stringa senza spazi">{LONG_WORD}</DescriptionListItem>
@@ -245,7 +245,7 @@ const VALUE_STEPS: { name: string; value: ReactNode }[] = [
 function ChangingValueDemo() {
   const [step, setStep] = useState(0);
   return (
-    <div data-testid="container" style={{ width: 600, border: BORDER, padding: 8 }}>
+    <div data-testid="container" style={{ width: 600, border: BORDER, padding: 16, boxSizing: 'content-box' }}>
       <Button size="sm" onClick={() => setStep((s) => (s + 1) % VALUE_STEPS.length)}>
         Cambia valore
       </Button>
@@ -383,7 +383,7 @@ function StatusDemo({ entity: initial, tone, width, showSummary, layout, onSelec
           </Button>
         ))}
       </div>
-      <div data-testid="container" style={{ width, maxWidth: '100%', border: BORDER, padding: 8 }}>
+      <div data-testid="container" style={{ width, maxWidth: '100%', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
         <DescriptionListStatus
           data-testid="status"
           status={hasBadge ? <StatusBadge tone={tone}>Archiviato</StatusBadge> : undefined}
@@ -462,7 +462,7 @@ export const StatusAndSummary: Story = {
 
 function SummaryRows({ layout, width }: { layout: DescriptionListLayout; width: number }) {
   return (
-    <div data-testid={`summary-${layout}`} style={{ width, maxWidth: '100%', border: BORDER, padding: 8 }}>
+    <div data-testid={`summary-${layout}`} style={{ width, maxWidth: '100%', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
       <DescriptionList layout={layout}>
         <DescriptionListItem label="Imponibile">1.016,39 €</DescriptionListItem>
         <DescriptionListItem label="IVA 22%" variant="summary">
@@ -537,7 +537,7 @@ export const StatusAndSummaryVisual: Story = {
         { id: 'empty', status: undefined, detail: undefined, width: 420 },
         { id: 'truncated', status: <StatusBadge tone="warning">Archiviato</StatusBadge>, detail: AUDIT, width: 250 },
       ].map(({ id, status, detail, width }) => (
-        <div key={id} data-testid={`box-${id}`} style={{ width, maxWidth: '100%', border: BORDER, padding: 8 }}>
+        <div key={id} data-testid={`box-${id}`} style={{ width, maxWidth: '100%', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
           <DescriptionListStatus data-testid={`status-${id}`} status={status} detail={detail} />
           <div style={{ height: 12 }} />
           <DescriptionList data-testid={`list-${id}`}>
