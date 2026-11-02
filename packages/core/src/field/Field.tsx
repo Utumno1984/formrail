@@ -68,7 +68,7 @@ const SCROLL_MARGIN = { scrollMarginTop: '0.5rem', scrollMarginBottom: 'calc(var
 // empty lines under every Field).
 const ERROR_SLOT = 'min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]';
 const LABEL_HIDDEN = 'sr-only';
-const LABEL = 'mb-1 text-rop-label text-rop-text [overflow-wrap:anywhere]';
+const LABEL = 'mb-2text-rop-label text-rop-text [overflow-wrap:anywhere]';
 const KEYBOARD_INSET = '--rop-keyboard-inset';
 
 /**
