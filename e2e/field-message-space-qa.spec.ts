@@ -19,7 +19,7 @@ async function fieldInfo(page: Page) {
   });
 }
 
-const cases: Record<string, string> = {
+const cases: Record<'none' | 'help' | 'error' | 'reason' | 'all', string> = {
   none: 'help:',
   help: 'help:Helpline',
   error: `help:;error:${SHORT}`,
@@ -45,7 +45,7 @@ for (const [vp, size, dir] of [
     test('one message of any kind keeps the Field height; stacked ones grow it', async ({ page }) => {
       const none = await measure(page, cases.none);
       expect(none.msgHeight).toBeCloseTo(20, 0);
-      for (const k of ['help', 'error', 'reason']) {
+      for (const k of ['help', 'error', 'reason'] as const) {
         const m = await measure(page, cases[k]);
         expect(m.describedKinds.length, k).toBe(1);
         expect(m.fieldHeight, k).toBeCloseTo(none.fieldHeight, 1);
