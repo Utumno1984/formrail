@@ -55,7 +55,8 @@ const opposite = (direction: ListReportSortDirection): ListReportSortDirection =
  *   set by `commitSearch()` or `searchCommitDelay` ms after the last draft edit. The committed query is
  *   trimmed and split on whitespace; every term must be a case/diacritics-insensitive substring of a
  *   searchable column (or of `getSearchText`). A committed query changed from outside never overwrites
- *   a draft the user is editing.
+ *   a draft the user is editing, and drops its pending delayed commit (the draft is committed at the
+ *   next edit or `commitSearch()`).
  * - `onFilterChange`/`onSearchQueryChange` are called only for gestures, never for outside changes.
  * - Controlled `searchQuery`: the hook assumes the parent applies what `onSearchQueryChange` reports. A
  *   late echo of a reported value (e.g. a router that applies it asynchronously) never overwrites the
@@ -122,16 +123,22 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
   const [seenCommitted, setSeenCommitted] = useState(committed);
   // Controlled mode: queries this hook emitted that the parent has not applied yet, oldest first.
   const inflight = useRef<string[]>([]);
+  // Set when the committed query changed from outside: the effect below drops a pending commit.
+  const outsideChange = useRef(false);
   // The committed query changed. A value we emitted coming back (a late echo) never touches the draft:
   // the user may have kept typing, or cleared the field, in the meantime. An outside change makes the
   // draft follow it if the user was not editing (draft equal to the previous committed query); if they
-  // typed something else, their text stays: no "going back".
+  // typed something else, their text stays: no "going back". Its pending delayed commit is dropped,
+  // though: the outside value (e.g. Back in the browser) wins until the user edits again or commits,
+  // so the timer does not overwrite it behind the user's back.
   if (committed !== seenCommitted) {
     setSeenCommitted(committed);
     const echo = inflight.current.indexOf(committed);
     if (echo >= 0) inflight.current.splice(0, echo + 1);
     else {
       inflight.current = [];
+      // Uncontrolled, only our own commits move the committed query (they are not tracked in `inflight`).
+      if (searchControlled) outsideChange.current = true;
       if (draft === seenCommitted) setDraft(committed);
     }
   }
@@ -170,9 +177,11 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
 
   /** The last query committed or emitted, whether or not the parent has applied it yet. */
   const lastCommitted = useCallback((): string => inflight.current.at(-1) ?? fs.current.committed, []);
-  // The committed query moved under a draft that now equals it: nothing left to commit.
+  // The committed query moved under a draft that now equals it, or changed from outside: nothing left
+  // to commit on a timer.
   useEffect(() => {
-    if (fs.current.draft === lastCommitted()) clearTimer();
+    if (outsideChange.current || fs.current.draft === lastCommitted()) clearTimer();
+    outsideChange.current = false;
   }, [committed, draft, clearTimer, lastCommitted]);
 
   const commitSearch = useCallback(() => {

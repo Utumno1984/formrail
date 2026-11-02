@@ -207,8 +207,12 @@
       "limit": 651
     },
     "useListReport": {
-      "baseline": 2609,
-      "limit": 2870
+      "baseline": 2637,
+      "limit": 2901
+    },
+    "useListReportUrlState": {
+      "baseline": 1327,
+      "limit": 1460
     },
     "useObjectPageForm": {
       "baseline": 1716,

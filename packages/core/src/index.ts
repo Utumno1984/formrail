@@ -80,6 +80,11 @@ export type { ListReportFilterBarProps } from './list-report/ListReportFilterBar
 export { ListReport } from './list-report/ListReport';
 export type { ListReportProps, ListReportLabels } from './list-report/ListReport';
 export { useListReport } from './list-report/use-list-report';
+export { useListReportUrlState } from './list-report/use-list-report-url-state';
+export type {
+  UseListReportUrlStateOptions,
+  UseListReportUrlStateReturn,
+} from './list-report/use-list-report-url-state';
 export type {
   ListReportColumn,
   ListReportFilter,
