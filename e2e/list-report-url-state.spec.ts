@@ -162,6 +162,45 @@ test.describe('Floorplans/List Report: UrlState', () => {
     expect(await historyLength(page)).toBe(length + 1);
   });
 
+  test('Back that moves only the pill while the user is typing: no write and no onSearchQueryChange', async ({ page }) => {
+    const actions = await recordActions(page);
+    await page.clock.install();
+    await gotoStory(page, FIXTURE, 'history:push');
+    await pill(page, 'Open').click();
+    await pill(page, 'Approved').click();
+    expect(await actions()).toEqual(['onFilterChange', 'onFilterChange']);
+    const length = await historyLength(page);
+    await page.evaluate(() => {
+      const w = window as unknown as { __writes: string[] };
+      w.__writes = [];
+      for (const method of ['pushState', 'replaceState'] as const) {
+        const original = window.history[method].bind(window.history);
+        window.history[method] = (...args: Parameters<History['pushState']>) => {
+          w.__writes.push(method);
+          original(...args);
+        };
+      }
+    });
+    // The page's clock stands still: Back surely arrives while the 300 ms commit of "ross" is pending.
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
+    await search(page).pressSequentially('ross');
+    await page.goBack();
+    await expect(pill(page, 'Open')).toBeChecked();
+    await page.clock.runFor(2_000); // well past the commit delay
+    await page.clock.resume();
+    expect(await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes)).toEqual([]);
+    expect(await own(page)).toEqual({ filter: 'open', q: null, sort: null });
+    await expect(search(page)).toHaveValue('ross');
+    expect(await actions()).toEqual(['onFilterChange', 'onFilterChange']);
+    expect(await historyLength(page)).toBe(length);
+    // Forward is still there: the navigation was not cut by a write.
+    await page.goForward();
+    await expect(pill(page, 'Approved')).toBeChecked();
+    // The text is still the user's: Enter commits it now, as a gesture.
+    await search(page).press('Enter');
+    expect((await own(page)).q).toBe('ross');
+  });
+
   test('Back while the user is typing: the field keeps the text, the table follows the URL, the pending commit is dropped', async ({
     page,
   }) => {

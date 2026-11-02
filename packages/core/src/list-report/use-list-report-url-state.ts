@@ -154,8 +154,13 @@ const getServerSnapshot = (): string => EMPTY_SNAPSHOT;
  *   hash and `history.state` are untouched, and so is an own parameter that is invalid *for now* (e.g. a
  *   pill id of filters that are still loading: it applies when `filters` contains it, with no callback).
  * - Back/Forward (`popstate`) updates the values with no callback of `useListReport` (not a gesture) and
- *   no write. A search typed and not committed stays in the field (`useListReport` keeps the draft and
- *   drops its pending commit, so the entry the user went back to is not rewritten behind them).
+ *   no write. A search typed and not committed stays in the field; when the navigation moves this
+ *   report's pill, search or sort, `useListReport` also drops its pending commit, so the entry the user
+ *   went back to is not rewritten behind them. A navigation that moves none of them (only other
+ *   parameters, another prefix, the hash) leaves the pending commit alone: the user's typing goes on.
+ * - Next to a router: the hook writes with the History API directly and keeps `history.state`, but the
+ *   router is not told (it may not re-render, and a router that rewrites the URL from its own state can
+ *   drop these parameters). Use it where the page owns the query string; an adapter is a separate step.
  * - Server rendering returns the defaults (no `window` access); the client reads the URL right after
  *   hydration, with no mismatch. In the browser the URL is read at the first render (no flash of defaults).
  * - Memoization: `filters` and `sortableColumnIds` may be new arrays every render (only their ids count).

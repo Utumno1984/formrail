@@ -501,7 +501,9 @@ export const UrlState: StoryObj<UrlStateArgs> = {
     await expect(own()).toBe(`${filterKey}=open&${searchKey}=&${sortKey}=`);
     await expect(win.history.length).toBe(length + step);
 
-    await userEvent.type(search, 'rossi{Enter}');
+    // No pause between keystrokes (`delay: null`): the five characters land within any commit delay, even
+    // on a slow machine, so the search is committed once (by Enter) and not halfway through the word.
+    await userEvent.type(search, 'rossi{Enter}', { delay: null });
     await expect(args.onSearchQueryChange).toHaveBeenCalledOnce();
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('rossi');
     await expect(own()).toBe(`${filterKey}=open&${searchKey}=rossi&${sortKey}=`);

@@ -530,6 +530,36 @@ describe('Back/Forward (popstate)', () => {
     expect(pushSpy).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['only the pill', '?filter=closed'],
+    ['only the sort', '?sort=amount.desc'],
+  ])('popstate that moves %s while the search commit is pending: the commit is dropped, nothing is written', (_, target) => {
+    vi.useFakeTimers();
+    const onSearchQueryChange = vi.fn();
+    render(<Host history="push" searchCommitDelay={300} onSearchQueryChange={onSearchQueryChange} />);
+    fireEvent.change(searchBox(), { target: { value: 'ross' } }); // 300 ms commit pending
+    spyWrites();
+    navigate(target);
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(onSearchQueryChange).not.toHaveBeenCalled();
+    expect(pushSpy).not.toHaveBeenCalled();
+    expect(replaceSpy).toHaveBeenCalledTimes(1); // `navigate` itself
+    expect(window.location.search).toBe(target);
+    expect(searchBox()).toHaveValue('ross');
+  });
+
+  it('popstate that changes only parameters of another instance or the hash: no render change, the commit still fires', () => {
+    vi.useFakeTimers();
+    const onSearchQueryChange = vi.fn();
+    render(<Host searchCommitDelay={300} onSearchQueryChange={onSearchQueryChange} />);
+    fireEvent.change(searchBox(), { target: { value: 'ross' } });
+    navigate('?other.filter=open');
+    act(() => void vi.advanceTimersByTime(300));
+    // Nothing of this report moved: the user's own pending commit is not a reaction to the navigation.
+    expect(onSearchQueryChange).toHaveBeenCalledExactlyOnceWith('ross');
+    expect(window.location.search).toBe('?other.filter=open&q=ross');
+  });
+
   it('popstate on a draft equal to the committed one (nothing pending): the field follows, nothing is written', () => {
     vi.useFakeTimers();
     setUrl('?q=rossi');
