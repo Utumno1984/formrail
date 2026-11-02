@@ -57,12 +57,12 @@ for (const [vp, size, dir] of VPS) {
         let prev = r.boxBottom;
         for (const m of r.msgs) {
           expect(m.top).toBeGreaterThanOrEqual(prev - 0.5);
-          expect(m.top - prev).toBeLessThan(8);
+          expect(m.top - prev).toBeLessThan(8.5); // exactly the 8px message gap (mt-2), no more
           prev = m.bottom;
         }
         expect(r.slotTop).toBeGreaterThanOrEqual(prev - 0.5);
         expect(r.slotBottom).toBeCloseTo(r.fieldBottom, 1);
-        expect(r.slotBottom - r.slotTop).toBeCloseTo(20, 0);
+        expect(r.slotBottom - r.slotTop).toBeCloseTo(24, 0);
       });
     }
   });

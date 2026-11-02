@@ -8,7 +8,7 @@ export type FieldMessageTone = 'help' | 'error';
 
 // Full literals (Tailwind scan). Both tones share every geometry class: only the colour differs.
 // The icon is 16px, the same as the caption line height, so the row never grows for an error.
-const BASE = 'mt-1 flex items-start gap-1 font-rop-sans text-rop-caption [overflow-wrap:anywhere]';
+const BASE = 'mt-2 flex items-start gap-1 font-rop-sans text-rop-caption [overflow-wrap:anywhere]';
 const TONE_CLASS: Record<FieldMessageTone, string> = {
   help: 'text-rop-text-muted',
   error: 'text-rop-error',

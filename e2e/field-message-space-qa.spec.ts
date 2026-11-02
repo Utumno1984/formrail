@@ -44,16 +44,16 @@ for (const [vp, size, dir] of [
 
     test('the error line is reserved on its own: an error never changes the height, help and reason add theirs', async ({ page }) => {
       const none = await measure(page, cases.none);
-      expect(none.msgHeight).toBeCloseTo(20, 0);
+      expect(none.msgHeight).toBeCloseTo(24, 0);
       const error = await measure(page, cases.error);
       expect(error.describedKinds.length).toBe(1);
       expect(error.fieldHeight).toBeCloseTo(none.fieldHeight, 1);
       for (const k of ['help', 'reason'] as const) {
         const m = await measure(page, cases[k]);
         expect(m.describedKinds.length, k).toBe(1);
-        expect(m.msgHeight, k).toBeCloseTo(20, 0);
+        expect(m.msgHeight, k).toBeCloseTo(24, 0);
         // Static descriptions take their own line while present.
-        expect(m.fieldHeight, k).toBeCloseTo(none.fieldHeight + 20, 1);
+        expect(m.fieldHeight, k).toBeCloseTo(none.fieldHeight + 24, 1);
       }
     });
 
@@ -61,7 +61,7 @@ for (const [vp, size, dir] of [
       const without = await measure(page, 'help:Helpline;state:forced;stateReason:Because+rule');
       const all = await measure(page, cases.all);
       expect(all.fieldHeight).toBeCloseTo(without.fieldHeight, 1);
-      expect(all.msgHeight).toBeCloseTo(20, 0);
+      expect(all.msgHeight).toBeCloseTo(24, 0);
     });
 
     test('reason + error + help: description order and content', async ({ page }) => {

@@ -60,13 +60,13 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
 // scrollIntoView stop above the virtual keyboard.
 const ROOT = 'flex min-w-0 flex-col font-rop-sans';
 const SCROLL_MARGIN = { scrollMarginTop: '0.5rem', scrollMarginBottom: 'calc(var(--rop-keyboard-inset, 0px) + 0.5rem)' };
-// The error slot always holds one caption line plus the gap of the message (`mt-1` = 0.25rem, a
+// The error slot always holds one caption line plus the gap of the message (`mt-2` = 0.5rem, a
 // literal on purpose: the design system exposes no global spacing variable), whatever else the Field shows (reason, help): a
 // one-line error appearing or going away moves nothing below the Field. A wrapped error grows it:
 // accepted, never clamped. Reason and help are static descriptions of the field's configuration,
 // not transient feedback: they take room only while present (reserving them too would add three
 // empty lines under every Field).
-const ERROR_SLOT = 'min-h-[calc(var(--text-rop-caption--line-height)+0.25rem)]';
+const ERROR_SLOT = 'min-h-[calc(var(--text-rop-caption--line-height)+0.5rem)]';
 const LABEL_HIDDEN = 'sr-only';
 const LABEL = 'mb-2 text-rop-label text-rop-text [overflow-wrap:anywhere]';
 const KEYBOARD_INSET = '--rop-keyboard-inset';

@@ -16,6 +16,33 @@ async function ringGap(page: Page, control: Locator, label: Locator): Promise<nu
   return c.y - (outline.w + outline.o) - (l.y + l.height);
 }
 
+/** Gap in px between the focus ring's bottom and the top of the FieldMessage text under it (#147). */
+async function bottomGap(page: Page, control: Locator, message: Locator): Promise<number> {
+  await page.keyboard.press('Shift');
+  await control.focus();
+  const w = await control.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { w: parseFloat(s.outlineWidth), o: parseFloat(s.outlineOffset) };
+  });
+  const c = (await control.boundingBox())!;
+  const m = (await message.boundingBox())!;
+  return m.y - (c.y + c.height + w.w + w.o);
+}
+
+test.describe('Field focus ring vs FieldMessage (#147)', () => {
+  for (const [testId, suffix] of [
+    ['f-help', 'help'],
+    ['f-error', 'error'],
+  ] as const) {
+    test(`${suffix}: the ring keeps >=4px from the message text`, async ({ page }) => {
+      await gotoStory(page, 'forms-field--overview');
+      const field = page.getByTestId(testId);
+      const gap = await bottomGap(page, field.getByRole('textbox'), field.locator(`[id$="-${suffix}"]`));
+      expect(gap).toBeGreaterThanOrEqual(4);
+    });
+  }
+});
+
 test.describe('Field focus ring vs label (#138)', () => {
   test('Input: the ring keeps >=4px from the label', async ({ page }) => {
     await gotoStory(page, 'forms-field--overview');

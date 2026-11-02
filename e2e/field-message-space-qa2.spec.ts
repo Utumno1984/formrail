@@ -46,7 +46,7 @@ for (const [vp, size, dir] of [
         const base = await tops(page);
         await page.getByRole('button', { name: 'Show error', exact: true }).click();
         const short = await tops(page);
-        expect(short.second - base.second).toBeCloseTo(short.err + 4, 1);
+        expect(short.second - base.second).toBeCloseTo(short.err + 8, 1);
         await page.getByRole('button', { name: 'Clear' }).click();
         expect((await tops(page)).second).toBeCloseTo(base.second, 1);
       });
