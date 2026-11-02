@@ -55,12 +55,39 @@ const listed = () => within(screen.getByRole('list')).queryAllByRole('listitem')
 describe('ListReportFilterBar', () => {
   it('renders a named search landmark with a named radiogroup and one radio per filter, checked like lr.filter', () => {
     render(<Harness options={{ defaultFilter: 'open' }} />);
-    const landmark = screen.getByRole('search', { name: 'Filtri e ricerca' });
-    const group = within(landmark).getByRole('radiogroup', { name: 'Filtri' });
+    const landmark = screen.getByRole('search', { name: 'Filters and search' });
+    const group = within(landmark).getByRole('radiogroup', { name: 'Filters' });
     const radios = within(group).getAllByRole('radio');
     expect(radios.map((r) => r.textContent)).toEqual(['Tutte', 'Aperte', 'Chiuse']);
     expect(radios.map((r) => r.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false']);
-    expect(within(landmark).getByRole('searchbox', { name: 'Cerca' })).toHaveAttribute('type', 'search');
+    expect(within(landmark).getByRole('searchbox', { name: 'Search' })).toHaveAttribute('type', 'search');
+  });
+
+  it('defaults the search placeholder to "Search" and the clear button to "Clear search"', async () => {
+    render(<Harness />);
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    expect(box).toHaveAttribute('placeholder', 'Search');
+    expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
+    await userEvent.type(box, 'x');
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument();
+  });
+
+  it('an explicit searchPlaceholder differs from the searchLabel, which stays the accessible name', () => {
+    render(<Harness bar={{ searchPlaceholder: 'Find an invoice...' }} />);
+    const box = screen.getByRole('searchbox', { name: 'Search' });
+    expect(box).toHaveAttribute('placeholder', 'Find an invoice...');
+  });
+
+  it('with aria-labelledby the landmark gets no default aria-label', () => {
+    render(
+      <>
+        <h2 id="bar-title">Invoices</h2>
+        <Harness bar={{ 'aria-labelledby': 'bar-title' }} />
+      </>,
+    );
+    const landmark = screen.getByRole('search', { name: 'Invoices' });
+    expect(landmark).not.toHaveAttribute('aria-label');
+    expect(screen.queryByRole('search', { name: 'Filters and search' })).toBeNull();
   });
 
   it('the labels and the landmark name can be overridden', () => {
@@ -230,17 +257,17 @@ describe('ListReportFilterBar', () => {
       const onSearchQueryChange = vi.fn();
       render(<Harness options={{ defaultSearchQuery: 'verdi', onSearchQueryChange }} />);
       expect(listed()).toEqual(['Verdi']);
-      await userEvent.click(screen.getByRole('button', { name: 'Svuota ricerca' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
       expect(screen.getByRole('searchbox')).toHaveValue('');
       expect(screen.getByRole('searchbox')).toHaveFocus();
       expect(listed()).toHaveLength(4);
       expect(onSearchQueryChange).toHaveBeenCalledExactlyOnceWith('');
-      expect(screen.queryByRole('button', { name: 'Svuota ricerca' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
     });
 
     it('the button is not there for an empty draft, and is named by clearSearchLabel', () => {
       const { unmount } = render(<Harness />);
-      expect(screen.queryByRole('button', { name: 'Svuota ricerca' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
       unmount();
       render(<Harness options={{ defaultSearchQuery: 'x' }} bar={{ clearSearchLabel: 'Clear' }} />);
       expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();

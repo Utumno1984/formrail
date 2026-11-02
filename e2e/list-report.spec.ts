@@ -15,7 +15,7 @@ const table = (page: Page): Locator => page.getByRole('table', { name: 'Fatture'
 const scroller = (page: Page): Locator => table(page).locator('..');
 const heading = (page: Page): Locator => page.getByRole('heading', { name: /Fatture/ });
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
-const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Cerca' });
+const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 const bodyRows = (page: Page): Locator => table(page).locator('tbody tr:not([aria-hidden])');
 
 const ALL = makeDemoInvoices(200);
@@ -208,13 +208,13 @@ test.describe('real keyboard (no mouse)', () => {
     await page.keyboard.press('ArrowRight');
     await expect(pill(page, 'Da approvare')).toBeChecked();
     await expect(pill(page, 'Da approvare')).toBeFocused();
-    await expect(heading(page)).toHaveText(`Fatture (${PENDING.length} di 200)`);
+    await expect(heading(page)).toHaveText(`Fatture (${PENDING.length} of 200)`);
 
     await page.keyboard.press('Tab');
     await expect(search(page)).toBeFocused();
     await page.keyboard.type('Ferrari');
     await page.keyboard.press('Enter');
-    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} di 200)`);
+    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} of 200)`);
     await expect(bodyRows(page)).toHaveCount(FOUND.length);
 
     await tabTo(page, page.getByRole('button', { name: 'Importo' }));
@@ -229,7 +229,7 @@ test.describe('real keyboard (no mouse)', () => {
     await page.keyboard.type('zzz');
     await page.keyboard.press('Enter');
     await expect(table(page).getByText('Nessun risultato per i filtri correnti', { exact: true })).toBeVisible();
-    await expect(heading(page)).toHaveText('Fatture (0 di 200)');
+    await expect(heading(page)).toHaveText('Fatture (0 of 200)');
 
     await tabTo(page, page.getByRole('button', { name: 'Azzera filtri' }));
     await page.keyboard.press('Enter');
@@ -286,13 +286,13 @@ test.describe('"Simula caricamento"', () => {
     await pill(page, 'Da approvare').click();
     await search(page).fill('Ferrari');
     await search(page).press('Enter');
-    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} di 200)`);
+    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} of 200)`);
     await page.getByRole('button', { name: 'Simula caricamento' }).click();
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     await expect(scroller(page)).not.toHaveAttribute('aria-busy', 'true');
     await expect(pill(page, 'Da approvare')).toBeChecked();
     await expect(search(page)).toHaveValue('Ferrari');
-    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} di 200)`);
+    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} of 200)`);
   });
 });
 
