@@ -84,8 +84,10 @@ const meta: Meta<RecordPageArgs> = {
     onBack: fn(),
     onSaved: fn(),
   },
-  // `key`: a different record starts a new page (and a new store), never an in-place rehydration.
-  render: (args) => <RecordPageDemo key={args.recordId} {...args} />,
+  // No `key` on the demo: the store lives as long as the story mount (a record saved earlier is still
+  // saved after switching `recordId` and back); `InvoiceRecordPage` itself mounts a fresh, hydrated
+  // editor for the new record.
+  render: (args) => <RecordPageDemo {...args} />,
 };
 
 export default meta;
@@ -98,17 +100,22 @@ const region = (canvas: ReturnType<typeof within>) => canvas.queryByRole('region
  * bar appears), Discard (original value, bar hidden), edit again, Save (the action is aria-disabled
  * while it runs, then the bar hides and the field shows the amount as the "server" normalized it),
  * and "Back to list" on a clean form leaves at once. Controls: record, delays and save outcome.
- * With `saveOutcome: error` or an unknown `recordId` this play is expected to stop early.
+ * With `saveOutcome: error`, `loadOutcome: error` or an unknown `recordId` this play is expected to
+ * fail (those states are what the Controls are for); a zero delay skips the in-flight assertions.
  */
 export const RecordPage: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
-    // The record is in flight: a loading state, no editable control.
-    await expect(canvas.getByRole('status')).toHaveTextContent('Loading invoice');
-    await expect(canvas.queryByRole('textbox')).toBeNull();
-    await expect(canvas.queryByRole('combobox')).toBeNull();
+    // The record is in flight: a loading state, no editable control (only observable with a delay).
+    if (args.loadDelayMs > 0) {
+      // Two nodes carry the text: the visible one and the hidden live region that announces it.
+      await expect(canvas.getByRole('status')).toHaveTextContent('Loading invoice…');
+      await expect(canvas.getAllByText('Loading invoice…')).toHaveLength(2);
+      await expect(canvas.queryByRole('textbox')).toBeNull();
+      await expect(canvas.queryByRole('combobox')).toBeNull();
+    }
 
     // Arrived: the editor is mounted with the record's values and a hidden (clean) footer.
     const amount = await canvas.findByRole('textbox', { name: /Amount/ });
@@ -131,7 +138,8 @@ export const RecordPage: Story = {
     await userEvent.type(amount, '1234.567');
     const save = within(await canvas.findByRole('region', { name: 'Save actions' })).getByRole('button', { name: 'Save' });
     await userEvent.click(save);
-    await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
+    // The in-flight state is only observable when the save takes a while.
+    if (args.saveDelayMs >= 200) await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
 
     // Saved: the bar hides, the field shows the server's value (not the typed one), onSaved ran once.
     await waitFor(() => expect(region(canvas)).toBeNull());

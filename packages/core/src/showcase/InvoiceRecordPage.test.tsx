@@ -75,6 +75,43 @@ describe('InvoiceRecordPage', () => {
     await waitFor(() => expect(footer()).toBeNull());
   });
 
+  it('the same number written without the trailing zeros is not a change', async () => {
+    const { store } = setup({}, 'inv-2');
+    const amount = await amountField();
+    const baseline = (await store.get('inv-2')).amount.toFixed(2);
+    await userEvent.clear(amount);
+    await userEvent.type(amount, String(Number(baseline)));
+    expect(footer()).toBeNull();
+    await userEvent.type(amount, '1');
+    await visibleBar();
+  });
+
+  it.each(['0x1F', '1e3', '-5', 'abc', '', '0'])('rejects the amount %j', async (typed) => {
+    const { onSaved } = setup();
+    const amount = await amountField();
+    await userEvent.clear(amount);
+    if (typed) await userEvent.type(amount, typed);
+    await userEvent.click(within(await visibleBar()).getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Amount must be greater than 0.')).toBeInTheDocument();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('announces the loading and the arrival in one live region that is always mounted', async () => {
+    setup({ loadDelayMs: 30 });
+    const region = screen.getByRole('status');
+    expect(region).toHaveTextContent('Loading invoice');
+    await amountField();
+    expect(region).toBeInTheDocument();
+    expect(region).toHaveTextContent(/^Invoice FT-2026-\d{4} loaded$/);
+  });
+
+  it('after Retry the focus lands on the title, not on the body', async () => {
+    setup({ loadOutcome: 'error-once' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    await amountField();
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
+  });
+
   it('Discard restores every value to the baseline', async () => {
     setup();
     const amount = await amountField();

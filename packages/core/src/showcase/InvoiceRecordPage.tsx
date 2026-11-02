@@ -1,7 +1,7 @@
 // Story-only: the invoice detail page, composed ONLY from the public Object Page pieces. Not exported
 // by the package. Spec §1.4: the editor is mounted already hydrated (`key` per record + `baseline` at
 // mount); a fetch in flight is a loading state, never an editor that is hydrated afterwards.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
@@ -65,7 +65,16 @@ const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as DemoInvoiceStatus[]).map((s
   label: STATUS_LABEL[s],
 }));
 
-const summaryText = (count: number) => (count === 1 ? '1 invalid field' : `${count} invalid fields`);
+const VISUALLY_HIDDEN: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
+const summaryText =(count: number) => (count === 1 ? '1 invalid field' : `${count} invalid fields`);
 const errorText = (error: unknown): string | undefined =>
   error === null || error === undefined ? undefined : error instanceof Error ? error.message : String(error);
 
@@ -92,16 +101,28 @@ export function InvoiceRecordPage({ store, recordId, onBack, onSaved }: InvoiceR
   // A result that belongs to another request counts as "still loading": no stale editor is ever shown.
   const settled = result && result.key === key ? result : null;
 
+  // One live region, always mounted: its text changes after mount, so the loading and the arrival of
+  // the editor are announced (a region inserted already filled may be skipped by a screen reader).
+  const announcement = !settled ? 'Loading invoice…' : 'record' in settled ? `Invoice ${settled.record.number} loaded` : '';
+  const announcer = (
+    <div role="status" style={VISUALLY_HIDDEN}>
+      {announcement}
+    </div>
+  );
+
   if (!settled) {
     return (
-      <div role="status" style={{ padding: 16 }}>
-        Loading invoice…
-      </div>
+      <>
+        {announcer}
+        <div style={{ padding: 16 }}>Loading invoice…</div>
+      </>
     );
   }
   if ('error' in settled) {
     const notFound = settled.error instanceof InvoiceNotFoundError;
     return (
+      <>
+        {announcer}
       <div style={{ display: 'grid', gap: 12, padding: 16, maxWidth: 560 }}>
         <MessageStrip tone="error" title={notFound ? 'Invoice not found' : 'Could not load the invoice'}>
           {notFound ? `There is no invoice with id "${recordId}".` : (errorText(settled.error) ?? 'Unknown error')}
@@ -115,11 +136,22 @@ export function InvoiceRecordPage({ store, recordId, onBack, onSaved }: InvoiceR
           )}
         </div>
       </div>
+      </>
     );
   }
   // `key`: a different record is a different editor, mounted hydrated, never a reset of the old one.
   return (
-    <InvoiceEditor key={settled.record.id} store={store} record={settled.record} onBack={onBack} onSaved={onSaved} />
+    <>
+      {announcer}
+      <InvoiceEditor
+        key={settled.record.id}
+        store={store}
+        record={settled.record}
+        onBack={onBack}
+        onSaved={onSaved}
+        focusTitleOnMount={attempt > 0}
+      />
+    </>
   );
 }
 
@@ -128,16 +160,31 @@ interface InvoiceEditorProps {
   record: StoredInvoice;
   onBack: () => void;
   onSaved: ((invoice: StoredInvoice) => void) | undefined;
+  /** After "Retry" the button that had the focus is gone: the title takes it (never `<body>`). */
+  focusTitleOnMount: boolean;
 }
 
-function InvoiceEditor({ store, record, onBack, onSaved }: InvoiceEditorProps) {
+// The amount is text; "1295.9" and "1295.90" are the same number, so typing the shorter form of the
+// baseline is not a change.
+const sameAmount = (a: string, b: string): boolean => a === b || (a.trim() !== '' && b.trim() !== '' && Number(a) === Number(b));
+const sameValues = (a: InvoiceValues, b: InvoiceValues): boolean =>
+  sameAmount(a.amount, b.amount) &&
+  a.supplier === b.supplier &&
+  a.status === b.status &&
+  a.date === b.date &&
+  a.dueDate === b.dueDate &&
+  a.notes === b.notes;
+
+const DECIMAL = /^\d+(\.\d+)?$/;
+
+function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: InvoiceEditorProps) {
   const form = useObjectPageForm<InvoiceValues>({
     baseline: toValues(record),
+    isEqual: sameValues,
     validate: (v) => {
       const errors: Partial<Record<keyof InvoiceValues, string>> = {};
       if (!v.supplier) errors.supplier = 'Supplier is required.';
-      const amount = Number(v.amount);
-      if (v.amount.trim() === '' || !Number.isFinite(amount) || amount <= 0) {
+      if (!DECIMAL.test(v.amount.trim()) || Number(v.amount) <= 0) {
         errors.amount = 'Amount must be greater than 0.';
       }
       return errors;
@@ -155,6 +202,9 @@ function InvoiceEditor({ store, record, onBack, onSaved }: InvoiceEditorProps) {
   });
   const frameRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
+  useEffect(() => {
+    if (focusTitleOnMount) frameRef.current?.querySelector('h1')?.focus();
+  }, [focusTitleOnMount]);
 
   const { values, setValue } = form;
   const save = () =>
@@ -179,8 +229,11 @@ function InvoiceEditor({ store, record, onBack, onSaved }: InvoiceEditorProps) {
         <ObjectPage labels={{ anchorBar: 'Sections' }}>
           <ObjectPageHeader
             title={record.number}
-            subtitle={values.supplier || 'No supplier'}
-            status={<StatusBadge tone={STATUS_TONE[values.status]}>{STATUS_LABEL[values.status]}</StatusBadge>}
+            // The identity shows the SAVED record (the baseline), not the unsaved draft.
+            subtitle={form.baseline.supplier || 'No supplier'}
+            status={
+              <StatusBadge tone={STATUS_TONE[form.baseline.status]}>{STATUS_LABEL[form.baseline.status]}</StatusBadge>
+            }
             actions={
               <Button variant="secondary" onClick={() => guard(onBack)}>
                 Back to list

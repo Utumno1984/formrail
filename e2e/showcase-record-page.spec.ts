@@ -222,6 +222,55 @@ test.describe('Showcase/Invoices: RecordPage', () => {
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
 
+  test('Retry: the focus lands on the title, not on the body', async ({ page }) => {
+    await gotoStory(page, FIXTURE, 'loadOutcome:error-once');
+    await page.getByRole('button', { name: 'Retry' }).click();
+    await expect(amount(page)).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+  });
+
+  test('the header shows the saved record: an unsaved status change does not touch the badge', async ({ page }) => {
+    await open(page);
+    const header = page.getByRole('heading', { level: 1 }).locator('xpath=../..');
+    const before = await header.innerText();
+    const current = await page.getByRole('combobox', { name: 'Status' }).innerText();
+    const other = current.trim() === 'Approved' ? 'Rejected' : 'Approved';
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: other }).click();
+    await expect(bar(page)).toBeVisible();
+    expect(await header.innerText()).toBe(before);
+  });
+
+  test('switching recordId from the Controls: the store survives, the new editor is hydrated and clean', async ({
+    page,
+  }) => {
+    await open(page);
+    await amount(page).fill('42');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await expect(bar(page)).toBeHidden();
+    await expect(amount(page)).toHaveValue('42.00');
+    await amount(page).fill('7'); // an unsaved edit that must NOT follow us to the next record
+    await expect(bar(page)).toBeVisible();
+    const setRecord = (recordId: string) =>
+      page.evaluate(
+        ([storyId, id]) =>
+          (
+            window as unknown as {
+              __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void };
+            }
+          ).__STORYBOOK_ADDONS_CHANNEL__.emit('updateStoryArgs', { storyId, updatedArgs: { recordId: id } }),
+        [FIXTURE, recordId] as const,
+      );
+    await setRecord('inv-3');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('FT-2026-0003');
+    await expect(bar(page)).toBeHidden();
+    await expect(amount(page)).not.toHaveValue('7');
+    await setRecord('inv-2');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('FT-2026-0002');
+    await expect(amount(page)).toHaveValue('42.00');
+    await expect(bar(page)).toBeHidden();
+  });
+
   test('no axe violations: editor and open dialog', async ({ page }) => {
     await open(page);
     await expectNoA11yViolations(page);
