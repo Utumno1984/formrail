@@ -11,7 +11,8 @@ const LONG =
 const BORDER = '1px dashed var(--color-rop-border)';
 // Demo frame: generous padding so the dashed border never touches the content (content-box keeps the
 // content width the stories measure). Table cells use BORDER alone: tight on purpose.
-const FRAME = { border: BORDER, padding: 16, boxSizing: 'content-box' as const };
+// maxWidth keeps the padded frame (content + 2 * 16 padding + 2 * 1 border) inside narrow viewports.
+const FRAME = { border: BORDER, padding: 16, boxSizing: 'content-box' as const, maxWidth: 'calc(100% - 34px)' };
 
 interface DemoArgs {
   children: string;
