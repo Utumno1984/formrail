@@ -28,7 +28,10 @@ un'app di admin/backoffice).
      valore idratato dopo il mount (verifica che NON marchi il form come sporco), save-bar che
      riserva lo spazio anche a riposo, uscita con modifiche non salvate; per un overlay — stack
      di più overlay (popover dentro dialog), ritorno del fuoco alla chiusura, nessun DOM leak di
-     proprietà di controllo (ispeziona il markup reso).
+     proprietà di controllo (ispeziona il markup reso); per un componente con testo in un box ad
+     altezza fissa o elementi contigui (etichetta/controllo, bordo/contenuto) — misura centratura
+     e distanza con bounding box reali su Storybook, non fidarti dello screenshot o della
+     baseline visiva (vedi "QA ottico" nello skill `storybook-and-wcag-review`).
 4. Se aggiungi test, committali sul branch della PR.
 
 ## Esito
