@@ -501,6 +501,24 @@ export const ErrorSummary: SupplierStory = {
   },
 };
 
+/**
+ * Visual baseline of the failed-save state (#120): the empty supplier form after "Save", with the
+ * field errors, the invalid markers and the footer's "Error: 3 invalid fields" summary all visible.
+ */
+export const FailedSaveState: SupplierStory = {
+  tags: ['visual'],
+  argTypes: SUPPLIER_ARG_TYPES,
+  args: { ...SUPPLIER_ARGS, requiredFields: 3 },
+  render: (args) => <SupplierForm {...args} baseline="empty" footer="always" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    await expect(await canvas.findByText('Supplier is required.')).toBeInTheDocument();
+    await expect(footerStatus(canvasElement)).toHaveTextContent('Error: 3 invalid fields');
+    await waitFor(() => expect(canvas.getByRole('textbox', { name: 'Supplier' })).toHaveFocus());
+  },
+};
+
 /** `ErrorSummary` without a `play` function: what `e2e/object-page-error-summary.spec.ts` drives with real input. */
 export const ErrorSummaryManual: SupplierStory = {
   argTypes: SUPPLIER_ARG_TYPES,
