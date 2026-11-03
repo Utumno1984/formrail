@@ -351,22 +351,29 @@ legittimamente distinguere "svuotato" da "non inviato".
 1. **Ordinamento della List Report**: `toSortKey` in `packages/core/src/list-report/compare.ts`
    tratta `null`/`undefined`/`''` (più `NaN` e `Date` invalida) come "vuoto", sempre in fondo. È un
    criterio di visualizzazione, non un'affermazione che i valori siano uguali.
-2. **Change Summary** (Pro, #174): classi **Assente** (`undefined`, `null`, chiave mancante) e
-   **Vuoto** (Assente ∪ `''` ∪ `[]` ∪ oggetto semplice con soli valori Vuoto), implementate in
-   `packages/pro/src/change-summary/compute-change-summary.ts`. La regola normativa è il TSDoc "No
-   value rule" di `change-summary/types.ts`; `ChangeEntry` normalizza a `undefined` il lato assente
-   anche se era `null`. Motivo: un riepilogo leggibile non deve mostrare "da (vuoto) a (vuoto)".
-3. **Rendering di un controllo**: mostrare un valore assente come testo vuoto (`value ?? ''`) è
+2. **Rendering di un controllo**: mostrare un valore assente come testo vuoto (`value ?? ''`) è
    lecito **in lettura**; non deve mai diventare una scrittura nello stato (sarebbe un'eco, §1.4).
 
 Qualunque altro collasso è un bug, finché non viene aggiunto a questo elenco con data e motivo.
 
-**Conseguenza nota e accettata finché Daniele non decide altrimenti (§5 punto 7).** Il livello 1 e il
-collasso 2 possono divergere: **form dirty con Change Summary vuoto**. Due casi concreti: baseline
-`{ note: null }`, l'utente scrive e poi cancella in un `Input` (che emette `''`); oppure un `Combobox`
-con `clearOnEmpty` emette `undefined` su una baseline `null`. Rimedi documentati per il consumer:
+**Change Summary: non è più un collasso ammesso (decisione di Daniele del 2026-11-03, fix in #202).**
+Il motore di #174 (`packages/pro/src/change-summary/compute-change-summary.ts`) collassava i valori in
+classi **Assente** (`undefined`, `null`, chiave mancante) e **Vuoto** (Assente ∪ `''` ∪ `[]` ∪
+oggetto semplice con soli valori Vuoto) e non generava entry tra due lati Vuoti; era il punto 2 di
+questo elenco. Da #202 segue il **Livello 1** come `isDirty`: invariante "nessuna entry ⇔ `isDirty
+=== false`" (senza `isEqual` personalizzato). La leggibilità ("da (vuoto) a (vuoto)") si risolve
+nella **resa** (testi distinti per `null`/`undefined`/chiave mancante nel componente), non
+nascondendo la modifica nel diff. Il TSDoc "No value rule" di `change-summary/types.ts` viene
+riscritto in #202; fino al merge di #202 il codice su `main` ha ancora il vecchio comportamento.
+
+**Divergenza "form dirty con Change Summary vuoto": non più accettata, risolta da #202.** Era la
+conseguenza del vecchio collasso. Casi concreti che #202 deve coprire: baseline `{ note: null }`,
+l'utente scrive e poi cancella in un `Input` (che emette `''`); un `Combobox` con `clearOnEmpty` che
+emette `undefined` su una baseline `null`. Dopo #202 in entrambi i casi il form è dirty **e** il
+riepilogo mostra la voce. Resta valido, come buona pratica e non più come rimedio a un difetto,
 costruire la baseline con la stessa rappresentazione di "vuoto" che il controllo emette
-(normalizzando al confine idratazione/schema), oppure passare un `isEqual` a `useObjectPageForm`.
+(normalizzando al confine idratazione/schema), così che svuotare un campo già vuoto non renda il
+form dirty.
 
 **Contratto per ogni controllo di form**, nuovo o toccato (Input, Select, Combobox, Checkbox #188,
 RadioGroup #189, Switch #190, Calendar #194, DatePicker #195, ticket Zod):
@@ -669,11 +676,12 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    deciso consapevolmente se ha priorità più alta del completamento di vistato/FiC o se procede in
    parallelo a ritmo più lento (sezione MVP sotto assume ritmo "lento ma con moat", non uno sprint).
 7. **Valori assenti tra form e Change Summary** (aperta il 2026-11-03, vedi §1.13.1).
-   (a) `isDirty` (core) distingue `''`/`null`/`undefined`, il Change Summary (Pro) li collassa:
-   "dirty ma nessuna modifica nel riepilogo" è possibile. **Raccomandazione**: lasciare `isDirty`
-   rigoroso (riflette il payload reale; cambiarlo sarebbe una rottura di comportamento nel Free),
-   documentare i rimedi lato consumer e, se serve, offrire un'opzione di equivalenza dei valori
-   assenti nel **dirty-tracking robusto Pro** (§3) quando verrà messo in un ticket.
+   (a) **Decisa il 2026-11-03, fix in corso in #202.** `isDirty` (core) resta rigoroso e invariato
+   (riflette il payload reale; nessuna modifica al Free); è il Change Summary (Pro) ad allinearsi al
+   Livello 1, distinguendo `''`/`null`/`undefined`/chiave mancante come `isDirty`. "Dirty ma nessuna
+   modifica nel riepilogo" non sarà più possibile dopo #202. Un'eventuale opzione di equivalenza
+   dei valori assenti resta materia del futuro **dirty-tracking robusto Pro** (§3), da applicare a
+   form e riepilogo insieme, mai a uno solo dei due.
    (b) Valore vuoto emesso dai controlli di selezione: `undefined` come Select/Combobox oggi
    (raccomandato: coerenza, con mappatura a `null` nello schema se il backend la vuole) oppure
    `null` come proposto dal default di #195. Da decidere prima dello sviluppo di #195.
@@ -787,9 +795,9 @@ function ChangeSummary(props: {
 ### Rischi tecnici noti da affrontare nei ticket (non insidie generiche, specifiche di questo componente)
 
 - **Tre stati di "nessun valore" distinti** (stringa vuota vs `undefined` vs `null`, vincolo già
-  fissato in §1.4): **risolto in #174** con le classi Assente/Vuoto (`''` è Vuoto: assente ↔ `''`
-  non genera entry, `''` ↔ `'abc'` sì). La regola canonica, i collassi ammessi e la divergenza nota
-  con `isDirty` sono in §1.13.1; la proposta di partenza scritta qui prima di #174 è superata.
+  fissato in §1.4): #174 li aveva collassati nelle classi Assente/Vuoto (assente ↔ `''` senza
+  entry); **la decisione del 2026-11-03 lo inverte** e #202 li rende distinti come in `isDirty`
+  (Livello 1, §1.13.1), con resa distinta nel componente. La regola canonica è in §1.13.1.
 - **Identity degli array**: un `id` presente nella baseline ma non nei `values` → `removed`; un `id`
   nuovo nei `values` → `added`; stesso `id` con contenuto diverso → `changed`, con un
   `ChangeEntry` per ciascun campo del singolo elemento cambiato (non un unico entry "la riga N è
