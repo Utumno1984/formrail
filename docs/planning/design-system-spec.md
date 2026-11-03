@@ -455,8 +455,18 @@ espone già `values`/`baseline`/`isDirty` (confronto strutturale profondo), ma n
 Il Change Summary consuma `values`/`baseline` come un hook separato — **nessuna modifica all'API
 Free esistente**.
 
-### Decisioni prese
+### Decisioni prese (approvate da Daniele, 2026-11-03)
 
+- **Due ticket separati per l'implementazione**: uno per il motore/hook `useChangeSummary` (unit
+  test esaustivi su edge-case e regole di uguaglianza — i tre stati "nessun valore", identity degli
+  array, riordino senza modifiche, algoritmo etichette), uno separato per il componente visivo
+  `<ChangeSummary />`. Non un solo ticket monolitico: il motore è il moat tecnico e va potuto
+  validare/testare a fondo da solo, prima e indipendentemente dalla presentazione.
+- **Il `renderValue` di default gestisce bene booleani e date**, non solo stringhe/numeri grezzi:
+  un booleano non deve apparire come "true"/"false" letterale, una data non come l'output grezzo di
+  `Date.prototype.toString()`. Dettaglio implementativo (formato esatto, locale) da ticket, ma il
+  criterio di accettazione del componente lo richiede esplicitamente fin dal primo giro, non come
+  rifinitura successiva.
 - **Diff su array: per-elemento, con `idKey` dichiarato dal consumer** per ogni campo array che lo
   richiede (es. righe fattura identificate da `id`). Un array senza `idKey` dichiarato fa diff "a
   blocco" (vecchio vs nuovo intero), non per-elemento — degrado esplicito, non un errore silenzioso.
@@ -499,7 +509,8 @@ function useChangeSummary<Values extends object>(
 
 function ChangeSummary(props: {
   entries: ChangeEntry[];
-  /** Per-value formatting hook (currency, dates, booleans...); defaults to String(value). */
+  /** Per-value formatting hook (currency, custom domain types...); overrides the built-in default,
+   *  which already renders booleans and dates sensibly (not `String(value)`), not just strings/numbers. */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
   emptyLabel?: string;
 }): JSX.Element;
