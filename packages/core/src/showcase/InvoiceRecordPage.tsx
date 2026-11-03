@@ -176,6 +176,7 @@ const sameValues = (a: InvoiceValues, b: InvoiceValues): boolean =>
   a.notes === b.notes;
 
 const DECIMAL = /^\d+(\.\d+)?$/;
+const SAVING_HINT = 'Saving… Discard only restores the form: the save still completes.';
 
 function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: InvoiceEditorProps) {
   const form = useObjectPageForm<InvoiceValues>({
@@ -192,17 +193,30 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
   });
   // #166: while a save is in flight, leaving cannot discard anything (the save still lands in the store), so
   // the guard stays armed (even after a footer "Discard" made the form clean) and the dialog says what really
-  // happens (this also covers browser Back, which opens the same dialog). The wording is sticky: it is set
-  // as soon as a save starts and cleared only by real unsaved edits once no save runs, so a dialog that is
-  // open when the save settles does not flip to a different promise under the user's cursor.
+  // happens (this also covers browser Back, which opens the same dialog). The "save" wording is sticky: it is
+  // set as soon as a save starts and cleared only by real unsaved edits once no save runs. So a dialog that is
+  // open when the save settles with a clean form keeps saying what it said; if the save fails or edits made
+  // meanwhile remain, the form is dirty again and the wording goes back to "unsaved changes" (which is true).
   const [savingWording, setSavingWording] = useState(false);
   useEffect(() => {
     if (form.isSaving) setSavingWording(true);
     else if (form.isDirty) setSavingWording(false);
   }, [form.isSaving, form.isDirty]);
+  // The values the save in flight sends: an edit made after Save is NOT part of it and would be lost on leaving.
+  const sentRef = useRef<InvoiceValues | null>(null);
+  const editedSinceSave = form.isSaving && form.isDirty && !!sentRef.current && !sameValues(form.values, sentRef.current);
   const { guard, dialog } = useDirtyGuard({
     when: form.isDirty || form.isSaving,
-    labels: savingWording || form.isSaving
+    labels: editedSinceSave
+      ? {
+          title: 'Unsaved changes',
+          description:
+            'A save is in progress and will complete, but the changes you made after pressing Save are not part of it and will be lost.',
+          stay: 'Keep editing',
+          leave: 'Discard newer changes',
+          close: 'Close',
+        }
+      : savingWording || form.isSaving
       ? {
           title: 'Unsaved changes',
           description: 'A save is still in progress. Leaving does not cancel it: it will complete in the background.',
@@ -227,6 +241,7 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
   const { values, setValue } = form;
   const save = () =>
     void form.save(async (v) => {
+      sentRef.current = v;
       const saved = await store.save(toInvoice(record, v));
       onSaved?.(saved);
       // The baseline becomes what the "server" returned (normalized), not what was sent.
@@ -234,9 +249,12 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
     });
 
   // The save error, when there is one, wins over the summary (`||`, not `??`).
-  const message =
+  const problem =
     errorText(form.saveError) ||
     getErrorSummary(form.fieldErrors, { formErrors: form.formErrors, message: summaryText });
+  // #166: while a save runs, the footer Discard only restores the form (the save still lands): say it BEFORE
+  // the click, since the footer hides once the form is clean.
+  const message = problem || (form.isSaving ? SAVING_HINT : undefined);
 
   return (
     <div
@@ -261,9 +279,9 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
           <ObjectPageFooter
             visible={form.isDirty}
             label="Save actions"
-            toneLabel="Error"
+            toneLabel={problem ? 'Error' : 'Information'}
             message={message}
-            messageTone="error"
+            messageTone={problem ? 'error' : 'info'}
           >
             <Button onClick={save} aria-disabled={form.isSaving || undefined}>
               Save

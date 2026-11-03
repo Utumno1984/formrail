@@ -201,6 +201,22 @@ describe('InvoiceRecordPage', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  it('#166: the footer says Discard does not cancel a save in flight; an edit made after Save is called out in the dialog', async () => {
+    const { onBack } = setup({ saveDelayMs: 600 });
+    const amount = await amountField();
+    await userEvent.type(amount, '1');
+    const bar = await visibleBar();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(within(bar).getByRole('status')).toHaveTextContent('the save still completes'));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), ' later');
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    expect(dialog).toHaveTextContent('made after pressing Save');
+    expect(within(dialog).queryByRole('button', { name: 'Leave anyway' })).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Discard newer changes' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('Back to list: clean calls onBack at once; dirty asks first (English dialog, X named Close)', async () => {
     const { onBack } = setup();
     const amount = await amountField();
