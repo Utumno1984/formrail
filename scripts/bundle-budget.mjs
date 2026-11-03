@@ -127,7 +127,9 @@ export const sideEffectFreeExternals = {
   name: 'side-effect-free-externals',
   setup(b) {
     // Every react / react-dom specifier (incl. subpaths such as react-dom/client) stays external.
-    b.onResolve({ filter: /^react(-dom)?(\/.*)?$/ }, (args) => ({
+    // So does `@react-object-page/core` (a peer dependency of pro): its code is not shipped by pro,
+    // so it must not be charged to a pro export.
+    b.onResolve({ filter: /^(react(-dom)?|@react-object-page\/core)(\/.*)?$/ }, (args) => ({
       path: args.path,
       external: true,
       sideEffects: false,

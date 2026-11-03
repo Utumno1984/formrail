@@ -1,0 +1,18 @@
+/*
+ * Entry of the compiled `styles.css` of @react-object-page/pro (also loaded by Storybook, so the
+ * docs render the same CSS the package ships). It holds ONLY the utilities the pro sources use:
+ * the tokens (`--color-rop-*`, ...) are NOT declared here, they come from
+ * `@react-object-page/core/theme.css` (imported as `theme(reference)`: utilities such as
+ * `text-rop-text-muted` resolve against the token names, no variable is emitted). No preflight;
+ * utilities are emitted inside `@layer`, as in core, so un-layered CSS of the consumer wins.
+ */
+@layer rop.theme, rop.utilities;
+
+@import 'tailwindcss/theme.css' layer(rop.theme) theme(reference);
+@import '@react-object-page/core/theme.css' theme(reference);
+@import 'tailwindcss/utilities.css' layer(rop.utilities) source(none);
+
+@source '../';
+@source not '../**/*.stories.*';
+@source not '../**/*.test.*';
+@source not '../**/*.css';
