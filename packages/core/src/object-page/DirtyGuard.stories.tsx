@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../dialog/Dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../dialog/Dialog';
 import { useDirtyGuard } from './use-dirty-guard';
 
 interface DemoArgs {
@@ -144,7 +151,9 @@ export const InsideDialog: Story = {
                 <DialogTitle>Scheda fornitore</DialogTitle>
                 <DialogDescription>Modifiche in corso.</DialogDescription>
               </DialogHeader>
-              <Button onClick={() => guard(() => setOpen(false))}>Chiudi scheda</Button>
+              <DialogFooter>
+                <Button onClick={() => guard(() => setOpen(false))}>Chiudi scheda</Button>
+              </DialogFooter>
               {dialog}
             </DialogContent>
           </Dialog>
