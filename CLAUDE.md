@@ -9,10 +9,12 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
 **Modello di business — open-core**:
 - `packages/core`: MIT, gratuito, pubblicato su npm pubblico. Primitivi e versioni "semplici" dei
   floorplan (vedi segmentazione in `docs/planning/design-system-spec.md`, §3).
-- `packages/pro`: licenza commerciale, **non esiste ancora** — si crea solo quando un ticket
-  esplicito lo richiede (vedi roadmap MVP nello stesso documento, §6). Distribuzione iniziale
-  pianificata: npm org privata, abbonamento ricorrente (decisione di Daniele, non rinegoziabile
-  senza nuova istruzione sua).
+- `packages/pro`: licenza commerciale ("da definire"), **vive in questo monorepo pubblico**
+  (decisione di Daniele del 2026-11-03: il sorgente è leggibile, il moat è servizio/licenza), con
+  `"private": true` finché non esiste l'org npm privata (nessun licensing a runtime). Si estende
+  solo con ticket espliciti (roadmap MVP, §6). Distribuzione iniziale pianificata: npm org
+  privata, abbonamento ricorrente (decisione di Daniele, non rinegoziabile senza nuova istruzione
+  sua).
 - Il documento di pianificazione completo (inventario componenti, insidie tecniche di classe
   generale, segmentazione Free/Pro, MVP) è in `docs/planning/design-system-spec.md`. **Il
   pianificatore lo legge sempre prima di creare ticket.**
