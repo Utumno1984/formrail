@@ -95,8 +95,8 @@ const recordHref = (id: string): string => urlWith(id);
 
 /* ----------------------------------------------------------------------- list */
 
-// outlineOffset: the cell wraps its content in an overflow-hidden box that starts at the link's edge, so an
-// outside focus ring would be cut off; the ring is drawn inside the link instead (#152).
+// A negative offset on the focus indicator: the cell wraps its content in a clipping box that starts at the
+// link's edge, so an indicator drawn outside the link would be cut off; it is drawn inside instead (#152).
 function RecordLink({ row, onOpen }: { row: DemoInvoice; onOpen: (id: string) => void }) {
   const click = (e: MouseEvent<HTMLAnchorElement>) => {
     // Ctrl/Cmd/Shift/Alt/middle click: the browser opens the real href (new tab/window), untouched.
