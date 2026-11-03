@@ -86,6 +86,10 @@
       "baseline": 3152,
       "limit": 3468
     },
+    "Divider": {
+      "baseline": 10421,
+      "limit": 11464
+    },
     "Field": {
       "baseline": 12355,
       "limit": 13591

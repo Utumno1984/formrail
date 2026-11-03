@@ -223,6 +223,7 @@ describe('internal icons', () => {
       'DialogHeader',
       'DialogTitle',
       'DialogTrigger',
+      'Divider',
       'Field',
       'FieldMessage',
       'Icon',

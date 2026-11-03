@@ -36,6 +36,7 @@ const EXPORTS = [
   'DialogHeader',
   'DialogTitle',
   'DialogTrigger',
+  'Divider',
   'Field',
   'FieldMessage',
   'Icon',
