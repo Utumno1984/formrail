@@ -71,7 +71,8 @@ export interface ChangeEntry {
  *   `Date` ↔ string, ...) is one `changed` entry on the node.
  *
  * Circular structures are supported: a (baseline, values) pair already being compared higher up
- * the stack is assumed equal.
+ * the stack is assumed equal. Depth is not limited by the JavaScript call stack (the visit is
+ * iterative, tested at 10 000 levels) and the cost stays linear in the number of visited nodes.
  *
  * ## Order of `entries`
  *

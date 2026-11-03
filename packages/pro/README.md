@@ -88,7 +88,8 @@ With a row changed, one added without id, one removed and two rows swapped, `ent
   structurally; no other normalization (`' '` vs `''`, `5` vs `'5'` are changes; `0`, `false`, `NaN`
   are not Empty).
 - `NaN` equals `NaN`, `0` equals `-0`, `Date`s by `getTime()`; `Map`, `Set`, class instances and
-  functions are leaves compared by reference. Circular structures are supported.
+  functions are leaves compared by reference. Circular structures are supported, and so are very deep
+  ones: the visit is iterative (no call-stack overflow, tested at 10 000 levels) and linear in the nodes.
 - **Arrays**: declare an identity key per array path without indexes (`arrayIdKeys`, e.g.
   `{ lineItems: 'id', 'lineItems.taxes': 'code' }`) to get per-field entries for matched rows,
   `added`/`removed` per row and no entry for a reorder. Without it, an array is diffed as a block (one

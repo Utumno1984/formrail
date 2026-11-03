@@ -319,6 +319,64 @@ describe('circular structures', () => {
   });
 });
 
+describe('deep structures (iterative visit, no call-stack limit)', () => {
+  const DEPTH = 10_000;
+  const chain = (leaf: unknown, wrap: (inner: unknown) => unknown = (inner) => ({ c: inner })) => {
+    let node: unknown = { v: leaf };
+    for (let i = 0; i < DEPTH; i += 1) node = wrap(node);
+    return node;
+  };
+  const deepPath = `${'c.'.repeat(DEPTH)}v`;
+
+  it(`diffs objects ${DEPTH} levels deep down to the leaf`, () => {
+    const entries = diff(chain(1), chain(2));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.path).toBe(deepPath);
+    expect(entries[0]?.kind).toBe('changed');
+    expect(entries[0]?.labelPath).toHaveLength(DEPTH + 1);
+    expect(entries[0]?.labelPath.at(-1)).toBe('V');
+    expect(diff(chain(1), chain(1))).toEqual([]);
+  });
+
+  it('asks isEqual on every level, with the concrete path', () => {
+    const isEqual = vi.fn<NonNullable<ChangeSummaryOptions<Loose>['isEqual']>>(() => undefined);
+    expect(paths(diff(chain(1), chain(2), { isEqual }))).toEqual([`changed ${deepPath}`]);
+    expect(isEqual).toHaveBeenCalledTimes(DEPTH + 1);
+    expect(isEqual.mock.calls.at(-1)?.[2]).toBe(deepPath);
+  });
+
+  it('settles a deep Empty pair with no entry, and still reaches the leaf for isEqual', () => {
+    expect(diff(chain(null), chain(''))).toEqual([]);
+    expect(diff(chain(null), {})).toEqual([]);
+    const strict = (a: unknown, b: unknown) => (a === null && b === '' ? false : undefined);
+    expect(paths(diff(chain(null), chain(''), { isEqual: strict }))).toEqual([`added ${deepPath}`]);
+  });
+
+  it('a deep non-Empty object against Absent is one entry on the node', () => {
+    expect(paths(diff({ o: chain(1) }, {}))).toEqual(['removed o']);
+  });
+
+  it(`diffs arrays nested ${DEPTH} levels deep, as a block and with an id key`, () => {
+    const nested = (leaf: unknown) => ({ l: chain(leaf, (inner) => [inner]) });
+    expect(paths(diff(nested(1), nested(2)))).toEqual(['changed l']);
+    expect(diff(nested(1), nested(1))).toEqual([]);
+  });
+
+  it('diffs id-matched arrays nested 2000 levels deep, item by item', () => {
+    // 2000, not DEPTH: one arrayIdKeys entry per level, whose keys grow with the depth.
+    const levels = 2000;
+    const items = (leaf: unknown) => {
+      let node: Loose = { id: 1, v: leaf };
+      for (let i = 0; i < levels; i += 1) node = { id: 1, l: [node] };
+      return { l: [node] };
+    };
+    const ids = Object.fromEntries(Array.from({ length: levels + 1 }, (_, i) => [`l${'.l'.repeat(i)}`, 'id']));
+    const entries = diff(items(1), items(2), { arrayIdKeys: ids });
+    expect(paths(entries)).toEqual([`changed l.0.${'l.0.'.repeat(levels)}v`]);
+    expect(diff(items(1), items(1), { arrayIdKeys: ids })).toEqual([]);
+  });
+});
+
 describe('arrays with arrayIdKeys', () => {
   const ids = { lineItems: 'id' };
   const item = (id: unknown, price = 10, qty = 1) => ({ id, price, qty });

@@ -20,20 +20,46 @@ const sameLeaf = (a: unknown, b: unknown): boolean => a === b || (a !== a && b !
 
 const own = (object: PlainObject, key: string): unknown => (Object.hasOwn(object, key) ? object[key] : undefined);
 
-/** Empty = Absent ∪ '' ∪ [] ∪ plain object whose own enumerable values are all Empty (cycle-safe). */
-function isEmptyValue(value: unknown, onStack: Set<object> = new Set()): boolean {
-  if (isAbsent(value) || value === '') return true;
-  if (Array.isArray(value)) return value.length === 0;
-  if (!isPlainObject(value)) return false;
-  // An object already being inspected higher up contributes no non-empty leaf of its own.
-  if (onStack.has(value)) return true;
-  onStack.add(value);
-  try {
-    for (const key of Object.keys(value)) if (!isEmptyValue(value[key], onStack)) return false;
-    return true;
-  } finally {
-    onStack.delete(value);
+/** A value that is not a plain object: Empty or not on its own. */
+const isEmptyLeaf = (value: unknown): boolean =>
+  isAbsent(value) || value === '' || (Array.isArray(value) && value.length === 0);
+
+/**
+ * Empty = Absent ∪ '' ∪ [] ∪ plain object whose own enumerable values are all Empty.
+ *
+ * Iterative (the depth is not bounded by the call stack) and cycle-safe: an object already met in
+ * this search is either Empty or would have ended it, so it adds no non-empty leaf when met again.
+ * `cache` (one per diff) keeps the verdict of every object it can settle: all objects met by a
+ * search that ends Empty are Empty, and every object on the discovery path to a non-empty leaf is
+ * not. Asking again on each level of a deep structure therefore stays linear overall.
+ */
+function isEmptyValue(value: unknown, cache: Map<object, boolean>): boolean {
+  if (!isPlainObject(value)) return isEmptyLeaf(value);
+  const known = cache.get(value);
+  if (known !== undefined) return known;
+  const parentOf = new Map<PlainObject, PlainObject | undefined>([[value, undefined]]);
+  const markNonEmpty = (from: PlainObject): false => {
+    for (let o: PlainObject | undefined = from; o; o = parentOf.get(o)) cache.set(o, false);
+    return false;
+  };
+  const todo: PlainObject[] = [value];
+  for (let current = todo.pop(); current; current = todo.pop()) {
+    for (const key of Object.keys(current)) {
+      const child = current[key];
+      if (!isPlainObject(child)) {
+        if (!isEmptyLeaf(child)) return markNonEmpty(current);
+        continue;
+      }
+      if (parentOf.has(child)) continue;
+      const verdict = cache.get(child);
+      if (verdict === false) return markNonEmpty(current);
+      if (verdict === true) continue;
+      parentOf.set(child, current);
+      todo.push(child);
+    }
   }
+  for (const o of parentOf.keys()) cache.set(o, true);
+  return true;
 }
 
 const warned = new Set<string>();
@@ -78,18 +104,46 @@ function indexById(items: readonly unknown[], idKey: string): Map<unknown, numbe
 /** Stand-in for an Empty side that has no keys of its own (Absent, `''`, `[]`). */
 const NO_KEYS: PlainObject = Object.freeze({});
 
+/**
+ * A visited position. Linked to its parent instead of copying the segments, so a node costs O(1)
+ * whatever its depth; `labelPath` is rebuilt from the chain only when an entry is emitted.
+ */
 interface Node {
-  /** Concrete segments (indexes included). */
-  path: readonly string[];
+  parent: Node | undefined;
+  /** Number of segments (0 at the root). */
+  depth: number;
+  /** Concrete segments (indexes included) joined with '.'. */
+  path: string;
   /** Segments without array indexes, joined with '.' (key of `arrayIdKeys` / `labels`). */
   schemaPath: string;
-  labelPath: readonly string[];
+  /** Label of the last segment ('' at the root). */
+  label: string;
   /** Array item: shares the array's `schemaPath`, but the array's id key is not about it. */
   isItem: boolean;
 }
 
+const ROOT: Node = { parent: undefined, depth: 0, path: '', schemaPath: '', label: '', isItem: false };
+
+const childPath = (node: Node, segment: string): string => (node.depth === 0 ? segment : `${node.path}.${segment}`);
+
+function labelPathOf(node: Node): string[] {
+  const labels: string[] = [];
+  for (let n: Node | undefined = node; n && n.depth > 0; n = n.parent) labels.push(n.label);
+  return labels.reverse();
+}
+
+type Task = () => void;
+
+/**
+ * The visit is iterative: instead of recursing, a node schedules its children as tasks on an
+ * explicit LIFO stack (in reverse, so they run in document order, each one's subtree completing
+ * before the next sibling starts). The order of entries and the cycle guard are the same as a
+ * recursive depth-first visit, but the depth of a structure is not bounded by the call stack.
+ */
 class Differ {
   private readonly onStack = new Map<object, Set<object>>();
+  private readonly pending: Task[] = [];
+  private readonly emptiness = new Map<object, boolean>();
 
   constructor(
     private readonly arrayIdKeys: Readonly<Record<string, string>> | undefined,
@@ -97,10 +151,20 @@ class Differ {
     private readonly isEqual: ChangeSummaryOptions<object>['isEqual'],
   ) {}
 
+  run(before: unknown, after: unknown, out: ChangeEntry[]): void {
+    this.visit(before, after, ROOT, out);
+    for (let task = this.pending.pop(); task; task = this.pending.pop()) task();
+  }
+
+  /** Schedules `tasks` to run in order, before anything scheduled earlier. */
+  private schedule(tasks: readonly Task[]): void {
+    for (let i = tasks.length - 1; i >= 0; i -= 1) this.pending.push(tasks[i] as Task);
+  }
+
   private emit(out: ChangeEntry[], node: Node, kind: ChangeKind, before: unknown, after: unknown): void {
-    const labelPath = [...node.labelPath];
+    const labelPath = labelPathOf(node);
     out.push({
-      path: node.path.join('.'),
+      path: node.path,
       labelPath,
       label: labelPath.join(' > '),
       kind,
@@ -113,25 +177,33 @@ class Differ {
     const schemaPath = node.schemaPath === '' ? key : `${node.schemaPath}.${key}`;
     const override = this.labels && Object.hasOwn(this.labels, schemaPath) ? this.labels[schemaPath] : undefined;
     return {
-      path: [...node.path, key],
+      parent: node,
+      depth: node.depth + 1,
+      path: childPath(node, key),
       schemaPath,
-      labelPath: [...node.labelPath, typeof override === 'string' ? override : inferSegmentLabel(key)],
+      label: typeof override === 'string' ? override : inferSegmentLabel(key),
       isItem: false,
     };
   }
 
   private indexChild(node: Node, index: number): Node {
     return {
-      path: [...node.path, String(index)],
+      parent: node,
+      depth: node.depth + 1,
+      path: childPath(node, String(index)),
       schemaPath: node.schemaPath,
-      labelPath: [...node.labelPath, itemLabel(index)],
+      label: itemLabel(index),
       isItem: true,
     };
   }
 
+  private isEmpty(value: unknown): boolean {
+    return isEmptyValue(value, this.emptiness);
+  }
+
   /** The id key declared for this node, after checking it is usable (dev warnings otherwise). */
   private idKeyFor(node: Node, before: unknown, after: unknown): string | undefined {
-    if (node.path.length === 0 || node.isItem || !this.arrayIdKeys || !Object.hasOwn(this.arrayIdKeys, node.schemaPath)) {
+    if (node.depth === 0 || node.isItem || !this.arrayIdKeys || !Object.hasOwn(this.arrayIdKeys, node.schemaPath)) {
       return undefined;
     }
     const idKey = this.arrayIdKeys[node.schemaPath];
@@ -140,7 +212,7 @@ class Differ {
     if (!usable(before) || !usable(after)) {
       warnOnce(
         `not-array:${node.schemaPath}`,
-        `[react-object-page/pro] useChangeSummary: arrayIdKeys['${node.schemaPath}'] is declared but the value at '${node.path.join('.')}' is not an array; the id key is ignored.`,
+        `[react-object-page/pro] useChangeSummary: arrayIdKeys['${node.schemaPath}'] is declared but the value at '${node.path}' is not an array; the id key is ignored.`,
       );
       return undefined;
     }
@@ -148,16 +220,16 @@ class Differ {
     if (dup) {
       warnOnce(
         `duplicate-id:${node.schemaPath}`,
-        `[react-object-page/pro] useChangeSummary: duplicate '${idKey}' values in the array at '${node.path.join('.')}'; it is diffed as a whole block instead of item by item.`,
+        `[react-object-page/pro] useChangeSummary: duplicate '${idKey}' values in the array at '${node.path}'; it is diffed as a whole block instead of item by item.`,
       );
       return undefined;
     }
     return idKey;
   }
 
-  visit(before: unknown, after: unknown, node: Node, out: ChangeEntry[]): void {
-    if (node.path.length > 0 && this.isEqual) {
-      const verdict = this.isEqual(before, after, node.path.join('.'));
+  private visit(before: unknown, after: unknown, node: Node, out: ChangeEntry[]): void {
+    if (node.depth > 0 && this.isEqual) {
+      const verdict = this.isEqual(before, after, node.path);
       if (verdict === true) return;
       if (verdict === false) {
         const kind: ChangeKind =
@@ -176,7 +248,7 @@ class Differ {
     if (beforeAbsent && afterAbsent) return;
     if (beforeAbsent || afterAbsent) {
       const present = beforeAbsent ? after : before;
-      if (isEmptyValue(present)) {
+      if (this.isEmpty(present)) {
         this.descendEmpty(before, after, node, out);
         return;
       }
@@ -189,7 +261,7 @@ class Differ {
       this.emit(out, node, beforeAbsent ? 'added' : 'removed', before, after);
       return;
     }
-    if (isEmptyValue(before) && isEmptyValue(after)) {
+    if (this.isEmpty(before) && this.isEmpty(after)) {
       this.descendEmpty(before, after, node, out);
       return;
     }
@@ -206,7 +278,7 @@ class Differ {
     if (beforeArray && afterArray) {
       this.guarded(before, after, () => {
         if (idKey !== undefined) this.diffById(before, after, idKey, node, out);
-        else if (!this.sameArray(before, after, node)) this.emit(out, node, 'changed', before, after);
+        else this.diffBlock(before, after, node, out);
       });
       return;
     }
@@ -232,7 +304,10 @@ class Differ {
     this.guarded(b, a, () => this.diffObject(b, a, node, out));
   }
 
-  /** Runs `body` unless the pair is already being compared higher up (then it counts as equal). */
+  /**
+   * Runs `body` unless the pair is already being compared higher up (then it counts as equal).
+   * The pair stays "on the stack" until every task `body` schedules has run.
+   */
   private guarded(before: object, after: object, body: () => void): void {
     let partners = this.onStack.get(before);
     if (partners?.has(after)) return;
@@ -240,56 +315,70 @@ class Differ {
       partners = new Set();
       this.onStack.set(before, partners);
     }
-    partners.add(after);
-    try {
-      body();
-    } finally {
-      partners.delete(after);
-      if (partners.size === 0) this.onStack.delete(before);
-    }
+    const set = partners;
+    set.add(after);
+    // Pushed first, so it runs after everything `body` schedules (LIFO).
+    this.pending.push(() => {
+      set.delete(after);
+      if (set.size === 0) this.onStack.delete(before);
+    });
+    body();
   }
 
   private diffObject(before: PlainObject, after: PlainObject, node: Node, out: ChangeEntry[]): void {
-    const afterKeys = Object.keys(after);
-    for (const key of afterKeys) this.visit(own(before, key), after[key], this.keyChild(node, key), out);
-    for (const key of Object.keys(before)) {
-      if (!Object.hasOwn(after, key)) this.visit(before[key], undefined, this.keyChild(node, key), out);
+    const tasks: Task[] = [];
+    for (const key of Object.keys(after)) {
+      tasks.push(() => this.visit(own(before, key), after[key], this.keyChild(node, key), out));
     }
+    for (const key of Object.keys(before)) {
+      if (!Object.hasOwn(after, key)) tasks.push(() => this.visit(before[key], undefined, this.keyChild(node, key), out));
+    }
+    this.schedule(tasks);
   }
 
-  /** Block comparison: same length and every positional pair without changes (same rules). */
-  private sameArray(before: readonly unknown[], after: readonly unknown[], node: Node): boolean {
-    if (before.length !== after.length) return false;
-    const probe: ChangeEntry[] = [];
-    for (let i = 0; i < after.length; i += 1) {
-      this.visit(before[i], after[i], this.indexChild(node, i), probe);
-      if (probe.length > 0) return false;
+  /**
+   * Block comparison: one `changed` entry unless same length and every positional pair is
+   * without changes (same rules). Stops at the first positional pair that differs.
+   */
+  private diffBlock(before: readonly unknown[], after: readonly unknown[], node: Node, out: ChangeEntry[]): void {
+    if (before.length !== after.length) {
+      this.emit(out, node, 'changed', before, after);
+      return;
     }
-    return true;
+    const probe: ChangeEntry[] = [];
+    const tasks: Task[] = [];
+    for (let i = 0; i < after.length; i += 1) {
+      tasks.push(() => {
+        if (probe.length === 0) this.visit(before[i], after[i], this.indexChild(node, i), probe);
+      });
+    }
+    tasks.push(() => {
+      if (probe.length > 0) this.emit(out, node, 'changed', before, after);
+    });
+    this.schedule(tasks);
   }
 
   private diffById(before: readonly unknown[], after: readonly unknown[], idKey: string, node: Node, out: ChangeEntry[]): void {
     const beforeIndex = indexById(before, idKey) ?? new Map<unknown, number>();
     const matched = new Set<number>();
+    const tasks: Task[] = [];
     for (let j = 0; j < after.length; j += 1) {
       const item = after[j];
       const id = itemId(item, idKey);
       const i = id === NO_ID ? undefined : beforeIndex.get(idMapKey(id));
-      const child = this.indexChild(node, j);
       if (i === undefined) {
-        this.emit(out, child, 'added', undefined, item);
+        tasks.push(() => this.emit(out, this.indexChild(node, j), 'added', undefined, item));
       } else {
         matched.add(i);
-        this.visit(before[i], item, child, out);
+        tasks.push(() => this.visit(before[i], item, this.indexChild(node, j), out));
       }
     }
     for (let i = 0; i < before.length; i += 1) {
-      if (!matched.has(i)) this.emit(out, this.indexChild(node, i), 'removed', before[i], undefined);
+      if (!matched.has(i)) tasks.push(() => this.emit(out, this.indexChild(node, i), 'removed', before[i], undefined));
     }
+    this.schedule(tasks);
   }
 }
-
-const ROOT: Node = { path: [], schemaPath: '', labelPath: [], isItem: false };
 
 /**
  * Field-by-field diff of `values` against the real saved `baseline`: a deterministic list of
@@ -302,6 +391,6 @@ export function computeChangeSummary<Values extends object>(options: ChangeSumma
   const { values, baseline, arrayIdKeys, labels, isEqual } = options;
   const entries: ChangeEntry[] = [];
   if ((values as unknown) === (baseline as unknown)) return entries;
-  new Differ(arrayIdKeys, labels, isEqual).visit(baseline, values, ROOT, entries);
+  new Differ(arrayIdKeys, labels, isEqual).run(baseline, values, entries);
   return entries;
 }
