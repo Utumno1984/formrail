@@ -90,12 +90,12 @@ test.describe('getErrorSummary in ObjectPageFooter: behavior in a real browser',
     await expect(page.getByLabel('Supplier')).toBeFocused();
   });
 
-  test('both texts empty: the library default (Italian), singular and plural', async ({ page }) => {
+  test('both texts empty: the library default (English), singular and plural', async ({ page }) => {
     await gotoStory(page, MANUAL, 'summaryOne:;summaryOther:;requiredFields:2');
     await save(page).click();
-    await expect(status(page)).toHaveText('Error: 2 campi non validi');
+    await expect(status(page)).toHaveText('Error: 2 invalid fields');
     await page.keyboard.type('ACME Ltd');
-    await expect(status(page)).toHaveText('Error: 1 campo non valido');
+    await expect(status(page)).toHaveText('Error: 1 invalid field');
   });
 
   test('a custom text from the controls replaces the default', async ({ page }) => {

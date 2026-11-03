@@ -32,7 +32,7 @@ const meta: Meta<PlaygroundArgs> = {
     },
     anchorBarLabel: { control: 'text', description: 'labels.anchorBar: nome accessibile del <nav>' },
   },
-  args: { sectionNavigation: 'anchors', sectionCount: 6, lastSectionHeight: 120, anchorBarLabel: 'Sezioni' },
+  args: { sectionNavigation: 'anchors', sectionCount: 6, lastSectionHeight: 120, anchorBarLabel: 'Sections' },
 };
 
 export default meta;

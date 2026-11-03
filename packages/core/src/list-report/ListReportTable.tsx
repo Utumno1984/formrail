@@ -79,7 +79,7 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   onRetry?: () => void;
   /** Adds a "clear filters" button to the "no results" state. The focus then moves to the table container. */
   onClearFilters?: () => void;
-  /** Overrides the texts (partial: the rest keeps the Italian defaults). */
+  /** Overrides the texts (partial: the rest keeps the English defaults). */
   labels?: Partial<ListReportTableLabels>;
 } & TableName;
 

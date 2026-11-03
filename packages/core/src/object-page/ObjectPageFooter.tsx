@@ -43,23 +43,23 @@ export type ObjectPageFooterProps = Omit<HTMLAttributes<HTMLDivElement>, 'childr
    *
    * Belongs here: the save error (network/server: the text of `saveError`) and the validation
    * **summary with the count** (`getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })`,
-   * "3 campi non validi"), both with `messageTone="error"`; when both exist, pass the save error.
+   * "3 invalid fields"), both with `messageTone="error"`; when both exist, pass the save error.
    * Does not belong here: the messages of the single fields ("Supplier is required"), which stay on
    * their `Field`. See the announcement rule on `ObjectPageFooter`.
    */
   message?: ReactNode;
   /** Icon and colour of the message. Default `info`. */
   messageTone?: ObjectPageFooterTone;
-  /** Visually hidden tone name read before the message. Default: "Errore" / "Operazione riuscita" / "Informazione". */
+  /** Visually hidden tone name read before the message. Default: "Error" / "Success" / "Information". */
   toneLabel?: string;
-  /** Accessible name of the footer's `region`. Default "Azioni di salvataggio". */
+  /** Accessible name of the footer's `region`. Default "Save actions". */
   label?: string;
 };
 
 const TONE_LABEL: Record<ObjectPageFooterTone, string> = {
-  error: 'Errore',
-  success: 'Operazione riuscita',
-  info: 'Informazione',
+  error: 'Error',
+  success: 'Success',
+  info: 'Information',
 };
 
 // `useLayoutEffect` warns on the server; the footer renders nothing there (its slot does not exist yet).
@@ -85,7 +85,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * | Level | Where | Announcement |
  * |---|---|---|
  * | Field | the `Field` error (`FieldMessage`), `aria-invalid` + `aria-describedby` on the control | not live: after a failed save `useFocusFirstInvalidField` moves the focus to the first invalid field and the screen reader reads its error there |
- * | Form summary | this footer: `message={getErrorSummary(...)}`, `messageTone="error"` | `role="status"`, polite, one line: the count only ("3 campi non validi"), never the field messages |
+ * | Form summary | this footer: `message={getErrorSummary(...)}`, `messageTone="error"` | `role="status"`, polite, one line: the count only ("3 invalid fields"), never the field messages |
  * | Save error (network/server) | this footer: `message` = the text of `saveError`, `messageTone="error"` | the same `role="status"`, polite; when present it has priority over the summary (pass one, never both) |
  * | Root error (`formErrors`: issues with no path, e.g. `z.object(...).refine(...)` without `path`) | no `Field` shows it: the consumer renders the messages, e.g. a `MessageStrip` `tone="error"` at the top of the form; this footer's summary counts them too | the strip's `role="alert"` |
  * | Blocking page error | `MessageStrip` `tone="error"` | `role="alert"` |
@@ -98,7 +98,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
  * on the page) still counts in the summary, which is then the only announcement of that error.
  */
 export const ObjectPageFooter = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageFooterProps>(function ObjectPageFooter(
-  { visible, children, message, messageTone = 'info', toneLabel, label = 'Azioni di salvataggio', className, ...rest },
+  { visible, children, message, messageTone = 'info', toneLabel, label = 'Save actions', className, ...rest },
   ref,
 ) {
   const page = useObjectPageContext('ObjectPageFooter');

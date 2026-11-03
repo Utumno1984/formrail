@@ -130,27 +130,27 @@ describe('ListReportTable empty and no results', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.children).toHaveLength(1);
     expect(rows[0]!.children[0]).toHaveAttribute('colspan', String(COLUMNS.length));
-    expect(within(rows[0]!).getByText('Nessun dato')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Azzera filtri' })).not.toBeInTheDocument();
+    expect(within(rows[0]!).getByText('No data')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
   });
 
   it('empty is not "no results": no clear-filters button even when onClearFilters is given', () => {
     render(<Host rows={[]} onClearFilters={() => undefined} />);
-    expect(screen.queryByRole('button', { name: 'Azzera filtri' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
   });
 
   it('no results: rows exist but none passes the filter -> its own message, not the empty one', () => {
     render(<Host filter="none" />);
-    expect(screen.getByText('Nessun risultato per i filtri correnti')).toBeInTheDocument();
-    expect(screen.queryByText('Nessun dato')).not.toBeInTheDocument();
+    expect(screen.getByText('No results for the current filters')).toBeInTheDocument();
+    expect(screen.queryByText('No data')).not.toBeInTheDocument();
   });
 
   it('no results: no button without onClearFilters, a button that calls it with it', async () => {
     const onClearFilters = vi.fn();
     const { rerender } = render(<Host filter="none" />);
-    expect(screen.queryByRole('button', { name: 'Azzera filtri' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).not.toBeInTheDocument();
     rerender(<Host filter="none" onClearFilters={onClearFilters} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
     expect(container()).toHaveFocus();
   });
@@ -166,9 +166,9 @@ describe('ListReportTable empty and no results', () => {
 describe('ListReportTable error', () => {
   it('shows an error strip with the default message', () => {
     render(<Host status="error" />);
-    const strip = within(container()).getByText('Impossibile caricare i dati', { exact: false });
+    const strip = within(container()).getByText('Unable to load data', { exact: false });
     expect(strip).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Riprova' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
   });
 
   it('replaces the rows that are present (declared behaviour)', () => {
@@ -178,10 +178,10 @@ describe('ListReportTable error', () => {
     expect(screen.getAllByRole('columnheader')).toHaveLength(COLUMNS.length);
   });
 
-  it('the Riprova button calls onRetry once and moves the focus to the container', async () => {
+  it('the Retry button calls onRetry once and moves the focus to the container', async () => {
     const onRetry = vi.fn();
     render(<Host status="error" onRetry={onRetry} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(container()).toHaveFocus();
   });
@@ -192,8 +192,8 @@ describe('ListReportTable error', () => {
       return <Host rows={[]} status={status} onRetry={() => setStatus('loading')} />;
     }
     render(<Flow />);
-    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
-    expect(screen.queryByRole('button', { name: 'Riprova' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(container()).toHaveFocus();
     expect(document.body).not.toHaveFocus();
   });
@@ -233,7 +233,7 @@ describe('ListReportTable live region', () => {
     expect(liveRegion()).toBe(region);
     expect(region.textContent).toBe(DEFAULT_LABELS.loading);
     rerender(<Host status="ready" />);
-    expect(region.textContent).toBe('3 risultati');
+    expect(region.textContent).toBe('3 results');
   });
 
   it('announces the error (its message when it is text, else the default)', () => {
@@ -242,22 +242,22 @@ describe('ListReportTable live region', () => {
     expect(liveRegion().textContent).toBe('Server non raggiungibile');
     rerender(<Host status="ready" />);
     rerender(<Host status="error" errorMessage={<span />} />);
-    expect(liveRegion().textContent).toBe('Impossibile caricare i dati');
+    expect(liveRegion().textContent).toBe('Unable to load data');
   });
 
   it('announces empty and no results', () => {
     const { rerender } = render(<Host />);
     rerender(<Host rows={[]} />);
-    expect(liveRegion().textContent).toBe('Nessun dato');
+    expect(liveRegion().textContent).toBe('No data');
     rerender(<Host />);
     rerender(<Host filter="none" />);
-    expect(liveRegion().textContent).toBe('Nessun risultato per i filtri correnti');
+    expect(liveRegion().textContent).toBe('No results for the current filters');
   });
 
   it('uses the singular for one result', () => {
     const { rerender } = render(<Host rows={[ROWS[0]!]} status="loading" />);
     rerender(<Host rows={[ROWS[0]!]} />);
-    expect(liveRegion().textContent).toBe('1 risultato');
+    expect(liveRegion().textContent).toBe('1 result');
   });
 
   it('does not re-announce while the state does not change (a rerender, a new row)', () => {
@@ -283,9 +283,9 @@ describe('ListReportTable live region', () => {
     expect(region.textContent).toBe('');
     rerender(<Host rows={ROWS.slice(0, 2)} />);
     expect(liveRegion()).toBe(region);
-    expect(region.textContent).toBe('2 risultati');
+    expect(region.textContent).toBe('2 results');
     rerender(<Host rows={ROWS.slice(0, 1)} />);
-    expect(region.textContent).toBe('1 risultato');
+    expect(region.textContent).toBe('1 result');
     expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
   });
 
@@ -309,7 +309,7 @@ describe('ListReportTable live region', () => {
     }
     render(<Searchable />);
     await user.click(screen.getByRole('button', { name: 'cerca' }));
-    expect(liveRegion().textContent).toBe('1 risultato');
+    expect(liveRegion().textContent).toBe('1 result');
   });
 
   it('a change that is both a return from loading and a new count announces once', () => {
@@ -317,7 +317,7 @@ describe('ListReportTable live region', () => {
     rerender(<Host status="loading" />);
     expect(liveRegion().textContent).toBe(DEFAULT_LABELS.loading);
     rerender(<Host rows={ROWS.slice(0, 2)} status="ready" />);
-    expect(liveRegion().textContent).toBe('2 risultati');
+    expect(liveRegion().textContent).toBe('2 results');
     expect(liveRegion().children).toHaveLength(0);
   });
 
@@ -347,8 +347,8 @@ describe('ListReportTable live region', () => {
     observer.observe(region, { childList: true, characterData: true, subtree: true });
     await user.click(screen.getByRole('button', { name: 'burst' }));
     await Promise.resolve();
-    expect(region.textContent).toBe('2 risultati');
-    expect(seen).not.toContain('1 risultato');
+    expect(region.textContent).toBe('2 results');
+    expect(seen).not.toContain('1 result');
     observer.disconnect();
   });
 
@@ -357,7 +357,7 @@ describe('ListReportTable live region', () => {
     rerender(<Host rows={ROWS.slice(0, 2)} />);
     const before = liveRegion().firstChild;
     rerender(<Host rows={[ROWS[1]!, ROWS[2]!]} />);
-    expect(liveRegion().textContent).toBe('2 risultati');
+    expect(liveRegion().textContent).toBe('2 results');
     expect(liveRegion().firstChild).toBe(before);
   });
 

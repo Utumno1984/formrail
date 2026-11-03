@@ -190,20 +190,20 @@ describe('<ListReport> announcements', () => {
     expect(live()).toHaveLength(1);
     // the table announces its change of state; the count in the heading is not a second announcement
     const region = live()[0] as HTMLElement;
-    expect(region).toHaveTextContent('Nessun risultato per i filtri correnti');
+    expect(region).toHaveTextContent('No results for the current filters');
     expect(region.textContent).not.toContain('di 40');
     expect(heading()).not.toContainElement(region);
   });
 });
 
 describe('<ListReport> clear filters', () => {
-  it('"Azzera filtri" clears filter and search with no wiring, and the focus goes to the search box', async () => {
+  it('"Clear filters" clears filter and search with no wiring, and the focus goes to the search box', async () => {
     const user = userEvent.setup();
     render(<Host />);
     await user.click(screen.getByRole('radio', { name: 'Da approvare' }));
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
-    expect(within(screen.getByRole('table')).getByText('Nessun risultato per i filtri correnti')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    expect(within(screen.getByRole('table')).getByText('No results for the current filters')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(heading()).toHaveTextContent('Fatture (40)');
     expect(screen.getByRole('radio', { name: 'Tutte' })).toBeChecked();
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
@@ -214,11 +214,11 @@ describe('<ListReport> clear filters', () => {
   it('without a search box the focus goes to the first pill', async () => {
     const user = userEvent.setup();
     render(<Host showSearch={false} defaultFilter="pending" rows={ROWS.filter((r) => r.status !== 'pending')} />);
-    await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByRole('radio', { name: 'Tutte' })).toHaveFocus();
     // the default pill was what left no result: the button is not dead, the rows are back
     expect(screen.getByRole('radio', { name: 'Tutte' })).toBeChecked();
-    expect(screen.queryByRole('button', { name: 'Azzera filtri' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
     expect(heading()).toHaveTextContent(`Fatture (${ROWS.filter((r) => r.status !== 'pending').length})`);
   });
 
@@ -233,7 +233,7 @@ describe('<ListReport> clear filters', () => {
     render(<Host rows={rows} filters={filters} defaultFilter="pending" onFilterChange={onFilterChange} />);
     await user.click(screen.getByRole('radio', { name: 'Respinte' }));
     onFilterChange.mockClear();
-    await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByRole('radio', { name: 'Da approvare' })).toBeChecked();
     expect(onFilterChange.mock.calls).toEqual([['pending']]);
   });
@@ -242,17 +242,17 @@ describe('<ListReport> clear filters', () => {
     const user = userEvent.setup();
     render(<Host showSearch defaultFilter="pending" rows={ROWS.filter((r) => r.status !== 'pending')} />);
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
-    await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
     expect(screen.getByRole('radio', { name: 'Tutte' })).toBeChecked();
-    expect(screen.queryByRole('button', { name: 'Azzera filtri' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
   });
 
   it('the focus goes to the search box of the bar, not to an input in the actions slot', async () => {
     const user = userEvent.setup();
     render(<Host actions={<input type="search" aria-label="Altro" />} />);
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
-    await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveFocus();
   });
 
@@ -261,10 +261,10 @@ describe('<ListReport> clear filters', () => {
     const onClearFilters = vi.fn();
     render(<Host onClearFilters={onClearFilters} />);
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'zzz{Enter}');
-    await user.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
     // not cleared: only the consumer's callback ran
-    expect(within(screen.getByRole('table')).getByText('Nessun risultato per i filtri correnti')).toBeVisible();
+    expect(within(screen.getByRole('table')).getByText('No results for the current filters')).toBeVisible();
   });
 });
 
@@ -274,7 +274,7 @@ describe('<ListReport> state props', () => {
     const onRetry = vi.fn();
     render(<Host status="error" errorMessage="Server non raggiungibile" onRetry={onRetry} />);
     expect(screen.getByText('Server non raggiungibile')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Riprova' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 

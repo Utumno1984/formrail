@@ -42,7 +42,7 @@ const meta: Meta<PlaygroundArgs> = {
     visible: true,
     message: LONG_MESSAGE,
     messageTone: 'error',
-    label: 'Azioni di salvataggio',
+    label: 'Save actions',
     onSave: fn(),
     onCancel: fn(),
   },
@@ -244,7 +244,7 @@ const SUPPLIER_BASELINES = { filled: FILLED_SUPPLIER, empty: EMPTY_SUPPLIER } as
 interface SupplierArgs {
   /** How many fields (in page order: Supplier, VAT number, Email, City, Postal code) are required. */
   requiredFields: number;
-  /** Summary text for one invalid field. Leave both texts empty for the library default (Italian). */
+  /** Summary text for one invalid field. Leave both texts empty for the library default (English). */
   summaryOne: string;
   /** Summary text for several, `{count}` replaced by the number. */
   summaryOther: string;
@@ -392,7 +392,7 @@ const SUPPLIER_ARG_TYPES: SupplierStory['argTypes'] = {
   },
   summaryOne: {
     control: 'text',
-    description: '`getErrorSummary` text for 1 invalid field. Both texts empty: the library default (Italian)',
+    description: '`getErrorSummary` text for 1 invalid field. Both texts empty: the library default (English)',
   },
   summaryOther: { control: 'text', description: '`getErrorSummary` text for several; `{count}` is replaced by the number' },
   onSaved: { control: false, description: 'Called with the values when the save succeeds' },
@@ -457,7 +457,7 @@ export const FormFlow: SupplierStory = {
 /**
  * The validation summary with several required fields (the `requiredFields` control) and your own
  * text (`summaryOne`/`summaryOther`; the library does not translate: leave both empty to see its
- * Italian default). Save the empty form: the footer announces "3 invalid fields" and the focus goes
+ * English default). Save the empty form: the footer announces "3 invalid fields" and the focus goes
  * to the first; each correction lowers the count (errors are cleared per field); with everything
  * fixed the message goes away. The footer keeps its height throughout.
  */

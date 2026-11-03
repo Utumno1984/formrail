@@ -96,7 +96,7 @@ describe('useListReportUrlState: React Router recipe', () => {
     });
     render(<RouterProvider router={router} />);
     expect(pill('Open')).toBeChecked();
-    await userEvent.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(router.state.location.search).toBe('?page=2');
     expect(router.state.location.hash).toBe('#section');
     expect(pill('All')).toBeChecked();

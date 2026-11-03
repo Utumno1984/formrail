@@ -28,7 +28,7 @@ export type ObjectPageProps = HTMLAttributes<HTMLDivElement> & {
    * scroller, once there are two or more sections; `none` shows nothing.
    */
   sectionNavigation?: 'anchors' | 'none';
-  /** Texts for assistive technology. `anchorBar`: the name of the Anchor Bar's `<nav>` (default "Sezioni"). */
+  /** Texts for assistive technology. `anchorBar`: the name of the Anchor Bar's `<nav>` (default "Sections"). */
   labels?: { anchorBar?: string };
   children?: ReactNode;
 };
@@ -161,7 +161,7 @@ export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageP
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
         <div ref={scrollerRef} tabIndex={0} data-object-page-scroller="" className={scrollerClass} style={scrollerStyle}>
           {sectionNavigation === 'anchors' && sections.length >= 2 ? (
-            <ObjectPageAnchorBar label={labels?.anchorBar ?? 'Sezioni'} />
+            <ObjectPageAnchorBar label={labels?.anchorBar ?? 'Sections'} />
           ) : null}
           {children}
         </div>

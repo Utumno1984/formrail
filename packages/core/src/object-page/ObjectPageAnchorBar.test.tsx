@@ -86,7 +86,7 @@ afterEach(() => {
 describe('Anchor Bar rendering', () => {
   it('lists the sections in DOM order as real links inside a named nav', () => {
     render(<Page />);
-    const nav = screen.getByRole('navigation', { name: 'Sezioni' });
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
     const links = within(nav).getAllByRole('link');
     expect(links.map((a) => a.textContent)).toEqual(['Sezione A', 'Sezione B', 'Sezione C']);
     expect(links.map((a) => a.getAttribute('href'))).toEqual(['#a', '#b', '#c']);

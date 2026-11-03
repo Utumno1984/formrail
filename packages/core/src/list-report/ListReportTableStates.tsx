@@ -14,7 +14,7 @@ import {
 } from './list-report-table-styles';
 import type { ListReportColumn } from './types';
 
-/** Texts of `ListReportTable` (all overridable; the defaults are in Italian). */
+/** Texts of `ListReportTable` (all overridable; the defaults are in English). */
 export interface ListReportTableLabels {
   /** Announced when the table starts loading. */
   loading: string;
@@ -33,13 +33,13 @@ export interface ListReportTableLabels {
 }
 
 export const DEFAULT_LABELS: ListReportTableLabels = {
-  loading: 'Caricamento in corso…',
-  empty: 'Nessun dato',
-  noResults: 'Nessun risultato per i filtri correnti',
-  error: 'Impossibile caricare i dati',
-  retry: 'Riprova',
-  clearFilters: 'Azzera filtri',
-  resultCount: (count) => (count === 1 ? '1 risultato' : `${count} risultati`),
+  loading: 'Loading…',
+  empty: 'No data',
+  noResults: 'No results for the current filters',
+  error: 'Unable to load data',
+  retry: 'Retry',
+  clearFilters: 'Clear filters',
+  resultCount: (count) => (count === 1 ? '1 result' : `${count} results`),
 };
 
 export const DEFAULT_LOADING_ROW_COUNT = 5;

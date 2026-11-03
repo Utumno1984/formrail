@@ -444,7 +444,7 @@ const rowsOf = (canvas: { getAllByRole: (role: string) => HTMLElement[] }): HTML
 /** Loading without rows: five skeleton rows under the same header, `aria-busy` on the scroller. */
 export const Loading: Story = {
   tags: ['visual'],
-  parameters: stateParameters('`status="loading"` senza righe.'),
+  parameters: stateParameters('`status="loading"` with no rows.'),
   render: stateRender({ rows: [], status: 'loading' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -457,41 +457,41 @@ export const Loading: Story = {
 /** Empty: the message in one cell across the columns. */
 export const Empty: Story = {
   tags: ['visual'],
-  parameters: stateParameters('Nessuna riga in input.'),
+  parameters: stateParameters('No rows in the input.'),
   render: stateRender({ rows: [] }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(rowsOf(canvas)).toHaveLength(1);
     await expect(canvas.getByRole('table').querySelector('td')).toHaveAttribute('colspan', '5');
-    await expect(within(canvas.getByRole('table')).getByText('Nessun dato')).toBeVisible();
+    await expect(within(canvas.getByRole('table')).getByText('No data')).toBeVisible();
   },
 };
 
 /**
  * No results: rows exist but the filter hides them. The play only checks the state (the screenshot is
- * taken after it): clicking "Azzera filtri" is tried in the Playground and in the e2e suite.
+ * taken after it): clicking "Clear filters" is tried in the Playground and in the e2e suite.
  */
 export const NoResults: Story = {
   tags: ['visual'],
-  parameters: stateParameters('Il filtro esclude tutte le righe: compare "Azzera filtri".'),
+  parameters: stateParameters('The filter excludes every row: "Clear filters" appears.'),
   render: stateRender({ rows: INVOICES.slice(0, 8), defaultFilter: 'none', onClearFilters: fn() }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(within(canvas.getByRole('table')).getByText('Nessun risultato per i filtri correnti')).toBeVisible();
-    await expect(canvas.getByRole('button', { name: 'Azzera filtri' })).toBeVisible();
+    await expect(within(canvas.getByRole('table')).getByText('No results for the current filters')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Clear filters' })).toBeVisible();
     await expect(canvasElement.querySelectorAll('tbody tr:not([data-rop-state])')).toHaveLength(0);
   },
 };
 
-/** Error: a Message Strip with "Riprova" in place of the body; the header stays. */
+/** Error: a Message Strip with "Retry" in place of the body; the header stays. */
 export const ErrorState: Story = {
   tags: ['visual'],
-  parameters: stateParameters('Errore di caricamento con `onRetry`.'),
+  parameters: stateParameters('Load error with `onRetry`.'),
   render: stateRender({ rows: [], status: 'error', onRetry: fn() }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(within(canvas.getByRole('table')).getByText('Impossibile caricare i dati')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Riprova' }));
+    await expect(within(canvas.getByRole('table')).getByText('Unable to load data')).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Retry' }));
     await expect(canvas.getByTestId('scroller')).toHaveFocus();
   },
 };
@@ -523,7 +523,7 @@ export const ErrorLongMessage: Story = {
 /** Reload with data: the rows stay, nothing changes height, the scroller is busy. */
 export const Reloading: Story = {
   tags: ['visual'],
-  parameters: stateParameters('`status="loading"` con righe già presenti: restano visibili, niente scheletri.'),
+  parameters: stateParameters('`status="loading"` with rows already present: they stay visible, no skeletons.'),
   render: stateRender({ rows: INVOICES.slice(0, 8), status: 'loading' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -542,7 +542,7 @@ function setArgs(storyId: string, updatedArgs: Partial<PlaygroundArgs>): void {
 }
 
 /**
- * Starts loading (no rows), goes to error, clicks "Riprova" (Actions gets the call) and ends on three
+ * Starts loading (no rows), goes to error, clicks "Retry" (Actions gets the call) and ends on three
  * rows. In every step the header does not move and the body is never shorter than `loadingRowCount` rows.
  */
 export const StatusTransitions: Story = {
@@ -567,7 +567,7 @@ export const StatusTransitions: Story = {
     await expect(canvasElement.querySelectorAll('[data-rop-skeleton]')).toHaveLength(5);
 
     setArgs(id, { status: 'error' });
-    const retry = await canvas.findByRole('button', { name: 'Riprova' });
+    const retry = await canvas.findByRole('button', { name: 'Retry' });
     await expect(scroller).not.toHaveAttribute('aria-busy');
     await expect(headerTop()).toBe(top);
     await expect(tableWidth()).toBe(width);

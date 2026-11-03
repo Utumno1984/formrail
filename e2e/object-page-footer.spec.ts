@@ -69,7 +69,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
     expect(hidden.footerHeight).toBe(57);
 
     await jsClick(page, 'Modifica');
-    await expect(page.getByRole('region', { name: 'Azioni di salvataggio' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Save actions' })).toBeVisible();
     const shown = await measure();
     for (const key of ['clientHeight', 'scrollTop', 'top', 'footerHeight'] as const) {
       expect(Math.abs(shown[key] - hidden[key]), key).toBeLessThanOrEqual(1);
@@ -90,7 +90,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
 
   test('hidden: not reachable with Tab, not clickable, out of the accessibility tree', async ({ page }) => {
     await gotoStory(page, STORY('manual'));
-    await expect(page.getByRole('region', { name: 'Azioni di salvataggio' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Salva' })).toHaveCount(0);
     expect(await page.locator(FOOTER).evaluate((el) => el.hasAttribute('inert'))).toBe(true);
 
@@ -110,7 +110,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
 
   test('visible: a region with the actions, reachable with Tab, aligned to the end', async ({ page }) => {
     await gotoStory(page, STORY('with-actions'));
-    const region = page.getByRole('region', { name: 'Azioni di salvataggio' });
+    const region = page.getByRole('region', { name: 'Save actions' });
     await expect(region).toBeVisible();
     const save = region.getByRole('button', { name: 'Salva' });
     await expect(save).toBeVisible();
@@ -129,7 +129,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
     await gotoStory(page, STORY('manual'), 'visible:!true');
     const save = page.getByRole('button', { name: 'Salva' });
     await save.click();
-    await expect(page.getByRole('region', { name: 'Azioni di salvataggio' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
 
@@ -181,7 +181,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
   test('zoom 200%: the actions are not cut and the reserved height follows the font size', async ({ page }) => {
     await gotoStory(page, STORY('with-actions'));
     await page.evaluate(() => (document.documentElement.style.fontSize = '32px'));
-    const region = page.getByRole('region', { name: 'Azioni di salvataggio' });
+    const region = page.getByRole('region', { name: 'Save actions' });
     const box = (await region.boundingBox())!;
     expect(box.height).toBe(113);
     for (const name of ['Salva', 'Annulla modifiche']) {
@@ -198,7 +198,7 @@ test.describe('Object Page footer on a narrow screen', () => {
   test('no horizontal overflow at 320px; the actions share the row; the height is the same with or without message', async ({ page }) => {
     await gotoStory(page, STORY('with-actions'));
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
-    const region = page.getByRole('region', { name: 'Azioni di salvataggio' });
+    const region = page.getByRole('region', { name: 'Save actions' });
     const plain = (await region.boundingBox())!;
     const save = (await region.getByRole('button', { name: 'Salva' }).boundingBox())!;
     const cancel = (await region.getByRole('button', { name: 'Annulla modifiche' }).boundingBox())!;
