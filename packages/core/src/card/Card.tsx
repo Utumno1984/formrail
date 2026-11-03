@@ -36,7 +36,7 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
 
 /**
  * Static compound container (`CardHeader`, `CardTitle`, `CardDescription`, `CardBody`,
- * `CardFooter`). It never uses `overflow: hidden` (that would clip the focus outline of children at
+ * `CardFooter`). It never uses `overflow: hidden` (that would clip the focus indicator of children at
  * the rounded border) and long unbroken text wraps instead of overflowing. Like every box of the
  * library it is `content-box`.
  */
