@@ -417,3 +417,103 @@ export const EditFlowManual: StoryObj<ListToRecordArgs> = {
   args: LIST_TO_RECORD_ARGS,
   render: (args) => <InvoiceListToRecord {...args} />,
 };
+
+/* ------------------------------------------------------------------------------------------ */
+/* #152: visual-regression states of the combined showcase (3 viewports, via the `visual` tag).   */
+/* ------------------------------------------------------------------------------------------ */
+
+// Deterministic picture: no delays (nothing is mid-load when the screenshot is taken) and the same
+// first record every time. The `play` brings the story to the state; the visual spec runs it first.
+const VISUAL_ARGS = { ...LIST_TO_RECORD_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0 } satisfies Partial<ListToRecordArgs>;
+const VISUAL_NOTE = 'Call the supplier before the due date.';
+
+async function visualStart(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  const win = canvasElement.ownerDocument.defaultView;
+  if (!win) throw new Error('visual story: no window');
+  resetListToRecord(win);
+  await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(5), { timeout: 5000 });
+  return canvas;
+}
+
+async function visualOpenRecord(canvas: ReturnType<typeof within>) {
+  await userEvent.click(canvas.getAllByRole('link')[0] as HTMLElement);
+  await expect(await canvas.findByRole('heading', { level: 1 })).toBeVisible();
+  return (await canvas.findByRole('textbox', { name: 'Notes' })) as HTMLInputElement;
+}
+
+async function visualMakeDirty(canvas: ReturnType<typeof within>, notes: HTMLInputElement) {
+  await userEvent.clear(notes);
+  await userEvent.type(notes, VISUAL_NOTE);
+  await expect(await canvas.findByRole('region', { name: 'Save actions' })).toBeVisible();
+}
+
+/** A record just opened from the list: header, Anchor Bar, hydrated sections, hidden (clean) save bar. */
+export const RecordOpen: StoryObj<ListToRecordArgs> = {
+  tags: ['visual'],
+  argTypes: LIST_TO_RECORD_ARGTYPES,
+  args: VISUAL_ARGS,
+  render: (args) => <InvoiceListToRecord {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await visualStart(canvasElement);
+    await visualOpenRecord(canvas);
+    await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();
+  },
+};
+
+/** The same record after typing in "Notes": the sticky save bar is visible and the space it needs was already reserved. */
+export const RecordDirty: StoryObj<ListToRecordArgs> = {
+  tags: ['visual'],
+  argTypes: LIST_TO_RECORD_ARGTYPES,
+  args: VISUAL_ARGS,
+  render: (args) => <InvoiceListToRecord {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await visualStart(canvasElement);
+    const notes = await visualOpenRecord(canvas);
+    await visualMakeDirty(canvas, notes);
+    await expect(notes).toHaveValue(VISUAL_NOTE);
+  },
+};
+
+/** Dirty record, then "Back to list": the confirmation Dialog is open over the page. */
+export const LeaveGuardOpen: StoryObj<ListToRecordArgs> = {
+  tags: ['visual'],
+  argTypes: LIST_TO_RECORD_ARGTYPES,
+  args: VISUAL_ARGS,
+  render: (args) => <InvoiceListToRecord {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await visualStart(canvasElement);
+    const notes = await visualOpenRecord(canvas);
+    await visualMakeDirty(canvas, notes);
+    await userEvent.click(canvas.getByRole('button', { name: 'Back to list' }));
+    const dialog = await within(document.body).findByRole('dialog', { name: 'Unsaved changes' });
+    // The Dialog fades in: "visible" (opacity) is only true once the entry animation has progressed.
+    await waitFor(() => expect(dialog).toBeVisible());
+    await expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus();
+  },
+};
+
+/** Edit, Save, "Back to list": the list again, the row link focused, the saved amount in the row. */
+export const ListAfterSave: StoryObj<ListToRecordArgs> = {
+  tags: ['visual'],
+  argTypes: LIST_TO_RECORD_ARGTYPES,
+  args: VISUAL_ARGS,
+  render: (args) => <InvoiceListToRecord {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = await visualStart(canvasElement);
+    const number = canvas.getAllByRole('link')[0]?.textContent ?? '';
+    await visualOpenRecord(canvas);
+    const amount = (await canvas.findByRole('textbox', { name: /Amount/ })) as HTMLInputElement;
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '4321.5');
+    const bar = await canvas.findByRole('region', { name: 'Save actions' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull());
+    await expect(args.onSaved).toHaveBeenCalledTimes(1);
+    await userEvent.click(canvas.getByRole('button', { name: 'Back to list' }));
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(5), { timeout: 5000 });
+    const row = canvas.getByRole('link', { name: number }).closest('tr') as HTMLElement;
+    await expect(row).toHaveTextContent('4.321,50 €');
+    await waitFor(() => expect(canvas.getByRole('link', { name: number })).toHaveFocus());
+  },
+};
