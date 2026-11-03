@@ -26,7 +26,7 @@ export interface BreadcrumbProps extends HTMLAttributes<HTMLElement> {
 
 /**
  * Navigation landmark with an ordered list of `BreadcrumbItem`. The accessible name defaults to
- * "Breadcrumb" (pass `aria-label` to translate it). The list never wraps: items are truncated with
+ * "Breadcrumb" (pass your own `aria-label` for another language). The list never wraps: items are truncated with
  * an ellipsis and shrink before the page overflows, the current item last.
  */
 export const Breadcrumb = /* @__PURE__ */ forwardRef<HTMLElement, BreadcrumbProps>(function Breadcrumb(
@@ -47,7 +47,7 @@ export const Breadcrumb = /* @__PURE__ */ forwardRef<HTMLElement, BreadcrumbProp
 const ITEM =
   'group/item flex min-w-0 max-w-[16rem] shrink-[10] items-center last:max-w-full last:shrink';
 // A previous item with real text never shrinks below a readable stub (separator + a few letters),
-// so its link keeps a box (focus ring, hover target). Short or icon-only items stay natural: a
+// so its link keeps a box (focus indicator, hover target). Short or icon-only items stay natural: a
 // fixed minimum would inflate them (`min()` cannot take `min-content`).
 const MIN_STUB = '[&:not(:last-child)]:min-w-[3rem]';
 const STUB_FROM = 6;
@@ -61,25 +61,13 @@ export const BreadcrumbItem = /* @__PURE__ */ forwardRef<HTMLLIElement, LiHTMLAt
         <span
           aria-hidden="true"
           data-rop-breadcrumb-separator=""
-          className="inline-flex shrink-0 select-none items-center px-1.5 text-rop-text-muted group-first/item:hidden"
-        >
-          {separator === 'slash' ? (
-            '/'
-          ) : (
-            <svg
-              viewBox="0 0 16 16"
-              width="1em"
-              height="1em"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="rtl:-scale-x-100"
-            >
-              <path d="M6 3.5 10.5 8 6 12.5" />
-            </svg>
+          className={cn(
+            'inline-flex shrink-0 select-none items-center px-1.5 text-rop-text-muted group-first/item:hidden',
+            separator === 'chevron' && 'text-[1.25em] leading-none',
           )}
+        >
+          {/* U+203A is a mirrored character: the browser draws it pointing the other way in RTL, so no direction-dependent CSS is needed (`:dir()` is rewritten by minifiers). */}
+          {separator === 'slash' ? '/' : '›'}
         </span>
         {children}
       </li>
@@ -99,7 +87,7 @@ export interface BreadcrumbLinkProps extends AnchorHTMLAttributes<HTMLAnchorElem
   asChild?: boolean;
 }
 
-/** Link to an ancestor. The text is truncated inside the link, so the focus ring is never clipped. */
+/** Link to an ancestor. The text is truncated inside the link, so the focus indicator is never clipped. */
 export const BreadcrumbLink = /* @__PURE__ */ forwardRef<HTMLAnchorElement, BreadcrumbLinkProps>(
   function BreadcrumbLink({ asChild = false, className, children, ...rest }, ref) {
     if (asChild) {

@@ -65,12 +65,11 @@ describe('Breadcrumb', () => {
     expect(screen.getByText('Only').getAttribute('aria-current')).toBe('page');
   });
 
-  it('the slash separator renders text, the chevron an svg; both decorative', () => {
+  it('the slash separator is "/", the chevron the mirrored character U+203A; both decorative', () => {
     const { container, rerender } = render(<Basic separator="slash" />);
     expect(container.querySelector('[data-rop-breadcrumb-separator]')?.textContent).toBe('/');
     rerender(<Basic separator="chevron" />);
-    expect(container.querySelector('[data-rop-breadcrumb-separator] svg')).not.toBeNull();
-    expect(container.querySelector('[data-rop-breadcrumb-separator]')?.textContent).toBe('');
+    expect(container.querySelector('[data-rop-breadcrumb-separator]')?.textContent).toBe('›');
   });
 
   it('className wins over the defaults (cn) and the ref is forwarded', () => {

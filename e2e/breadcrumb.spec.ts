@@ -133,24 +133,29 @@ test.describe('Navigation/Breadcrumb', () => {
     expect(info[2]).toEqual([false]);
   });
 
-  test('RTL: the order is reversed and the chevron is mirrored', async ({ page }) => {
+  test('RTL: the order is reversed, the chevron is drawn mirrored, the slash is not', async ({ page }) => {
     await gotoStory(page, `${ID}separators`);
-    const nav = page.getByRole('navigation', { name: 'Breadcrumb chevron' });
-    const ltr = await nav.evaluate((n) => ({
-      first: n.querySelector('li')!.getBoundingClientRect().left,
-      last: n.querySelector('li:last-child')!.getBoundingClientRect().left,
-      scale: getComputedStyle(n.querySelector('[data-rop-breadcrumb-separator] svg')!).scale,
-    }));
+    const chevron = page.getByRole('navigation', { name: 'Breadcrumb chevron' });
+    const slash = page.getByRole('navigation', { name: 'Breadcrumb slash' });
+    const sep = (nav: typeof chevron) =>
+      nav
+        .locator('[data-rop-breadcrumb-separator]')
+        .nth(1)
+        .evaluate((e) => ({ text: e.textContent, direction: getComputedStyle(e).direction }));
+    const order = (nav: typeof chevron) =>
+      nav.evaluate((n) => ({
+        first: n.querySelector('li')!.getBoundingClientRect().left,
+        last: n.querySelector('li:last-child')!.getBoundingClientRect().left,
+      }));
+    const ltr = await order(chevron);
+    expect(await sep(chevron)).toEqual({ text: '›', direction: 'ltr' });
     expect(ltr.first).toBeLessThan(ltr.last);
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
-    const rtl = await nav.evaluate((n) => ({
-      first: n.querySelector('li')!.getBoundingClientRect().left,
-      last: n.querySelector('li:last-child')!.getBoundingClientRect().left,
-      scale: getComputedStyle(n.querySelector('[data-rop-breadcrumb-separator] svg')!).scale,
-    }));
+    const rtl = await order(chevron);
     expect(rtl.first).toBeGreaterThan(rtl.last);
-    expect(rtl.scale).toMatch(/^-1/);
-    expect(ltr.scale).not.toMatch(/^-1/);
+    // U+203A is a Bidi_Mirrored character: resolved in an RTL context the browser draws it mirrored.
+    expect(await sep(chevron)).toEqual({ text: '›', direction: 'rtl' });
+    expect((await sep(slash)).text).toBe('/');
   });
 
   test('an icon-only link keeps its accessible name from the hidden text', async ({ page }) => {
