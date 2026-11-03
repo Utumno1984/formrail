@@ -36,6 +36,10 @@ critico-avversariale) e le regole di dominio.
 - In locale `reuseExistingServer` è attivo: se qualcosa ascolta già sulla porta 6007, Playwright
   lo riusa senza ricostruire, quindi si può testare una build **vecchia**. Se i risultati sembrano
   incoerenti, ferma il processo sulla 6007 e rilancia.
+- **Più git worktree in parallelo**: la porta è configurabile con `PLAYWRIGHT_PORT` (default 6007).
+  Senza, due worktree condividono la 6007 e una può testare la build dell'altra (per via di
+  `reuseExistingServer`). Dai a ogni worktree la sua porta, es.
+  `PLAYWRIGHT_PORT=6107 npm run test:e2e`.
 - In CI `retries: 1`: un test instabile che passa al secondo tentativo risulta **flaky ma verde**.
   Controlla il report per i test marcati flaky, non fidarti solo del colore.
 - I test marcati `@touch` girano solo nel progetto `chromium-touch`.
