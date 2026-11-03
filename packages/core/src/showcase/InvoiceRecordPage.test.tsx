@@ -184,6 +184,23 @@ describe('InvoiceRecordPage', () => {
     await waitFor(() => expect(footer()).toBeNull());
   });
 
+  it('#166: Back during a save asks with truthful labels, also after a footer Discard made the form clean', async () => {
+    const { onBack } = setup({ saveDelayMs: 300 });
+    const amount = await amountField();
+    await userEvent.type(amount, '1');
+    const bar = await visibleBar();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await userEvent.click(within(bar).getByRole('button', { name: 'Discard' }));
+    // The form is clean now, the save is still in flight: Back must not skip the confirmation.
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(onBack).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    expect(within(dialog).queryByRole('button', { name: 'Discard changes' })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Leave anyway' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('Back to list: clean calls onBack at once; dirty asks first (English dialog, X named Close)', async () => {
     const { onBack } = setup();
     const amount = await amountField();

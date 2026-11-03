@@ -172,7 +172,7 @@ const LIST_TO_RECORD_ARGTYPES = {
   saveDelayMs: {
     control: { type: 'range', min: 0, max: 3000, step: 100 },
     description:
-      'How long a save takes. Leaving the page while a save is in flight (Back to list, then "Discard changes") goes at once; the save still completes and the store then holds the saved value.',
+      'How long a save takes. Leaving the page while a save is in flight (Back to list, then "Leave anyway") goes at once; the save still completes and the store then holds the saved value.',
   },
   saveOutcome: {
     control: 'radio',
@@ -306,7 +306,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
  * the sort), where the list was (pill, search, sort, scroll). Then another record: change, Back, "Discard
  * changes" and the list is unchanged.
  *
- * Declared behaviour: leaving while a save is in flight ("Back to list", then "Discard changes") is immediate;
+ * Declared behaviour: leaving while a save is in flight ("Back to list", then "Leave anyway") is immediate;
  * the save is not cancelled, so once it resolves the store holds the saved value. The demo's reads (the list,
  * a re-opened record) wait for the saves in flight, so they show that value and a later save cannot overwrite
  * it with an older one. The browser's Back/Forward is

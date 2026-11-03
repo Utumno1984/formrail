@@ -38,7 +38,7 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: 'FT-2026-0012' })).toBe(document.activeElement));
   });
 
-  it('save in flight + Back + Discard changes: leaves at once, the store gets the saved value, no React warning', async () => {
+  it('save in flight + Back + Leave anyway: leaves at once, the store gets the saved value, no React warning', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onSaved = vi.fn();
     render(
@@ -59,7 +59,7 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await userEvent.type(amount, '4242.424');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
     await waitFor(() => expect(window.location.search).not.toContain('record='));
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(window.__ropShowcaseStore?.snapshot().find((r) => r.id === 'inv-12')?.amount).toBe(4242.42);
@@ -81,7 +81,7 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await userEvent.type(amount, '4242.424');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
     // Re-open at once: the read waits for the save in flight.
     await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }, { timeout: 5000 }));
     const reopened = await screen.findByRole('textbox', { name: /Amount/ }, { timeout: 5000 });

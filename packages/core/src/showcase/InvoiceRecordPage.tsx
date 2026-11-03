@@ -190,15 +190,33 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
       return errors;
     },
   });
+  // #166: while a save is in flight, leaving cannot discard anything (the save still lands in the store), so
+  // the guard stays armed (even after a footer "Discard" made the form clean) and the dialog says what really
+  // happens (this also covers browser Back, which opens the same dialog). The wording is sticky: it is set
+  // as soon as a save starts and cleared only by real unsaved edits once no save runs, so a dialog that is
+  // open when the save settles does not flip to a different promise under the user's cursor.
+  const [savingWording, setSavingWording] = useState(false);
+  useEffect(() => {
+    if (form.isSaving) setSavingWording(true);
+    else if (form.isDirty) setSavingWording(false);
+  }, [form.isSaving, form.isDirty]);
   const { guard, dialog } = useDirtyGuard({
-    when: form.isDirty,
-    labels: {
-      title: 'Unsaved changes',
-      description: 'You have unsaved changes: if you leave now they will be lost.',
-      stay: 'Keep editing',
-      leave: 'Discard changes',
-      close: 'Close',
-    },
+    when: form.isDirty || form.isSaving,
+    labels: savingWording || form.isSaving
+      ? {
+          title: 'Unsaved changes',
+          description: 'A save is still in progress. Leaving does not cancel it: it will complete in the background.',
+          stay: 'Keep editing',
+          leave: 'Leave anyway',
+          close: 'Close',
+        }
+      : {
+          title: 'Unsaved changes',
+          description: 'You have unsaved changes: if you leave now they will be lost.',
+          stay: 'Keep editing',
+          leave: 'Discard changes',
+          close: 'Close',
+        },
   });
   const frameRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
