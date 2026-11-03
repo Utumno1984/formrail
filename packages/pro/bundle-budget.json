@@ -3,16 +3,16 @@
   "version": 1,
   "exports": {
     "computeChangeSummary": {
-      "baseline": 1857,
-      "limit": 2043
+      "baseline": 2188,
+      "limit": 2407
     },
     "inferSegmentLabel": {
       "baseline": 246,
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2032,
-      "limit": 2236
+      "baseline": 2364,
+      "limit": 2601
     }
   }
 }
