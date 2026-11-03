@@ -43,7 +43,8 @@ export interface ChangeEntry {
  *   whose own enumerable properties are all Empty, recursively (`{}` included).
  *
  * Applied in this order to every node (after `isEqual`):
- * 1. Both sides Empty → no entry for that node nor for its descendants.
+ * 1. Both sides Empty → no entry for that node nor for its descendants (unless a custom `isEqual`
+ *    returns `false` on one of them: see `isEqual`).
  * 2. One side Absent and the other not Empty → **one** entry on the node, `added` (baseline
  *    absent) or `removed` (values absent), without descending to the leaves. Only exception: an
  *    array with a declared id key, where Absent counts as `[]` (one entry per item).
@@ -116,8 +117,11 @@ export interface ChangeSummaryOptions<Values extends object> {
    * entry on the node, without descending (`changed`, or `added`/`removed` when one side is
    * Absent; `changed` when both are); `undefined` → default rules.
    *
-   * Nodes under a pair that rule 1 already settled (both sides Empty) are not visited, so
-   * `isEqual` is not called for them.
+   * Rule 1 does not cut the visit short for `isEqual`: under a pair where both sides are Empty
+   * (e.g. `{ note: null }` against `{ note: '' }`, or an Empty object against an Absent side) the
+   * descendants are still visited and `isEqual` is asked on each of them, so the verdict on a node
+   * does not depend on whether it has a non-empty sibling. Their default stays "no entry"; only an
+   * explicit `false` produces one. Without `isEqual` such subtrees are not visited at all.
    *
    * `useChangeSummary` compares this function by identity: pass a stable function (module scope
    * or `useCallback`), an inline one recomputes the summary on every render.

@@ -96,5 +96,7 @@ With a row changed, one added without id, one removed and two rows swapped, `ent
   development warning.
 - **`isEqual(a, b, path)`**: custom equality, called before the default rules on every visited pair
   except the root. `true` → no entry for that subtree, `false` → one atomic entry, `undefined` → default.
+  It is asked inside Empty subtrees too (`{ note: null }` → `{ note: '' }` reaches `note`), so its
+  verdict on a node does not depend on the siblings; there the default stays "no entry".
 - **Order**: depth-first; keys in the order of `values`, then baseline-only keys; id-matched arrays in
   the order of `values`, then the `removed` items in baseline order.

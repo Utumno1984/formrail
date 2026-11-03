@@ -629,6 +629,48 @@ describe('isEqual', () => {
     expect(paths(diff({ name: 'n', note: '' }, { name: 'n', note: null }, { isEqual: strict }))).toEqual(['removed note']);
   });
 
+  it('is consulted inside a subtree where both sides are Empty (same verdict as with a non-empty sibling)', () => {
+    const strict = (a: unknown, b: unknown) => (a === null && b === '') || (a === '' && b === null) ? false : undefined;
+    const expected = [{ path: 'note', kind: 'added', before: undefined, after: '' }];
+    expect(brief(diff({ note: null }, { note: '' }, { isEqual: strict }))).toEqual(expected);
+    expect(brief(diff({ name: 'n', note: null }, { name: 'n', note: '' }, { isEqual: strict }))).toEqual(expected);
+    expect(brief(diff({ supplier: { name: null } }, { supplier: { name: '' } }, { isEqual: strict }))).toEqual([
+      { path: 'supplier.name', kind: 'added', before: undefined, after: '' },
+    ]);
+    expect(brief(diff({ supplier: { name: null, x: 1 } }, { supplier: { name: '', x: 1 } }, { isEqual: strict }))).toEqual([
+      { path: 'supplier.name', kind: 'added', before: undefined, after: '' },
+    ]);
+  });
+
+  it('is consulted on the children of an Empty object against an Absent side', () => {
+    const isEqual = vi.fn((_a: unknown, _b: unknown, path: string) => (path === 'a.b' ? false : undefined));
+    expect(brief(diff({ a: { b: null } }, { a: { b: '' } }, { isEqual }))).toEqual([
+      { path: 'a.b', kind: 'added', before: undefined, after: '' },
+    ]);
+    expect(brief(diff({}, { a: { b: '' } }, { isEqual }))).toEqual([{ path: 'a.b', kind: 'added', before: undefined, after: '' }]);
+    expect(brief(diff({ a: { b: '' } }, { a: null }, { isEqual }))).toEqual([{ path: 'a.b', kind: 'removed', before: '', after: undefined }]);
+  });
+
+  it('inside an Empty subtree the default stays "no entry" and the visit asks every descendant once', () => {
+    const isEqual = vi.fn((): boolean | undefined => undefined);
+    expect(diff({ a: { b: null, c: { d: '' } } }, { a: { b: '', e: [] } }, { isEqual })).toEqual([]);
+    expect(isEqual.mock.calls.map((c) => c[2])).toEqual(['a', 'a.b', 'a.e', 'a.c', 'a.c.d']);
+  });
+
+  it('does not loop on an Empty circular object inside an Empty subtree', () => {
+    const o: Loose = {};
+    o.self = o;
+    const p: Loose = { n: null };
+    p.self = p;
+    const isEqual = vi.fn((): boolean | undefined => undefined);
+    expect(diff({ o }, { o: null }, { isEqual })).toEqual([]);
+    expect(diff({ o }, { o: p }, { isEqual })).toEqual([]);
+    // The cycle is cut at the pair already on the stack: 'o.self.n' is never visited.
+    expect(diff({ o: p }, {}, { isEqual: (_a, _b, path) => (path === 'o.self.n' ? false : undefined) })).toEqual([]);
+    // null against a missing key: both Absent → 'changed'.
+    expect(paths(diff({ o: p }, {}, { isEqual: (_a, _b, path) => (path === 'o.n' ? false : undefined) }))).toEqual(['changed o.n']);
+  });
+
   it('false with both sides Absent is a changed entry', () => {
     const always = () => false;
     expect(brief(diff({ a: 1, v: null }, { a: 1 }, { isEqual: (_a, _b, p) => (p === 'v' ? always() : undefined) }))).toEqual([

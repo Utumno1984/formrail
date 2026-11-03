@@ -75,6 +75,9 @@ function indexById(items: readonly unknown[], idKey: string): Map<unknown, numbe
   return map;
 }
 
+/** Stand-in for an Empty side that has no keys of its own (Absent, `''`, `[]`). */
+const NO_KEYS: PlainObject = Object.freeze({});
+
 interface Node {
   /** Concrete segments (indexes included). */
   path: readonly string[];
@@ -173,7 +176,10 @@ class Differ {
     if (beforeAbsent && afterAbsent) return;
     if (beforeAbsent || afterAbsent) {
       const present = beforeAbsent ? after : before;
-      if (isEmptyValue(present)) return;
+      if (isEmptyValue(present)) {
+        this.descendEmpty(before, after, node, out);
+        return;
+      }
       // Rule 2, id-key exception: Absent counts as [].
       if (idKey !== undefined) {
         this.diffById(beforeAbsent ? [] : (before as unknown[]), afterAbsent ? [] : (after as unknown[]), idKey, node, out);
@@ -183,7 +189,10 @@ class Differ {
       this.emit(out, node, beforeAbsent ? 'added' : 'removed', before, after);
       return;
     }
-    if (isEmptyValue(before) && isEmptyValue(after)) return;
+    if (isEmptyValue(before) && isEmptyValue(after)) {
+      this.descendEmpty(before, after, node, out);
+      return;
+    }
 
     // Rule 3: structural comparison.
     if (isDate(before) || isDate(after)) {
@@ -207,6 +216,20 @@ class Differ {
     }
     // Type change, or two different non-traversable leaves.
     this.emit(out, node, 'changed', before, after);
+  }
+
+  /**
+   * Rule 1 with a custom `isEqual`: the default verdict on the whole subtree stays "no entry"
+   * (every descendant pair of two Empty sides is Empty too), but `isEqual` is still asked on every
+   * descendant pair, exactly as when the subtree has a non-empty sibling. Without `isEqual`
+   * nothing is visited (unchanged cost). Only plain objects have children here (Empty array = `[]`).
+   */
+  private descendEmpty(before: unknown, after: unknown, node: Node, out: ChangeEntry[]): void {
+    if (!this.isEqual) return;
+    const b = isPlainObject(before) ? before : NO_KEYS;
+    const a = isPlainObject(after) ? after : NO_KEYS;
+    if (b === NO_KEYS && a === NO_KEYS) return;
+    this.guarded(b, a, () => this.diffObject(b, a, node, out));
   }
 
   /** Runs `body` unless the pair is already being compared higher up (then it counts as equal). */
