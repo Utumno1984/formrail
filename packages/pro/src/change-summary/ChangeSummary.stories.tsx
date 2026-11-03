@@ -203,6 +203,13 @@ const isItem = (name: RegExp) => (_: string, el: Element | null) =>
   el?.tagName === 'LI' && name.test(el.textContent ?? '');
 const item = (canvas: ReturnType<typeof within>, name: RegExp) => canvas.findByText(isItem(name));
 
+/** Text a screen reader gets: DOM order, visually hidden text included, aria-hidden excluded. */
+function readText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+  if (!(node instanceof Element) || node.getAttribute('aria-hidden') === 'true') return '';
+  return Array.from(node.childNodes).map(readText).join('');
+}
+
 /**
  * A real editor: change the amount, tick "Paid", add / move / remove lines and watch the summary
  * follow. `emptyLabel`, `label`, `locale`, `timeZone` and `valueFormat` are Controls; "Save" and
@@ -228,8 +235,9 @@ export const Playground: Story = {
     await userEvent.type(amount, '120');
     const amountItem = await item(canvas, /^Amount/);
     await expect(amountItem).toHaveTextContent(/changed/);
-    // One assertion on the text read, so the order is checked too (before, then after).
-    await expect(amountItem).toHaveTextContent(/from\s*100\s*to\s*120/);
+    // One assertion on the text read (aria-hidden arrow excluded), so the order is checked too:
+    // before, then after (`from 100 to 120`, or `from 100,00 € to 120,00 €` with the currency control).
+    await expect(readText(amountItem)).toMatch(/^Amount, changed, from [^,]*100[^ ]*( €)? to [^,]*120[^ ]*( €)?$/);
     await expect(items()).toHaveLength(1);
 
     // A boolean reads Yes / No, never true / false.
