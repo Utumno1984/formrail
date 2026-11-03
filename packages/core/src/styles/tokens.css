@@ -95,6 +95,9 @@
   --animate-rop-overlay-out: rop-overlay-out var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing) forwards;
   --animate-rop-modal-in: rop-modal-in var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing);
   --animate-rop-modal-out: rop-modal-out var(--motion-rop-overlay-duration) var(--motion-rop-overlay-easing) forwards;
+  /* Indeterminate ProgressBar sweep; applied only under `motion-safe:`. */
+  --motion-rop-progress-duration: 1.4s;
+  --animate-rop-progress-indeterminate: rop-progress-indeterminate var(--motion-rop-progress-duration) linear infinite;
   /* Invisible (no visual change): only keeps the wrapper of the portal mounted for as long as its
      children animate out. */
   --animate-rop-modal-hold: rop-modal-hold var(--motion-rop-overlay-duration) linear forwards;
@@ -102,6 +105,16 @@
   /* The panel animates the individual `scale` / `translate` properties, never `transform`: the
      Dialog centres itself with `transform`, which must stay untouched. `--rop-modal-from-*` are set
      by the component (a Dialog scales in, a Sheet slides in from its edge). */
+  /* Indeterminate ProgressBar: the fill (40% of the track) sweeps from before the start edge to past
+     the end. Applied only under `motion-safe:`. */
+  @keyframes rop-progress-indeterminate {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 250% 0;
+    }
+  }
   @keyframes rop-overlay-in {
     from {
       opacity: 0;
