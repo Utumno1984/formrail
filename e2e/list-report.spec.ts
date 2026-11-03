@@ -192,7 +192,7 @@ test.describe('live region count', () => {
     await expect(region).toHaveCount(1);
     await pill(page, 'Tutte').focus();
     await page.keyboard.press('ArrowRight');
-    await expect(region).toHaveText(`${PENDING.length} risultati`);
+    await expect(region).toHaveText(`${PENDING.length} results`);
     await search(page).focus();
     await page.keyboard.type('Ferrari');
     await page.keyboard.press('Enter');

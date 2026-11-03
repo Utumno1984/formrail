@@ -87,7 +87,7 @@ test.describe('ListReport count pill', () => {
     const live = page.locator('[aria-live="polite"]');
     await expect(live).toHaveText('');
     await page.getByRole('radio', { name: 'Da approvare' }).click();
-    await expect(live).toHaveText(/\d+ risultati/);
+    await expect(live).toHaveText(/\d+ results/);
     await expect(live.locator('[data-rop-count]')).toHaveCount(0);
   });
 
