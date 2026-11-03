@@ -652,7 +652,7 @@ describe('isEqual', () => {
   });
 
   it('inside an Empty subtree the default stays "no entry" and the visit asks every descendant once', () => {
-    const isEqual = vi.fn((): boolean | undefined => undefined);
+    const isEqual = vi.fn<NonNullable<ChangeSummaryOptions<Loose>['isEqual']>>(() => undefined);
     expect(diff({ a: { b: null, c: { d: '' } } }, { a: { b: '', e: [] } }, { isEqual })).toEqual([]);
     expect(isEqual.mock.calls.map((c) => c[2])).toEqual(['a', 'a.b', 'a.e', 'a.c', 'a.c.d']);
   });
