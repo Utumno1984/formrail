@@ -72,7 +72,8 @@ export interface ChangeEntry {
  *
  * Circular structures are supported: a (baseline, values) pair already being compared higher up
  * the stack is assumed equal. Depth is not limited by the JavaScript call stack (the visit is
- * iterative, tested at 10 000 levels) and the cost stays linear in the number of visited nodes.
+ * iterative, tested at 10 000 levels) and the cost is linear in the number of visited nodes (pathological exception: positional arrays nested
+ * thousands of levels deep with a difference at the bottom, which cost quadratic time).
  *
  * ## Order of `entries`
  *
