@@ -444,7 +444,7 @@ const rowsOf = (canvas: { getAllByRole: (role: string) => HTMLElement[] }): HTML
 /** Loading without rows: five skeleton rows under the same header, `aria-busy` on the scroller. */
 export const Loading: Story = {
   tags: ['visual'],
-  parameters: stateParameters('`status="loading"` senza righe.'),
+  parameters: stateParameters('`status="loading"` with no rows.'),
   render: stateRender({ rows: [], status: 'loading' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -457,7 +457,7 @@ export const Loading: Story = {
 /** Empty: the message in one cell across the columns. */
 export const Empty: Story = {
   tags: ['visual'],
-  parameters: stateParameters('Nessuna riga in input.'),
+  parameters: stateParameters('No rows in the input.'),
   render: stateRender({ rows: [] }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -486,7 +486,7 @@ export const NoResults: Story = {
 /** Error: a Message Strip with "Retry" in place of the body; the header stays. */
 export const ErrorState: Story = {
   tags: ['visual'],
-  parameters: stateParameters('Errore di caricamento con `onRetry`.'),
+  parameters: stateParameters('Load error with `onRetry`.'),
   render: stateRender({ rows: [], status: 'error', onRetry: fn() }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -523,7 +523,7 @@ export const ErrorLongMessage: Story = {
 /** Reload with data: the rows stay, nothing changes height, the scroller is busy. */
 export const Reloading: Story = {
   tags: ['visual'],
-  parameters: stateParameters('`status="loading"` con righe già presenti: restano visibili, niente scheletri.'),
+  parameters: stateParameters('`status="loading"` with rows already present: they stay visible, no skeletons.'),
   render: stateRender({ rows: INVOICES.slice(0, 8), status: 'loading' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
