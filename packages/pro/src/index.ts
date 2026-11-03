@@ -1,3 +1,10 @@
-// Public entry of @react-object-page/pro. Exports are added by the feature tickets (the first
-// one is the Change Summary engine, #174); the scaffold only proves the toolchain end to end.
-export {};
+// Public entry of @react-object-page/pro.
+export { computeChangeSummary } from './change-summary/compute-change-summary';
+export { useChangeSummary } from './change-summary/use-change-summary';
+export { inferSegmentLabel } from './change-summary/infer-label';
+export type {
+  ChangeEntry,
+  ChangeKind,
+  ChangeSummaryOptions,
+  UseChangeSummaryReturn,
+} from './change-summary/types';
