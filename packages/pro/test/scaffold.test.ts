@@ -7,7 +7,13 @@ describe('@react-object-page/pro scaffold', () => {
   });
 
   it('exports exactly the change-summary engine at runtime', () => {
-    expect(Object.keys(pro).sort()).toEqual(['computeChangeSummary', 'inferSegmentLabel', 'useChangeSummary']);
+    expect(Object.keys(pro).sort()).toEqual([
+      'ChangeSummary',
+      'computeChangeSummary',
+      'formatChangeValue',
+      'inferSegmentLabel',
+      'useChangeSummary',
+    ]);
   });
 });
 

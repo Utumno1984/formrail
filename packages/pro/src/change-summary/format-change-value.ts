@@ -12,11 +12,12 @@ export interface ChangeSummaryValueLabels {
   noValue: string;
   /** A `Date` whose time is `NaN`. Default `Invalid date`. */
   invalidDate: string;
-  /** Visible kind of an `added` entry. Default `Added`. */
+  /** Kind of an `added` entry. Default `added`; shown with its first letter upper-cased (CSS), the
+   *  text read by assistive technology is the lower-case one: `Note, added, Hello`. */
   added: string;
-  /** Visible kind of a `removed` entry. Default `Removed`. */
+  /** Kind of a `removed` entry. Default `removed` (see `added`). */
   removed: string;
-  /** Visible kind of a `changed` entry. Default `Changed`. */
+  /** Kind of a `changed` entry. Default `changed` (see `added`). */
   changed: string;
   /** Visually hidden word before the value in the text read for `changed`. Default `from`. */
   from: string;
@@ -33,9 +34,9 @@ export const DEFAULT_VALUE_LABELS: ChangeSummaryValueLabels = {
   empty: 'Empty',
   noValue: 'No value',
   invalidDate: 'Invalid date',
-  added: 'Added',
-  removed: 'Removed',
-  changed: 'Changed',
+  added: 'added',
+  removed: 'removed',
+  changed: 'changed',
   from: 'from',
   to: 'to',
   items: (count) => (count === 0 ? 'No items' : count === 1 ? '1 item' : `${count} items`),
