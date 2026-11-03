@@ -204,6 +204,12 @@ describe('internal icons', () => {
     expect(exposed.sort()).toEqual([
       'Avatar',
       'Button',
+      'Card',
+      'CardBody',
+      'CardDescription',
+      'CardFooter',
+      'CardHeader',
+      'CardTitle',
       'Combobox',
       'DescriptionList',
       'DescriptionListItem',
