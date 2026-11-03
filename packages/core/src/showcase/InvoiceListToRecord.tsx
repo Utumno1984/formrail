@@ -12,7 +12,7 @@
 //     Forward reopens the record), otherwise (deep link) a `replaceState` to the same URL without `record`;
 //   - the list restores its scroll by itself (`useListReportScrollRestoration`, keyed on the list's own
 //     parameters: `record` is not one of them); focus goes back to the opened row's link, or to the title.
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
 import { ListReport } from '../list-report/ListReport';
 import { useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
@@ -20,7 +20,7 @@ import { updateSearch, useListReportUrlState } from '../list-report/use-list-rep
 import type { DemoInvoice } from '../internal/demo-invoices';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
 import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
-import { createInvoiceStore, type InvoiceStore } from './invoice-store';
+import { createInvoiceStore, type InvoiceStore, type SaveOutcome, type StoredInvoice } from './invoice-store';
 
 export type NavigateEvent = { to: 'record'; id: string } | { to: 'list' };
 
@@ -31,6 +31,12 @@ export interface InvoiceListToRecordProps {
   recordLoadDelayMs: number;
   /** Called on the list <-> record navigations the user starts (link, "Back to list"), never on Back/Forward. */
   onNavigate: (event: NavigateEvent) => void;
+  /** How long a save takes (#151). Default 400. */
+  saveDelayMs?: number;
+  /** `error`: the save fails, the form stays dirty and the store is unchanged (#151). Default `success`. */
+  saveOutcome?: SaveOutcome;
+  /** Called once per successful save with the record as the server stored it, even if the page was left meanwhile. */
+  onSaved?: (invoice: StoredInvoice) => void;
 }
 
 declare global {
@@ -210,31 +216,60 @@ function ListView({ store, history, returning, returnedFrom, onOpen }: ListViewP
 
 /* ---------------------------------------------------------------------- demo */
 
-export function InvoiceListToRecord({ history, listLoadDelayMs, recordLoadDelayMs, onNavigate }: InvoiceListToRecordProps) {
+export function InvoiceListToRecord({
+  history,
+  listLoadDelayMs,
+  recordLoadDelayMs,
+  onNavigate,
+  saveDelayMs = 400,
+  saveOutcome = 'success',
+  onSaved,
+}: InvoiceListToRecordProps) {
   // One store per mount of the story: nothing shared between stories.
   const [store] = useState(() => createInvoiceStore());
   const delays = useRef({ listLoadDelayMs, recordLoadDelayMs });
   const callbacks = useRef(onNavigate);
+  const savedCallback = useRef(onSaved);
   useEffect(() => {
     delays.current = { listLoadDelayMs, recordLoadDelayMs };
     callbacks.current = onNavigate;
+    savedCallback.current = onSaved;
   });
+  // Layout effect: applies before the page's passive effects, so a changed control reaches the next call.
+  useLayoutEffect(() => {
+    store.configure({ saveDelayMs, saveOutcome });
+  }, [store, saveDelayMs, saveOutcome]);
   // The store has ONE read delay: the list and the record each set theirs just before their call
   // (the store reads its configuration when the call is made).
-  const api = useMemo<InvoiceStore>(
-    () => ({
+  // A save outlives the page that started it (leave with "Discard changes" while it runs). Reads wait for the
+  // saves in flight, so a list or a re-opened record never shows (and a later save never builds on) a value
+  // older than the one the server is about to hold: no stale echo can overwrite a fresher save.
+  const api = useMemo<InvoiceStore>(() => {
+    const saving = new Set<Promise<unknown>>();
+    const settled = async () => {
+      while (saving.size > 0) await Promise.allSettled([...saving]);
+    };
+    return {
       ...store,
-      list: () => {
+      save: (invoice) => {
+        const run = store.save(invoice);
+        saving.add(run);
+        const done = () => void saving.delete(run);
+        run.then(done, done);
+        return run;
+      },
+      list: async () => {
+        await settled();
         store.configure({ loadDelayMs: delays.current.listLoadDelayMs });
         return store.list();
       },
-      get: (id) => {
+      get: async (id) => {
+        await settled();
         store.configure({ loadDelayMs: delays.current.recordLoadDelayMs });
         return store.get(id);
       },
-    }),
-    [store],
-  );
+    };
+  }, [store]);
   useEffect(() => {
     window.__ropShowcaseStore = store;
     return () => {
@@ -258,13 +293,14 @@ export function InvoiceListToRecord({ history, listLoadDelayMs, recordLoadDelayM
     callbacks.current({ to: 'record', id });
     openRecord(id);
   }).current;
+  const saved = useRef((invoice: StoredInvoice) => savedCallback.current?.(invoice)).current;
   const back = useRef(() => {
     if (leaving) return; // already on its way back: no second navigation, no second report
     callbacks.current({ to: 'list' });
     leaveRecord();
   }).current;
 
-  if (record) return <InvoiceRecordPage store={api} recordId={record} onBack={back} />;
+  if (record) return <InvoiceRecordPage store={api} recordId={record} onBack={back} onSaved={saved} />;
   return (
     <ListView
       store={api}

@@ -37,4 +37,62 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     expect(onNavigate).toHaveBeenLastCalledWith({ to: 'list' });
     await waitFor(() => expect(screen.getByRole('link', { name: 'FT-2026-0012' })).toBe(document.activeElement));
   });
+
+  it('save in flight + Back + Discard changes: leaves at once, the store gets the saved value, no React warning', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const onSaved = vi.fn();
+    render(
+      <StrictMode>
+        <InvoiceListToRecord
+          history="replace"
+          listLoadDelayMs={0}
+          recordLoadDelayMs={0}
+          saveDelayMs={150}
+          onNavigate={vi.fn()}
+          onSaved={onSaved}
+        />
+      </StrictMode>,
+    );
+    await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }));
+    const amount = await screen.findByRole('textbox', { name: /Amount/ });
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '4242.424');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(window.location.search).not.toContain('record='));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(window.__ropShowcaseStore?.snapshot().find((r) => r.id === 'inv-12')?.amount).toBe(4242.42);
+    // The list reloading after the return is async and outside `act`: a harness notice, not a React warning
+    // about the save resolving after the page is gone.
+    expect(errors.mock.calls.filter(([message]) => !String(message).includes('not wrapped in act'))).toEqual([]);
+    errors.mockRestore();
+  }, 20_000);
+
+  it('leaving during a save and re-opening the record: it shows the saved value, a second save keeps it', async () => {
+    render(
+      <StrictMode>
+        <InvoiceListToRecord history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={1500} onNavigate={vi.fn()} />
+      </StrictMode>,
+    );
+    await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }));
+    const amount = await screen.findByRole('textbox', { name: /Amount/ });
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '4242.424');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    // Re-open at once: the read waits for the save in flight.
+    await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }, { timeout: 5000 }));
+    const reopened = await screen.findByRole('textbox', { name: /Amount/ }, { timeout: 5000 });
+    expect(reopened).toHaveProperty('value', '4242.42');
+    const notes = screen.getByRole('textbox', { name: 'Notes' });
+    await userEvent.type(notes, ' x');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const stored = () => window.__ropShowcaseStore?.snapshot().find((r) => r.id === 'inv-12');
+    await waitFor(() => expect(stored()?.notes).toContain(' x'), { timeout: 5000 });
+    const row = stored();
+    expect(row?.amount).toBe(4242.42);
+    expect(row?.notes).toContain(' x');
+  }, 20_000);
 });

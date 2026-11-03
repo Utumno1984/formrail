@@ -169,11 +169,19 @@ const NOT_HERE = { control: false, table: { disable: true } } as const;
 const LIST_TO_RECORD_ARGTYPES = {
   recordId: NOT_HERE,
   loadDelayMs: NOT_HERE,
-  saveDelayMs: NOT_HERE,
-  saveOutcome: NOT_HERE,
+  saveDelayMs: {
+    control: { type: 'range', min: 0, max: 3000, step: 100 },
+    description:
+      'How long a save takes. Leaving the page while a save is in flight (Back to list, then "Discard changes") goes at once; the save still completes and the store then holds the saved value.',
+  },
+  saveOutcome: {
+    control: 'radio',
+    options: ['success', 'error'],
+    description: '`error`: the save fails, the form stays dirty with the message in the footer and the store is unchanged.',
+  },
   loadOutcome: NOT_HERE,
   onBack: NOT_HERE,
-  onSaved: NOT_HERE,
+  onSaved: { control: false, description: 'Called once per successful save with the record as the server stored it.' },
   listLoadDelayMs: {
     control: { type: 'range', min: 0, max: 3000, step: 100 },
     description: 'How long the list takes to arrive, every time it mounts (also when coming back).',
@@ -198,6 +206,9 @@ const LIST_TO_RECORD_ARGS = {
   recordLoadDelayMs: 300,
   history: 'replace',
   onNavigate: fn(),
+  saveDelayMs: 400,
+  saveOutcome: 'success',
+  onSaved: fn(),
 } satisfies Partial<ListToRecordArgs>;
 
 function resetListToRecord(win: Window): void {
@@ -276,6 +287,132 @@ export const ListToRecord: StoryObj<ListToRecordArgs> = {
 
 /** `ListToRecord` without a `play` function: what `e2e/showcase-list-to-record.spec.ts` drives with real input. */
 export const ListToRecordManual: StoryObj<ListToRecordArgs> = {
+  argTypes: LIST_TO_RECORD_ARGTYPES,
+  args: LIST_TO_RECORD_ARGS,
+  render: (args) => <InvoiceListToRecord {...args} />,
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* #151: edit -> save / discard -> back to a list that reflects the store, with the dirty guard. */
+/* ------------------------------------------------------------------------------------------ */
+
+/** Lets a programmatic scroll report itself (next frame) and be saved before the script leaves the list. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+/**
+ * The round a buyer wants to see: filter, sort, scroll, open a record, change the amount, "Back to list" asks
+ * for confirmation, "Keep editing" keeps the value and the focus on "Back to list", Save, then "Back to list"
+ * leaves with no question and the list shows the amount as the "server" normalized it (the row moved because of
+ * the sort), where the list was (pill, search, sort, scroll). Then another record: change, Back, "Discard
+ * changes" and the list is unchanged.
+ *
+ * Declared behaviour: leaving while a save is in flight ("Back to list", then "Discard changes") is immediate;
+ * the save is not cancelled, so once it resolves the store holds the saved value. The demo's reads (the list,
+ * a re-opened record) wait for the saves in flight, so they show that value and a later save cannot overwrite
+ * it with an older one. The browser's Back button is
+ * not intercepted (a documented limit of `useDirtyGuard`, which has no router integration): with unsaved
+ * changes it leaves without asking and the changes are lost, while closing or reloading the page still gets
+ * the browser's own prompt. Controls: both load delays, `saveDelayMs`, `saveOutcome` (`error` keeps the form
+ * dirty with the message in the footer), `history`.
+ */
+export const EditFlow: StoryObj<ListToRecordArgs> = {
+  argTypes: LIST_TO_RECORD_ARGTYPES,
+  args: LIST_TO_RECORD_ARGS,
+  render: (args) => <InvoiceListToRecord {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('EditFlow: no window');
+    resetListToRecord(win);
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+
+    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'FT-2026-00{Enter}');
+    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
+    const scrollerOf = () => canvas.getByRole('table').parentElement as HTMLElement;
+    scrollerOf().scrollTop = 400;
+    await waitFor(() => expect(scrollerOf().scrollTop).toBe(400));
+    const before = scrollerOf().scrollTop;
+    await settle();
+
+    const pickLink = (skip?: string) => {
+      const area = scrollerOf().getBoundingClientRect();
+      const found = canvas
+        .getAllByRole('link')
+        .find(
+          (l) =>
+            l.textContent !== skip &&
+            l.getBoundingClientRect().top > area.top + 120 &&
+            l.getBoundingClientRect().bottom < area.bottom,
+        );
+      if (!found) throw new Error('EditFlow: no link in view');
+      return found;
+    };
+    const rowOf = (number: string) => canvas.getByRole('link', { name: number }).closest('tr') as HTMLElement;
+    const amountCell = (number: string) => within(rowOf(number)).getAllByRole('cell')[3] as HTMLElement;
+    const back = () => canvas.findByRole('button', { name: 'Back to list' });
+    const amountField = () => canvas.findByRole('textbox', { name: /Amount/ });
+    const listBack = () => waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+
+    // 1. Open a record, change the amount, "Back to list" asks, "Keep editing" keeps everything.
+    const link = pickLink();
+    const number = link.textContent ?? '';
+    const id = link.getAttribute('data-record-id') ?? '';
+    await userEvent.click(link);
+    const amount = (await amountField()) as HTMLInputElement;
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '12345.678');
+    await userEvent.click(await back());
+    const dialog = await body.findByRole('dialog', { name: 'Unsaved changes' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(amount).toHaveValue('12345.678');
+    await waitFor(() => expect(canvas.getByRole('button', { name: 'Back to list' })).toHaveFocus());
+    await expect(new URLSearchParams(win.location.search).get('record')).toBe(id);
+
+    // 2. Save, then leave with no question: the row shows the normalized amount, moved by the sort.
+    const bar = await canvas.findByRole('region', { name: 'Save actions' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull());
+    await expect(amount).toHaveValue('12345.68');
+    await expect(args.onSaved).toHaveBeenCalledTimes(1);
+    await userEvent.click(canvas.getByRole('button', { name: 'Back to list' }));
+    await expect(body.queryByRole('dialog')).toBeNull();
+    await listBack();
+    await expect(amountCell(number)).toHaveTextContent('12.345,68 €');
+    await expect(canvas.getAllByRole('row')[1]).toBe(rowOf(number));
+    let params = new URLSearchParams(win.location.search);
+    await expect(params.get('record')).toBeNull();
+    await expect([params.get('filter'), params.get('q'), params.get('sort')]).toEqual(['open', 'FT-2026-00', 'amount.desc']);
+    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
+    await waitFor(() => expect(Math.abs(scrollerOf().scrollTop - before)).toBeLessThanOrEqual(1));
+    // The saved row moved above the scrolled-to area: the focus goes to the list title.
+    await waitFor(() => expect(canvas.getByRole('heading', { level: 2, name: /Invoices/ })).toHaveFocus());
+
+    // 3. Another record: change, Back, "Discard changes": the list and the store are unchanged.
+    const other = pickLink(number);
+    const otherNumber = other.textContent ?? '';
+    const otherAmount = amountCell(otherNumber).textContent ?? '';
+    const stored = JSON.stringify(window.__ropShowcaseStore?.snapshot());
+    await userEvent.click(other);
+    const field = (await amountField()) as HTMLInputElement;
+    await userEvent.clear(field);
+    await userEvent.type(field, '777');
+    await userEvent.click(await back());
+    const confirm = await body.findByRole('dialog', { name: 'Unsaved changes' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Discard changes' }));
+    await listBack();
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(amountCell(otherNumber)).toHaveTextContent(otherAmount);
+    await expect(JSON.stringify(window.__ropShowcaseStore?.snapshot())).toBe(stored);
+    params = new URLSearchParams(win.location.search);
+    await expect(params.get('record')).toBeNull();
+  },
+};
+
+/** `EditFlow` without a `play` function: what `e2e/showcase-edit-flow.spec.ts` drives with real input. */
+export const EditFlowManual: StoryObj<ListToRecordArgs> = {
   argTypes: LIST_TO_RECORD_ARGTYPES,
   args: LIST_TO_RECORD_ARGS,
   render: (args) => <InvoiceListToRecord {...args} />,
