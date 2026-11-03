@@ -6,6 +6,22 @@
       "baseline": 11348,
       "limit": 12483
     },
+    "Breadcrumb": {
+      "baseline": 10387,
+      "limit": 11426
+    },
+    "BreadcrumbItem": {
+      "baseline": 10577,
+      "limit": 11635
+    },
+    "BreadcrumbLink": {
+      "baseline": 31458,
+      "limit": 34604
+    },
+    "BreadcrumbPage": {
+      "baseline": 31290,
+      "limit": 34419
+    },
     "Button": {
       "baseline": 13146,
       "limit": 14461
