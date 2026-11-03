@@ -1,0 +1,5 @@
+---
+'@react-object-page/core': minor
+---
+
+`useDirtyGuard`: while `when` is true, the browser's Back/Forward now opens the same confirmation dialog instead of silently losing the changes; "Leave without saving" completes the original traversal. With the Navigation API (Chromium) the traversal is cancelled outright: no `popstate` fires, so routers and `useListReportUrlState` on the browser History never see it. Without it the hook can only undo the traversal after the fact with `history.go(-delta)` (no entry is pushed, the forward history is kept), so a `popstate` router registered before the hook may still react, and every traversal is assumed to be Back by one entry: best effort, documented in the hook's JSDoc. Not covered: adapters that do not use the browser History (e.g. an in-memory `ListReportUrlAdapter`) and navigations that do not traverse the history (router link clicks), which still need `guard(action)`. With several active hooks only one intercepts (the last activated; the outer one when nested), so a traversal never opens two dialogs. Opt-in through the existing `when`; `beforeunload` is unchanged.

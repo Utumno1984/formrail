@@ -1,4 +1,5 @@
 import { expect, test, type Dialog, type Locator, type Page } from '@playwright/test';
+import { browserBack } from './helpers/history';
 import { expectPlayToPass } from './helpers/story';
 
 // #151: Showcase/Invoices -> EditFlow. List -> record -> edit -> save / discard -> list that reflects the store.
@@ -186,7 +187,9 @@ test.describe('Showcase/Invoices: EditFlow', () => {
     expect(problems).toEqual([]);
   });
 
-  test('browser Back with a dirty form: documented limit, coherent list, no Dialog, no scroll lock, no beforeunload left', async ({ page }) => {
+  // #154 lifted the former "documented limit" of this test (browser Back with a dirty form went to the list
+  // with no Dialog and lost the edits): now Back asks first; "Leave" completes it, with the same end state.
+  test('browser Back with a dirty form: Dialog first (record and value kept), Leave then gives a coherent list, no scroll lock, no beforeunload left', async ({ page }) => {
     await trackBeforeUnload(page);
     await openList(page);
     const number = (await page.locator('a[data-record-id]').nth(2).innerText()).trim();
@@ -194,7 +197,13 @@ test.describe('Showcase/Invoices: EditFlow', () => {
     await openRecord(page, number);
     await typeAmount(page, '1234');
     expect(await beforeUnloadCount(page)).toBe(1);
-    await page.goBack();
+    browserBack(page);
+    await expect(dialogOf(page)).toBeVisible();
+    expect(params(page).get('record')).not.toBeNull();
+    await page.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(amountInput(page)).toHaveValue('1234');
+    browserBack(page);
+    await page.getByRole('button', { name: 'Discard changes' }).click();
     await expect(table(page)).toBeVisible();
     await expect(dialogOf(page)).toHaveCount(0);
     expect(params(page).get('record')).toBeNull();

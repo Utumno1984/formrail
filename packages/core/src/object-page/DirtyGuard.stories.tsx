@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
@@ -148,6 +148,40 @@ export const InsideDialog: Story = {
               {dialog}
             </DialogContent>
           </Dialog>
+        </main>
+      );
+    }
+    return <Root />;
+  },
+};
+
+/**
+ * Fixture for the e2e suite and the smoke test: browser Back/Forward with a modified field. Three
+ * history entries (`#step-1`, `#step-2`, `#step-3`, the last one current); the "router" below only
+ * reads `location.hash` on `popstate`. Type in the field, press the browser's Back/Forward: the dialog
+ * opens and the route does not move until "Leave without saving".
+ */
+export const BrowserHistory: Story = {
+  render: ({ title, description, stay, leave }) => {
+    function Root() {
+      const [hash, setHash] = useState(() => window.location.hash);
+      const [value, setValue] = useState('');
+      useEffect(() => {
+        for (const h of ['#step-1', '#step-2', '#step-3']) window.history.pushState(null, '', h);
+        setHash(window.location.hash);
+        const onPop = () => setHash(window.location.hash);
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+      }, []);
+      const { dialog } = useDirtyGuard({ when: value !== '', labels: { title, description, stay, leave } });
+      return (
+        <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
+          <p data-testid="route">Route: {hash || '(none)'}</p>
+          <label>
+            Supplier name
+            <input value={value} onChange={(e) => setValue(e.target.value)} style={{ marginLeft: 8 }} />
+          </label>
+          {dialog}
         </main>
       );
     }

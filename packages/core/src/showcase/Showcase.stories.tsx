@@ -309,10 +309,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
  * Declared behaviour: leaving while a save is in flight ("Back to list", then "Discard changes") is immediate;
  * the save is not cancelled, so once it resolves the store holds the saved value. The demo's reads (the list,
  * a re-opened record) wait for the saves in flight, so they show that value and a later save cannot overwrite
- * it with an older one. The browser's Back button is
- * not intercepted (a documented limit of `useDirtyGuard`, which has no router integration): with unsaved
- * changes it leaves without asking and the changes are lost, while closing or reloading the page still gets
- * the browser's own prompt. Controls: both load delays, `saveDelayMs`, `saveOutcome` (`error` keeps the form
+ * it with an older one. The browser's Back/Forward is
+ * intercepted by `useDirtyGuard` (#154) with the same dialog; in a browser without the Navigation API this
+ * is best effort (see its docs), while closing or reloading the page gets the browser's own prompt. Controls: both load delays, `saveDelayMs`, `saveOutcome` (`error` keeps the form
  * dirty with the message in the footer), `history`.
  */
 export const EditFlow: StoryObj<ListToRecordArgs> = {
