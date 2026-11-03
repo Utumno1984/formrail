@@ -9,4 +9,6 @@
 - `Select` `emptyLabel`: "No options" (was "Nessuna opzione").
 - `Combobox` `emptyLabel`: "No results" (was "Nessun risultato").
 
+Scope: only these four defaults change here. Other Italian defaults (`ListReport` table states, `ObjectPageFooter`, the error-summary message) are still Italian and are tracked in #164.
+
 Anyone passing these labels explicitly is unaffected. To keep Italian, pass the previous strings. Tests or queries that match the old Italian defaults must be updated.
