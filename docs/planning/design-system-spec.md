@@ -261,6 +261,64 @@ più il default per il progetto nel suo complesso.
   stessa release quando sono accoppiati — un primitivo "che rompe" pubblicato senza il fix compagno
   crea una finestra di versione "avvelenata" che i consumer possono installare per sbaglio.
 
+### 1.12 Primitivi Free di completamento (gap rispetto alle librerie open source generaliste) — **difficoltà: bassa-media, DatePicker media-alta**
+
+**Decisione di Daniele del 2026-11-03.** Dal confronto con le librerie di componenti React open source
+generaliste mancano alcuni primitivi che un consumer si aspetta di trovare in qualunque DS. Sono
+tutti **Free** (§3): standard, ampiamente disponibili altrove, servono per l'adozione. Ognuno è un
+ticket indipendente, sviluppabile in un proprio branch/worktree (unica eccezione: DatePicker
+dipende da Calendar).
+
+Verifica anti-duplicati sul codice esistente (2026-11-03) — nessuno esiste già come primitivo
+esportato, ma alcuni hanno un parente interno da tenere presente:
+
+| Componente | Sovrapposizione esistente | Esito |
+|---|---|---|
+| **Toast / notifica** | `MessageStrip` è un messaggio *inline* persistente, non transitorio né a portale | nuovo primitivo |
+| **Tabs** | `ObjectPageAnchorBar` è navigazione ancorata con scroll-spy (link a sezioni sempre montate), non pannelli alternativi | nuovo primitivo |
+| **Accordion / Collapse** | nessuna (le sezioni dell'Object Page non sono collassabili) | nuovo primitivo |
+| **Avatar** | nessuna | nuovo primitivo |
+| **Breadcrumb** | nessuna | nuovo primitivo |
+| **Pagination** | citata in §1.1 come variante della List Report ma **mai implementata** | nuovo primitivo standalone; l'integrazione nella List Report è un ticket separato futuro |
+| **Progress bar** | nessuna | nuovo primitivo |
+| **Skeleton** | `SkeletonRows`/`skeletonBarClass` interni a `ListReportTable` (non esportati) | nuovo primitivo; la migrazione della tabella sul primitivo è fuori scope (eviterebbe churn delle baseline visive) |
+| **Spinner** | nessuna | nuovo primitivo |
+| **Checkbox** | nessuna (`Input` è solo testuale) | nuovo primitivo, integrato con `Field` |
+| **RadioGroup** | le pillole di `ListReportFilterBar` sono un `radiogroup` segmented di dominio, non un controllo di form | nuovo primitivo, integrato con `Field` |
+| **Switch** | nessuna | nuovo primitivo, integrato con `Field` |
+| **Card** | nessuna | nuovo primitivo |
+| **Divider** | nessuna | nuovo primitivo |
+| **Menu / Dropdown** | nessuna; è la base del menu overflow citato in §1.1/§1.4 | nuovo primitivo |
+| **Calendar** | nessuna (lo showcase usa `<Input type="date">` nativo) | nuovo primitivo |
+| **DatePicker** | idem | nuovo primitivo, **dipende da Calendar** |
+| Badge generico | già coperto da `StatusBadge` (#86) e dalla pillola conteggio della List Report (#82) | **scartato**, non è un gap |
+
+**Insidie di classe generale da portare nei ticket** (oltre a quelle di §1.6/§1.7 che valgono per
+ogni primitivo):
+- I controlli booleani/a scelta (Checkbox, RadioGroup, Switch) devono passare dallo stesso cablaggio
+  di `Field` degli altri controlli (`useFieldControlProps`: `aria-describedby`, `aria-invalid`,
+  stati forced/locked **non interagibili anche da tastiera e da click sulla label**) e non generare
+  un `onChange` di eco quando il valore cambia dall'esterno (§1.4).
+- Overlay nuovi (Menu/Dropdown, popover del DatePicker) si appoggiano a `overlayLayer`: niente
+  z-index letterali, ritorno del fuoco al trigger, corretti anche dentro Dialog/Sheet. Il Toast è il
+  primo overlay *non modale e persistente mentre l'utente lavora*: il suo livello nella scala
+  z-index va deciso esplicitamente (e un Toast non deve mai rubare il fuoco).
+- Una voce di Menu deve ereditare `onClick`/`disabled` da ciò che rappresenta (insidia §1.1).
+- Annunci: Toast e Progress/Spinner annunciano tramite una regione live **già montata** (una regione
+  creata insieme al messaggio non viene letta), senza ripetere lo stesso annuncio a ogni render.
+- Motion (Toast, Accordion, Spinner, Skeleton) dichiarata come token e disattivata con
+  `prefers-reduced-motion` (regola "Motion" di CLAUDE.md).
+- Impronta stabile: Skeleton/Avatar (fallback → immagine caricata), Pagination (cambio di numero
+  di pagine) e Tabs (cambio di pannello) non devono produrre salti di layout evitabili.
+
+**Nota futura — Toast avanzato (Pro), non pianificato.** Stesso schema già usato per List Report e
+Object Page (base Free, estensione avanzata Pro): il Toast Free copre il singolo messaggio
+transitorio accessibile; un eventuale **Toast avanzato** Pro aggiungerebbe coda multi-toast con
+priorità e limite di visibili, pausa del timer su hover/focus e su finestra non attiva, persistenza
+tra navigazioni/ricariche, hook di analytics (mostrato/chiuso/azione). Nessun ticket finché Daniele
+non lo chiede esplicitamente; il Toast Free va disegnato in modo che questa estensione non richieda
+una rottura della sua API.
+
 ---
 
 ## 2. Architettura proposta
@@ -345,6 +403,8 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
 | Description List (inline/stacked) | ✅ | | Difficoltà media, ma componente "vetrina" per mostrare la qualità del DS e attirare adozione |
 | List Report client-side semplice (no virtualizzazione) | ✅ | | Buona come showcase, ma senza il pezzo difficile |
 | Object Page base (sezioni + save-bar semplice) | ✅ | | Idem: mostra il pattern, senza il dirty-tracking avanzato |
+| Primitivi di completamento (§1.12): Toast singolo, Tabs, Accordion, Avatar, Breadcrumb, Pagination standalone, Progress bar, Skeleton, Spinner, Checkbox, RadioGroup, Switch, Card, Divider, Menu/Dropdown, Calendar, DatePicker | ✅ | | Attesi in qualunque DS, ampiamente disponibili altrove: servono per l'adozione (decisione di Daniele del 2026-11-03) |
+| Toast avanzato (coda multi-toast, pausa su hover/focus, persistenza, analytics) | | ✅ (nota futura, non pianificato) | Stesso schema Free base / Pro avanzato di List Report e Object Page; vedi §1.12 |
 | **List Report virtualizzata per dataset grandi** | | ✅ | Virtualizzazione + scroll/selection/drag coerenti è lavoro ingegneristico alto, moat reale (già provato su react-virtual-tree-view/dnd-table) |
 | **Dirty-tracking robusto con idratazione asincrona** (niente "eco" su valore esterno, niente falsi dirty) | | ✅ | Insidia sottile e ricorrente (§1.4), risolverla bene è anni di esperienza concentrati, difficile da replicare al volo |
 | **Change Summary avanzato** (diff per-campo affidabile su dati annidati/array) | | ✅ | Logica non banale, alto valore percepito per i clienti enterprise |
