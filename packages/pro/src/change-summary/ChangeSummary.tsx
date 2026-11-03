@@ -135,7 +135,10 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
                   <Pause />
                 </span>
                 {entry.kind === 'changed' ? (
-                  <span className="flex min-w-0 flex-col gap-1 @md:flex-row @md:items-baseline @md:gap-2">
+                  // Row by default, stacked on a narrow container with `@max-md:` variants only: a base
+                  // `flex-col` + `@md:flex-row` pair breaks when a minifier merges the identical `.flex-col`
+                  // rule of core's stylesheet after the container-query block (same layer, later wins).
+                  <span className="flex min-w-0 gap-2 @md:items-baseline @max-md:flex-col @max-md:gap-1">
                     <Hidden>{`${labels.from} `}</Hidden>
                     <span className="min-w-0 text-rop-text-muted line-through">{show(entry.before, entry, beforeText)}</span>
                     <span aria-hidden="true" className="text-rop-text-muted @md:-rotate-90">

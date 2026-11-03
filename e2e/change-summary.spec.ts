@@ -62,8 +62,9 @@ test.describe('Pro/ChangeSummary', () => {
     const kind = first.getByText('changed', { exact: true });
     await expect(kind).toBeVisible();
     await expect(kind).toHaveCSS('text-transform', 'capitalize');
-    await expect(first.getByText('100', { exact: true })).toHaveCSS('text-decoration-line', 'line-through');
-    await expect(first.getByText('120', { exact: true })).toHaveCSS('text-decoration-line', 'none');
+    // The decoration is set on the wrapper of the value, not on the text span itself.
+    await expect(first.getByText('100', { exact: true }).locator('..')).toHaveCSS('text-decoration-line', 'line-through');
+    await expect(first.getByText('120', { exact: true }).locator('..')).toHaveCSS('text-decoration-line', 'none');
   });
 
   test('there is no live region, status or alert, with or without entries', async ({ page }) => {
@@ -154,13 +155,18 @@ test.describe('Pro/ChangeSummary', () => {
   }
 
   test('before and after stack vertically on a narrow container and sit side by side on a wide one', async ({ page }) => {
-    const positions = async () =>
-      page.evaluate(() => {
-        const li = document.querySelector('li') as HTMLElement;
-        const spans = Array.from(li.querySelectorAll('span')).filter((s) => ['100', '120'].includes(s.textContent ?? ''));
+    const positions = async () => {
+      await expect(page.getByText('120', { exact: true }).first()).toBeVisible();
+      return page.evaluate(() => {
+        const li = document.querySelector('ul[aria-label="Changes"] li') as HTMLElement;
+        // Innermost text spans only: their wrappers have the same text content.
+        const spans = Array.from(li.querySelectorAll('span')).filter(
+          (s) => ['100', '120'].includes(s.textContent ?? '') && s.children.length === 0,
+        );
         const [b, a] = spans.map((s) => s.getBoundingClientRect());
         return { sameRow: Math.abs((b as DOMRect).top - (a as DOMRect).top) < 4 };
       });
+    };
     await page.setViewportSize({ width: 375, height: 667 });
     await gotoStory(page, EDITED);
     expect(await positions()).toEqual({ sameRow: false });
@@ -179,7 +185,7 @@ test.describe('Pro/ChangeSummary', () => {
   });
 
   test('axe: no violations on the Playground with entries and on Empty', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND);
+    await expectPlayToPass(page, PLAYGROUND);
     await editAmount(page, '120');
     await page.getByRole('checkbox', { name: 'Paid' }).check();
     await page.getByRole('button', { name: 'Add line' }).click();
