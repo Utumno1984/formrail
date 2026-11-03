@@ -10,7 +10,6 @@ const PHOTO_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="192"><rect width="96" height="192" fill="#0a6ed1"/></svg>';
 
 const avatar = (page: Page) => page.getByTestId('avatar');
-const status = (page: Page) => avatar(page).getAttribute('data-rop-avatar-status');
 const size = (page: Page) => avatar(page).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height }));
 
 /** Serves the demo's "broken" URL as a real image after `delayMs` (null: let it 404). */
