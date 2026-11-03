@@ -171,3 +171,61 @@ test.describe('guard with changes', () => {
     await expect(outer).toBeVisible();
   });
 });
+
+test.describe('Back/Forward of the browser (popstate)', () => {
+  const HISTORY = 'patterns-dirtyguard--browser-history';
+  const route = (page: Page) => page.getByTestId('route');
+  const field = (page: Page) => page.getByLabel('Supplier name');
+  const hash = (page: Page) => page.evaluate(() => window.location.hash);
+  const settle = (page: Page) => page.waitForTimeout(300); // the undo (history.go) is asynchronous
+  const leave = (page: Page) => page.getByRole('button', { name: 'Leave without saving' }).click();
+
+  test('with changes, Back opens the dialog and the route does not move; "Keep editing" keeps the value', async ({
+    page,
+  }) => {
+    await gotoStory(page, HISTORY);
+    await expect(route(page)).toHaveText('Route: #step-3');
+    await field(page).fill('ACME');
+    await page.goBack();
+    await expect(confirmDialog(page)).toBeVisible();
+    await settle(page);
+    expect(await hash(page)).toBe('#step-3');
+    await expect(route(page)).toHaveText('Route: #step-3');
+    await page.getByRole('button', { name: 'Keep editing' }).click();
+    await expect(confirmDialog(page)).toBeHidden();
+    await expect(field(page)).toHaveValue('ACME');
+    expect(await hash(page)).toBe('#step-3');
+  });
+
+  test('"Leave without saving" completes the original Back/Forward; no spurious entry', async ({ page }) => {
+    await gotoStory(page, HISTORY);
+    await field(page).fill('ACME');
+    await page.goBack();
+    await leave(page);
+    await expect(route(page)).toHaveText('Route: #step-2');
+    expect(await hash(page)).toBe('#step-2');
+    // The page did not unmount, so the field is still modified: Forward asks again.
+    await page.goForward();
+    await expect(confirmDialog(page)).toBeVisible();
+    await settle(page);
+    expect(await hash(page)).toBe('#step-2');
+    await leave(page);
+    await expect(route(page)).toHaveText('Route: #step-3');
+    // Two Backs from step-3 reach step-1 exactly: no duplicated entry in between.
+    await page.goBack();
+    await leave(page);
+    await expect(route(page)).toHaveText('Route: #step-2');
+    await page.goBack();
+    await leave(page);
+    await expect(route(page)).toHaveText('Route: #step-1');
+  });
+
+  test('without changes, Back and Forward work normally with no dialog', async ({ page }) => {
+    await gotoStory(page, HISTORY);
+    await page.goBack();
+    await expect(route(page)).toHaveText('Route: #step-2');
+    await page.goForward();
+    await expect(route(page)).toHaveText('Route: #step-3');
+    await expect(confirmDialog(page)).toBeHidden();
+  });
+});

@@ -34,6 +34,17 @@ const DEFAULT_LABELS: Omit<DirtyGuardLabels, 'close'> = {
   leave: 'Leave without saving',
 };
 
+interface NavigationLike {
+  currentEntry?: { index: number } | null;
+  addEventListener?: (type: string, listener: (event: Event) => void) => void;
+  removeEventListener?: (type: string, listener: (event: Event) => void) => void;
+}
+
+function getNavigation(): NavigationLike | null {
+  if (typeof window === 'undefined') return null;
+  return (window as unknown as { navigation?: NavigationLike }).navigation ?? null;
+}
+
 export interface UseDirtyGuardOptions {
   /** `true` while there are unsaved changes (e.g. `useObjectPageForm().isDirty`, or any other state). */
   when: boolean;
@@ -59,7 +70,15 @@ export interface UseDirtyGuardReturn {
  *   bar navigation: the browser shows its own prompt). It is removed as soon as `when` turns false
  *   or the component unmounts. Two hooks on one page keep independent listeners.
  * - `guard(action)` wraps the consumer's own exit action (a router navigation, closing the page).
- *   Back/forward navigation of the browser is not intercepted.
+ * - While `when` is true, browser Back/Forward (`popstate`) opens the same dialog. The traversal is
+ *   undone at once with `history.go(-delta)` (no entry is pushed, the forward history is kept) and
+ *   the `popstate` is swallowed (capture phase + `stopImmediatePropagation`), so routers listening on
+ *   `window` never see it. "leave" repeats it with `history.go(delta)` and lets that `popstate`
+ *   through. Limits: it works on the native History API and on routers that listen to `popstate`
+ *   on `window` (e.g. `useListReportUrlState`); direction and size of the jump come from the
+ *   Navigation API (`window.navigation`): where it is missing every traversal is treated as Back by
+ *   one entry. Navigations a router performs without `popstate` (link clicks) are not covered:
+ *   wrap those in `guard`.
  *
  * Declared behaviour:
  * - A second `guard` call while the dialog is open is ignored: the first action stays pending.
@@ -116,6 +135,54 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     pendingRef.current = action;
     setOpen(true);
   }, []);
+
+  // Back/Forward (`popstate`). The browser cannot cancel a traversal that already happened, so the
+  // hook undoes it with `history.go(-delta)` (no `pushState`: no entry is added and the forward
+  // history survives) and, if the user confirms, repeats it with `history.go(delta)`.
+  const guardRef = useRef(guard);
+  useEffect(() => {
+    guardRef.current = guard;
+  }, [guard]);
+  useEffect(() => {
+    if (!when) return undefined;
+    const nav = getNavigation();
+    let traverseDelta: number | null = null;
+    let reverting = false;
+    let allow = false;
+    const onEntryChange = (event: Event) => {
+      const from = (event as unknown as { from?: { index: number } }).from;
+      const to = nav?.currentEntry?.index;
+      if (from && typeof to === 'number') traverseDelta = to - from.index;
+    };
+    nav?.addEventListener?.('currententrychange', onEntryChange);
+    const onPopState = (event: PopStateEvent) => {
+      if (allow) {
+        // The traversal the user confirmed: let it through to the app's router.
+        allow = false;
+        return;
+      }
+      // Capture phase + stopImmediatePropagation: the app's router never sees a traversal we undo.
+      event.stopImmediatePropagation();
+      if (reverting) {
+        reverting = false;
+        return;
+      }
+      // Without the Navigation API the direction is unknown: assume Back by one entry.
+      const delta = nav && traverseDelta ? traverseDelta : -1;
+      traverseDelta = null;
+      reverting = true;
+      window.history.go(-delta);
+      guardRef.current(() => {
+        allow = true;
+        window.history.go(delta);
+      });
+    };
+    window.addEventListener('popstate', onPopState, true);
+    return () => {
+      window.removeEventListener('popstate', onPopState, true);
+      nav?.removeEventListener?.('currententrychange', onEntryChange);
+    };
+  }, [when]);
 
   const stay = useCallback(() => {
     pendingRef.current = null;
