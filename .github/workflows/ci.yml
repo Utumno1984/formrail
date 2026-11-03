@@ -163,7 +163,8 @@ jobs:
   # Publishes the static Storybook to GitHub Pages. Runs only after every gate above is green, and
   # only on push to main (or a manual dispatch) - never on pull requests. The workflow-level token
   # stays read-only; this job alone gets the Pages permissions. Only the Free core stories are built
-  # (.storybook/main.ts globs packages/core); a future packages/pro demo needs its own build.
+  # (STORYBOOK_EXCLUDE_PRO=1 in the build step drops the packages/pro stories and CSS, see
+  # .storybook/story-globs.mjs); a future Pro demo needs its own build.
   deploy-pages:
     name: deploy storybook
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -187,7 +188,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Free stories only: .storybook/story-globs.mjs leaves packages/pro (stories and CSS) out.
       - run: npm run build-storybook
+        env:
+          STORYBOOK_EXCLUDE_PRO: '1'
       - uses: actions/upload-pages-artifact@v5
         with:
           path: storybook-static

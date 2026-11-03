@@ -10,10 +10,13 @@ Pro tier of react-object-page (commercial license, **to be defined**; see [LICEN
 - Same toolchain as `packages/core` (tsup, Vitest, shared ESLint/tsconfig) and the same governance:
   per-import bundle budget in [`bundle-budget.json`](./bundle-budget.json) (checked by
   `npm run bundle:check`, regenerated with `npm run bundle:update-baseline -- --package packages/pro`),
-  changeset required on every change. No Storybook or e2e yet: the first release is a pure engine
-  (see `docs/planning/design-system-spec.md` §7); the `<ChangeSummary />` component comes next.
-- No runtime dependency on `@react-object-page/core`: it works with any form state that exposes the
-  current values and the saved baseline (e.g. core's `useObjectPageForm`).
+  changeset required on every change. Storybook stories live under `Pro/` (included in dev, e2e and
+  visual builds; the public GitHub Pages deploy sets `STORYBOOK_EXCLUDE_PRO=1` and publishes Free only).
+- The engine (`computeChangeSummary`, `useChangeSummary`) works with any form state that exposes the
+  current values and the saved baseline (e.g. core's `useObjectPageForm`). The components
+  (`<ChangeSummary />`) use `@react-object-page/core` (`cn`, design tokens), declared as a
+  **peer dependency** and treated as external by the build. The peer range must be revisited when pro
+  is published.
 
 ## Change Summary engine
 
@@ -103,3 +106,50 @@ With a row changed, one added without id, one removed and two rows swapped, `ent
   verdict on a node does not depend on the siblings; there the default stays "no entry".
 - **Order**: depth-first; keys in the order of `values`, then baseline-only keys; id-matched arrays in
   the order of `values`, then the `removed` items in baseline order.
+
+## `<ChangeSummary />`
+
+An accessible, responsive list of the entries of the engine, to show in an Object Page before saving.
+
+### Styles and import order
+
+```ts
+import '@react-object-page/core/theme.css'; // 1. tokens (--rop-*)
+import '@react-object-page/core/styles.css'; // 2. core utilities
+import '@react-object-page/pro/styles.css'; //  3. pro component styles (consume the tokens, never redefine them)
+```
+
+Pro's `styles.css` holds only its own `.rop-pro-*` component classes, never a Tailwind utility also
+emitted by core, so it cannot override core's responsive variants: the result does not depend on the
+order of the imports. Its rules are in the nested layer `rop.utilities.pro`, below core's utilities:
+a core utility passed through `className` (`className="p-0"`) overrides the component's default, and
+your un-layered CSS overrides both.
+
+### Usage
+
+```tsx
+import { ChangeSummary, useChangeSummary } from '@react-object-page/pro';
+
+const { entries } = useChangeSummary({ values: form.values, baseline: form.baseline });
+<ChangeSummary entries={entries} locale="en-US" />;
+```
+
+- Props: `entries`, `renderValue?(value, entry)`, `emptyLabel` (`"No changes"`), `label` (accessible name of
+  the list, `"Changes"`), `locale`, `timeZone`, `valueLabels` (`yes`, `no`, `empty`, `noValue`,
+  `invalidDate`, `added`, `removed`, `changed`, `from`, `to`, `contentsDiffer`, `items`), `className`
+  (merged with `tailwind-merge`; a core utility wins over the component's default, see above), `ref`
+  and other HTML attributes on the root.
+- Text read by assistive technology: `Amount, changed, from 100 to 120`. The kind of change is visible
+  text, never only colour. There is no live region: a summary that changes at every keystroke is not
+  announced.
+- Default formatting (`formatChangeValue`, also exported, pure): booleans `Yes`/`No`; dates with
+  `Intl.DateTimeFormat` (`dateStyle: 'medium'`), `Invalid date` for invalid ones; numbers with
+  `Intl.NumberFormat`; `''` is `Empty`, `null`/`undefined` is `No value`; arrays `N items`; plain objects
+  a compact `Label: value` list. If before and after would look identical, both are re-rendered
+  precisely (time, ISO string, full number with `n` for a bigint, quoted string), then with their
+  contents written out (`["a", "b"]` / `["a", "c"]`, `{a: {x: 1}}`, `Map {"k" => 1}`, truncated to 120
+  characters); if even that matches (two class instances), the after side ends with
+  `(contents differ)`. `formatChangeValue` never throws (revoked Proxy, throwing traps or getters give
+  `Unsupported value`).
+- `renderValue` is called once for each value shown (never for the missing side of `added`/`removed`);
+  returning `null` leaves the value empty. An exception thrown by `renderValue` propagates.

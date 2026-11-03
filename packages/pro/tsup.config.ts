@@ -7,5 +7,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   target: 'es2022',
-  external: ['react', 'react-dom', 'react/jsx-runtime'],
+  external: ['react', 'react-dom', 'react/jsx-runtime', '@react-object-page/core'],
 });
