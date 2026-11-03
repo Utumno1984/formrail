@@ -102,7 +102,7 @@ function indexById(items: readonly unknown[], idKey: string): Map<unknown, numbe
 }
 
 /** Stand-in for an Empty side that has no keys of its own (Absent, `''`, `[]`). */
-const NO_KEYS: PlainObject = Object.freeze({});
+const NO_KEYS: PlainObject = /* @__PURE__ */ Object.freeze({});
 
 /**
  * A visited position. Linked to its parent instead of copying the segments, so a node costs O(1)
