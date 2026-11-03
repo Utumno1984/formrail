@@ -175,7 +175,7 @@ test.describe('Showcase/Invoices: EditFlow', () => {
     await footer(page).getByRole('button', { name: 'Save' }).click();
     await back(page).click();
     await dialogOf(page).getByRole('button', { name: 'Discard changes' }).click();
-    // Immediate: the list is there well before the 1.5 s save ends, still with the old amount.
+    // Immediate: the page changes well before the 1.5 s save ends (the list loads until the save settles).
     await expect(table(page)).toBeVisible({ timeout: 1000 });
     await expect(dialogOf(page)).toHaveCount(0);
     await expect
