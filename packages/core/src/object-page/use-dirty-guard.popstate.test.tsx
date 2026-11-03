@@ -83,6 +83,28 @@ describe('useDirtyGuard: popstate (Back/Forward)', () => {
     expect(go).toHaveBeenCalledWith(-1); // Forward by one, undone by Back
   });
 
+  it('a confirmed guard() action that navigates itself (history.back) is not intercepted again', async () => {
+    const seen = vi.fn();
+    window.addEventListener('popstate', seen);
+    function Opener() {
+      const { guard, dialog } = useDirtyGuard({ when: true });
+      return (
+        <>
+          <button onClick={() => guard(() => void window.dispatchEvent(new PopStateEvent('popstate')))}>
+            Back to list
+          </button>
+          {dialog}
+        </>
+      );
+    }
+    render(<Opener />);
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave without saving' }));
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    window.removeEventListener('popstate', seen);
+  });
+
   it('removes its listener when when turns false and on unmount', () => {
     const remove = vi.spyOn(window, 'removeEventListener');
     const { rerender, unmount } = render(<Host when />);

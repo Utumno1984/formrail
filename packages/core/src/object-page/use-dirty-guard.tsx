@@ -139,6 +139,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
   // Back/Forward (`popstate`). The browser cannot cancel a traversal that already happened, so the
   // hook undoes it with `history.go(-delta)` (no `pushState`: no entry is added and the forward
   // history survives) and, if the user confirms, repeats it with `history.go(delta)`.
+  const passUntilRef = useRef(0);
   const guardRef = useRef(guard);
   useEffect(() => {
     guardRef.current = guard;
@@ -156,9 +157,10 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     };
     nav?.addEventListener?.('currententrychange', onEntryChange);
     const onPopState = (event: PopStateEvent) => {
-      if (allow) {
-        // The traversal the user confirmed: let it through to the app's router.
+      if (allow || Date.now() < passUntilRef.current) {
+        // The traversal the user confirmed (or one started by the confirmed action): let it through.
         allow = false;
+        passUntilRef.current = 0;
         return;
       }
       // Capture phase + stopImmediatePropagation: the app's router never sees a traversal we undo.
@@ -200,6 +202,9 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
       setOpen(false);
       setLeaving(true);
     });
+    // The confirmed action may itself navigate (`history.back()`): its `popstate`, asynchronous, must
+    // not be intercepted again. The window closes at the first `popstate` or after a second.
+    passUntilRef.current = Date.now() + 1000;
     try {
       action?.();
     } finally {
