@@ -14,7 +14,7 @@ import {
 } from './list-report-table-styles';
 import type { ListReportColumn } from './types';
 
-/** Texts of `ListReportTable` (all overridable; the defaults are in Italian). */
+/** Texts of `ListReportTable` (all overridable; the defaults are in English). */
 export interface ListReportTableLabels {
   /** Announced when the table starts loading. */
   loading: string;

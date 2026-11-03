@@ -46,10 +46,10 @@ describe('ObjectPageFooter placement', () => {
   it('takes a custom label', () => {
     render(
       <ObjectPage>
-        <ObjectPageFooter visible label="Save actions" />
+        <ObjectPageFooter visible label="Azioni salvataggio" />
       </ObjectPage>,
     );
-    expect(screen.getByRole('region', { name: 'Save actions' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Azioni salvataggio' })).toBeInTheDocument();
   });
 
   it('declares the room of the actions row with a CSS variable, hidden or not', () => {
@@ -244,10 +244,10 @@ describe('ObjectPageFooter message', () => {
   it('takes a custom tone label', () => {
     render(
       <ObjectPage>
-        <ObjectPageFooter visible message="x" toneLabel="Error" />
+        <ObjectPageFooter visible message="x" toneLabel="Fallito" />
       </ObjectPage>,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Error: x');
+    expect(screen.getByRole('status')).toHaveTextContent('Fallito: x');
   });
 });
 

@@ -54,7 +54,7 @@ import { useObjectPageForm } from './use-object-page-form';
  * each rule, `z.string().min(1, 'Supplier is required.')`, or give the schema your own error map
  * (`z.config({ customError })` / `z.setErrorMap` depending on the Zod version, or the equivalent of
  * Valibot/ArkType). The footer summary text is the `message` option of `getErrorSummary` (its default
- * is Italian), and the guard dialog texts are `useDirtyGuard`'s `labels`.
+ * is English), and the guard dialog texts are `useDirtyGuard`'s `labels`.
  *
  * Declared limits
  *

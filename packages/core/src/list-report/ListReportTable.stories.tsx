@@ -473,7 +473,7 @@ export const Empty: Story = {
  */
 export const NoResults: Story = {
   tags: ['visual'],
-  parameters: stateParameters('Il filtro esclude tutte le righe: compare "Clear filters".'),
+  parameters: stateParameters('The filter excludes every row: "Clear filters" appears.'),
   render: stateRender({ rows: INVOICES.slice(0, 8), defaultFilter: 'none', onClearFilters: fn() }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

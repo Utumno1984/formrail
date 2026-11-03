@@ -30,7 +30,7 @@ describe('getErrorSummary', () => {
     expect(getErrorSummary({ a: undefined }, { formErrors: [] })).toBeUndefined();
   });
 
-  it('Italian default: singular for one, plural otherwise', () => {
+  it('English default: singular for one, plural otherwise', () => {
     expect(getErrorSummary({ supplier: 'Required' })).toBe('1 invalid field');
     expect(getErrorSummary({ supplier: 'Required', vat: 'Required' })).toBe('2 invalid fields');
     expect(getErrorSummary({ a: 'x', b: 'x', c: 'x', d: 'x', e: 'x', f: 'x', g: 'x', h: 'x', i: 'x', j: 'x', k: 'x' })).toBe(

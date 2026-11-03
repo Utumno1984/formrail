@@ -52,7 +52,7 @@ function getNavigation(): NavigationLike | null {
 export interface UseDirtyGuardOptions {
   /** `true` while there are unsaved changes (e.g. `useObjectPageForm().isDirty`, or any other state). */
   when: boolean;
-  /** Texts of the confirmation dialog; every key falls back to the Italian default. */
+  /** Texts of the confirmation dialog; every key falls back to the English default. */
   labels?: Partial<DirtyGuardLabels>;
 }
 

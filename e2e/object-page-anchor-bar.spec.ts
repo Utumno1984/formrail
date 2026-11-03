@@ -31,7 +31,7 @@ const settle = (page: Page) =>
 test.describe('Floorplans/Object Page/Anchor Bar', () => {
   test('a nav of real links in DOM order; none with one section or sectionNavigation=none', async ({ page }) => {
     await gotoStory(page, STORY('scrollable'), 'sectionCount:4');
-    const nav = page.getByRole('navigation', { name: 'Sezioni' });
+    const nav = page.getByRole('navigation', { name: 'Sections' });
     await expect(nav.getByRole('link')).toHaveText(['Dati generali', 'Fornitore', 'Righe', 'Importi']);
     await expect(nav.getByRole('link').first()).toHaveAttribute('href', '#sezione-1');
 
