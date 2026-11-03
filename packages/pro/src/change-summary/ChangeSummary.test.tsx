@@ -92,6 +92,21 @@ describe('<ChangeSummary />', () => {
     errors.mockRestore();
   });
 
+  it('gives no duplicate key warning when an added and a removed item share one path', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const entries = [
+      entry({ kind: 'removed', path: 'lines.1', label: 'Lines > Item 2', before: 'old' }),
+      entry({ kind: 'added', path: 'lines.1', label: 'Lines > Item 2', after: 'new' }),
+    ];
+    render(<ChangeSummary entries={entries} />);
+    expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+      'Lines > Item 2, removed, old',
+      'Lines > Item 2, added, new',
+    ]);
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
   it('merges className with tailwind-merge (p-0 replaces the default padding)', () => {
     const { container } = render(<ChangeSummary entries={[]} className="p-0" />);
     const root = container.firstElementChild as HTMLElement;

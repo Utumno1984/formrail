@@ -105,7 +105,9 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
             const [beforeText, afterText] = entry.kind === 'changed' && !renderValue ? pair(entry) : [undefined, undefined];
             return (
               <li
-                key={entry.path}
+                // path + kind: an `added` and a `removed` array item can share one path (the index
+                // in `values` against the index in the baseline), the path alone is not unique.
+                key={`${entry.kind}:${entry.path}`}
                 className="flex min-w-0 flex-col gap-1 [&:not(:first-child)]:pt-3 [&:not(:first-child)]:[border-top:1px_solid_var(--color-rop-border)]"
               >
                 <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
