@@ -185,13 +185,15 @@ describe('<ChangeSummary />', () => {
     it('mutes the empty / no value texts only', () => {
       const e = [entry({ kind: 'changed', before: '', after: 'x' })];
       render(<ChangeSummary entries={e} />);
-      expect(screen.getByText('Empty').className).toContain('text-rop-text-muted');
-      expect(screen.getByText('x').className).not.toContain('text-rop-text-muted');
+      // Muted modifier of pro's component classes (was the `text-rop-text-muted` utility; the
+      // computed colour / italic is asserted in the browser, e2e/change-summary.spec.ts).
+      expect(screen.getByText('Empty').className).toContain('rop-pro-change-summary__value--muted');
+      expect(screen.getByText('x').className).not.toContain('rop-pro-change-summary__value--muted');
     });
 
     it('keeps line breaks and spaces of a string (pre-wrap class)', () => {
       render(<ChangeSummary entries={[entry({ kind: 'added', after: 'a\n  b' })]} />);
-      const node = screen.getByText((_, el) => el?.textContent === 'a\n  b' && el.tagName === 'SPAN' && el.className.includes('whitespace-pre-wrap'));
+      const node = screen.getByText((_, el) => el?.textContent === 'a\n  b' && el.tagName === 'SPAN' && el.className.split(' ').includes('rop-pro-change-summary__value'));
       expect(node).toBeInTheDocument();
     });
 
@@ -210,6 +212,38 @@ describe('<ChangeSummary />', () => {
       const match = /from (.*) to (.*)$/s.exec(text);
       expect(match).not.toBeNull();
       expect(match?.[1]).not.toBe(match?.[2]);
+    });
+
+    it.each([
+      ['arrays of the same length', ['a', 'b'], ['a', 'c'], 'from ["a", "b"] to ["a", "c"]'],
+      ['nested objects', { a: { x: 1 } }, { a: { x: 2 } }, 'from {a: {x: 1}} to {a: {x: 2}}'],
+      ['Maps of the same size', new Map([['k', 1]]), new Map([['k', 2]]), 'from Map {"k" => 1} to Map {"k" => 2}'],
+      ['bigint against number', 10n, 10, 'from 10n to 10'],
+    ])('tells apart values whose default texts collide: %s', (_, before, after, expected) => {
+      // really a collision of the default rendering (`2 items` / `A: …` / `Unsupported value` / `10`)
+      expect(formatChangeValue(before, common)).toBe(formatChangeValue(after, common));
+      render(<ChangeSummary entries={[entry({ kind: 'changed', before, after })]} {...common} />);
+      expect(readText(screen.getByRole('listitem'))).toBe(`Amount, changed, ${expected}`);
+    });
+
+    it('says "contents differ" as a last resort when the written-out contents still match', () => {
+      class Money {
+        constructor(public cents: number) {}
+      }
+      const long = (last: number) => [...Array.from({ length: 60 }, () => 0), last];
+      render(
+        <ChangeSummary
+          entries={[
+            entry({ kind: 'changed', path: 'm', before: new Money(1), after: new Money(2) }),
+            entry({ kind: 'changed', path: 'l', label: 'Long', before: long(1), after: long(2) }),
+          ]}
+          {...common}
+          valueLabels={{ contentsDiffer: 'differs' }}
+        />,
+      );
+      const [money, longItem] = screen.getAllByRole('listitem').map(readText);
+      expect(money).toBe('Amount, changed, from Unsupported value to Unsupported value (differs)');
+      expect(longItem).toMatch(/^Long, changed, from \[0, 0.*… to \[0, 0.*… \(differs\)$/);
     });
 
     it('does not use precise formatting when the sides already differ', () => {

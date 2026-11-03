@@ -23,6 +23,10 @@ export interface ChangeSummaryValueLabels {
   from: string;
   /** Visually hidden word between the two values in the text read for `changed`. Default `to`. */
   to: string;
+  /** Last resort of `<ChangeSummary />` when before and after still look the same with their
+   *  contents written out (two class instances, a difference past the truncation): appended to
+   *  the after value in parentheses. Default `contents differ`. */
+  contentsDiffer: string;
   /** Array summary, a function because plural forms differ per language. Default: `No items`,
    *  `1 item`, `N items`. */
   items: (count: number) => string;
@@ -39,6 +43,7 @@ export const DEFAULT_VALUE_LABELS: ChangeSummaryValueLabels = {
   changed: 'changed',
   from: 'from',
   to: 'to',
+  contentsDiffer: 'contents differ',
   items: (count) => (count === 0 ? 'No items' : count === 1 ? '1 item' : `${count} items`),
 };
 
@@ -63,8 +68,16 @@ const UNSUPPORTED = 'Unsupported value';
 /** Text for a nested object inside a summarized object. */
 const NESTED = '…';
 
-/** Rendering level: 0 default, 1 precise, 2 precise and, for dates, ISO 8601. */
-export type FormatLevel = 0 | 1 | 2;
+/**
+ * Rendering level: 0 default, 1 precise, 2 precise and, for dates, ISO 8601, 3 contents (arrays,
+ * objects, Map and Set written out, nested values included, truncated to {@link CONTENTS_MAX}).
+ */
+export type FormatLevel = 0 | 1 | 2 | 3;
+
+/** Longest text of the contents level (3), ellipsis included. */
+export const CONTENTS_MAX = 120;
+/** Nesting written out by the contents level; deeper values are `…`. */
+const CONTENTS_DEPTH = 4;
 
 type Resolved = {
   locale?: string;
@@ -107,9 +120,39 @@ function formatDate(value: Date, r: Resolved, level: FormatLevel): string {
 }
 
 function formatNumber(value: number | bigint, r: Resolved, level: FormatLevel): string {
-  if (level > 0) return String(value);
+  // `10n` against `10`: a bigint keeps its suffix in the precise renderings.
+  if (level > 0) return typeof value === 'bigint' ? `${value}n` : String(value);
   return make((locale) => new Intl.NumberFormat(locale), r).format(value);
 }
+
+/**
+ * Level 3: the contents of a value written out, nested values included, so that two arrays or
+ * objects of the same size are told apart (`["a", "b"]` / `["a", "c"]`). Leaves use the precise
+ * rendering (level 2). Cycles and values deeper than {@link CONTENTS_DEPTH} are `…`; instances
+ * other than Date / Map / Set stay the fixed fallback text.
+ */
+function contents(value: unknown, r: Resolved, depth: number, seen: Set<object>): string {
+  if (typeof value !== 'object' || value === null || value instanceof Date) return format(value, r, 2);
+  if (seen.has(value) || depth >= CONTENTS_DEPTH) return NESTED;
+  seen.add(value);
+  try {
+    const inner = (item: unknown) => contents(item, r, depth + 1, seen);
+    if (Array.isArray(value)) return `[${value.map(inner).join(', ')}]`;
+    if (value instanceof Map) {
+      return `Map {${Array.from(value, ([k, v]) => `${inner(k)} => ${inner(v)}`).join(', ')}}`;
+    }
+    if (value instanceof Set) return `Set {${Array.from(value, inner).join(', ')}}`;
+    if (isPlainObject(value)) {
+      const parts = Object.keys(value).map((key) => `${key}: ${inner((value as Record<string, unknown>)[key])}`);
+      return `{${parts.join(', ')}}`;
+    }
+    return UNSUPPORTED;
+  } finally {
+    seen.delete(value);
+  }
+}
+
+const truncate = (text: string): string => (text.length > CONTENTS_MAX ? `${text.slice(0, CONTENTS_MAX - 1)}…` : text);
 
 const isPlainObject = (value: object): boolean => {
   const proto = Object.getPrototypeOf(value) as unknown;
@@ -131,7 +174,20 @@ function formatObject(value: object, r: Resolved, level: FormatLevel): string {
   return parts.length === 0 ? r.labels.empty : parts.join(', ');
 }
 
+/**
+ * Never throws: a revoked Proxy (`Array.isArray` throws), a throwing `getPrototypeOf` trap
+ * (`instanceof`), a throwing getter or label function all give the fixed fallback text.
+ */
 function format(value: unknown, r: Resolved, level: FormatLevel): string {
+  try {
+    if (level === 3) return truncate(contents(value, r, 0, new Set()));
+    return formatUnsafe(value, r, level);
+  } catch {
+    return UNSUPPORTED;
+  }
+}
+
+function formatUnsafe(value: unknown, r: Resolved, level: FormatLevel): string {
   if (value === undefined || value === null) return r.labels.noValue;
   switch (typeof value) {
     case 'boolean':
@@ -145,13 +201,7 @@ function format(value: unknown, r: Resolved, level: FormatLevel): string {
     case 'object':
       if (value instanceof Date) return formatDate(value, r, level);
       if (Array.isArray(value)) return r.labels.items(value.length);
-      if (isPlainObject(value)) {
-        try {
-          return formatObject(value, r, level);
-        } catch {
-          return UNSUPPORTED; // a throwing getter or proxy trap
-        }
-      }
+      if (isPlainObject(value)) return formatObject(value, r, level);
       return UNSUPPORTED;
     default:
       return UNSUPPORTED;

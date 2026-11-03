@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatChangeValue, formatChangeValueAt } from './format-change-value';
+import { CONTENTS_MAX, formatChangeValue, formatChangeValueAt } from './format-change-value';
 
 const NOON = new Date('2026-03-05T12:00:00Z');
 const base = { locale: 'en-US', timeZone: 'UTC' };
@@ -117,6 +117,69 @@ describe('formatChangeValue', () => {
     it('level 2 renders dates as ISO 8601', () => {
       expect(formatChangeValueAt(new Date('2026-03-05T12:00:00.250Z'), base, 2)).toBe('2026-03-05T12:00:00.250Z');
       expect(formatChangeValueAt(new Date('nope'), base, 2)).toBe('Invalid date');
+    });
+
+    it('tells a bigint from a number of the same value (10n against 10)', () => {
+      expect(formatChangeValue(10n, { ...base, precise: true })).toBe('10n');
+      expect(formatChangeValue(10, { ...base, precise: true })).toBe('10');
+      expect(formatChangeValueAt(10n, base, 2)).not.toBe(formatChangeValueAt(10, base, 2));
+      expect(formatChangeValue(10n, base)).toBe('10'); // the default rendering stays plain
+    });
+  });
+
+  describe('level 3 (contents)', () => {
+    it('writes out arrays, nested objects, Map and Set with precise leaves', () => {
+      expect(formatChangeValueAt(['a', 'b'], base, 3)).toBe('["a", "b"]');
+      expect(formatChangeValueAt({ a: { x: 1 } }, base, 3)).toBe('{a: {x: 1}}');
+      expect(formatChangeValueAt(new Map([['k', 1]]), base, 3)).toBe('Map {"k" => 1}');
+      expect(formatChangeValueAt(new Set([1, 2n]), base, 3)).toBe('Set {1, 2n}');
+      expect(formatChangeValueAt([NOON, null, true], base, 3)).toBe('[2026-03-05T12:00:00.000Z, No value, Yes]');
+    });
+
+    it('stops at cycles and deep nesting, truncates long contents', () => {
+      const loop: unknown[] = [1];
+      loop.push(loop);
+      expect(formatChangeValueAt(loop, base, 3)).toBe('[1, …]');
+      expect(formatChangeValueAt([[[[['deep']]]]], base, 3)).toBe('[[[[…]]]]');
+      const long = formatChangeValueAt(Array.from({ length: 100 }, (_, i) => i), base, 3);
+      expect(long).toHaveLength(CONTENTS_MAX);
+      expect(long.endsWith('…')).toBe(true);
+    });
+
+    it('keeps the fallback text for class instances', () => {
+      class Money {
+        constructor(public cents: number) {}
+      }
+      expect(formatChangeValueAt(new Money(1), base, 3)).toBe('Unsupported value');
+      expect(formatChangeValueAt([new Money(1)], base, 3)).toBe('[Unsupported value]');
+    });
+  });
+
+  describe('never throws', () => {
+    const revoked = () => {
+      const { proxy, revoke } = Proxy.revocable({}, {});
+      revoke();
+      return proxy;
+    };
+    const throwingProto = () =>
+      new Proxy(
+        {},
+        {
+          getPrototypeOf() {
+            throw new Error('trap');
+          },
+        },
+      );
+
+    it.each([0, 1, 2, 3] as const)('on a revoked Proxy and a throwing getPrototypeOf trap (level %s)', (level) => {
+      expect(formatChangeValueAt(revoked(), base, level)).toBe('Unsupported value');
+      expect(formatChangeValueAt(throwingProto(), base, level)).toBe('Unsupported value');
+      expect(formatChangeValueAt({ a: revoked() }, base, level)).toEqual(expect.any(String));
+    });
+
+    it('on a revoked Proxy through the public formatChangeValue', () => {
+      expect(() => formatChangeValue(revoked())).not.toThrow();
+      expect(() => formatChangeValue(throwingProto(), { precise: true })).not.toThrow();
     });
   });
 });

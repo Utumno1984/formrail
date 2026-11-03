@@ -1,18 +1,114 @@
 /*
  * Entry of the compiled `styles.css` of @react-object-page/pro (also loaded by Storybook, so the
- * docs render the same CSS the package ships). It holds ONLY the utilities the pro sources use:
- * the tokens (`--color-rop-*`, ...) are NOT declared here, they come from
- * `@react-object-page/core/theme.css` (imported as `theme(reference)`: utilities such as
- * `text-rop-text-muted` resolve against the token names, no variable is emitted). No preflight;
- * utilities are emitted inside `@layer`, as in core, so un-layered CSS of the consumer wins.
+ * docs render the same CSS the package ships).
+ *
+ * Why component classes and not Tailwind utilities (as core does): two stylesheets that both emit
+ * `.flex-col`, `.gap-2`, ... in the same cascade layer conflict by source order. Core's responsive
+ * pairs (`flex-col sm:flex-row`) then depend on which file the consumer imports last: with pro
+ * after core (the documented order) pro's `.flex-col` came after core's `sm:flex-row` and won.
+ * So pro emits NO utility class at all, only its own `.rop-pro-*` classes (class names never
+ * shared with core: no collision, whatever the import order), built with `@apply` against core's
+ * tokens (`--color-rop-*`, ...; imported as `theme(reference)`, no variable is emitted).
+ *
+ * The rules live in the nested layer `rop.utilities.pro`. Inside `rop.utilities`, the rules not in
+ * a sub-layer (core's utilities) win over the sub-layer, whatever the import order: a core
+ * utility passed through `className` (`p-0`) overrides the component's default (`padding`), and
+ * un-layered CSS of the consumer wins over both. No source is scanned (no `@source`, no
+ * utilities import): comments or strings in the pro sources cannot add CSS.
  */
 @layer rop.theme, rop.utilities;
+@layer rop.utilities.pro;
 
 @import 'tailwindcss/theme.css' layer(rop.theme) theme(reference);
 @import '@react-object-page/core/theme.css' theme(reference);
-@import 'tailwindcss/utilities.css' layer(rop.utilities) source(none);
 
-@source '../';
-@source not '../**/*.stories.*';
-@source not '../**/*.test.*';
-@source not '../**/*.css';
+@layer rop.utilities.pro {
+  /* ChangeSummary (packages/pro/src/change-summary/ChangeSummary.tsx). Nothing is animated. */
+  .rop-pro-change-summary {
+    @apply @container min-w-0 rounded-rop-md bg-rop-surface p-4 font-rop-sans text-rop-body text-rop-text;
+    border: 1px solid var(--color-rop-border);
+  }
+
+  .rop-pro-change-summary__empty {
+    @apply text-rop-text-muted;
+  }
+
+  .rop-pro-change-summary__list {
+    @apply m-0 flex list-none flex-col gap-3 p-0;
+  }
+
+  .rop-pro-change-summary__item {
+    @apply flex min-w-0 flex-col gap-1;
+
+    &:not(:first-child) {
+      @apply pt-3;
+      border-top: 1px solid var(--color-rop-border);
+    }
+  }
+
+  /* One inline flow (no flex): the hidden commas stay glued to the words they follow. */
+  .rop-pro-change-summary__head {
+    @apply block min-w-0;
+  }
+
+  .rop-pro-change-summary__label {
+    @apply font-[500] [overflow-wrap:anywhere];
+  }
+
+  /* A comma for assistive technology only, inline (an absolutely positioned box would be a block
+     for the accessibility tree) and taking no room. */
+  .rop-pro-change-summary__pause {
+    @apply select-none [font-size:0] [line-height:0];
+  }
+
+  .rop-pro-change-summary__hidden {
+    @apply sr-only;
+  }
+
+  .rop-pro-change-summary__kind {
+    @apply ml-2 px-1 text-rop-caption capitalize;
+    outline: 1px solid currentColor;
+    outline-offset: -1px;
+  }
+
+  .rop-pro-change-summary__kind--added {
+    @apply text-rop-success;
+  }
+
+  .rop-pro-change-summary__kind--removed {
+    @apply text-rop-error;
+  }
+
+  .rop-pro-change-summary__kind--changed {
+    @apply text-rop-primary;
+  }
+
+  /* Before / after: stacked on a narrow container, on one row from `@md` (28rem) up. */
+  .rop-pro-change-summary__values {
+    @apply flex min-w-0 flex-col gap-1 @md:flex-row @md:items-baseline @md:gap-2;
+  }
+
+  .rop-pro-change-summary__single {
+    @apply flex min-w-0 flex-col;
+  }
+
+  .rop-pro-change-summary__before {
+    @apply min-w-0 text-rop-text-muted line-through;
+  }
+
+  .rop-pro-change-summary__arrow {
+    @apply text-rop-text-muted @md:-rotate-90;
+  }
+
+  .rop-pro-change-summary__after {
+    @apply min-w-0;
+  }
+
+  .rop-pro-change-summary__value {
+    @apply min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere];
+  }
+
+  .rop-pro-change-summary__value--muted {
+    @apply text-rop-text-muted italic;
+  }
+}

@@ -116,8 +116,14 @@ An accessible, responsive list of the entries of the engine, to show in an Objec
 ```ts
 import '@react-object-page/core/theme.css'; // 1. tokens (--rop-*)
 import '@react-object-page/core/styles.css'; // 2. core utilities
-import '@react-object-page/pro/styles.css'; //  3. pro utilities (consume the tokens, never redefine them)
+import '@react-object-page/pro/styles.css'; //  3. pro component styles (consume the tokens, never redefine them)
 ```
+
+Pro's `styles.css` holds only its own `.rop-pro-*` component classes, never a Tailwind utility also
+emitted by core, so it cannot override core's responsive variants: the result does not depend on the
+order of the imports. Its rules are in the nested layer `rop.utilities.pro`, below core's utilities:
+a core utility passed through `className` (`className="p-0"`) overrides the component's default, and
+your un-layered CSS overrides both.
 
 ### Usage
 
@@ -130,8 +136,9 @@ const { entries } = useChangeSummary({ values: form.values, baseline: form.basel
 
 - Props: `entries`, `renderValue?(value, entry)`, `emptyLabel` (`"No changes"`), `label` (accessible name of
   the list, `"Changes"`), `locale`, `timeZone`, `valueLabels` (`yes`, `no`, `empty`, `noValue`,
-  `invalidDate`, `added`, `removed`, `changed`, `from`, `to`, `items`), `className` (merged with
-  `tailwind-merge`), `ref` and other HTML attributes on the root.
+  `invalidDate`, `added`, `removed`, `changed`, `from`, `to`, `contentsDiffer`, `items`), `className`
+  (merged with `tailwind-merge`; a core utility wins over the component's default, see above), `ref`
+  and other HTML attributes on the root.
 - Text read by assistive technology: `Amount, changed, from 100 to 120`. The kind of change is visible
   text, never only colour. There is no live region: a summary that changes at every keystroke is not
   announced.
@@ -139,6 +146,10 @@ const { entries } = useChangeSummary({ values: form.values, baseline: form.basel
   `Intl.DateTimeFormat` (`dateStyle: 'medium'`), `Invalid date` for invalid ones; numbers with
   `Intl.NumberFormat`; `''` is `Empty`, `null`/`undefined` is `No value`; arrays `N items`; plain objects
   a compact `Label: value` list. If before and after would look identical, both are re-rendered
-  precisely (time, ISO string, full number, quoted string).
+  precisely (time, ISO string, full number with `n` for a bigint, quoted string), then with their
+  contents written out (`["a", "b"]` / `["a", "c"]`, `{a: {x: 1}}`, `Map {"k" => 1}`, truncated to 120
+  characters); if even that matches (two class instances), the after side ends with
+  `(contents differ)`. `formatChangeValue` never throws (revoked Proxy, throwing traps or getters give
+  `Unsupported value`).
 - `renderValue` is called once for each value shown (never for the missing side of `added`/`removed`);
   returning `null` leaves the value empty. An exception thrown by `renderValue` propagates.
