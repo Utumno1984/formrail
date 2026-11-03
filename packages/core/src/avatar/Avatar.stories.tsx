@@ -84,12 +84,15 @@ const box = (el: HTMLElement) => {
   return { w: r.width, h: r.height };
 };
 
+/** Controls: name, src, size, shape, decorative, image behaviour (no play function: free to drive). */
+export const Playground: Story = {};
+
 /**
- * Controls: name, src, size, shape, decorative, image behaviour. The play function waits for the
- * photo, then clicks "Break the image" (the `src` changes to a URL that fails): the initials come
- * back, the status goes through `loading` to `error`, and the box keeps its exact size.
+ * The play function waits for the photo, then clicks "Break the image" (the `src` changes to a URL
+ * that fails): the initials come back, the status goes through `loading` to `error`, and the box
+ * keeps its exact size.
  */
-export const Playground: Story = {
+export const BreakingImage: Story = {
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const avatar = canvas.getByTestId('avatar');
@@ -103,8 +106,8 @@ export const Playground: Story = {
     const after = box(avatar);
     await expect(Math.abs(after.w - before.w)).toBeLessThanOrEqual(0.5);
     await expect(Math.abs(after.h - before.h)).toBeLessThanOrEqual(0.5);
+    await waitFor(() => expect(args.onLoadingStatusChange).toHaveBeenLastCalledWith('error'));
     await expect(args.onLoadingStatusChange).toHaveBeenCalledWith('loaded');
-    await expect(args.onLoadingStatusChange).toHaveBeenLastCalledWith('error');
   },
 };
 
@@ -143,6 +146,9 @@ export const Overview: Story = {
         <span>Ada Lovelace</span>
         <Avatar name="Grace Hopper" src={BROKEN} data-testid="broken" />
         <Avatar name="Single" size="lg" shape="square" data-testid="one-word" />
+      </div>
+      <div data-testid="narrow" style={{ display: 'flex', width: 16, outline: '1px dashed var(--color-rop-border)' }}>
+        <Avatar name="Narrow Cell" data-testid="narrow-avatar" />
       </div>
     </div>
   ),
