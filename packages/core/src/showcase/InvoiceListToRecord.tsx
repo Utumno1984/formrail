@@ -95,6 +95,8 @@ const recordHref = (id: string): string => urlWith(id);
 
 /* ----------------------------------------------------------------------- list */
 
+// A negative offset on the focus indicator: the cell wraps its content in a clipping box that starts at the
+// link's edge, so an indicator drawn outside the link would be cut off; it is drawn inside instead (#152).
 function RecordLink({ row, onOpen }: { row: DemoInvoice; onOpen: (id: string) => void }) {
   const click = (e: MouseEvent<HTMLAnchorElement>) => {
     // Ctrl/Cmd/Shift/Alt/middle click: the browser opens the real href (new tab/window), untouched.
@@ -103,7 +105,7 @@ function RecordLink({ row, onOpen }: { row: DemoInvoice; onOpen: (id: string) =>
     onOpen(row.id);
   };
   return (
-    <a href={recordHref(row.id)} data-record-id={row.id} onClick={click} style={{ color: 'inherit' }}>
+    <a href={recordHref(row.id)} data-record-id={row.id} onClick={click} style={{ color: 'inherit', outlineOffset: -2 }}>
       {row.number}
     </a>
   );
