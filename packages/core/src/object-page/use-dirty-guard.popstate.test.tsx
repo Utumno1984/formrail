@@ -105,6 +105,62 @@ describe('useDirtyGuard: popstate (Back/Forward)', () => {
     window.removeEventListener('popstate', seen);
   });
 
+  describe('Navigation API: the traversal is cancelled, no popstate fires', () => {
+    function setup() {
+      const listeners: Record<string, (e: Event) => void> = {};
+      const nav = {
+        currentEntry: { index: 3 },
+        traverseTo: vi.fn(),
+        addEventListener: (t: string, l: (e: Event) => void) => void (listeners[t] = l),
+        removeEventListener: vi.fn(),
+      };
+      (window as unknown as { navigation: unknown }).navigation = nav;
+      const navigate = (over: Record<string, unknown> = {}, cancelable = true) => {
+        const event = Object.assign(new Event('navigate', { cancelable }), {
+          navigationType: 'traverse',
+          destination: { index: 2, key: 'k2', sameDocument: true },
+          ...over,
+        });
+        act(() => void listeners.navigate?.(event));
+        return event;
+      };
+      return { nav, navigate };
+    }
+
+    it('cancels a cancelable traverse, opens the dialog, and "Leave" traverses to that entry', async () => {
+      const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
+      const { nav, navigate } = setup();
+      render(<Host when />);
+      const event = navigate();
+      expect(event.defaultPrevented).toBe(true);
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave without saving' }));
+      expect(nav.traverseTo).toHaveBeenCalledExactlyOnceWith('k2');
+      expect(go).not.toHaveBeenCalled();
+      // The confirmed traversal itself is let through.
+      expect(navigate().defaultPrevented).toBe(false);
+    });
+
+    it('"Keep editing" leaves nothing pending: the next Back asks again', async () => {
+      const { nav, navigate } = setup();
+      render(<Host when />);
+      navigate();
+      await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(nav.traverseTo).not.toHaveBeenCalled();
+      expect(navigate().defaultPrevented).toBe(true);
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('ignores pushes, reloads and non-cancelable traversals (those fall back to popstate)', () => {
+      const { navigate } = setup();
+      render(<Host when />);
+      expect(navigate({ navigationType: 'push' }).defaultPrevented).toBe(false);
+      expect(navigate({ navigationType: 'reload' }).defaultPrevented).toBe(false);
+      expect(navigate({}, false).defaultPrevented).toBe(false);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
   it('removes its listener when when turns false and on unmount', () => {
     const remove = vi.spyOn(window, 'removeEventListener');
     const { rerender, unmount } = render(<Host when />);

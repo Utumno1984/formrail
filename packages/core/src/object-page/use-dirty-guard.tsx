@@ -36,6 +36,7 @@ const DEFAULT_LABELS: Omit<DirtyGuardLabels, 'close'> = {
 
 interface NavigationLike {
   currentEntry?: { index: number } | null;
+  traverseTo?: (key: string) => unknown;
   addEventListener?: (type: string, listener: (event: Event) => void) => void;
   removeEventListener?: (type: string, listener: (event: Event) => void) => void;
 }
@@ -70,15 +71,16 @@ export interface UseDirtyGuardReturn {
  *   bar navigation: the browser shows its own prompt). It is removed as soon as `when` turns false
  *   or the component unmounts. Two hooks on one page keep independent listeners.
  * - `guard(action)` wraps the consumer's own exit action (a router navigation, closing the page).
- * - While `when` is true, browser Back/Forward (`popstate`) opens the same dialog. The traversal is
- *   undone at once with `history.go(-delta)` (no entry is pushed, the forward history is kept) and
- *   the `popstate` is swallowed (capture phase + `stopImmediatePropagation`), so routers listening on
- *   `window` never see it. "leave" repeats it with `history.go(delta)` and lets that `popstate`
- *   through. Limits: it works on the native History API and on routers that listen to `popstate`
- *   on `window` (e.g. `useListReportUrlState`); direction and size of the jump come from the
- *   Navigation API (`window.navigation`): where it is missing every traversal is treated as Back by
- *   one entry. Navigations a router performs without `popstate` (link clicks) are not covered:
- *   wrap those in `guard`.
+ * - While `when` is true, browser Back/Forward opens the same dialog; "leave" completes the traversal.
+ *   With the Navigation API (`window.navigation`) the traversal is cancelled outright (`navigate`
+ *   event): no `popstate` fires, so any router/`useListReportUrlState` stays untouched, whenever it was
+ *   registered. The browser only allows that after a user interaction with the page (always true while
+ *   the user is editing). Otherwise (no Navigation API, or a non-cancelable traversal) the fallback
+ *   undoes the traversal with `history.go(-delta)` (no `pushState`: no entry is added, the forward
+ *   history is kept) and swallows its `popstate` (capture + `stopImmediatePropagation`); that only
+ *   hides it from listeners registered AFTER the hook, and without the Navigation API every
+ *   traversal is treated as Back by one entry. Navigations a router performs without history
+ *   traversal (link clicks, `pushState`) are not covered: wrap those in `guard`.
  *
  * Declared behaviour:
  * - A second `guard` call while the dialog is open is ignored: the first action stays pending.
@@ -156,6 +158,33 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
       if (from && typeof to === 'number') traverseDelta = to - from.index;
     };
     nav?.addEventListener?.('currententrychange', onEntryChange);
+    // Preferred path (Navigation API): cancel the traversal itself. No `popstate` ever fires, so a
+    // router registered before this hook (which a capture listener cannot outrun: `window` listeners
+    // run in registration order) never sees it either.
+    const onNavigate = (event: Event) => {
+      const e = event as unknown as {
+        navigationType?: string;
+        cancelable?: boolean;
+        destination?: { index: number; key?: string; sameDocument?: boolean };
+        preventDefault: () => void;
+      };
+      if (e.navigationType !== 'traverse' || !e.cancelable || !e.destination?.sameDocument) return;
+      const current = nav?.currentEntry?.index;
+      if (typeof current !== 'number') return;
+      // Confirmed traversal (or one started by the confirmed action): its `popstate` clears the flags.
+      if (allow || reverting || Date.now() < passUntilRef.current) return;
+      const delta = e.destination.index - current;
+      if (delta === 0) return;
+      e.preventDefault();
+      const key = e.destination.key;
+      guardRef.current(() => {
+        allow = true;
+        // `traverseTo(key)` names the exact entry; `history.go(delta)` is the fallback.
+        if (key && nav?.traverseTo) nav.traverseTo(key);
+        else window.history.go(delta);
+      });
+    };
+    nav?.addEventListener?.('navigate', onNavigate);
     const onPopState = (event: PopStateEvent) => {
       if (allow || Date.now() < passUntilRef.current) {
         // The traversal the user confirmed (or one started by the confirmed action): let it through.
@@ -183,6 +212,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     return () => {
       window.removeEventListener('popstate', onPopState, true);
       nav?.removeEventListener?.('currententrychange', onEntryChange);
+      nav?.removeEventListener?.('navigate', onNavigate);
     };
   }, [when]);
 
