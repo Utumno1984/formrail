@@ -62,6 +62,7 @@ const EXPORTS = [
   'StatusBadge',
   'Text',
   'Title',
+  'ToastProvider',
   'Tooltip',
   'TooltipProvider',
   'TruncatedText',
@@ -78,6 +79,7 @@ const EXPORTS = [
   'useListReportScrollRestoration',
   'useListReportUrlState',
   'useObjectPageForm',
+  'useToast',
 ];
 
 describe('built package consumers (requires a prior `npm run build`)', () => {

@@ -71,11 +71,12 @@
   /* Container-query thresholds (Tailwind v4 `container` namespace: `@rop-description-list:` variant) */
   --container-rop-description-list: 24rem;
 
-  /* z-index scale: sticky < overlay (backdrop) < modal < popover < tooltip */
+  /* z-index scale: sticky < overlay (backdrop) < modal < popover < toast < tooltip */
   --z-index-rop-sticky: 10;
   --z-index-rop-overlay: 20;
   --z-index-rop-modal: 30;
   --z-index-rop-popover: 40;
+  --z-index-rop-toast: 45;
   --z-index-rop-tooltip: 50;
 
   /* Motion: a short feedback (e.g. a value that changed). The tokens are plain values: every use site
@@ -98,6 +99,14 @@
   /* Invisible (no visual change): only keeps the wrapper of the portal mounted for as long as its
      children animate out. */
   --animate-rop-modal-hold: rop-modal-hold var(--motion-rop-overlay-duration) linear forwards;
+
+  /* Motion: enter / exit of a toast. Keyframe animations like the modal ones: the toast node stays
+     mounted for as long as its exit animation runs. Every use site applies them only under
+     `motion-safe:`, so with prefers-reduced-motion the toast appears and disappears at once. */
+  --motion-rop-toast-duration: 180ms;
+  --motion-rop-toast-easing: cubic-bezier(0.2, 0, 0, 1);
+  --animate-rop-toast-in: rop-toast-in var(--motion-rop-toast-duration) var(--motion-rop-toast-easing);
+  --animate-rop-toast-out: rop-toast-out var(--motion-rop-toast-duration) var(--motion-rop-toast-easing) forwards;
 
   /* The panel animates the individual `scale` / `translate` properties, never `transform`: the
      Dialog centres itself with `transform`, which must stay untouched. `--rop-modal-from-*` are set
@@ -124,6 +133,18 @@
       opacity: 0;
       scale: var(--rop-modal-from-scale, 1);
       translate: var(--rop-modal-from-translate, 0 0);
+    }
+  }
+  @keyframes rop-toast-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+  @keyframes rop-toast-out {
+    to {
+      opacity: 0;
+      translate: 0 0.5rem;
     }
   }
   @keyframes rop-modal-hold {
