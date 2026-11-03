@@ -90,7 +90,7 @@ for (const path of PATHS) {
     test('the close button is named after the title and closes', async ({ page }) => {
       await gotoStory(page, path.story);
       await page.getByRole('button', { name: path.opener }).click();
-      await page.getByRole('button', { name: 'Chiudi: Dettaglio fornitore' }).click();
+      await page.getByRole('button', { name: 'Close: Dettaglio fornitore' }).click();
       await expect(sheetOf(page)).toHaveCount(0);
       await expect(page.getByRole('button', { name: path.opener })).toBeFocused();
     });

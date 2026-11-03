@@ -145,7 +145,7 @@ test.describe("QA #45: onValueChange contract", () => {
     expect(await calls(page)).toEqual([]);
   });
 
-  test('options arrive while the list is open on "Nessun risultato": the list updates without crashing', async ({
+  test('options arrive while the list is open on "No results": the list updates without crashing', async ({
     page,
   }) => {
     const errors: string[] = [];
@@ -156,7 +156,7 @@ test.describe("QA #45: onValueChange contract", () => {
     const box = input(page);
     await box.click();
     await release(page);
-    await expect(page.getByText("Nessun risultato")).toBeVisible();
+    await expect(page.getByText("No results")).toBeVisible();
     await page.keyboard.press("Enter"); // empty options: nothing happens
     await page.keyboard.press("ArrowDown");
     await page

@@ -30,10 +30,10 @@ const meta: Meta<DemoArgs> = {
   },
   args: {
     when: true,
-    title: 'Modifiche non salvate',
-    description: 'Ci sono modifiche non salvate: se esci ora andranno perse.',
-    stay: 'Continua a modificare',
-    leave: 'Esci senza salvare',
+    title: 'Unsaved changes',
+    description: 'You have unsaved changes: leaving now will lose them.',
+    stay: 'Keep editing',
+    leave: 'Leave without saving',
     close: '',
     action: fn(),
   },
@@ -63,7 +63,7 @@ function Demo({ when, title, description, stay, leave, close, action }: DemoArgs
 /**
  * Controls: `when` (unsaved changes), the four texts of the dialog. `action` is wired to Actions and
  * is called only when the exit is confirmed. The play function opens the dialog, checks the focus on
- * "Continua a modificare", stays (nothing in Actions, the focus back on the opener), then opens it
+ * "Keep editing", stays (nothing in Actions, the focus back on the opener), then opens it
  * again and leaves: exactly one call.
  */
 export const Playground: Story = {
@@ -77,9 +77,9 @@ export const Playground: Story = {
     await expect(dialog).toHaveAttribute('aria-modal', 'true');
     await expect(dialog).toHaveAccessibleDescription(args.description);
     await waitFor(() => expect(body.getByRole('button', { name: args.stay })).toHaveFocus());
-    // The X is named by the `close` control when set, else by the default "Chiudi: <title>".
+    // The X is named by the `close` control when set, else by the default "Close: <title>".
     await expect(
-      body.getByRole('button', { name: args.close.trim() ? args.close : `Chiudi: ${args.title}` }),
+      body.getByRole('button', { name: args.close.trim() ? args.close : `Close: ${args.title}` }),
     ).toBeInTheDocument();
 
     await userEvent.click(body.getByRole('button', { name: args.stay }));
@@ -100,7 +100,7 @@ export const DialogOpen: Story = {
   render: (args) => <Demo {...args} />,
   play: async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Torna alla lista' }));
-    await within(document.body).findByRole('dialog', { name: 'Modifiche non salvate' });
+    await within(document.body).findByRole('dialog', { name: 'Unsaved changes' });
   },
 };
 

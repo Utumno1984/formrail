@@ -203,7 +203,7 @@ describe('Dialog', () => {
     expect(errors.mock.calls.some((c) => String(c[0]).includes('has no accessible name'))).toBe(false);
   });
 
-  it('the default close button is a Button icon-xs named "Chiudi: <title>", overridable', async () => {
+  it('the default close button is a Button icon-xs named "Close: <title>", overridable', async () => {
     render(
       <Dialog defaultOpen>
         <DialogContent aria-describedby={undefined}>
@@ -213,7 +213,7 @@ describe('Dialog', () => {
         </DialogContent>
       </Dialog>,
     );
-    const close = await screen.findByRole('button', { name: 'Chiudi: Modifica fornitore' });
+    const close = await screen.findByRole('button', { name: 'Close: Modifica fornitore' });
     expect(close).toHaveClass('size-6');
     expect(close.querySelector('svg')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Esci' })).toBeInTheDocument();

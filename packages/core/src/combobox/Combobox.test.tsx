@@ -76,7 +76,7 @@ describe('Combobox', () => {
     await user.clear(input);
     await user.type(input, 'zzz');
     expect(screen.queryAllByRole('option')).toHaveLength(0);
-    expect(screen.getByText('Nessun risultato')).toBeInTheDocument();
+    expect(screen.getByText('No results')).toBeInTheDocument();
   });
 
   it('arrows skip the disabled option, Enter picks once and the input shows the label; focus stays on the input', async () => {
@@ -219,13 +219,21 @@ describe('Combobox', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
+  it('an explicit emptyLabel (any language) replaces the English default', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={[]} emptyLabel="Nessun risultato" aria-label="Comune" />);
+    await user.click(screen.getByRole('combobox'));
+    expect(screen.getByText('Nessun risultato')).toBeInTheDocument();
+    expect(screen.queryByText('No results')).toBeNull();
+  });
+
   it('empty options: the list opens with the empty text, Enter does nothing, no crash', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
     render(<Combobox options={[]} onValueChange={onValueChange} aria-label="Comune" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
-    expect(screen.getByText('Nessun risultato')).toBeInTheDocument();
+    expect(screen.getByText('No results')).toBeInTheDocument();
     await user.keyboard('{Enter}');
     expect(onValueChange).not.toHaveBeenCalled();
   });

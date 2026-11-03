@@ -110,5 +110,5 @@ export const SheetFooter = ModalFooter;
 
 export type SheetCloseProps = ModalCloseProps;
 
-/** Closes the sheet; same default button as `DialogClose`, named "Chiudi: <title>". */
+/** Closes the sheet; same default button as `DialogClose`, named "Close: <title>". */
 export const SheetClose = ModalClose;

@@ -494,7 +494,7 @@ export type ModalCloseProps = ComponentPropsWithoutRef<typeof RadixDialog.Close>
 
 /**
  * Closes the panel. With no children and no `asChild` it renders the default close button: a ghost
- * `icon-xs` `Button` with the close icon, named "Chiudi: <title>" (from the panel's title) unless
+ * `icon-xs` `Button` with the close icon, named "Close: <title>" (from the panel's title) unless
  * you pass `aria-label` / `aria-labelledby`. With `children` / `asChild` it is Radix's plain Close.
  */
 export const ModalClose = /* @__PURE__ */ forwardRef<HTMLButtonElement, ModalCloseProps>(function ModalClose(props, ref) {
@@ -541,8 +541,8 @@ function DefaultClose({
   const naming = ownName
     ? {}
     : titleId
-      ? { 'aria-label': 'Chiudi:', 'aria-labelledby': `${closeId} ${titleId}` }
-      : { 'aria-label': 'Chiudi' };
+      ? { 'aria-label': 'Close:', 'aria-labelledby': `${closeId} ${titleId}` }
+      : { 'aria-label': 'Close' };
   return (
     <RadixDialog.Close asChild>
       <Button {...({ ...naming, ...rest } as { 'aria-label': string })} id={closeId} ref={setRef} variant="ghost" size="icon-xs" className={className}>

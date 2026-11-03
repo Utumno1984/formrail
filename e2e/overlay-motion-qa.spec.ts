@@ -140,12 +140,12 @@ for (const [label, story, panel] of [
   });
 }
 
-test('dirty-guard: "Esci senza salvare" with a slow exit still runs the action and leaves no orphan', async ({ page }) => {
+test('dirty-guard: "Leave without saving" with a slow exit still runs the action and leaves no orphan', async ({ page }) => {
   await expectPlayToPass(page, 'patterns-dirtyguard--playground', 'when:!true');
   await slowDown(page);
   await page.getByRole('button', { name: 'Torna alla lista' }).click();
-  await page.getByRole('button', { name: 'Esci senza salvare' }).click();
-  await expect(page.getByRole('dialog', { name: 'Modifiche non salvate' })).toHaveCount(0, { timeout: 5000 });
+  await page.getByRole('button', { name: 'Leave without saving' }).click();
+  await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toHaveCount(0, { timeout: 5000 });
   const state = await page.evaluate(() => ({
     locked: document.body.hasAttribute('data-scroll-locked'),
     hidden: document.querySelectorAll('[data-aria-hidden]').length,

@@ -18,7 +18,7 @@ describe('useDirtyGuard SSR', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const html = renderToString(<Demo />);
     expect(html).toContain('Torna alla lista');
-    expect(html).not.toContain('Modifiche non salvate');
+    expect(html).not.toContain('Unsaved changes');
     expect(error).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });

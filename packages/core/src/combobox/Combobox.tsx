@@ -60,7 +60,7 @@ export interface ComboboxProps extends Omit<
    * whatever the new value is (an option that has just arrived, one that does not exist, `undefined`).
    */
   onValueChange?: (value: string | undefined) => void;
-  /** Shown in the open list when nothing matches. Default `Nessun risultato`. */
+  /** Shown in the open list when nothing matches. Default `No results`. */
   emptyLabel?: string;
   /** Shown in the input when `value` matches no option. Default: the raw value. */
   unknownValueLabel?: string;
@@ -119,7 +119,7 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
     value: valueProp,
     defaultValue,
     onValueChange,
-    emptyLabel = 'Nessun risultato',
+    emptyLabel = 'No results',
     unknownValueLabel,
     filter,
     clearOnEmpty,

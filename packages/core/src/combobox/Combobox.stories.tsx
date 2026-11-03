@@ -72,7 +72,7 @@ const meta: Meta<DemoArgs> = {
   args: {
     size: 'md',
     placeholder: 'Cerca un comune',
-    emptyLabel: 'Nessun risultato',
+    emptyLabel: 'No results',
     clearOnEmpty: false,
     state: 'default',
     onValueChange: fn(),
@@ -193,7 +193,7 @@ export const NoResults: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.type(input(canvasElement), 'zzz');
     const list = await listbox();
-    await expect(within(list).getByText('Nessun risultato')).toBeInTheDocument();
+    await expect(within(list).getByText('No results')).toBeInTheDocument();
     await expect(within(list).queryAllByRole('option')).toHaveLength(0);
   },
 };
