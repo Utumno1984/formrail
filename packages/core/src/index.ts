@@ -66,6 +66,10 @@ export type {
 } from './sheet/Sheet';
 export { Tooltip, TooltipProvider } from './tooltip/Tooltip';
 export type { TooltipProps, TooltipProviderProps, TooltipSide, TooltipAlign } from './tooltip/Tooltip';
+export { ToastProvider } from './toast/ToastProvider';
+export type { ToastProviderProps, ToastLabels } from './toast/ToastProvider';
+export { useToast } from './toast/use-toast';
+export type { ToastOptions, ToastTone, ToastDismissReason, UseToastReturn } from './toast/use-toast';
 export { TruncatedText } from './truncated-text/TruncatedText';
 export type { TruncatedTextProps } from './truncated-text/TruncatedText';
 export { Select } from './select/Select';
@@ -139,3 +143,7 @@ export { Card, CardHeader, CardTitle, CardDescription, CardBody, CardFooter } fr
 export type { CardProps, CardElement, CardTitleProps, CardTitleLevel } from './card/Card';
 export { ProgressBar } from './progress-bar/ProgressBar';
 export type { ProgressBarProps, ProgressBarTone } from './progress-bar/ProgressBar';
+export { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage } from './breadcrumb/Breadcrumb';
+export type { BreadcrumbProps, BreadcrumbLinkProps, BreadcrumbSeparator } from './breadcrumb/Breadcrumb';
+export { Divider } from './divider/Divider';
+export type { DividerProps, DividerOrientation, DividerSpacing } from './divider/Divider';

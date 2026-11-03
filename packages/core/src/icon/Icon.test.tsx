@@ -203,6 +203,10 @@ describe('internal icons', () => {
     expect(exposed).not.toContain('internalIcons');
     expect(exposed.sort()).toEqual([
       'Avatar',
+      'Breadcrumb',
+      'BreadcrumbItem',
+      'BreadcrumbLink',
+      'BreadcrumbPage',
       'Button',
       'Card',
       'CardBody',
@@ -223,6 +227,7 @@ describe('internal icons', () => {
       'DialogHeader',
       'DialogTitle',
       'DialogTrigger',
+      'Divider',
       'Field',
       'FieldMessage',
       'Icon',
@@ -249,6 +254,7 @@ describe('internal icons', () => {
       'StatusBadge',
       'Text',
       'Title',
+      'ToastProvider',
       'Tooltip',
       'TooltipProvider',
       'TruncatedText',
@@ -265,6 +271,7 @@ describe('internal icons', () => {
       'useListReportScrollRestoration',
       'useListReportUrlState',
       'useObjectPageForm',
+      'useToast',
     ]);
   });
 });

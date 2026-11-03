@@ -43,10 +43,10 @@ describe('design tokens (src/styles/tokens.css, built into dist/theme.css and di
     expect(stylesCss).not.toMatch(/@font-face|url\(/);
   });
 
-  it('the z-index scale is strictly increasing: sticky < overlay < modal < popover < tooltip', () => {
+  it('the z-index scale is strictly increasing: sticky < overlay < modal < popover < toast < tooltip', () => {
     // Read from the generated CSS, not from the source.
     const generated = customProperties(stylesCss);
-    const order = ['sticky', 'overlay', 'modal', 'popover', 'tooltip'];
+    const order = ['sticky', 'overlay', 'modal', 'popover', 'toast', 'tooltip'];
     const values = order.map((name) => Number(generated.get(`--z-index-rop-${name}`)));
     expect(values.every((v) => Number.isInteger(v))).toBe(true);
     for (let i = 1; i < values.length; i += 1) {
@@ -215,7 +215,7 @@ describe('styles.css (compiled)', () => {
 
 describe('cn() knows every token of the CSS source', () => {
   it('there are tokens to check (the derivation did not silently produce an empty list)', () => {
-    expect(namesOf('z-index')).toHaveLength(5);
+    expect(namesOf('z-index')).toHaveLength(6);
     expect(namesOf('text').length).toBeGreaterThanOrEqual(6);
   });
 
