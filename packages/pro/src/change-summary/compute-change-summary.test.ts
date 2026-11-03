@@ -458,6 +458,28 @@ describe('arrays with arrayIdKeys', () => {
     expect(String(warn.mock.calls[0]?.[0])).toMatch(/duplicate 'id'.*lineItems/);
   });
 
+  it('duplicate ids only in the baseline also degrade to the block diff, with a warning', () => {
+    const before = { lineItems: [item(1), item(1)] };
+    const after = { lineItems: [item(1)] };
+    expect(brief(diff(before, after, { arrayIdKeys: ids }))).toEqual([
+      { path: 'lineItems', kind: 'changed', before: before.lineItems, after: after.lineItems },
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toMatch(/duplicate 'id'.*lineItems/);
+  });
+
+  it('rows with a null id on both sides are never matched (not even to each other)', () => {
+    expect(paths(diff({ lineItems: [item(null)] }, { lineItems: [item(null)] }, { arrayIdKeys: ids }))).toEqual([
+      'added lineItems.0',
+      'removed lineItems.0',
+    ]);
+    // Two null ids per side are not "duplicate ids": no block degrade, no warning.
+    expect(
+      paths(diff({ lineItems: [item(null), item(null, 2)] }, { lineItems: [item(null), item(null, 2)] }, { arrayIdKeys: ids })),
+    ).toEqual(['added lineItems.0', 'added lineItems.1', 'removed lineItems.0', 'removed lineItems.1']);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('does not apply the array id key to the items themselves (no "not an array" warning on them)', () => {
     diff({ lineItems: [item(1), item(1)] }, { lineItems: [item(1, 5), item(1)] }, { arrayIdKeys: ids });
     expect(warn.mock.calls.map((c) => String(c[0])).filter((m) => /not an array/.test(m))).toEqual([]);
@@ -538,6 +560,10 @@ describe('arrays without id key (block diff)', () => {
 
   it('a length change is one block entry', () => {
     expect(paths(diff({ l: [1] }, { l: [1, 2] }))).toEqual(['changed l']);
+  });
+
+  it('a shrinking array is one block entry (the common prefix being equal is not enough)', () => {
+    expect(brief(diff({ l: [1, 2] }, { l: [1] }))).toEqual([{ path: 'l', kind: 'changed', before: [1, 2], after: [1] }]);
   });
 });
 
