@@ -215,6 +215,10 @@ test.describe('motion', () => {
     expect(await toast.evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
     await page.waitForTimeout(400);
     await page.getByRole('button', { name: 'Dismiss notification' }).click();
+    // The closed node is still there while the exit animation runs, then it goes.
+    const closing = status(page).locator('[data-state="closed"]');
+    await expect(closing).toHaveCount(1);
+    expect(await closing.evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
     await expect(status(page)).toBeEmpty();
   });
 

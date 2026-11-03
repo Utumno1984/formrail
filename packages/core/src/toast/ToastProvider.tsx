@@ -147,7 +147,7 @@ function ToastView({ item, open, labels, nodeRef, onUserDismiss, onAction, onExi
   }, [open]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape' || !open) return;
+    if (event.key !== 'Escape' || !open || event.defaultPrevented) return;
     event.stopPropagation();
     onUserDismiss();
   };
@@ -219,6 +219,11 @@ const VIEWPORT_STYLE = {
  * - Declared limit: the focus trap of a modal keeps the focus inside the modal, so F8 cannot reach
  *   the toast while it is open. A toast with an `action` therefore stays until closed, and the
  *   action is reachable as soon as the modal closes.
+ * - Declared limit (SSR): the regions are portalled to `document.body`, so they appear in the render
+ *   after hydration, not in the server HTML. A `show` called in the mount effect of a child may run
+ *   before the regions exist in the DOM and not be announced; call it from an event or after mount.
+ * - An update by `id` that changes the tone between `error` and the others moves the toast to the
+ *   other live region (a new node); the focus, if inside it, goes back to the previous element.
  * - Declared limit: the timer keeps running while the window is in the background or the toast is
  *   hovered/focused (pausing is outside the single-toast scope).
  *
@@ -272,13 +277,7 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
     return () => document.removeEventListener('focusin', onFocusIn);
   }, [rememberFocus]);
 
-  useEffect(
-    () => () => {
-      clearTimeout(timerRef.current);
-      currentRef.current = null;
-    },
-    [],
-  );
+  const durationRef = useRef<number | null>(null);
 
   /** If the focus is inside the toast, gives it back to the last element outside (when still usable). */
   const restoreFocus = useCallback(() => {
@@ -293,6 +292,7 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
       if (!item || (onlyKey !== undefined && item.key !== onlyKey)) return;
       clearTimeout(timerRef.current);
       currentRef.current = null;
+      durationRef.current = null;
       // A close while the focus is inside the toast must not drop it on <body>.
       restoreFocus();
       setCurrent(null);
@@ -322,7 +322,10 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
       const item: ToastItem = { id, key: previous && sameToast ? previous.key : keyRef.current, options };
       // Replaced: the old node goes at once (no exit animation) and the focus, if it was inside,
       // goes back to where it came from.
-      if (previous && !sameToast) restoreFocus();
+      // Same for an update that moves the toast between the polite and the assertive region: React
+      // mounts a new node there, so a focus inside the old one would be lost.
+      const changesRegion = sameToast && (previous.options.tone === 'error') !== (options.tone === 'error');
+      if (previous && (!sameToast || changesRegion)) restoreFocus();
       currentRef.current = item;
       setLeaving(null);
       setCurrent(item);
@@ -331,6 +334,7 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
       clearTimeout(timerRef.current);
       const duration =
         options.duration !== undefined ? options.duration : options.action ? null : defaultDurationRef.current;
+      durationRef.current = typeof duration === 'number' ? duration : null;
       if (typeof duration === 'number') {
         timerRef.current = setTimeout(() => closeCurrent('timeout', item.key), duration);
       }
@@ -347,6 +351,18 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
     },
     [closeCurrent],
   );
+
+  // The cleanup only stops the timer: the effects of a mounted tree can be torn down and set up
+  // again (`<Activity>` hidden then visible, Fast Refresh) while the toast is still on screen, so
+  // `currentRef` must keep pointing at it and the timer is re-armed here.
+  useEffect(() => {
+    const item = currentRef.current;
+    const duration = durationRef.current;
+    if (item && typeof duration === 'number') {
+      timerRef.current = setTimeout(() => closeCurrent('timeout', item.key), duration);
+    }
+    return () => clearTimeout(timerRef.current);
+  }, [closeCurrent]);
 
   const api = useMemo<UseToastReturn>(() => ({ show, dismiss }), [show, dismiss]);
 

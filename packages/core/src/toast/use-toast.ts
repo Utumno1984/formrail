@@ -8,7 +8,9 @@ export type ToastDismissReason = 'timeout' | 'user' | 'replaced' | 'programmatic
 export interface ToastOptions {
   /**
    * Identity of the toast. `show` with the id of the toast on screen updates it in place (same node,
-   * the new text is announced, the timer restarts). Default: a generated id.
+   * the new text is announced, the timer restarts). If the update switches the tone between `error`
+   * and another, the toast moves to the other live region: it is a new node and a focus inside the
+   * toast goes back to the previous element. Default: a generated id.
    */
   id?: string;
   /** Default `info`. `error` is announced assertively (`role="alert"`), the other tones politely. */

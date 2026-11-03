@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { createRef, useState } from 'react';
+import { Activity, createRef, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Input } from '../input/Input';
 import { ToastProvider, type ToastProviderProps } from './ToastProvider';
@@ -193,6 +193,36 @@ describe('focus', () => {
       expect(input).toHaveFocus();
     },
   );
+
+  it.each([
+    ['info', 'error'],
+    ['error', 'info'],
+  ] as const)(
+    'an update by id from tone %s to %s moves the toast to the other region without dropping the focus on body',
+    (from, to) => {
+      setup();
+      const input = screen.getByLabelText('Name');
+      input.focus();
+      show({ id: 'save', tone: from, description: 'One' });
+      fireEvent.keyDown(document, { key: 'F8' });
+      expect(document.activeElement).not.toBe(input);
+      show({ id: 'save', tone: to, description: 'Two' });
+      expect(document.activeElement).toBe(input);
+      expect((to === 'error' ? assertive() : polite()).textContent).toContain('Two');
+    },
+  );
+
+  it('Escape already handled (defaultPrevented) does not close the toast', () => {
+    const onDismiss = vi.fn();
+    setup();
+    show({ description: 'Saved', onDismiss });
+    fireEvent.keyDown(document, { key: 'F8' });
+    const toast = polite().firstElementChild as HTMLElement;
+    toast.addEventListener('keydown', (e) => e.preventDefault(), { capture: true });
+    fireEvent.keyDown(toast, { key: 'Escape' });
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(polite()).toHaveTextContent('Saved');
+  });
 
   it('a previous element that is disabled or gone is not focused, and nothing arbitrary is', () => {
     const { rerender } = render(
@@ -428,6 +458,36 @@ describe('closing', () => {
     expect(error).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
     expect(document.body.querySelector('[aria-live]')).toBeNull();
+  });
+
+  it('hiding and showing the tree again (Activity) keeps the toast closable and its timer armed', () => {
+    const onDismiss = vi.fn();
+    function App({ mode }: { mode: 'visible' | 'hidden' }) {
+      return (
+        <Activity mode={mode}>
+          <ToastProvider>
+            <Capture />
+          </ToastProvider>
+        </Activity>
+      );
+    }
+    const { rerender } = render(<App mode="visible" />);
+    show({ description: 'Saved', onDismiss });
+    rerender(<App mode="hidden" />);
+    rerender(<App mode="visible" />);
+    expect(polite()).toHaveTextContent('Saved');
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(onDismiss).toHaveBeenCalledExactlyOnceWith('timeout');
+    expect(polite()).toBeEmptyDOMElement();
+
+    show({ description: 'Again', onDismiss });
+    rerender(<App mode="hidden" />);
+    rerender(<App mode="visible" />);
+    act(() => api.dismiss());
+    expect(onDismiss).toHaveBeenLastCalledWith('programmatic');
+    expect(polite()).toBeEmptyDOMElement();
   });
 });
 
