@@ -11,6 +11,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
+import { textOf } from '../internal/react-nodes';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
 
@@ -44,18 +45,23 @@ export const Breadcrumb = /* @__PURE__ */ forwardRef<HTMLElement, BreadcrumbProp
 // `group/item` + `group-first/item:hidden`: no separator before the first item, whatever the
 // consumer renders. Logical properties only (no left/right), so RTL needs no override.
 const ITEM =
-  'group/item flex min-w-0 max-w-[16rem] shrink-[10] items-center last:max-w-full last:shrink [&:not(:last-child)]:min-w-[2rem]';
+  'group/item flex min-w-0 max-w-[16rem] shrink-[10] items-center last:max-w-full last:shrink';
+// A previous item with real text never shrinks below a readable stub (separator + a few letters),
+// so its link keeps a box (focus ring, hover target). Short or icon-only items stay natural: a
+// fixed minimum would inflate them (`min()` cannot take `min-content`).
+const MIN_STUB = '[&:not(:last-child)]:min-w-[3rem]';
+const STUB_FROM = 6;
 
 /** One entry of the list (`li`). Renders the separator before itself, except when it is the first. */
 export const BreadcrumbItem = /* @__PURE__ */ forwardRef<HTMLLIElement, LiHTMLAttributes<HTMLLIElement>>(
   function BreadcrumbItem({ className, children, ...rest }, ref) {
     const separator = useContext(SeparatorContext);
     return (
-      <li {...rest} ref={ref} className={cn(ITEM, className)}>
+      <li {...rest} ref={ref} className={cn(ITEM, textOf(children).trim().length >= STUB_FROM && MIN_STUB, className)}>
         <span
           aria-hidden="true"
           data-rop-breadcrumb-separator=""
-          className="inline-flex shrink-0 select-none items-center px-2 text-rop-text-muted group-first/item:hidden"
+          className="inline-flex shrink-0 select-none items-center px-1.5 text-rop-text-muted group-first/item:hidden"
         >
           {separator === 'slash' ? (
             '/'

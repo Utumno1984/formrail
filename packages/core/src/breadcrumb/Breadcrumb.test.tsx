@@ -81,6 +81,30 @@ describe('Breadcrumb', () => {
     expect(ref.current!.className).not.toContain('max-w-full');
   });
 
+  it('only a previous item with real text (6+ chars) gets a minimum width; short and icon-only items stay natural', () => {
+    const { container } = render(
+      <Breadcrumb>
+        <BreadcrumbItem>
+          <BreadcrumbLink href="/">
+            <svg aria-hidden="true" />
+            <span className="sr-only">Home</span>
+          </BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbItem>
+          <BreadcrumbLink href="/a">Ab</BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbItem>
+          <BreadcrumbLink href="/b">Invoices</BreadcrumbLink>
+        </BreadcrumbItem>
+        <BreadcrumbItem>
+          <BreadcrumbPage>2026-0142</BreadcrumbPage>
+        </BreadcrumbItem>
+      </Breadcrumb>,
+    );
+    const li = Array.from(container.querySelectorAll('li')).map((l) => l.className.includes('min-w-[3rem]'));
+    expect(li).toEqual([false, false, true, true]); // the last one carries it too, but `:not(:last-child)` gates it in CSS
+  });
+
   it('does not leak non-DOM props: no unknown attribute reaches the DOM', () => {
     const { container } = render(<Basic separator="slash" />);
     const nav = container.querySelector('nav')!;

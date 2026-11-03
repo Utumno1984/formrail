@@ -70,7 +70,18 @@ test.describe('Navigation/Breadcrumb', () => {
     expect(items.every((i) => i.overflow === 'hidden' && i.ws === 'nowrap')).toBe(true);
     expect(new Set(items.map((i) => i.lineHeight)).size).toBe(1); // one line each
     expect(Math.max(...items.map((i) => i.right))).toBeLessThanOrEqual(375);
-    await expect(page.getByRole('link', { name: 'Invoices received from suppliers' })).toBeVisible();
+    // Every link keeps a real box (a zero-width link would have no focus ring and no hover target).
+    const links = page.getByRole('link');
+    for (let i = 0; i < (await links.count()); i++) {
+      await expect(links.nth(i)).toBeVisible();
+      expect((await links.nth(i).boundingBox())!.width).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  test('a short or icon-only item keeps its natural width (no inflated minimum)', async ({ page }) => {
+    await gotoStory(page, `${ID}separators`);
+    const w = await page.getByRole('link', { name: 'Home' }).first().evaluate((a) => a.closest('li')!.getBoundingClientRect().width);
+    expect(w).toBeLessThanOrEqual(20);
   });
 
   test('the current item has priority: it is truncated less than the previous ones, which are narrower', async ({

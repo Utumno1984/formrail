@@ -121,7 +121,14 @@ export const Separators: Story = {
         <Breadcrumb key={separator} separator={separator} aria-label={`Breadcrumb ${separator}`}>
           <BreadcrumbItem>
             <BreadcrumbLink href="#home">
-              <svg aria-hidden="true" viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                width="1em"
+                height="1em"
+                fill="currentColor"
+                style={{ verticalAlign: '-0.15em' }}
+              >
                 <path d="M8 2 1 8h2v6h4v-4h2v4h4V8h2z" />
               </svg>
               <span className="sr-only">Home</span>
