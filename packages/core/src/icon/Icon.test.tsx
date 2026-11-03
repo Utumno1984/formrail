@@ -202,6 +202,7 @@ describe('internal icons', () => {
     const exposed = Object.keys(publicApi);
     expect(exposed).not.toContain('internalIcons');
     expect(exposed.sort()).toEqual([
+      'Avatar',
       'Button',
       'Combobox',
       'DescriptionList',

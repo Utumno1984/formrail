@@ -95,6 +95,12 @@ describe('contrast', () => {
     expect(contrast(token('text'), badgeBackgrounds[tone]!)).toBeGreaterThanOrEqual(4.5);
   });
 
+  // Avatar: initials (text) and generic icon (text-muted) on the subtle surface; the outline
+  // (border) is a non-text contour, not subject to the text threshold.
+  it.each(['text', 'text-muted'])('Avatar: %s on the subtle surface is at least 4.5:1 (WCAG AA)', (name) => {
+    expect(contrast(token(name), token('surface-subtle'))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('the focus ring is drawn with the primary token', () => {
     expect(token('primary')).toEqual(token('blue-600'));
   });
