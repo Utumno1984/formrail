@@ -49,8 +49,10 @@ function InvoiceChanges({ invoice }: { invoice: Invoice }) {
   if (isEmpty) return <p>No changes</p>;
   return (
     <ul>
-      {entries.map((entry) => (
-        <li key={`${entry.kind}:${entry.path}`}>
+      {entries.map((entry, index) => (
+        // kind + path alone can collide (a key containing a dot, `{ 'a.b': 1 }` vs `{ a: { b: 1 } }`):
+        // the index makes the key unique within the list.
+        <li key={`${index}:${entry.kind}:${entry.path}`}>
           {entry.label}: {entry.kind}
         </li>
       ))}
