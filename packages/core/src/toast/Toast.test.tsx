@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { Activity, createRef, useState } from 'react';
+import { Activity, StrictMode, createRef, useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Input } from '../input/Input';
 import { ToastProvider, type ToastProviderProps } from './ToastProvider';
@@ -343,6 +343,44 @@ describe('replacement and update', () => {
     expect(polite()).toBeEmptyDOMElement();
     expect(first).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ['normal mode', false],
+    ['StrictMode', true],
+  ])(
+    'a show in a child mount effect leaves no orphan timer: a later update with an action stays (%s)',
+    (_name, strict) => {
+      const onDismiss = vi.fn();
+      function ShowOnMount() {
+        const toast = useToast();
+        useEffect(() => {
+          toast.show({ id: 'save', description: 'Saving', onDismiss });
+        }, [toast]);
+        return null;
+      }
+      const tree = (
+        <ToastProvider>
+          <Capture />
+          <ShowOnMount />
+        </ToastProvider>
+      );
+      render(strict ? <StrictMode>{tree}</StrictMode> : tree);
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      show({
+        id: 'save',
+        description: 'Save failed',
+        action: { label: 'Retry', onClick: vi.fn() },
+        onDismiss,
+      });
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(onDismiss).not.toHaveBeenCalled();
+    },
+  );
 
   it('two shows in the same tick leave one toast: the last', () => {
     setup();

@@ -359,6 +359,9 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
     const item = currentRef.current;
     const duration = durationRef.current;
     if (item && typeof duration === 'number') {
+      // A child's mount effect runs before this one and may already have armed a timer through
+      // `show()`: stop it first, or it would be orphaned and close a later update of the same id.
+      clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => closeCurrent('timeout', item.key), duration);
     }
     return () => clearTimeout(timerRef.current);
