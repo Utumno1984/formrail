@@ -124,7 +124,7 @@ function EditorDemo({ emptyLabel, label, locale, timeZone, valueFormat, onSave, 
       : undefined;
 
   return (
-    // Inline styles: the pro stylesheet does not scan stories, so story layout cannot use utilities.
+    // Inline styles: the pro stylesheet emits no utilities (only `.rop-pro-*` component classes).
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
       <Field label="Amount" name="amount">
         <Input value={values.amount} onChange={(event) => form.setValue('amount', event.target.value)} />
@@ -228,8 +228,8 @@ export const Playground: Story = {
     await userEvent.type(amount, '120');
     const amountItem = await item(canvas, /^Amount/);
     await expect(amountItem).toHaveTextContent(/changed/);
-    await expect(amountItem).toHaveTextContent(/100/);
-    await expect(amountItem).toHaveTextContent(/120/);
+    // One assertion on the text read, so the order is checked too (before, then after).
+    await expect(amountItem).toHaveTextContent(/from\s*100\s*to\s*120/);
     await expect(items()).toHaveLength(1);
 
     // A boolean reads Yes / No, never true / false.
