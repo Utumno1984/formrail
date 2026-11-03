@@ -24,7 +24,7 @@ test.describe('Foundations/Tokens', () => {
     expect(swatch).toBe('rgb(10, 110, 209)');
   });
 
-  test('the z-index scale is listed in strictly increasing order: sticky, overlay, modal, popover, tooltip', async ({
+  test('the z-index scale is listed in strictly increasing order: sticky, overlay, modal, popover, toast, tooltip', async ({
     page,
   }) => {
     await gotoStory(page, STORY);
@@ -34,6 +34,7 @@ test.describe('Foundations/Tokens', () => {
       'rop-overlay',
       'rop-modal',
       'rop-popover',
+      'rop-toast',
       'rop-tooltip',
     ]);
     const values = items.map((t) => Number(t.split(':')[1]));

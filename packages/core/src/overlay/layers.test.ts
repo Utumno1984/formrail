@@ -26,7 +26,7 @@ describe('overlayLayer', () => {
   it('maps every level onto an existing z-index token, in increasing order', () => {
     const tokens = parseTokenScale(tokensCss)['z-index'];
     const classes = Object.values(overlayLayer);
-    expect(Object.keys(overlayLayer)).toEqual(['backdrop', 'modal', 'popover', 'tooltip']);
+    expect(Object.keys(overlayLayer)).toEqual(['backdrop', 'modal', 'popover', 'toast', 'tooltip']);
     for (const cls of classes) expect(tokens).toContain(cls.replace(/^z-/, ''));
     const indexes = classes.map((cls) => tokens.indexOf(cls.replace(/^z-/, '')));
     expect(indexes).toEqual([...indexes].sort((a, b) => a - b));

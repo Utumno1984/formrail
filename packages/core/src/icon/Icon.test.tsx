@@ -241,6 +241,7 @@ describe('internal icons', () => {
       'StatusBadge',
       'Text',
       'Title',
+      'ToastProvider',
       'Tooltip',
       'TooltipProvider',
       'TruncatedText',
@@ -257,6 +258,7 @@ describe('internal icons', () => {
       'useListReportScrollRestoration',
       'useListReportUrlState',
       'useObjectPageForm',
+      'useToast',
     ]);
   });
 });

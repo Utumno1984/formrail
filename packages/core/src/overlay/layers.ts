@@ -1,8 +1,10 @@
 /**
  * Overlay levels mapped onto the z-index tokens of `styles/tokens.css`
- * (sticky < overlay < modal < popover < tooltip). Internal: overlay wrappers take their stacking
- * from here and never write a literal z-index, so a popover is always above a modal and a tooltip
- * above both.
+ * (sticky < overlay < modal < popover < toast < tooltip). Internal: overlay wrappers take their
+ * stacking from here and never write a literal z-index, so a popover is always above a modal and a
+ * tooltip above both. A toast sits between popover and tooltip: one shown before a modal or a
+ * popover opens must not end up under it (a lost message), while the tiny pointer-bound tooltip
+ * (e.g. the one on a toast's close button) stays above it.
  *
  * The class names are written out in full on purpose: the CSS build scans the sources for
  * utilities, a name assembled at run time would never be generated.
@@ -19,6 +21,7 @@ export const overlayLayer = {
   backdrop: 'z-rop-overlay',
   modal: 'z-rop-modal',
   popover: 'z-rop-popover',
+  toast: 'z-rop-toast',
   tooltip: 'z-rop-tooltip',
 } as const;
 
