@@ -124,11 +124,11 @@ test.describe('Showcase/Invoices: EditFlow', () => {
 
   test('Open filter, status changed to Approved and saved: the row is gone, the count follows, focus on the title', async ({ page }) => {
     await openList(page, 'filter=open&sort=amount.desc');
-    const count = async () => {
-      const m = /\((\d+)(?: of (\d+))?\)/.exec(await page.getByRole('heading', { level: 2, name: /Invoices/ }).innerText());
-      return Number(m?.[1]);
-    };
+    const parts = async () => /\((\d+)(?: of (\d+))?\)/.exec(await page.getByRole('heading', { level: 2, name: /Invoices/ }).innerText());
+    const count = async () => Number((await parts())?.[1]);
     const open = await count();
+    const total = (await parts())?.[2];
+    expect(total).toBe('200');
     const number = (await page.locator('a[data-record-id]').nth(3).innerText()).trim();
     await openRecord(page, number);
     await page.getByRole('combobox', { name: 'Status' }).click();
@@ -140,6 +140,7 @@ test.describe('Showcase/Invoices: EditFlow', () => {
     await expect(page.getByRole('radio', { name: 'Open' })).toBeChecked();
     await expect(page.getByRole('link', { name: number, exact: true })).toHaveCount(0);
     await expect.poll(count).toBe(open - 1);
+    expect((await parts())?.[2]).toBe(total); // the total of the store did not change
     await expect(title(page)).toBeFocused();
   });
 

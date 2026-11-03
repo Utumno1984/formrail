@@ -241,20 +241,35 @@ export function InvoiceListToRecord({
   }, [store, saveDelayMs, saveOutcome]);
   // The store has ONE read delay: the list and the record each set theirs just before their call
   // (the store reads its configuration when the call is made).
-  const api = useMemo<InvoiceStore>(
-    () => ({
+  // A save outlives the page that started it (leave with "Discard changes" while it runs). Reads wait for the
+  // saves in flight, so a list or a re-opened record never shows (and a later save never builds on) a value
+  // older than the one the server is about to hold: no stale echo can overwrite a fresher save.
+  const api = useMemo<InvoiceStore>(() => {
+    const saving = new Set<Promise<unknown>>();
+    const settled = async () => {
+      while (saving.size > 0) await Promise.allSettled([...saving]);
+    };
+    return {
       ...store,
-      list: () => {
+      save: (invoice) => {
+        const run = store.save(invoice);
+        saving.add(run);
+        const done = () => void saving.delete(run);
+        run.then(done, done);
+        return run;
+      },
+      list: async () => {
+        await settled();
         store.configure({ loadDelayMs: delays.current.listLoadDelayMs });
         return store.list();
       },
-      get: (id) => {
+      get: async (id) => {
+        await settled();
         store.configure({ loadDelayMs: delays.current.recordLoadDelayMs });
         return store.get(id);
       },
-    }),
-    [store],
-  );
+    };
+  }, [store]);
   useEffect(() => {
     window.__ropShowcaseStore = store;
     return () => {

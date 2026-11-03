@@ -307,7 +307,9 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
  * changes" and the list is unchanged.
  *
  * Declared behaviour: leaving while a save is in flight ("Back to list", then "Discard changes") is immediate;
- * the save is not cancelled, so once it resolves the store holds the saved value. The browser's Back button is
+ * the save is not cancelled, so once it resolves the store holds the saved value. The demo's reads (the list,
+ * a re-opened record) wait for the saves in flight, so they show that value and a later save cannot overwrite
+ * it with an older one. The browser's Back button is
  * not intercepted (a documented limit of `useDirtyGuard`, which has no router integration): with unsaved
  * changes it leaves without asking and the changes are lost, while closing or reloading the page still gets
  * the browser's own prompt. Controls: both load delays, `saveDelayMs`, `saveOutcome` (`error` keeps the form
