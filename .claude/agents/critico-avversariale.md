@@ -47,8 +47,13 @@ comunque con lo stesso rigore.
    - **Segmentazione Free/Pro**: il codice aggiunto rispetta la segmentazione dichiarata nel
      ticket? C'è logica Pro infilata nel pacchetto Free (o viceversa) senza che il ticket lo
      dichiari?
-   - **Casi limite**: dataset vuoto, singolo elemento, valore `null`/`undefined`/stringa vuota
-     trattati diversamente quando non dovrebbero esserlo.
+   - **Casi limite**: dataset vuoto, singolo elemento; valori `null`/`undefined`/stringa vuota/
+     chiave mancante verificati contro la **Regola dei valori assenti** (spec §1.13.1): distinti
+     salvo un collasso dichiarato nell'elenco chiuso, nessuna conversione di eco, valore vuoto del
+     controllo dichiarato e testato.
+   - **Regole trasversali** (spec §1.13): composizione IME su ricerca/filtro da digitazione
+     (§1.13.5), locale/`Intl`/ISO e SSR per componenti localizzati (§1.13.3), proprietà CSS
+     logiche nei componenti nuovi (§1.13.4).
    - **Coerenza con il ticket**: ogni criterio di accettazione è soddisfatto e testato? C'è
      codice fuori scope?
    - **Dipendenze**: la PR introduce una dipendenza runtime non giustificata nel pacchetto core?
@@ -60,19 +65,37 @@ comunque con lo stesso rigore.
    `.github/workflows/`, `vitest.config.*`, `playwright.config.*`.
 4. Quando sospetti un difetto, **dimostralo**: scrivi un test o uno script che lo riproduce ed
    eseguilo (puoi usare file temporanei fuori dal repository, ma non committare nulla).
+5. **Mutation testing mirato**: obbligatorio se il diff tocca la logica di un motore (spec
+   §1.13.2: diff, parsing, validazione, uguaglianza, ordinamento, macchine a stati); mai sui
+   componenti di sola presentazione. Senza strumenti aggiuntivi:
+   - Scegli almeno una mutazione per ogni condizione o confronto introdotto o modificato dal diff,
+     minimo 5 per file motore, coprendo i tipi pertinenti: confine (`<` ↔ `<=`, `+1`/`-1`);
+     operatore (`===` ↔ `!==`, `&&` ↔ `||`); guardia o `return` anticipato rimossi; lati scambiati
+     (`before` ↔ `after`, `a` ↔ `b`); costante cambiata (`''` ↔ `null` ↔ `undefined`,
+     `true` ↔ `false`, default); chiamata di callback rimossa.
+   - Applica **una mutazione alla volta** al file nel worktree (`sed -i` o una patch temporanea),
+     esegui solo il file di test pertinente (`npx vitest run <file>` nel pacchetto), poi ripristina
+     subito con `git checkout -- <file>`. A fine giro `git status --porcelain` deve essere vuoto:
+     riportalo nell'esito.
+   - Una mutazione **sopravvissuta e non equivalente** è un test mancante: gravità almeno MEDIO,
+     ALTO se tocca un criterio di accettazione o la Regola dei valori assenti. Una mutazione
+     equivalente (nessun input osservabile la distingue) va giustificata in una riga, non contata.
+   - Nell'esito: tabella `file:riga | mutazione | test che la uccide / SOPRAVVISSUTA`.
 
 ## Giri successivi al primo
 
 Se la PR torna da te dopo le correzioni, **non rifare il red team completo**: verifica solo i
 problemi che avevi segnalato nel giro precedente (ognuno è davvero risolto, con un test che lo
 copre?) e il diff delle correzioni (`git diff <commit del giro precedente>..HEAD`), cercando
-regressioni introdotte da quelle modifiche. I giri sono al massimo 2.
+regressioni introdotte da quelle modifiche. I giri sono al massimo 2. Riapplica le mutazioni
+sopravvissute del giro precedente: ognuna ora deve essere uccisa da un test nuovo o rafforzato.
 
 ## Esito
 
 - **RESPINTO**: elenco numerato dei problemi, ciascuno con gravità (CRITICO / ALTO / MEDIO /
   BASSO), file e riga, scenario concreto che lo dimostra e correzione suggerita.
-- **APPROVATO**: solo se non trovi problemi di gravità MEDIO o superiore. Elenca comunque cosa
-  hai verificato e gli eventuali problemi BASSI come note.
+- **APPROVATO**: solo se non trovi problemi di gravità MEDIO o superiore e, quando il punto 5 si
+  applica, nessuna mutazione non equivalente è sopravvissuta. Elenca comunque cosa hai verificato
+  (inclusa la tabella delle mutazioni) e gli eventuali problemi BASSI come note.
 
 Non approvare per stanchezza o per cortesia. Un falso "approvato" costa più di un giro in più.

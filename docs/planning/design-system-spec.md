@@ -121,7 +121,7 @@ campi effettivamente modificati rispetto al valore originale).
   (separare "fetch in corso" da "editor montato") non sempre applicabile a cuor leggero.
 - **Change Summary** affidabile richiede calcolare il diff sul valore effettivo salvato lato
   server (baseline), non su un default statico, e deve gestire bene stringhe vuote vs valori
-  assenti vs `null`.
+  assenti vs `null` (regola canonica: **Regola dei valori assenti**, §1.13.1).
 - **Campi con stati "forzato/bloccato/disabilitato"** (il valore è determinato da una regola di
   business, non dall'utente) devono: (a) essere realmente non interagibili anche da tastiera (non
   solo visivamente "spenti" col mouse), (b) esporre una spiegazione collegata via
@@ -147,6 +147,8 @@ gestione esplicita degli errori di duplicato/validazione lato server mappati su 
 - Un valore selezionato che non è tra i risultati dell'ultima ricerca (perché l'utente ha
   continuato a digitare dopo aver scelto) deve restare visibile: la UI non deve "perdere" la
   selezione solo perché non compare nella lista filtrata corrente.
+- Durante una composizione IME il testo è provvisorio: nessuna ricerca né commit finché non arriva
+  `compositionend`, ed Enter non seleziona (**Composizione IME**, §1.13.5).
 
 ### 1.6 Primitivi di overlay: Dialog, Select/Combobox, Popover, Tooltip, Sheet — **difficoltà: alta**
 
@@ -260,6 +262,8 @@ più il default per il progetto nel suo complesso.
   il suo fix compagno (in un consumer che si affida a quel comportamento) vanno rilasciati nella
   stessa release quando sono accoppiati — un primitivo "che rompe" pubblicato senza il fix compagno
   crea una finestra di versione "avvelenata" che i consumer possono installare per sbaglio.
+- **Mutation testing mirato sui motori** (diff, parsing, validazione, uguaglianza): giro manuale
+  del critico su ogni PR che ne tocca la logica, senza dipendenze aggiuntive (§1.13.2).
 
 ### 1.12 Primitivi Free di completamento (gap rispetto alle librerie open source generaliste) — **difficoltà: bassa-media, DatePicker media-alta**
 
@@ -310,6 +314,10 @@ ogni primitivo):
   `prefers-reduced-motion` (regola "Motion" di CLAUDE.md).
 - Impronta stabile: Skeleton/Avatar (fallback → immagine caricata), Pagination (cambio di numero
   di pagine) e Tabs (cambio di pannello) non devono produrre salti di layout evitabili.
+- Checkbox, RadioGroup, Switch, Calendar e DatePicker rispettano la **Regola dei valori assenti**
+  (§1.13.1: valore vuoto dichiarato, nessuna conversione di eco); Calendar e DatePicker sono
+  vincolati a **Locale e i18n** (§1.13.3); tutti usano proprietà CSS logiche (**RTL**, §1.13.4),
+  senza garanzia RTL; il typeahead del Menu segue la **Composizione IME** (§1.13.5).
 
 **Nota futura — Toast avanzato (Pro), non pianificato.** Stesso schema già usato per List Report e
 Object Page (base Free, estensione avanzata Pro): il Toast Free copre il singolo messaggio
@@ -318,6 +326,197 @@ priorità e limite di visibili, pausa del timer su hover/focus e su finestra non
 tra navigazioni/ricariche, hook di analytics (mostrato/chiuso/azione). Nessun ticket finché Daniele
 non lo chiede esplicitamente; il Toast Free va disegnato in modo che questa estensione non richieda
 una rottura della sua API.
+
+### 1.13 Regole trasversali di robustezza — **difficoltà: bassa da applicare, alta da recuperare dopo**
+
+**Decisione di Daniele del 2026-11-03.** Cinque regole che valgono per più componenti, ognuna con un
+nome citabile. Il pianificatore le richiama **per nome** nei criteri di accettazione dei ticket
+interessati e il critico le verifica. Le sezioni dei singoli componenti rimandano qui invece di
+ripeterle (una sola fonte, nessun testo copiato che poi diverge).
+
+#### 1.13.1 Regola dei valori assenti
+
+**Problema.** `''`, `null`, `undefined` e, dentro un oggetto, la chiave mancante sono rappresentazioni
+diverse di "nessun valore". Se ogni modulo decide da sé quando sono "la stessa cosa" nascono falsi
+dirty, voci fantasma nel Change Summary e payload diversi da quelli attesi.
+
+**Livello 1, identità del dato (default ovunque).** I quattro stati sono **distinti**: `''` ≠ `null`
+≠ `undefined`, e una chiave con valore `undefined` ≠ una chiave mancante. Valgono così: lo stato del
+form, `isDirty` (`deepEqual` in `packages/core/src/object-page/equal.ts`, regola scritta nel suo
+TSDoc), gli schema di validazione (§1.5) e il payload verso l'API. Motivo: sul filo sono davvero
+diversi (in JSON `undefined` fa sparire la chiave, `null` resta, `''` è una stringa) e un backend può
+legittimamente distinguere "svuotato" da "non inviato".
+
+**Livello 2, collassi voluti (solo presentazione, elenco chiuso).**
+1. **Ordinamento della List Report**: `toSortKey` in `packages/core/src/list-report/compare.ts`
+   tratta `null`/`undefined`/`''` (più `NaN` e `Date` invalida) come "vuoto", sempre in fondo. È un
+   criterio di visualizzazione, non un'affermazione che i valori siano uguali.
+2. **Change Summary** (Pro, #174): classi **Assente** (`undefined`, `null`, chiave mancante) e
+   **Vuoto** (Assente ∪ `''` ∪ `[]` ∪ oggetto semplice con soli valori Vuoto), implementate in
+   `packages/pro/src/change-summary/compute-change-summary.ts`. La regola normativa è il TSDoc "No
+   value rule" di `change-summary/types.ts`; `ChangeEntry` normalizza a `undefined` il lato assente
+   anche se era `null`. Motivo: un riepilogo leggibile non deve mostrare "da (vuoto) a (vuoto)".
+3. **Rendering di un controllo**: mostrare un valore assente come testo vuoto (`value ?? ''`) è
+   lecito **in lettura**; non deve mai diventare una scrittura nello stato (sarebbe un'eco, §1.4).
+
+Qualunque altro collasso è un bug, finché non viene aggiunto a questo elenco con data e motivo.
+
+**Conseguenza nota e accettata finché Daniele non decide altrimenti (§5 punto 7).** Il livello 1 e il
+collasso 2 possono divergere: **form dirty con Change Summary vuoto**. Due casi concreti: baseline
+`{ note: null }`, l'utente scrive e poi cancella in un `Input` (che emette `''`); oppure un `Combobox`
+con `clearOnEmpty` emette `undefined` su una baseline `null`. Rimedi documentati per il consumer:
+costruire la baseline con la stessa rappresentazione di "vuoto" che il controllo emette
+(normalizzando al confine idratazione/schema), oppure passare un `isEqual` a `useObjectPageForm`.
+
+**Contratto per ogni controllo di form**, nuovo o toccato (Input, Select, Combobox, Checkbox #188,
+RadioGroup #189, Switch #190, Calendar #194, DatePicker #195, ticket Zod):
+- Il TSDoc dichiara il **valore vuoto emesso quando l'utente svuota**. Esistenti: `Input` → `''`;
+  `Select`/`Combobox` → `undefined` (`'value' in props` distingue "controllato e vuoto" da "non
+  controllato"). Controlli di selezione nuovi → `undefined`, coerente con Select/Combobox, salvo
+  diversa decisione (§5 punto 7). Checkbox/Switch emettono sempre un booleano; "indeterminato" è una
+  prop separata, mai `null` come valore.
+- Un valore assente in ingresso (`null` compreso) viene mostrato come vuoto **senza** nessun
+  `onChange`/`onValueChange` che lo converta in un'altra rappresentazione di assente (eco, §1.4).
+- Test obbligatori: matrice ingresso {`undefined`, `null`, `''` dove il tipo lo ammette, prop/chiave
+  mancante} × {al mount, cambiato dopo il mount} → zero callback; svuotamento da parte dell'utente →
+  esattamente il valore vuoto dichiarato.
+- Schema Zod: nessuna coercizione implicita. `.nullable()`/`.optional()` sono espliciti; un
+  `preprocess` `'' → null` è dichiarato nello schema e testato; un campo obbligatorio mancante
+  fallisce rumorosamente (§1.5).
+
+#### 1.13.2 Mutation testing mirato sui motori
+
+**Problema.** Sui moduli di logica pura (diff, parsing, validazione, uguaglianza, ordinamento) una
+suite verde ed "esaustiva" può passare comunque con un confronto invertito o una guardia tolta: è il
+punto dove un difetto costa di più e si vede di meno. Un test che non fallisce quando il codice è
+sbagliato non protegge nulla. Finora è stato fatto solo per iniziativa del critico (#174).
+
+**Regola.** Ogni PR che aggiunge o modifica la logica di un **motore** passa da un giro di mutation
+testing **manuale e mirato**, fatto dal critico (procedura in `.claude/agents/critico-avversariale.md`):
+muta a mano le condizioni e i confronti introdotti o toccati dal diff, una mutazione alla volta, e
+verifica che almeno un test esistente fallisca. Una mutazione sopravvissuta e non equivalente vale
+come test mancante: PR respinta.
+
+**Ambito.** Sono motori oggi: `object-page/equal.ts`, `object-page/field-errors.ts`,
+`list-report/compare.ts`, la logica di ordinamento/filtro/commit della ricerca in
+`list-report/use-list-report.ts`, il parsing in `list-report/use-list-report-url-state.ts` e
+`use-list-report-scroll-restoration.ts`, `combobox/filter.ts` con `internal/normalize-text.ts`, la
+macchina a stati di `combobox/use-combobox.ts`, `internal/keyboard-navigation.ts` e, in Pro,
+`change-summary/{compute-change-summary,infer-label,format-change-value}.ts`. In arrivo:
+`calendar/date-math.ts` (#194), `date-picker/date-format.ts` (#195), gli schema Zod. **Esclusi**: i
+componenti di sola presentazione, i file di stile, le story. La regola si applica ai diff, non a una
+campagna retroattiva sui moduli già uniti.
+
+**Perché manuale e non Stryker (decisione 2026-11-03).** Uno strumento automatico (Stryker con
+runner Vitest) aggiungerebbe una dipendenza di sviluppo pesante ed eseguirebbe la suite del file per
+ogni mutante: sui motori con matrici parametriche (i 36 casi di #174) sono minuti per file, un costo
+fisso a ogni PR su CI condivisa con il vincolo hardware già noto, più molto rumore di mutanti
+equivalenti su codice difensivo. Le mutazioni che contano sono poche e prevedibili (confini,
+operatori di confronto, guardie, lati scambiati) e il critico legge comunque il diff riga per riga.
+Da rivedere se un difetto arrivato su `main` si rivela catturabile da una mutazione che il giro
+manuale aveva saltato, o quando i motori diventano troppi per un giro manuale per PR.
+
+#### 1.13.3 Locale e i18n
+
+**Decisione del 2026-11-03, vincolante per #194 (Calendar), #195 (DatePicker) e per ogni componente
+che formatta date, numeri o testi interni.** Principio: iniziare semplice, evolvere se serve.
+
+- **Nessuna libreria di i18n o di date nel bundle** (né core né Pro): la formattazione usa `Intl`
+  nativo (`DateTimeFormat`, `NumberFormat`, `Collator`, `Locale`). Motivo: il budget per-import
+  (§1.11), e `Intl` copre già quello che serve. Un locale o un fuso non validi degradano ai default
+  del runtime senza eccezioni (precedente: `change-summary/format-change-value.ts`).
+- **Risoluzione del locale**: prop `locale` del componente → (in futuro) un provider di contesto del
+  core → default del runtime (si passa `undefined` a `Intl`, che nel browser equivale alla lingua
+  dell'utente). La libreria non legge mai `navigator.language` direttamente: `undefined` dà lo stesso
+  risultato nel browser e funziona lato server senza guardie su `navigator`. È lo stesso default già
+  in uso in `useListReport({ locale })` e in `ChangeSummary` (`locale`, `timeZone`). Il provider non
+  si introduce ora: i componenti passano da un unico helper interno di risoluzione, così aggiungerlo
+  più avanti non rompe l'API.
+- **SSR, rischio dichiarato**: lato server il default è il locale del processo (spesso `en-US`), lato
+  client quello del browser. Senza `locale` esplicito il testo formattato può differire e React
+  segnala un mismatch di idratazione (con ri-render client del sottoalbero). Contratto: chi fa SSR
+  passa `locale` e, dove serve, `timeZone` e `today`. Ogni componente localizzato ha un test
+  `renderToString` + `hydrateRoot` con locale esplicito, senza errori di idratazione. Story, e2e e
+  baseline visive passano sempre un locale fisso.
+- **Valori di data**: stringa ISO `YYYY-MM-DD` (tipo `IsoDate`), indipendente dal locale di
+  visualizzazione. Mai `Date` come valore: rappresenta un istante e slitta di un giorno tra fusi e
+  ora legale. L'aritmetica si fa su `Date.UTC`. Il locale incide solo sulla visualizzazione e sul
+  parsing del testo digitato. Se `locale` cambia dopo il mount, il testo viene riformattato senza
+  `onValueChange` (eco, §1.4).
+- **Primo giorno della settimana**, in ordine: (1) prop `weekStartsOn`; (2)
+  `Intl.Locale(locale).getWeekInfo()` o l'accessor `weekInfo` dove esiste (non in tutti i motori);
+  (3) una piccola tabella interna per regione (`Intl.Locale(locale).maximize().region`) derivata da
+  CLDR `weekData.firstDay`, poche decine di codici e qualche centinaio di byte; (4) lunedì (ISO
+  8601). Motivo della tabella: con il solo "domenica per `en-US`, lunedì per gli altri", `ja-JP`,
+  `pt-BR`, `en-CA` (domenica) o `ar-EG` (sabato) risulterebbero sbagliati e, soprattutto, il
+  risultato cambierebbe tra un browser con `weekInfo` e uno senza: due baseline visive diverse per lo
+  stesso locale.
+- **Testi interni della libreria** ("Previous month", "Clear", "Choose date", ...): default inglesi.
+  Un componente nuovo con due o più testi interni, o con testi che contengono valori, espone
+  `labels?: Partial<XLabels>` con il tipo `XLabels` esportato e unito ai default. I testi con un
+  valore sono funzioni (`chooseDateSelected: (date: string) => string`), non segnaposto in una
+  stringa: niente formato ICU; plurali solo con funzioni (precedente: `items` in
+  `format-change-value.ts`). Le prop `*Label` singole già esistenti (`emptyLabel`, `dismissLabel`,
+  `searchLabel`, ...) restano: nessuna migrazione retroattiva. Eccezione dichiarata: `ChangeSummary`
+  usa `valueLabels` perché `labels` è già preso dalle etichette dei path di `useChangeSummary`.
+
+#### 1.13.4 RTL: non garantito per ora, porta aperta a basso costo
+
+**Decisione del 2026-11-03.** Il layout da destra a sinistra **non è supportato né garantito**: è una
+scelta consapevole, non una dimenticanza. Nessun test, nessuna baseline visiva RTL, nessuna promessa
+nella documentazione. Per tenere basso il costo di un recupero futuro, i componenti nuovi o toccati
+usano **proprietà logiche**: `margin-inline`, `padding-inline`, `inset-inline-start/end`,
+`text-align: start` e, con Tailwind v4 (lo stack in uso), le utility
+`ms-/me-/ps-/pe-/start-/end-/text-start/text-end`, non `ml-/mr-/pl-/pr-/left-/right-/text-left`.
+Il codice esistente è già quasi tutto logico (listbox, Field, Select, Description List, List Report);
+le eccezioni fisiche censite il 2026-11-03 sono `StatusBadge` e il bottone di chiusura di
+`MessageStrip`, da convertire solo quando quei file vengono toccati per altri motivi.
+
+**Cosa il solo CSS logico NON copre** (da sapere al momento del recupero, così la stima resta onesta):
+- icone direzionali (chevron mese precedente/successivo, separatore di Breadcrumb, frecce di
+  Pagination);
+- **tasti freccia sinistra/destra** nella navigazione da tastiera custom (Calendar, Tabs, Menu): va
+  letta la `direction` calcolata, come fa già `isRtl` in `ListReportFilterBar.tsx`;
+- traslazioni e animazioni di ingresso (`--rop-modal-from-translate` e l'offset di `box-shadow` dello
+  Sheet);
+- API con lati fisici (`side: 'left' | 'right'` di Sheet e Tooltip);
+- `scrollLeft`, che in RTL è negativo nei browser moderni: oggi il parsing della posizione in
+  `use-list-report-scroll-restoration.ts` scarta i valori negativi;
+- isolamento bidi dei valori utente dentro testo composto (`<bdi>` / `unicode-bidi: isolate`, es.
+  "from X to Y" nel Change Summary);
+- il provider di direzione delle primitive Radix.
+
+Il comportamento RTL già esistente (frecce invertite nelle pillole della Filter Bar) resta com'è, con
+i suoi test, ma non è una garanzia di prodotto. Lo stesso vale per un componente nuovo che decida di
+gestire `direction` a costo quasi nullo (es. le frecce del Calendar): ammesso, senza baseline visive
+RTL dedicate.
+
+#### 1.13.5 Composizione IME nella ricerca e nel filtro
+
+Stessa famiglia della race su digitazione rapida (§1.5). Durante una composizione IME (input CJK, tra
+`compositionstart` e `compositionend`, o keydown con `isComposing` / `keyCode === 229`) il testo
+nell'input è provvisorio: candidati non ancora confermati, kana non ancora convertiti. Regole per
+ogni controllo con ricerca o filtro innescato dalla digitazione:
+- **Durante la composizione** non parte nessuna ricerca asincrona e nessun commit ritardato
+  (debounce, sincronizzazione con l'URL, callback di "query confermata"). Un filtro locale sincrono
+  può seguire il testo: è economico e reversibile.
+- **A `compositionend`** il testo finale vale come una sola modifica, da cui partono debounce o
+  ricerca. Va letto da `event.currentTarget.value` nel gestore stesso, senza contare su un
+  `onChange` successivo: l'ordine `input`/`compositionend` cambia tra i motori.
+- **Enter, Escape, frecce e Tab durante la composizione appartengono all'IME**: nessuna selezione,
+  chiusura o commit. Si ignora anche il keydown con `keyCode 229` che Safari invia dopo
+  `compositionend`. Se il fuoco esce durante la composizione, lo stato di composizione si azzera.
+  Precedente corretto: `onKeyDown`/`onBlur` di `combobox/use-combobox.ts`.
+- **Test**: unit con `compositionStart` → `change`... → `compositionEnd`: zero ricerche e commit
+  durante la composizione, esattamente uno dopo, col testo finale; Enter con `isComposing` non
+  seleziona. In e2e Chromium si può usare CDP `Input.imeSetComposition` dove serve.
+- **Si applica a**: Combobox con ricerca asincrona (Pro, §3; il Combobox sincrono del Free ignora
+  già i tasti durante la composizione, ma `onInputValueChange` scatta anche sul testo provvisorio:
+  il contratto asincrono non può appoggiarsi lì così com'è), typeahead del Menu (#193), ricerca della
+  `ListReportFilterBar` (**difetto latente censito il 2026-11-03**: Enter in composizione è già
+  ignorato, ma `setSearchDraft` in `use-list-report.ts` fa partire il commit ritardato di 300 ms a
+  ogni `change`, quindi una pausa sulla scelta del candidato conferma la ricerca col testo
+  provvisorio, aggiorna URL e righe e poi ripete tutto col testo convertito; nessun ticket aperto).
 
 ---
 
@@ -469,6 +668,15 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    sniper-trading-bot) più il filone Fatture in Cloud. Questo è un **quinto/sesto fronte**. Va
    deciso consapevolmente se ha priorità più alta del completamento di vistato/FiC o se procede in
    parallelo a ritmo più lento (sezione MVP sotto assume ritmo "lento ma con moat", non uno sprint).
+7. **Valori assenti tra form e Change Summary** (aperta il 2026-11-03, vedi §1.13.1).
+   (a) `isDirty` (core) distingue `''`/`null`/`undefined`, il Change Summary (Pro) li collassa:
+   "dirty ma nessuna modifica nel riepilogo" è possibile. **Raccomandazione**: lasciare `isDirty`
+   rigoroso (riflette il payload reale; cambiarlo sarebbe una rottura di comportamento nel Free),
+   documentare i rimedi lato consumer e, se serve, offrire un'opzione di equivalenza dei valori
+   assenti nel **dirty-tracking robusto Pro** (§3) quando verrà messo in un ticket.
+   (b) Valore vuoto emesso dai controlli di selezione: `undefined` come Select/Combobox oggi
+   (raccomandato: coerenza, con mappatura a `null` nello schema se il backend la vuole) oppure
+   `null` come proposto dal default di #195. Da decidere prima dello sviluppo di #195.
 
 ---
 
@@ -579,10 +787,9 @@ function ChangeSummary(props: {
 ### Rischi tecnici noti da affrontare nei ticket (non insidie generiche, specifiche di questo componente)
 
 - **Tre stati di "nessun valore" distinti** (stringa vuota vs `undefined` vs `null`, vincolo già
-  fissato in §1.4): serve una regola esplicita e testata, non lasciata all'uguaglianza JS di
-  default. Proposta di partenza (da confermare in ticket): `undefined`/`null` equivalenti come
-  "assente", stringa vuota `''` è un valore reale distinto da "assente" — ma un campo che passa da
-  assente a `''` non genera un `ChangeEntry` finto.
+  fissato in §1.4): **risolto in #174** con le classi Assente/Vuoto (`''` è Vuoto: assente ↔ `''`
+  non genera entry, `''` ↔ `'abc'` sì). La regola canonica, i collassi ammessi e la divergenza nota
+  con `isDirty` sono in §1.13.1; la proposta di partenza scritta qui prima di #174 è superata.
 - **Identity degli array**: un `id` presente nella baseline ma non nei `values` → `removed`; un `id`
   nuovo nei `values` → `added`; stesso `id` con contenuto diverso → `changed`, con un
   `ChangeEntry` per ciascun campo del singolo elemento cambiato (non un unico entry "la riga N è
