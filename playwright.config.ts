@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 6007;
+// Overridable so parallel git worktrees can each serve their own build (default 6007).
+const PORT = Number(process.env.PLAYWRIGHT_PORT) || 6007;
 const isCI = !!process.env.CI;
 
 export default defineConfig({
