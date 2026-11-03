@@ -79,24 +79,30 @@ export const Playground: Story = {
 /** The same control without the `play` function: for manual use and for the e2e tests that set `page` via args. */
 export const Manual: Story = {};
 
-const stack ={ display: 'grid', gap: 16, color: 'var(--color-rop-text)' } as const;
+const stack = { display: 'grid', gap: 16, color: 'var(--color-rop-text)' } as const;
 
-const fixed: Pick<Story, 'parameters' | 'tags'> = { parameters: { controls: { disable: true } }, tags: ['visual'] };
+// `tags` are written inline in each story: Storybook reads them statically, a spread is not seen.
+const noControls = { controls: { disable: true } };
 
 /** Visual: first page of 120. */
-export const FirstPage: Story = { ...fixed, args: { page: 1, pageCount: 120 } };
+export const FirstPage: Story = { tags: ['visual'], parameters: noControls, args: { page: 1, pageCount: 120 } };
 /** Visual: a page in the middle of 120. */
-export const MiddlePage: Story = { ...fixed, args: { page: 60, pageCount: 120 } };
+export const MiddlePage: Story = { tags: ['visual'], parameters: noControls, args: { page: 60, pageCount: 120 } };
 /** Visual: the last page of 120. */
-export const LastPage: Story = { ...fixed, args: { page: 120, pageCount: 120 } };
+export const LastPage: Story = { tags: ['visual'], parameters: noControls, args: { page: 120, pageCount: 120 } };
 /** Visual: a single page (also what pageCount 0 renders). */
-export const SinglePage: Story = { ...fixed, args: { page: 1, pageCount: 1 } };
+export const SinglePage: Story = { tags: ['visual'], parameters: noControls, args: { page: 1, pageCount: 1 } };
 /** Visual: the whole control disabled (e.g. while loading); same size as the enabled one. */
-export const Disabled: Story = { ...fixed, args: { page: 60, pageCount: 120, disabled: true } };
+export const Disabled: Story = {
+  tags: ['visual'],
+  parameters: noControls,
+  args: { page: 60, pageCount: 120, disabled: true },
+};
 
 /** Visual: right-to-left; the arrows are mirrored. */
 export const RightToLeft: Story = {
-  ...fixed,
+  tags: ['visual'],
+  parameters: noControls,
   args: { page: 60, pageCount: 120 },
   render: (args) => (
     <div dir="rtl" style={stack}>
