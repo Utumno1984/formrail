@@ -22,6 +22,17 @@ describe('evaluateChangesetGate', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('rejects a PR touching only packages/pro/src without a changeset (pro is gated like core)', () => {
+    const r = evaluateChangesetGate([
+      'packages/pro/src/change-summary/compute-change-summary.ts',
+      { status: 'M', path: 'packages/pro/src/index.ts' },
+    ]);
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain('packages/pro/src/change-summary/compute-change-summary.ts');
+    expect(r.packageFiles).toEqual(['packages/pro/src/change-summary/compute-change-summary.ts', 'packages/pro/src/index.ts']);
+    expect(evaluateChangesetGate(['packages/pro/src/index.ts', '.changeset/pro-change.md']).ok).toBe(true);
+  });
+
   it('passes for docs/.github/scripts-only changes without changeset', () => {
     expect(
       evaluateChangesetGate(['docs/a.md', '.github/workflows/ci.yml', 'scripts/x.mjs', 'README.md']).ok,

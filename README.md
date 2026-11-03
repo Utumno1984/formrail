@@ -13,8 +13,12 @@ Free/Pro, architettura, roadmap) è in [`docs/planning/design-system-spec.md`](d
 ## Modello
 
 - **Free** (`packages/core`, MIT): primitivi di base e versioni semplici dei floorplan.
-- **Pro** (`packages/pro`, in arrivo, licenza commerciale): componenti con moat tecnico reale
-  (virtualizzazione, dirty-tracking avanzato, Change Summary, dialog con griglia incorporata).
+- **Pro** (`packages/pro`, `@react-object-page/pro`, in sviluppo): componenti con moat tecnico reale
+  (virtualizzazione, dirty-tracking avanzato, Change Summary, dialog con griglia incorporata). Il
+  pacchetto è privato (`"private": true`, non pubblicato su npm) e ha una **licenza commerciale
+  separata** ([`packages/pro/LICENSE`](packages/pro/LICENSE)); il sorgente è leggibile in questo
+  repo, ma la licenza MIT della radice copre solo `packages/core`. Primo modulo: il motore del
+  Change Summary (`useChangeSummary`), vedi [`packages/pro/README.md`](packages/pro/README.md).
 
 ## Sviluppo
 

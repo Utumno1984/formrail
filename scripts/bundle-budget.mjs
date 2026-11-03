@@ -1,16 +1,35 @@
 #!/usr/bin/env node
-// Per-import bundle budget. For every public export of packages/core/dist we bundle a stub that
-// imports only that export (esbuild, minified, tree-shaken) and measure its gzip size, then
-// compare it with the versioned baseline in packages/core/bundle-budget.json.
-// `check` NEVER writes the baseline; only `update-baseline` does, run locally and committed.
+// Per-import bundle budget. For every public export of each budgeted package (packages/core,
+// packages/pro) we bundle a stub that imports only that export from <package>/dist (esbuild,
+// minified, tree-shaken) and measure its gzip size, then compare it with the versioned baseline in
+// <package>/bundle-budget.json.
+// `check` NEVER writes a baseline; only `update-baseline` does, run locally and committed.
+// Without `--package <dir>`, `check` covers every budgeted package and fails if any one fails;
+// `update-baseline` writes the baseline of `--package <dir>` (default: packages/core).
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_PACKAGE = resolve(ROOT, 'packages/core');
+/** Packages whose public exports have a versioned budget; `check` covers all of them by default. */
+export const BUDGETED_PACKAGES = ['packages/core', 'packages/pro'].map((dir) => resolve(ROOT, dir));
+
+/** Path shown in messages: relative to the repo root when inside it, absolute otherwise. */
+export function displayPath(path) {
+  const rel = relative(ROOT, path);
+  return rel === '' || rel.startsWith('..') ? path : rel.split('\\').join('/');
+}
+
+/** Command that regenerates the baseline of `packageDir` (core is the default package). */
+export function updateCommand(packageDir) {
+  return resolve(packageDir) === DEFAULT_PACKAGE
+    ? 'npm run bundle:update-baseline'
+    : `npm run bundle:update-baseline -- --package ${displayPath(resolve(packageDir))}`;
+}
+
 const HEADROOM_RATIO = 1.1;
 const HEADROOM_MIN_BYTES = 20;
 
@@ -42,9 +61,16 @@ export function validateBudget(budget) {
  * Pure comparison.
  * @param {Record<string, number>} measured gzip bytes per public export
  * @param {{ exports: Record<string, { baseline: number, limit: number }> }} budget
+ * @param {string} [budgetFile] baseline file named in the messages
+ * @param {string} [update] command named in the messages to regenerate that baseline
  * @returns {{ ok: boolean, errors: string[], lines: string[] }}
  */
-export function compareBudget(measured, budget) {
+export function compareBudget(
+  measured,
+  budget,
+  budgetFile = 'packages/core/bundle-budget.json',
+  update = 'npm run bundle:update-baseline',
+) {
   const problems = validateBudget(budget);
   if (problems.length > 0) {
     return { ok: false, errors: problems.map((p) => `invalid baseline: ${p}`), lines: [] };
@@ -56,7 +82,7 @@ export function compareBudget(measured, budget) {
     const entry = Object.hasOwn(entries, name) ? entries[name] : undefined;
     if (!entry) {
       errors.push(
-        `${name}: public export without a budget. Add it explicitly with \`npm run bundle:update-baseline\` and commit packages/core/bundle-budget.json.`,
+        `${name}: public export without a budget. Add it explicitly with \`${update}\` and commit ${budgetFile}.`,
       );
       continue;
     }
@@ -70,7 +96,7 @@ export function compareBudget(measured, budget) {
   for (const name of Object.keys(entries).sort()) {
     if (!Object.hasOwn(measured, name)) {
       errors.push(
-        `${name}: orphan budget entry, the export no longer exists in dist. Remove it with \`npm run bundle:update-baseline\`.`,
+        `${name}: orphan budget entry, the export no longer exists in dist. Remove it with \`${update}\`.`,
       );
     }
   }
@@ -162,13 +188,30 @@ export async function runCheck({
   if (!existsSync(budgetPath)) {
     return {
       ok: false,
-      errors: [`${budgetPath} not found. Run \`npm run bundle:update-baseline\` and commit it.`],
+      errors: [`${displayPath(budgetPath)} not found. Run \`${updateCommand(packageDir)}\` and commit it.`],
       lines: [],
     };
   }
   const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
   const measured = await measureAll(resolve(packageDir, 'dist/index.js'));
-  return compareBudget(measured, budget);
+  return compareBudget(measured, budget, displayPath(budgetPath), updateCommand(packageDir));
+}
+
+/**
+ * Checks several packages and merges the results: one package over its limit (or with an
+ * unbudgeted export) fails the whole check even when the others are fine. Lines and errors are
+ * prefixed with the package path.
+ */
+export async function runCheckAll({ packageDirs = BUDGETED_PACKAGES } = {}) {
+  const merged = { ok: true, errors: [], lines: [] };
+  for (const packageDir of packageDirs) {
+    const prefix = `[${displayPath(packageDir)}] `;
+    const result = await runCheck({ packageDir });
+    merged.ok = merged.ok && result.ok;
+    merged.lines.push(...result.lines.map((line) => prefix + line));
+    merged.errors.push(...result.errors.map((error) => prefix + error));
+  }
+  return merged;
 }
 
 export async function runUpdate({
@@ -180,20 +223,26 @@ export async function runUpdate({
   return measured;
 }
 
+/** Message printed after `update-baseline`: names the baseline file really written. */
+export const updatedMessage = (budgetPath) => `Baseline written. Review and commit ${displayPath(budgetPath)}.`;
+
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const opts = {};
   const pkgIdx = rest.indexOf('--package');
-  if (pkgIdx >= 0) opts.packageDir = resolve(rest[pkgIdx + 1]);
+  if (pkgIdx >= 0) {
+    if (!rest[pkgIdx + 1]) throw new Error('--package needs a directory, e.g. --package packages/pro');
+    opts.packageDir = resolve(rest[pkgIdx + 1]);
+  }
   if (command === 'check') {
-    const result = await runCheck(opts);
+    const result = opts.packageDir ? await runCheck(opts) : await runCheckAll();
     for (const line of result.lines) console.log(`ok   ${line}`);
     for (const error of result.errors) console.error(`FAIL ${error}`);
     process.exit(result.ok ? 0 : 1);
   } else if (command === 'update-baseline') {
     const measured = await runUpdate(opts);
     for (const [name, size] of Object.entries(measured)) console.log(`${name}: ${size} B`);
-    console.log('Baseline written. Review and commit packages/core/bundle-budget.json.');
+    console.log(updatedMessage(resolve(opts.packageDir ?? DEFAULT_PACKAGE, 'bundle-budget.json')));
   } else {
     console.error('Usage: bundle-budget.mjs <check|update-baseline> [--package <dir>]');
     process.exit(2);

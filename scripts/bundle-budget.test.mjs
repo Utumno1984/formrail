@@ -2,7 +2,23 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bundleExport, buildBaseline, compareBudget, limitFor, runCheck, runUpdate } from './bundle-budget.mjs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  BUDGETED_PACKAGES,
+  bundleExport,
+  buildBaseline,
+  compareBudget,
+  displayPath,
+  limitFor,
+  runCheck,
+  runCheckAll,
+  runUpdate,
+  updateCommand,
+  updatedMessage,
+} from './bundle-budget.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('compareBudget', () => {
   const budget = { version: 1, exports: { a: { baseline: 100, limit: 120 } } };
@@ -245,5 +261,109 @@ describe('react externals measurement (#34)', () => {
     const result = await runCheck({ packageDir: dir });
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/composeRefs:.*OVER LIMIT/);
+  });
+});
+
+describe('multi-package check (#174)', () => {
+  let dirs;
+  const makePackage = (code) => {
+    const dir = mkdtempSync(join(tmpdir(), 'budget-pkg-'));
+    mkdirSync(join(dir, 'dist'));
+    writeFileSync(join(dir, 'dist/index.js'), code);
+    dirs.push(dir);
+    return dir;
+  };
+  beforeEach(() => {
+    dirs = [];
+  });
+  afterEach(() => {
+    for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('checks core and pro by default, each with its own versioned baseline file', () => {
+    expect(BUDGETED_PACKAGES).toEqual([resolve(ROOT, 'packages/core'), resolve(ROOT, 'packages/pro')]);
+  });
+
+  it('the committed pro baseline has one valid entry per public export of pro', () => {
+    const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.json'), 'utf8'));
+    expect(Object.keys(budget.exports)).toEqual(['computeChangeSummary', 'inferSegmentLabel', 'useChangeSummary']);
+    const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
+    expect(compareBudget(measured, budget).ok).toBe(true);
+  });
+
+  it('passes when every package is within its limits, with lines prefixed by package', async () => {
+    const a = makePackage('export const a = () => 1;\n');
+    const b = makePackage('export const b = () => 2;\n');
+    await runUpdate({ packageDir: a });
+    await runUpdate({ packageDir: b });
+    const result = await runCheckAll({ packageDirs: [a, b] });
+    expect(result.ok).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.lines).toHaveLength(2);
+    expect(result.lines[0].startsWith(`[${displayPath(a)}] a: measured`)).toBe(true);
+    expect(result.lines[1].startsWith(`[${displayPath(b)}] b: measured`)).toBe(true);
+  });
+
+  it('one package over its limit fails the whole check even if the other is fine', async () => {
+    const ok = makePackage('export const fine = () => 1;\n');
+    const over = makePackage('export const heavy = () => 1;\n');
+    await runUpdate({ packageDir: ok });
+    await runUpdate({ packageDir: over });
+    const bloat = Array.from({ length: 300 }, (_, i) => i.toString(36)).join('');
+    writeFileSync(join(over, 'dist/index.js'), `export const heavy = () => "${bloat}";\n`);
+    expect((await runCheck({ packageDir: ok })).ok).toBe(true);
+    for (const order of [
+      [ok, over],
+      [over, ok],
+    ]) {
+      const result = await runCheckAll({ packageDirs: order });
+      expect(result.ok).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(`[${displayPath(over)}] heavy:`);
+      expect(result.errors[0]).toContain('OVER LIMIT');
+      expect(result.lines.some((l) => l.includes('fine:'))).toBe(true);
+    }
+  });
+
+  it('an unbudgeted export in one package fails the check and names that package baseline', async () => {
+    const ok = makePackage('export const fine = () => 1;\n');
+    const other = makePackage('export const known = () => 1;\n');
+    await runUpdate({ packageDir: ok });
+    await runUpdate({ packageDir: other });
+    writeFileSync(join(other, 'dist/index.js'), 'export const known = () => 1;\nexport const fresh = 1;\n');
+    const result = await runCheckAll({ packageDirs: [ok, other] });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('fresh: public export without a budget');
+    expect(result.errors[0]).toContain(join(other, 'bundle-budget.json'));
+  });
+
+  it('a package without a baseline fails the check', async () => {
+    const ok = makePackage('export const fine = () => 1;\n');
+    const missing = makePackage('export const x = 1;\n');
+    await runUpdate({ packageDir: ok });
+    const result = await runCheckAll({ packageDirs: [ok, missing] });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatch(/bundle-budget\.json not found/);
+  });
+
+  it('messages name the baseline file and the update command of the package really involved', () => {
+    expect(updatedMessage(resolve(ROOT, 'packages/pro/bundle-budget.json'))).toBe(
+      'Baseline written. Review and commit packages/pro/bundle-budget.json.',
+    );
+    expect(updatedMessage(resolve(ROOT, 'packages/core/bundle-budget.json'))).toBe(
+      'Baseline written. Review and commit packages/core/bundle-budget.json.',
+    );
+    expect(updateCommand(resolve(ROOT, 'packages/core'))).toBe('npm run bundle:update-baseline');
+    expect(updateCommand(resolve(ROOT, 'packages/pro'))).toBe('npm run bundle:update-baseline -- --package packages/pro');
+    const r = compareBudget(
+      { x: 1 },
+      { version: 1, exports: {} },
+      'packages/pro/bundle-budget.json',
+      updateCommand(resolve(ROOT, 'packages/pro')),
+    );
+    expect(r.errors[0]).toBe(
+      'x: public export without a budget. Add it explicitly with `npm run bundle:update-baseline -- --package packages/pro` and commit packages/pro/bundle-budget.json.',
+    );
   });
 });
