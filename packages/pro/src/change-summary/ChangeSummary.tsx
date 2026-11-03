@@ -40,6 +40,15 @@ const KIND_CLASS: Record<ChangeKind, string> = {
   changed: 'text-rop-primary',
 };
 
+/**
+ * A comma for assistive technology only, in the middle of a line of text. It stays `display:
+ * inline` (an absolutely positioned `sr-only` box is a block for the accessibility tree, which
+ * would split `Amount` and `,`) and takes no room (`font-size: 0`).
+ */
+function Pause() {
+  return <span className="select-none [font-size:0] [line-height:0]">{', '}</span>;
+}
+
 /** Text that carries meaning for assistive technology only. */
 function Hidden({ children }: { children: ReactNode }) {
   return <span className="sr-only">{children}</span>;
@@ -110,18 +119,20 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
                 key={`${entry.kind}:${entry.path}`}
                 className="flex min-w-0 flex-col gap-1 [&:not(:first-child)]:pt-3 [&:not(:first-child)]:[border-top:1px_solid_var(--color-rop-border)]"
               >
-                <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                  <span className="min-w-0 font-[500] [overflow-wrap:anywhere]">{entry.label}</span>
-                  <Hidden>{', '}</Hidden>
+                {/* One inline flow (no flex): the hidden commas stay glued to the words they follow in
+                    the text read by assistive technology (`Amount, changed, from ...`). */}
+                <span className="block min-w-0">
+                  <span className="font-[500] [overflow-wrap:anywhere]">{entry.label}</span>
+                  <Pause />
                   <span
                     className={cn(
-                      'text-rop-caption px-1 first-letter:uppercase [outline:1px_solid_currentColor] [outline-offset:-1px]',
+                      'ml-2 text-rop-caption capitalize px-1 [outline:1px_solid_currentColor] [outline-offset:-1px]',
                       KIND_CLASS[entry.kind],
                     )}
                   >
                     {labels[entry.kind]}
                   </span>
-                  <Hidden>{', '}</Hidden>
+                  <Pause />
                 </span>
                 {entry.kind === 'changed' ? (
                   <span className="flex min-w-0 flex-col gap-1 @md:flex-row @md:items-baseline @md:gap-2">

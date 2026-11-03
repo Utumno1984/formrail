@@ -24,7 +24,8 @@ test.describe('Pro/ChangeSummary', () => {
   });
 
   test('the text read for an item is "Amount, changed, from 100 to 120" (aria snapshot)', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND);
+    // Wait for the play function to finish (it ends with "Discard"), then drive the editor.
+    await expectPlayToPass(page, PLAYGROUND);
     await editAmount(page, '120');
     await expect(page.getByRole('list', { name: 'Changes' })).toMatchAriaSnapshot(`
       - list "Changes":
@@ -46,7 +47,7 @@ test.describe('Pro/ChangeSummary', () => {
   });
 
   test('an added and a removed item are read as "Note, added, ..." / "..., removed, ..."', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND);
+    await expectPlayToPass(page, PLAYGROUND);
     await page.getByRole('button', { name: 'Remove line 1' }).click();
     await expect(page.getByRole('list', { name: 'Changes' })).toMatchAriaSnapshot(`
       - list "Changes":
@@ -57,16 +58,12 @@ test.describe('Pro/ChangeSummary', () => {
   test('the kind of change is visible text, and "before" is also struck through', async ({ page }) => {
     await gotoStory(page, EDITED);
     const first = page.getByRole('listitem').first();
-    await expect(first.getByText('Changed', { exact: true })).toBeVisible();
-    const decorations = await first.evaluate((li) => {
-      const before = Array.from(li.querySelectorAll('span')).find((s) => s.textContent === '100') as HTMLElement;
-      const after = Array.from(li.querySelectorAll('span')).find((s) => s.textContent === '120') as HTMLElement;
-      return {
-        before: getComputedStyle(before.parentElement as HTMLElement).textDecorationLine,
-        after: getComputedStyle(after.parentElement as HTMLElement).textDecorationLine,
-      };
-    });
-    expect(decorations).toEqual({ before: 'line-through', after: 'none' });
+    // The DOM text is the lower-case one read by assistive technology; it is shown capitalized.
+    const kind = first.getByText('changed', { exact: true });
+    await expect(kind).toBeVisible();
+    await expect(kind).toHaveCSS('text-transform', 'capitalize');
+    await expect(first.getByText('100', { exact: true })).toHaveCSS('text-decoration-line', 'line-through');
+    await expect(first.getByText('120', { exact: true })).toHaveCSS('text-decoration-line', 'none');
   });
 
   test('there is no live region, status or alert, with or without entries', async ({ page }) => {
@@ -83,16 +80,16 @@ test.describe('Pro/ChangeSummary', () => {
   });
 
   test('the locale control changes the date format', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND, 'locale:en-US');
+    await expectPlayToPass(page, PLAYGROUND, 'locale:en-US');
     await page.getByLabel('Due date').fill('2026-04-01');
     await expect(page.getByRole('listitem').filter({ hasText: 'Due Date' })).toContainText('Apr 1, 2026');
-    await gotoStory(page, PLAYGROUND, 'locale:de-DE');
+    await expectPlayToPass(page, PLAYGROUND, 'locale:de-DE');
     await page.getByLabel('Due date').fill('2026-04-01');
     await expect(page.getByRole('listitem').filter({ hasText: 'Due Date' })).toContainText('01.04.2026');
   });
 
   test('valueFormat=currency shows the amount as money', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND, 'valueFormat:currency');
+    await expectPlayToPass(page, PLAYGROUND, 'valueFormat:currency');
     await editAmount(page, '120');
     await expect(page.getByRole('listitem').filter({ hasText: 'Amount' })).toContainText('€100.00');
     await expect(page.getByRole('listitem').filter({ hasText: 'Amount' })).toContainText('€120.00');
