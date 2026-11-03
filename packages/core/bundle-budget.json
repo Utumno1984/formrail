@@ -154,6 +154,10 @@
       "baseline": 11247,
       "limit": 12372
     },
+    "Pagination": {
+      "baseline": 14449,
+      "limit": 15894
+    },
     "Select": {
       "baseline": 43643,
       "limit": 48008

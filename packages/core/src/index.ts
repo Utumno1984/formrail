@@ -145,3 +145,5 @@ export { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage } from './br
 export type { BreadcrumbProps, BreadcrumbLinkProps, BreadcrumbSeparator } from './breadcrumb/Breadcrumb';
 export { Divider } from './divider/Divider';
 export type { DividerProps, DividerOrientation, DividerSpacing } from './divider/Divider';
+export { Pagination } from './pagination/Pagination';
+export type { PaginationProps, PaginationLabels } from './pagination/Pagination';
