@@ -16,6 +16,12 @@ function run(file: string): string[] {
 
 const EXPORTS = [
   'Button',
+  'Card',
+  'CardBody',
+  'CardDescription',
+  'CardFooter',
+  'CardHeader',
+  'CardTitle',
   'Combobox',
   'DescriptionList',
   'DescriptionListItem',

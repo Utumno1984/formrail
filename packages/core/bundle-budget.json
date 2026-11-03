@@ -6,6 +6,30 @@
       "baseline": 13146,
       "limit": 14461
     },
+    "Card": {
+      "baseline": 10624,
+      "limit": 11687
+    },
+    "CardBody": {
+      "baseline": 10277,
+      "limit": 11305
+    },
+    "CardDescription": {
+      "baseline": 10278,
+      "limit": 11306
+    },
+    "CardFooter": {
+      "baseline": 10295,
+      "limit": 11325
+    },
+    "CardHeader": {
+      "baseline": 10291,
+      "limit": 11321
+    },
+    "CardTitle": {
+      "baseline": 10454,
+      "limit": 11500
+    },
     "Combobox": {
       "baseline": 38186,
       "limit": 42005

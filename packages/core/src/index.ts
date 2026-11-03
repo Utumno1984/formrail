@@ -133,3 +133,5 @@ export type {
 } from './description-list/DescriptionList';
 export { DescriptionListStatus } from './description-list/DescriptionListStatus';
 export type { DescriptionListStatusProps } from './description-list/DescriptionListStatus';
+export { Card, CardHeader, CardTitle, CardDescription, CardBody, CardFooter } from './card/Card';
+export type { CardProps, CardElement, CardTitleProps, CardTitleLevel } from './card/Card';
