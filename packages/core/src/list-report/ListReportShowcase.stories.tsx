@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
@@ -14,8 +14,9 @@ import {
 } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
-import { formatEuro, type DemoInvoice } from '../internal/demo-invoices';
-import { makeShowcaseInvoices, STATUS_LABEL } from '../showcase/showcase-data';
+import type { DemoInvoice } from '../internal/demo-invoices';
+import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from '../showcase/invoice-list-shared';
+import { makeShowcaseInvoices } from '../showcase/showcase-data';
 import { repositionAfterMotion, settleMotion } from '../internal/settle-motion';
 import {
   Sheet,
@@ -28,7 +29,7 @@ import {
   SheetTrigger,
 } from '../sheet/Sheet';
 import { ListReport } from './ListReport';
-import type { ListReportColumn, ListReportFilter, ListReportSort } from './types';
+import type { ListReportSort } from './types';
 import { useListReport } from './use-list-report';
 import { useListReportScrollRestoration } from './use-list-report-scroll-restoration';
 import { useListReportUrlState } from './use-list-report-url-state';
@@ -53,52 +54,7 @@ interface ShowcaseArgs {
 /** Below this width `overlay: auto` opens a Sheet. */
 const MOBILE_QUERY = '(max-width: 600px)';
 
-const LABELS = {
-  loading: 'Loading…',
-  empty: 'No data',
-  noResults: 'No results for the current filters',
-  error: 'Could not load the data',
-  retry: 'Retry',
-  clearFilters: 'Clear filters',
-  resultCount: (count: number) => (count === 1 ? '1 result' : `${count} results`),
-  count: (resultCount: number, totalCount: number) =>
-    resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`,
-};
-
-const FILTERS: ListReportFilter<DemoInvoice>[] = [
-  { id: 'all', label: 'All' },
-  { id: 'open', label: 'Open', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
-  { id: 'rejected', label: 'Rejected', predicate: (r) => r.status === 'rejected' },
-];
-
-const COLUMNS: ListReportColumn<DemoInvoice>[] = [
-  { id: 'number', header: 'Number', accessor: (r) => r.number, width: 150 },
-  { id: 'supplier', header: 'Supplier', accessor: (r) => r.supplier, minWidth: 200 },
-  { id: 'date', header: 'Date', accessor: (r) => r.date, width: 130 },
-  {
-    id: 'amount',
-    header: 'Amount',
-    accessor: (r) => r.amount,
-    cell: (r) => formatEuro(r.amount),
-    align: 'end',
-    firstSortDirection: 'desc',
-    searchable: false,
-    width: 140,
-  },
-  { id: 'status', header: 'Status', accessor: (r) => STATUS_LABEL[r.status], searchable: false, width: 150 },
-];
-const SORTABLE = COLUMNS.map((c) => c.id);
 const ROWS = makeShowcaseInvoices(200);
-
-const PAGE: CSSProperties = {
-  boxSizing: 'border-box',
-  padding: 16,
-  fontFamily: 'system-ui, sans-serif',
-  height: '100dvh',
-  display: 'flex',
-  flexDirection: 'column',
-};
 
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches);
