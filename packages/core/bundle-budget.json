@@ -102,6 +102,10 @@
       "baseline": 3152,
       "limit": 3468
     },
+    "Divider": {
+      "baseline": 10421,
+      "limit": 11464
+    },
     "Field": {
       "baseline": 12355,
       "limit": 13591
@@ -202,6 +206,10 @@
       "baseline": 10291,
       "limit": 11321
     },
+    "ToastProvider": {
+      "baseline": 17336,
+      "limit": 19070
+    },
     "Tooltip": {
       "baseline": 30788,
       "limit": 33867
@@ -265,6 +273,10 @@
     "useObjectPageForm": {
       "baseline": 1716,
       "limit": 1888
+    },
+    "useToast": {
+      "baseline": 188,
+      "limit": 208
     }
   }
 }
