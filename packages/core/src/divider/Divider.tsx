@@ -35,7 +35,7 @@ const VERTICAL_SPACING: Record<DividerSpacing, string> = {
 // border and `overflow: hidden`: each is set explicitly. The line is a 1px border (not a
 // background) so it stays visible in forced-colors mode. Boxes are content-box, so the 0-sized
 // box plus the 1px border is exactly 1px thick.
-const HORIZONTAL_BASE = 'box-content h-0 w-full self-stretch border-0 border-t border-solid border-rop-border p-0';
+const HORIZONTAL_BASE = 'box-content h-0 w-full self-stretch border-0 border-bs border-solid border-rop-border p-0';
 // `min-h-[1em]`: outside a flex container the line has a real height instead of collapsing to 0.
 const VERTICAL_BASE =
   'box-content min-h-[1em] w-0 shrink-0 self-stretch border-0 border-s border-solid border-rop-border p-0';

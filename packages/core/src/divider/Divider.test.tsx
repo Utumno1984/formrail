@@ -34,7 +34,7 @@ describe('Divider', () => {
   it('draws the line as a 1px border in the border token (not a background), resetting the hr defaults', () => {
     render(<Divider />);
     const cls = screen.getByRole('separator').className;
-    for (const c of ['h-0', 'border-0', 'border-t', 'border-solid', 'border-rop-border', 'box-content', 'p-0', 'w-full']) {
+    for (const c of ['h-0', 'border-0', 'border-bs', 'border-solid', 'border-rop-border', 'box-content', 'p-0', 'w-full']) {
       expect(cls).toContain(c);
     }
     expect(cls).not.toMatch(/(^|\s)bg-/);
@@ -72,7 +72,7 @@ describe('Divider', () => {
     for (const props of [{}, { orientation: 'vertical' as const }]) {
       const { container, unmount } = render(<Divider {...props} spacing="lg" />);
       expect((container.firstElementChild as HTMLElement).className).not.toMatch(
-        /(^|\s)(m[lrtb]|p[lrtb]|border-[lrtb]|left|right)-/,
+        /(^|\s)(m[lrtb]|p[lrtb]|border-[lrtb]|left|right)(-|\s|$)/,
       );
       unmount();
     }
@@ -88,10 +88,11 @@ describe('Divider', () => {
 
   it('className wins over conflicting classes (real merge), ref is forwarded, other props pass through', () => {
     const ref = createRef<HTMLElement>();
-    render(<Divider ref={ref} className="my-10 border-t-4" data-testid="d" id="x" />);
+    render(<Divider ref={ref} className="my-10 border-bs-4" data-testid="d" id="x" />);
     const d = screen.getByTestId('d');
     expect(ref.current).toBe(d);
-    expect(d).toHaveClass('my-10', 'border-t-4');
+    expect(d).toHaveClass('my-10', 'border-bs-4');
+    expect(d).not.toHaveClass('border-bs');
     expect(d).not.toHaveClass('my-4');
     expect(d).toHaveAttribute('id', 'x');
   });
