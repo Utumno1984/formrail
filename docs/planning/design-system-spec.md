@@ -445,3 +445,82 @@ già un primo componente Pro vendibile per validare la domanda, senza costruire 
 soft-delete come pattern Pro completo, Picker/Assignment dialog (è notoriamente il componente più
 fragile di questa classe, §1.8 — rifarlo bene richiede aver già consolidato Dialog+Select+DataGrid,
 altrimenti si eredita la stessa classe di bug fin dall'inizio).
+
+---
+
+## 7. Change Summary Pro — decisioni di API (brainstorming con Daniele, 2026-11-03)
+
+Primo componente Pro del progetto (§6 punto 4). Non esiste ancora nulla: `useObjectPageForm` (Free)
+espone già `values`/`baseline`/`isDirty` (confronto strutturale profondo), ma nessun diff per campo.
+Il Change Summary consuma `values`/`baseline` come un hook separato — **nessuna modifica all'API
+Free esistente**.
+
+### Decisioni prese
+
+- **Diff su array: per-elemento, con `idKey` dichiarato dal consumer** per ogni campo array che lo
+  richiede (es. righe fattura identificate da `id`). Un array senza `idKey` dichiarato fa diff "a
+  blocco" (vecchio vs nuovo intero), non per-elemento — degrado esplicito, non un errore silenzioso.
+- **Etichette: inferenza automatica dal path** (`amount` → "Amount", camelCase/snake_case spezzato e
+  capitalizzato), **con mappa di override** per i path dove l'inferenza non basta (es. acronimi,
+  terminologia di dominio). Nessuna dipendenza dal lavoro Zod non ancora pianificato.
+- **Forma dell'API: hook + componente.** `useChangeSummary` è il motore (il vero moat: diff
+  strutturato, gestisce annidamento/array/identity), `ChangeSummary` è un componente opinionato che
+  lo rende leggibile di default ma resta sostituibile (stesso principio di Field/FieldMessage: motore
+  riusabile + presentazione pronta).
+- **Sequenza: si parte subito**, il blocco Zod/uniformità validazione (confermato 2026-11-01, mai
+  pianificato) resta il prossimo dopo questo, non un prerequisito.
+
+### Schizzo dell'API (da rifinire in ticket, non vincolante sui nomi)
+
+```ts
+interface ChangeSummaryOptions<Values extends object> {
+  values: Values;
+  baseline: Values;
+  /** Per-path array identity key, e.g. { 'lineItems': 'id' }. An array with no entry here diffs as
+   *  a whole block (old vs new), not per-item — explicit degrade, not a silent one. */
+  arrayIdKeys?: Record<string, string>;
+  /** Override the auto-inferred label for specific paths, e.g. { 'supplier.vatNumber': 'VAT number' }. */
+  labels?: Record<string, string>;
+  /** Custom equality per path/value; falls back to the same deep structural comparison as `isDirty`. */
+  isEqual?: (a: unknown, b: unknown, path: string) => boolean;
+}
+
+interface ChangeEntry {
+  path: string;   // e.g. 'lineItems[2].price'
+  label: string;  // auto-inferred or overridden, e.g. 'Line Items > Item 3 > Price'
+  kind: 'added' | 'removed' | 'changed';
+  before: unknown; // undefined when kind === 'added'
+  after: unknown;  // undefined when kind === 'removed'
+}
+
+function useChangeSummary<Values extends object>(
+  options: ChangeSummaryOptions<Values>,
+): { entries: ChangeEntry[]; isEmpty: boolean };
+
+function ChangeSummary(props: {
+  entries: ChangeEntry[];
+  /** Per-value formatting hook (currency, dates, booleans...); defaults to String(value). */
+  renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
+  emptyLabel?: string;
+}): JSX.Element;
+```
+
+### Rischi tecnici noti da affrontare nei ticket (non insidie generiche, specifiche di questo componente)
+
+- **Tre stati di "nessun valore" distinti** (stringa vuota vs `undefined` vs `null`, vincolo già
+  fissato in §1.4): serve una regola esplicita e testata, non lasciata all'uguaglianza JS di
+  default. Proposta di partenza (da confermare in ticket): `undefined`/`null` equivalenti come
+  "assente", stringa vuota `''` è un valore reale distinto da "assente" — ma un campo che passa da
+  assente a `''` non genera un `ChangeEntry` finto.
+- **Identity degli array**: un `id` presente nella baseline ma non nei `values` → `removed`; un `id`
+  nuovo nei `values` → `added`; stesso `id` con contenuto diverso → `changed`, con un
+  `ChangeEntry` per ciascun campo del singolo elemento cambiato (non un unico entry "la riga N è
+  cambiata"). **Riordinare un array senza cambiarne il contenuto non deve generare nessun
+  `ChangeEntry`** — è l'intero motivo per preferire `idKey` al diff posizionale, va testato
+  esplicitamente (stesso identity set, ordine diverso → `entries` vuoto).
+- **Algoritmo di inferenza etichette**: va fissato e testato in modo deterministico (split su
+  confini camelCase/`_`/`-`, capitalizzazione, segmenti di array resi come "Item N" o simile) prima
+  di scrivere il componente, non improvvisato caso per caso.
+- **Performance**: il diff va ricalcolato con `useMemo` tenuto stabile su `values`/`baseline` per
+  identità (stesso pattern già in uso per `isDirty` in `useObjectPageForm`), non ricalcolato ad ogni
+  render per valore.
