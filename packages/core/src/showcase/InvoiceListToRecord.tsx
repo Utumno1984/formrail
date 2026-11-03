@@ -67,8 +67,15 @@ function openRecord(id: string): void {
   notifyRoute();
 }
 
+// `history.back()` is asynchronous: until its `popstate` the record page is still on screen and still
+// carries the marker, so a second click would go back TWO entries (out of the app). One at a time.
+let leaving = false;
+
 function leaveRecord(): void {
   if (stateObject()[FROM_LIST] === true) {
+    if (leaving) return;
+    leaving = true;
+    window.addEventListener('popstate', () => (leaving = false), { once: true });
     window.history.back(); // `popstate` re-renders the list
     return;
   }
@@ -252,6 +259,7 @@ export function InvoiceListToRecord({ history, listLoadDelayMs, recordLoadDelayM
     openRecord(id);
   }).current;
   const back = useRef(() => {
+    if (leaving) return; // already on its way back: no second navigation, no second report
     callbacks.current({ to: 'list' });
     leaveRecord();
   }).current;

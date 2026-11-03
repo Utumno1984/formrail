@@ -111,6 +111,21 @@ test.describe('Showcase/Invoices: ListToRecord', () => {
     expect(await page.evaluate(() => history.length)).toBe(entries + 1);
   });
 
+  test('a double click on Back to list goes back ONE entry: the list stays, the app is not left', async ({ page }) => {
+    // An entry before the app, so that going back twice would leave it.
+    await page.goto('/index.json');
+    await page.goto(url(LIST_QUERY));
+    await expect(table(page)).toBeVisible();
+    await page.getByRole('link', { name: 'FT-2026-0012', exact: true }).click();
+    await expect(back(page)).toBeVisible();
+    await back(page).dblclick();
+    await expect(table(page)).toBeVisible();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    expect(page.url()).toContain('iframe.html');
+    expect(params(page).get('record')).toBeNull();
+    expect(params(page).get('filter')).toBe('open');
+  });
+
   test('Back to list: URL, pill, search, sort and scroll restored, focus on the opened row link', async ({ page }) => {
     await openList(page, LIST_QUERY);
     const number = await scrollAndPick(page, 600);
