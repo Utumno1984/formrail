@@ -85,6 +85,8 @@ test.describe('#166 QA: exit dialog with a save in flight', () => {
     await page.getByRole('textbox', { name: 'Notes' }).fill('typed meanwhile');
     await page.getByRole('button', { name: 'Back to list' }).click();
     await expect(dialogOf(page)).toBeVisible();
-    console.log('DIALOG:', await dialogOf(page).innerText());
+    await expect(dialogOf(page)).toContainText('made after pressing Save');
+    await expect(dialogOf(page).getByRole('button', { name: 'Discard newer changes' })).toBeVisible();
+    await expect(dialogOf(page).getByRole('button', { name: 'Leave anyway' })).toHaveCount(0);
   });
 });
