@@ -13,6 +13,8 @@ export { MessageStrip } from './message-strip/MessageStrip';
 export type { MessageStripProps, MessageStripTone } from './message-strip/MessageStrip';
 export { StatusBadge } from './status-badge/StatusBadge';
 export type { StatusBadgeProps, StatusBadgeTone } from './status-badge/StatusBadge';
+export { Avatar } from './avatar/Avatar';
+export type { AvatarProps, AvatarSize, AvatarShape, AvatarLoadingStatus } from './avatar/Avatar';
 export { FieldMessage } from './field-message/FieldMessage';
 export type { FieldMessageProps, FieldMessageTone } from './field-message/FieldMessage';
 export { Field } from './field/Field';

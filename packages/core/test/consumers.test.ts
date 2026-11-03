@@ -15,6 +15,7 @@ function run(file: string): string[] {
 }
 
 const EXPORTS = [
+  'Avatar',
   'Button',
   'Combobox',
   'DescriptionList',
