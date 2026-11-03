@@ -162,7 +162,7 @@ test.describe('Showcase/Invoices: EditFlow', () => {
     expect(await stored(page)).toBe(before);
   });
 
-  test('save in flight + Back + Discard changes: immediate, the store gets the saved value, no warning or exception', async ({ page }) => {
+  test('save in flight + Back + Leave anyway: immediate, the store gets the saved value, no warning or exception', async ({ page }) => {
     const problems: string[] = [];
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
     page.on('console', (m) => {
@@ -175,7 +175,10 @@ test.describe('Showcase/Invoices: EditFlow', () => {
     await typeAmount(page, '2468.13');
     await footer(page).getByRole('button', { name: 'Save' }).click();
     await back(page).click();
-    await dialogOf(page).getByRole('button', { name: 'Discard changes' }).click();
+    // #166: with a save in flight the dialog does not promise a discard.
+    await expect(dialogOf(page)).toContainText('A save is still in progress');
+    await expect(dialogOf(page).getByRole('button', { name: 'Discard changes' })).toHaveCount(0);
+    await dialogOf(page).getByRole('button', { name: 'Leave anyway' }).click();
     // Immediate: the page changes well before the 1.5 s save ends (the list loads until the save settles).
     await expect(table(page)).toBeVisible({ timeout: 1000 });
     await expect(dialogOf(page)).toHaveCount(0);

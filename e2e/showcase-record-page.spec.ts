@@ -164,6 +164,19 @@ test.describe('Showcase/Invoices: RecordPage', () => {
     await expect(bar(page)).toBeHidden();
   });
 
+  test('#166: Save, Discard, then Back while the save is in flight: the dialog still asks, with truthful labels', async ({ page }) => {
+    await open(page, 'saveDelayMs:1500');
+    await amount(page).fill('88.8');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await bar(page).getByRole('button', { name: 'Discard' }).click();
+    await expect(bar(page)).toBeHidden();
+    await back(page).click();
+    await expect(dialog(page)).toBeVisible();
+    await expect(dialog(page)).toContainText('A save is still in progress');
+    await expect(dialog(page).getByRole('button', { name: 'Discard changes' })).toHaveCount(0);
+    await expect(dialog(page).getByRole('button', { name: 'Leave anyway' })).toBeVisible();
+  });
+
   test('an edit made while the save is in flight stays dirty', async ({ page }) => {
     await open(page, 'saveDelayMs:800');
     await amount(page).fill('50.123');

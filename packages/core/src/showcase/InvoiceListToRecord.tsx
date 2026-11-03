@@ -243,7 +243,7 @@ export function InvoiceListToRecord({
   }, [store, saveDelayMs, saveOutcome]);
   // The store has ONE read delay: the list and the record each set theirs just before their call
   // (the store reads its configuration when the call is made).
-  // A save outlives the page that started it (leave with "Discard changes" while it runs). Reads wait for the
+  // A save outlives the page that started it (leave with "Leave anyway" while it runs). Reads wait for the
   // saves in flight, so a list or a re-opened record never shows (and a later save never builds on) a value
   // older than the one the server is about to hold: no stale echo can overwrite a fresher save.
   const api = useMemo<InvoiceStore>(() => {

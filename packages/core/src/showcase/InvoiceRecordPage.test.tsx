@@ -184,6 +184,39 @@ describe('InvoiceRecordPage', () => {
     await waitFor(() => expect(footer()).toBeNull());
   });
 
+  it('#166: Back during a save asks with truthful labels, also after a footer Discard made the form clean', async () => {
+    const { onBack } = setup({ saveDelayMs: 300 });
+    const amount = await amountField();
+    await userEvent.type(amount, '1');
+    const bar = await visibleBar();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await userEvent.click(within(bar).getByRole('button', { name: 'Discard' }));
+    // The form is clean now, the save is still in flight: Back must not skip the confirmation.
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(onBack).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    expect(within(dialog).queryByRole('button', { name: 'Discard changes' })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Leave anyway' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('#166: the footer says Discard does not cancel a save in flight; an edit made after Save is called out in the dialog', async () => {
+    const { onBack } = setup({ saveDelayMs: 600 });
+    const amount = await amountField();
+    await userEvent.type(amount, '1');
+    const bar = await visibleBar();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(within(bar).getByRole('status')).toHaveTextContent('the save still completes'));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), ' later');
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    expect(dialog).toHaveTextContent('made after pressing Save');
+    expect(within(dialog).queryByRole('button', { name: 'Leave anyway' })).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Discard newer changes' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
   it('Back to list: clean calls onBack at once; dirty asks first (English dialog, X named Close)', async () => {
     const { onBack } = setup();
     const amount = await amountField();
