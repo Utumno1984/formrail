@@ -41,6 +41,9 @@ interface NavigationLike {
   removeEventListener?: (type: string, listener: (event: Event) => void) => void;
 }
 
+/** Hooks currently intercepting Back/Forward, in activation order; the last one handles it. */
+const interceptors: object[] = [];
+
 function getNavigation(): NavigationLike | null {
   if (typeof window === 'undefined') return null;
   return (window as unknown as { navigation?: NavigationLike }).navigation ?? null;
@@ -72,15 +75,23 @@ export interface UseDirtyGuardReturn {
  *   or the component unmounts. Two hooks on one page keep independent listeners.
  * - `guard(action)` wraps the consumer's own exit action (a router navigation, closing the page).
  * - While `when` is true, browser Back/Forward opens the same dialog; "leave" completes the traversal.
- *   With the Navigation API (`window.navigation`) the traversal is cancelled outright (`navigate`
- *   event): no `popstate` fires, so any router/`useListReportUrlState` stays untouched, whenever it was
- *   registered. The browser only allows that after a user interaction with the page (always true while
- *   the user is editing). Otherwise (no Navigation API, or a non-cancelable traversal) the fallback
- *   undoes the traversal with `history.go(-delta)` (no `pushState`: no entry is added, the forward
- *   history is kept) and swallows its `popstate` (capture + `stopImmediatePropagation`); that only
- *   hides it from listeners registered AFTER the hook, and without the Navigation API every
- *   traversal is treated as Back by one entry. Navigations a router performs without history
- *   traversal (link clicks, `pushState`) are not covered: wrap those in `guard`.
+ *   With the Navigation API (`window.navigation`, Chromium) the traversal is cancelled outright
+ *   (`navigate` event): no `popstate` fires, so any router/`useListReportUrlState` on the browser
+ *   History stays untouched, whenever it was registered. The browser only allows that after a user
+ *   interaction with the page (always true while the user is editing).
+ *   LIMITS of the fallback (no Navigation API, or a non-cancelable traversal): the hook can only undo
+ *   the traversal with `history.go(-delta)` (no `pushState`: no entry is added, the forward history is
+ *   kept), AFTER it happened. A router listening to `popstate` that registered BEFORE the hook (the usual
+ *   case: it mounts first) has already seen it, so its visible state can flip and come back, or the
+ *   page can unmount and lose its edits: there the guard is not reliable. Without the Navigation API
+ *   every traversal is also assumed to be Back by one entry (a Forward is not told apart).
+ *   Not covered at all: an adapter that does not use the browser History (e.g. the in-memory
+ *   `ListReportUrlAdapter` of the stories, which has its own Back/Forward), and navigations that do not
+ *   traverse the history (link clicks, `pushState`): wrap those in `guard`.
+ * - With several hooks active on one page (a page and a nested sheet) only ONE intercepts
+ *   Back/Forward, so a traversal never opens two stacked dialogs: the last whose effect activated (for
+ *   nested components, the outer one, since effects run children first). `beforeunload` and `guard` stay
+ *   independent.
  *
  * Declared behaviour:
  * - A second `guard` call while the dialog is open is ignored: the first action stays pending.
@@ -149,8 +160,14 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
   useEffect(() => {
     if (!when) return undefined;
     const nav = getNavigation();
+    // Only the most recently activated hook intercepts Back/Forward (e.g. a nested sheet over its
+    // page): the others let it through, so one traversal never opens two stacked dialogs.
+    const token = {};
+    interceptors.push(token);
+    const isTop = () => interceptors[interceptors.length - 1] === token;
     let traverseDelta: number | null = null;
     let reverting = false;
+    let revertTimer: ReturnType<typeof setTimeout> | undefined;
     let allow = false;
     const onEntryChange = (event: Event) => {
       const from = (event as unknown as { from?: { index: number } }).from;
@@ -168,6 +185,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
         destination?: { index: number; key?: string; sameDocument?: boolean };
         preventDefault: () => void;
       };
+      if (!isTop()) return;
       if (e.navigationType !== 'traverse' || !e.cancelable || !e.destination?.sameDocument) return;
       const current = nav?.currentEntry?.index;
       if (typeof current !== 'number') return;
@@ -186,6 +204,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     };
     nav?.addEventListener?.('navigate', onNavigate);
     const onPopState = (event: PopStateEvent) => {
+      if (!isTop()) return;
       if (allow || Date.now() < passUntilRef.current) {
         // The traversal the user confirmed (or one started by the confirmed action): let it through.
         allow = false;
@@ -196,12 +215,16 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
       event.stopImmediatePropagation();
       if (reverting) {
         reverting = false;
+        clearTimeout(revertTimer);
         return;
       }
       // Without the Navigation API the direction is unknown: assume Back by one entry.
       const delta = nav && traverseDelta ? traverseDelta : -1;
       traverseDelta = null;
       reverting = true;
+      // The undo may be a no-op (no entry to go to): never leave the flag stuck.
+      clearTimeout(revertTimer);
+      revertTimer = setTimeout(() => (reverting = false), 500);
       window.history.go(-delta);
       guardRef.current(() => {
         allow = true;
@@ -210,6 +233,8 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     };
     window.addEventListener('popstate', onPopState, true);
     return () => {
+      interceptors.splice(interceptors.indexOf(token), 1);
+      clearTimeout(revertTimer);
       window.removeEventListener('popstate', onPopState, true);
       nav?.removeEventListener?.('currententrychange', onEntryChange);
       nav?.removeEventListener?.('navigate', onNavigate);
@@ -234,7 +259,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
     });
     // The confirmed action may itself navigate (`history.back()`): its `popstate`, asynchronous, must
     // not be intercepted again. The window closes at the first `popstate` or after a second.
-    passUntilRef.current = Date.now() + 1000;
+    passUntilRef.current = Date.now() + 500;
     try {
       action?.();
     } finally {

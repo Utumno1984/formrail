@@ -33,8 +33,9 @@ describe('useDirtyGuard: popstate (Back/Forward)', () => {
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
     const push = vi.spyOn(window.history, 'pushState');
     const seen = vi.fn();
-    window.addEventListener('popstate', seen);
     render(<Host when />);
+    // Registered AFTER the hook: the only listeners the fallback can hide the popstate from.
+    window.addEventListener('popstate', seen);
     popstate();
     expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeInTheDocument();
     expect(go).toHaveBeenCalledExactlyOnceWith(1); // Back (fallback) undone by going forward
@@ -159,6 +160,45 @@ describe('useDirtyGuard: popstate (Back/Forward)', () => {
       expect(navigate({}, false).defaultPrevented).toBe(false);
       expect(screen.queryByRole('dialog')).toBeNull();
     });
+  });
+
+  it('with two active hooks only the most recently activated one intercepts: one dialog, one traversal', async () => {
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
+    function Two() {
+      const page = useDirtyGuard({ when: true, labels: { title: 'Page' } });
+      return (
+        <>
+          {page.dialog}
+          <Sheet />
+        </>
+      );
+    }
+    function Sheet() {
+      return <SheetInner />;
+    }
+    function SheetInner() {
+      return useDirtyGuard({ when: true, labels: { title: 'Sheet' } }).dialog;
+    }
+    render(<Two />);
+    popstate();
+    // Effects run children first: the outer (page) hook is the last activated.
+    expect(await screen.findByRole('dialog', { name: 'Page' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Sheet' })).toBeNull();
+    expect(go).toHaveBeenCalledTimes(1);
+  });
+
+  it('a no-op undo does not leave the next Back swallowed without a dialog', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
+    render(<Host when />);
+    popstate(); // undo never produces its popstate (nothing to go to)
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+    act(() => void vi.advanceTimersByTime(600));
+    popstate();
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(go).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 
   it('removes its listener when when turns false and on unmount', () => {
