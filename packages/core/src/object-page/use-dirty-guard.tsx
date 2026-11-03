@@ -258,7 +258,7 @@ export function useDirtyGuard(options: UseDirtyGuardOptions): UseDirtyGuardRetur
       setLeaving(true);
     });
     // The confirmed action may itself navigate (`history.back()`): its `popstate`, asynchronous, must
-    // not be intercepted again. The window closes at the first `popstate` or after a second.
+    // not be intercepted again. The window closes at the first `popstate` or after 500 ms.
     passUntilRef.current = Date.now() + 500;
     try {
       action?.();
