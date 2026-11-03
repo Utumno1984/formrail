@@ -207,7 +207,7 @@ interface FormState<Values> {
  * | Level | Source | Where | Announcement |
  * |---|---|---|---|
  * | Field | `fieldErrors` | the `Field` error (through `ValidationProvider` or `error`): `aria-invalid` + `aria-describedby` on the control | not live: after a failed save `useFocusFirstInvalidField` moves the focus to the first invalid field and the screen reader reads its error there |
- * | Form summary | `fieldErrors` + `formErrors` | `ObjectPageFooter` `message={getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })}`, `messageTone="error"` | footer `role="status"`, polite, one line: the count only ("3 campi non validi"), never the field messages |
+ * | Form summary | `fieldErrors` + `formErrors` | `ObjectPageFooter` `message={getErrorSummary(form.fieldErrors, { formErrors: form.formErrors })}`, `messageTone="error"` | footer `role="status"`, polite, one line: the count only ("3 invalid fields"), never the field messages |
  * | Save error (network/server) | `saveError` | `ObjectPageFooter` `message` = its text, `messageTone="error"` | the same footer `role="status"`, polite; when present it has priority over the summary (pass one, never both) |
  * | Root error | `formErrors` (issues with no path, e.g. `z.object(...).refine(...)` without `path`) | no `Field` shows it: the consumer renders the messages, e.g. a `MessageStrip` `tone="error"` at the top of the form, mounted while `formErrors` is not empty; the footer summary counts them too | the strip's `role="alert"` (mounted already filled, so it is announced) |
  * | Blocking page error | the consumer's own state | `MessageStrip` `tone="error"` | `role="alert"` |

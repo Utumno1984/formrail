@@ -22,7 +22,7 @@ test.describe('ObjectPageFooter QA', () => {
     const early = await scroller.evaluate((el) => el.clientHeight);
     const footerBox = await page.locator(FOOTER).boundingBox();
     await jsClick(page, 'Annulla modifiche');
-    await expect(page.getByRole('region', { name: 'Azioni di salvataggio' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     expect(await scroller.evaluate((el) => el.clientHeight)).toBe(early);
     const hiddenBox = await page.locator(FOOTER).boundingBox();
     expect(hiddenBox!.y).toBe(footerBox!.y);
@@ -31,7 +31,7 @@ test.describe('ObjectPageFooter QA', () => {
 
   test('hidden WITH a message: message and status are out of the a11y tree, not hit-testable, not focusable', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'visible:!false');
-    await expect(page.getByRole('region', { name: 'Azioni di salvataggio' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveCount(0);
     await expect(page.getByText(/Salvataggio non riuscito/)).toBeHidden();
     const info = await page.evaluate((sel) => {
@@ -54,7 +54,7 @@ test.describe('ObjectPageFooter QA', () => {
     // by itself, before the footer has any say (documented as a consumer concern in the QA report).
     await save.evaluate((el) => el.setAttribute('aria-disabled', 'true'));
     await jsClick(page, 'Annulla modifiche');
-    await expect(page.getByRole('region', { name: 'Azioni di salvataggio' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
   });

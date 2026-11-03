@@ -185,7 +185,7 @@ const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row
  * riempie lo spazio con un solo scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
  * `firstSortDirection` della colonna "Data" e larghezza del contenitore; le callback compaiono in Actions.
  * La play function sceglie "Da approvare", cerca un fornitore, ordina per importo decrescente, controlla
- * le prime righe e il conteggio "n of 200", poi cerca un testo inesistente, clicca "Azzera filtri" e
+ * le prime righe e il conteggio "n of 200", poi cerca un testo inesistente, clicca "Clear filters" e
  * verifica che tornino 200 righe e che il fuoco sia sul campo di ricerca.
  */
 export const Playground: Story = {
@@ -219,8 +219,8 @@ export const Playground: Story = {
 
     await userEvent.clear(search);
     await userEvent.type(search, 'zzz{Enter}');
-    await expect(canvas.getByText('Nessun risultato per i filtri correnti', { selector: 'p' })).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Azzera filtri' }));
+    await expect(canvas.getByText('No results for the current filters', { selector: 'p' })).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(bodyRows(canvas)).toHaveLength(200));
     await expect(heading(canvas)).toHaveTextContent('Fatture (200)');
     await expect(canvas.getByRole('radio', { name: 'Tutte' })).toBeChecked();
@@ -255,40 +255,40 @@ export const Loading: Story = {
   },
 };
 
-/** Nessun dato. */
+/** No data. */
 export const Empty: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   args: { dataset: 0 },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Nessun dato', { selector: 'p' })).toBeVisible();
+    await expect(canvas.getByText('No data', { selector: 'p' })).toBeVisible();
     await expect(heading(canvas)).toHaveTextContent('Fatture (0)');
   },
 };
 
-/** Una ricerca che non trova nulla: "Azzera filtri" funziona senza collegamenti. */
+/** Una ricerca che non trova nulla: "Clear filters" funziona senza collegamenti. */
 export const NoResults: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   args: { defaultSearchQuery: 'zzz' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Nessun risultato per i filtri correnti', { selector: 'p' })).toBeVisible();
-    await expect(canvas.getByRole('button', { name: 'Azzera filtri' })).toBeVisible();
+    await expect(canvas.getByText('No results for the current filters', { selector: 'p' })).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Clear filters' })).toBeVisible();
     await expect(heading(canvas)).toHaveTextContent('Fatture (0 of 200)');
   },
 };
 
-/** Errore: il corpo diventa una striscia con "Riprova" (la callback compare in Actions). */
+/** Errore: il corpo diventa una striscia con "Retry" (la callback compare in Actions). */
 export const ErrorState: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   args: { status: 'error' },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText('Impossibile caricare i dati')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Riprova' }));
+    await expect(canvas.getByText('Unable to load data')).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Retry' }));
     await expect(args.onRetry).toHaveBeenCalledTimes(1);
   },
 };

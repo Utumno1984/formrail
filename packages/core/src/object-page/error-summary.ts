@@ -5,7 +5,7 @@ export interface GetErrorSummaryOptions {
   /**
    * Root-level messages (`useObjectPageForm().formErrors`): each one adds one to the count. Omit it
    * to count the field errors only. A root error belongs to no field, yet the default text counts it
-   * as one ("1 campo non valido"): if your schema has root rules (e.g. `z.object(...).refine(...)`
+   * as one ("1 invalid field"): if your schema has root rules (e.g. `z.object(...).refine(...)`
    * without `path`), pass a `message` that does not speak of fields, e.g. `(n) => n + ' errors'`.
    * The root messages themselves are not in the summary: render them yourself (see the announcement
    * rule on `useObjectPageForm`).
@@ -14,16 +14,16 @@ export interface GetErrorSummaryOptions {
   /**
    * Builds the text from the count (always `>= 1`: it is never called without errors). The library
    * does not translate: pass your own text, e.g.
-   * `(n) => (n === 1 ? '1 invalid field' : n + ' invalid fields')`. Default (Italian):
-   * "1 campo non valido" / "N campi non validi".
+   * `(n) => (n === 1 ? '1 invalid field' : n + ' invalid fields')`. Default (English):
+   * "1 invalid field" / "N invalid fields".
    */
   message?: (count: number) => string;
 }
 
-const defaultMessage = (count: number) => (count === 1 ? '1 campo non valido' : `${count} campi non validi`);
+const defaultMessage = (count: number) => (count === 1 ? '1 invalid field' : `${count} invalid fields`);
 
 /**
- * The one-line validation summary for `ObjectPageFooter`'s `message` ("3 campi non validi"), or
+ * The one-line validation summary for `ObjectPageFooter`'s `message` ("3 invalid fields"), or
  * `undefined` when there is nothing to report, so the footer shows no message.
  *
  * The count is the number of invalid paths of `fieldErrors` (the keys whose value is not

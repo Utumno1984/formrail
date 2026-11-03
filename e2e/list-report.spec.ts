@@ -196,7 +196,7 @@ test.describe('live region count', () => {
     await search(page).focus();
     await page.keyboard.type('Ferrari');
     await page.keyboard.press('Enter');
-    await expect(region).toHaveText(FOUND.length === 1 ? '1 risultato' : `${FOUND.length} risultati`);
+    await expect(region).toHaveText(FOUND.length === 1 ? '1 result' : `${FOUND.length} results`);
     await expect(region).toHaveCount(1);
   });
 });
@@ -228,10 +228,10 @@ test.describe('real keyboard (no mouse)', () => {
     await page.keyboard.press('Control+A');
     await page.keyboard.type('zzz');
     await page.keyboard.press('Enter');
-    await expect(table(page).getByText('Nessun risultato per i filtri correnti', { exact: true })).toBeVisible();
+    await expect(table(page).getByText('No results for the current filters', { exact: true })).toBeVisible();
     await expect(heading(page)).toHaveText('Fatture (0 of 200)');
 
-    await tabTo(page, page.getByRole('button', { name: 'Azzera filtri' }));
+    await tabTo(page, page.getByRole('button', { name: 'Clear filters' }));
     await page.keyboard.press('Enter');
     await expect(bodyRows(page)).toHaveCount(200);
     await expect(heading(page)).toHaveText('Fatture (200)');
@@ -240,9 +240,9 @@ test.describe('real keyboard (no mouse)', () => {
     await expect(search(page)).toBeFocused();
   });
 
-  test('"Azzera filtri" with the mouse also lands the focus on the search box, not the body', async ({ page }) => {
+  test('"Clear filters" with the mouse also lands the focus on the search box, not the body', async ({ page }) => {
     await gotoStory(page, STORY('no-results'));
-    await page.getByRole('button', { name: 'Azzera filtri' }).click();
+    await page.getByRole('button', { name: 'Clear filters' }).click();
     await expect(bodyRows(page)).toHaveCount(200);
     await expect(search(page)).toBeFocused();
   });
@@ -297,9 +297,9 @@ test.describe('"Simula caricamento"', () => {
 });
 
 test.describe('controls', () => {
-  test('status=error: Riprova is there and the count is invisible', async ({ page }) => {
+  test('status=error: Retry is there and the count is invisible', async ({ page }) => {
     await gotoStory(page, PLAYGROUND, 'status:error');
-    await expect(page.getByRole('button', { name: 'Riprova' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     await expect(heading(page).getByText('(200)')).toBeHidden();
   });
 

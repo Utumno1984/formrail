@@ -31,25 +31,25 @@ describe('getErrorSummary', () => {
   });
 
   it('Italian default: singular for one, plural otherwise', () => {
-    expect(getErrorSummary({ supplier: 'Required' })).toBe('1 campo non valido');
-    expect(getErrorSummary({ supplier: 'Required', vat: 'Required' })).toBe('2 campi non validi');
+    expect(getErrorSummary({ supplier: 'Required' })).toBe('1 invalid field');
+    expect(getErrorSummary({ supplier: 'Required', vat: 'Required' })).toBe('2 invalid fields');
     expect(getErrorSummary({ a: 'x', b: 'x', c: 'x', d: 'x', e: 'x', f: 'x', g: 'x', h: 'x', i: 'x', j: 'x', k: 'x' })).toBe(
-      '11 campi non validi',
+      '11 invalid fields',
     );
   });
 
   it('ignores keys whose value is undefined, counts every other one (an empty message too)', () => {
-    expect(getErrorSummary({ a: 'x', b: undefined, c: '' })).toBe('2 campi non validi');
+    expect(getErrorSummary({ a: 'x', b: undefined, c: '' })).toBe('2 invalid fields');
   });
 
   it('counts nested and array paths one by one, with no control needed for them', () => {
-    expect(getErrorSummary({ 'address.city': 'x', 'lines.0.qty': 'x', 'lines.10.qty': 'x' })).toBe('3 campi non validi');
+    expect(getErrorSummary({ 'address.city': 'x', 'lines.0.qty': 'x', 'lines.10.qty': 'x' })).toBe('3 invalid fields');
   });
 
   it('adds formErrors to the count, also with no field error', () => {
-    expect(getErrorSummary({ a: 'x' }, { formErrors: ['Root rule'] })).toBe('2 campi non validi');
-    expect(getErrorSummary({}, { formErrors: ['Root rule'] })).toBe('1 campo non valido');
-    expect(getErrorSummary({ a: 'x', b: undefined }, { formErrors: ['One', 'Two'] })).toBe('3 campi non validi');
+    expect(getErrorSummary({ a: 'x' }, { formErrors: ['Root rule'] })).toBe('2 invalid fields');
+    expect(getErrorSummary({}, { formErrors: ['Root rule'] })).toBe('1 invalid field');
+    expect(getErrorSummary({ a: 'x', b: undefined }, { formErrors: ['One', 'Two'] })).toBe('3 invalid fields');
   });
 
   it('message replaces the text and receives the count, never called without errors', () => {
@@ -64,13 +64,13 @@ describe('getErrorSummary', () => {
   it('does not read Object.prototype nor inherited keys', () => {
     const inherited = Object.create({ inherited: 'x' }) as Record<string, string>;
     expect(getErrorSummary(inherited)).toBeUndefined();
-    expect(getErrorSummary({ constructor: 'x', toString: 'y' })).toBe('2 campi non validi');
+    expect(getErrorSummary({ constructor: 'x', toString: 'y' })).toBe('2 invalid fields');
   });
 
   it('does not change its arguments', () => {
     const errors = Object.freeze({ a: 'x', b: undefined });
     const formErrors = Object.freeze(['Root']);
-    expect(getErrorSummary(errors, { formErrors })).toBe('2 campi non validi');
+    expect(getErrorSummary(errors, { formErrors })).toBe('2 invalid fields');
   });
 });
 
@@ -155,17 +155,17 @@ describe('getErrorSummary with useObjectPageForm and ObjectPageFooter', () => {
     // Same node, now holding the count (the region was there before: announced politely).
     expect(statusOf()).toBe(status);
     expect(status).toHaveAttribute('aria-live', 'polite');
-    expect(status).toHaveTextContent('Errore: 4 campi non validi');
+    expect(status).toHaveTextContent('Error: 4 invalid fields');
     expect(status).not.toHaveTextContent(/required/);
     expect(screen.getByText('Supplier is required.')).toBeInTheDocument();
     expect(screen.getByText('Region is required.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Supplier' })).toHaveFocus();
 
     await user.type(screen.getByRole('textbox', { name: 'Supplier' }), 'ACME');
-    expect(status).toHaveTextContent('Errore: 3 campi non validi');
+    expect(status).toHaveTextContent('Error: 3 invalid fields');
     await user.type(screen.getByRole('textbox', { name: 'VAT number' }), 'IT1');
     // Left: the locked field and the path with no control, neither focusable.
-    expect(status).toHaveTextContent('Errore: 2 campi non validi');
+    expect(status).toHaveTextContent('Error: 2 invalid fields');
   });
 
   it('only unreachable invalid paths: the summary is still there (it is their only announcement)', async () => {
@@ -173,7 +173,7 @@ describe('getErrorSummary with useObjectPageForm and ObjectPageFooter', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     render(<SupplierPage baseline={{ supplier: 'ACME', vat: 'IT1', region: '', internalCode: '' }} />);
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(statusOf()).toHaveTextContent('Errore: 2 campi non validi');
+    expect(statusOf()).toHaveTextContent('Error: 2 invalid fields');
   });
 
   it('no error: no message, the status region stays mounted and empty', async () => {
@@ -191,7 +191,7 @@ describe('getErrorSummary with useObjectPageForm and ObjectPageFooter', () => {
     // Nothing to validate yet, rejected by the server: a saveError and no field error.
     const { rerender } = render(<SupplierPage failSave rules={lenient} baseline={empty} />);
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(statusOf()).toHaveTextContent('Errore: The server is unreachable.');
+    expect(statusOf()).toHaveTextContent('Error: The server is unreachable.');
 
     // The rules tighten with no edit: the next save fails validation, which does not clear the
     // earlier saveError, so both exist at once and the footer shows only the save error.
@@ -199,7 +199,7 @@ describe('getErrorSummary with useObjectPageForm and ObjectPageFooter', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByText('Supplier is required.')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Supplier' })).toHaveFocus();
-    expect(statusOf()).toHaveTextContent('Errore: The server is unreachable.');
+    expect(statusOf()).toHaveTextContent('Error: The server is unreachable.');
     expect(statusOf()).not.toHaveTextContent(/non valid/);
 
     // An edit clears the save error: the summary of what is left takes its place.
@@ -207,6 +207,6 @@ describe('getErrorSummary with useObjectPageForm and ObjectPageFooter', () => {
     expect(statusOf()).not.toHaveTextContent(/unreachable/);
     await user.clear(screen.getByRole('textbox', { name: 'Supplier' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(statusOf()).toHaveTextContent('Errore: 1 campo non valido');
+    expect(statusOf()).toHaveTextContent('Error: 1 invalid field');
   });
 });

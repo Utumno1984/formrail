@@ -109,7 +109,7 @@ describe('<ListReport> count pill', () => {
     const live = container.querySelector('[aria-live]')!;
     expect(live).toHaveTextContent('');
     rerender(<Host rows={ROWS.slice(0, 10)} />);
-    expect(live).toHaveTextContent('10 risultati');
+    expect(live).toHaveTextContent('10 results');
     expect(live.contains(pill())).toBe(false);
   });
 });

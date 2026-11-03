@@ -39,7 +39,7 @@ describe('ObjectPageFooter placement', () => {
         </ObjectPageFooter>
       </ObjectPage>,
     );
-    const region = screen.getByRole('region', { name: 'Azioni di salvataggio' });
+    const region = screen.getByRole('region', { name: 'Save actions' });
     expect(region).toContainElement(screen.getByRole('button', { name: 'Salva' }));
   });
 
@@ -220,7 +220,7 @@ describe('ObjectPageFooter message', () => {
       </ObjectPage>,
     );
     const status = screen.getByRole('status');
-    expect(status).toHaveTextContent('Errore: Salvataggio non riuscito');
+    expect(status).toHaveTextContent('Error: Salvataggio non riuscito');
     const text = screen.getByText('Salvataggio non riuscito');
     expect(text).toHaveClass('whitespace-nowrap', 'text-ellipsis');
   });
@@ -238,7 +238,7 @@ describe('ObjectPageFooter message', () => {
       </ObjectPage>,
     );
     expect(screen.getByRole('status').innerHTML).toContain('text-rop-success');
-    expect(screen.getByRole('status')).toHaveTextContent('Operazione riuscita: x');
+    expect(screen.getByRole('status')).toHaveTextContent('Success: x');
   });
 
   it('takes a custom tone label', () => {

@@ -42,7 +42,7 @@ const meta: Meta<PlaygroundArgs> = {
     visible: true,
     message: LONG_MESSAGE,
     messageTone: 'error',
-    label: 'Azioni di salvataggio',
+    label: 'Save actions',
     onSave: fn(),
     onCancel: fn(),
   },

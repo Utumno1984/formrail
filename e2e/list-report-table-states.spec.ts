@@ -90,12 +90,12 @@ test.describe('stable footprint', () => {
     expect(loading.body.height).toBeGreaterThanOrEqual(5 * row - EPS);
 
     await setArgs(page, PLAYGROUND, { status: 'ready' });
-    await expect(page.getByText('Nessun dato', { exact: true }).last()).toBeVisible();
+    await expect(page.getByText('No data', { exact: true }).last()).toBeVisible();
     const empty = await footprint(page);
     expectSameFootprint(loading, empty);
 
     await setArgs(page, PLAYGROUND, { status: 'error' });
-    await expect(page.getByRole('button', { name: 'Riprova' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     const error = await footprint(page);
     expectSameFootprint(loading, error);
 
@@ -110,7 +110,7 @@ test.describe('stable footprint', () => {
     await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
     const loading = await footprint(page);
     await setArgs(page, PLAYGROUND, { status: 'ready', dataset: 'filtro che esclude tutto' });
-    await expect(page.getByRole('button', { name: 'Azzera filtri' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
     expectSameFootprint(loading, await footprint(page));
   });
 
@@ -135,7 +135,7 @@ test.describe('stable footprint', () => {
     const loading = await footprint(page);
     expect(loading.body.height).toBeGreaterThanOrEqual(8 * row - EPS);
     await setArgs(page, PLAYGROUND, { status: 'error' });
-    await expect(page.getByRole('button', { name: 'Riprova' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     expectSameFootprint(loading, await footprint(page));
   });
 
@@ -146,7 +146,7 @@ test.describe('stable footprint', () => {
     const row = await rowHeight(page);
     expect(loading.body.height).toBeGreaterThanOrEqual(row - EPS);
     await setArgs(page, PLAYGROUND, { status: 'error' });
-    await expect(page.getByRole('button', { name: 'Riprova' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     close((await footprint(page)).header.top, loading.header.top);
   });
 
@@ -175,7 +175,7 @@ test.describe('reload with data', () => {
 });
 
 test.describe('transitions without jumps', () => {
-  test('loading -> error -> Riprova -> loading -> data: page scroll and header position do not change', async ({ page }) => {
+  test('loading -> error -> Retry -> loading -> data: page scroll and header position do not change', async ({ page }) => {
     // A short viewport makes the page itself scrollable.
     await page.setViewportSize({ width: 1000, height: 200 });
     await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
@@ -185,13 +185,13 @@ test.describe('transitions without jumps', () => {
     const start = await state();
 
     await setArgs(page, PLAYGROUND, { status: 'error' });
-    await expect(page.getByRole('button', { name: 'Riprova' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     expect(await state()).toEqual(start);
 
-    await page.getByRole('button', { name: 'Riprova' }).click();
+    await page.getByRole('button', { name: 'Retry' }).click();
     // the retry button is gone with the click's effect: the focus goes to the table container, not to body
     await setArgs(page, PLAYGROUND, { status: 'loading' });
-    await expect(page.getByRole('button', { name: 'Riprova' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
     await expect(scroller(page)).toBeFocused();
     expect(await state()).toEqual(start);
 
@@ -201,21 +201,21 @@ test.describe('transitions without jumps', () => {
   });
 });
 
-test.describe('"Azzera filtri"', () => {
+test.describe('"Clear filters"', () => {
   test('is shown only for no results; clicking it calls onClearFilters, shows the rows and keeps the focus on the container', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND, 'dataset:filtro che esclude tutto');
     const table = page.getByRole('table', { name: 'Fatture' });
-    await expect(table.getByText('Nessun risultato per i filtri correnti')).toBeVisible();
-    await page.getByRole('button', { name: 'Azzera filtri' }).click();
-    await expect(page.getByRole('button', { name: 'Azzera filtri' })).toHaveCount(0);
+    await expect(table.getByText('No results for the current filters')).toBeVisible();
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
     await expect(page.locator('#storybook-root tbody tr:not([aria-hidden])').first()).toBeVisible();
     await expect(scroller(page)).toBeFocused();
   });
 
-  test('an empty dataset shows "Nessun dato" and no button', async ({ page }) => {
+  test('an empty dataset shows "No data" and no button', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND, 'dataset:vuoto');
-    await expect(page.getByRole('table').getByText('Nessun dato')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Azzera filtri' })).toHaveCount(0);
+    await expect(page.getByRole('table').getByText('No data')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   });
 });
 
@@ -265,15 +265,15 @@ test.describe('announcements', () => {
     await expect(region(page)).toHaveCount(1);
     await expect(region(page)).toHaveText('');
     await setArgs(page, PLAYGROUND, { status: 'loading' });
-    await expect(region(page)).toHaveText('Caricamento in corso…');
+    await expect(region(page)).toHaveText('Loading…');
     await setArgs(page, PLAYGROUND, { status: 'error' });
-    await expect(region(page)).toHaveText('Impossibile caricare i dati');
+    await expect(region(page)).toHaveText('Unable to load data');
     await setArgs(page, PLAYGROUND, { status: 'ready' });
-    await expect(region(page)).toHaveText('3 risultati');
+    await expect(region(page)).toHaveText('3 results');
     await setArgs(page, PLAYGROUND, { dataset: 'vuoto' });
-    await expect(region(page)).toHaveText('Nessun dato');
+    await expect(region(page)).toHaveText('No data');
     await setArgs(page, PLAYGROUND, { dataset: 'filtro che esclude tutto' });
-    await expect(region(page)).toHaveText('Nessun risultato per i filtri correnti');
+    await expect(region(page)).toHaveText('No results for the current filters');
   });
 
   test('the region is the same node through the whole life of the table', async ({ page }) => {
@@ -281,7 +281,7 @@ test.describe('announcements', () => {
     await region(page).evaluate((el) => ((window as unknown as { __live: Element }).__live = el));
     await setArgs(page, PLAYGROUND, { status: 'loading' });
     await setArgs(page, PLAYGROUND, { status: 'ready' });
-    await expect(region(page)).toHaveText('3 risultati');
+    await expect(region(page)).toHaveText('3 results');
     expect(await region(page).evaluate((el) => el === (window as unknown as { __live: Element }).__live)).toBe(true);
   });
 });
@@ -297,7 +297,7 @@ test.describe('accessibility and overflow', () => {
   test('a long error message on a narrow box wraps inside the strip: the page does not overflow', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 700 });
     await gotoStory(page, STORY('error-long-message'));
-    await expect(page.getByRole('button', { name: 'Riprova' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });

@@ -147,7 +147,7 @@ describe('useListReportUrlState with an adapter', () => {
     render(<Host adapter={adapter} history="push" />);
     expect(pill('Open')).toBeChecked();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Azzera filtri' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     });
     expect(adapter.read().toString()).toBe('page=2');
     expect(pill('All')).toBeChecked();
