@@ -203,6 +203,10 @@ describe('internal icons', () => {
     expect(exposed).not.toContain('internalIcons');
     expect(exposed.sort()).toEqual([
       'Avatar',
+      'Breadcrumb',
+      'BreadcrumbItem',
+      'BreadcrumbLink',
+      'BreadcrumbPage',
       'Button',
       'Card',
       'CardBody',
