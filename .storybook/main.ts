@@ -15,9 +15,19 @@ const config: StorybookConfig = {
   framework: { name: '@storybook/react-vite', options: {} },
   core: { disableTelemetry: true },
   // Same Tailwind pipeline as the published `styles.css` (packages/core/src/styles/index.css).
+  // Pro stories import `@react-object-page/core`, whose package entry points at `dist/` (not built in
+  // the e2e/visual jobs): resolve it to the sources instead, like the Free stories do.
   viteFinal: (viteConfig) => ({
     ...viteConfig,
     plugins: [...(viteConfig.plugins ?? []), tailwindcss()],
+    resolve: {
+      ...viteConfig.resolve,
+      alias: [
+        { find: /^@react-object-page\/core\/theme\.css$/, replacement: fileURLToPath(new URL('../packages/core/src/styles/tokens.css', import.meta.url)) },
+        { find: /^@react-object-page\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
+        ...(Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : Object.entries(viteConfig.resolve?.alias ?? {}).map(([find, replacement]) => ({ find, replacement }))),
+      ],
+    },
   }),
 };
 

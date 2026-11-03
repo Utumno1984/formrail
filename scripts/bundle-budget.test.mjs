@@ -307,7 +307,13 @@ describe('multi-package check (#174)', () => {
 
   it('the committed pro baseline has one valid entry per public export of pro', () => {
     const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.json'), 'utf8'));
-    expect(Object.keys(budget.exports)).toEqual(['computeChangeSummary', 'inferSegmentLabel', 'useChangeSummary']);
+    expect(Object.keys(budget.exports).sort()).toEqual([
+      'ChangeSummary',
+      'computeChangeSummary',
+      'formatChangeValue',
+      'inferSegmentLabel',
+      'useChangeSummary',
+    ]);
     const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
     expect(compareBudget(measured, budget).ok).toBe(true);
   });
