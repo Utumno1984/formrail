@@ -21,6 +21,7 @@ const EXPORTS = [
   'BreadcrumbLink',
   'BreadcrumbPage',
   'Button',
+  'Calendar',
   'Card',
   'CardBody',
   'CardDescription',
