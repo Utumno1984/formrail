@@ -54,8 +54,7 @@ test.describe('Primitives/Skeleton', () => {
       expect(Math.abs(skeleton - token)).toBeLessThanOrEqual(0.5);
       // Real text of the same step, in the same cell: first real line height equals one skeleton line.
       const real = await row.evaluate((el) => {
-        const cell = el.children[1];
-        return cell.children[0].getBoundingClientRect().height;
+        return el.children[1]?.children[0]?.getBoundingClientRect().height ?? -1;
       });
       expect(Math.abs(real - skeleton)).toBeLessThanOrEqual(0.5);
       // Three lines: exactly three line heights.
@@ -69,8 +68,9 @@ test.describe('Primitives/Skeleton', () => {
     const lines = page.getByTestId('row-body').locator('[data-rop-skeleton]').nth(1).locator('[data-rop-skeleton-line]');
     await expect(lines).toHaveCount(3);
     const w = await lines.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().width));
-    expect(w[0]).toBeCloseTo(w[1], 0);
-    expect(w[2]).toBeLessThan(w[0] * 0.7);
+    const [first = 0, second = -1, last = Infinity] = w;
+    expect(first).toBeCloseTo(second, 0);
+    expect(last).toBeLessThan(first * 0.7);
   });
 
   test('rect and circle take their declared size', async ({ page }) => {

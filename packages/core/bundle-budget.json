@@ -218,6 +218,10 @@
       "baseline": 3156,
       "limit": 3472
     },
+    "Skeleton": {
+      "baseline": 10936,
+      "limit": 12030
+    },
     "StatusBadge": {
       "baseline": 10811,
       "limit": 11893

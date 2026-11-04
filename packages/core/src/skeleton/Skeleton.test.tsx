@@ -3,7 +3,9 @@ import { renderToString } from 'react-dom/server';
 import { render, screen } from '@testing-library/react';
 import { Skeleton } from './Skeleton';
 
-const lineOf = (el: HTMLElement) => el.querySelectorAll('[data-rop-skeleton-line]');
+/** Class names of every line of a text skeleton. */
+const lineOf = (el: HTMLElement): string[] =>
+  Array.from(el.querySelectorAll('[data-rop-skeleton-line]'), (l) => l.className);
 
 describe('Skeleton', () => {
   it('is always aria-hidden, with no role and not focusable, whatever the variant', () => {
@@ -32,14 +34,14 @@ describe('Skeleton', () => {
     render(<Skeleton data-testid="s" />);
     const lines = lineOf(screen.getByTestId('s'));
     expect(lines).toHaveLength(1);
-    expect(lines[0].className).toContain('h-[var(--text-rop-body--line-height)]');
+    expect(lines[0]).toContain('h-[var(--text-rop-body--line-height)]');
   });
 
   it.each(['body', 'caption', 'label', 'title-sm', 'title-md', 'title-lg'] as const)(
     'text: textVariant %s takes its own line-height token',
     (v) => {
       render(<Skeleton data-testid="s" textVariant={v} />);
-      expect(lineOf(screen.getByTestId('s'))[0].className).toContain(`h-[var(--text-rop-${v}--line-height)]`);
+      expect(lineOf(screen.getByTestId('s'))[0]).toContain(`h-[var(--text-rop-${v}--line-height)]`);
     },
   );
 
@@ -47,14 +49,14 @@ describe('Skeleton', () => {
     render(<Skeleton data-testid="s" lines={3} />);
     const lines = lineOf(screen.getByTestId('s'));
     expect(lines).toHaveLength(3);
-    expect(lines[0].className).not.toContain('w-3/5');
-    expect(lines[1].className).not.toContain('w-3/5');
-    expect(lines[2].className).toContain('w-3/5');
+    expect(lines[0]).not.toContain('w-3/5');
+    expect(lines[1]).not.toContain('w-3/5');
+    expect(lines[2]).toContain('w-3/5');
   });
 
   it('text: a single line is not shortened', () => {
     render(<Skeleton data-testid="s" lines={1} />);
-    expect(lineOf(screen.getByTestId('s'))[0].className).not.toContain('w-3/5');
+    expect(lineOf(screen.getByTestId('s'))[0]).not.toContain('w-3/5');
   });
 
   it.each([0, -2, Number.NaN, Number.POSITIVE_INFINITY])('lines=%s renders nothing and does not crash', (n) => {
