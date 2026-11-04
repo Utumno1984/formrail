@@ -99,6 +99,10 @@
   /* Indeterminate ProgressBar sweep; applied only under `motion-safe:`. */
   --motion-rop-progress-duration: 1.4s;
   --animate-rop-progress-indeterminate: rop-progress-indeterminate var(--motion-rop-progress-duration) linear infinite;
+  /* Skeleton pulse: one CSS animation (no JS timer); applied only under `motion-safe:`. */
+  --motion-rop-skeleton-duration: 1.6s;
+  --motion-rop-skeleton-easing: ease-in-out;
+  --animate-rop-skeleton-pulse: rop-skeleton-pulse var(--motion-rop-skeleton-duration) var(--motion-rop-skeleton-easing) infinite;
   /* Invisible (no visual change): only keeps the wrapper of the portal mounted for as long as its
      children animate out. */
   --animate-rop-modal-hold: rop-modal-hold var(--motion-rop-overlay-duration) linear forwards;
@@ -122,6 +126,11 @@
     }
     to {
       translate: 250% 0;
+    }
+  }
+  @keyframes rop-skeleton-pulse {
+    50% {
+      opacity: 0.5;
     }
   }
   @keyframes rop-overlay-in {
