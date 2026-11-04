@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useArgs } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
@@ -144,42 +145,149 @@ export const Manual: Story = {
   render: (args) => <PlaygroundDemo {...args} />,
 };
 
+interface UncontrolledDemoProps extends DemoArgs {
+  /** Called by the Lock / Unlock buttons: the story adapter mirrors it into the `fieldState` arg. */
+  onFieldStateChange: (state: FieldState) => void;
+}
+
 /**
- * An UNCONTROLLED Switch in a Field whose state is switched by buttons; a counter shows how many
- * times `onCheckedChange` was called. For the e2e: a blocked gesture must change and report nothing,
- * and the first real click after unlocking (or after a form reset) must report again.
+ * An UNCONTROLLED Switch (`defaultChecked`) in a Field whose state the Lock / Unlock buttons switch
+ * after mount, without remounting the switch: the value the user gave survives a Lock. The Field state
+ * is local, seeded from the `fieldState` arg and re-synced when the arg changes (Controls panel).
  */
-export const UncontrolledBlocked: Story = {
-  render: ({ checked, fieldState, onCheckedChange }) => {
-    function Demo() {
-      const [state, setState] = useState<FieldState>(fieldState === 'default' ? 'locked' : fieldState);
-      const [calls, setCalls] = useState<boolean[]>([]);
-      return (
-        <form style={column}>
-          <Field label="Notifications" {...stateProps(state)}>
-            <Switch
-              defaultChecked={checked}
-              onCheckedChange={(next) => {
-                setCalls((cur) => [...cur, next]);
-                onCheckedChange(next);
-              }}
-            >
-              Email notifications
-            </Switch>
-          </Field>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button type="button" variant="secondary" onClick={() => setState('default')}>
-              Unlock
-            </Button>
-            <Button type="reset" variant="secondary">
-              Reset
-            </Button>
-          </div>
-          <output data-testid="calls">{JSON.stringify(calls)}</output>
-        </form>
-      );
-    }
-    return <Demo />;
+function UncontrolledBlockedDemo({
+  checked,
+  fieldState,
+  invalid,
+  required,
+  fieldLabel,
+  inlineLabel,
+  onCheckedChange,
+  onFieldStateChange,
+}: UncontrolledDemoProps) {
+  const [state, setState] = useState<FieldState>(fieldState);
+  useEffect(() => setState(fieldState), [fieldState]);
+  const [calls, setCalls] = useState<boolean[]>([]);
+  const change = (next: FieldState) => {
+    setState(next);
+    onFieldStateChange(next);
+  };
+  return (
+    <form style={column}>
+      <Field
+        label={fieldLabel}
+        error={invalid ? 'The setting could not be saved.' : undefined}
+        required={required}
+        {...stateProps(state)}
+      >
+        {/* A new `checked` arg is a new initial value: remount, `defaultChecked` is read only at mount. */}
+        <Switch
+          key={String(checked)}
+          defaultChecked={checked}
+          onCheckedChange={(next) => {
+            setCalls((cur) => [...cur, next]);
+            onCheckedChange(next);
+          }}
+        >
+          {inlineLabel}
+        </Switch>
+      </Field>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button type="button" variant="secondary" disabled={state === 'locked'} onClick={() => change('locked')}>
+          Lock
+        </Button>
+        <Button type="button" variant="secondary" disabled={state === 'default'} onClick={() => change('default')}>
+          Unlock
+        </Button>
+        <Button type="reset" variant="secondary">
+          Reset
+        </Button>
+      </div>
+      <p style={{ margin: 0 }}>
+        Field state: <strong data-testid="field-state">{state}</strong>
+      </p>
+      <p style={{ margin: 0 }}>
+        onCheckedChange calls: <output data-testid="calls">{JSON.stringify(calls)}</output>
+      </p>
+    </form>
+  );
+}
+
+const uncontrolledBlocked: Story = {
+  args: { fieldState: 'locked' },
+  argTypes: {
+    checked: { description: 'Initial value (`defaultChecked`): changing it remounts the switch.' },
+    fieldState: { description: 'Initial Field state; Lock / Unlock change it after mount (and update this control).' },
+  },
+  render: function Render(args) {
+    const [, updateArgs] = useArgs<DemoArgs>();
+    return <UncontrolledBlockedDemo {...args} onFieldStateChange={(fieldState) => updateArgs({ fieldState })} />;
+  },
+};
+
+/**
+ * An UNCONTROLLED Switch in a Field that starts locked (`fieldState: default` starts it editable);
+ * Lock / Unlock switch the Field state after mount without remounting the switch, Reset is a form
+ * reset. The output lists every `onCheckedChange` call (also in Actions): a blocked gesture must change
+ * and report nothing, a real click after unlocking or after a reset must report. Driven by the e2e, so
+ * it has no play function: see `UncontrolledBlockedWalkthrough`.
+ */
+export const UncontrolledBlocked: Story = { ...uncontrolledBlocked };
+
+/**
+ * `UncontrolledBlocked` scripted: while locked a click on either label and Space change and report
+ * nothing; Unlock, a click turns it on and reports `true`; Lock keeps the value (no remount) and blocks
+ * Space again; Unlock, two clicks report `false`, `true`; Reset restores the initial value and reports
+ * nothing. A separate story because the e2e open `UncontrolledBlocked` with its default args.
+ */
+export const UncontrolledBlockedWalkthrough: Story = {
+  ...uncontrolledBlocked,
+  play: async ({ args, canvasElement }) => {
+    if (args.fieldState !== 'locked' || args.checked !== false || args.invalid || args.required) return;
+    const canvas = within(canvasElement);
+    const el = control(canvasElement);
+    const calls = canvas.getByTestId('calls');
+    const lock = canvas.getByRole('button', { name: 'Lock' });
+    const unlock = canvas.getByRole('button', { name: 'Unlock' });
+    await expect(el).toHaveAttribute('aria-readonly', 'true');
+    await expect(el).toHaveAccessibleDescription('Decided by the framework agreement.');
+    await expect(lock).toBeDisabled();
+    await expect(calls).toHaveTextContent('[]');
+
+    await userEvent.click(canvas.getByText(args.fieldLabel));
+    await userEvent.click(canvas.getByText(args.inlineLabel));
+    el.focus();
+    await userEvent.keyboard(' ');
+    await expect(el).not.toBeChecked();
+    await expect(calls).toHaveTextContent('[]');
+    // Nothing reached Actions either. Checked here, before the first Lock / Unlock: those update the args,
+    // and an args update clears the spies' call history, so later calls are counted by the output above.
+    await expect(args.onCheckedChange).not.toHaveBeenCalled();
+
+    await userEvent.click(unlock);
+    await waitFor(() => expect(el).not.toHaveAttribute('aria-readonly'));
+    await expect(canvas.getByTestId('field-state')).toHaveTextContent('default');
+    await expect(unlock).toBeDisabled();
+    await userEvent.click(el);
+    await expect(el).toBeChecked();
+    await expect(calls).toHaveTextContent('[true]');
+
+    await userEvent.click(lock);
+    await waitFor(() => expect(el).toHaveAttribute('aria-readonly', 'true'));
+    // Same node, same value: locking after mount does not remount the uncontrolled switch.
+    await expect(control(canvasElement)).toBe(el);
+    await expect(el).toBeChecked();
+    el.focus();
+    await userEvent.keyboard(' ');
+    await expect(el).toBeChecked();
+
+    await userEvent.click(unlock);
+    await userEvent.click(el);
+    await userEvent.click(el);
+    await expect(calls).toHaveTextContent('[true,false,true]');
+    await userEvent.click(canvas.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(el).not.toBeChecked());
+    await expect(calls).toHaveTextContent('[true,false,true]');
   },
 };
 

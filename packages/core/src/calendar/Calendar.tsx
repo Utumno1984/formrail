@@ -132,10 +132,21 @@ const DAY =
   'pointer-events-none inline-flex h-8 w-8 items-center justify-center rounded-rop-md border border-transparent ' +
   '[font-variant-numeric:tabular-nums]';
 const DAY_HOVER = 'cursor-pointer group-hover/day:bg-rop-surface-subtle';
+// The selected day per state (#223), chosen in the render so the three never compete: default =
+// primary fill; invalid = error fill; forced / locked (`readOnly`) = an outlined day in neutral
+// colours, never primary (an invalid read-only calendar shows its error on the frame only).
 const DAY_SELECTED =
   'bg-rop-primary font-[600] text-rop-primary-contrast forced-colors:border-[Highlight]';
+const DAY_SELECTED_INVALID =
+  'not-forced-colors:bg-rop-error font-[600] text-rop-primary-contrast forced-colors:border-[Highlight]';
+const DAY_SELECTED_READONLY =
+  'font-[600] text-rop-text not-forced-colors:border-rop-readonly-indicator forced-colors:border-[Highlight]';
 const DAY_TODAY = 'font-[600] underline underline-offset-2';
 const DAY_TODAY_UNSELECTED = 'border-rop-primary text-rop-primary forced-colors:border-[CanvasText]';
+// Forced / locked: today keeps its underline and frame, in neutral colours.
+const DAY_TODAY_UNSELECTED_READONLY = 'border-rop-readonly-indicator text-rop-text forced-colors:border-[CanvasText]';
+// Forced / locked frame: dashed, on the read-only surface (the dashed border stays in forced colours).
+const ROOT_READONLY = 'border-dashed not-forced-colors:bg-rop-readonly-surface';
 const DAY_UNAVAILABLE = 'text-rop-text-muted line-through';
 
 // SSR: useLayoutEffect warns on the server (React 18).
@@ -443,7 +454,7 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
       /* Focusable by script only while disabled: where the focus goes when it is disabled under the user. */
       tabIndex={disabled ? -1 : rest.tabIndex}
       data-invalid={invalid || undefined}
-      className={cn(ROOT, invalid && 'border-rop-error', disabled && 'opacity-50', className)}
+      className={cn(ROOT, invalid && 'border-rop-error', disabled && 'opacity-50', readOnly && ROOT_READONLY, className)}
     >
       <div className={HEADER}>
         <Button
@@ -520,9 +531,9 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
                         DAY,
                         interactive && selectable && !isSelected && DAY_HOVER,
                         isToday && DAY_TODAY,
-                        isToday && !isSelected && DAY_TODAY_UNSELECTED,
+                        isToday && !isSelected && (readOnly ? DAY_TODAY_UNSELECTED_READONLY : DAY_TODAY_UNSELECTED),
                         !selectable && !isSelected && DAY_UNAVAILABLE,
-                        isSelected && DAY_SELECTED,
+                        isSelected && (readOnly ? DAY_SELECTED_READONLY : invalid ? DAY_SELECTED_INVALID : DAY_SELECTED),
                       )}
                     >
                       {formatters.day(date)}

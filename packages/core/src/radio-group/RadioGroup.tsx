@@ -92,9 +92,16 @@ const ROW =
 // The cell is one 20px text line plus the label's 2px padding (24px): the radio is centred on the cap
 // height of the label's first line (`CapIconSlot`), whatever the font.
 const CELL = 'w-6 py-0.5 text-center';
+// States (#223), read from the group (which carries the Field's ARIA), with mutually exclusive
+// selectors: default = primary border and dot when selected; invalid = error border and, unless
+// read-only, error dot; forced / locked (`aria-readonly` on the group; NOT `data-rop-blocked`, which
+// a disabled Field sets too) = dashed border, read-only surface, neutral border and dot, never
+// primary; disabled = the default look at 0.5 opacity. Colours under `not-forced-colors:`.
 const RADIO =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-full border border-rop-text-muted bg-rop-surface ' +
-  'checked:border-rop-primary disabled:cursor-not-allowed data-[rop-blocked]:cursor-not-allowed ' +
+  'not-forced-colors:group-not-aria-invalid/rg:group-not-aria-readonly/rg:checked:border-rop-primary ' +
+  'group-aria-readonly/rg:border-dashed not-forced-colors:group-aria-readonly/rg:bg-rop-readonly-surface ' +
+  'disabled:cursor-not-allowed data-[rop-blocked]:cursor-not-allowed ' +
   'not-disabled:not-data-[rop-blocked]:group-rop-hover/row:bg-rop-surface-subtle not-disabled:not-data-[rop-blocked]:group-active/row:bg-rop-surface-pressed ' +
   'not-forced-colors:group-aria-invalid/rg:border-rop-error not-forced-colors:group-aria-invalid/rg:checked:border-rop-error ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
@@ -102,7 +109,8 @@ const RADIO =
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:border-[ButtonText] forced-colors:checked:border-[Highlight]';
 const DOT =
-  'pointer-events-none absolute inset-0 m-auto hidden h-2 w-2 rounded-full bg-rop-primary peer-checked:block not-forced-colors:group-aria-invalid/rg:bg-rop-error ' +
+  'pointer-events-none absolute inset-0 m-auto hidden h-2 w-2 rounded-full bg-rop-primary peer-checked:block ' +
+  'not-forced-colors:group-not-aria-readonly/rg:group-aria-invalid/rg:bg-rop-error not-forced-colors:group-aria-readonly/rg:bg-rop-readonly-indicator ' +
   'forced-colors:bg-[Highlight]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);

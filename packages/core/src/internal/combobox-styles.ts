@@ -8,7 +8,7 @@
 export const COMBOBOX_INPUT =
   'block max-w-full min-w-0 rounded-rop-md border border-rop-border bg-rop-surface px-3 font-rop-sans text-rop-body text-rop-text ' +
   'placeholder:text-rop-text-muted focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
-  'read-only:bg-rop-surface-subtle disabled:cursor-not-allowed disabled:opacity-50';
+  'read-only:bg-rop-readonly-surface read-only:not-disabled:border-dashed disabled:cursor-not-allowed disabled:opacity-50';
 
 export const COMBOBOX_SIZE = {
   sm: 'py-[5px]',

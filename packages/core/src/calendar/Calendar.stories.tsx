@@ -241,7 +241,10 @@ export const InField: Story = {
 
 const tile = { display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', alignItems: 'start' } as const;
 
-/** Selection + today, limits, disabled dates, `readOnly`, `disabled`, invalid Field (en-US), for the visual regression. */
+/**
+ * Selection + today, limits, disabled dates, locked and forced (dashed frame, outlined neutral day),
+ * `disabled`, invalid Field without and with a selection (error fill) (en-US), for the visual regression.
+ */
 export const States: Story = {
   tags: ['visual'],
   render: ({ onValueChange }) => (
@@ -261,11 +264,17 @@ export const States: Story = {
       <Field label="Locked" state="locked" stateReason="Set by the contract.">
         <Calendar locale="en-US" today={TODAY} defaultValue="2026-03-17" onValueChange={onValueChange} />
       </Field>
+      <Field label="Forced" state="forced" stateReason="Decided by the framework agreement.">
+        <Calendar locale="en-US" today={TODAY} defaultValue="2026-03-17" onValueChange={onValueChange} />
+      </Field>
       <Field label="Disabled" state="disabled">
         <Calendar locale="en-US" today={TODAY} defaultValue="2026-03-17" onValueChange={onValueChange} />
       </Field>
       <Field label="Invalid" error="Pick a business day.">
         <Calendar locale="en-US" today={TODAY} onValueChange={onValueChange} />
+      </Field>
+      <Field label="Invalid with a selection" error="Pick a business day.">
+        <Calendar locale="en-US" today={TODAY} defaultValue="2026-03-14" onValueChange={onValueChange} />
       </Field>
     </div>
   ),

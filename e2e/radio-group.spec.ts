@@ -11,7 +11,7 @@ const checkedValue = (page: Page) =>
   group(page).evaluate((g) => (g.querySelector('input:checked') as HTMLInputElement | null)?.value ?? null);
 
 test.describe('Forms/RadioGroup: stories play', () => {
-  for (const name of ['playground', 'async-hydration']) {
+  for (const name of ['playground', 'async-hydration', 'uncontrolled-blocked-walkthrough']) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
     });
@@ -249,5 +249,61 @@ test.describe('accessibility', () => {
   test('locked and invalid states: no axe violations', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'fieldState:locked;invalid:!true;required:!true');
     await expectNoA11yViolations(page);
+  });
+});
+
+// #223: the UncontrolledBlocked Controls act on the DOM, and Lock / Unlock switch the Field state
+// after mount (dashed <-> solid) without remounting the group.
+test.describe('UncontrolledBlocked: Controls and Lock / Unlock', () => {
+  const lockButton = (page: Page) => page.getByRole('button', { name: 'Lock', exact: true });
+  const unlockButton = (page: Page) => page.getByRole('button', { name: 'Unlock', exact: true });
+  const borderStyle = (page: Page, name: string) => radio(page, name).evaluate((el) => getComputedStyle(el).borderTopStyle);
+
+  test('without arguments it starts locked on Team; fieldState:default starts it editable', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await expect(group(page)).toHaveAttribute('aria-readonly', 'true');
+    expect(await checkedValue(page)).toBe('team');
+    await expect(page.getByTestId('field-state')).toHaveText('locked');
+    await expect(lockButton(page)).toBeDisabled();
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldState:default');
+    await expect(group(page)).not.toHaveAttribute('aria-readonly');
+    await expect(unlockButton(page)).toBeDisabled();
+    await radio(page, 'Business').click();
+    expect(await checkedValue(page)).toBe('business');
+    await expect(calls(page)).toHaveText('["business"]');
+  });
+
+  test('invalid, required and orientation reach the radiogroup', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'invalid:!true;required:!true;orientation:horizontal');
+    await expect(group(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(group(page)).toHaveAttribute('aria-required', 'true');
+    await expect(group(page)).toHaveAttribute('aria-orientation', 'horizontal');
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await expect(group(page)).not.toHaveAttribute('aria-invalid');
+    await expect(group(page)).not.toHaveAttribute('aria-required');
+    await expect(group(page)).toHaveAttribute('aria-orientation', 'vertical');
+  });
+
+  test('Lock / Unlock alternate the dashed and the solid border; the value stays (no remount)', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldState:default');
+    expect(await borderStyle(page, 'Team')).toBe('solid');
+    await radio(page, 'Business').click();
+    const node = await group(page).elementHandle();
+    await lockButton(page).click();
+    await expect(group(page)).toHaveAttribute('aria-readonly', 'true');
+    expect(await borderStyle(page, 'Business')).toBe('dashed');
+    expect(await checkedValue(page)).toBe('business');
+    expect(await node!.evaluate((el) => el.isConnected)).toBe(true);
+    await unlockButton(page).click();
+    await expect(group(page)).not.toHaveAttribute('aria-readonly');
+    expect(await borderStyle(page, 'Business')).toBe('solid');
+    expect(await checkedValue(page)).toBe('business');
+    await expect(calls(page)).toHaveText('["business"]');
+  });
+
+  test('value:business mounts the group on Business and reports nothing', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'value:business');
+    expect(await checkedValue(page)).toBe('business');
+    await expect(calls(page)).toHaveText('[]');
   });
 });

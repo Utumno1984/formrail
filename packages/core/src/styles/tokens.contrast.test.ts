@@ -156,6 +156,31 @@ describe('contrast', () => {
     expect(contrast(token('primary'), token('primary-contrast'))).toBeGreaterThanOrEqual(3);
   });
 
+  // Forced / locked controls (#223): the neutral "on" indicator and the dashed border on the plain
+  // and the read-only surfaces (WCAG 1.4.11), the text inside a read-only field (1.4.3).
+  it.each(['surface', 'readonly-surface'])('forced/locked: the indicator (readonly-indicator) on %s is at least 3:1 (WCAG 1.4.11)', (name) => {
+    expect(contrast(token('readonly-indicator'), token(name))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('forced/locked + invalid: the error border on the read-only surface is at least 3:1 (WCAG 1.4.11)', () => {
+    expect(contrast(token('error'), token('readonly-surface'))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('forced/locked: the text on the read-only surface is at least 4.5:1 (WCAG AA)', () => {
+    expect(contrast(token('text'), token('readonly-surface'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Invalid (#223): the tick / dash / thumb (primary-contrast) on the error fill of a Checkbox, a
+  // Switch and a selected Calendar day; the same at hover and pressed.
+  it.each(['error', 'error-hover', 'error-active'])('invalid: primary-contrast on the %s fill is at least 4.5:1', (name) => {
+    expect(contrast(token(name), token('primary-contrast'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('the read-only tokens are aliases of the neutral scale, not new colours', () => {
+    expect(declarations.get('--color-rop-readonly-surface')).toBe('var(--color-rop-surface-subtle)');
+    expect(declarations.get('--color-rop-readonly-indicator')).toBe('var(--color-rop-text-muted)');
+  });
+
   it('the focus ring is drawn with the primary token', () => {
     expect(token('primary')).toEqual(token('blue-600'));
   });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { useArgs } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
@@ -153,47 +154,157 @@ export const Manual: Story = {
   render: (args) => <PlaygroundDemo {...args} />,
 };
 
+interface UncontrolledDemoProps extends DemoArgs {
+  /** Called by the Lock / Unlock buttons: the story adapter mirrors it into the `fieldState` arg. */
+  onFieldStateChange: (state: FieldState) => void;
+}
+
 /**
- * An UNCONTROLLED group in a Field whose state is switched by buttons; a counter shows how many times
- * `onValueChange` was called. For the e2e: a blocked gesture must change and report nothing, and the
- * first real click after unlocking (or after a form reset) must report again.
+ * An UNCONTROLLED group (`defaultValue`) in a Field whose state the Lock / Unlock buttons switch after
+ * mount, without remounting the group: the value the user picked survives a Lock. The Field state is
+ * local, seeded from the `fieldState` arg and re-synced when the arg changes (Controls panel).
  */
-export const UncontrolledBlocked: Story = {
-  render: ({ fieldState, orientation, onValueChange }) => {
-    function Demo() {
-      const [state, setState] = useState<FieldState>(fieldState === 'default' ? 'locked' : fieldState);
-      const [calls, setCalls] = useState<string[]>([]);
-      return (
-        <form style={column}>
-          <Field label="Plan" {...stateProps(state)}>
-            <RadioGroup
-              defaultValue="team"
-              orientation={orientation}
-              onValueChange={(next) => {
-                setCalls((cur) => [...cur, next]);
-                onValueChange(next);
-              }}
-            >
-              {OPTIONS.map((o) => (
-                <RadioGroupItem key={o.value} value={o.value}>
-                  {o.label}
-                </RadioGroupItem>
-              ))}
-            </RadioGroup>
-          </Field>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button type="button" variant="secondary" onClick={() => setState('default')}>
-              Unlock
-            </Button>
-            <Button type="reset" variant="secondary">
-              Reset
-            </Button>
-          </div>
-          <output data-testid="calls">{JSON.stringify(calls)}</output>
-        </form>
-      );
-    }
-    return <Demo />;
+function UncontrolledBlockedDemo({
+  fieldState,
+  invalid,
+  required,
+  orientation,
+  value,
+  onValueChange,
+  onFieldStateChange,
+}: UncontrolledDemoProps) {
+  const [state, setState] = useState<FieldState>(fieldState);
+  useEffect(() => setState(fieldState), [fieldState]);
+  const [calls, setCalls] = useState<string[]>([]);
+  const change = (next: FieldState) => {
+    setState(next);
+    onFieldStateChange(next);
+  };
+  return (
+    <form style={column}>
+      <Field
+        label="Plan"
+        error={invalid ? 'Pick a plan to continue.' : undefined}
+        required={required}
+        {...stateProps(state)}
+      >
+        {/* A new `value` arg is a new initial value: remount, `defaultValue` is read only at mount. */}
+        <RadioGroup
+          key={value}
+          defaultValue={value === '' ? undefined : value}
+          orientation={orientation}
+          onValueChange={(next) => {
+            setCalls((cur) => [...cur, next]);
+            onValueChange(next);
+          }}
+        >
+          {OPTIONS.map((o) => (
+            <RadioGroupItem key={o.value} value={o.value}>
+              {o.label}
+            </RadioGroupItem>
+          ))}
+        </RadioGroup>
+      </Field>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button type="button" variant="secondary" disabled={state === 'locked'} onClick={() => change('locked')}>
+          Lock
+        </Button>
+        <Button type="button" variant="secondary" disabled={state === 'default'} onClick={() => change('default')}>
+          Unlock
+        </Button>
+        <Button type="reset" variant="secondary">
+          Reset
+        </Button>
+      </div>
+      <p style={{ margin: 0 }}>
+        Field state: <strong data-testid="field-state">{state}</strong>
+      </p>
+      <p style={{ margin: 0 }}>
+        onValueChange calls: <output data-testid="calls">{JSON.stringify(calls)}</output>
+      </p>
+    </form>
+  );
+}
+
+const uncontrolledBlocked: Story = {
+  args: { fieldState: 'locked', value: 'team' },
+  argTypes: {
+    value: { description: 'Initial value (`defaultValue`): changing it remounts the group.' },
+    fieldState: { description: 'Initial Field state; Lock / Unlock change it after mount (and update this control).' },
+    disabledItem: { table: { disable: true } },
+  },
+  render: function Render(args) {
+    const [, updateArgs] = useArgs<DemoArgs>();
+    return <UncontrolledBlockedDemo {...args} onFieldStateChange={(fieldState) => updateArgs({ fieldState })} />;
+  },
+};
+
+/**
+ * An UNCONTROLLED group in a Field that starts locked (`fieldState: default` starts it editable);
+ * Lock / Unlock switch the Field state after mount without remounting the group, Reset is a form
+ * reset. The output lists every `onValueChange` call (also in Actions): a blocked gesture must change
+ * and report nothing, a real click after unlocking or after a reset must report. Driven by the e2e, so
+ * it has no play function: see `UncontrolledBlockedWalkthrough`.
+ */
+export const UncontrolledBlocked: Story = { ...uncontrolledBlocked };
+
+/**
+ * `UncontrolledBlocked` scripted: while locked clicks on a radio, an inline label and the Field label,
+ * and the arrow keys, change and report nothing; Unlock, a click selects Business and reports it; Lock
+ * keeps it (no remount) and blocks the arrows again; Unlock, a click reports Enterprise; Reset restores
+ * Team and reports nothing. A separate story because the e2e open `UncontrolledBlocked` with its
+ * default args.
+ */
+export const UncontrolledBlockedWalkthrough: Story = {
+  ...uncontrolledBlocked,
+  play: async ({ args, canvasElement }) => {
+    if (args.fieldState !== 'locked' || args.value !== 'team' || args.invalid || args.required) return;
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole('radiogroup');
+    const radio = (name: string) => canvas.getByRole('radio', { name });
+    const calls = canvas.getByTestId('calls');
+    const lock = canvas.getByRole('button', { name: 'Lock' });
+    const unlock = canvas.getByRole('button', { name: 'Unlock' });
+    await expect(group).toHaveAttribute('aria-readonly', 'true');
+    await expect(group).toHaveAccessibleDescription('Decided by the framework agreement.');
+    await expect(lock).toBeDisabled();
+    await expect(radio('Team')).toBeChecked();
+    await expect(calls).toHaveTextContent('[]');
+
+    await userEvent.click(radio('Business'));
+    await userEvent.click(canvas.getByText('Enterprise'));
+    await userEvent.click(canvas.getByText('Plan'));
+    radio('Team').focus();
+    await userEvent.keyboard('{ArrowDown}{ArrowUp}');
+    await expect(radio('Team')).toBeChecked();
+    await expect(calls).toHaveTextContent('[]');
+    // Nothing reached Actions either. Checked here, before the first Lock / Unlock: those update the args,
+    // and an args update clears the spies' call history, so later calls are counted by the output above.
+    await expect(args.onValueChange).not.toHaveBeenCalled();
+
+    await userEvent.click(unlock);
+    await waitFor(() => expect(group).not.toHaveAttribute('aria-readonly'));
+    await expect(canvas.getByTestId('field-state')).toHaveTextContent('default');
+    await expect(unlock).toBeDisabled();
+    await userEvent.click(radio('Business'));
+    await expect(radio('Business')).toBeChecked();
+    await expect(calls).toHaveTextContent('["business"]');
+
+    await userEvent.click(lock);
+    await waitFor(() => expect(group).toHaveAttribute('aria-readonly', 'true'));
+    // Same node, same value: locking after mount does not remount the uncontrolled group.
+    await expect(canvas.getByRole('radiogroup')).toBe(group);
+    await expect(radio('Business')).toBeChecked();
+    radio('Business').focus();
+    await userEvent.keyboard('{ArrowDown}');
+    await expect(radio('Business')).toBeChecked();
+
+    await userEvent.click(unlock);
+    await userEvent.click(radio('Enterprise'));
+    await expect(calls).toHaveTextContent('["business","enterprise"]');
+    await userEvent.click(canvas.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(radio('Team')).toBeChecked());
+    await expect(calls).toHaveTextContent('["business","enterprise"]');
   },
 };
 
