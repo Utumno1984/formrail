@@ -101,6 +101,11 @@ describe('contrast', () => {
     expect(contrast(token(name), token('surface-subtle'))).toBeGreaterThanOrEqual(4.5);
   });
 
+  // ProgressBar: the fill tones against the track (non-text component, WCAG 1.4.11).
+  it.each(['primary', 'success', 'error'])('ProgressBar %s fill on the track is at least 3:1 (WCAG 1.4.11)', (tone) => {
+    expect(contrast(token(tone), token('border'))).toBeGreaterThanOrEqual(3);
+  });
+
   it('the focus ring is drawn with the primary token', () => {
     expect(token('primary')).toEqual(token('blue-600'));
   });

@@ -158,6 +158,10 @@
       "baseline": 14449,
       "limit": 15894
     },
+    "ProgressBar": {
+      "baseline": 11146,
+      "limit": 12261
+    },
     "Select": {
       "baseline": 43643,
       "limit": 48008

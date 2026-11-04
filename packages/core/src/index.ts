@@ -141,6 +141,8 @@ export { DescriptionListStatus } from './description-list/DescriptionListStatus'
 export type { DescriptionListStatusProps } from './description-list/DescriptionListStatus';
 export { Card, CardHeader, CardTitle, CardDescription, CardBody, CardFooter } from './card/Card';
 export type { CardProps, CardElement, CardTitleProps, CardTitleLevel } from './card/Card';
+export { ProgressBar } from './progress-bar/ProgressBar';
+export type { ProgressBarProps, ProgressBarTone } from './progress-bar/ProgressBar';
 export { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage } from './breadcrumb/Breadcrumb';
 export type { BreadcrumbProps, BreadcrumbLinkProps, BreadcrumbSeparator } from './breadcrumb/Breadcrumb';
 export { Divider } from './divider/Divider';
