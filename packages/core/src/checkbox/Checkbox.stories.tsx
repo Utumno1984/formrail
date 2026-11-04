@@ -131,7 +131,46 @@ export const Manual: Story = {
   render: (args) => <PlaygroundDemo {...args} />,
 };
 
-const MATRIX_CHECKED: { name: string; value: CheckedState }[] = [
+/**
+ * An UNCONTROLLED Checkbox in a Field whose state is switched by buttons; a counter shows how many
+ * times `onCheckedChange` was called. For the e2e: a blocked gesture must change and report nothing,
+ * and the first real click after unlocking (or after a form reset) must report again.
+ */
+export const UncontrolledBlocked: Story = {
+  render: ({ checked, fieldState, onCheckedChange }) => {
+    function Demo() {
+      const [state, setState] = useState<FieldState>(fieldState === 'default' ? 'locked' : fieldState);
+      const [calls, setCalls] = useState<boolean[]>([]);
+      return (
+        <form style={column}>
+          <Field label="Terms" {...stateProps(state)}>
+            <Checkbox
+              defaultChecked={checked === true}
+              onCheckedChange={(next) => {
+                setCalls((cur) => [...cur, next]);
+                onCheckedChange(next);
+              }}
+            >
+              I accept the terms and conditions
+            </Checkbox>
+          </Field>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button type="button" variant="secondary" onClick={() => setState('default')}>
+              Unlock
+            </Button>
+            <Button type="reset" variant="secondary">
+              Reset
+            </Button>
+          </div>
+          <output data-testid="calls">{JSON.stringify(calls)}</output>
+        </form>
+      );
+    }
+    return <Demo />;
+  },
+};
+
+const MATRIX_CHECKED:{ name: string; value: CheckedState }[] = [
   { name: 'Unchecked', value: false },
   { name: 'Checked', value: true },
   { name: 'Indeterminate', value: 'indeterminate' },

@@ -50,39 +50,85 @@ test.describe('mouse and keyboard (default)', () => {
   });
 });
 
+const GESTURES: Array<[string, (page: Page) => Promise<void>]> = [
+  ['click on the box', async (page) => checkbox(page).click()],
+  ['click on the inline label', async (page) => page.getByText('I accept the terms and conditions').click()],
+  ['click on the Field label', async (page) => page.locator('label', { hasText: /^Terms$/ }).click()],
+  [
+    'Space',
+    async (page) => {
+      await checkbox(page).focus();
+      await page.keyboard.press('Space');
+    },
+  ],
+];
+const calls = (page: Page) => page.getByTestId('calls');
+
 for (const state of ['forced', 'locked'] as const) {
   test.describe(`${state}`, () => {
-    test(`Tab reaches it; clicks (box, Field label, inline label) and Space change nothing; the reason describes it`, async ({
-      page,
-    }) => {
+    test('Tab reaches it, aria-readonly, described by the reason, focus ring visible', async ({ page }) => {
       await gotoStory(page, STORY('manual'), `fieldState:${state};checked:!true`);
       const box = checkbox(page);
-      await expect(box).toBeChecked();
       await page.keyboard.press('Tab');
       await expect(box).toBeFocused();
       await expect(box).toHaveAttribute('aria-readonly', 'true');
       await expect(box).toHaveAccessibleDescription(/Decided by the framework agreement/);
-      await box.click();
-      await page.getByText('I accept the terms and conditions').click();
-      await page.locator('label', { hasText: /^Terms$/ }).click();
-      await box.focus();
-      await page.keyboard.press('Space');
-      await expect(box).toBeChecked();
-      await expect(box).toBeFocused();
       await expectFocusRingVisible(box);
     });
 
-    test('unchecked stays unchecked', async ({ page }) => {
-      await gotoStory(page, STORY('manual'), `fieldState:${state}`);
-      const box = checkbox(page);
-      await box.click({ force: true });
-      await page.locator('label', { hasText: /^Terms$/ }).click();
-      await box.focus();
-      await page.keyboard.press('Space');
-      await expect(box).not.toBeChecked();
+    for (const initial of [true, false]) {
+      for (const [name, gesture] of GESTURES) {
+        const start = initial ? 'checked' : 'unchecked';
+        test(`controlled, ${name}, starting ${start}: state unchanged`, async ({ page }) => {
+          await gotoStory(page, STORY('manual'), `fieldState:${state};checked:!${initial}`);
+          await expect(checkbox(page)).toBeChecked({ checked: initial });
+          await gesture(page);
+          await expect(checkbox(page)).toBeChecked({ checked: initial });
+          await gesture(page);
+          await expect(checkbox(page)).toBeChecked({ checked: initial });
+        });
+
+        test(`uncontrolled, ${name}, starting ${start}: state unchanged and nothing reported`, async ({ page }) => {
+          await gotoStory(page, STORY('uncontrolled-blocked'), `fieldState:${state};checked:!${initial}`);
+          await expect(checkbox(page)).toBeChecked({ checked: initial });
+          await gesture(page);
+          await expect(checkbox(page)).toBeChecked({ checked: initial });
+          await gesture(page);
+          await expect(checkbox(page)).toBeChecked({ checked: initial });
+          await expect(calls(page)).toHaveText('[]');
+        });
+      }
+    }
+
+    test(`uncontrolled: after blocked gestures and unlocking, a normal click toggles and reports`, async ({ page }) => {
+      await gotoStory(page, STORY('uncontrolled-blocked'), `fieldState:${state}`);
+      for (const [, gesture] of GESTURES) await gesture(page);
+      await expect(checkbox(page)).not.toBeChecked();
+      await page.getByRole('button', { name: 'Unlock' }).click();
+      await expect(checkbox(page)).not.toHaveAttribute('aria-readonly', 'true');
+      await checkbox(page).click();
+      await expect(checkbox(page)).toBeChecked();
+      await expect(calls(page)).toHaveText('[true]');
+      await checkbox(page).click();
+      await expect(checkbox(page)).not.toBeChecked();
+      await expect(calls(page)).toHaveText('[true,false]');
     });
   });
 }
+
+test.describe('uncontrolled in a form', () => {
+  test('after Reset the next click still reports', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await page.getByRole('button', { name: 'Unlock' }).click();
+    await checkbox(page).click();
+    await expect(calls(page)).toHaveText('[true]');
+    await page.getByRole('button', { name: 'Reset' }).click();
+    await expect(checkbox(page)).not.toBeChecked();
+    await checkbox(page).click();
+    await expect(checkbox(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[true,true]');
+  });
+});
 
 test.describe('disabled', () => {
   test('out of the tab order and no click changes it', async ({ page }) => {
@@ -124,6 +170,32 @@ test.describe('indeterminate', () => {
     expect(await marks('Unchecked')).toEqual(['none', 'none']);
     expect(await marks('Checked')).toEqual(['block', 'none']);
     expect(await marks('Indeterminate')).toEqual(['none', 'block']);
+  });
+});
+
+test.describe('forced-colors', () => {
+  test('checked and indeterminate have a visible, mutually exclusive mark', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await gotoStory(page, STORY('state-matrix'));
+    const read = async (name: string) =>
+      page
+        .locator('label', { hasText: new RegExp(`^${name} / default$`) })
+        .locator('xpath=..')
+        .evaluate((cell) => {
+          const input = cell.querySelector('input')!;
+          const bg = getComputedStyle(input).backgroundColor;
+          return Array.from(cell.querySelectorAll('svg')).map((s) => {
+            const cs = getComputedStyle(s);
+            return { display: cs.display, differsFromBox: cs.color !== bg };
+          });
+        });
+    const checked = await read('Checked');
+    expect(checked.map((m) => m.display)).toEqual(['block', 'none']);
+    expect(checked[0]!.differsFromBox).toBe(true);
+    const mixed = await read('Indeterminate');
+    expect(mixed.map((m) => m.display)).toEqual(['none', 'block']);
+    expect(mixed[1]!.differsFromBox).toBe(true);
+    expect((await read('Unchecked')).map((m) => m.display)).toEqual(['none', 'none']);
   });
 });
 

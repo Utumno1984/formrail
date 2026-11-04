@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -100,22 +101,62 @@ export const Checkbox = /* @__PURE__ */ forwardRef<HTMLInputElement, CheckboxPro
 
   // The browser clears `indeterminate` on a click and React never writes it: apply it after every
   // render (a click also forces one, see `handleChange`), so a consumer that keeps 'indeterminate' wins.
+  const hadMixed = useRef(false);
   useLayoutEffect(() => {
-    if (input.current && controlled) input.current.indeterminate = checked === 'indeterminate';
+    const el = input.current;
+    if (!el) return;
+    if (controlled) {
+      el.indeterminate = checked === 'indeterminate';
+      hadMixed.current = el.indeterminate;
+    } else if (hadMixed.current) {
+      // Controlled 'indeterminate' -> uncontrolled: React never clears the property.
+      el.indeterminate = false;
+      hadMixed.current = false;
+    }
   });
+
+  // React's value tracker is only updated through the `checked` setter. A cancelled click (or a
+  // form reset) makes the browser change `checked` behind its back, so the next real click would
+  // look like "no change" and onChange would never fire. Re-assigning the same value realigns it.
+  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const realign = useCallback(() => {
+    const timer = setTimeout(() => {
+      timers.current.delete(timer);
+      const el = input.current;
+      if (el) {
+        const value = el.checked;
+        el.checked = value;
+      }
+    }, 0);
+    timers.current.add(timer);
+  }, []);
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      pending.forEach(clearTimeout);
+      pending.clear();
+    };
+  }, []);
+  useEffect(() => {
+    const form = input.current?.form;
+    if (!form || controlled) return;
+    form.addEventListener('reset', realign);
+    return () => form.removeEventListener('reset', realign);
+  }, [controlled, realign]);
 
   const hasInline = hasContent(children);
   const labelledBy = [fieldProps['aria-labelledby'], hasInline ? inlineId : undefined].filter(Boolean).join(' ');
 
   const handleClick = (event: MouseEvent<HTMLInputElement>) => {
     onClick?.(event);
-    if (blocked) {
-      event.preventDefault();
+    if (blocked) event.preventDefault();
+    if (event.nativeEvent.defaultPrevented) {
       rerender();
+      if (!controlled) realign();
     }
   };
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (!blocked) onCheckedChange?.(event.currentTarget.checked);
+    if (!blocked && !event.nativeEvent.defaultPrevented) onCheckedChange?.(event.currentTarget.checked);
     rerender();
   };
 

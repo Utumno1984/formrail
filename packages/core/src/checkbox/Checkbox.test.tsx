@@ -102,15 +102,12 @@ describe('Checkbox: interaction', () => {
   });
 
   it.each(['forced', 'locked'] as const)(
-    '%s: focusable, aria-readonly, described by the reason, and no click or Space changes it',
+    '%s: focusable, aria-readonly and described by the reason',
     async (state) => {
       const user = userEvent.setup();
-      const onCheckedChange = vi.fn();
       render(
         <Field label="Terms" state={state} stateReason="Decided by contract">
-          <Checkbox defaultChecked onCheckedChange={onCheckedChange}>
-            I accept
-          </Checkbox>
+          <Checkbox defaultChecked>I accept</Checkbox>
         </Field>,
       );
       const box = screen.getByRole('checkbox');
@@ -118,15 +115,82 @@ describe('Checkbox: interaction', () => {
       expect(box).toHaveFocus();
       expect(box).toHaveAttribute('aria-readonly', 'true');
       expect(box).toHaveAccessibleDescription(/Decided by contract/);
-      await user.click(box);
-      await user.click(screen.getByText('I accept'));
-      await user.click(screen.getByText('Terms'));
-      box.focus();
-      await user.keyboard(' ');
-      expect(box).toBeChecked();
-      expect(onCheckedChange).not.toHaveBeenCalled();
     },
   );
+
+  // Uncontrolled only: jsdom inverts the DOM of a cancelled controlled click on alternate clicks
+  // (jsdom artefact); the controlled parity is covered by the Chromium e2e.
+  describe.each(['forced', 'locked'] as const)('%s: every single gesture is blocked', (state) => {
+    const gestures: Array<[string, (user: ReturnType<typeof userEvent.setup>, box: HTMLElement) => Promise<void>]> = [
+      ['click on the box', async (user, box) => user.click(box)],
+      ['click on the inline label', async (user) => user.click(screen.getByText('I accept'))],
+      ['click on the Field label', async (user) => user.click(screen.getByText('Terms'))],
+      [
+        'Space',
+        async (user, box) => {
+          box.focus();
+          await user.keyboard(' ');
+        },
+      ],
+    ];
+    for (const initial of [true, false]) {
+      for (const [name, gesture] of gestures) {
+        it(`${name}, starting ${initial ? 'checked' : 'unchecked'}`, async () => {
+          const user = userEvent.setup();
+          const onCheckedChange = vi.fn();
+          render(
+            <Field label="Terms" state={state} stateReason="Decided by contract">
+              <Checkbox defaultChecked={initial} onCheckedChange={onCheckedChange}>
+                I accept
+              </Checkbox>
+            </Field>,
+          );
+          const box = screen.getByRole('checkbox') as HTMLInputElement;
+          await gesture(user, box);
+          expect(box.checked).toBe(initial);
+          expect(onCheckedChange).not.toHaveBeenCalled();
+        });
+      }
+    }
+  });
+
+  it('uncontrolled: after a blocked click the Field goes back to default and the next click reports true', async () => {
+    const user = userEvent.setup();
+    const onCheckedChange = vi.fn();
+    function Host({ locked }: { locked: boolean }) {
+      const props = locked ? ({ state: 'locked', stateReason: 'Closed' } as const) : ({ state: 'default' } as const);
+      return (
+        <Field label="Terms" {...props}>
+          <Checkbox onCheckedChange={onCheckedChange}>x</Checkbox>
+        </Field>
+      );
+    }
+    const { rerender } = render(<Host locked />);
+    const box = screen.getByRole('checkbox');
+    await user.click(box);
+    expect(box).not.toBeChecked();
+    // let the realignment timer run
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    rerender(<Host locked={false} />);
+    await user.click(box);
+    expect(box).toBeChecked();
+    expect(onCheckedChange).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('a consumer onClick that calls preventDefault cancels the toggle and onCheckedChange', async () => {
+    const user = userEvent.setup();
+    const onCheckedChange = vi.fn();
+    render(
+      <Checkbox onClick={(e) => e.preventDefault()} onCheckedChange={onCheckedChange}>
+        x
+      </Checkbox>,
+    );
+    await user.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    expect(onCheckedChange).not.toHaveBeenCalled();
+  });
 
   it('forced and unchecked stays unchecked', async () => {
     const user = userEvent.setup();
@@ -220,9 +284,39 @@ describe('Checkbox: no echo', () => {
     expect(box).toBeChecked();
     expect(onCheckedChange).not.toHaveBeenCalled();
   });
+
+  it('after a form reset the next click still reports the new state', async () => {
+    const user = userEvent.setup();
+    const onCheckedChange = vi.fn();
+    render(
+      <form data-testid="form">
+        <Checkbox onCheckedChange={onCheckedChange}>x</Checkbox>
+      </form>,
+    );
+    const box = screen.getByRole('checkbox');
+    await user.click(box);
+    expect(box).toBeChecked();
+    act(() => (screen.getByTestId('form') as HTMLFormElement).reset());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    expect(box).not.toBeChecked();
+    onCheckedChange.mockClear();
+    await user.click(box);
+    expect(box).toBeChecked();
+    expect(onCheckedChange).toHaveBeenCalledExactlyOnceWith(true);
+  });
 });
 
 describe('Checkbox: indeterminate', () => {
+  it('clears the DOM property when it goes from "indeterminate" to uncontrolled', () => {
+    const { rerender } = render(<Checkbox checked="indeterminate" />);
+    const box = screen.getByRole('checkbox') as HTMLInputElement;
+    expect(box.indeterminate).toBe(true);
+    rerender(<Checkbox />);
+    expect(box.indeterminate).toBe(false);
+  });
+
   it('sets the DOM property (exposed as mixed), a click goes to true and reports true', async () => {
     const user = userEvent.setup();
     const onCheckedChange = vi.fn();
