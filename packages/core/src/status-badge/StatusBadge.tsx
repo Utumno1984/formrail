@@ -1,4 +1,5 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
 
@@ -87,10 +88,11 @@ export const StatusBadge = /* @__PURE__ */ forwardRef<HTMLSpanElement, StatusBad
         className,
       )}
     >
+      {/* Centred on the cap height of the text (`CapIconSlot`): the slot is one caption line tall. */}
       {icon ? (
-        <span aria-hidden="true" data-rop-badge-icon="" className="ml-1.5 inline-flex shrink-0 items-center [&>svg]:size-(--icon-rop-xs)">
+        <CapIconSlot aria-hidden="true" data-rop-badge-icon="" className="ml-1.5 [&_svg]:size-(--icon-rop-xs)">
           {icon}
-        </span>
+        </CapIconSlot>
       ) : null}
       <span className={cn('min-w-0 truncate pr-1.5', icon ? 'pl-1' : 'pl-1.5')}>{children}</span>
     </span>

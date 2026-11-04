@@ -14,6 +14,7 @@ import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { Icon } from '../icon/Icon';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import {
   LISTBOX_CONTENT,
@@ -258,7 +259,9 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
                   className={cn(LISTBOX_ITEM, '[overflow-wrap:anywhere]')}
                 >
                   <RadixSelect.ItemIndicator className={LISTBOX_ITEM_INDICATOR}>
-                    <Icon size="sm">{internalIcons.check}</Icon>
+                    <CapIconSlot>
+                      <Icon size="sm">{internalIcons.check}</Icon>
+                    </CapIconSlot>
                   </RadixSelect.ItemIndicator>
                   <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
                 </RadixSelect.Item>

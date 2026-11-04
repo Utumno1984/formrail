@@ -21,6 +21,7 @@ import {
   COMBOBOX_OPTION,
   COMBOBOX_SIZE,
 } from '../internal/combobox-styles';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import {
   LISTBOX_CONTENT_POPOVER,
@@ -256,7 +257,9 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
                   >
                     {selected ? (
                       <span className={LISTBOX_ITEM_INDICATOR}>
-                        <Icon size="sm">{internalIcons.check}</Icon>
+                        <CapIconSlot>
+                          <Icon size="sm">{internalIcons.check}</Icon>
+                        </CapIconSlot>
                       </span>
                     ) : null}
                     {option.label}

@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
@@ -48,11 +49,13 @@ export interface CheckboxProps
 // Full literals (Tailwind scan). The box is drawn on a native input (`appearance-none`); the check
 // and the dash are sibling SVGs shown through `peer-*` variants, so they follow the real DOM state
 // whether the Checkbox is controlled or not. No preflight: boxes are content-box, hence 14px + 2px
-// border = 16px. The cell around the box is 24px tall (the minimum target size).
+// border = 16px. The cell around the box is 24px tall (the minimum target size): one 20px text line
+// plus the same 2px padding as the label, so the box is centred on the cap height of the label's
+// first line (`CapIconSlot`), whatever the font.
 const ROW =
   'inline-flex max-w-full min-w-0 items-start gap-1 font-rop-sans text-rop-body text-rop-text ' +
   'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50';
-const CELL = 'relative inline-flex h-6 w-6 shrink-0 items-center justify-center';
+const CELL = 'w-6 py-0.5 text-center';
 const BOX =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-rop-sm border border-rop-text-muted bg-rop-surface ' +
   'checked:bg-rop-primary indeterminate:bg-rop-primary disabled:cursor-not-allowed ' +
@@ -164,7 +167,7 @@ export const Checkbox = /* @__PURE__ */ forwardRef<HTMLInputElement, CheckboxPro
 
   return (
     <label className={ROW} htmlFor={id}>
-      <span className={CELL}>
+      <CapIconSlot className={CELL}>
         <input
           {...rest}
           {...stateProps}
@@ -208,7 +211,7 @@ export const Checkbox = /* @__PURE__ */ forwardRef<HTMLInputElement, CheckboxPro
         >
           <path d="M6 12h12" />
         </svg>
-      </span>
+      </CapIconSlot>
       {hasInline ? (
         <span id={inlineId} className={TEXT}>
           {children}

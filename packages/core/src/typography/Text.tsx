@@ -35,8 +35,12 @@ export const Text = /* @__PURE__ */ forwardRef<HTMLElement, TextProps>(function 
       ref={ref as Ref<HTMLParagraphElement>}
       // `[&_svg]:my-[-0.25em]`: an icon inline in the text barely touches the line box, so a
       // 16px icon in a caption line keeps the line height (outside text <Icon> has no margin).
+      // An icon that is a direct child is centred on the cap height of the line, not on the
+      // x-height middle of `vertical-align: middle` (1.2-2px lower, ticket #217): `middle` puts it
+      // on baseline + 0.5ex and the relative offset adds 0.5ex - 0.5cap (same font, so the x-height
+      // cancels out). Without `cap` support the offset is dropped and `middle` remains.
       className={cn(
-        'm-0 [&_svg]:my-[-0.25em]',
+        'm-0 [&_svg]:my-[-0.25em] [&>svg]:relative [&>svg]:top-[calc(0.5ex-0.5cap)] [&>svg]:align-middle',
         VARIANT_CLASS[variant],
         mono ? 'font-rop-mono' : 'font-rop-sans',
         className,
