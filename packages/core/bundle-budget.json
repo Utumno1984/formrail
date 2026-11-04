@@ -166,6 +166,14 @@
       "baseline": 11146,
       "limit": 12261
     },
+    "RadioGroup": {
+      "baseline": 11603,
+      "limit": 12763
+    },
+    "RadioGroupItem": {
+      "baseline": 11425,
+      "limit": 12568
+    },
     "Select": {
       "baseline": 43643,
       "limit": 48008

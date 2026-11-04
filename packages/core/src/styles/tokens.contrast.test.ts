@@ -115,6 +115,19 @@ describe('contrast', () => {
     expect(contrast(token('primary'), token('primary-contrast'))).toBeGreaterThanOrEqual(3);
   });
 
+  // RadioGroup: the circle border (text-muted) on the surface and the selected border/dot (primary), WCAG 1.4.11.
+  it.each(['surface', 'surface-subtle'])('RadioGroup: the circle border (text-muted) on %s is at least 3:1 (WCAG 1.4.11)', (name) => {
+    expect(contrast(token('text-muted'), token(name))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('RadioGroup: the selected dot and border (primary) on the surface are at least 3:1', () => {
+    expect(contrast(token('primary'), token('surface'))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('RadioGroup: the invalid border (error) on the surface is at least 3:1', () => {
+    expect(contrast(token('error'), token('surface'))).toBeGreaterThanOrEqual(3);
+  });
+
   // Switch: off = text-muted border and thumb on the surface; on = primary track with a primary-contrast thumb.
   it.each(['surface', 'surface-subtle'])('Switch: the off track border and thumb (text-muted) on %s are at least 3:1 (WCAG 1.4.11)', (name) => {
     expect(contrast(token('text-muted'), token(name))).toBeGreaterThanOrEqual(3);
