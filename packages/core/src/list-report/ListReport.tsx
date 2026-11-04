@@ -27,7 +27,7 @@ import {
   selectionActionsClass,
   selectionBarClass,
   selectionCountClass,
-  selectionStatusClass,
+  selectionClearClass,
   tableClass,
   titleClass,
 } from './list-report-styles';
@@ -194,22 +194,20 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
           <span id={`${baseId}-selection`} hidden>
             {labels?.selectionBar ?? 'Selection'}
           </span>
-          <div className={selectionStatusClass}>
-            <TruncatedText className={selectionCountClass} data-rop-selection-count="">
-              {(labels?.selectionCount ?? DEFAULT_SELECTION_COUNT)(selection.selectedResultCount, selection.hiddenSelectedCount)}
-            </TruncatedText>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={clearSelection}
-              className="shrink-0"
-              // Hidden, not removed: it keeps its box (the bar never changes height) and leaves the tab order.
-              style={selectedAny ? undefined : { visibility: 'hidden' }}
-            >
-              {labels?.clearSelection ?? 'Clear selection'}
-            </Button>
-          </div>
+          <TruncatedText className={selectionCountClass} data-rop-selection-count="">
+            {(labels?.selectionCount ?? DEFAULT_SELECTION_COUNT)(selection.selectedResultCount, selection.hiddenSelectedCount)}
+          </TruncatedText>
           {bulkActions ? <div className={selectionActionsClass}>{bulkActions(selection)}</div> : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearSelection}
+            className={selectionClearClass}
+            // Hidden, not removed: it keeps its box (the bar never changes height) and leaves the tab order.
+            style={selectedAny ? undefined : { visibility: 'hidden' }}
+          >
+            {labels?.clearSelection ?? 'Clear selection'}
+          </Button>
         </div>
       ) : null}
       <ListReportTable
