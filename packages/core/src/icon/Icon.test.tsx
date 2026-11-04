@@ -214,6 +214,7 @@ describe('internal icons', () => {
       'CardFooter',
       'CardHeader',
       'CardTitle',
+      'Checkbox',
       'Combobox',
       'DescriptionList',
       'DescriptionListItem',

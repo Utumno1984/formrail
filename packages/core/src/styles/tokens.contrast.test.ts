@@ -106,6 +106,15 @@ describe('contrast', () => {
     expect(contrast(token(tone), token('border'))).toBeGreaterThanOrEqual(3);
   });
 
+  // Checkbox: the box border (text-muted) on the surface and the white mark on the filled box, WCAG 1.4.11.
+  it.each(['surface', 'surface-subtle'])('Checkbox: the box border (text-muted) on %s is at least 3:1 (WCAG 1.4.11)', (name) => {
+    expect(contrast(token('text-muted'), token(name))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('Checkbox: the white mark on the filled (primary) box is at least 3:1', () => {
+    expect(contrast(token('primary'), token('primary-contrast'))).toBeGreaterThanOrEqual(3);
+  });
+
   it('the focus ring is drawn with the primary token', () => {
     expect(token('primary')).toEqual(token('blue-600'));
   });

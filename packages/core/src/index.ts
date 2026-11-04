@@ -74,6 +74,8 @@ export { TruncatedText } from './truncated-text/TruncatedText';
 export type { TruncatedTextProps } from './truncated-text/TruncatedText';
 export { Select } from './select/Select';
 export type { SelectProps, SelectOption, SelectSize } from './select/Select';
+export { Checkbox } from './checkbox/Checkbox';
+export type { CheckboxProps, CheckedState } from './checkbox/Checkbox';
 export { Combobox } from './combobox/Combobox';
 export type { ComboboxProps, ComboboxOption, ComboboxSize } from './combobox/Combobox';
 export { useCombobox } from './combobox/use-combobox';
