@@ -1,8 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef, useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createRef, useRef, useState, type ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Field } from '../field/Field';
+import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { RadioGroup, RadioGroupItem } from './RadioGroup';
 
 afterEach(() => {
@@ -413,6 +414,172 @@ describe('RadioGroup: Field label click', () => {
     await user.click(screen.getByText('Plan'));
     expect(screen.getByRole('radio', { name: 'Beta' })).toBeChecked();
     expect(onValueChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('RadioGroup: controlled gesture paths', () => {
+  it('a form reset on a controlled group puts the DOM back to `value`, reports nothing, and the next click still reports', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const { rerender } = render(
+      <form>
+        <RadioGroup aria-label="x" value="b" onValueChange={onValueChange}>
+          <Items />
+        </RadioGroup>
+        <button type="reset">Reset</button>
+      </form>,
+    );
+    await user.click(screen.getByRole('radio', { name: 'Gamma' }));
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('radio', { name: 'Beta' })).toBeChecked();
+    // The value moves from outside (hydration): the browser's reset target (the `checked` attribute) may lag behind.
+    rerender(
+      <form>
+        <RadioGroup aria-label="x" value="a" onValueChange={onValueChange}>
+          <Items />
+        </RadioGroup>
+        <button type="reset">Reset</button>
+      </form>,
+    );
+    expect(screen.getByRole('radio', { name: 'Alpha' })).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+    expect(screen.getByRole('radio', { name: 'Alpha' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Beta' })).not.toBeChecked();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('radio', { name: 'Gamma' }));
+    expect(onValueChange).toHaveBeenCalledTimes(2);
+    expect(onValueChange).toHaveBeenLastCalledWith('c');
+  });
+
+  it('controlled: blocked clicks, then unlocking, then a real click reports', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    function Demo() {
+      const [locked, setLocked] = useState(true);
+      const [value, setValue] = useState('b');
+      return (
+        <>
+          <button onClick={() => setLocked(false)}>Unlock</button>
+          <Field label="Plan" {...(locked ? ({ state: 'locked', stateReason: 'why' } as const) : { state: 'default' as const })}>
+            <RadioGroup
+              value={value}
+              onValueChange={(next) => {
+                setValue(next);
+                onValueChange(next);
+              }}
+            >
+              <Items />
+            </RadioGroup>
+          </Field>
+        </>
+      );
+    }
+    render(<Demo />);
+    await user.click(screen.getByRole('radio', { name: 'Alpha' }));
+    await user.click(screen.getByRole('radio', { name: 'Alpha' }));
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('radio', { name: 'Beta' })).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Unlock' }));
+    await user.click(screen.getByRole('radio', { name: 'Alpha' }));
+    expect(screen.getByRole('radio', { name: 'Alpha' })).toBeChecked();
+    expect(onValueChange.mock.calls).toEqual([['a']]);
+  });
+});
+
+describe('RadioGroup: useFocusFirstInvalidField', () => {
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  function Form({ children }: { children: ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useFocusFirstInvalidField({ containerRef: ref, fieldErrors: { plan: 'required' } });
+    return <div ref={ref}>{children}</div>;
+  }
+
+  it('focuses the selected radio, not the first one', () => {
+    render(
+      <Form>
+        <Field label="Plan" name="plan" error="required">
+          <RadioGroup defaultValue="b">
+            <Items />
+          </RadioGroup>
+        </Field>
+      </Form>,
+    );
+    expect(screen.getByRole('radio', { name: 'Beta' })).toHaveFocus();
+    expect(screen.getByRole('radio', { name: 'Beta' })).toBeChecked();
+  });
+
+  it('with nothing selected focuses the first enabled radio even if the first item is disabled', () => {
+    render(
+      <Form>
+        <Field label="Plan" name="plan" error="required">
+          <RadioGroup>
+            <Items disabledItem="a" />
+          </RadioGroup>
+        </Field>
+      </Form>,
+    );
+    expect(screen.getByRole('radio', { name: 'Beta' })).toHaveFocus();
+  });
+
+  it('is found through the Field name even when the group has its own native name', () => {
+    render(
+      <Form>
+        <Field label="Plan" name="plan" error="required">
+          <RadioGroup name="plan_native">
+            <Items />
+          </RadioGroup>
+        </Field>
+      </Form>,
+    );
+    expect(screen.getByRole('radio', { name: 'Alpha' })).toHaveFocus();
+  });
+
+  it('the attribute follows an external selection change', () => {
+    const { rerender } = render(
+      <Field label="Plan" name="plan">
+        <RadioGroup value="a">
+          <Items />
+        </RadioGroup>
+      </Field>,
+    );
+    expect(screen.getByRole('radio', { name: 'Alpha' })).toHaveAttribute('data-rop-name', 'plan');
+    rerender(
+      <Field label="Plan" name="plan">
+        <RadioGroup value="c">
+          <Items />
+        </RadioGroup>
+      </Field>,
+    );
+    expect(screen.getByRole('radio', { name: 'Gamma' })).toHaveAttribute('data-rop-name', 'plan');
+    expect(screen.getByRole('radio', { name: 'Alpha' })).not.toHaveAttribute('data-rop-name');
+  });
+});
+
+describe('RadioGroupItem: accessible name', () => {
+  it('logs in development when an item has no children, aria-label or aria-labelledby', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <RadioGroup aria-label="x">
+        <RadioGroupItem value="a" />
+      </RadioGroup>,
+    );
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('RadioGroupItem value="a"'));
+  });
+
+  it('does not log with aria-label', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <RadioGroup aria-label="x">
+        <RadioGroupItem value="a" aria-label="Alpha" />
+      </RadioGroup>,
+    );
+    expect(error).not.toHaveBeenCalled();
   });
 });
 

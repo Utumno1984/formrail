@@ -102,9 +102,14 @@ function PlaygroundDemo({ fieldState, invalid, required, orientation, disabledIt
       >
         <Controlled initial={value} orientation={orientation} disabledItem={disabledItem} onValueChange={onValueChange} />
       </Field>
-      <Button variant="secondary" onClick={() => setState('locked')}>
-        Lock this value
-      </Button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="secondary" onClick={() => setState('locked')}>
+          Lock this value
+        </Button>
+        <Button variant="secondary" onClick={() => setState('default')}>
+          Make editable
+        </Button>
+      </div>
     </div>
   );
 }
@@ -199,11 +204,11 @@ export const StateMatrix: Story = {
     <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
       {(['vertical', 'horizontal'] as const).flatMap((orientation) =>
         [...STATES, 'invalid' as const].map((state) => {
-          const props = state === 'invalid' ? ({ error: 'Pick a plan.' } as const) : stateProps(state);
+          const props = state === 'invalid' ? ({ error: 'This plan is not available.' } as const) : stateProps(state);
           return (
             <Field key={`${orientation}-${state}`} label={`${orientation} / ${state}`} help="Help text." {...props}>
               <Controlled
-                initial={state === 'invalid' ? '' : 'team'}
+                initial="team"
                 orientation={orientation}
                 disabledItem={state === 'default' ? 'enterprise' : undefined}
                 onValueChange={onValueChange}

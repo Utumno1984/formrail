@@ -90,13 +90,13 @@ const ROW =
 const CELL = 'relative inline-flex h-6 w-6 shrink-0 items-center justify-center';
 const RADIO =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-full border border-rop-text-muted bg-rop-surface ' +
-  'checked:border-rop-primary disabled:cursor-not-allowed group-aria-invalid/rg:border-rop-error ' +
+  'checked:border-rop-primary disabled:cursor-not-allowed group-aria-invalid/rg:border-rop-error group-aria-invalid/rg:checked:border-rop-error ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:border-[ButtonText] forced-colors:checked:border-[Highlight]';
 const DOT =
-  'pointer-events-none absolute inset-0 m-auto hidden h-2 w-2 rounded-full bg-rop-primary peer-checked:block ' +
+  'pointer-events-none absolute inset-0 m-auto hidden h-2 w-2 rounded-full bg-rop-primary peer-checked:block group-aria-invalid/rg:bg-rop-error ' +
   'forced-colors:bg-[Highlight]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
@@ -116,6 +116,9 @@ const BOTH_WARNING =
  * label targets a non-labelable element and changes nothing, in every state. `forced`/`locked`
  * (`interactionBlocked`) keep the selected radio focusable but cancel `click` and the arrow keys
  * (native `readOnly` does not stop radios). `onValueChange` is called only from a user gesture.
+ *
+ * `required` on the Field is exposed as `aria-required` on the group only: the radios get no native
+ * `required`, so the browser's own form validation does not block a submit with nothing selected.
  */
 export const RadioGroup = /* @__PURE__ */ forwardRef<HTMLDivElement, RadioGroupProps>(function RadioGroup(props, ref) {
   const {
@@ -152,6 +155,21 @@ export const RadioGroup = /* @__PURE__ */ forwardRef<HTMLDivElement, RadioGroupP
       console.error(BOTH_WARNING);
     }
   }, [hasName, controlled, defaultValue]);
+
+  // `useFocusFirstInvalidField` looks a control up by `data-rop-name` and focuses ONE element: the
+  // radio where Tab would land (the selected one, else the first enabled). Only that radio carries
+  // the attribute, set on the DOM after every render because the selection of an uncontrolled
+  // group lives in the DOM. React never renders this attribute on the radios, so it never clears it.
+  const fieldName = fieldProps['data-rop-name'];
+  useEffect(() => {
+    const radios = Array.from(container.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? []);
+    const enabled = radios.filter((el) => !el.disabled);
+    const target = enabled.find((el) => el.checked) ?? enabled[0];
+    for (const el of radios) {
+      if (fieldName && el === target) el.setAttribute('data-rop-name', fieldName);
+      else el.removeAttribute('data-rop-name');
+    }
+  });
 
   // React's value tracker is only updated through the `checked` setter. A cancelled click (or a
   // form reset) makes the browser change `checked` behind its back, so the next real click would
@@ -233,6 +251,13 @@ export const RadioGroupItem = /* @__PURE__ */ forwardRef<HTMLInputElement, Radio
   const group = useContext(RadioGroupContext);
   const generatedId = useId();
   const inputId = id ?? generatedId;
+
+  const unnamed = !hasContent(children) && !rest['aria-label'] && !rest['aria-labelledby'];
+  useEffect(() => {
+    if (unnamed && isDev()) {
+      console.error(`[react-object-page] <RadioGroupItem value="${value}"> has no accessible name: give it children, \`aria-label\` or \`aria-labelledby\`.`);
+    }
+  }, [unnamed, value]);
 
   if (!group) {
     if (isDev()) console.error('[react-object-page] <RadioGroupItem> must be rendered inside a <RadioGroup>.');

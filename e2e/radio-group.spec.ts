@@ -122,6 +122,45 @@ for (const state of ['forced', 'locked'] as const) {
   });
 }
 
+test.describe('controlled: lock, blocked gestures, unlock', () => {
+  test('after blocked clicks and arrows, unlocking lets a real click and arrow change the value', async ({ page }) => {
+    await gotoStory(page, STORY('manual'));
+    await page.getByRole('button', { name: 'Lock this value' }).click();
+    await expect(group(page)).toHaveAttribute('aria-readonly', 'true');
+    await radio(page, 'Business').click();
+    await page.getByText('Enterprise', { exact: true }).click();
+    await radio(page, 'Free').focus();
+    await page.keyboard.press('ArrowDown');
+    expect(await checkedValue(page)).toBe('free');
+    await page.getByRole('button', { name: 'Make editable' }).click();
+    await expect(group(page)).not.toHaveAttribute('aria-readonly', 'true');
+    await radio(page, 'Business').click();
+    expect(await checkedValue(page)).toBe('business');
+    await page.keyboard.press('ArrowDown');
+    expect(await checkedValue(page)).toBe('enterprise');
+  });
+});
+
+test.describe('invalid', () => {
+  test('the selected radio, the unselected ones and the dot all use the error colour', async ({ page }) => {
+    await gotoStory(page, STORY('manual'), 'invalid:!true');
+    await expect(group(page)).toHaveAttribute('aria-invalid', 'true');
+    const read = () =>
+      page.locator('input[type="radio"]').evaluateAll((els) =>
+        els.map((e) => ({
+          checked: (e as HTMLInputElement).checked,
+          border: getComputedStyle(e).borderTopColor,
+          dot: getComputedStyle(e.nextElementSibling as Element).backgroundColor,
+        })),
+      );
+    const rows = await read();
+    const selected = rows.find((r) => r.checked)!;
+    const other = rows.find((r) => !r.checked)!;
+    expect(selected.border).toBe(other.border);
+    expect(selected.dot).toBe(other.border);
+  });
+});
+
 test.describe('disabled', () => {
   test('out of the tab order and no click on radio or labels changes it', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'fieldState:disabled');
