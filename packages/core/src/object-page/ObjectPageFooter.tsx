@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../icon/Icon';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import { hasContent } from '../internal/react-nodes';
 import { TruncatedText } from '../truncated-text/TruncatedText';
@@ -158,9 +159,12 @@ export const ObjectPageFooter = /* @__PURE__ */ forwardRef<HTMLDivElement, Objec
       <div role="status" aria-live="polite" data-object-page-footer-message="" className={footerMessageClass}>
         {hasMessage ? (
           <>
-            <Icon size="md" className={footerToneIconClass[messageTone]}>
-              {internalIcons[messageTone]}
-            </Icon>
+            {/* One text line tall, centred on the cap height of the message (single line). */}
+            <CapIconSlot>
+              <Icon size="md" className={footerToneIconClass[messageTone]}>
+                {internalIcons[messageTone]}
+              </Icon>
+            </CapIconSlot>
             <span className="sr-only">{toneLabel ?? TONE_LABEL[messageTone]}: </span>
             <TruncatedText tabIndex={0} className={footerTruncatedClass}>
               {message}

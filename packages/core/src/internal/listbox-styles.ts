@@ -28,8 +28,11 @@ export const LISTBOX_ITEM =
   'relative flex min-w-0 cursor-default select-none items-center rounded-rop-md py-1.5 ps-8 pe-3 outline-none ' +
   'data-[highlighted]:bg-rop-surface-subtle data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50';
 
-/** The slot of the selected-option check. */
-export const LISTBOX_ITEM_INDICATOR = 'absolute start-2 inline-flex items-center';
+/**
+ * The slot of the selected-option check: at the top of the first line (the item's `py-1.5`); the
+ * check inside it goes in a `CapIconSlot`, so it is centred on the cap height of that line.
+ */
+export const LISTBOX_ITEM_INDICATOR = 'absolute start-2 top-1.5';
 
 /** The text shown instead of options when there are none. */
 export const LISTBOX_EMPTY = 'px-3 py-1.5 text-rop-text-muted';

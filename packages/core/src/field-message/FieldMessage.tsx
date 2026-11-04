@@ -1,5 +1,6 @@
 import { forwardRef, type HTMLAttributes } from 'react';
 import { Icon } from '../icon/Icon';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
@@ -7,7 +8,8 @@ import { cn } from '../utils/cn';
 export type FieldMessageTone = 'help' | 'error';
 
 // Full literals (Tailwind scan). Both tones share every geometry class: only the colour differs.
-// The icon is 16px, the same as the caption line height, so the row never grows for an error.
+// The icon is 16px, the same as the caption line height; it sits in a `CapIconSlot` (one caption line
+// tall, centred on the cap height of the first line), so the row never grows for an error.
 const BASE = 'mt-2 flex items-start gap-1 font-rop-sans text-rop-caption [overflow-wrap:anywhere]';
 const TONE_CLASS: Record<FieldMessageTone, string> = {
   help: 'text-rop-text-muted',
@@ -33,7 +35,11 @@ export const FieldMessage = /* @__PURE__ */ forwardRef<HTMLDivElement, FieldMess
   if (!hasContent(children)) return null;
   return (
     <div {...rest} ref={ref} className={cn(BASE, TONE_CLASS[tone], className)}>
-      {tone === 'error' ? <Icon size="sm">{internalIcons.error}</Icon> : null}
+      {tone === 'error' ? (
+        <CapIconSlot>
+          <Icon size="sm">{internalIcons.error}</Icon>
+        </CapIconSlot>
+      ) : null}
       <span className="min-w-0">{children}</span>
     </div>
   );

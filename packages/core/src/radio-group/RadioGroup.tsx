@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
@@ -87,7 +88,9 @@ const VERTICAL = 'flex-col gap-1';
 const HORIZONTAL = 'flex-row flex-wrap gap-x-4 gap-y-1';
 const ROW =
   'inline-flex max-w-full min-w-0 items-start gap-1 ' + 'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50';
-const CELL = 'relative inline-flex h-6 w-6 shrink-0 items-center justify-center';
+// The cell is one 20px text line plus the label's 2px padding (24px): the radio is centred on the cap
+// height of the label's first line (`CapIconSlot`), whatever the font.
+const CELL = 'w-6 py-0.5 text-center';
 const RADIO =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-full border border-rop-text-muted bg-rop-surface ' +
   'checked:border-rop-primary disabled:cursor-not-allowed not-forced-colors:group-aria-invalid/rg:border-rop-error not-forced-colors:group-aria-invalid/rg:checked:border-rop-error ' +
@@ -291,7 +294,7 @@ export const RadioGroupItem = /* @__PURE__ */ forwardRef<HTMLInputElement, Radio
 
   return (
     <label className={ROW} htmlFor={inputId}>
-      <span className={CELL}>
+      <CapIconSlot className={CELL}>
         <input
           {...rest}
           {...selection}
@@ -307,7 +310,7 @@ export const RadioGroupItem = /* @__PURE__ */ forwardRef<HTMLInputElement, Radio
           className={cn(RADIO, className)}
         />
         <span aria-hidden="true" className={DOT} />
-      </span>
+      </CapIconSlot>
       {hasContent(children) ? <span className={TEXT}>{children}</span> : null}
     </label>
   );

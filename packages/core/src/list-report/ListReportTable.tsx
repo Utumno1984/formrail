@@ -12,6 +12,7 @@ import {
   type Ref,
 } from 'react';
 import { Icon } from '../icon/Icon';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import { hasContent, textOf } from '../internal/react-nodes';
 import { TruncatedText } from '../truncated-text/TruncatedText';
@@ -291,9 +292,11 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
                   {sortable ? (
                     <button {...table.getSortButtonProps(column.id)} className={cn(sortButtonClass, ALIGN_JUSTIFY[align])}>
                       <TruncatedText>{column.header}</TruncatedText>
-                      <Icon size="xs" className={cn(sortIconClass, sorted === null && sortIconIdleClass, sorted === 'asc' && sortIconAscendingClass)}>
-                        {internalIcons['chevron-down']}
-                      </Icon>
+                      <CapIconSlot>
+                        <Icon size="xs" className={cn(sortIconClass, sorted === null && sortIconIdleClass, sorted === 'asc' && sortIconAscendingClass)}>
+                          {internalIcons['chevron-down']}
+                        </Icon>
+                      </CapIconSlot>
                     </button>
                   ) : (
                     <TruncatedText>{column.header}</TruncatedText>

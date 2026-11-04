@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
@@ -46,7 +47,9 @@ export interface SwitchProps
 const ROW =
   'inline-flex max-w-full min-w-0 items-start gap-2 font-rop-sans text-rop-body text-rop-text ' +
   'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50';
-const CELL = 'relative inline-flex h-6 w-10 shrink-0 items-center';
+// The cell is one 20px text line plus the label's 2px padding (24px, as tall as the track): the track
+// is centred on the cap height of the label's first line (`CapIconSlot`), whatever the font.
+const CELL = 'w-10 py-0.5';
 const TRACK =
   'peer m-0 box-content block h-5 w-9 cursor-pointer appearance-none rounded-full border-2 border-rop-text-muted bg-rop-surface ' +
   'checked:border-rop-primary checked:bg-rop-primary disabled:cursor-not-allowed ' +
@@ -146,7 +149,7 @@ export const Switch = /* @__PURE__ */ forwardRef<HTMLInputElement, SwitchProps>(
 
   return (
     <label className={ROW} htmlFor={id}>
-      <span className={CELL}>
+      <CapIconSlot className={CELL}>
         <input
           {...rest}
           {...stateProps}
@@ -167,7 +170,7 @@ export const Switch = /* @__PURE__ */ forwardRef<HTMLInputElement, SwitchProps>(
           className={cn(TRACK, CONTROL_INVALID, className)}
         />
         <span aria-hidden="true" className={THUMB} />
-      </span>
+      </CapIconSlot>
       {hasInline ? (
         <span id={inlineId} className={TEXT}>
           {children}

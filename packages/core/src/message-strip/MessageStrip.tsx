@@ -1,6 +1,7 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { Button } from '../button/Button';
 import { Icon } from '../icon/Icon';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import { hasContent, textOf } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
@@ -77,9 +78,12 @@ export const MessageStrip = /* @__PURE__ */ forwardRef<HTMLDivElement, MessageSt
         className,
       )}
     >
-      <Icon size="md" className={classes.icon}>
-        {internalIcons[tone]}
-      </Icon>
+      {/* One text line tall, centred on the cap height of the first line (title or content). */}
+      <CapIconSlot>
+        <Icon size="md" className={classes.icon}>
+          {internalIcons[tone]}
+        </Icon>
+      </CapIconSlot>
       <div className="min-w-0 flex-1">
         <span className="sr-only">{toneLabel ?? TONE_LABEL[tone]}: </span>
         {hasContent(title) ? <strong className="block font-[700]">{title}</strong> : null}
