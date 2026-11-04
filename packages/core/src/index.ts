@@ -157,3 +157,5 @@ export { Pagination } from './pagination/Pagination';
 export type { PaginationProps, PaginationLabels } from './pagination/Pagination';
 export { Calendar } from './calendar/Calendar';
 export type { CalendarProps, CalendarLabels, IsoDate, IsoMonth, Weekday } from './calendar/Calendar';
+export { DatePicker } from './date-picker/DatePicker';
+export type { DatePickerProps, DatePickerLabels, DatePickerInvalidReason, DatePickerSize } from './date-picker/DatePicker';

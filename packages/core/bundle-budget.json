@@ -62,6 +62,10 @@
       "baseline": 38186,
       "limit": 42005
     },
+    "DatePicker": {
+      "baseline": 43595,
+      "limit": 47955
+    },
     "DescriptionList": {
       "baseline": 10421,
       "limit": 11464
