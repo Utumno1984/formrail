@@ -256,6 +256,7 @@ describe('internal icons', () => {
       'SheetHeader',
       'SheetTitle',
       'SheetTrigger',
+      'Skeleton',
       'StatusBadge',
       'Switch',
       'Text',

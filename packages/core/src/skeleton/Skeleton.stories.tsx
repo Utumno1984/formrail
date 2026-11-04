@@ -30,7 +30,7 @@ const cardStyle = {
 function CardDemo({ onLoad, loaded: initiallyLoaded = false, variant, textVariant, lines, width, height }: DemoArgs) {
   const [loaded, setLoaded] = useState(initiallyLoaded);
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
       <section data-testid="card" aria-busy={!loaded} aria-label="Invoice summary" style={cardStyle}>
         {loaded ? (
           <>
@@ -109,8 +109,21 @@ export const Playground: Story = {
   },
 };
 
-const sheet = { display: 'grid', gap: 24, maxWidth: 480, color: 'var(--color-rop-text)' } as const;
-const pair = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' } as const;
+// `minmax(0, 1fr)` columns: an implicit `auto` grid track would size to the fixed-width children
+// and overflow a narrow viewport instead of honouring `max-width: 100%`.
+const sheet = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 24,
+  maxWidth: 480,
+  color: 'var(--color-rop-text)',
+} as const;
+const pair = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+  gap: 16,
+  alignItems: 'start',
+} as const;
 
 /**
  * Visual: for every `textVariant`, 1 and 3 lines, each next to the real text of the same step
