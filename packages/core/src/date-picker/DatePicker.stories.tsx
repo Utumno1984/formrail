@@ -298,8 +298,10 @@ export const InsideSheet: Story = {
 /** The field low on a tall page, for the virtual keyboard e2e (spec §1.10). */
 export const KeyboardSafe: Story = {
   render: (args) => (
-    <div>
-      <div style={{ height: '40vh' }} />
+    // Same layout as Forms/Field KeyboardSafe: enough content above for the field to be scrolled to
+    // the bottom edge of the screen (where the keyboard will cover it), and the inset reserved below.
+    <div style={{ paddingBottom: 'var(--rop-keyboard-inset, 0px)' }}>
+      <div style={{ height: '120dvh' }}>Long content before the field.</div>
       <div style={{ maxWidth: 320 }} data-testid="kb-field">
         <Field label="Due date">
           <DatePicker locale="en-US" today={TODAY} onValueChange={args.onValueChange} />
