@@ -16,8 +16,8 @@ const HOVER_MEDIA = '@media (hover: hover) and (pointer: fine)';
  */
 const SOURCE_ALLOWLIST: Record<string, string> = {
   // Calendar day cells use `group-hover/day:`; migrating them to `rop-hover` (and adding a pressed
-  // state) is a follow-up of #196 to open after the DatePicker PR (#215) is merged.
-  'calendar/Calendar.tsx': 'follow-up of #196 (Calendar day cells)',
+  // state) is a follow-up of #196, tracked in #222.
+  'calendar/Calendar.tsx': 'follow-up of #196 (Calendar day cells), see #222',
 };
 const CSS_ALLOWLIST = [/group-hover\\\/day\\:/];
 

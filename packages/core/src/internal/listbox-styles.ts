@@ -23,10 +23,18 @@ export const LISTBOX_CONTENT_POPOVER =
 /** The scroll container: at most 20rem tall and 24rem wide, the list scrolls here, never the page. */
 export const LISTBOX_VIEWPORT = 'max-h-80 max-w-96 overflow-y-auto p-1';
 
-/** One option. The check sits in the start padding so labels stay aligned. */
+/**
+ * One option. The check sits in the start padding so labels stay aligned. The pressed look is
+ * gated on `:active` alone, not on `data-[highlighted]` (#196 follow-up): Radix Select only sets
+ * `data-highlighted` from focus, which on a pointer gesture it gives only to a mouse
+ * (`pointerTypeRef.current === "mouse"` in `@radix-ui/react-select`); the Combobox's own
+ * highlight likewise starts from `onMouseMove`. A tap never produces either, so a pressed rule
+ * that required `data-[highlighted]` never activated on touch. The highlight rule below stays
+ * keyboard/mouse-only on purpose, decoupled from the pressed rule.
+ */
 export const LISTBOX_ITEM =
   'relative flex min-w-0 cursor-pointer select-none items-center rounded-rop-md py-1.5 ps-8 pe-3 outline-none ' +
-  'data-[highlighted]:bg-rop-surface-subtle not-data-[disabled]:data-[highlighted]:active:bg-rop-surface-pressed ' +
+  'data-[highlighted]:bg-rop-surface-subtle not-data-[disabled]:active:bg-rop-surface-pressed ' +
   'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50';
 
 /**

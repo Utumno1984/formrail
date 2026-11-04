@@ -1,6 +1,6 @@
 import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { SELECTED_PILL, STORY, SURFACES, look, paint, type Surface } from './helpers/affordance';
-import { expectPlayToPass } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 
 // A phone profile: `hover: none` and `pointer: coarse`, so the `rop-hover` variant must not apply.
 // The "chromium-touch" project only adds `hasTouch`, which does not change those media features:
@@ -86,7 +86,41 @@ test.describe('Foundations/Interaction states: touch affordance', () => {
     await settles(page, trigger, rest);
   });
 
-  // A finger held on the control: the pressed look appears (touchStart, read, touchEnd via CDP).
+  /**
+   * A finger held on `tapTarget` must show the pressed look on `measure` at least once
+   * (touchStart, read, touchEnd via CDP). Chrome (headless, synthetic touch) applies `:active`
+   * only when the gesture is recognised, i.e. around the release, and keeps it for a short
+   * while: the style is sampled every frame from before the touch until well after it.
+   */
+  async function pressedAppearsOnHeldTouch(page: Page, tapTarget: Locator, measure: Locator, label: string): Promise<void> {
+    const rest = paint(await look(measure));
+    const box = (await tapTarget.boundingBox())!;
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const cdp = await page.context().newCDPSession(page);
+    const sampler = measure.evaluate(
+      (node, { resting }) =>
+        new Promise<boolean>((resolve) => {
+          const t0 = performance.now();
+          const read = () => {
+            const cs = getComputedStyle(node);
+            return [cs.backgroundColor, cs.borderTopColor, cs.color, cs.textDecorationLine].join('|');
+          };
+          const tick = () => {
+            if (read() !== resting) return resolve(true);
+            if (performance.now() - t0 > 2500) return resolve(false);
+            requestAnimationFrame(tick);
+          };
+          tick();
+        }),
+      { resting: rest },
+    );
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await page.waitForTimeout(250);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    expect(await sampler, `${label}: a pressed frame was seen`).toBe(true);
+  }
+
+  // A finger held on the control: the pressed look appears.
   // Not the Select trigger: Radix opens the list on the touch itself, and no pressed frame of the
   // trigger is observable (the desktop spec covers its pressed look with a real mouse).
   for (const name of ['Button secondary', 'Checkbox (checked)', 'Filter pill (not selected)', 'Sortable header']) {
@@ -95,34 +129,80 @@ test.describe('Foundations/Interaction states: touch affordance', () => {
       const s = SURFACES.find((x) => x.name === name)!;
       const el = target(s, page);
       await el.scrollIntoViewIfNeeded();
-      const rest = paint(await look(s.measure(page)));
-      const box = (await el.boundingBox())!;
-      const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      const cdp = await page.context().newCDPSession(page);
-      // Chrome (headless, synthetic touch) applies `:active` only when the gesture is recognised, i.e.
-      // around the release, and keeps it for a short while: sample the style every frame from
-      // before the touch until well after it, and require at least one pressed frame.
-      const sampler = s.measure(page).evaluate(
-        (node, { resting }) =>
-          new Promise<boolean>((resolve) => {
-            const t0 = performance.now();
-            const read = () => {
-              const cs = getComputedStyle(node);
-              return [cs.backgroundColor, cs.borderTopColor, cs.color, cs.textDecorationLine].join('|');
-            };
-            const tick = () => {
-              if (read() !== resting) return resolve(true);
-              if (performance.now() - t0 > 2500) return resolve(false);
-              requestAnimationFrame(tick);
-            };
-            tick();
-          }),
-        { resting: rest },
-      );
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
-      await page.waitForTimeout(250);
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      expect(await sampler, `${name}: a pressed frame was seen`).toBe(true);
+      await pressedAppearsOnHeldTouch(page, el, s.measure(page), name);
     });
   }
+
+  /**
+   * The precondition asserted by hand (no `expectPlayToPass`: the "Manual" stories have no play
+   * function, built for e2e driving the real pointer, same convention as `e2e/select-qa2.spec.ts`).
+   */
+  async function openManual(page: Page, storyId: string): Promise<void> {
+    await gotoStory(page, storyId);
+    const matches = await page.evaluate((q) => matchMedia(q).matches, PRECISE_HOVER);
+    expect(matches, 'precondition: this device must not report a precise hover').toBe(false);
+  }
+
+  /**
+   * Two things get in the way of observing a touch-pressed option directly:
+   *
+   * 1. Picking an option normally selects it on the synthesized `click` and unmounts the whole
+   *    listbox well before Chrome (headless, synthetic touch) ever applies `:active` (confirmed
+   *    by hand: sampling every frame through the gesture, the node is already disconnected a
+   *    couple of frames after `touchEnd`, always at the "rest" look). A capturing `click`
+   *    listener swallows that one synthesized click (Radix's touch selection path is `onClick`,
+   *    not `onPointerUp` — `@radix-ui/react-select/dist/index.mjs` around line 901; the
+   *    Combobox's is a plain `onClick` too, see `use-combobox.ts`), so the option stays mounted.
+   * 2. Chrome's compatibility mouse events for a synthetic touch still run the browser's default
+   *    "focus follows pointerdown" on a Select option, and still fire `mousemove` over a
+   *    Combobox option (confirmed by hand: with neither blocked, `data-highlighted` flips to set
+   *    within a frame or two of `:active` turning true — too close for "does the look ever
+   *    differ from rest" to tell a pressed-only rule from a pressed-AND-highlighted one; both
+   *    pass, bug or no bug). A capturing `mousedown` listener with `preventDefault()` blocks the
+   *    default focus (Select), and a capturing `mousemove` listener blocks the compatibility
+   *    move reaching the option (Combobox) — neither blocks `:active` itself, which is driven by
+   *    the touch sequence, not by focus or by the mouse-tracked highlight. `data-highlighted`
+   *    then stays unset for the entire gesture: a clean, unconfounded "pressed with NO
+   *    highlight" case.
+   *
+   * Reverting the `LISTBOX_ITEM` fix with these guards in place reproduces the bug exactly as
+   * filed: `:active` turns true but the look stays at rest the whole time, because the rule
+   * required `data-[highlighted]` too.
+   */
+  async function armTouchOnOption(el: Locator): Promise<void> {
+    await el.evaluate(() => {
+      document.addEventListener('click', (e) => e.stopPropagation(), { capture: true, once: true });
+      document.addEventListener('mousedown', (e) => e.preventDefault(), { capture: true, once: true });
+      document.addEventListener('mousemove', (e) => e.stopPropagation(), { capture: true });
+    });
+  }
+
+  // Options of an open listbox: `data-[highlighted]` (Radix Select) and the Combobox's own
+  // highlight both come from a pointer-tracked focus/hover that a tap never produces (#196
+  // follow-up), so the pressed rule in `LISTBOX_ITEM` must fire from `:active` alone, independent
+  // of the highlight. These two options can't piggy-back on the `TAPPED` loop above: opening the
+  // list is itself a tap, and `Surface` has no notion of "open first, then touch an option".
+  test('@touch Select option: a held touch shows the pressed look, never highlighted', async ({ page }) => {
+    await openManual(page, 'forms-select--manual');
+    const trigger = page.getByRole('combobox', { name: 'Paese' });
+    await trigger.tap();
+    const option = page.getByRole('option', { name: 'Francia' });
+    await expect(option).toBeVisible();
+    await expect(option, 'precondition: untouched, so not data-highlighted either').not.toHaveAttribute('data-highlighted', '');
+    await armTouchOnOption(option);
+    await pressedAppearsOnHeldTouch(page, option, option, 'Select option (Francia)');
+    await expect(option, 'never highlighted: focus was blocked for the whole gesture').not.toHaveAttribute('data-highlighted', '');
+  });
+
+  test('@touch Combobox option: a held touch shows the pressed look, never highlighted', async ({ page }) => {
+    await openManual(page, 'forms-combobox--manual');
+    const input = page.getByRole('combobox', { name: 'Comune' });
+    await input.tap();
+    const option = page.getByRole('option', { name: 'Milano' });
+    await expect(option).toBeVisible();
+    await expect(option, 'precondition: untouched, so not data-highlighted either').not.toHaveAttribute('data-highlighted', '');
+    await armTouchOnOption(option);
+    await pressedAppearsOnHeldTouch(page, option, option, 'Combobox option (Milano)');
+    await expect(option, 'never highlighted: focus was blocked for the whole gesture').not.toHaveAttribute('data-highlighted', '');
+  });
 });
