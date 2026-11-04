@@ -240,6 +240,7 @@ describe('internal icons', () => {
       'ObjectPageFooter',
       'ObjectPageHeader',
       'ObjectPageSection',
+      'Pagination',
       'ProgressBar',
       'Select',
       'Sheet',
