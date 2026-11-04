@@ -7,7 +7,7 @@ const STORY = (name: string) => `forms-checkbox--${name}`;
 const checkbox = (page: Page): Locator => page.getByRole('checkbox');
 
 test.describe('Forms/Checkbox: stories play', () => {
-  for (const name of ['playground', 'select-all', 'async-hydration']) {
+  for (const name of ['playground', 'select-all', 'async-hydration', 'uncontrolled-blocked-walkthrough']) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
     });
@@ -246,5 +246,71 @@ test.describe('accessibility', () => {
   test('forced and invalid states: no axe violations', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'fieldState:forced;invalid:!true;required:!true');
     await expectNoA11yViolations(page);
+  });
+});
+
+// #223: the UncontrolledBlocked Controls act on the DOM, and Lock / Unlock switch the Field state
+// after mount (dashed <-> solid) without remounting the box.
+test.describe('UncontrolledBlocked: Controls and Lock / Unlock', () => {
+  const lockButton = (page: Page) => page.getByRole('button', { name: 'Lock', exact: true });
+  const unlockButton = (page: Page) => page.getByRole('button', { name: 'Unlock', exact: true });
+  const borderStyle = (page: Page) => checkbox(page).evaluate((el) => getComputedStyle(el).borderTopStyle);
+
+  test('without arguments it starts locked; fieldState:default starts it editable', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await expect(checkbox(page)).toHaveAttribute('aria-readonly', 'true');
+    await expect(page.getByTestId('field-state')).toHaveText('locked');
+    await expect(lockButton(page)).toBeDisabled();
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldState:default');
+    await expect(checkbox(page)).not.toHaveAttribute('aria-readonly');
+    await expect(page.getByTestId('field-state')).toHaveText('default');
+    await expect(unlockButton(page)).toBeDisabled();
+    await checkbox(page).click();
+    await expect(checkbox(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[true]');
+  });
+
+  test('invalid and required reach the box as aria-invalid and aria-required', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'invalid:!true;required:!true');
+    await expect(checkbox(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(checkbox(page)).toHaveAttribute('aria-required', 'true');
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await expect(checkbox(page)).not.toHaveAttribute('aria-invalid');
+    await expect(checkbox(page)).not.toHaveAttribute('aria-required');
+  });
+
+  test('fieldLabel is part of the accessible name', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldLabel:Consent');
+    await expect(checkbox(page)).toHaveAccessibleName(/Consent/);
+    await expect(page.locator('label', { hasText: /^Consent$/ })).toBeVisible();
+  });
+
+  test('Lock / Unlock alternate the dashed and the solid border; the value stays (no remount)', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldState:default');
+    expect(await borderStyle(page)).toBe('solid');
+    await checkbox(page).click();
+    const node = await checkbox(page).elementHandle();
+    await lockButton(page).click();
+    await expect(checkbox(page)).toHaveAttribute('aria-readonly', 'true');
+    expect(await borderStyle(page)).toBe('dashed');
+    await expect(checkbox(page)).toBeChecked();
+    expect(await node!.evaluate((el) => el.isConnected)).toBe(true);
+    await unlockButton(page).click();
+    await expect(checkbox(page)).not.toHaveAttribute('aria-readonly');
+    expect(await borderStyle(page)).toBe('solid');
+    await expect(checkbox(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[true]');
+  });
+
+  test('checked:!true mounts the box checked and reports nothing', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'checked:!true');
+    await expect(checkbox(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[]');
+  });
+
+  test('checked:indeterminate is not valid uncontrolled: an explicit note, the box unchecked', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'checked:indeterminate');
+    await expect(page.getByText('Indeterminate needs a controlled Checkbox (see Playground): showing unchecked.')).toBeVisible();
+    await expect(checkbox(page)).not.toBeChecked();
   });
 });

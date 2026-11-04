@@ -17,7 +17,7 @@ const thumbOffset = (el: Locator) =>
   });
 
 test.describe('Forms/Switch: stories play', () => {
-  for (const name of ['playground', 'async-hydration', 'async-save']) {
+  for (const name of ['playground', 'async-hydration', 'async-save', 'uncontrolled-blocked-walkthrough']) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
     });
@@ -308,5 +308,65 @@ test.describe('accessibility', () => {
   test('forced and invalid states: no axe violations', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'fieldState:forced;invalid:!true;required:!true');
     await expectNoA11yViolations(page);
+  });
+});
+
+// #223: the UncontrolledBlocked Controls act on the DOM, and Lock / Unlock switch the Field state
+// after mount (dashed <-> solid) without remounting the switch.
+test.describe('UncontrolledBlocked: Controls and Lock / Unlock', () => {
+  const lockButton = (page: Page) => page.getByRole('button', { name: 'Lock', exact: true });
+  const unlockButton = (page: Page) => page.getByRole('button', { name: 'Unlock', exact: true });
+  const borderStyle = (page: Page) => toggle(page).evaluate((el) => getComputedStyle(el).borderTopStyle);
+
+  test('without arguments it starts locked; fieldState:default starts it editable', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await expect(toggle(page)).toHaveAttribute('aria-readonly', 'true');
+    await expect(page.getByTestId('field-state')).toHaveText('locked');
+    await expect(lockButton(page)).toBeDisabled();
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldState:default');
+    await expect(toggle(page)).not.toHaveAttribute('aria-readonly');
+    await expect(page.getByTestId('field-state')).toHaveText('default');
+    await expect(unlockButton(page)).toBeDisabled();
+    await toggle(page).click();
+    await expect(toggle(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[true]');
+  });
+
+  test('invalid and required reach the switch as aria-invalid and aria-required', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'invalid:!true;required:!true');
+    await expect(toggle(page)).toHaveAttribute('aria-invalid', 'true');
+    await expect(toggle(page)).toHaveAttribute('aria-required', 'true');
+    await gotoStory(page, STORY('uncontrolled-blocked'));
+    await expect(toggle(page)).not.toHaveAttribute('aria-invalid');
+    await expect(toggle(page)).not.toHaveAttribute('aria-required');
+  });
+
+  test('fieldLabel is part of the accessible name', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldLabel:Consent');
+    await expect(toggle(page)).toHaveAccessibleName(/Consent/);
+    await expect(page.locator('label', { hasText: /^Consent$/ })).toBeVisible();
+  });
+
+  test('Lock / Unlock alternate the dashed and the solid border; the value stays (no remount)', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'fieldState:default');
+    expect(await borderStyle(page)).toBe('solid');
+    await toggle(page).click();
+    const node = await toggle(page).elementHandle();
+    await lockButton(page).click();
+    await expect(toggle(page)).toHaveAttribute('aria-readonly', 'true');
+    expect(await borderStyle(page)).toBe('dashed');
+    await expect(toggle(page)).toBeChecked();
+    expect(await node!.evaluate((el) => el.isConnected)).toBe(true);
+    await unlockButton(page).click();
+    await expect(toggle(page)).not.toHaveAttribute('aria-readonly');
+    expect(await borderStyle(page)).toBe('solid');
+    await expect(toggle(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[true]');
+  });
+
+  test('checked:!true mounts the switch on and reports nothing', async ({ page }) => {
+    await gotoStory(page, STORY('uncontrolled-blocked'), 'checked:!true');
+    await expect(toggle(page)).toBeChecked();
+    await expect(calls(page)).toHaveText('[]');
   });
 });
