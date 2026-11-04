@@ -179,6 +179,31 @@ describe('Checkbox: interaction', () => {
     expect(onCheckedChange).toHaveBeenCalledExactlyOnceWith(true);
   });
 
+  it('uncontrolled: a click cancelled by an ancestor onClick, then a free click, reports true', async () => {
+    const user = userEvent.setup();
+    const onCheckedChange = vi.fn();
+    function Host({ cancel }: { cancel: boolean }) {
+      return (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+        <div onClick={(e) => cancel && e.preventDefault()}>
+          <Checkbox aria-label="Terms" onCheckedChange={onCheckedChange} />
+        </div>
+      );
+    }
+    const { rerender } = render(<Host cancel />);
+    const box = screen.getByRole('checkbox');
+    await user.click(box);
+    expect(box).not.toBeChecked();
+    expect(onCheckedChange).not.toHaveBeenCalled();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    rerender(<Host cancel={false} />);
+    await user.click(box);
+    expect(box).toBeChecked();
+    expect(onCheckedChange).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
   it('a consumer onClick that calls preventDefault cancels the toggle and onCheckedChange', async () => {
     const user = userEvent.setup();
     const onCheckedChange = vi.fn();

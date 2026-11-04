@@ -150,10 +150,10 @@ export const Checkbox = /* @__PURE__ */ forwardRef<HTMLInputElement, CheckboxPro
   const handleClick = (event: MouseEvent<HTMLInputElement>) => {
     onClick?.(event);
     if (blocked) event.preventDefault();
-    if (event.nativeEvent.defaultPrevented) {
-      rerender();
-      if (!controlled) realign();
-    }
+    if (event.nativeEvent.defaultPrevented) rerender();
+    // An ancestor's onClick (or a native listener) can still cancel the click after this handler
+    // ran, so always realign after an uncontrolled click: re-assigning the same value is harmless.
+    if (!controlled) realign();
   };
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (!blocked && !event.nativeEvent.defaultPrevented) onCheckedChange?.(event.currentTarget.checked);

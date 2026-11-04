@@ -170,7 +170,7 @@ export const UncontrolledBlocked: Story = {
   },
 };
 
-const MATRIX_CHECKED:{ name: string; value: CheckedState }[] = [
+const MATRIX_CHECKED: { name: string; value: CheckedState }[] = [
   { name: 'Unchecked', value: false },
   { name: 'Checked', value: true },
   { name: 'Indeterminate', value: 'indeterminate' },
