@@ -17,6 +17,11 @@ const cardStyle = {
   gap: 12,
   width: 360,
   maxWidth: '100%',
+  // No Tailwind preflight in this package: boxes are `content-box`, so without this the padding and
+  // border add 34px on top of `max-width: 100%`. `min-width: 0` lets the grid item shrink below its
+  // content (a `minmax(0, 1fr)` track alone does not).
+  boxSizing: 'border-box',
+  minWidth: 0,
   padding: 16,
   border: '1px solid var(--color-rop-border)',
   borderRadius: 8,
@@ -116,6 +121,8 @@ const sheet = {
   gridTemplateColumns: 'minmax(0, 1fr)',
   gap: 24,
   maxWidth: 480,
+  boxSizing: 'border-box',
+  minWidth: 0,
   color: 'var(--color-rop-text)',
 } as const;
 const pair = {
@@ -123,6 +130,7 @@ const pair = {
   gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
   gap: 16,
   alignItems: 'start',
+  minWidth: 0,
 } as const;
 
 /**
