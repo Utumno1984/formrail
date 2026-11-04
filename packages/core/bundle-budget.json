@@ -50,6 +50,10 @@
       "baseline": 10454,
       "limit": 11500
     },
+    "Checkbox": {
+      "baseline": 11825,
+      "limit": 13008
+    },
     "Combobox": {
       "baseline": 38186,
       "limit": 42005
