@@ -142,6 +142,67 @@ describe('Skeleton', () => {
     expect(renderToString(<Skeleton />)).toContain('aria-hidden="true"');
   });
 
+  it.each(['body', 'caption', 'label', 'title-sm', 'title-md', 'title-lg'] as const)(
+    'text: the bar of textVariant %s scales with that step font size',
+    (v) => {
+      const { container } = render(<Skeleton textVariant={v} />);
+      const bar = container.querySelector('[data-rop-skeleton-line] > div') as HTMLElement;
+      expect(bar.className.split(' ')).toContain(`text-rop-${v}`);
+      expect(bar.className).toContain('h-[0.7em]');
+    },
+  );
+
+  it('text: barClassName restyles the bars (colour, radius) with a real merge', () => {
+    const { container } = render(<Skeleton lines={2} barClassName="bg-red-500 rounded-full" />);
+    const bars = container.querySelectorAll<HTMLElement>('[data-rop-skeleton-line] > div');
+    expect(bars).toHaveLength(2);
+    for (const bar of bars) {
+      expect(bar.className).toContain('bg-red-500');
+      expect(bar.className).not.toContain('bg-rop-border');
+      expect(bar.className).toContain('rounded-full');
+      expect(bar.className).not.toContain('rounded-[2px]');
+    }
+  });
+
+  it('does not leak barClassName to the DOM', () => {
+    const { container } = render(<Skeleton barClassName="x" />);
+    const attrs = [...container.querySelectorAll('*')].flatMap((e) => e.getAttributeNames());
+    expect(attrs).not.toContain('barclassname');
+    expect(attrs).not.toContain('barClassName');
+  });
+
+  it('text: consumer style.width / minWidth survive when no width prop is passed', () => {
+    render(<Skeleton data-testid="s" style={{ width: '50%', minWidth: '5rem' }} />);
+    expect(screen.getByTestId('s').style.width).toBe('50%');
+    expect(screen.getByTestId('s').style.minWidth).toBe('5rem');
+  });
+
+  it('text: the width prop wins over style.width', () => {
+    render(<Skeleton data-testid="s" width={100} style={{ width: '50%' }} />);
+    expect(screen.getByTestId('s').style.width).toBe('100px');
+  });
+
+  it('rect: consumer style width/height survive when props are missing, props win otherwise', () => {
+    render(<Skeleton variant="rect" data-testid="a" style={{ width: 30, height: 20 }} />);
+    expect(screen.getByTestId('a')).toHaveStyle({ width: '30px', height: '20px' });
+    render(<Skeleton variant="rect" data-testid="b" width={10} height={12} style={{ width: 30, height: 20 }} />);
+    expect(screen.getByTestId('b')).toHaveStyle({ width: '10px', height: '12px' });
+  });
+
+  it('circle: consumer style size survives when props are missing', () => {
+    render(<Skeleton variant="circle" data-testid="a" style={{ width: 18, height: 18 }} />);
+    expect(screen.getByTestId('a')).toHaveStyle({ width: '18px', height: '18px' });
+  });
+
+  it('circle: a percentage size derives its height from aspect-ratio (no % height)', () => {
+    render(<Skeleton variant="circle" data-testid="a" width="50%" />);
+    const el = screen.getByTestId('a');
+    expect(el.className).toContain('aspect-square');
+    expect(el.style.width).toBe('50%');
+    expect(el.style.height).toBe('auto');
+    expect(el.style.minWidth).toBe('1rem');
+  });
+
   it('forced-colors keeps a visible contour', () => {
     const { container } = render(<Skeleton variant="rect" />);
     expect((container.firstElementChild as HTMLElement).className).toContain('forced-colors:');

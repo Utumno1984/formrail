@@ -17,10 +17,21 @@ const LINE_HEIGHT_CLASS: Record<SkeletonTextVariant, string> = {
   'title-lg': 'h-[var(--text-rop-title-lg--line-height)]',
 };
 
+// Font-size class of the same step: the bar inside a line is 0.7em of that size, so it scales
+// with the text it stands in for while the line box keeps the line-height token above.
+const FONT_SIZE_CLASS: Record<SkeletonTextVariant, string> = {
+  body: 'text-rop-body',
+  caption: 'text-rop-caption',
+  label: 'text-rop-label',
+  'title-sm': 'text-rop-title-sm',
+  'title-md': 'text-rop-title-md',
+  'title-lg': 'text-rop-title-lg',
+};
+
 export interface SkeletonProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'role' | 'tabIndex'> {
   /** Default `text`. */
   variant?: SkeletonVariant;
-  /** `text` only: the typographic step whose line height each line takes. Default `body`. */
+  /** `text` only: the typographic step whose line height (and bar size) each line takes. Default `body`. */
   textVariant?: SkeletonTextVariant;
   /**
    * `text` only: number of lines (default 1); the last one is shorter. Fractions are rounded down;
@@ -29,12 +40,21 @@ export interface SkeletonProps extends Omit<HTMLAttributes<HTMLDivElement>, 'chi
   lines?: number;
   /**
    * Number (px) or CSS length. `text`: width of the block (default 100% of the container, capped by
-   * `max-width: 100%`). `rect`: default 100%. `circle`: the diameter (falls back to `height`, then 40px).
+   * `max-width: 100%`). `rect`: default 100%. `circle`: the diameter (falls back to `height`, then 40px);
+   * a percentage diameter keeps the circle round through `aspect-ratio`.
    * A percentage never collapses to 0 inside a shrink-to-fit parent: the minimum width is 1rem.
+   * Explicit `width` / `height` props win over `style.width` / `style.height` / `style.minWidth`;
+   * when a prop is not passed, the consumer's `style` value is kept (and wins over the default).
    */
   width?: number | string;
   /** `rect`: default 4rem. `circle`: used as the diameter when `width` is missing. Ignored by `text`. */
   height?: number | string;
+  /**
+   * `text` only: extra classes for the bar of each line (colour, radius...), merged over the
+   * defaults. On `text`, `className` lands on the container and cannot restyle the bars; for
+   * `rect` / `circle` use `className`.
+   */
+  barClassName?: string;
 }
 
 const toCss = (v: number | string): string => (typeof v === 'number' ? `${v}px` : v);
@@ -53,23 +73,23 @@ const BAR =
  * `motion-safe:` (none with `prefers-reduced-motion`).
  */
 export const Skeleton = /* @__PURE__ */ forwardRef<HTMLDivElement, SkeletonProps>(function Skeleton(
-  { variant = 'text', textVariant = 'body', lines = 1, width, height, className, style, ...rest },
+  { variant = 'text', textVariant = 'body', lines = 1, width, height, className, barClassName, style, ...rest },
   ref,
 ) {
   if (variant === 'text') {
     const count = Number.isFinite(lines) ? Math.floor(lines) : 0;
     if (count < 1) return null;
-    const rootStyle: CSSProperties = {
-      ...style,
-      width: width === undefined ? undefined : toCss(width),
-      minWidth: isPercent(width) ? '1rem' : undefined,
-    };
+    const rootStyle: CSSProperties = { ...style };
+    if (width !== undefined) {
+      rootStyle.width = toCss(width);
+      if (isPercent(width)) rootStyle.minWidth = '1rem';
+    }
     return (
       <div
         {...rest}
         aria-hidden="true"
         ref={ref}
-        data-rop-skeleton="text"
+        data-rop-skeleton-shape="text"
         className={cn('flex w-full min-w-0 max-w-full flex-col', className)}
         style={rootStyle}
       >
@@ -83,7 +103,7 @@ export const Skeleton = /* @__PURE__ */ forwardRef<HTMLDivElement, SkeletonProps
               count > 1 && i === count - 1 && 'w-3/5',
             )}
           >
-            <div className={cn('h-[0.7em] w-full rounded-[2px] text-rop-body', BAR)} />
+            <div className={cn('h-[0.7em] w-full rounded-[2px]', FONT_SIZE_CLASS[textVariant], BAR, barClassName)} />
           </div>
         ))}
       </div>
@@ -91,33 +111,40 @@ export const Skeleton = /* @__PURE__ */ forwardRef<HTMLDivElement, SkeletonProps
   }
 
   if (variant === 'circle') {
-    const size = width ?? height ?? 40;
+    const size = width ?? height;
+    const circleStyle: CSSProperties = { width: '40px', height: '40px', ...style };
+    if (size !== undefined) {
+      circleStyle.width = toCss(size);
+      // A percentage height would collapse or distort: aspect-ratio derives it from the width.
+      circleStyle.height = isPercent(size) ? 'auto' : toCss(size);
+      if (isPercent(size)) circleStyle.minWidth = '1rem';
+    }
     return (
       <div
         {...rest}
         aria-hidden="true"
         ref={ref}
-        data-rop-skeleton="circle"
-        className={cn('inline-block shrink-0 rounded-full align-middle', BAR, className)}
-        style={{ ...style, width: toCss(size), height: toCss(size), minWidth: isPercent(size) ? '1rem' : undefined }}
+        data-rop-skeleton-shape="circle"
+        className={cn('inline-block aspect-square shrink-0 rounded-full align-middle', BAR, className)}
+        style={circleStyle}
       />
     );
   }
 
-  const rectWidth = width ?? '100%';
+  const rectStyle: CSSProperties = { width: '100%', height: '4rem', ...style };
+  if (width !== undefined) {
+    rectStyle.width = toCss(width);
+    if (isPercent(width)) rectStyle.minWidth = '1rem';
+  }
+  if (height !== undefined) rectStyle.height = toCss(height);
   return (
     <div
       {...rest}
       aria-hidden="true"
       ref={ref}
-      data-rop-skeleton="rect"
+      data-rop-skeleton-shape="rect"
       className={cn('block max-w-full rounded-[4px]', BAR, className)}
-      style={{
-        ...style,
-        width: toCss(rectWidth),
-        height: toCss(height ?? '4rem'),
-        minWidth: isPercent(rectWidth) ? '1rem' : undefined,
-      }}
+      style={rectStyle}
     />
   );
 });

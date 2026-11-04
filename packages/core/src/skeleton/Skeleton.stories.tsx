@@ -100,14 +100,14 @@ export const Playground: Story = {
     const canvas = within(canvasElement);
     const card = canvas.getByTestId('card');
     await expect(card).toHaveAttribute('aria-busy', 'true');
-    await expect(canvasElement.querySelectorAll('[data-rop-skeleton]').length).toBeGreaterThan(0);
-    for (const s of canvasElement.querySelectorAll('[data-rop-skeleton]')) {
+    await expect(canvasElement.querySelectorAll('[data-rop-skeleton-shape]').length).toBeGreaterThan(0);
+    for (const s of canvasElement.querySelectorAll('[data-rop-skeleton-shape]')) {
       await expect(s).toHaveAttribute('aria-hidden', 'true');
     }
     const before = card.getBoundingClientRect().height;
     await userEvent.click(canvas.getByRole('button', { name: 'Load' }));
     await expect(card).toHaveAttribute('aria-busy', 'false');
-    await expect(canvasElement.querySelectorAll('[data-rop-skeleton]')).toHaveLength(0);
+    await expect(canvasElement.querySelectorAll('[data-rop-skeleton-shape]')).toHaveLength(0);
     await expect(canvas.getByText('Invoice 2024-0042')).toBeVisible();
     await expect(args.onLoad).toHaveBeenCalledTimes(1);
     await expect(Math.abs(card.getBoundingClientRect().height - before)).toBeLessThanOrEqual(0.5);
