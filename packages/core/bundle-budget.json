@@ -167,12 +167,12 @@
       "limit": 12261
     },
     "RadioGroup": {
-      "baseline": 11268,
-      "limit": 12395
+      "baseline": 11496,
+      "limit": 12646
     },
     "RadioGroupItem": {
-      "baseline": 11084,
-      "limit": 12192
+      "baseline": 11312,
+      "limit": 12444
     },
     "Select": {
       "baseline": 43643,
