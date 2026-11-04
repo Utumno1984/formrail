@@ -88,6 +88,7 @@ describe('parseDateText', () => {
     ['03/15/02026', 'five-digit year'],
     ['03/15/0000', 'year 0'],
     ['003/15/2026', 'three-digit month'],
+    ['03/015/2026', 'three-digit day'],
     ['March 15, 2026', 'month name'],
     ['03/15', 'two fields'],
     ['03/15/2026/1', 'four fields'],

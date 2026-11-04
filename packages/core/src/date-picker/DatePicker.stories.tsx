@@ -366,7 +366,7 @@ export const Open: Story = {
   tags: ['visual'],
   render: ({ onValueChange }) => (
     <div style={{ maxWidth: 320 }}>
-      <Field label="Data di scadenza">
+      <Field label="Due date (it-IT)">
         <DatePicker locale="it-IT" today={TODAY} defaultValue="2026-03-17" onValueChange={onValueChange} />
       </Field>
     </div>

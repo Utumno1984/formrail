@@ -259,6 +259,107 @@ describe('DatePicker: typing', () => {
     expect(input()).toHaveValue('03/03/2026');
   });
 
+  it('IME: compositionStart → change → compositionEnd → keydown Enter 229 commits nothing; a later real Enter commits once', () => {
+    const onValueChange = vi.fn();
+    const onInvalidInput = vi.fn();
+    render(<Controlled onValueChange={onValueChange} onInvalidInput={onInvalidInput} />);
+    const box = input();
+    fireEvent.compositionStart(box);
+    fireEvent.change(box, { target: { value: '03/05/2026' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    fireEvent.compositionEnd(box);
+    fireEvent.keyDown(box, { key: 'Enter', keyCode: 229 });
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onInvalidInput).not.toHaveBeenCalled();
+    expect(box).toHaveValue('03/05/2026');
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenCalledWith('2026-03-05');
+    expect(onInvalidInput).not.toHaveBeenCalled();
+  });
+
+  it("the consumer's onBlur runs after the commit: it already sees the committed value", async () => {
+    const user = userEvent.setup();
+    let latest: IsoDate | null | 'unset' = 'unset';
+    const seenInBlur: (IsoDate | null | 'unset')[] = [];
+    render(
+      <Controlled
+        onValueChange={(next) => {
+          latest = next;
+        }}
+        onBlur={() => seenInBlur.push(latest)}
+      />,
+    );
+    await user.type(input(), '03/05/2026');
+    await user.tab();
+    expect(seenInBlur).toEqual(['2026-03-05']);
+  });
+
+  it('min and max are inclusive for typed text; one day outside is refused', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const onInvalidInput = vi.fn();
+    render(<Controlled min="2026-03-05" max="2026-03-20" onValueChange={onValueChange} onInvalidInput={onInvalidInput} />);
+    for (const [typed, expected] of [
+      ['03/05/2026', '2026-03-05'],
+      ['03/20/2026', '2026-03-20'],
+    ] as const) {
+      await user.clear(input());
+      await user.type(input(), `${typed}{Enter}`);
+      expect(onValueChange).toHaveBeenLastCalledWith(expected);
+    }
+    expect(onInvalidInput).not.toHaveBeenCalled();
+    for (const typed of ['03/04/2026', '03/21/2026']) {
+      await user.clear(input());
+      await user.type(input(), `${typed}{Enter}`);
+      expect(onInvalidInput).toHaveBeenLastCalledWith(typed, 'out-of-range');
+      expect(input()).toHaveValue(typed);
+    }
+    expect(onInvalidInput).toHaveBeenCalledTimes(2);
+  });
+
+  it('after an invalid commit, focus in and out without edits reports nothing more', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const onInvalidInput = vi.fn();
+    render(<Controlled onValueChange={onValueChange} onInvalidInput={onInvalidInput} initial="2026-03-05" />);
+    await user.clear(input());
+    await user.type(input(), 'abc');
+    await user.tab();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onInvalidInput).toHaveBeenCalledTimes(1);
+    await user.click(input());
+    await user.tab();
+    await user.click(input());
+    await user.keyboard('{Enter}');
+    await user.tab();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onInvalidInput).toHaveBeenCalledTimes(1);
+    expect(input()).toHaveValue('abc');
+  });
+
+  it('a text of spaces only is empty: onValueChange(null), text emptied', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const onInvalidInput = vi.fn();
+    render(<Controlled onValueChange={onValueChange} onInvalidInput={onInvalidInput} initial="2026-03-05" />);
+    await user.clear(input());
+    await user.type(input(), '   ');
+    await user.tab();
+    expect(onValueChange).toHaveBeenCalledTimes(1);
+    expect(onValueChange).toHaveBeenCalledWith(null);
+    expect(onInvalidInput).not.toHaveBeenCalled();
+    expect(input()).toHaveValue('');
+  });
+
+  it('a three-digit day is refused', async () => {
+    const user = userEvent.setup();
+    const onInvalidInput = vi.fn();
+    render(<Controlled onInvalidInput={onInvalidInput} />);
+    await user.type(input(), '03/015/2026{Enter}');
+    expect(onInvalidInput).toHaveBeenCalledWith('03/015/2026', 'unparsable');
+  });
+
   it('Enter during an IME composition does not commit', () => {
     const onValueChange = vi.fn();
     render(<Controlled onValueChange={onValueChange} />);
@@ -292,6 +393,40 @@ describe('DatePicker: no echo (rule of absent values)', () => {
     expect(input()).toHaveValue('');
     rerender(<DatePicker {...BASE} aria-label="Due date" value={undefined} onValueChange={onValueChange} onInvalidInput={onInvalidInput} />);
     expect(input()).toHaveValue('');
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onInvalidInput).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["''", ''],
+    ['spaces only', '   '],
+  ])('value %s: shown empty at mount and after mount, no callback (dev error, as Calendar)', (_, absent) => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onValueChange = vi.fn();
+    const onInvalidInput = vi.fn();
+    const props = { ...BASE, 'aria-label': 'Due date', onValueChange, onInvalidInput };
+    const { rerender } = render(<DatePicker {...props} value={absent} />);
+    expect(input()).toHaveValue('');
+    rerender(<DatePicker {...props} value="2026-03-05" />);
+    expect(input()).toHaveValue('03/05/2026');
+    rerender(<DatePicker {...props} value={absent} />);
+    expect(input()).toHaveValue('');
+    fireEvent.blur(input());
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onInvalidInput).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('is not a valid ISO date'));
+  });
+
+  it('value prop missing at mount, then set after mount: text follows, no callback', () => {
+    const onValueChange = vi.fn();
+    const onInvalidInput = vi.fn();
+    const props = { ...BASE, 'aria-label': 'Due date', onValueChange, onInvalidInput };
+    const { rerender } = render(<DatePicker {...props} />);
+    expect(input()).toHaveValue('');
+    rerender(<DatePicker {...props} value="2026-07-14" />);
+    expect(input()).toHaveValue('07/14/2026');
+    expect(button()).toHaveAccessibleName('Choose date, selected July 14, 2026');
+    fireEvent.blur(input());
     expect(onValueChange).not.toHaveBeenCalled();
     expect(onInvalidInput).not.toHaveBeenCalled();
   });
@@ -389,7 +524,16 @@ describe('DatePicker: popover', () => {
     await user.click(button());
     await user.keyboard('{Enter}');
     expect(popover()).toBeNull();
-    expect(onValueChange).toHaveBeenCalledTimes(1);
+    await user.click(button());
+    expect(day('Friday, March 20, 2026')).toHaveFocus();
+    await user.keyboard(' ');
+    expect(popover()).toBeNull();
+    // Space on another day than the selected one picks it (and closes).
+    await user.click(button());
+    await user.keyboard('{ArrowLeft} ');
+    expect(popover()).toBeNull();
+    expect(onValueChange).toHaveBeenCalledTimes(2);
+    expect(onValueChange).toHaveBeenLastCalledWith('2026-03-19');
   });
 
   it('Escape closes without changing the value and returns the focus to the button', async () => {

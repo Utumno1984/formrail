@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CompositionEvent,
   type FocusEvent,
   type InputHTMLAttributes,
   type KeyboardEvent,
@@ -174,6 +175,8 @@ export const DatePicker = /* @__PURE__ */ forwardRef<HTMLInputElement, DatePicke
     readOnly: ownReadOnly,
     onBlur,
     onKeyDown,
+    onCompositionStart,
+    onCompositionEnd,
     autoComplete,
     ...rest
   } = props;
@@ -273,6 +276,7 @@ export const DatePicker = /* @__PURE__ */ forwardRef<HTMLInputElement, DatePicke
   };
 
   // --- popover ----------------------------------------------------------------------------------
+  const composing = useRef(false);
   const [open, setOpen] = useState(false);
   // Never open while it cannot be used: closes at once when the Field becomes disabled/locked.
   if (open && locked) setOpen(false);
@@ -330,13 +334,25 @@ export const DatePicker = /* @__PURE__ */ forwardRef<HTMLInputElement, DatePicke
               setTextValue(event.target.value);
               setEdited(true);
             }}
+            onCompositionStart={(event: CompositionEvent<HTMLInputElement>) => {
+              composing.current = true;
+              onCompositionStart?.(event);
+            }}
+            onCompositionEnd={(event: CompositionEvent<HTMLInputElement>) => {
+              composing.current = false;
+              onCompositionEnd?.(event);
+            }}
+            // Committed first: the consumer's onBlur already sees the committed value (validation on blur).
             onBlur={(event: FocusEvent<HTMLInputElement>) => {
-              onBlur?.(event);
+              composing.current = false;
               commit();
+              onBlur?.(event);
             }}
             onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
               onKeyDown?.(event);
-              if (event.defaultPrevented || event.nativeEvent.isComposing) return;
+              // IME (spec §1.13.5): keys belong to the composition; keyCode 229 covers the keydown
+              // some engines (Safari) fire right after `compositionend`.
+              if (event.defaultPrevented || composing.current || event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key === 'Enter') commit();
               else if (event.key === 'ArrowDown' && event.altKey) {
                 event.preventDefault();

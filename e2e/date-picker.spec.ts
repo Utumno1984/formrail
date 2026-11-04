@@ -389,6 +389,10 @@ test.describe('virtual keyboard', () => {
     await gotoStory(page, STORY('keyboard-safe'));
     const box = input(page);
     const keyboard = Math.round(667 * 0.45);
+    // Precondition: the field at the very bottom edge, visible now but covered by the keyboard later,
+    // so the test fails without the keyboard-safe behaviour.
+    await box.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+    expect(await box.evaluate((el) => el.getBoundingClientRect().bottom)).toBeGreaterThan(667 - keyboard);
     await box.focus();
     await page.evaluate((px) => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(px), keyboard);
     const visibleBottom = 667 - keyboard;
