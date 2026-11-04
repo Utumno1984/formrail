@@ -358,7 +358,9 @@ describe('Switch: props hygiene', () => {
   it('does not leak onCheckedChange as a DOM attribute', () => {
     const { container } = render(<Switch checked onCheckedChange={() => undefined} />);
     expect(container.innerHTML.toLowerCase()).not.toContain('oncheckedchange');
-    expect(container.querySelector('input')!.getAttribute('checked')).toBeNull();
+    const names = Array.from(container.querySelector('input')!.attributes).map((a) => a.name);
+    expect(names).not.toContain('oncheckedchange');
+    expect(names).not.toContain('onCheckedChange');
   });
 
   it('className wins over the base classes (real merge)', () => {
@@ -390,11 +392,12 @@ describe('Switch: props hygiene', () => {
     expect(track).toContain('motion-safe:duration-[var(--motion-rop-feedback-duration)]');
     expect(track).toContain('motion-safe:ease-[var(--motion-rop-feedback-easing)]');
     const thumb = container.querySelector('span[aria-hidden="true"]')!.className;
-    expect(thumb).toContain('motion-safe:[transition-property:translate,background-color]');
+    expect(thumb).toContain('motion-safe:[transition-property:inset-inline-start,background-color]');
     expect(thumb).toContain('motion-safe:duration-[var(--motion-rop-feedback-duration)]');
     expect(thumb).not.toMatch(/(^|\s)(transition|duration-\d+)/);
-    expect(thumb).toContain('peer-checked:translate-x-4');
-    expect(thumb).toContain('rtl:peer-checked:-translate-x-4');
+    // Logical offsets (start-*) mirror in RTL without a `[dir=rtl]` selector (the stylesheet bans global selectors).
+    expect(thumb).toContain('start-1');
+    expect(thumb).toContain('peer-checked:start-5');
   });
 
   it('a form submits name/value only when on', () => {

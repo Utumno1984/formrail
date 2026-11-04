@@ -39,16 +39,16 @@ export interface SwitchProps
   children?: ReactNode;
 }
 
-// Full literals (Tailwind scan). The track is a native input (`appearance-none`, box-border so the
-// size is the real 40x24 target); the thumb is a sibling shown through `peer-checked:` so it follows
-// the real DOM state whether the Switch is controlled or not. The state is readable without colour:
+// Full literals (Tailwind scan). The track is a native input (`appearance-none`). There is no
+// preflight, so boxes are content-box: 36x20 + 2px border = the real 40x24 target. The thumb is a
+// sibling shown through `peer-checked:` so it follows the real DOM state whether the Switch is controlled or not. The state is readable without colour:
 // the thumb sits at the start when off and at the end when on (mirrored in RTL).
 const ROW =
   'inline-flex max-w-full min-w-0 items-start gap-2 font-rop-sans text-rop-body text-rop-text ' +
   'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50';
 const CELL = 'relative inline-flex h-6 w-10 shrink-0 items-center';
 const TRACK =
-  'peer m-0 box-border block h-6 w-10 cursor-pointer appearance-none rounded-full border-2 border-rop-text-muted bg-rop-surface ' +
+  'peer m-0 box-content block h-5 w-9 cursor-pointer appearance-none rounded-full border-2 border-rop-text-muted bg-rop-surface ' +
   'checked:border-rop-primary checked:bg-rop-primary disabled:cursor-not-allowed ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:background-color,border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
@@ -56,8 +56,8 @@ const TRACK =
   'forced-colors:border-[ButtonText] forced-colors:checked:border-[Highlight] forced-colors:checked:bg-[Highlight]';
 const THUMB =
   'pointer-events-none absolute start-1 top-1 h-4 w-4 rounded-full bg-rop-text-muted ' +
-  'peer-checked:translate-x-4 peer-checked:bg-rop-primary-contrast rtl:peer-checked:-translate-x-4 ' +
-  'motion-safe:[transition-property:translate,background-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
+  'peer-checked:start-5 peer-checked:bg-rop-primary-contrast ' +
+  'motion-safe:[transition-property:inset-inline-start,background-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:bg-[ButtonText] forced-colors:peer-checked:bg-[HighlightText]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';

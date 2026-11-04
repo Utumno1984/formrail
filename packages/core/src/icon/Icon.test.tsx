@@ -254,6 +254,7 @@ describe('internal icons', () => {
       'SheetTitle',
       'SheetTrigger',
       'StatusBadge',
+      'Switch',
       'Text',
       'Title',
       'ToastProvider',
