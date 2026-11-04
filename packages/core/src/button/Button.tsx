@@ -36,9 +36,12 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
   // Hover/active only on an enabled control; primary/danger darken (keeps the white text AA).
   primary:
     'bg-rop-primary text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-primary-hover not-disabled:not-aria-disabled:active:bg-rop-primary-active',
-  secondary: 'border-rop-border bg-rop-surface text-rop-text not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle',
-  ghost: 'bg-transparent text-rop-primary not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle',
-  danger: 'bg-rop-error text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-error-hover',
+  secondary:
+    'border-rop-border bg-rop-surface text-rop-text not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle not-disabled:not-aria-disabled:active:bg-rop-surface-pressed',
+  ghost:
+    'bg-transparent text-rop-primary not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle not-disabled:not-aria-disabled:active:bg-rop-surface-pressed not-disabled:not-aria-disabled:active:text-rop-primary-active',
+  danger:
+    'bg-rop-error text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-error-hover not-disabled:not-aria-disabled:active:bg-rop-error-active',
 };
 
 // Text sizes get their height from line height + vertical padding (+ 2px border), so they grow when

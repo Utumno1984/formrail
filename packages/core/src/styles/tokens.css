@@ -15,13 +15,16 @@
  * primary input can really hover and is precise, so a tap on a touch screen never leaves a stuck
  * hover state. A named variant (instead of redefining `hover`) keeps the consumer's own `hover:`
  * classes untouched and does not depend on Tailwind's default `hover` definition.
- * Pressed feedback is `active:`. Known limit: a hybrid device whose primary pointer is a mouse can
+ * Pressed feedback is `active:`. `rop-hover` excludes `:active` (`:hover:not(:active)`): the variant is
+ * registered after the built-in ones, so its rules would be emitted after `active:` and, with the same
+ * specificity, would always win over the pressed style; the exclusion makes the two states mutually
+ * exclusive, so each `rop-hover:` property needs its `active:` counterpart. Known limit: a hybrid device whose primary pointer is a mouse can
  * still keep a hover after a finger tap (media queries describe the primary input only); this is
  * documented, not chased with JavaScript. iOS Safari applies `:active` only when a `touchstart`
  * listener exists on the event path: React registers one on its root, so nothing else is needed.
  */
 @custom-variant rop-hover {
-  &:hover {
+  &:hover:not(:active) {
     @media (hover: hover) and (pointer: fine) {
       @slot;
     }
