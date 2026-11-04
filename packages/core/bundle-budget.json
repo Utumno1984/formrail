@@ -210,6 +210,10 @@
       "baseline": 10811,
       "limit": 11893
     },
+    "Switch": {
+      "baseline": 11861,
+      "limit": 13048
+    },
     "Text": {
       "baseline": 10292,
       "limit": 11322
