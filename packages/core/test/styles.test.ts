@@ -92,6 +92,8 @@ describe('styles.css (compiled)', () => {
         !name.startsWith('--tw-') &&
         !name.startsWith('--rop-vv-') &&
         !name.startsWith('--rop-modal-from-') &&
+        // ProgressBar's own fill fraction (0..1).
+        name !== '--rop-progress-fraction' &&
         !name.startsWith('--rop-list-report-') &&
         name !== '--rop-object-page-footer-height',
     );
