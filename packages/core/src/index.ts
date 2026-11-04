@@ -76,6 +76,8 @@ export { Select } from './select/Select';
 export type { SelectProps, SelectOption, SelectSize } from './select/Select';
 export { Checkbox } from './checkbox/Checkbox';
 export type { CheckboxProps, CheckedState } from './checkbox/Checkbox';
+export { Switch } from './switch/Switch';
+export type { SwitchProps } from './switch/Switch';
 export { Combobox } from './combobox/Combobox';
 export type { ComboboxProps, ComboboxOption, ComboboxSize } from './combobox/Combobox';
 export { useCombobox } from './combobox/use-combobox';

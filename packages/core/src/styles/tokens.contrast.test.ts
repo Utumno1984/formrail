@@ -115,6 +115,19 @@ describe('contrast', () => {
     expect(contrast(token('primary'), token('primary-contrast'))).toBeGreaterThanOrEqual(3);
   });
 
+  // Switch: off = text-muted border and thumb on the surface; on = primary track with a primary-contrast thumb.
+  it.each(['surface', 'surface-subtle'])('Switch: the off track border and thumb (text-muted) on %s are at least 3:1 (WCAG 1.4.11)', (name) => {
+    expect(contrast(token('text-muted'), token(name))).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(['surface', 'surface-subtle'])('Switch: the on track (primary) on %s is at least 3:1', (name) => {
+    expect(contrast(token('primary'), token(name))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('Switch: the on thumb (primary-contrast) on the on track (primary) is at least 3:1', () => {
+    expect(contrast(token('primary'), token('primary-contrast'))).toBeGreaterThanOrEqual(3);
+  });
+
   it('the focus ring is drawn with the primary token', () => {
     expect(token('primary')).toEqual(token('blue-600'));
   });
