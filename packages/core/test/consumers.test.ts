@@ -69,6 +69,7 @@ const EXPORTS = [
   'SheetHeader',
   'SheetTitle',
   'SheetTrigger',
+  'Skeleton',
   'StatusBadge',
   'Switch',
   'Text',

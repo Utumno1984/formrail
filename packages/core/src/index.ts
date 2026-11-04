@@ -149,6 +149,8 @@ export { Card, CardHeader, CardTitle, CardDescription, CardBody, CardFooter } fr
 export type { CardProps, CardElement, CardTitleProps, CardTitleLevel } from './card/Card';
 export { ProgressBar } from './progress-bar/ProgressBar';
 export type { ProgressBarProps, ProgressBarTone } from './progress-bar/ProgressBar';
+export { Skeleton } from './skeleton/Skeleton';
+export type { SkeletonProps, SkeletonVariant, SkeletonTextVariant } from './skeleton/Skeleton';
 export { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage } from './breadcrumb/Breadcrumb';
 export type { BreadcrumbProps, BreadcrumbLinkProps, BreadcrumbSeparator } from './breadcrumb/Breadcrumb';
 export { Divider } from './divider/Divider';
