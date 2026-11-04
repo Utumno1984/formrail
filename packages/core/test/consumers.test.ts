@@ -69,6 +69,7 @@ const EXPORTS = [
   'SheetTitle',
   'SheetTrigger',
   'StatusBadge',
+  'Switch',
   'Text',
   'Title',
   'ToastProvider',
