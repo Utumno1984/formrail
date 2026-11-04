@@ -243,6 +243,8 @@ describe('internal icons', () => {
       'ObjectPageSection',
       'Pagination',
       'ProgressBar',
+      'RadioGroup',
+      'RadioGroupItem',
       'Select',
       'Sheet',
       'SheetBody',

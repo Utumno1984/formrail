@@ -56,6 +56,8 @@ const EXPORTS = [
   'ObjectPageSection',
   'Pagination',
   'ProgressBar',
+  'RadioGroup',
+  'RadioGroupItem',
   'Select',
   'Sheet',
   'SheetBody',
