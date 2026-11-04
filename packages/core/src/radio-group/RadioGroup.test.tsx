@@ -606,4 +606,24 @@ describe('RadioGroup: RTL', () => {
     expect(fireEvent.keyDown(beta, { key: 'ArrowRight' })).toBe(false);
     expect(fireEvent.keyDown(beta, { key: 'Tab' })).toBe(true);
   });
+
+  // Styling hook of the affordance (#196): a blocked radio shows no pointer / hover / pressed look.
+  it('marks every radio of a blocked group with data-rop-blocked, and none otherwise', () => {
+    const { rerender } = render(
+      <Field label="Plan" state="locked" stateReason="why">
+        <RadioGroup defaultValue="b">
+          <Items />
+        </RadioGroup>
+      </Field>,
+    );
+    for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveAttribute('data-rop-blocked');
+    rerender(
+      <Field label="Plan">
+        <RadioGroup defaultValue="b">
+          <Items />
+        </RadioGroup>
+      </Field>,
+    );
+    for (const radio of screen.getAllByRole('radio')) expect(radio).not.toHaveAttribute('data-rop-blocked');
+  });
 });

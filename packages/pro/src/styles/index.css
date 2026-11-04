@@ -8,7 +8,7 @@
  * after core (the documented order) pro's `.flex-col` came after core's `sm:flex-row` and won.
  * So pro emits NO utility class at all, only its own `.rop-pro-*` classes (class names never
  * shared with core: no collision, whatever the import order), built with `@apply` against core's
- * tokens (`--color-rop-*`, ...; imported as `theme(reference)`, no variable is emitted).
+ * tokens (`--color-rop-*`, ...; imported with `@reference`, no variable is emitted).
  *
  * The rules live in the nested layer `rop.utilities.pro`. Inside `rop.utilities`, the rules not in
  * a sub-layer (core's utilities) win over the sub-layer, whatever the import order: a core
@@ -20,7 +20,9 @@
 @layer rop.utilities.pro;
 
 @import 'tailwindcss/theme.css' layer(rop.theme) theme(reference);
-@import '@react-object-page/core/theme.css' theme(reference);
+/* `@reference` (not `theme(reference)`): core's theme.css also holds the `rop-hover` variant, and a
+   `theme(reference)` import accepts `@theme` blocks only. Nothing is emitted either way. */
+@reference '@react-object-page/core/theme.css';
 
 @layer rop.utilities.pro {
   /* ChangeSummary (packages/pro/src/change-summary/ChangeSummary.tsx). Nothing is animated. */

@@ -87,12 +87,12 @@ const VERTICAL = 'flex-col gap-1';
 const HORIZONTAL = 'flex-row flex-wrap gap-x-4 gap-y-1';
 const ROW =
   'group/row inline-flex max-w-full min-w-0 cursor-pointer items-start gap-1 ' +
-  'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[[aria-readonly=true]]:cursor-not-allowed';
+  'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[[data-rop-blocked]]:cursor-not-allowed';
 const CELL = 'relative inline-flex h-6 w-6 shrink-0 items-center justify-center';
 const RADIO =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-full border border-rop-text-muted bg-rop-surface ' +
-  'checked:border-rop-primary disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
-  'not-disabled:not-aria-readonly:group-rop-hover/row:bg-rop-surface-subtle not-disabled:not-aria-readonly:group-active/row:bg-rop-surface-pressed ' +
+  'checked:border-rop-primary disabled:cursor-not-allowed data-[rop-blocked]:cursor-not-allowed ' +
+  'not-disabled:not-data-[rop-blocked]:group-rop-hover/row:bg-rop-surface-subtle not-disabled:not-data-[rop-blocked]:group-active/row:bg-rop-surface-pressed ' +
   'not-forced-colors:group-aria-invalid/rg:border-rop-error not-forced-colors:group-aria-invalid/rg:checked:border-rop-error ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
@@ -304,6 +304,8 @@ export const RadioGroupItem = /* @__PURE__ */ forwardRef<HTMLInputElement, Radio
           name={group.name}
           value={value}
           disabled={group.disabled || disabled}
+          // Styling hook only: a forced / locked radio stays focusable but shows no click affordance.
+          data-rop-blocked={blocked ? '' : undefined}
           onClick={handleClick}
           onKeyDown={handleKeyDown}
           onChange={handleChange}
