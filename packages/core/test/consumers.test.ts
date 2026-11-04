@@ -53,6 +53,7 @@ const EXPORTS = [
   'ObjectPageFooter',
   'ObjectPageHeader',
   'ObjectPageSection',
+  'Pagination',
   'Select',
   'Sheet',
   'SheetBody',

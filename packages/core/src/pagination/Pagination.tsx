@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type FocusEvent,
   type HTMLAttributes,
   type ReactNode,
@@ -11,6 +12,7 @@ import {
 import { Button } from '../button/Button';
 import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
+import { composeRefs } from '../utils/compose-refs';
 import { getPaginationRange, toInt } from './pagination-range';
 
 export interface PaginationLabels {
@@ -53,11 +55,13 @@ const DEFAULT_LABELS = {
 
 // Inline arrows (decorative: the buttons are named by aria-label). Drawn pointing to the inline
 // end/start; in RTL they are mirrored so "previous" still points towards the previous page.
-function Arrow({ direction }: { direction: 'previous' | 'next' }) {
+// The direction comes from the computed style (a `rtl:` variant would emit a global `[dir=rtl]`
+// selector from the library stylesheet, which the governance test forbids).
+function Arrow({ direction, rtl }: { direction: 'previous' | 'next'; rtl: boolean }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      className="size-4 shrink-0 rtl:[transform:scaleX(-1)]"
+      className={cn('size-4 shrink-0', rtl && '[transform:scaleX(-1)]')}
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -119,6 +123,13 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
     }
   }, [page, pageProp, pageCount]);
 
+  const navRef = useRef<HTMLElement | null>(null);
+  const [rtl, setRtl] = useState(false);
+  useIsomorphicLayoutEffect(() => {
+    const node = navRef.current;
+    if (node) setRtl(getComputedStyle(node).direction === 'rtl');
+  });
+
   // --- focus never lost -------------------------------------------------------------------------
   const currentRef = useRef<HTMLButtonElement | null>(null);
   const lastFocused = useRef<HTMLElement | null>(null);
@@ -129,7 +140,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   };
   const handleBlur = (event: FocusEvent<HTMLElement>) => {
     // The user left the control (or the focus was moved on): nothing to restore. A button disabled
-    // or removed by a re-render is handled by the layout effect below, which runs before any blur
+    // or removed by a re-render is handled by the layout effect below, which runs before any focus-loss event
     // the browser may report for it.
     lastFocused.current = null;
     onBlur?.(event);
@@ -155,7 +166,12 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   // Every slot is at least as wide as the widest page number, so 9 -> 10 -> 100 never moves anything.
   // Border-box: the digits (tabular, so `ch` is exact for every digit) + the px-0.5 padding + the 1px
   // borders, and never under 2rem (touch target >= 32px).
-  const slotStyle = { minWidth: `max(2rem, calc(${digits}ch + 0.25rem + 2px))` };
+  // Set inline (not as a utility) so it holds whatever box-sizing the host app uses, and the
+  // library stylesheet never declares a global-looking `box-sizing` rule.
+  const slotStyle = {
+    boxSizing: 'border-box' as const,
+    minWidth: `max(2rem, calc(${digits}ch + 0.25rem + 2px))`,
+  };
 
   // Previous/Next are disabled at the ends and the numbers are within range: no clamping needed.
   const go = (target: number) => {
@@ -168,7 +184,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
         <li key={item} aria-hidden="true" className="list-none">
           <span
             style={slotStyle}
-            className="box-border inline-flex min-h-5 items-center justify-center border border-transparent px-0.5 py-[5px] leading-5 text-rop-label font-[500] text-rop-text-muted [font-variant-numeric:tabular-nums]"
+            className="inline-flex min-h-5 items-center justify-center border border-transparent px-0.5 py-[5px] leading-5 text-rop-label font-[500] text-rop-text-muted [font-variant-numeric:tabular-nums]"
           >
             …
           </span>
@@ -198,7 +214,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   return (
     <nav
       {...rest}
-      ref={ref}
+      ref={composeRefs(ref, navRef)}
       aria-label={ariaLabel ?? text.navigation}
       style={style}
       className={cn('inline-block max-w-full font-rop-sans', className)}
@@ -216,7 +232,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
             className={BUTTON_CLASS}
             onClick={() => go(page - 1)}
           >
-            <Arrow direction="previous" />
+            <Arrow direction="previous" rtl={rtl} />
           </Button>
         </li>
         {nodes}
@@ -230,7 +246,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
             className={BUTTON_CLASS}
             onClick={() => go(page + 1)}
           >
-            <Arrow direction="next" />
+            <Arrow direction="next" rtl={rtl} />
           </Button>
         </li>
       </ul>
