@@ -77,7 +77,7 @@ interface RadioGroupState {
   refresh: () => void;
 }
 
-const RadioGroupContext = createContext<RadioGroupState | null>(null);
+const RadioGroupContext = /* @__PURE__ */ createContext<RadioGroupState | null>(null);
 
 // Full literals (Tailwind scan). The radio is a native input drawn by `appearance-none`; the dot is
 // a sibling shown through `peer-checked`, so it follows the real DOM state (controlled or not).
@@ -90,13 +90,13 @@ const ROW =
 const CELL = 'relative inline-flex h-6 w-6 shrink-0 items-center justify-center';
 const RADIO =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-full border border-rop-text-muted bg-rop-surface ' +
-  'checked:border-rop-primary disabled:cursor-not-allowed group-aria-invalid/rg:border-rop-error group-aria-invalid/rg:checked:border-rop-error ' +
+  'checked:border-rop-primary disabled:cursor-not-allowed not-forced-colors:group-aria-invalid/rg:border-rop-error not-forced-colors:group-aria-invalid/rg:checked:border-rop-error ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:border-[ButtonText] forced-colors:checked:border-[Highlight]';
 const DOT =
-  'pointer-events-none absolute inset-0 m-auto hidden h-2 w-2 rounded-full bg-rop-primary peer-checked:block group-aria-invalid/rg:bg-rop-error ' +
+  'pointer-events-none absolute inset-0 m-auto hidden h-2 w-2 rounded-full bg-rop-primary peer-checked:block not-forced-colors:group-aria-invalid/rg:bg-rop-error ' +
   'forced-colors:bg-[Highlight]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
@@ -160,6 +160,9 @@ export const RadioGroup = /* @__PURE__ */ forwardRef<HTMLDivElement, RadioGroupP
   // radio where Tab would land (the selected one, else the first enabled). Only that radio carries
   // the attribute, set on the DOM after every render because the selection of an uncontrolled
   // group lives in the DOM. React never renders this attribute on the radios, so it never clears it.
+  // It is refreshed whenever the group re-renders (user gesture, reset, Field context change such as
+  // a new error, parent re-render). Items added later by a child component with its own state do not
+  // re-render the group: keep the options in the component that renders the group.
   const fieldName = fieldProps['data-rop-name'];
   useEffect(() => {
     const radios = Array.from(container.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? []);

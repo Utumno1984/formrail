@@ -213,6 +213,20 @@ test.describe('selected without colour and forced-colors', () => {
   });
 });
 
+test.describe('forced-colors and invalid', () => {
+  test('an invalid group keeps a visible system-coloured dot on the selected radio', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await gotoStory(page, STORY('manual'), 'invalid:!true');
+    const info = await page.locator('input[type="radio"]:checked').evaluate((el) => {
+      const dot = el.nextElementSibling as Element;
+      const cs = getComputedStyle(dot);
+      return { display: cs.display, bg: cs.backgroundColor, canvas: getComputedStyle(el).backgroundColor };
+    });
+    expect(info.display).toBe('block');
+    expect(info.bg).not.toBe(info.canvas);
+  });
+});
+
 test.describe('layout', () => {
   test('375px: five long options wrap without horizontal overflow', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
