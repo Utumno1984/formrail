@@ -56,21 +56,31 @@ auto-mode di "self-approval", non un problema di sintassi o di permessi): scrivi
 un file locale (es. `.tickets-draft/<nome>.md`, già in `.gitignore`) e restituiscilo
 all'orchestratore, che lo pubblica lui con `gh issue create --body-file`.
 
-### Budget dei token (piano Pro)
+### Modello per carico intellettuale del task (Piano Max dal 01/11/2026)
 
-Le quote di utilizzo (5 ore e settimanale) sono il vincolo: usa il modello più leggero adatto.
+Niente più vincolo stretto di quota: col piano Max non si sceglie il modello per risparmiare
+token, ma per il carico intellettuale del singolo task (istruzione di Daniele del 01/11/2026,
+generalizzata a tutti i progetti in `~/projects/CLAUDE.md`, "Come delegare"). `sonnet` e `opus`
+restano punti di partenza per ruolo (sviluppatore/tester `sonnet`, pianificatore/critico `opus`),
+ma sono priorità non regole rigide:
 
-- Sessioni headless (`claude -p`) e orchestratore: sempre `--model sonnet`.
-- Modelli degli agenti: pianificatore e critico `opus` di default, sviluppatore e tester
-  `sonnet`; ogni agente ha un `maxTurns` nel frontmatter.
-- Critico su `sonnet`: solo per un ticket a **basso rischio** (una story di Storybook, un
-  testo, una rifinitura visiva senza logica di stato/accessibilità coinvolta). Chi invoca il
-  critico decide e scrive nel ticket "critico: sonnet (basso rischio)" con il motivo; in caso
-  di dubbio resta `opus`. `effort: medium`; dal secondo giro verifica solo i punti segnalati e
-  il diff delle correzioni, non rifà il red team completo. Massimo 2 giri.
+- **Alza a opus** quando il task tocca gestione del focus/accessibilità, logica di stato non
+  banale, ambiguità reale, o un red team serio — anche per lo sviluppatore o il tester se il
+  ticket lo richiede.
+- **Scendi a sonnet** quando il task è meccanico, ben specificato, basso rischio (rifinitura
+  visiva, una story, un fix isolato già diagnosticato) — il pattern già in uso per il critico
+  ("critico: sonnet, basso rischio", motivato nel ticket) si applica così a qualunque agente.
+- Sessioni headless (`claude -p`): `--model sonnet` di default (l'orchestrazione/rebase/CI-watch
+  è meccanica), ma valuta `opus` se il ticket stesso è ad alto rischio.
+- Documenta la scelta non ovvia nel prompt di lancio o sul ticket (una riga: modello e motivo).
+- Lavoro in parallelo (più worktree, più ticket indipendenti) ok di default — resta il vincolo
+  reale dell'hardware (CPU/Chromium in parallelo), non più la quota: vedi `~/projects/CLAUDE.md`.
 
-Questo è un progetto a **ritmo lento e parallelo** (non prioritario su vistato/Fatture in Cloud):
-va bene procedere ticket per ticket senza fretta.
+**Priorità e ritmo (decisione di Daniele del 2026-11-04, sostituisce "ritmo lento/non
+prioritario")**: react-object-page è ora **prioritario**, non più un progetto a ritmo lento in
+parallelo su vistato/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
+step salvo una vera decisione da chiedere a Daniele (vedi anche la nota sulla pipeline ad
+oltranza in memoria dell'orchestratore).
 
 ## Regressione e test
 
