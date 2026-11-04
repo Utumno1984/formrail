@@ -83,6 +83,66 @@ export interface UseListReportOptions<Row> {
   searchCommitDelay?: number | null;
   /** Replaces the per-column search text of a row (`searchable` and `accessor` are then ignored). */
   getSearchText?: (row: Row) => string;
+  /**
+   * Multiple selection on the data (ids, never the DOM). Default `false`: `selection.enabled` is
+   * `false`, no selection is computed and `ListReportTable`/`ListReport` render exactly as without it.
+   */
+  selectable?: boolean;
+  /**
+   * Controlled selected ids. `undefined` leaves the hook uncontrolled. The hook never mutates it: pass
+   * a new `Set` for every change (e.g. the one `onSelectedIdsChange` gave you).
+   */
+  selectedIds?: ReadonlySet<string>;
+  defaultSelectedIds?: ReadonlySet<string>;
+  /**
+   * Called only for a gesture (`toggle`, `toggleAllResults`, `clearSelection`, `setSelectedIds`), never
+   * when `selectedIds` changes from outside. Always receives a new `Set`.
+   */
+  onSelectedIdsChange?: (ids: ReadonlySet<string>) => void;
+  /**
+   * Name of a row, used for the accessible name of its checkbox ("Select INV-0001"). Default: the text
+   * of the first column with an `accessor` (`String(accessor(row))`), else `getRowId(row)`. Memoize it
+   * like `columns`.
+   */
+  getRowLabel?: (row: Row) => string;
+}
+
+/**
+ * Selection state and gestures (`UseListReportReturn.selection`). The effective selection is
+ * "selected ∩ current results": ids hidden by the filter or the search stay selected (going back to
+ * the pill shows them again), but they are not counted in `allResultsState`/`selectedResultCount` and
+ * never returned by `getSelectedRows()`, so a bulk action only acts on rows the user can see. Ids no
+ * longer in the data are ignored by every count and kept in `selectedIds` (pruning them would be a
+ * change that is not a gesture): a consumer that deletes rows updates the selection itself.
+ */
+export interface ListReportSelection<Row> {
+  /** The `selectable` option. */
+  enabled: boolean;
+  /** The selected ids as they are (including hidden or missing ones). */
+  selectedIds: ReadonlySet<string>;
+  /** O(1). */
+  isSelected: (id: string) => boolean;
+  /** Gesture: adds or removes one id. */
+  toggle: (id: string) => void;
+  /** Gesture: replaces the whole selection (a primitive for extensions, e.g. range selection). */
+  setSelectedIds: (ids: ReadonlySet<string>) => void;
+  /**
+   * Gesture: when every current result is selected, removes the results (ids hidden by the filters
+   * stay selected); otherwise adds every current result. No-op with no results.
+   */
+  toggleAllResults: () => void;
+  /** Gesture: empties the selection, hidden ids included. No-op when already empty. */
+  clearSelection: () => void;
+  /** State of the "select all results" checkbox, over the current results only (`false` with none). */
+  allResultsState: boolean | 'indeterminate';
+  /** Selected ids among the current results (filter + search). */
+  selectedResultCount: number;
+  /** Selected ids present in the data but hidden by the filter or the search. */
+  hiddenSelectedCount: number;
+  /** The selected rows among the current results, in the order of `rows`. */
+  getSelectedRows: () => readonly Row[];
+  /** The `getRowLabel` option, resolved (with its default). */
+  getRowLabel: (row: Row) => string;
 }
 
 export interface ListReportHeaderProps {
@@ -132,4 +192,6 @@ export interface UseListReportReturn<Row> {
   totalCount: number;
   /** Rows after filter and search (the length of `rows`). */
   resultCount: number;
+  /** Multiple selection (always present; `enabled` is `false` without `selectable`). */
+  selection: ListReportSelection<Row>;
 }

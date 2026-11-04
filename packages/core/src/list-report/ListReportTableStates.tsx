@@ -7,6 +7,7 @@ import {
   bodyCellClass,
   fillerCellClass,
   ROW_PITCH_EXTRA_PX,
+  selectBodyCellClass,
   skeletonBarClass,
   stateBoxClass,
   stateCellClass,
@@ -30,6 +31,10 @@ export interface ListReportTableLabels {
   clearFilters: string;
   /** Announced when the data is back: the number of results. */
   resultCount: (count: number) => string;
+  /** Name of the "select all results" checkbox in the header (with `selectable`). */
+  selectAllResults: string;
+  /** Name of the checkbox of a row, from `selection.getRowLabel(row)` (with `selectable`). Keep it distinct per row. */
+  selectRow: (label: string) => string;
 }
 
 export const DEFAULT_LABELS: ListReportTableLabels = {
@@ -40,6 +45,8 @@ export const DEFAULT_LABELS: ListReportTableLabels = {
   retry: 'Retry',
   clearFilters: 'Clear filters',
   resultCount: (count) => (count === 1 ? '1 result' : `${count} results`),
+  selectAllResults: 'Select all results',
+  selectRow: (label) => `Select ${label}`,
 };
 
 export const DEFAULT_LOADING_ROW_COUNT = 5;
@@ -52,9 +59,19 @@ export const wholeRows = (n: number): number => (Number.isFinite(n) && n > 0 ? M
 const rowsHeight = (n: number, trailing: number): string =>
   `calc((var(--rop-list-report-row-height) + ${ROW_PITCH_EXTRA_PX}px) * ${n} - ${2 + trailing}px)`;
 
-export function SkeletonRows<Row>({ columns, count }: { columns: readonly ListReportColumn<Row>[]; count: number }) {
+export function SkeletonRows<Row>({
+  columns,
+  count,
+  selectable = false,
+}: {
+  columns: readonly ListReportColumn<Row>[];
+  count: number;
+  /** A leading empty cell for the selection column (no fake, focusable checkbox). */
+  selectable?: boolean;
+}) {
   return Array.from({ length: count }, (_, index) => (
     <tr key={index} aria-hidden="true" data-rop-skeleton="">
+      {selectable ? <td className={selectBodyCellClass} /> : null}
       {columns.map((column) => (
         <td key={column.id} className={cn(bodyCellClass, ALIGN_TEXT[column.align ?? 'start'])}>
           <span className={skeletonBarClass} />

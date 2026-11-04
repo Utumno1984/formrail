@@ -29,3 +29,14 @@ export const filterBarClass = 'shrink-0';
 // The one scroller: it takes what is left of the column (and, without a bounded parent, the height of
 // its rows).
 export const tableClass = 'min-h-0 flex-1';
+
+// Selection bar (only with `selection.enabled`): always mounted, below the bar of pills and search, above the table.
+// Its height never depends on the selection: the count is one truncated line, the "clear" button keeps
+// its box while hidden and the bulk actions are always rendered. On a narrow screen the
+// actions go under the count (two lines at 0 and at n alike); side by side from 640px.
+export const selectionBarClass =
+  'flex shrink-0 flex-col gap-1 rounded-rop-md border border-rop-border bg-rop-surface-subtle px-2 py-1 ' +
+  'sm:flex-row sm:items-center sm:justify-between sm:gap-3';
+export const selectionStatusClass = 'flex min-h-8 min-w-0 items-center gap-2';
+export const selectionCountClass = 'min-w-0 text-rop-text';
+export const selectionActionsClass = 'flex min-w-0 flex-wrap items-center gap-2';

@@ -1,14 +1,18 @@
 import {
   forwardRef,
   useId,
+  useMemo,
   useRef,
   type HTMLAttributes,
   type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react';
+import { Button } from '../button/Button';
+import { TruncatedText } from '../truncated-text/TruncatedText';
 import { Title, type TitleLevel } from '../typography/Title';
 import { cn } from '../utils/cn';
+import { composeRefs } from '../utils/compose-refs';
 import { ListReportFilterBar } from './ListReportFilterBar';
 import { ListReportTable, type ListReportTableStatus } from './ListReportTable';
 import type { ListReportTableLabels } from './ListReportTableStates';
@@ -20,20 +24,40 @@ import {
   filterBarClass,
   headerClass,
   rootClass,
+  selectionActionsClass,
+  selectionBarClass,
+  selectionCountClass,
+  selectionStatusClass,
   tableClass,
   titleClass,
 } from './list-report-styles';
-import type { UseListReportReturn } from './types';
+import type { ListReportSelection, UseListReportReturn } from './types';
 import { useChangeFlash } from './use-change-flash';
 
 /** Texts of `ListReport`: those of `ListReportTable` plus the count in the header (the count default is English). */
 export interface ListReportLabels extends ListReportTableLabels {
   /** The count next to the title. Default: `(n)`, and `(n of m)` when a pill or the search hide some of the rows. */
   count: (resultCount: number, totalCount: number) => string;
+  /**
+   * Text of the selection bar (with `selectable`): the selected rows among the results and the selected
+   * ones hidden by the filters. Default: "No items selected", "3 selected", "1 selected (2 hidden by filters)".
+   */
+  selectionCount: (selectedCount: number, hiddenCount: number) => string;
+  /** Button of the selection bar that empties the selection (hidden ids included). Default "Clear selection". */
+  clearSelection: string;
+  /** Name of the selection bar, followed by the title ("Selection Invoices"). Default "Selection". */
+  selectionBar: string;
 }
 
 const DEFAULT_COUNT = (resultCount: number, totalCount: number): string =>
   resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`;
+
+const DEFAULT_SELECTION_COUNT = (selectedCount: number, hiddenCount: number): string =>
+  hiddenCount > 0
+    ? `${selectedCount} selected (${hiddenCount} hidden by filters)`
+    : selectedCount === 0
+      ? 'No items selected'
+      : `${selectedCount} selected`;
 
 export type ListReportProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'title'> & {
   /** Heading of the report. Its text (and only its text) is the accessible name of the table. */
@@ -70,6 +94,12 @@ export type ListReportProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'childre
    * forwards its `ref` to. Give it `useListReportScrollRestoration().ref`. Never reaches the DOM as an attribute.
    */
   scrollerRef?: Ref<HTMLDivElement>;
+  /**
+   * Bulk actions of the selection bar (with `useListReport({ selectable: true })`): rendered at 0 selected
+   * too, so they decide themselves whether to be disabled (`selection.selectedResultCount === 0`). Act on
+   * `selection.getSelectedRows()`: only the selected rows the user can see. Never reaches the DOM.
+   */
+  bulkActions?: (selection: ListReportSelection<Row>) => ReactNode;
 };
 
 function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElement>) {
@@ -88,11 +118,16 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
     searchLabel,
     showSearch = true,
     scrollerRef,
+    bulkActions,
     className,
     ...rest
   } = props;
-  const nameId = `${useId()}-name`;
+  const baseId = useId();
+  const nameId = `${baseId}-name`;
   const barRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const mergedRef = useMemo(() => composeRefs(ref, rootRef), [ref]);
+  const { selection } = table;
   const count = labels?.count ?? DEFAULT_COUNT;
   // The pill eases to a stronger tone when the numbers change (not at mount); the text itself just changes.
   const countChanged = useChangeFlash(`${table.resultCount}/${table.totalCount}`);
@@ -111,8 +146,20 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
     target?.focus();
   };
 
+  // "Clear selection" hides itself: the focus goes to the "select all results" checkbox of the table
+  // (or, when it is disabled because there are no results, to the table container), never to the body.
+  const tableId = `${baseId}-table`;
+  const selectedAny = selection.selectedResultCount + selection.hiddenSelectedCount > 0;
+  const clearSelection = () => {
+    selection.clearSelection();
+    const root = rootRef.current;
+    const header = root?.querySelector<HTMLInputElement>('th[data-rop-select] input');
+    const target = header && !header.disabled ? header : root?.querySelector<HTMLElement>(`[id="${tableId}"]`);
+    target?.focus();
+  };
+
   return (
-    <div {...rest} ref={ref} className={cn(rootClass, className)}>
+    <div {...rest} ref={mergedRef} className={cn(rootClass, className)}>
       <div className={headerClass}>
         <Title level={titleLevel} className={titleClass}>
           <span id={nameId}>{title}</span>{' '}
@@ -136,8 +183,38 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
           className={filterBarClass}
         />
       ) : null}
+      {selection.enabled ? (
+        <div
+          role="group"
+          aria-labelledby={`${baseId}-selection ${nameId}`}
+          aria-controls={tableId}
+          data-rop-selection-bar=""
+          className={selectionBarClass}
+        >
+          <span id={`${baseId}-selection`} hidden>
+            {labels?.selectionBar ?? 'Selection'}
+          </span>
+          <div className={selectionStatusClass}>
+            <TruncatedText className={selectionCountClass} data-rop-selection-count="">
+              {(labels?.selectionCount ?? DEFAULT_SELECTION_COUNT)(selection.selectedResultCount, selection.hiddenSelectedCount)}
+            </TruncatedText>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearSelection}
+              className="shrink-0"
+              // Hidden, not removed: it keeps its box (the bar never changes height) and leaves the tab order.
+              style={selectedAny ? undefined : { visibility: 'hidden' }}
+            >
+              {labels?.clearSelection ?? 'Clear selection'}
+            </Button>
+          </div>
+          {bulkActions ? <div className={selectionActionsClass}>{bulkActions(selection)}</div> : null}
+        </div>
+      ) : null}
       <ListReportTable
         ref={scrollerRef}
+        id={selection.enabled ? tableId : undefined}
         table={table}
         aria-labelledby={nameId}
         className={tableClass}
@@ -169,6 +246,13 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  * - The count is part of the heading's name ("Fatture (12 of 40)"); the table's name stays "Fatture".
  * - `status`, `errorMessage`, `onRetry`, `loadingRowCount` and `labels` reach `ListReportTable` unchanged;
  *   `filtersLabel`, `searchLabel` and `showSearch` reach `ListReportFilterBar`. The other props go on the root.
+ *
+ * - Selection (`useListReport({ selectable: true })`): a bar between the filters and the table, always
+ *   mounted (its height is the same at 0 and at n selected, so the table never moves), with the count
+ *   ("3 selected (2 hidden by filters)"), "Clear selection" (shown only with a selection; then the focus
+ *   goes to the "select all results" checkbox) and the `bulkActions` slot. The bar is a named group, not a
+ *   live region: like the count in the title, numbers are not announced; the checkbox that was toggled
+ *   already says its new state.
  *
  * The parts stay exported (`ListReportFilterBar`, `ListReportTable`) for other layouts.
  */

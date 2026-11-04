@@ -68,3 +68,17 @@ export const stateBoxClass =
   'sticky start-0 flex max-w-full flex-col items-center justify-center gap-3 p-4 text-center text-rop-text-muted';
 export const stateStripClass = 'w-full max-w-prose text-start text-rop-text';
 export const skeletonBarClass = 'block h-3 w-3/4 max-w-48 rounded-rop-md bg-rop-border';
+
+// Selection column (only with `selection.enabled`): a square column as wide as a row is tall, the box
+// centred in it. The header cell keeps the sticky classes of the other header cells.
+export const SELECT_COLUMN_WIDTH = 'var(--rop-list-report-row-height)';
+export const selectHeaderCellClass =
+  'sticky top-0 z-rop-sticky h-(--rop-list-report-row-height) border-b border-rop-border bg-rop-surface-subtle px-0 align-middle';
+export const selectBodyCellClass = 'h-(--rop-list-report-row-height) border-b border-rop-border px-0 py-px align-middle';
+export const selectBoxClass = 'flex items-center justify-center';
+// A selectable row: a subtle hover, and the selected tone (from the primary scale) with a stronger tone on
+// hover. Pressing keeps the hover tone (no flicker while the checkbox is pressed). In forced colours the
+// backgrounds are dropped and the checkbox alone carries the state.
+export const selectableRowClass =
+  'rop-hover:bg-rop-surface-subtle active:bg-rop-surface-subtle ' +
+  'data-selected:bg-rop-blue-50 data-selected:rop-hover:bg-rop-blue-100 data-selected:active:bg-rop-blue-100';
