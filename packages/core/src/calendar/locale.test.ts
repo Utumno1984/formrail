@@ -137,11 +137,16 @@ describe('createCalendarFormatters', () => {
     expect([0, 1, 2, 3, 4, 5, 6].map((n) => de.weekdayShort(n as 0))).toEqual(['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']);
   });
 
-  it('far years format as themselves (no 1900+ mapping of years 0-99)', () => {
+  it('far years format as themselves (no 1900+ mapping of years 0-99), with 4 digits below 1000', () => {
     const f = createCalendarFormatters('en-US');
-    expect(f.fullDate('0001-01-01')).toMatch(/January 1, 1\b/);
-    expect(f.fullDate('0099-12-31')).toMatch(/December 31, 99\b/);
+    expect(f.fullDate('0001-01-01')).toBe('Monday, January 1, 0001');
+    expect(f.fullDate('0099-12-31')).toMatch(/^\w+, December 31, 0099$/);
+    expect(f.fullDate('0999-06-15')).toMatch(/June 15, 0999$/);
+    expect(f.month('0001-01')).toBe('January 0001');
+    expect(f.fullDate('1000-01-01')).toMatch(/January 1, 1000$/);
     expect(f.fullDate('9999-12-31')).toBe('Friday, December 31, 9999');
+    // Non-ASCII digits are left to the locale.
+    expect(createCalendarFormatters('ar-EG').month('0001-01')).not.toMatch(/[0-9]/);
     expect(toUtcDate('0050-06-15').getUTCFullYear()).toBe(50);
   });
   it('toUtcDate rejects an invalid date', () => {

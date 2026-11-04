@@ -127,11 +127,22 @@ export function createCalendarFormatters(locale: string | undefined): CalendarFo
     const narrowFormat = formatter(locale, { weekday: 'narrow' });
     headers = days.map((n) => narrowFormat.format(weekday(n)));
   }
+  // Years below 1000 are written with 4 digits ("January 1, 0001", not "January 1, 1", which reads
+  // as a day or a two-digit year). Only when the locale writes the year in ASCII digits; other
+  // numbering systems are left as the locale formats them.
+  const withYear = (format: Intl.DateTimeFormat, date: IsoDate) => {
+    const d = toUtcDate(date);
+    if (d.getUTCFullYear() >= 1000) return format.format(d);
+    return format
+      .formatToParts(d)
+      .map((part) => (part.type === 'year' && /^\d+$/.test(part.value) ? part.value.padStart(4, '0') : part.value))
+      .join('');
+  };
   return {
-    month: (month) => monthFormat.format(toUtcDate(`${month}-01`)),
+    month: (month) => withYear(monthFormat, `${month}-01`),
     weekdayShort: (n) => headers[n] as string,
     weekdayLong: (n) => longFormat.format(weekday(n)),
     day: (date) => dayFormat.format(toUtcDate(date)),
-    fullDate: (date) => fullFormat.format(toUtcDate(date)),
+    fullDate: (date) => withYear(fullFormat, date),
   };
 }

@@ -131,6 +131,24 @@ test.describe('limits', () => {
     expect(await focusedIso(page)).toBe('2026-04-20');
   });
 
+  test('a visible month before min can be left towards the range (buttons and PageDown), never away', async ({ page }) => {
+    await gotoStory(page, STORY('manual'), 'defaultMonth:2025-06;min:2026-01-01;max:2026-03-31');
+    const heading = page.locator('[aria-live="polite"]');
+    await expect(heading).toHaveText('June 2025');
+    await expect(page.getByRole('button', { name: 'Previous month' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Next month' }).click();
+    await expect(heading).toHaveText('July 2025');
+    await page.keyboard.press('Tab');
+    expect(await focusedIso(page)).toBe('2025-07-01');
+    await page.keyboard.press('PageUp');
+    await expect(heading).toHaveText('July 2025');
+    for (let i = 0; i < 6; i++) await page.keyboard.press('PageDown');
+    await expect(heading).toHaveText('January 2026');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('value')).toHaveText('2026-01-01');
+    await expect(page.getByRole('button', { name: 'Previous month' })).toBeDisabled();
+  });
+
   test('disabled weekends are skipped by selection, not by the arrows', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'disableWeekends:!true');
     await tabIntoGrid(page);
@@ -265,7 +283,7 @@ test.describe('locales', () => {
 });
 
 test.describe('accessibility', () => {
-  for (const story of ['manual', 'states', 'locales', 'in-field', 'stable-footprint', 'controlled-month']) {
+  for (const story of ['manual', 'states', 'locales', 'in-field', 'stable-footprint', 'controlled-month', 'right-to-left']) {
     test(`${story}: no axe violations`, async ({ page }) => {
       await gotoStory(page, STORY(story));
       await expectNoA11yViolations(page);

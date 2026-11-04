@@ -3,6 +3,7 @@ import {
   addDays,
   addMonths,
   addMonthsToMonth,
+  canNavigateMonth,
   clampMonth,
   dayInMonth,
   dayOfWeek,
@@ -286,6 +287,33 @@ describe('limits', () => {
     expect(isMonthNavigable('2026-06', {})).toBe(true);
     expect(isMonthNavigable('2026-06', { min: '2026-09-01', max: '2026-01-01' })).toBe(true);
     expect(isMonthNavigable('bad', {})).toBe(false);
+  });
+
+  it('canNavigateMonth: inside the range as isMonthNavigable; from outside, only towards it without overshooting', () => {
+    const limits = { min: '2026-01-01', max: '2026-03-31' };
+    // Inside the range.
+    expect(canNavigateMonth('2026-02', '2026-03', limits)).toBe(true);
+    expect(canNavigateMonth('2026-03', '2026-04', limits)).toBe(false);
+    expect(canNavigateMonth('2026-01', '2025-12', limits)).toBe(false);
+    // Before the range (value 2024-05): forward only, up to the range.
+    expect(canNavigateMonth('2024-05', '2024-06', limits)).toBe(true);
+    expect(canNavigateMonth('2024-05', '2025-05', limits)).toBe(true);
+    expect(canNavigateMonth('2025-12', '2026-01', limits)).toBe(true);
+    expect(canNavigateMonth('2024-05', '2024-04', limits)).toBe(false);
+    expect(canNavigateMonth('2024-05', '2024-05', limits)).toBe(false);
+    expect(canNavigateMonth('2025-06', '2026-06', limits)).toBe(false); // overshoots max
+    // After the range: backward only, down to the range.
+    expect(canNavigateMonth('2027-08', '2027-07', limits)).toBe(true);
+    expect(canNavigateMonth('2026-04', '2026-03', limits)).toBe(true);
+    expect(canNavigateMonth('2027-08', '2027-09', limits)).toBe(false);
+    expect(canNavigateMonth('2026-06', '2025-06', limits)).toBe(false); // overshoots min
+    // Only one limit.
+    expect(canNavigateMonth('2024-05', '2030-01', { min: '2026-01-01' })).toBe(true);
+    expect(canNavigateMonth('2030-05', '2020-01', { max: '2026-01-01' })).toBe(true);
+    expect(canNavigateMonth('2030-05', '2030-06', { max: '2026-01-01' })).toBe(false);
+    // Unlimited, invalid target.
+    expect(canNavigateMonth('2026-01', '2040-01', {})).toBe(true);
+    expect(canNavigateMonth('2026-01', 'bad', {})).toBe(false);
   });
 
   it('clampMonth', () => {

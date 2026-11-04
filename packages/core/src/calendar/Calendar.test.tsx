@@ -446,6 +446,150 @@ describe('Calendar: limits', () => {
   });
 });
 
+describe('Calendar: visible month outside min/max (never stuck)', () => {
+  const limits = { min: '2026-01-01', max: '2026-03-31' } as const;
+
+  it('value before the range: Next and PageDown move towards it, Previous/PageUp stay blocked', async () => {
+    const user = userEvent.setup();
+    const onMonthChange = vi.fn();
+    render(<Calendar {...BASE} value="2024-05-10" {...limits} onMonthChange={onMonthChange} />);
+    expect(heading()).toHaveTextContent('May 2024');
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next month' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+    expect(heading()).toHaveTextContent('June 2024');
+    act(() => day('Monday, June 10, 2024').focus());
+    press('PageUp');
+    expect(heading()).toHaveTextContent('June 2024');
+    press('PageDown', { shiftKey: true });
+    expect(heading()).toHaveTextContent('June 2025');
+    // A year more would overshoot max (June 2026): refused.
+    press('PageDown', { shiftKey: true });
+    expect(heading()).toHaveTextContent('June 2025');
+    for (let i = 0; i < 7; i++) press('PageDown');
+    expect(heading()).toHaveTextContent('January 2026');
+    expect(onMonthChange.mock.calls.map((c) => c[0])).toEqual([
+      '2024-06',
+      '2025-06',
+      '2025-07',
+      '2025-08',
+      '2025-09',
+      '2025-10',
+      '2025-11',
+      '2025-12',
+      '2026-01',
+    ]);
+    // Inside the range now: the usual rule (no going back out).
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeDisabled();
+  });
+
+  it('defaultMonth after the range: Previous moves back to it, Next stays blocked', async () => {
+    const user = userEvent.setup();
+    render(<Calendar {...BASE} defaultMonth="2026-06" {...limits} />);
+    expect(screen.getByRole('button', { name: 'Next month' })).toBeDisabled();
+    for (let i = 0; i < 3; i++) await user.click(screen.getByRole('button', { name: 'Previous month' }));
+    expect(heading()).toHaveTextContent('March 2026');
+    expect(screen.getByRole('button', { name: 'Next month' })).toBeDisabled();
+  });
+
+  it('defaultMonth 2025-06 (before): arrows crossing the month boundary towards the range work', () => {
+    render(<Calendar {...BASE} defaultMonth="2025-06" {...limits} />);
+    act(() => day('Monday, June 30, 2025').focus());
+    press('ArrowRight');
+    expect(heading()).toHaveTextContent('July 2025');
+    expect(document.activeElement).toHaveAttribute('data-iso', '2025-07-01');
+    press('ArrowLeft');
+    expect(heading()).toHaveTextContent('July 2025');
+    expect(document.activeElement).toHaveAttribute('data-iso', '2025-07-01');
+  });
+
+  it('an async value out of range: the same', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Calendar {...BASE} value={null} {...limits} />);
+    rerender(<Calendar {...BASE} value="2024-05-10" {...limits} />);
+    expect(heading()).toHaveTextContent('May 2024');
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+    expect(heading()).toHaveTextContent('June 2024');
+  });
+});
+
+describe('Calendar: the tab stop follows an external value', () => {
+  it('after the user moved the focus, a new value from outside becomes the tab stop', () => {
+    const { rerender } = render(<Calendar {...BASE} value="2026-03-05" />);
+    act(() => day('Thursday, March 5, 2026').focus());
+    press('ArrowRight');
+    press('ArrowRight');
+    act(() => (document.activeElement as HTMLElement).blur());
+    expect(tabStopIso()).toBe('2026-03-07');
+    rerender(<Calendar {...BASE} value="2026-03-20" />);
+    expect(tabStopIso()).toBe('2026-03-20');
+    rerender(<Calendar {...BASE} value="2026-08-14" />);
+    expect(heading()).toHaveTextContent('August 2026');
+    expect(tabStopIso()).toBe('2026-08-14');
+  });
+
+  it('with the focus in the grid, the focus moves to the new value', () => {
+    const { rerender } = render(<Calendar {...BASE} value="2026-03-05" />);
+    act(() => day('Thursday, March 5, 2026').focus());
+    press('ArrowDown');
+    rerender(<Calendar {...BASE} value="2026-03-25" />);
+    expect(document.activeElement).toHaveAttribute('data-iso', '2026-03-25');
+  });
+});
+
+describe('Calendar: becoming disabled with the focus inside', () => {
+  it.each(['a day', 'a month button'])('focus on %s moves to the container, which is out of the tab order', (where) => {
+    const { rerender, container } = render(<Calendar {...BASE} aria-label="Due" />);
+    const target = where === 'a day' ? day('Tuesday, March 10, 2026') : screen.getByRole('button', { name: 'Next month' });
+    act(() => target.focus());
+    rerender(<Calendar {...BASE} aria-label="Due" disabled />);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root).toHaveFocus();
+    expect(root).toHaveAttribute('tabindex', '-1');
+    rerender(<Calendar {...BASE} aria-label="Due" />);
+    expect(root).not.toHaveAttribute('tabindex');
+  });
+
+  it('focus elsewhere is not touched', () => {
+    const { rerender } = render(
+      <>
+        <button type="button">outside</button>
+        <Calendar {...BASE} aria-label="Due" />
+      </>,
+    );
+    act(() => screen.getByRole('button', { name: 'outside' }).focus());
+    rerender(
+      <>
+        <button type="button">outside</button>
+        <Calendar {...BASE} aria-label="Due" disabled />
+      </>,
+    );
+    expect(screen.getByRole('button', { name: 'outside' })).toHaveFocus();
+  });
+});
+
+describe('Calendar: direction', () => {
+  it('reads the computed direction once per locale, and at each navigation key', () => {
+    const spy = vi.spyOn(window, 'getComputedStyle');
+    const { rerender } = render(<Calendar {...BASE} />);
+    const afterMount = spy.mock.calls.length;
+    rerender(<Calendar {...BASE} value="2026-03-05" />);
+    rerender(<Calendar {...BASE} value="2026-03-06" />);
+    expect(spy.mock.calls.length).toBe(afterMount);
+    rerender(<Calendar {...BASE} locale="de-DE" value="2026-03-06" />);
+    expect(spy.mock.calls.length).toBe(afterMount + 1);
+  });
+
+  it('RTL picked up at key time: ArrowLeft moves forward', () => {
+    // Inline on the root: jsdom does not inherit `direction` from an ancestor.
+    const { rerender } = render(<Calendar {...BASE} value="2026-03-05" />);
+    rerender(<Calendar {...BASE} value="2026-03-05" style={{ direction: 'rtl' }} />);
+    act(() => day('Thursday, March 5, 2026').focus());
+    press('ArrowLeft');
+    expect(document.activeElement).toHaveAttribute('data-iso', '2026-03-06');
+  });
+});
+
 describe('Calendar: disabled and readOnly', () => {
   it('disabled: no tab stop, buttons disabled, clicks and keys do nothing', async () => {
     const user = userEvent.setup();

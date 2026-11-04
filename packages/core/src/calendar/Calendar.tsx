@@ -29,7 +29,7 @@ import {
   isGridNavigationKey,
   isIsoDate,
   isIsoMonth,
-  isMonthNavigable,
+  canNavigateMonth,
   limitsConflict,
   localToday,
   monthOf,
@@ -185,6 +185,9 @@ const invalidDate = (v: unknown) => v !== undefined && v !== null && !isIsoDate(
  *   `useFocusFirstInvalidField` focuses). `required`/`invalid` are not exposed as
  *   `aria-required`/`aria-invalid`: in ARIA 1.2 neither `group` nor `grid` supports them. An invalid
  *   Field shows an error border; the error text is part of the description.
+ * - A visible month outside `min`/`max` (external value or month) can always be left towards the range.
+ * - Becoming `disabled` while the focus is inside moves the focus to the container (`tabIndex=-1`
+ *   only while disabled, so it is still out of the tab order) rather than losing it on `<body>`.
  */
 export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps>(function Calendar(props, ref) {
   const {
@@ -257,9 +260,12 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
 
   // An external selection outside the visible month brings its month into view (uncontrolled month
   // only), during render so there is no frame on the old month, and without any callback (no echo).
+  // A new selection also resets the remembered focus, so the tab stop follows the new value.
+  const [focused, setFocused] = useState<IsoDate | null>(null);
   const [previousSelected, setPreviousSelected] = useState(selected);
   if (previousSelected !== selected) {
     setPreviousSelected(selected);
+    setFocused(null);
     if (selected && !monthControlled && monthOf(selected) !== internalMonth) setInternalMonth(monthOf(selected));
   }
 
@@ -299,7 +305,6 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
   }, [min, max]);
 
   // --- focus ------------------------------------------------------------------------------------
-  const [focused, setFocused] = useState<IsoDate | null>(null);
   const [focusInside, setFocusInside] = useState(false);
   // While the focus is in the grid and the month changes from outside, it stays on the same day
   // number of the new month (or its last day); otherwise the default tab stop applies.
@@ -317,18 +322,31 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
   const nextRef = useRef<HTMLButtonElement | null>(null);
   const pendingButtonFocus = useRef<'previous' | 'next' | null>(null);
 
+  // The direction is read once after mount and when the locale changes (for the arrow icons), and
+  // again at every navigation key (for the keys themselves), never on every render.
   const [rtl, setRtl] = useState(false);
+  const readRtl = () => {
+    const node = container.current;
+    return node ? getComputedStyle(node).direction === 'rtl' : false;
+  };
   useIsomorphicLayoutEffect(() => {
     const node = container.current;
     if (node) setRtl(getComputedStyle(node).direction === 'rtl');
-  });
+  }, [locale]);
 
   // Keeps the DOM focus on the tab stop while the focus is in the grid (keyboard moves, a month
   // changed from outside). Cells are keyed by position, so the focused cell is reused, not removed.
+  // When the calendar becomes disabled with the focus inside it (a cell or a month button), the
+  // focus moves to the container (focusable only while disabled) instead of being lost on <body>.
   useIsomorphicLayoutEffect(() => {
     const grid = gridRef.current;
-    if (!grid || disabled) return;
+    const root = container.current;
+    if (!grid || !root) return;
     const active = document.activeElement;
+    if (disabled) {
+      if (active !== root && root.contains(active)) root.focus();
+      return;
+    }
     if (!grid.contains(active) && !focusInside) return;
     const cell = grid.querySelector<HTMLElement>(`[data-iso="${tabStop}"]`);
     if (cell && cell !== active) cell.focus();
@@ -348,7 +366,9 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
     if (!monthControlled) setInternalMonth(next);
     onMonthChange?.(next);
   };
-  const canReach = (month: IsoMonth | null): month is IsoMonth => month !== null && isMonthNavigable(month, { min, max });
+  // From an out-of-range month (external value/month), steps towards min/max stay possible.
+  const canReach = (month: IsoMonth | null): month is IsoMonth =>
+    month !== null && canNavigateMonth(visibleMonth, month, { min, max });
   const previousMonth = addMonthsToMonth(visibleMonth, -1);
   const nextMonth = addMonthsToMonth(visibleMonth, 1);
   const canPrevious = !disabled && canReach(previousMonth);
@@ -376,7 +396,9 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
     }
     if (!isGridNavigationKey(event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
-    const target = getKeyboardTarget(from, event.key, { shift: event.shiftKey, rtl, weekStartsOn });
+    const isRtl = readRtl();
+    if (isRtl !== rtl) setRtl(isRtl);
+    const target = getKeyboardTarget(from, event.key, { shift: event.shiftKey, rtl: isRtl, weekStartsOn });
     if (!target) return;
     const month = monthOf(target);
     if (month !== visibleMonth && !canReach(month)) return;
@@ -399,7 +421,7 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
     const month = direction === 'previous' ? previousMonth : nextMonth;
     if (!canReach(month)) return;
     const after = addMonthsToMonth(month, direction === 'previous' ? -1 : 1);
-    if (!canReach(after)) pendingButtonFocus.current = direction === 'previous' ? 'next' : 'previous';
+    if (after === null || !canNavigateMonth(month, after, { min, max })) pendingButtonFocus.current = direction === 'previous' ? 'next' : 'previous';
     goToMonth(month);
   };
 
@@ -418,6 +440,8 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
       aria-labelledby={fieldProps['aria-labelledby']}
       aria-describedby={fieldProps['aria-describedby']}
       aria-disabled={disabled || undefined}
+      /* Focusable by script only while disabled: where the focus goes when it is disabled under the user. */
+      tabIndex={disabled ? -1 : rest.tabIndex}
       data-invalid={invalid || undefined}
       className={cn(ROOT, invalid && 'border-rop-error', disabled && 'opacity-50', className)}
     >

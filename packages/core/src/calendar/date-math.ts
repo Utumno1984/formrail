@@ -235,6 +235,22 @@ export function isMonthNavigable(month: IsoMonth, { min, max }: DateLimits): boo
   return true;
 }
 
+/**
+ * Whether the user may go from the visible month `from` to `to` (month buttons, PageUp/PageDown,
+ * arrows crossing a month). Always when `to` is navigable. When `from` itself is outside `min`/`max`
+ * (an external `value`/`month`/`defaultMonth` out of range), also any step TOWARDS the range that does
+ * not overshoot it, so the user is never stuck on an out-of-range month. Never away from the range.
+ */
+export function canNavigateMonth(from: IsoMonth, to: IsoMonth, limits: DateLimits): boolean {
+  if (!isIsoMonth(to)) return false;
+  if (isMonthNavigable(to, limits)) return true;
+  if (isMonthNavigable(from, limits)) return false;
+  const { min, max } = limits;
+  if (min !== undefined && from < monthOf(min)) return to > from && (max === undefined || to <= monthOf(max));
+  if (max !== undefined && from > monthOf(max)) return to < from && (min === undefined || to >= monthOf(min));
+  return false;
+}
+
 /** `month` moved inside the navigable range of `min`/`max` (unchanged when already inside). */
 export function clampMonth(month: IsoMonth, { min, max }: DateLimits): IsoMonth {
   if (limitsConflict({ min, max })) return month;
