@@ -208,6 +208,7 @@ describe('internal icons', () => {
       'BreadcrumbLink',
       'BreadcrumbPage',
       'Button',
+      'Calendar',
       'Card',
       'CardBody',
       'CardDescription',

@@ -155,3 +155,5 @@ export { Divider } from './divider/Divider';
 export type { DividerProps, DividerOrientation, DividerSpacing } from './divider/Divider';
 export { Pagination } from './pagination/Pagination';
 export type { PaginationProps, PaginationLabels } from './pagination/Pagination';
+export { Calendar } from './calendar/Calendar';
+export type { CalendarProps, CalendarLabels, IsoDate, IsoMonth, Weekday } from './calendar/Calendar';
