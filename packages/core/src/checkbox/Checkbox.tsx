@@ -53,12 +53,18 @@ export interface CheckboxProps
 // plus the same 2px padding as the label, so the box is centred on the cap height of the label's
 // first line (`CapIconSlot`), whatever the font.
 const ROW =
-  'inline-flex max-w-full min-w-0 items-start gap-1 font-rop-sans text-rop-body text-rop-text ' +
-  'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50';
+  'group/row inline-flex max-w-full min-w-0 cursor-pointer items-start gap-1 font-rop-sans text-rop-body text-rop-text ' +
+  'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[[aria-readonly=true]]:cursor-not-allowed';
+// The cell is one 20px text line plus the label's 2px padding (24px): the box is centred on the cap
+// height of the label's first line (`CapIconSlot`), whatever the font.
 const CELL = 'w-6 py-0.5 text-center';
 const BOX =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-rop-sm border border-rop-text-muted bg-rop-surface ' +
-  'checked:bg-rop-primary indeterminate:bg-rop-primary disabled:cursor-not-allowed ' +
+  'checked:bg-rop-primary indeterminate:bg-rop-primary disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
+  'not-checked:not-indeterminate:not-disabled:not-aria-readonly:group-rop-hover/row:bg-rop-surface-subtle ' +
+  'not-checked:not-indeterminate:not-disabled:not-aria-readonly:group-active/row:bg-rop-surface-pressed ' +
+  'not-disabled:not-aria-readonly:checked:group-rop-hover/row:bg-rop-primary-hover not-disabled:not-aria-readonly:indeterminate:group-rop-hover/row:bg-rop-primary-hover ' +
+  'not-disabled:not-aria-readonly:checked:group-active/row:bg-rop-primary-active not-disabled:not-aria-readonly:indeterminate:group-active/row:bg-rop-primary-active ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:background-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +

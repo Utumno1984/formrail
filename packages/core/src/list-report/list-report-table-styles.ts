@@ -37,7 +37,8 @@ export const nodeWrapperClass = 'min-w-0 overflow-hidden';
 
 export const sortButtonClass =
   'flex w-full min-w-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-start [font:inherit] ' +
-  'text-inherit focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
+  'rounded-rop-sm text-inherit rop-hover:bg-rop-border/30 active:bg-rop-border/60 ' +
+  'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
 
 // The arrow always takes its space (no shift when a column becomes sorted): unsorted it is invisible.
 export const sortIconClass = 'text-rop-text-muted';

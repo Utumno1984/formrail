@@ -87,8 +87,8 @@ export const anchorBarListClass =
 export const anchorBarItemClass = 'min-w-0 shrink-0';
 // 46px tall (padding, line and border): a touch target. A long title is cut by the max width, never wrapped.
 export const anchorBarLinkClass =
-  'block max-w-64 overflow-hidden text-ellipsis whitespace-nowrap border-0 border-b-2 border-solid ' +
-  'px-3 py-3 text-rop-label font-[500] no-underline hover:bg-rop-surface-subtle ' +
+  'block max-w-64 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap border-0 border-b-2 border-solid ' +
+  'px-3 py-3 text-rop-label font-[500] no-underline rop-hover:bg-rop-surface-subtle active:bg-rop-surface-pressed ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px]';
-export const anchorBarLinkIdleClass = 'border-transparent text-rop-text-muted hover:text-rop-text';
+export const anchorBarLinkIdleClass = 'border-transparent text-rop-text-muted rop-hover:text-rop-text active:text-rop-text';
 export const anchorBarLinkActiveClass = 'border-rop-primary font-[600] text-rop-primary';

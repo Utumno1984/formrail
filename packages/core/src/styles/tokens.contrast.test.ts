@@ -75,6 +75,21 @@ describe('contrast', () => {
     expect(contrast(token(name), white)).toBeGreaterThanOrEqual(4.5);
   });
 
+  // Pressed states (#196): the text that sits on the pressed backgrounds.
+  it.each(['error-hover', 'error-active'])('white text on %s is at least 4.5:1 (WCAG AA)', (name) => {
+    expect(contrast(token(name), white)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(['text', 'text-muted', 'primary-active'])('%s text on the pressed surface is at least 4.5:1 (WCAG AA)', (name) => {
+    expect(contrast(token(name), token('surface-pressed'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('the pressed surface is darker than the hover surface, which is darker than the surface', () => {
+    expect(luminance(token('surface-pressed'))).toBeLessThan(luminance(token('surface-subtle')));
+    expect(luminance(token('surface-subtle'))).toBeLessThan(luminance(token('surface')));
+    expect(luminance(token('error-active'))).toBeLessThan(luminance(token('error-hover')));
+  });
+
   it.each(['surface', 'surface-subtle'])('the focus ring (blue-600) on %s is at least 3:1 (WCAG 1.4.11)', (name) => {
     expect(contrast(token('blue-600'), token(name))).toBeGreaterThanOrEqual(3);
   });

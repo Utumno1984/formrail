@@ -76,7 +76,8 @@ export const BreadcrumbItem = /* @__PURE__ */ forwardRef<HTMLLIElement, LiHTMLAt
 );
 
 const LINK =
-  'inline-flex min-w-0 max-w-full rounded-rop-sm text-rop-primary no-underline hover:text-rop-primary-hover hover:underline ' +
+  'inline-flex min-w-0 max-w-full cursor-pointer rounded-rop-sm text-rop-primary no-underline rop-hover:text-rop-primary-hover rop-hover:underline ' +
+  'active:text-rop-primary-active active:underline ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
 
 export interface BreadcrumbLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
