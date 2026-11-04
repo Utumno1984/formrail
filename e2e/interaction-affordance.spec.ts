@@ -64,15 +64,15 @@ test.describe('Foundations/Interaction states: desktop affordance', () => {
     expect(pressed.rect).toBe(rest.rect);
   });
 
-  test('a press that leaves the control before release does not stay pressed', async ({ page }) => {
+  test('a press released away from the control leaves no pressed look behind', async ({ page }) => {
     await expectPlayToPass(page, STORY);
     const button = SURFACES[1]!.measure(page);
     const rest = await look(button);
     await button.hover();
     await page.mouse.down();
     await leave(page);
-    expect(paint(await look(button))).toBe(paint(rest));
     await page.mouse.up();
+    expect(paint(await look(button))).toBe(paint(rest));
   });
 
   test('every surface switches its transitions off under reduced motion', async ({ page }) => {

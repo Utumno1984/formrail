@@ -87,7 +87,11 @@ export const SELECTED_PILL: Surface = {
   noHoverChange: true,
 };
 
-/** Moves the mouse well away from every surface (hover gone). */
+/**
+ * Moves the mouse away from every surface (hover gone), into the empty space right of the story's
+ * 720px column and away from the viewport edges: near an edge a held button would start the
+ * browser's selection autoscroll and shift the page under the measured boxes.
+ */
 export async function leave(page: Page): Promise<void> {
-  await page.mouse.move(2, 2);
+  await page.mouse.move(1000, 400);
 }
