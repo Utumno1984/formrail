@@ -58,19 +58,35 @@ const ROW =
 // The cell is one 20px text line plus the label's 2px padding (24px): the box is centred on the cap
 // height of the label's first line (`CapIconSlot`), whatever the font.
 const CELL = 'w-6 py-0.5 text-center';
+//
+// States (#223), with mutually exclusive selectors instead of relying on the order of the rules:
+// - default: the "on" fill is primary;
+// - invalid (`aria-invalid`, not read-only): the border AND the fill are error, so a ticked invalid
+//   box is as visibly red as a Radio or a Switch;
+// - forced / locked (`aria-readonly`): dashed border, read-only surface, a neutral tick / dash and no
+//   fill at all (never primary); with an error the border is red, the tick stays neutral;
+// - disabled: the default look at 0.5 opacity (on the row).
+// The colours live under `not-forced-colors:` so the forced-colors rules (system colours) are left
+// alone; the dashed border stays in forced colours too.
 const BOX =
   'peer m-0 block h-3.5 w-3.5 cursor-pointer appearance-none rounded-rop-sm border border-rop-text-muted bg-rop-surface ' +
-  'checked:bg-rop-primary indeterminate:bg-rop-primary disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
+  'not-forced-colors:not-aria-readonly:not-aria-invalid:checked:bg-rop-primary not-forced-colors:not-aria-readonly:not-aria-invalid:indeterminate:bg-rop-primary ' +
+  'not-forced-colors:not-aria-readonly:aria-invalid:checked:bg-rop-error not-forced-colors:not-aria-readonly:aria-invalid:indeterminate:bg-rop-error ' +
+  'aria-readonly:border-dashed not-forced-colors:aria-readonly:bg-rop-readonly-surface ' +
+  'disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
   'not-checked:not-indeterminate:not-disabled:not-aria-readonly:group-rop-hover/row:bg-rop-surface-subtle ' +
   'not-checked:not-indeterminate:not-disabled:not-aria-readonly:group-active/row:bg-rop-surface-pressed ' +
-  'not-disabled:not-aria-readonly:checked:group-rop-hover/row:bg-rop-primary-hover not-disabled:not-aria-readonly:indeterminate:group-rop-hover/row:bg-rop-primary-hover ' +
-  'not-disabled:not-aria-readonly:checked:group-active/row:bg-rop-primary-active not-disabled:not-aria-readonly:indeterminate:group-active/row:bg-rop-primary-active ' +
+  'not-disabled:not-aria-readonly:not-aria-invalid:checked:group-rop-hover/row:bg-rop-primary-hover not-disabled:not-aria-readonly:not-aria-invalid:indeterminate:group-rop-hover/row:bg-rop-primary-hover ' +
+  'not-disabled:not-aria-readonly:not-aria-invalid:checked:group-active/row:bg-rop-primary-active not-disabled:not-aria-readonly:not-aria-invalid:indeterminate:group-active/row:bg-rop-primary-active ' +
+  'not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:checked:group-rop-hover/row:bg-rop-error-hover not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:indeterminate:group-rop-hover/row:bg-rop-error-hover ' +
+  'not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:checked:group-active/row:bg-rop-error-active not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:indeterminate:group-active/row:bg-rop-error-active ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:background-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:border-[ButtonText] forced-colors:checked:bg-[Highlight] forced-colors:indeterminate:bg-[Highlight]';
 const MARK =
-  'pointer-events-none absolute inset-0 m-auto hidden h-3 w-3 text-rop-primary-contrast forced-colors:text-[HighlightText]';
+  'pointer-events-none absolute inset-0 m-auto hidden h-3 w-3 text-rop-primary-contrast ' +
+  'not-forced-colors:peer-aria-readonly:text-rop-readonly-indicator forced-colors:text-[HighlightText]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 
 const BOTH_WARNING =

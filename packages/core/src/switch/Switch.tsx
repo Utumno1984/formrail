@@ -50,19 +50,29 @@ const ROW =
 // The cell is one 20px text line plus the label's 2px padding (24px, as tall as the track): the track
 // is centred on the cap height of the label's first line (`CapIconSlot`), whatever the font.
 const CELL = 'w-10 py-0.5';
+// States (#223), with mutually exclusive selectors (not the order of the rules): default = primary
+// track when on; invalid (not read-only) = error border, and error track when on; forced / locked
+// (`aria-readonly`) = dashed border, read-only surface, neutral thumb still at the "on" end, never
+// primary (with an error the border is red); disabled = the default look at 0.5 opacity. Colours under
+// `not-forced-colors:`; the dashed border stays in forced colours.
 const TRACK =
   'peer m-0 box-content block h-5 w-9 cursor-pointer appearance-none rounded-full border-2 border-rop-text-muted bg-rop-surface ' +
-  'checked:border-rop-primary checked:bg-rop-primary disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
+  'not-forced-colors:not-aria-readonly:not-aria-invalid:checked:border-rop-primary not-forced-colors:not-aria-readonly:not-aria-invalid:checked:bg-rop-primary ' +
+  'not-forced-colors:not-aria-readonly:aria-invalid:checked:bg-rop-error ' +
+  'aria-readonly:border-dashed not-forced-colors:aria-readonly:bg-rop-readonly-surface ' +
+  'disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
   'not-checked:not-disabled:not-aria-readonly:group-rop-hover/row:bg-rop-surface-subtle not-checked:not-disabled:not-aria-readonly:group-active/row:bg-rop-surface-pressed ' +
-  'not-disabled:not-aria-readonly:checked:group-rop-hover/row:border-rop-primary-hover not-disabled:not-aria-readonly:checked:group-rop-hover/row:bg-rop-primary-hover ' +
-  'not-disabled:not-aria-readonly:checked:group-active/row:border-rop-primary-active not-disabled:not-aria-readonly:checked:group-active/row:bg-rop-primary-active ' +
+  'not-disabled:not-aria-readonly:not-aria-invalid:checked:group-rop-hover/row:border-rop-primary-hover not-disabled:not-aria-readonly:not-aria-invalid:checked:group-rop-hover/row:bg-rop-primary-hover ' +
+  'not-disabled:not-aria-readonly:not-aria-invalid:checked:group-active/row:border-rop-primary-active not-disabled:not-aria-readonly:not-aria-invalid:checked:group-active/row:bg-rop-primary-active ' +
+  'not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:checked:group-rop-hover/row:border-rop-error-hover not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:checked:group-rop-hover/row:bg-rop-error-hover ' +
+  'not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:checked:group-active/row:border-rop-error-active not-forced-colors:not-disabled:not-aria-readonly:aria-invalid:checked:group-active/row:bg-rop-error-active ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:background-color,border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:border-[ButtonText] forced-colors:checked:border-[Highlight] forced-colors:checked:bg-[Highlight]';
 const THUMB =
   'pointer-events-none absolute start-1 top-1 h-4 w-4 rounded-full bg-rop-text-muted ' +
-  'peer-checked:start-5 peer-checked:bg-rop-primary-contrast ' +
+  'peer-checked:start-5 peer-checked:bg-rop-primary-contrast not-forced-colors:peer-aria-readonly:peer-checked:bg-rop-readonly-indicator ' +
   'motion-safe:[transition-property:inset-inline-start,background-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:bg-[ButtonText] forced-colors:peer-checked:bg-[HighlightText]';

@@ -62,6 +62,11 @@
   --color-rop-error: #d20a0a;
   --color-rop-error-hover: color-mix(in srgb, var(--color-rop-error) 80%, black);
   --color-rop-error-active: color-mix(in srgb, var(--color-rop-error) 62%, black);
+  /* Forced / locked form controls (#223): a value the user can see and focus but not change. Drawn
+     neutral (never primary) on a subtle surface with a dashed border; disabled keeps the 0.5 opacity. */
+  --color-rop-readonly-surface: var(--color-rop-surface-subtle);
+  /* The "on" part (tick, dash, thumb, dot, selected day) of a forced / locked control. */
+  --color-rop-readonly-indicator: var(--color-rop-text-muted);
 
   /* Typographic scale (size + line height) */
   --text-rop-caption: 0.75rem;
