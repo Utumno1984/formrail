@@ -115,8 +115,10 @@ export interface CalendarProps
 }
 
 // Full literals (Tailwind scan). Logical properties only (spec §1.13.4).
+// `self-start`: keeps its intrinsic width inside a stretching flex column (a Field), so the columns
+// stay 40px wide.
 const ROOT =
-  'inline-flex max-w-full flex-col gap-2 rounded-rop-md border border-rop-border bg-rop-surface p-3 ' +
+  'inline-flex max-w-full self-start flex-col gap-2 rounded-rop-md border border-rop-border bg-rop-surface p-3 ' +
   'font-rop-sans text-rop-body text-rop-text';
 const HEADER = 'flex items-center gap-2';
 const HEADING = 'min-w-0 flex-1 text-center text-rop-title-sm font-[600] [overflow-wrap:anywhere]';

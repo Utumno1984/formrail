@@ -26,6 +26,10 @@
       "baseline": 13146,
       "limit": 14461
     },
+    "Calendar": {
+      "baseline": 18186,
+      "limit": 20005
+    },
     "Card": {
       "baseline": 10624,
       "limit": 11687

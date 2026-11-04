@@ -80,7 +80,11 @@ export function getWeekStartsOn(locale: string | undefined): Weekday {
 export interface CalendarFormatters {
   /** "March 2026" (`YYYY-MM`). */
   month: (month: IsoMonth) => string;
-  /** Short weekday name ("Mon"), 0 = Sunday. */
+  /**
+   * Weekday name for a column header ("Mon"), 0 = Sunday: the locale's short name, or its narrow
+   * name ("M") when some short name of the locale is longer than 4 characters (e.g. `ar-EG`, whose
+   * "short" names are the full ones and would not fit a 40px column). The same form for all 7 days.
+   */
   weekdayShort: (weekday: Weekday) => string;
   /** Full weekday name ("Monday"), 0 = Sunday. */
   weekdayLong: (weekday: Weekday) => string;
@@ -105,18 +109,27 @@ function formatter(locale: string | undefined, options: Intl.DateTimeFormatOptio
   return new Intl.DateTimeFormat(locale, { ...options, timeZone: 'UTC' });
 }
 
+/** Longest short weekday name used as a column header; longer ones switch the locale to narrow names. */
+const MAX_HEADER_LENGTH = 4;
+
 /** Formatters for `locale` (already resolved with `resolveLocale`). */
 export function createCalendarFormatters(locale: string | undefined): CalendarFormatters {
   const monthFormat = formatter(locale, { month: 'long', year: 'numeric' });
-  const shortFormat = formatter(locale, { weekday: 'short' });
   const longFormat = formatter(locale, { weekday: 'long' });
   const dayFormat = formatter(locale, { day: 'numeric' });
   const fullFormat = formatter(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   // 2023-01-01 was a Sunday: weekday `n` is 2023-01-(1 + n).
   const weekday = (n: Weekday) => toUtcDate(`2023-01-0${n + 1}`);
+  const days = [0, 1, 2, 3, 4, 5, 6] as const;
+  const shortFormat = formatter(locale, { weekday: 'short' });
+  let headers = days.map((n) => shortFormat.format(weekday(n)));
+  if (headers.some((name) => Array.from(name).length > MAX_HEADER_LENGTH)) {
+    const narrowFormat = formatter(locale, { weekday: 'narrow' });
+    headers = days.map((n) => narrowFormat.format(weekday(n)));
+  }
   return {
     month: (month) => monthFormat.format(toUtcDate(`${month}-01`)),
-    weekdayShort: (n) => shortFormat.format(weekday(n)),
+    weekdayShort: (n) => headers[n] as string,
     weekdayLong: (n) => longFormat.format(weekday(n)),
     day: (date) => dayFormat.format(toUtcDate(date)),
     fullDate: (date) => fullFormat.format(toUtcDate(date)),
