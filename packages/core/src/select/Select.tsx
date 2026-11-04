@@ -70,9 +70,10 @@ export interface SelectProps
 // widens the Field.
 const TRIGGER =
   'flex max-w-full min-w-0 items-center justify-between gap-2 rounded-rop-md border border-rop-border bg-rop-surface px-3 ' +
-  'font-rop-sans text-rop-body text-rop-text text-start focus-visible:[outline:2px_solid_var(--color-rop-primary)] ' +
+  'cursor-pointer font-rop-sans text-rop-body text-rop-text text-start focus-visible:[outline:2px_solid_var(--color-rop-primary)] ' +
   'focus-visible:outline-offset-2 data-[placeholder]:text-rop-text-muted disabled:cursor-not-allowed disabled:opacity-50 ' +
-  'aria-readonly:bg-rop-surface-subtle';
+  'aria-readonly:cursor-not-allowed aria-readonly:bg-rop-surface-subtle ' +
+  'not-disabled:not-aria-readonly:rop-hover:bg-rop-surface-subtle not-disabled:not-aria-readonly:active:bg-rop-surface-pressed';
 const SIZE_CLASS: Record<SelectSize, string> = {
   sm: 'py-[5px]',
   md: 'py-[7px]',

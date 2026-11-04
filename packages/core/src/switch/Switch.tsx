@@ -44,12 +44,15 @@ export interface SwitchProps
 // sibling shown through `peer-checked:` so it follows the real DOM state whether the Switch is controlled or not. The state is readable without colour:
 // the thumb sits at the start when off and at the end when on (mirrored in RTL).
 const ROW =
-  'inline-flex max-w-full min-w-0 items-start gap-2 font-rop-sans text-rop-body text-rop-text ' +
-  'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50';
+  'group/row inline-flex max-w-full min-w-0 cursor-pointer items-start gap-2 font-rop-sans text-rop-body text-rop-text ' +
+  'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[[aria-readonly=true]]:cursor-not-allowed';
 const CELL = 'relative inline-flex h-6 w-10 shrink-0 items-center';
 const TRACK =
   'peer m-0 box-content block h-5 w-9 cursor-pointer appearance-none rounded-full border-2 border-rop-text-muted bg-rop-surface ' +
-  'checked:border-rop-primary checked:bg-rop-primary disabled:cursor-not-allowed ' +
+  'checked:border-rop-primary checked:bg-rop-primary disabled:cursor-not-allowed aria-readonly:cursor-not-allowed ' +
+  'not-checked:not-disabled:not-aria-readonly:group-rop-hover/row:bg-rop-surface-subtle not-checked:not-disabled:not-aria-readonly:group-active/row:bg-rop-surface-pressed ' +
+  'not-disabled:not-aria-readonly:checked:group-rop-hover/row:border-rop-primary-hover not-disabled:not-aria-readonly:checked:group-rop-hover/row:bg-rop-primary-hover ' +
+  'not-disabled:not-aria-readonly:checked:group-active/row:border-rop-primary-active not-disabled:not-aria-readonly:checked:group-active/row:bg-rop-primary-active ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'motion-safe:[transition-property:background-color,border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +

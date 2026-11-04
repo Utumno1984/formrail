@@ -25,8 +25,9 @@ export const LISTBOX_VIEWPORT = 'max-h-80 max-w-96 overflow-y-auto p-1';
 
 /** One option. The check sits in the start padding so labels stay aligned. */
 export const LISTBOX_ITEM =
-  'relative flex min-w-0 cursor-default select-none items-center rounded-rop-md py-1.5 ps-8 pe-3 outline-none ' +
-  'data-[highlighted]:bg-rop-surface-subtle data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50';
+  'relative flex min-w-0 cursor-pointer select-none items-center rounded-rop-md py-1.5 ps-8 pe-3 outline-none ' +
+  'data-[highlighted]:bg-rop-surface-subtle not-data-[disabled]:data-[highlighted]:active:bg-rop-surface-pressed ' +
+  'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50';
 
 /** The slot of the selected-option check. */
 export const LISTBOX_ITEM_INDICATOR = 'absolute start-2 inline-flex items-center';
