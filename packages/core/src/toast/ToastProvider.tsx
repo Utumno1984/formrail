@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 import * as DismissableLayer from '@radix-ui/react-dismissable-layer';
 import { Button } from '../button/Button';
 import { Icon } from '../icon/Icon';
+import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
 import { isDev } from '../internal/is-dev';
 import { hasContent, textOf } from '../internal/react-nodes';
@@ -166,9 +167,12 @@ function ToastView({ item, open, labels, nodeRef, onUserDismiss, onAction, onExi
         classes.box,
       )}
     >
-      <Icon size="md" className={classes.icon}>
-        {internalIcons[tone]}
-      </Icon>
+      {/* One text line tall, centred on the cap height of the first line (title or description). */}
+      <CapIconSlot>
+        <Icon size="md" className={classes.icon}>
+          {internalIcons[tone]}
+        </Icon>
+      </CapIconSlot>
       <div className="min-w-0 flex-1">
         <span className="sr-only">{labels?.tones?.[tone] ?? TONE_LABEL[tone]}: </span>
         {hasContent(title) ? <strong className="block font-[700]">{title}</strong> : null}

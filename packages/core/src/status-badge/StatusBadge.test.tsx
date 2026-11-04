@@ -122,10 +122,13 @@ describe('StatusBadge', () => {
           Attivo
         </StatusBadge>,
       );
+      // The icon sits in an alignment slot (CapIconSlot, #217): the aria-hidden wrapper is the
+      // slot root (`data-rop-badge-icon`), not necessarily the icon's direct parent.
       const icon = screen.getByTestId('icon');
-      expect(icon.parentElement).toHaveAttribute('aria-hidden', 'true');
+      const wrapper = icon.closest('[data-rop-badge-icon]');
+      expect(wrapper).toHaveAttribute('aria-hidden', 'true');
       expect(screen.queryByRole('img')).toBeNull();
-      expect(icon.parentElement!.nextElementSibling).toHaveTextContent('Attivo');
+      expect(wrapper!.nextElementSibling).toHaveTextContent('Attivo');
     });
 
     it('no icon wrapper without icon', () => {
