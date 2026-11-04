@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hoverRules } from './helpers/css-analysis';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDir = join(packageDir, 'test/fixtures/tailwind-consumer');
@@ -23,6 +24,7 @@ function compile(input: string): string {
   }
 }
 
+const GUARD = '@media (hover: hover) and (pointer: fine)';
 const squash = (css: string): string => css.replace(/\s+/g, ' ');
 
 describe('a Tailwind v4 consumer (theme.css + @source), requires a prior build', () => {
@@ -33,6 +35,17 @@ describe('a Tailwind v4 consumer (theme.css + @source), requires a prior build',
     expect(css).toMatch(/\.font-rop-mono \{ font-family: var\(--font-rop-mono\); \}/);
     expect(css).toMatch(/--font-rop-mono: [^;]*monospace;/);
     expect(css).toMatch(/\.text-rop-error \{ color: var\(--color-rop-error\); \}/);
+  });
+
+  it('the rop-hover variant keeps the hover guard even when the consumer redefines `hover`', () => {
+    const rules = hoverRules(compile('override-hover.css'));
+    const library = rules.filter((r) => r.selector.includes('rop-hover'));
+    expect(library.length).toBeGreaterThan(0);
+    for (const r of library) expect(r.media, r.selector).toContain(GUARD);
+    // The consumer's own `hover:` is the unguarded one it asked for: the override really applied.
+    const own = rules.find((r) => r.selector.includes('hover\\:underline') && !r.selector.includes('rop-hover'));
+    expect(own).toBeDefined();
+    expect(own?.media ?? []).not.toContain(GUARD);
   });
 
   it('importing styles.css on top of theme.css is unsupported (duplication) but does not crash', () => {

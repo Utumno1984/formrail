@@ -132,6 +132,30 @@ export function findGlobalLeaks(css: string): string[] {
   return problems;
 }
 
+export interface HoverRule {
+  selector: string;
+  /** `@media` preludes enclosing the rule, outermost first. */
+  media: string[];
+}
+
+/** Every rule whose selector contains `:hover`, with the `@media` preludes that enclose it. */
+export function hoverRules(css: string): HoverRule[] {
+  const hits: HoverRule[] = [];
+  const walk = (source: string, media: string[]): void => {
+    for (const block of topLevel(source)) {
+      if (block.statement) continue;
+      if (block.prelude.startsWith('@')) {
+        walk(block.body, block.prelude.startsWith('@media') ? [...media, block.prelude] : media);
+      } else {
+        if (block.prelude.includes(':hover')) hits.push({ selector: block.prelude, media });
+        walk(block.body, media);
+      }
+    }
+  };
+  walk(css, []);
+  return hits;
+}
+
 /** Declared custom properties (name -> value) of a CSS text. */
 export function customProperties(css: string): Map<string, string> {
   const vars = new Map<string, string>();

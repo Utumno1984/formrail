@@ -9,12 +9,33 @@
  * - This file is published as `theme.css` for Tailwind v4 projects, and imported by
  *   `index.css` to build `styles.css`.
  */
+/*
+ * Interaction convention: hover feedback is written ONLY as `rop-hover:` (never a bare `hover:`,
+ * `group-hover:` or `peer-hover:`, enforced by a source scan test). It applies on devices whose
+ * primary input can really hover and is precise, so a tap on a touch screen never leaves a stuck
+ * hover state. A named variant (instead of redefining `hover`) keeps the consumer's own `hover:`
+ * classes untouched and does not depend on Tailwind's default `hover` definition.
+ * Pressed feedback is `active:`. Known limit: a hybrid device whose primary pointer is a mouse can
+ * still keep a hover after a finger tap (media queries describe the primary input only); this is
+ * documented, not chased with JavaScript. iOS Safari applies `:active` only when a `touchstart`
+ * listener exists on the event path: React registers one on its root, so nothing else is needed.
+ */
+@custom-variant rop-hover {
+  &:hover {
+    @media (hover: hover) and (pointer: fine) {
+      @slot;
+    }
+  }
+}
+
 @theme static {
   /* Semantic colors */
   --color-rop-text: #1d2d3e;
   --color-rop-text-muted: #556b82;
   --color-rop-surface: #ffffff;
   --color-rop-surface-subtle: #f5f6f7;
+  /* Pressed background of a neutral surface (button, pill, option): one step darker than hover. */
+  --color-rop-surface-pressed: color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black);
   --color-rop-border: #c4cdd6;
   /* Primary scale: blue-600 is the only hardcoded value; every other step is mixed from it. */
   --color-rop-blue-600: #0a6ed1;
@@ -37,6 +58,7 @@
   --color-rop-warning: #b25f00;
   --color-rop-error: #d20a0a;
   --color-rop-error-hover: color-mix(in srgb, var(--color-rop-error) 80%, black);
+  --color-rop-error-active: color-mix(in srgb, var(--color-rop-error) 62%, black);
 
   /* Typographic scale (size + line height) */
   --text-rop-caption: 0.75rem;

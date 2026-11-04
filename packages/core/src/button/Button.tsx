@@ -35,10 +35,10 @@ const BASE =
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   // Hover/active only on an enabled control; primary/danger darken (keeps the white text AA).
   primary:
-    'bg-rop-primary text-rop-primary-contrast not-disabled:not-aria-disabled:hover:bg-rop-primary-hover not-disabled:not-aria-disabled:active:bg-rop-primary-active',
-  secondary: 'border-rop-border bg-rop-surface text-rop-text not-disabled:not-aria-disabled:hover:bg-rop-surface-subtle',
-  ghost: 'bg-transparent text-rop-primary not-disabled:not-aria-disabled:hover:bg-rop-surface-subtle',
-  danger: 'bg-rop-error text-rop-primary-contrast not-disabled:not-aria-disabled:hover:bg-rop-error-hover',
+    'bg-rop-primary text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-primary-hover not-disabled:not-aria-disabled:active:bg-rop-primary-active',
+  secondary: 'border-rop-border bg-rop-surface text-rop-text not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle',
+  ghost: 'bg-transparent text-rop-primary not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle',
+  danger: 'bg-rop-error text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-error-hover',
 };
 
 // Text sizes get their height from line height + vertical padding (+ 2px border), so they grow when
@@ -55,7 +55,7 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
   // not just "overflowing" as documented below).
   // `underline`: inline sits inside running text, where `text-rop-primary` on `text-rop-text` only
   // measures ~2.8:1 (WCAG 1.4.1/technique G183 wants 3:1 to rely on color alone) — permanent, not
-  // `hover:`, since the indicator must be visible without interacting. SVG icons ignore
+  // `rop-hover:`, since the indicator must be visible without interacting. SVG icons ignore
   // text-decoration, so a leading/trailing icon is unaffected.
   inline:
     'h-[1lh] whitespace-nowrap justify-start px-1 align-baseline text-[length:inherit] leading-[inherit] underline underline-offset-2',
