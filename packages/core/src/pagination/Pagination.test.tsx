@@ -275,4 +275,30 @@ describe('Pagination DOM hygiene', () => {
     expect(page.className).toContain('tabular-nums');
     expect(screen.getByRole('button', { name: 'Next page' }).style.minWidth).toBe(page.style.minWidth);
   });
+
+  it('an explicit undefined label behaves like an absent one (default text, never an unnamed control)', () => {
+    render(
+      <Pagination
+        page={2}
+        pageCount={5}
+        labels={{ navigation: undefined, previous: undefined, next: undefined, page: undefined }}
+      />,
+    );
+    expect(screen.getByRole('navigation', { name: 'Pagination' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous page' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next page' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Page 2' })).toBeInTheDocument();
+  });
+
+  it('a stable ref callback is attached once, not detached and re-attached on every render', () => {
+    const calls: Array<HTMLElement | null> = [];
+    const ref = (node: HTMLElement | null) => {
+      calls.push(node);
+    };
+    const { rerender } = render(<Pagination ref={ref} page={1} pageCount={5} />);
+    rerender(<Pagination ref={ref} page={2} pageCount={5} />);
+    rerender(<Pagination ref={ref} page={3} pageCount={5} />);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toBe(screen.getByRole('navigation'));
+  });
 });

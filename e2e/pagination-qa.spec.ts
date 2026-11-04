@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const MANUAL = 'navigation-pagination--manual';
 const nav = (page: Page) => page.getByTestId('pagination');
@@ -79,5 +79,9 @@ test.describe('Navigation/Pagination QA', () => {
     }));
     expect(m.s).toBeLessThanOrEqual(m.c);
     expect((await nav(page).boundingBox())!.height).toBeLessThanOrEqual(40);
+  });
+
+  test('disabled while a page loads: the focus ends on the current page, never on body', async ({ page }) => {
+    await expectPlayToPass(page, 'navigation-pagination--loading-on-change');
   });
 });

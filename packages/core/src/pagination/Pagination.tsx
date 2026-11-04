@@ -105,7 +105,13 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
     ...rest
   } = props;
 
-  const text = { ...DEFAULT_LABELS, ...labels };
+  // `?? default` per key: an explicit `undefined` behaves like an absent key (never an unnamed control).
+  const text = {
+    navigation: labels?.navigation ?? DEFAULT_LABELS.navigation,
+    previous: labels?.previous ?? DEFAULT_LABELS.previous,
+    next: labels?.next ?? DEFAULT_LABELS.next,
+    page: labels?.page ?? DEFAULT_LABELS.page,
+  };
   const pageCount = Math.max(1, toInt(pageCountProp, 1, 0));
   const page = Math.min(toInt(pageProp, 1, 1), pageCount);
   const siblingCount = toInt(siblingProp, 1, 0);
@@ -124,6 +130,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   }, [page, pageProp, pageCount]);
 
   const navRef = useRef<HTMLElement | null>(null);
+  const mergedRef = useMemo(() => composeRefs(ref, navRef), [ref]);
   const [rtl, setRtl] = useState(false);
   useIsomorphicLayoutEffect(() => {
     const node = navRef.current;
@@ -146,17 +153,34 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
     onBlur?.(event);
   };
 
+  // The focused button was lost while the whole control is disabled (e.g. `disabled` while a page
+  // loads): there is nowhere to move the focus yet, so the restore waits until the control is enabled.
+  const restorePending = useRef(false);
+
   useIsomorphicLayoutEffect(() => {
+    const active = document.activeElement;
+    const onNothing = active === null || active === document.body;
+    const current = currentRef.current;
+
+    if (restorePending.current) {
+      if (!onNothing) {
+        restorePending.current = false; // the focus is somewhere real: nothing to restore
+      } else if (current && !current.disabled) {
+        restorePending.current = false;
+        current.focus();
+      }
+      return;
+    }
+
     const el = lastFocused.current;
     if (!el) return;
     const lost = !el.isConnected || (el as HTMLButtonElement).disabled;
-    const active = document.activeElement;
-    if (lost && (active === null || active === document.body || active === el)) {
-      const current = currentRef.current;
+    if (lost && (onNothing || active === el)) {
       if (current && !current.disabled) {
         current.focus();
       } else {
         lastFocused.current = null;
+        restorePending.current = true;
       }
     }
   });
@@ -214,7 +238,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   return (
     <nav
       {...rest}
-      ref={composeRefs(ref, navRef)}
+      ref={mergedRef}
       aria-label={ariaLabel ?? text.navigation}
       style={style}
       className={cn('inline-block max-w-full font-rop-sans', className)}

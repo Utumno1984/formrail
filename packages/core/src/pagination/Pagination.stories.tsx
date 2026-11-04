@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Pagination, type PaginationProps } from './Pagination';
 
 interface DemoArgs extends Omit<PaginationProps, 'onPageChange'> {
@@ -97,6 +97,46 @@ export const Disabled: Story = {
   tags: ['visual'],
   parameters: noControls,
   args: { page: 60, pageCount: 120, disabled: true },
+};
+
+/** The parent disables the whole control while the new page "loads" (300 ms): the focus is not lost. */
+function LoadingDemo({ onPageChange, ...args }: DemoArgs) {
+  const [page, setPage] = useState(args.page);
+  const [loading, setLoading] = useState(false);
+  return (
+    <div style={{ padding: 8 }}>
+      <Pagination
+        {...args}
+        data-testid="pagination"
+        page={page}
+        disabled={loading}
+        onPageChange={(next) => {
+          onPageChange(next);
+          setPage(next);
+          setLoading(true);
+          window.setTimeout(() => setLoading(false), 300);
+        }}
+      />
+    </div>
+  );
+}
+
+export const LoadingOnChange: Story = {
+  parameters: noControls,
+  args: { page: 5, pageCount: 10 },
+  render: (args) => <LoadingDemo {...(args as DemoArgs)} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const next = canvas.getByRole('button', { name: 'Next page' });
+    next.focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onPageChange).toHaveBeenCalledWith(6);
+    // once loading ends the focus is on the current page, not on <body>, and Enter keeps working
+    await waitFor(() => expect(canvas.getByRole('button', { name: 'Page 6' })).toBeEnabled(), { timeout: 2000 });
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Page 6'));
+    await userEvent.keyboard('{Tab}{Enter}');
+    await expect(args.onPageChange).toHaveBeenLastCalledWith(7);
+  },
 };
 
 /** Visual: right-to-left; the arrows are mirrored. */
