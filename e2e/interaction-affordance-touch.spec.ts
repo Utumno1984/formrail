@@ -5,6 +5,8 @@ import { expectPlayToPass } from './helpers/story';
 // A phone profile: `hover: none` and `pointer: coarse`, so the `rop-hover` variant must not apply.
 // The "chromium-touch" project only adds `hasTouch`, which does not change those media features:
 // the precondition is therefore asserted in every test, so none can pass vacuously.
+// `defaultBrowserType` cannot be set inside a describe block, so it is dropped from the profile.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { defaultBrowserType: _ignored, ...phone } = devices['Pixel 5'];
 test.use({ ...phone, reducedMotion: 'reduce' });
 

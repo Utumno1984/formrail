@@ -118,9 +118,15 @@ function Surfaces({ disabled, state, onClick, onValueChange, onFilterChange }: S
             Danger
           </Button>
           <Button variant="secondary" asChild>
-            <a aria-disabled={disabled ? 'true' : undefined} onClick={(e) => (disabled ? e.preventDefault() : onClick())}>
+            <span
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-disabled={disabled ? 'true' : undefined}
+              onClick={() => (disabled ? undefined : onClick())}
+              onKeyDown={(e) => (!disabled && (e.key === 'Enter' || e.key === ' ') ? onClick() : undefined)}
+            >
               As child, no href
-            </a>
+            </span>
           </Button>
         </div>
       </Group>
@@ -180,7 +186,10 @@ function Surfaces({ disabled, state, onClick, onValueChange, onFilterChange }: S
           </BreadcrumbItem>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
-              <a onClick={onClick}>Invoices (as child, no href)</a>
+              {/* Like a router Link without href: no native pointer, the library must supply it. */}
+              <span role="link" tabIndex={0} onClick={onClick} onKeyDown={(e) => (e.key === 'Enter' ? onClick() : undefined)}>
+                Invoices (as child, no href)
+              </span>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbItem>
