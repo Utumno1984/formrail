@@ -27,6 +27,7 @@ const EXPORTS = [
   'CardFooter',
   'CardHeader',
   'CardTitle',
+  'Checkbox',
   'Combobox',
   'DescriptionList',
   'DescriptionListItem',

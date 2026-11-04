@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { addons } from 'storybook/preview-api';
-import { UPDATE_STORY_ARGS } from 'storybook/internal/core-events';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { Checkbox, type CheckedState } from './Checkbox';
@@ -79,36 +78,47 @@ function Controlled({
 
 const box = (canvasElement: HTMLElement) => within(canvasElement).getByRole('checkbox');
 
-/**
- * Controls: `checked`, the Field state, `invalid`, `required` and the labels; `onCheckedChange` is in
- * Actions. The play function ticks the box by clicking its inline label, then switches the Field to
- * `forced` and checks that a click on the Field's label and Space change nothing and report nothing.
- */
-export const Playground: Story = {
-  render: ({ fieldState, invalid, required, fieldLabel, inlineLabel, checked, onCheckedChange }) => (
+/** The Playground body: the Field state starts from the Controls, and a button can switch it to `forced`. */
+function PlaygroundDemo({ fieldState, invalid, required, fieldLabel, inlineLabel, checked, onCheckedChange }: DemoArgs) {
+  const [state, setState] = useState<FieldState>(fieldState);
+  useEffect(() => setState(fieldState), [fieldState]);
+  return (
     <div style={column}>
       <Field
         label={fieldLabel}
         help="You can change this later."
         error={invalid ? 'You must accept to continue.' : undefined}
         required={required}
-        {...stateProps(fieldState)}
+        {...stateProps(state)}
       >
         <Controlled initial={checked} inlineLabel={inlineLabel} onCheckedChange={onCheckedChange} />
       </Field>
+      <Button variant="secondary" onClick={() => setState('forced')}>
+        Force this value
+      </Button>
     </div>
-  ),
-  play: async ({ args, canvasElement, id }) => {
+  );
+}
+
+/**
+ * Controls: `checked`, the Field state, `invalid`, `required` and the labels; `onCheckedChange` is in
+ * Actions. The play function ticks the box by clicking its inline label, then forces the value with
+ * the button and checks that a click on the Field's label and Space change nothing and report nothing.
+ */
+export const Playground: Story = {
+  render: (args) => <PlaygroundDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
     if (args.fieldState !== 'default' || args.checked !== false) return;
+    const canvas = within(canvasElement);
     const control = box(canvasElement);
-    await userEvent.click(within(canvasElement).getByText(args.inlineLabel));
+    await userEvent.click(canvas.getByText(args.inlineLabel));
     await expect(control).toBeChecked();
     await expect(args.onCheckedChange).toHaveBeenCalledTimes(1);
     await expect(args.onCheckedChange).toHaveBeenLastCalledWith(true);
 
-    addons.getChannel().emit(UPDATE_STORY_ARGS, { storyId: id, updatedArgs: { fieldState: 'forced' } });
+    await userEvent.click(canvas.getByRole('button', { name: 'Force this value' }));
     await waitFor(() => expect(control).toHaveAttribute('aria-readonly', 'true'));
-    await userEvent.click(within(canvasElement).getByText(args.fieldLabel));
+    await userEvent.click(canvas.getByText(args.fieldLabel));
     control.focus();
     await userEvent.keyboard(' ');
     await expect(control).toBeChecked();
@@ -118,7 +128,7 @@ export const Playground: Story = {
 
 /** The Playground without a play function: for manual testing and for the e2e that drive the real keyboard and mouse. */
 export const Manual: Story = {
-  render: Playground.render,
+  render: (args) => <PlaygroundDemo {...args} />,
 };
 
 const MATRIX_CHECKED: { name: string; value: CheckedState }[] = [
@@ -221,6 +231,33 @@ export const SelectAll: Story = {
     await userEvent.click(parent);
     await expect(parent).not.toBeChecked();
   },
+};
+
+/** Uncontrolled inside a native form: `name`/`value` are submitted only when ticked, and Reset restores `defaultChecked` without reporting. */
+export const InForm: Story = {
+  render: ({ onCheckedChange }) => (
+    <form
+      style={column}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget);
+        event.currentTarget.dataset.submitted = JSON.stringify(Array.from(data.keys()));
+      }}
+    >
+      <Checkbox name="news" value="yes" defaultChecked onCheckedChange={onCheckedChange}>
+        Newsletter
+      </Checkbox>
+      <Checkbox name="terms" value="yes" onCheckedChange={onCheckedChange}>
+        Terms
+      </Checkbox>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button type="submit">Submit</Button>
+        <Button type="reset" variant="secondary">
+          Reset
+        </Button>
+      </div>
+    </form>
+  ),
 };
 
 /** Mounted unchecked, then `true` arrives from a "fetch": the box updates and nothing is reported. */

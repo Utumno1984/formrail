@@ -60,8 +60,7 @@ const BOX =
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:border-[ButtonText] forced-colors:checked:bg-[Highlight] forced-colors:indeterminate:bg-[Highlight]';
 const MARK =
-  'pointer-events-none absolute start-1/2 top-1/2 hidden h-3 w-3 -translate-x-1/2 -translate-y-1/2 rtl:translate-x-1/2 ' +
-  'text-rop-primary-contrast forced-colors:text-[HighlightText]';
+  'pointer-events-none absolute inset-0 m-auto hidden h-3 w-3 text-rop-primary-contrast forced-colors:text-[HighlightText]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 
 const BOTH_WARNING =
