@@ -54,7 +54,7 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
     };
   }, [scrollerRef]);
 
-  // Keeps the active link visible in the (horizontally scrolling) list. Scrolls the list itself, never
+  // Keeps the active link centered in the (horizontally scrolling) list. Scrolls the list itself, never
   // `scrollIntoView`, which would also move the vertical scroller.
   useEffect(() => {
     const list = listRef.current;
@@ -63,8 +63,12 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
     if (!link) return;
     const listBox = list.getBoundingClientRect();
     const linkBox = link.getBoundingClientRect();
-    if (linkBox.left < listBox.left) list.scrollLeft += linkBox.left - listBox.left;
-    else if (linkBox.right > listBox.right) list.scrollLeft += linkBox.right - listBox.right;
+    // Always centers, even when the link is already visible: the native focus scroll of a click centers
+    // the link while it still has the idle weight (the active style then widens it), and a scroll that
+    // only acts on an off-screen link would leave that position or its own depending on which links
+    // were active on the way. Centering with the final geometry makes the position a function of the
+    // active link alone. The browser clamps at both ends of the list.
+    list.scrollLeft += (linkBox.left + linkBox.right) / 2 - (listBox.left + listBox.right) / 2;
   }, [activeId]);
 
   const navigate = (event: MouseEvent<HTMLAnchorElement>, id: string) => {

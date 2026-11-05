@@ -279,6 +279,34 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
     expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0);
   });
 
+  test('at 375px an off-screen active link is centered in the bar, whatever links were active before', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 700 });
+    const target = 'Allegati e documenti collegati';
+    const finalState = async (via: string[]) => {
+      await gotoStory(page, STORY('many-sections'));
+      for (const name of [...via, target]) {
+        await page.getByRole('link', { name, exact: true }).click();
+        await expect.poll(async () => (await activeNames(page))[0]).toBe(name);
+        await settle(page);
+      }
+      // The link's center aligned with the list's center, up to rounding.
+      await expect
+        .poll(() =>
+          page.locator(`${BAR} a[aria-current]`).evaluate((a) => {
+            const l = a.closest('ul')!.getBoundingClientRect();
+            const r = a.getBoundingClientRect();
+            return Math.abs((r.left + r.right) / 2 - (l.left + l.right) / 2);
+          }),
+        )
+        .toBeLessThanOrEqual(2);
+      return page.locator(`${BAR} ul`).evaluate((el) => el.scrollLeft);
+    };
+    const direct = await finalState([]);
+    const viaIntermediate = await finalState(['Fornitore e coordinate bancarie', 'Registro di audit completo']);
+    expect(direct).toBeGreaterThan(0);
+    expect(Math.abs(viaIntermediate - direct)).toBeLessThanOrEqual(2);
+  });
+
   test('a tooltip opened in a section stays above the bar', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('tooltip-over-bar'));
