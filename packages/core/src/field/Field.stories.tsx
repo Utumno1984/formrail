@@ -95,7 +95,7 @@ export const Playground: Story = {
     const input = canvas.getByRole('textbox', { name: 'Ragione sociale' });
     await userEvent.type(input, 'Contoso');
     await expect(input).toHaveValue('Contoso');
-    await expect(args.onChange).toHaveBeenCalledTimes(4);
+    await expect(args.onChange).toHaveBeenCalledTimes(7);
     await expect(input).toHaveAccessibleDescription('Come appare in fattura.');
     // The `name` control reaches the control as `data-rop-name` (and the native `name`).
     await expect(input).toHaveAttribute('data-rop-name', args.name);
