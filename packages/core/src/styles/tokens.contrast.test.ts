@@ -118,7 +118,16 @@ describe('contrast', () => {
 
   // ProgressBar: the fill tones against the track (non-text component, WCAG 1.4.11).
   it.each(['primary', 'success', 'error'])('ProgressBar %s fill on the track is at least 3:1 (WCAG 1.4.11)', (tone) => {
-    expect(contrast(token(tone), token('border'))).toBeGreaterThanOrEqual(3);
+    expect(contrast(token(tone), token('border-subtle'))).toBeGreaterThanOrEqual(3);
+  });
+
+  // Control outlines (Input, Select, Combobox, secondary Button), WCAG 1.4.11.
+  it.each(['surface', 'surface-subtle'])('control outline (border) on %s is at least 3:1 (WCAG 1.4.11)', (name) => {
+    expect(contrast(token('border'), token(name))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('the soft neutral (border-subtle) stays lighter than the control outline', () => {
+    expect(luminance(token('border-subtle'))).toBeGreaterThan(luminance(token('border')));
   });
 
   // Checkbox: the box border (text-muted) on the surface and the white mark on the filled box, WCAG 1.4.11.

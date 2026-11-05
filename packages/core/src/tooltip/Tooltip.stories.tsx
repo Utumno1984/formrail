@@ -439,7 +439,7 @@ export const ClippedAndInSheet: Story = {
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => (
     <Page>
-      <div style={{ overflow: 'hidden', width: 80, height: 40, border: '1px solid #c4cdd6', marginBottom: 24 }}>
+      <div style={{ overflow: 'hidden', width: 80, height: 40, border: '1px solid var(--color-rop-border)', marginBottom: 24 }}>
         <Tooltip content="Non tagliato dal contenitore" delayDuration={delayDuration} side="right">
           <TrashButton label="Nel contenitore" />
         </Tooltip>

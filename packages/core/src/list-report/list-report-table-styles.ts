@@ -42,7 +42,7 @@ export const nodeWrapperClass = 'min-w-0 overflow-hidden';
 
 export const sortButtonClass =
   'flex w-full min-w-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-start [font:inherit] ' +
-  'rounded-rop-sm text-inherit rop-hover:bg-rop-border/30 active:bg-rop-border/60 ' +
+  'rounded-rop-sm text-inherit rop-hover:bg-rop-border-subtle/30 active:bg-rop-border-subtle/60 ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
 
 // The arrow always takes its space (no shift when a column becomes sorted): unsorted it is invisible.
@@ -72,7 +72,7 @@ export const fillerCellClass = 'px-0 py-px';
 export const stateBoxClass =
   'sticky start-0 flex max-w-full flex-col items-center justify-center gap-3 p-4 text-center text-rop-text-muted';
 export const stateStripClass = 'w-full max-w-prose text-start text-rop-text';
-export const skeletonBarClass = 'block h-3 w-3/4 max-w-48 rounded-rop-md bg-rop-border';
+export const skeletonBarClass = 'block h-3 w-3/4 max-w-48 rounded-rop-md bg-rop-border-subtle';
 
 // Selection column (only with `selection.enabled`): a square column as wide as a row is tall, the box
 // centred in it. The header cell keeps the sticky classes of the other header cells.

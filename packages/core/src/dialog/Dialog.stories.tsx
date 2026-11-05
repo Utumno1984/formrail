@@ -205,7 +205,7 @@ export const WideTable: Story = {
               {Array.from({ length: 4 }, (_, r) => (
                 <tr key={r}>
                   {Array.from({ length: 12 }, (_, c) => (
-                    <td key={c} style={{ border: '1px solid #c4cdd6', padding: '4px 12px' }}>
+                    <td key={c} style={{ border: '1px solid var(--color-rop-border)', padding: '4px 12px' }}>
                       R{r + 1}C{c + 1}
                     </td>
                   ))}
