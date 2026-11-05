@@ -20,6 +20,7 @@ import {
   COMBOBOX_LIST,
   COMBOBOX_OPTION,
   COMBOBOX_SIZE,
+  COMBOBOX_STATUS,
 } from '../internal/combobox-styles';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
@@ -113,6 +114,13 @@ function useKeyboardOpen(active: boolean): boolean {
  *
  * `onValueChange` is called only for a user gesture: a `value` that changes from outside, to an
  * option that has just arrived, an unknown value or `undefined`, is just a render.
+ *
+ * When the open list has nothing to show, `emptyLabel` is both the list's disabled option and the
+ * text of a visually hidden `role="status"` region next to the input, announced once each time the
+ * list enters that state and emptied when results come back or the list closes. A second query that
+ * also matches nothing leaves the text as it is, so it is not announced again (the state has not
+ * changed). The Combobox has no loading state: `options={[]}` while the parent is loading shows and
+ * announces `emptyLabel`, exactly like the list does.
  */
 export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxProps>(function Combobox(props, ref) {
   const {
@@ -201,6 +209,11 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
   });
 
   const listbox = combobox.getListboxProps<HTMLDivElement>({ ref: setListEl });
+  // While typing the focus stays on the input, so the disabled message option is never read on its
+  // own: the state is announced by a live region instead. Its text depends only on "the open list
+  // shows the message", so keystrokes that keep that state leave the DOM text untouched (React skips
+  // an identical text) and nothing is re-announced; each entry into the state is a new announcement.
+  const noResults = shown && combobox.filteredItems.length === 0;
 
   return (
     <Popover.Root
@@ -217,6 +230,11 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
             ref={inputProps.ref}
             className={cn(COMBOBOX_INPUT, CONTROL_INVALID, COMBOBOX_SIZE[size], className)}
           />
+          {/* Always mounted and outside the portal: a live region inserted already filled is not
+              announced. Out of the flex flow (absolute), so the anchor keeps the input's box. */}
+          <div role="status" aria-live="polite" aria-atomic="true" className={COMBOBOX_STATUS}>
+            {noResults ? emptyLabel : ''}
+          </div>
         </div>
       </Popover.Anchor>
       {shown ? null : <div {...listbox} ref={undefined} hidden />}

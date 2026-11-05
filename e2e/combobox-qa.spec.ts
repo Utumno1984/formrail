@@ -156,7 +156,8 @@ test.describe("QA #45: onValueChange contract", () => {
     const box = input(page);
     await box.click();
     await release(page);
-    await expect(page.getByText("No results")).toBeVisible();
+    // Scoped to the list: the live region next to the input carries the same text.
+    await expect(page.getByRole("listbox").getByText("No results")).toBeVisible();
     await page.keyboard.press("Enter"); // empty options: nothing happens
     await page.keyboard.press("ArrowDown");
     await page
