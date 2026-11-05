@@ -7,6 +7,7 @@ const VALUE_TYPES = 'pro-changesummary--value-types';
 const EMPTY = 'pro-changesummary--empty';
 const LONG_VALUES = 'pro-changesummary--long-values';
 const EDITED = 'pro-changesummary--edited-invoice';
+const NO_VALUE_STATES = 'pro-changesummary--no-value-states';
 
 /** Makes the Playground summary non-empty (the play function ends with "Discard"). */
 async function editAmount(page: Page, value: string) {
@@ -128,6 +129,44 @@ test.describe('Pro/ChangeSummary', () => {
     await expect(note.getByText('Empty', { exact: true })).toHaveCSS('font-style', 'italic');
     const memo = page.getByRole('listitem').filter({ hasText: /^Memo/ });
     await expect(memo.getByText('No value', { exact: true })).toHaveCSS('font-style', 'italic');
+  });
+
+  test('the NoValueStates play function passes (the summary follows the dirty state)', async ({ page }) => {
+    await expectPlayToPass(page, NO_VALUE_STATES);
+  });
+
+  test('a nullable field typed and cleared stays in the summary; a field with an empty baseline does not', async ({ page }) => {
+    await expectPlayToPass(page, NO_VALUE_STATES);
+    const note = page.getByRole('textbox', { name: 'Note' });
+    await note.fill('abc');
+    await note.fill('');
+    await expect(page.getByText('Unsaved changes')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Changes' })).toMatchAriaSnapshot(`
+      - list "Changes":
+        - listitem: Note, added, Empty
+    `);
+    await page.getByRole('button', { name: 'Discard' }).click();
+    await expect(page.getByRole('list', { name: 'Changes' })).toHaveCount(0);
+
+    const memo = page.getByRole('textbox', { name: 'Memo' });
+    await memo.fill('abc');
+    await memo.fill('');
+    await expect(page.getByText('All saved')).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Changes' })).toHaveCount(0);
+    await expect(page.getByText('No changes')).toBeVisible();
+  });
+
+  test('two no-value states read differently and stay muted', async ({ page }) => {
+    await expectPlayToPass(page, NO_VALUE_STATES);
+    await page.getByRole('button', { name: 'Clear note to undefined' }).click();
+    const list = page.getByRole('list', { name: 'Changes' });
+    await expect(list).toMatchAriaSnapshot(`
+      - list "Changes":
+        - listitem: Note, changed, from Null to Undefined
+    `);
+    await expect(list.getByText('Null', { exact: true })).toHaveCSS('font-style', 'italic');
+    await expect(list.getByText('Undefined', { exact: true })).toHaveCSS('font-style', 'italic');
+    await expectNoA11yViolations(page);
   });
 
   for (const [name, width, height] of [
