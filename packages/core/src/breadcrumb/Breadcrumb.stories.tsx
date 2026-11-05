@@ -3,12 +3,12 @@ import { forwardRef, type AnchorHTMLAttributes } from 'react';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, type BreadcrumbProps } from './Breadcrumb';
 
-const SHORT = ['Home', 'Invoices', 'Suppliers', 'Acme', 'Orders', '2026-0142'];
+const SHORT = ['Home', 'Invoices', 'Suppliers', 'Contoso', 'Orders', '2026-0142'];
 const LONG = [
   'Home of the finance department',
   'Invoices received from suppliers',
   'Suppliers located in northern Italy',
-  'Acme Manufacturing S.r.l. unipersonale',
+  'Contoso Manufacturing S.r.l. unipersonale',
   'Purchase orders waiting for approval',
   'INVOICE-2026-0142-ACME-MANUFACTURING-FINAL',
 ];
@@ -79,7 +79,7 @@ export const Playground: Story = {
     const second = canvas.getAllByRole('link')[1]!;
     await expect(second).toHaveFocus();
     await userEvent.keyboard('{Enter}');
-    await expect(args.onNavigate).toHaveBeenCalledWith('Acme');
+    await expect(args.onNavigate).toHaveBeenCalledWith('Contoso');
     const current = canvas.getByText('2026-0142');
     await expect(current).toHaveAttribute('aria-current', 'page');
     await expect(current).not.toHaveAttribute('tabindex');

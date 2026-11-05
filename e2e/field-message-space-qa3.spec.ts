@@ -82,7 +82,7 @@ test('tab order: error slot not focusable', async ({ page }) => {
     );
   }
   console.log(seq.join(' | '));
-  expect(seq).toEqual(['BUTTON:Show error', 'BUTTON:Show long error', 'BUTTON:Clear', 'INPUT:12345', 'INPUT:Acme']);
+  expect(seq).toEqual(['BUTTON:Show error', 'BUTTON:Show long error', 'BUTTON:Clear', 'INPUT:12345', 'INPUT:Contoso']);
 });
 
 test('accessible description order with error, help, reason', async ({ page }) => {

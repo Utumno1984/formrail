@@ -113,7 +113,7 @@ test.describe('Forms/Field', () => {
     const input = page.getByRole('textbox', { name: 'Ragione sociale' });
     await countInputEvents(page);
     await page.getByRole('button', { name: 'Carica dati' }).click();
-    await expect(input).toHaveValue('Acme S.p.A.');
+    await expect(input).toHaveValue('Contoso S.p.A.');
     expect(await inputEvents(page)).toBe(0);
     await input.focus();
     await page.keyboard.type('!');

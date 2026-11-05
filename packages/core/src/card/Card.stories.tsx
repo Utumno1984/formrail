@@ -45,7 +45,7 @@ const meta = {
       <Card {...args} data-testid="card">
         <CardHeader>
           <CardTitle level={level}>Invoice 2026-0142</CardTitle>
-          {showDescription ? <CardDescription>Acme S.r.l. - due on 30 November</CardDescription> : null}
+          {showDescription ? <CardDescription>Contoso S.r.l. - due on 30 November</CardDescription> : null}
         </CardHeader>
         <CardBody>
           <a href="#details" onClick={(e) => e.preventDefault()}>
@@ -111,7 +111,7 @@ export const Complete: Story = {
       <Card as="article" data-testid="card">
         <CardHeader>
           <CardTitle>Invoice 2026-0142</CardTitle>
-          <CardDescription>Acme S.r.l. - due on 30 November</CardDescription>
+          <CardDescription>Contoso S.r.l. - due on 30 November</CardDescription>
         </CardHeader>
         <CardBody>Total 1,240.00 EUR, 22% VAT included. Approved by the finance team.</CardBody>
         <CardFooter>

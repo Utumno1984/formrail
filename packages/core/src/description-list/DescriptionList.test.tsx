@@ -8,7 +8,7 @@ describe('DescriptionList', () => {
     it('renders a <dl> of <div> items, each with one <dt> and one <dd>', () => {
       const { container } = render(
         <DescriptionList>
-          <DescriptionListItem label="Supplier">Acme</DescriptionListItem>
+          <DescriptionListItem label="Supplier">Contoso</DescriptionListItem>
           <DescriptionListItem label="Total">120</DescriptionListItem>
         </DescriptionList>,
       );
@@ -21,7 +21,7 @@ describe('DescriptionList', () => {
         expect(Array.from(item.children).map((c) => c.tagName)).toEqual(['DT', 'DD']);
       }
       expect(screen.getByText('Supplier').tagName).toBe('DT');
-      expect(screen.getByText('Acme').tagName).toBe('DD');
+      expect(screen.getByText('Contoso').tagName).toBe('DD');
     });
 
     it('renders an empty <dl> for zero items without errors', () => {

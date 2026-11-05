@@ -134,7 +134,7 @@ export const Overview: Story = {
       <section aria-label="In a description list" style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
         {(['inline', 'stacked'] as const).map((layout) => (
           <DescriptionList key={layout} layout={layout} data-testid={`dl-${layout}`}>
-            <DescriptionListItem label="Cliente">Acme S.r.l.</DescriptionListItem>
+            <DescriptionListItem label="Cliente">Contoso S.r.l.</DescriptionListItem>
             <DescriptionListItem label="Stato">
               <StatusBadge tone="success" data-testid={`dl-badge-${layout}`}>
                 Attivo

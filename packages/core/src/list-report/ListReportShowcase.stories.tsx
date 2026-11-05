@@ -293,8 +293,8 @@ export const SmartFilterBarShowcase: Story = {
     await expect(args.onClick).toHaveBeenCalledTimes(1);
     const overlay = await body.findByRole('dialog', { name: 'New invoice' });
     await settleMotion();
-    await userEvent.type(within(overlay).getByRole('textbox', { name: 'Supplier name' }), 'Acme');
-    await expect(within(overlay).getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Acme');
+    await userEvent.type(within(overlay).getByRole('textbox', { name: 'Supplier name' }), 'Contoso');
+    await expect(within(overlay).getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Contoso');
 
     await userEvent.click(within(overlay).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());

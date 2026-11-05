@@ -15,7 +15,7 @@ const cjs = createRequire(import.meta.url)(distCjs) as Api;
 const baseline = {
   number: 'INV-1',
   note: null as string | null,
-  supplier: { name: 'Acme', vatNumber: 'IT111' },
+  supplier: { name: 'Contoso', vatNumber: 'IT111' },
   lineItems: [
     { id: 'a', description: 'Desk', price: 100 },
     { id: 'b', description: 'Chair', price: 50 },
@@ -27,7 +27,7 @@ const baseline = {
 const values = {
   ...baseline,
   note: '',
-  supplier: { name: 'Acme', vatNumber: 'IT222' },
+  supplier: { name: 'Contoso', vatNumber: 'IT222' },
   lineItems: [
     { id: 'a', description: 'Desk', price: 120 }, // modified
     { id: 'd', description: 'Shelf', price: 70 }, // swapped with c

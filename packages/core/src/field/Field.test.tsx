@@ -201,12 +201,12 @@ describe('Field', () => {
   it('forced -> default after mount drops readOnly and the reason, keeping the current value', () => {
     const { rerender } = render(
       <Field label="Nome" state="forced" stateReason="Regola">
-        <Input defaultValue="Acme" />
+        <Input defaultValue="Contoso" />
       </Field>,
     );
     rerender(
       <Field label="Nome">
-        <Input defaultValue="Acme" />
+        <Input defaultValue="Contoso" />
       </Field>,
     );
     const input = screen.getByRole('textbox', { name: 'Nome' });
@@ -214,19 +214,19 @@ describe('Field', () => {
     expect(input).not.toHaveAttribute('aria-readonly');
     expect(input).not.toHaveAttribute('aria-describedby');
     expect(screen.queryByText('Regola')).toBeNull();
-    expect(input).toHaveValue('Acme');
+    expect(input).toHaveValue('Contoso');
   });
 
   it('a forced input ignores typing and Backspace and never calls onChange', async () => {
     const onChange = vi.fn();
     render(
       <Field label="Nome" state="forced" stateReason="Regola">
-        <Input value="Acme" onChange={onChange} />
+        <Input value="Contoso" onChange={onChange} />
       </Field>,
     );
     const input = screen.getByRole('textbox', { name: 'Nome' });
     await userEvent.type(input, 'xyz{Backspace}');
-    expect(input).toHaveValue('Acme');
+    expect(input).toHaveValue('Contoso');
     expect(onChange).not.toHaveBeenCalled();
   });
 

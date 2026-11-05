@@ -93,8 +93,8 @@ export const Playground: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const input = canvas.getByRole('textbox', { name: 'Ragione sociale' });
-    await userEvent.type(input, 'Acme');
-    await expect(input).toHaveValue('Acme');
+    await userEvent.type(input, 'Contoso');
+    await expect(input).toHaveValue('Contoso');
     await expect(args.onChange).toHaveBeenCalledTimes(4);
     await expect(input).toHaveAccessibleDescription('Come appare in fattura.');
     // The `name` control reaches the control as `data-rop-name` (and the native `name`).
@@ -163,7 +163,7 @@ function LoadData({ onChange }: { onChange: PlaygroundArgs['onChange'] }) {
           }}
         />
       </Field>
-      <Button onClick={() => setValue('Acme S.p.A.')}>Carica dati</Button>
+      <Button onClick={() => setValue('Contoso S.p.A.')}>Carica dati</Button>
     </div>
   );
 }
@@ -179,7 +179,7 @@ export const ExternalValue: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Carica dati' }));
     const input = canvas.getByRole('textbox', { name: 'Ragione sociale' });
-    await expect(input).toHaveValue('Acme S.p.A.');
+    await expect(input).toHaveValue('Contoso S.p.A.');
     await expect(args.onChange).not.toHaveBeenCalled();
     await userEvent.type(input, '!');
     await expect(args.onChange).toHaveBeenCalledTimes(1);
@@ -301,7 +301,7 @@ export const ErrorReservesSpace: Story = {
           <Input defaultValue="12345" />
         </Field>
         <Field label="Company name" data-testid="er-second">
-          <Input defaultValue="Acme" />
+          <Input defaultValue="Contoso" />
         </Field>
       </div>
     );
@@ -335,7 +335,7 @@ export const Overview: Story = {
         <Input placeholder="Testo" />
       </Field>
       <Field label="Con aiuto" help="Visibile in fattura." data-testid="f-help">
-        <Input defaultValue="Acme" />
+        <Input defaultValue="Contoso" />
       </Field>
       <Field label="Con errore" error="Campo obbligatorio." help="Aiuto" data-testid="f-error">
         <Input />

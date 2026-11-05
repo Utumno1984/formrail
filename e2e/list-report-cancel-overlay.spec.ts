@@ -244,7 +244,7 @@ for (const vp of VIEWPORTS) {
       const field = overlay(page).getByRole('textbox', { name: 'Supplier name' });
       await field.click();
       await expect(field).toBeFocused();
-      await field.pressSequentially('Acme');
+      await field.pressSequentially('Contoso');
       expect(await snapshot(page)).toEqual(before);
       await overlay(page).getByRole('button', { name: 'Cancel' }).click();
       await expectRestored(page, before);
@@ -290,7 +290,7 @@ test('the Dialog field keeps the table scroll too', async ({ page }) => {
   await newButton(page).click();
   const field = overlay(page).getByRole('textbox', { name: 'Supplier name' });
   await field.click();
-  await field.pressSequentially('Acme');
+  await field.pressSequentially('Contoso');
   expect(await snapshot(page)).toEqual(before);
   await page.keyboard.press('Escape');
   await expectRestored(page, before);

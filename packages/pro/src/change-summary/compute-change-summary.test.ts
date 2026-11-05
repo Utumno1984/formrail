@@ -248,8 +248,8 @@ describe('scalars, objects, special types', () => {
 
   it('descends nested plain objects to the leaves with the full path', () => {
     const entries = diff(
-      { supplier: { name: 'Acme', address: { city: 'Rome', zip: '00100' } } },
-      { supplier: { name: 'Acme', address: { city: 'Milan', zip: '00100' } } },
+      { supplier: { name: 'Contoso', address: { city: 'Rome', zip: '00100' } } },
+      { supplier: { name: 'Contoso', address: { city: 'Milan', zip: '00100' } } },
     );
     expect(brief(entries)).toEqual([{ path: 'supplier.address.city', kind: 'changed', before: 'Rome', after: 'Milan' }]);
     expect(entries[0]?.labelPath).toEqual(['Supplier', 'Address', 'City']);

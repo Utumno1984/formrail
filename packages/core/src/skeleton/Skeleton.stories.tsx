@@ -40,7 +40,7 @@ function CardDemo({ onLoad, loaded: initiallyLoaded = false, variant, textVarian
         {loaded ? (
           <>
             <Title level={3}>Invoice 2024-0042</Title>
-            <Text>Paid on 12 March by Acme Corp. Net amount EUR 1,250.00.</Text>
+            <Text>Paid on 12 March by Contoso Corp. Net amount EUR 1,250.00.</Text>
             <Text variant="caption">Last updated 2 minutes ago</Text>
           </>
         ) : (

@@ -27,7 +27,7 @@ function Items({ kind, onOpen }: { kind: ValueKind; onOpen?: () => void }): Reac
   if (kind === 'strings') {
     return (
       <>
-        <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+        <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
         <DescriptionListItem label="Numero">INV-2026-0142</DescriptionListItem>
         <DescriptionListItem label="Importo totale">1.240,00 €</DescriptionListItem>
         <DescriptionListItem label="Scadenza">30/11/2026</DescriptionListItem>
@@ -37,7 +37,7 @@ function Items({ kind, onOpen }: { kind: ValueKind; onOpen?: () => void }): Reac
   if (kind === 'with-empties') {
     return (
       <>
-        <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+        <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
         <DescriptionListItem label="Note">{null}</DescriptionListItem>
         <DescriptionListItem label="Riferimento">{''}</DescriptionListItem>
         <DescriptionListItem label="Allegati">{0}</DescriptionListItem>
@@ -47,7 +47,7 @@ function Items({ kind, onOpen }: { kind: ValueKind; onOpen?: () => void }): Reac
   }
   return (
     <>
-      <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+      <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
       <DescriptionListItem label="Sito">
         <a href="#acme">acme.example</a>
       </DescriptionListItem>
@@ -236,7 +236,7 @@ export const Rtl: Story = {
 };
 
 const VALUE_STEPS: { name: string; value: ReactNode }[] = [
-  { name: 'string', value: 'Acme S.r.l.' },
+  { name: 'string', value: 'Contoso S.r.l.' },
   { name: 'node', value: <a href="#acme">acme.example</a> },
   { name: 'empty', value: null },
   { name: 'multi-line', value: <div>Via Roma 1<br />20100 Milano</div> },
@@ -297,7 +297,7 @@ export const EdgeCases: Story = {
     <div style={{ display: 'grid', gap: 24 }}>
       <div data-testid="flex-row" style={{ display: 'flex', width: 700, border: BORDER }}>
         <DescriptionList data-testid="flex-list">
-          <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+          <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
         </DescriptionList>
       </div>
       <table>
@@ -305,7 +305,7 @@ export const EdgeCases: Story = {
           <tr>
             <td data-testid="cell" style={{ width: 500 }}>
               <DescriptionList data-testid="cell-list">
-                <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+                <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
               </DescriptionList>
             </td>
           </tr>
@@ -318,7 +318,7 @@ export const EdgeCases: Story = {
             <tr>
               <td data-testid="auto-cell">
                 <DescriptionList data-testid="auto-cell-list">
-                  <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+                  <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
                 </DescriptionList>
               </td>
             </tr>
@@ -328,7 +328,7 @@ export const EdgeCases: Story = {
       <div>
         <div data-testid="shrink-wrap" style={{ display: 'inline-block' }}>
           <DescriptionList data-testid="shrink-list">
-            <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+            <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
           </DescriptionList>
         </div>
       </div>
@@ -391,7 +391,7 @@ function StatusDemo({ entity: initial, tone, width, showSummary, layout, onSelec
         />
         <div style={{ height: 12 }} />
         <DescriptionList layout={layout} data-testid="list">
-          <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+          <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
           <DescriptionListItem label="Numero">INV-2026-0142</DescriptionListItem>
           <DescriptionListItem label="Imponibile">1.016,39 €</DescriptionListItem>
           {showSummary ? (
@@ -541,7 +541,7 @@ export const StatusAndSummaryVisual: Story = {
           <DescriptionListStatus data-testid={`status-${id}`} status={status} detail={detail} />
           <div style={{ height: 12 }} />
           <DescriptionList data-testid={`list-${id}`}>
-            <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+            <DescriptionListItem label="Fornitore">Contoso S.r.l.</DescriptionListItem>
             <DescriptionListItem label="Numero">INV-2026-0142</DescriptionListItem>
           </DescriptionList>
         </div>
