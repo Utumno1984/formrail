@@ -169,6 +169,8 @@ function ShowToast() {
 export const ToastPair: Story = {
   render: () => (
     <ToastProvider style={{ top: 16, bottom: 'auto' }}>
+      {/* The provider only renders into a portal, and the story helper requires some root output. */}
+      <div style={{ height: 120 }} />
       <ShowToast />
     </ToastProvider>
   ),
