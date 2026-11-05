@@ -131,7 +131,11 @@ const DAY_CELL =
 const DAY =
   'pointer-events-none inline-flex h-8 w-8 items-center justify-center rounded-rop-md border border-transparent ' +
   '[font-variant-numeric:tabular-nums]';
-const DAY_HOVER = 'cursor-pointer group-hover/day:bg-rop-surface-subtle';
+// The day span is `pointer-events-none`: `:hover`, `:active` and the cursor all belong to the td,
+// hence group variants here and `DAY_CELL_ACTIVE` on the td. `:active` (unlike hover) also fires on
+// a touch tap.
+const DAY_HOVER = 'group-rop-hover/day:bg-rop-surface-subtle group-active/day:bg-rop-surface-pressed';
+const DAY_CELL_ACTIVE = 'cursor-pointer';
 // The selected day per state (#223), chosen in the render so the three never compete: default =
 // primary fill; invalid = error fill; forced / locked (`readOnly`) = an outlined day in neutral
 // colours, never primary (an invalid read-only calendar shows its error on the frame only).
@@ -523,7 +527,12 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
                     aria-current={isToday ? 'date' : undefined}
                     aria-disabled={!selectable || undefined}
                     tabIndex={disabled ? undefined : date === tabStop ? 0 : -1}
-                    className={cn(CELL, !disabled && DAY_CELL, interactive && !selectable && 'cursor-not-allowed')}
+                    className={cn(
+                      CELL,
+                      !disabled && DAY_CELL,
+                      interactive && selectable && !isSelected && DAY_CELL_ACTIVE,
+                      interactive && !selectable && 'cursor-not-allowed',
+                    )}
                   >
                     <span
                       aria-hidden="true"
