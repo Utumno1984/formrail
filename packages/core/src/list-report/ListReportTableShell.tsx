@@ -96,6 +96,8 @@ export type ListReportTableShellProps<Row> = ListReportTableProps<Row> & {
   renderBody: (ctx: ListReportTableBodyContext<Row>) => ReactNode;
   /** Extra attributes merged onto the `<table>` element (e.g. `aria-rowcount` in a virtualized table). */
   tableProps?: Omit<TableHTMLAttributes<HTMLTableElement>, 'className' | 'style' | 'children' | 'aria-label' | 'aria-labelledby'>;
+  /** Extra attributes merged onto the header `<tr>` (e.g. `aria-rowindex={1}` in a virtualized table). */
+  headRowProps?: HTMLAttributes<HTMLTableRowElement>;
 };
 
 function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, ref: Ref<HTMLDivElement>) {
@@ -115,6 +117,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     'aria-labelledby': ariaLabelledby,
     renderBody,
     tableProps,
+    headRowProps,
     ...rest
   } = props;
   const { columns, selection } = table;
@@ -210,7 +213,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
         {...tableProps}
       >
         {hasContent(caption) ? <caption className={captionClass}>{caption}</caption> : null}
-        <ListReportTableHead table={table} selectable={selectable} labels={labels} />
+        <ListReportTableHead table={table} selectable={selectable} labels={labels} rowProps={headRowProps} />
         <tbody>
           {view === 'rows' ? renderBody({ table, selectable, columnCount, labels, minRows }) : null}
           {view === 'skeleton' ? (
