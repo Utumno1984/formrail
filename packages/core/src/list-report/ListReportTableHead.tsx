@@ -1,3 +1,4 @@
+import type { HTMLAttributes } from 'react';
 import { Checkbox } from '../checkbox/Checkbox';
 import { Icon } from '../icon/Icon';
 import { CapIconSlot } from '../internal/CapIconSlot';
@@ -26,6 +27,8 @@ export interface ListReportTableHeadProps<Row> {
   /** Whether to render the leading selection column (header checkbox + its `<col>`). */
   selectable: boolean;
   labels: ListReportTableLabels;
+  /** Extra attributes merged onto the header `<tr>` (e.g. `aria-rowindex={1}` in a virtualized table). Without it the `<tr>` has none. */
+  rowProps?: HTMLAttributes<HTMLTableRowElement>;
 }
 
 /**
@@ -34,7 +37,7 @@ export interface ListReportTableHeadProps<Row> {
  * sortable column headers. Exported from `@react-object-page/core/internal` for
  * `@react-object-page/pro`; not public API, no semver guarantee, not meant to be used standalone.
  */
-export function ListReportTableHead<Row>({ table, selectable, labels }: ListReportTableHeadProps<Row>) {
+export function ListReportTableHead<Row>({ table, selectable, labels, rowProps }: ListReportTableHeadProps<Row>) {
   const { columns, selection } = table;
   return (
     <>
@@ -45,7 +48,7 @@ export function ListReportTableHead<Row>({ table, selectable, labels }: ListRepo
         ))}
       </colgroup>
       <thead>
-        <tr>
+        <tr {...rowProps}>
           {selectable ? (
             <th scope="col" data-rop-select="" className={selectHeaderCellClass}>
               <div className={selectBoxClass}>

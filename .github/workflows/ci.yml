@@ -119,7 +119,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Firefox and WebKit run only the tests tagged @engines (playwright.config.ts).
+      - run: npx playwright install --with-deps chromium firefox webkit
       # Builds Storybook, serves it locally and runs the Playwright suite.
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v7

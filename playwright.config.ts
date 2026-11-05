@@ -52,6 +52,21 @@ export default defineConfig({
       grep: /@touch/,
       use: { ...devices['Desktop Chrome'], hasTouch: true },
     },
+    // Other engines, for the tests that must hold in all three (e.g. the declared 200,000-row ceiling of
+    // the virtualized List Report: the maximum element height differs per engine). Opt-in by tag: tag a
+    // test `@engines` to run it here too (it also runs in `chromium`).
+    {
+      name: 'firefox',
+      testIgnore: /visual\//,
+      grep: /@engines/,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      testIgnore: /visual\//,
+      grep: /@engines/,
+      use: { ...devices['Desktop Safari'] },
+    },
     // Viewport grid (spec §1.10): one baseline per story per viewport, viewport fixed.
     ...(
       [

@@ -6,9 +6,11 @@ describe('@react-object-page/pro scaffold', () => {
     expect(pro).toBeTypeOf('object');
   });
 
-  it('exports exactly the change-summary engine at runtime', () => {
+  it('exports exactly the change-summary engine and the virtualized List Report at runtime', () => {
     expect(Object.keys(pro).sort()).toEqual([
       'ChangeSummary',
+      'VirtualListReport',
+      'VirtualListReportTable',
       'computeChangeSummary',
       'formatChangeValue',
       'inferSegmentLabel',
