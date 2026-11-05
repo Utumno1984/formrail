@@ -62,7 +62,7 @@ const isPercent = (v: number | string | undefined): boolean => typeof v === 'str
 
 // Colour from an existing token; the contour keeps the shape visible in forced-colors mode.
 const BAR =
-  'bg-rop-border motion-safe:animate-rop-skeleton-pulse forced-colors:[outline:1px_solid_CanvasText]';
+  'bg-rop-border-subtle motion-safe:animate-rop-skeleton-pulse forced-colors:[outline:1px_solid_CanvasText]';
 
 /**
  * Decorative loading placeholder (text, rectangle, circle). It is ALWAYS `aria-hidden="true"`,
