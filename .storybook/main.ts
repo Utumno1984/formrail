@@ -24,6 +24,9 @@ const config: StorybookConfig = {
       ...viteConfig.resolve,
       alias: [
         { find: /^@react-object-page\/core\/theme\.css$/, replacement: fileURLToPath(new URL('../packages/core/src/styles/tokens.css', import.meta.url)) },
+        // `/internal` (ticket #230): Pro stories build their own table from these building blocks;
+        // resolved to the source facade for the same reason as the bare specifier above.
+        { find: /^@react-object-page\/core\/internal$/, replacement: fileURLToPath(new URL('../packages/core/src/internal.ts', import.meta.url)) },
         { find: /^@react-object-page\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
         ...(Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : Object.entries(viteConfig.resolve?.alias ?? {}).map(([find, replacement]) => ({ find, replacement }))),
       ],
