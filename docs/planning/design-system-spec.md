@@ -353,6 +353,17 @@ legittimamente distinguere "svuotato" da "non inviato".
    criterio di visualizzazione, non un'affermazione che i valori siano uguali.
 2. **Rendering di un controllo**: mostrare un valore assente come testo vuoto (`value ?? ''`) è
    lecito **in lettura**; non deve mai diventare una scrittura nello stato (sarebbe un'eco, §1.4).
+3. **Resa compatta del Change Summary** (livello 0 di `<ChangeSummary />`, voce aggiunta il
+   2026-11-05 su decisione di Daniele, #202): `null`, `undefined` e chiave mancante si leggono tutti
+   `No value`. È solo testo; `ChangeEntry` conserva la distinzione (`before`/`after`,
+   `beforeMissing`/`afterMissing`) e la resa precisa (livello ≥ 1) usa testi distinti.
+4. **`renderValue` personalizzata che delega a `formatChangeValue`** (voce aggiunta il 2026-11-05 su
+   decisione di Daniele, #202): `renderValue` riceve una chiave mancante come `undefined` e, in un
+   `changed` da `undefined` presente a chiave mancante, le due chiamate hanno argomenti identici, quindi
+   la delega non distingue i due stati e rende `from Undefined to Undefined` (con `precise: true`;
+   in forma compatta `from No value to No value`). Comportamento accettato, non un difetto: la resa di
+   default del componente li distingue e i dati in `ChangeEntry` restano corretti. Non è previsto un
+   terzo argomento di `renderValue`.
 
 Qualunque altro collasso è un bug, finché non viene aggiunto a questo elenco con data e motivo.
 
