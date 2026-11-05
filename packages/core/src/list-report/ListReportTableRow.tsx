@@ -21,7 +21,8 @@ export interface ListReportTableRowProps<Row> {
   /**
    * Replaces `selection.toggle(id)` as the effect of the row checkbox (only with `selectable`): called
    * once per user toggle with the row id and the `click` event of the checkbox (modifier keys included,
-   * e.g. `shiftKey` for a range-selection gesture in a virtualized table). It decides itself what to
+   * e.g. `shiftKey` for a range-selection gesture in a virtualized table; the event has already been
+   * dispatched, so read the checkbox from `event.target`, not `currentTarget`). It decides itself what to
    * change (`selection.toggle`, `selection.setSelectedIds`, …). Without it the checkbox calls
    * `selection.toggle(id)`, exactly as before. Never rendered to the DOM.
    */

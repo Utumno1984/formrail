@@ -12,3 +12,7 @@ export type {
   ChangeSummaryOptions,
   UseChangeSummaryReturn,
 } from './change-summary/types';
+export { VirtualListReportTable } from './list-report/VirtualListReportTable';
+export type { VirtualListReportTableHandle, VirtualListReportTableProps } from './list-report/VirtualListReportTable';
+export { VirtualListReport } from './list-report/VirtualListReport';
+export type { VirtualListReportLabels, VirtualListReportProps } from './list-report/VirtualListReport';

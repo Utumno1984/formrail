@@ -113,4 +113,12 @@
   .rop-pro-change-summary__value--muted {
     @apply text-rop-text-muted italic;
   }
+
+  /* VirtualListReportTable (packages/pro/src/list-report/VirtualListReportTable.tsx): a virtualized row
+     has a fixed pitch, so the content of its cells is capped at the row height and never grows the
+     row. The `node` wrapper already clips (`overflow: hidden`); nothing else is clipped here (the
+     selection box keeps the checkbox's focus ring visible). */
+  .rop-pro-virtual-row > td > * {
+    max-height: var(--rop-list-report-row-height);
+  }
 }
