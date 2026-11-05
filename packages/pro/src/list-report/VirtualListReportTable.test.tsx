@@ -128,7 +128,8 @@ describe('below the threshold, with no rows and in every state: the Free table',
     expect(pro).not.toContain('data-rop-spacer');
     expect(pro).not.toContain('aria-rowcount');
     expect(pro).not.toContain('aria-rowindex');
-  });
+    // Two full renders of up to 199 rows (jsdom) plus HTML serialization: CPU-bound, scales with contention.
+  }, 20_000);
 
   it.each(cases)('%s: no scroll listener, no ResizeObserver beyond those of the Free table', (_label, props) => {
     const ro = installResizeObserverStub();

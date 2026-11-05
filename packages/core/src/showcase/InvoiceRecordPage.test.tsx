@@ -21,7 +21,16 @@ function setup(config: Parameters<typeof createInvoiceStore>[1] = {}, recordId =
   return { store, onBack, onSaved, view, ui };
 }
 
-const amountField = () => screen.findByRole('textbox', { name: /Amount/ });
+// A save held in flight until `release()`: no timer, so CPU contention cannot let it finish early.
+function saveGate() {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { gate, release };
+}
+
+const amountField =() => screen.findByRole('textbox', { name: /Amount/ });
 // jsdom loads no CSS: a hidden footer is still in the tree, but `inert`.
 const footer = () => {
   const el = screen.queryByRole('region', { name: 'Save actions', hidden: true });
@@ -175,17 +184,22 @@ describe('InvoiceRecordPage', () => {
   });
 
   it('Save is aria-disabled while the save is in flight', async () => {
-    setup({ saveDelayMs: 100 });
+    const { gate, release } = saveGate();
+    setup({ saveDelayMs: gate });
     const amount = await amountField();
     await userEvent.type(amount, '1');
     const save = within(await visibleBar()).getByRole('button', { name: 'Save' });
     await userEvent.click(save);
     await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
+    // Still held: the attribute does not depend on how quickly the assertion above ran.
+    expect(footer()).not.toBeNull();
+    release();
     await waitFor(() => expect(footer()).toBeNull());
   });
 
   it('#166: Back during a save asks with truthful labels, also after a footer Discard made the form clean', async () => {
-    const { onBack } = setup({ saveDelayMs: 300 });
+    const { gate, release } = saveGate();
+    const { onBack } = setup({ saveDelayMs: gate });
     const amount = await amountField();
     await userEvent.type(amount, '1');
     const bar = await visibleBar();
@@ -199,10 +213,12 @@ describe('InvoiceRecordPage', () => {
     expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Leave anyway' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+    release();
   });
 
   it('#166: the footer says Discard does not cancel a save in flight; an edit made after Save is called out in the dialog', async () => {
-    const { onBack } = setup({ saveDelayMs: 600 });
+    const { gate, release } = saveGate();
+    const { onBack } = setup({ saveDelayMs: gate });
     const amount = await amountField();
     await userEvent.type(amount, '1');
     const bar = await visibleBar();
@@ -215,6 +231,7 @@ describe('InvoiceRecordPage', () => {
     expect(within(dialog).queryByRole('button', { name: 'Leave anyway' })).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Discard newer changes' }));
     expect(onBack).toHaveBeenCalledTimes(1);
+    release();
   });
 
   it('Back to list: clean calls onBack at once; dirty asks first (English dialog, X named Close)', async () => {

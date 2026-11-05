@@ -10,6 +10,15 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+// A save held in flight until `release()`: no timer, so CPU contention cannot let it finish early.
+function saveGate() {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { gate, release };
+}
+
 describe('InvoiceListToRecord (StrictMode)', () => {
   it('list -> record -> list: one history entry, the list parameters back, the focus on the opened link', async () => {
     const onNavigate = vi.fn();
@@ -43,16 +52,14 @@ describe('InvoiceListToRecord (StrictMode)', () => {
   it('save in flight + Back + Leave anyway: leaves at once, the store gets the saved value, no React warning', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onSaved = vi.fn();
+    const { gate, release } = saveGate();
     render(
       <StrictMode>
         <InvoiceListToRecord
           history="replace"
           listLoadDelayMs={0}
           recordLoadDelayMs={0}
-          // The save must still be in flight when 'Back to list' is clicked: the delay has to outlast the two
-          // user-event clicks between them, whose wall time grows with CPU contention. A shorter one lets the
-          // save resolve first, the form turns clean and no 'Unsaved changes' dialog appears.
-          saveDelayMs={1500}
+          saveDelayMs={gate}
           onNavigate={vi.fn()}
           onSaved={onSaved}
         />
@@ -66,7 +73,9 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
     await waitFor(() => expect(window.location.search).not.toContain('record='));
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    expect(onSaved).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(window.__ropShowcaseStore?.snapshot().find((r) => r.id === 'inv-12')?.amount).toBe(4242.42);
     // The list reloading after the return is async and outside `act`: a harness notice, not a React warning
     // about the save resolving after the page is gone.
@@ -75,9 +84,10 @@ describe('InvoiceListToRecord (StrictMode)', () => {
   }, 20_000);
 
   it('leaving during a save and re-opening the record: it shows the saved value, a second save keeps it', async () => {
+    const { gate, release } = saveGate();
     render(
       <StrictMode>
-        <InvoiceListToRecord history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={1500} onNavigate={vi.fn()} />
+        <InvoiceListToRecord history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={gate} onNavigate={vi.fn()} />
       </StrictMode>,
     );
     await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }));
@@ -87,7 +97,8 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
-    // Re-open at once: the read waits for the save in flight.
+    // The list read waits for the save in flight: it only settles once the save is released.
+    release();
     await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }, { timeout: 5000 }));
     const reopened = await screen.findByRole('textbox', { name: /Amount/ }, { timeout: 5000 });
     expect(reopened).toHaveProperty('value', '4242.42');

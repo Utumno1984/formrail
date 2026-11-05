@@ -31,8 +31,8 @@ export interface InvoiceListToRecordProps {
   recordLoadDelayMs: number;
   /** Called on the list <-> record navigations the user starts (link, "Back to list"), never on Back/Forward. */
   onNavigate: (event: NavigateEvent) => void;
-  /** How long a save takes (#151). Default 400. */
-  saveDelayMs?: number;
+  /** How long a save takes (#151). Default 400. A promise holds every save until it settles (for tests). */
+  saveDelayMs?: number | Promise<void>;
   /** `error`: the save fails, the form stays dirty and the store is unchanged (#151). Default `success`. */
   saveOutcome?: SaveOutcome;
   /** Called once per successful save with the record as the server stored it, even if the page was left meanwhile. */

@@ -17,7 +17,11 @@ export type LoadOutcome = 'success' | 'error' | 'error-once';
 export interface InvoiceStoreConfig {
   /** Delay of `get` and `list`. */
   loadDelayMs: number;
-  saveDelayMs: number;
+  /**
+   * A number of ms, or a promise the save waits on instead of a timer: lets a test hold a save in flight
+   * and release it at an exact moment, independent of CPU load. A settled promise adds no wait.
+   */
+  saveDelayMs: number | Promise<void>;
   saveOutcome: SaveOutcome;
   loadOutcome: LoadOutcome;
 }
@@ -66,8 +70,10 @@ const extend = (r: DemoInvoice, index: number): StoredInvoice => ({
 
 const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
 
-const delay = (ms: number): Promise<void> =>
-  ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+const delay = (ms: number | Promise<void>): Promise<void> => {
+  if (typeof ms !== 'number') return ms;
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+};
 
 export function createInvoiceStore(
   seed: readonly DemoInvoice[] = makeShowcaseInvoices(),
