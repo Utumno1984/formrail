@@ -34,6 +34,9 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   `TruncatedText` unless the column sets `truncate: false`. A `cell` that returns a React node is
  *   placed in a `min-width: 0; overflow: hidden` wrapper; its layout (and its height) is the
  *   consumer's responsibility. `null`/`undefined` give an empty cell.
+ * - Rows are memoized: a render of the parent does not re-evaluate `cell` or `accessor` for a row whose
+ *   object, `columns`, selected state, selection label and id are unchanged. A cell that reads anything
+ *   else, or a row mutated in place, keeps what is on screen: see `ListReportColumn.cell` for what to do.
  * - One scroller: the container (`forwardRef`) scrolls both ways and the header sticks to its top.
  *   Size it with the parent (flex) or with `maxHeight`. It is a tab stop so the keyboard can scroll.
  * - Every row has the height of `--rop-list-report-row-height`.

@@ -225,6 +225,61 @@ describe('virtualized (100,000 rows)', () => {
     }
   });
 
+  it('the observer watches the body, and a range change never touches what it observes', () => {
+    const ro = installResizeObserverStub();
+    try {
+      render(<Host />);
+      const observed = () => ro.instances.flatMap((i) => i.observed);
+      const before = observed();
+      expect(before).toContain(document.querySelector('tbody'));
+      expect(before).toContain(document.querySelector('thead'));
+      scrollTo(10_000 * PITCH);
+      expect(observed()).toEqual(before);
+    } finally {
+      ro.restore();
+    }
+  });
+
+  it('the observer leaves the scroll position to the scroll event', () => {
+    const ro = installResizeObserverStub();
+    try {
+      render(<Host />);
+      const before = rowIndices();
+      scroller().scrollTop = 1000 * PITCH;
+      act(() => ro.trigger());
+      expect(rowIndices()).toEqual(before);
+      act(() => {
+        fireEvent.scroll(scroller());
+      });
+      expect(rowIndices()).toContain(1002);
+    } finally {
+      ro.restore();
+    }
+  });
+
+  it('the commit of a scroll event does not read scrollTop a second time (the getter forces a layout)', () => {
+    render(<Host />);
+    scroller().scrollTop = 1000 * PITCH;
+    const reads = vi.spyOn(Element.prototype, 'scrollTop', 'get');
+    try {
+      act(() => {
+        fireEvent.scroll(scroller());
+      });
+      expect(rowIndices()).toContain(1002);
+      expect(reads).toHaveBeenCalledTimes(1);
+    } finally {
+      reads.mockRestore();
+    }
+  });
+
+  it('after the commit of a scroll event, a later commit still picks up a scrollTop changed without an event', () => {
+    const { rerender } = render(<Host />);
+    scrollTo(1000 * PITCH);
+    scroller().scrollTop = 5000 * PITCH;
+    rerender(<Host />);
+    expect(rowIndices()).toContain(5002);
+  });
+
   it('unmounting removes the scroll listener and disconnects the observer', () => {
     const ro = installResizeObserverStub();
     const remove = vi.spyOn(EventTarget.prototype, 'removeEventListener');

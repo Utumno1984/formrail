@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type FocusEvent,
+  type HTMLAttributes,
   type KeyboardEvent,
   type MouseEvent,
   type ReactElement,
@@ -62,6 +63,8 @@ const FORCE_TRUNCATE = { forceTruncate: true } as const;
 // Pro stylesheet (`styles.css`): caps the content of a cell at the row height, so a `node` cell can
 // never make a row taller than the pitch the range is computed with.
 const VIRTUAL_ROW_CLASS = 'rop-pro-virtual-row';
+
+type RowHandlersById = Map<string, Pick<HTMLAttributes<HTMLTableRowElement>, 'onFocus' | 'onBlur'>>;
 
 const TAB_STOPS = 'a[href], button, input, select, textarea, [tabindex]';
 /** The keyboard tab stops of a row, in document order. */
@@ -132,8 +135,17 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
     if (anchor.current !== null && indexOfResult(anchor.current) < 0) anchor.current = null;
   }, [indexOfResult]);
 
+  // Stable identity (the rows are memoized on it): the live values are read through a ref at gesture
+  // time, not captured, so a skipped row render never leaves it with a stale selection or result index.
+  // Written on commit: a render that never commits (a suspended transition) must not change what a
+  // gesture on the rows on screen acts on.
+  const live = useRef({ indexOfResult, resultIds, selection });
+  useIsomorphicLayoutEffect(() => {
+    live.current = { indexOfResult, resultIds, selection };
+  });
   const onToggle = useCallback(
     (id: string, event: MouseEvent<HTMLInputElement>) => {
+      const { indexOfResult, resultIds, selection } = live.current;
       const shift = event.shiftKey || shiftSpace.current;
       shiftSpace.current = false;
       const from = anchor.current === null ? -1 : indexOfResult(anchor.current);
@@ -149,7 +161,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         anchor.current = id;
       }
     },
-    [indexOfResult, resultIds, selection],
+    [],
   );
 
   // Tab / Shift+Tab from the last / first tab stop of a row go to the next / previous ROW, as in the Free
@@ -196,15 +208,13 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // listener is on `window`, capture phase — attached only while something is selected: with an empty
   // selection Escape is not even seen here and goes on (the Dialog closes as usual).
   const hasSelection = selection.enabled && selection.selectedIds.size > 0;
-  const clearSelection = useRef(selection.clearSelection);
-  clearSelection.current = selection.clearSelection;
   useEffect(() => {
     if (!hasSelection) return undefined;
     const onEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return;
       const el = scrollerRef.current;
       if (!el || !(event.target instanceof Node) || !el.contains(event.target)) return;
-      clearSelection.current();
+      live.current.selection.clearSelection();
       event.stopPropagation();
     };
     window.addEventListener('keydown', onEscape, true);
@@ -267,13 +277,19 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   );
 
   // --- Rendering ----------------------------------------------------------------------------------
+  // Handlers per id, so a row that stays mounted across a range change gets the same functions and the
+  // shallow `rowProps` comparison of `ListReportTableRow` skips its render. Rebuilt on every body pass
+  // from the ids actually rendered, so it never holds more than the mounted rows.
+  const rowHandlers = useRef<RowHandlersById>(new Map());
+  const nextRowHandlers: RowHandlersById = new Map();
   const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number): ReactNode => {
     const row = ctx.table.rows[index]!;
     const id = ctx.table.getRowId(row);
-    const handlers = {
+    const handlers = rowHandlers.current.get(id) ?? {
       onFocus: () => onRowFocus(id),
-      onBlur: (event: FocusEvent<HTMLTableRowElement>) => onRowBlur(id, event),
+      onBlur: (event) => onRowBlur(id, event),
     };
+    nextRowHandlers.set(id, handlers);
     return (
       <ListReportTableRow
         key={id}
@@ -307,6 +323,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
       }
     }
     children.push(<Filler key="rop-filler" columnCount={ctx.columnCount} rows={ctx.minRows - count} />);
+    rowHandlers.current = nextRowHandlers;
     return children;
   };
 

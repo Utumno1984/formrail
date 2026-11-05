@@ -53,7 +53,8 @@ const acknowledge = (emitted: string[], value: string): boolean => {
  *   The mixed-type fallback is not a total order (it is not transitive across types): do not rely
  *   on a specific order for columns that mix types.
  * - Memoize `columns` (e.g. `useMemo` or a module constant): a new array each render defeats the
- *   memoization of the handlers and the sorted rows.
+ *   memoization of the handlers, of the sorted rows and of the table rows. See `ListReportColumn.cell`
+ *   for what a memoized table row does not pick up.
  * - An uncontrolled `defaultSort`/`setSort` on a column that is not there yet stays pending until the
  *   column appears (it warns in development if `columns` is not empty); it resets to no sort only if
  *   a column that was active is removed. A `sortable: true` column with neither `accessor` nor

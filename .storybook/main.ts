@@ -14,6 +14,9 @@ const config: StorybookConfig = {
   ],
   framework: { name: '@storybook/react-vite', options: {} },
   core: { disableTelemetry: true },
+  // Unused here, and not free: on every DOM change under the story it re-runs `getComputedStyle` on
+  // every element of the page, a cost the performance e2e would charge to the component.
+  features: { highlight: false },
   // Same Tailwind pipeline as the published `styles.css` (packages/core/src/styles/index.css).
   // Pro stories import `@react-object-page/core`, whose package entry points at `dist/` (not built in
   // the e2e/visual jobs): resolve it to the sources instead, like the Free stories do.

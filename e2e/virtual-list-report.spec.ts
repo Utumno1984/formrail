@@ -307,6 +307,84 @@ test.describe('selection', () => {
   });
 });
 
+test.describe('memoized rows keep their state through the scroll', () => {
+  test('a selected row stays checked after its row unmounts and remounts; a row that stays mounted keeps its DOM node', async ({ page }) => {
+    await openDefault(page);
+    await page.getByRole('checkbox', { name: 'Select INV-000003' }).click();
+    await expect(page.getByText('1 selected')).toBeVisible();
+    await scroller(page).focus(); // a focused row stays mounted: release the focus
+    const g = await geometry(page);
+    // A one-row scroll: INV-000008 stays mounted and must keep the same <tr> element.
+    const keep = page.getByRole('checkbox', { name: 'Select INV-000008' }).locator('xpath=ancestor::tr');
+    await keep.evaluate((tr) => ((window as unknown as { __kept?: Element }).__kept = tr));
+    await scrollToTop(page, g.pitch);
+    await expect(keep).toHaveAttribute('aria-rowindex', '9');
+    expect(await keep.evaluate((tr) => tr === (window as unknown as { __kept?: Element }).__kept)).toBe(true);
+    // Away (the row is unmounted) and back.
+    await scrollToTop(page, 5000 * g.pitch);
+    await expect(page.getByRole('checkbox', { name: 'Select INV-000003' })).toHaveCount(0);
+    await scrollToTop(page, 0);
+    await expect(page.getByRole('checkbox', { name: 'Select INV-000003' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Select INV-000004' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Select INV-000003' }).locator('xpath=ancestor::tr')).toHaveAttribute('data-selected', '');
+  });
+
+  test('toggling a row after scrolling updates the selection with the current state', async ({ page }) => {
+    await openDefault(page);
+    await page.getByRole('checkbox', { name: 'Select INV-000003' }).click();
+    await scroller(page).focus();
+    const g = await geometry(page);
+    await scrollToTop(page, 3 * g.pitch);
+    await page.getByRole('checkbox', { name: 'Select INV-000006' }).click();
+    await expect(page.getByText('2 selected')).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Select INV-000003' }).click();
+    await expect(page.getByText('1 selected')).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: 'Select INV-000003' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Select INV-000006' })).toBeChecked();
+  });
+});
+
+test.describe('range commit and pitch in a real browser', () => {
+  test('a programmatic scroll per frame commits every range inside the scroll event, not in a later task', async ({ page }) => {
+    await openDefault(page);
+    const { inside, outside } = await scroller(page).evaluate(async (el) => {
+      let dispatching = false;
+      let inside = 0;
+      let outside = 0;
+      // The capture listener on `window` runs before the table's own, this bubbling one after it.
+      window.addEventListener('scroll', () => { dispatching = true; }, { capture: true, passive: true });
+      el.addEventListener('scroll', () => { dispatching = false; }, { passive: true });
+      // Runs as a microtask right after the table's listener returns, while `dispatching` still holds.
+      new MutationObserver(() => {
+        if (dispatching) inside++;
+        else outside++;
+      }).observe(el.querySelector('tbody')!, { childList: true });
+      for (let i = 0; i < 60; i++) {
+        el.scrollBy(0, 94);
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      }
+      return { inside, outside };
+    });
+    expect(inside).toBeGreaterThan(50);
+    expect(outside).toBe(0);
+  });
+
+  test('a row height changed after the mount is picked up: pitch, scroll height and range follow it', async ({ page }) => {
+    await openDefault(page);
+    await scroller(page).evaluate((el) => el.style.setProperty('--rop-list-report-row-height', '4rem'));
+    await expect.poll(async () => (await geometry(page)).pitch).toBeCloseTo(67, 0);
+    const n = 100_000;
+    await expect.poll(async () => {
+      const g = await geometry(page);
+      return Math.abs(g.scrollHeight - (g.header + n * g.pitch));
+    }).toBeLessThanOrEqual(1);
+    const g = await geometry(page);
+    await scrollToTop(page, 50_000 * g.pitch);
+    expect((await rowIndices(page))[0]).toBe(50_002 - OVERSCAN);
+    expect(await centreHit(page)).toBe('data');
+  });
+});
+
 test.describe('scroll restoration (core hook, unchanged)', () => {
   async function scrollThenOpen(page: Page, top: number): Promise<number> {
     await expect(table(page)).toHaveAttribute('aria-rowcount', '100001');
@@ -409,6 +487,43 @@ test.describe('performance (reported, not gating)', () => {
     expect(selectAll.checked).toBe(true);
     await expect(page.getByText('100000 selected')).toBeVisible();
     const line = `[perf] 100,000 rows (${testInfo.project.name}): mount ${mount.toFixed(1)} ms, 100 scrollBy ${scroll.toFixed(0)} ms (${(scroll / 100).toFixed(1)} ms/frame), select all ${selectAll.ms.toFixed(1)} ms`;
+    console.log(line);
+    testInfo.annotations.push({ type: 'perf', description: line });
+  });
+
+  test('100,000 rows: wheel-like scroll, commit latency and frame interval (P50 / P95)', async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await openDefault(page);
+    // Main-thread CPU time of the loop (CDP TaskDuration). Not load-independent: under CPU contention the
+    // same build more than doubled it, so compare builds only with alternated, repeated runs.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Performance.enable');
+    const taskDuration = async (): Promise<number> =>
+      ((await cdp.send('Performance.getMetrics')).metrics.find((m) => m.name === 'TaskDuration')?.value ?? 0) * 1000;
+    const cpuBefore = await taskDuration();
+    const result = await scroller(page).evaluate(async (el) => {
+      const tbody = el.querySelector('tbody')!;
+      const commit: number[] = [];
+      let scrollAt = -1;
+      el.addEventListener('scroll', () => { if (scrollAt < 0) scrollAt = performance.now(); }, { capture: true, passive: true });
+      // A childList change of the body is the commit of a new range; the observer runs right after it.
+      new MutationObserver(() => {
+        if (scrollAt >= 0) { commit.push(performance.now() - scrollAt); scrollAt = -1; }
+      }).observe(tbody, { childList: true });
+      const frames: number[] = [];
+      let last = performance.now();
+      for (let i = 0; i < 300; i++) {
+        el.scrollBy(0, 94); // two rows per frame: the range changes on most frames
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        const now = performance.now();
+        frames.push(now - last);
+        last = now;
+      }
+      return { commit, frames };
+    });
+    const cpuPerFrame = ((await taskDuration()) - cpuBefore) / 300;
+    const pct = (values: number[], p: number): number => [...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * p))] ?? -1;
+    const line = `[perf] wheel scroll (${testInfo.project.name}): commit latency P50 ${pct(result.commit, 0.5).toFixed(1)} ms, P95 ${pct(result.commit, 0.95).toFixed(1)} ms (${result.commit.length} commits); frame interval P50 ${pct(result.frames, 0.5).toFixed(1)} ms, P95 ${pct(result.frames, 0.95).toFixed(1)} ms; main-thread CPU ${cpuPerFrame.toFixed(2)} ms/frame`;
     console.log(line);
     testInfo.annotations.push({ type: 'perf', description: line });
   });
