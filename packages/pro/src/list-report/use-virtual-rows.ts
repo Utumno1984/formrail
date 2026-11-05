@@ -16,7 +16,8 @@ import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-eff
  * (2.75rem at a 16px root) + `ROW_PITCH_EXTRA_PX` (3). Also the server value: the first client
  * render must produce the same range as the server, so nothing measured is used before mount.
  */
-export const FALLBACK_PITCH = 2.75 * 16 + 3;
+// A literal on purpose: an arithmetic expression at module level is not dropped by tree-shaking.
+export const FALLBACK_PITCH = 47; // 2.75rem x 16px + 3px
 
 /**
  * Height of the visible area of the rows before the first measurement (server render and first

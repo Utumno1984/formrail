@@ -3,8 +3,16 @@
   "version": 1,
   "exports": {
     "ChangeSummary": {
-      "baseline": 1967,
-      "limit": 2164
+      "baseline": 1968,
+      "limit": 2165
+    },
+    "VirtualListReport": {
+      "baseline": 3924,
+      "limit": 4317
+    },
+    "VirtualListReportTable": {
+      "baseline": 3561,
+      "limit": 3918
     },
     "computeChangeSummary": {
       "baseline": 2187,
