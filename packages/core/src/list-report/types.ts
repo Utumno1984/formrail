@@ -11,7 +11,12 @@ export interface ListReportColumn<Row> {
   header: ReactNode;
   /** Value used for sorting (and, in later tickets, filtering and searching). */
   accessor?: (row: Row) => unknown;
-  /** Cell content for the table that consumes the hook; the hook itself never calls it. */
+  /**
+   * Cell content for the table that consumes the hook; the hook itself never calls it. Must depend
+   * only on `row` and on what changes with `columns`: table rows are memoized, so a render of the
+   * parent does not call it again when the row object, `columns` and the selection of the row are
+   * unchanged. A row mutated in place is not detected either: pass a new object.
+   */
   cell?: (row: Row) => ReactNode;
   /** Sortable only with an `accessor` or a `compare`; `false` opts out. */
   sortable?: boolean;

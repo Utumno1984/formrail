@@ -59,12 +59,12 @@ export type VirtualListReportTableProps<Row> = ListReportTableProps<Row> & {
 
 const DEFAULT_THRESHOLD = 200;
 const DEFAULT_OVERSCAN = 10;
-type RowPropsById = Map<string, HTMLAttributes<HTMLTableRowElement>>;
-
-const FORCE_TRUNCATE ={ forceTruncate: true } as const;
+const FORCE_TRUNCATE = { forceTruncate: true } as const;
 // Pro stylesheet (`styles.css`): caps the content of a cell at the row height, so a `node` cell can
 // never make a row taller than the pitch the range is computed with.
 const VIRTUAL_ROW_CLASS = 'rop-pro-virtual-row';
+
+type RowPropsById = Map<string, HTMLAttributes<HTMLTableRowElement>>;
 
 const TAB_STOPS = 'a[href], button, input, select, textarea, [tabindex]';
 /** The keyboard tab stops of a row, in document order. */
@@ -279,7 +279,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // `ListReportTableRow` can skip its render. Rebuilt on every body pass from the ids actually rendered,
   // so it never holds more than the mounted rows. An entry is reused only while its `aria-rowindex`
   // (absent when not virtualized) is the one the row needs.
-  const rowPropsCache = useRef(new Map<string, HTMLAttributes<HTMLTableRowElement>>());
+  const rowPropsCache = useRef<RowPropsById>(new Map());
   const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number, nextRowProps: RowPropsById): ReactNode => {
     const row = ctx.table.rows[index]!;
     const id = ctx.table.getRowId(row);

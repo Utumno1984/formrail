@@ -46,6 +46,7 @@ function Host() {
     () => [
       { id: 'all', label: 'All' },
       { id: 'odd', label: 'Odd', predicate: (r: Item) => Number(r.id.slice(1)) % 2 === 1 },
+      { id: 'few', label: 'Few', predicate: (r: Item) => Number(r.id.slice(1)) < 10 },
     ],
     [],
   );
@@ -130,6 +131,33 @@ describe('ListReportTableRow memoization in the virtualized table', () => {
     expect(rendered()).toEqual(['r3', 'r4', 'r5', 'r6']);
   });
 
+  it('a shift-click keeps a selection made outside its range and follows a clicked row already selected', () => {
+    render(<Host />);
+    const box = (n: number) => screen.getByRole('checkbox', { name: `Select Item ${n}` });
+    fireEvent.click(box(9));
+    fireEvent.click(box(2));
+    fireEvent.click(box(4), { shiftKey: true });
+    for (const n of [2, 3, 4, 9]) expect(box(n)).toBeChecked();
+    // The clicked row is selected: the gesture deselects the range, and only the range.
+    fireEvent.click(box(2));
+    fireEvent.click(box(2));
+    fireEvent.click(box(3), { shiftKey: true });
+    for (const n of [2, 3]) expect(box(n)).not.toBeChecked();
+    for (const n of [4, 9]) expect(box(n)).toBeChecked();
+  });
+
+  it('a shift-click after a filter walks the current results, not those of the first render', () => {
+    render(<Host />);
+    act(() => controls.setFilter('odd'));
+    const box = (n: number) => screen.getByRole('checkbox', { name: `Select Item ${n}` });
+    fireEvent.click(box(1));
+    fireEvent.click(box(5), { shiftKey: true });
+    for (const n of [1, 3, 5]) expect(box(n)).toBeChecked();
+    act(() => controls.setFilter('all'));
+    for (const n of [0, 2, 4]) expect(box(n)).not.toBeChecked();
+    for (const n of [1, 3, 5]) expect(box(n)).toBeChecked();
+  });
+
   it('changing the columns renders every mounted row with the new cell', () => {
     render(<Host />);
     const mounted = mountedIds();
@@ -164,5 +192,30 @@ describe('ListReportTableRow memoization in the virtualized table', () => {
     expect(row.getAttribute('aria-rowindex')).toBe('3');
     expect(screen.getByRole('checkbox', { name: 'Select Item 3' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'Select Item 5' }).closest('tr')!.getAttribute('aria-rowindex')).toBe('4');
+  });
+
+  it('crossing the threshold rebuilds the cached row props in both directions', () => {
+    render(<Host />);
+    const row = () => screen.getByRole('checkbox', { name: 'Select Item 3' }).closest('tr')!;
+    expect(row().getAttribute('aria-rowindex')).toBe('5');
+    expect(row().classList.contains('rop-pro-virtual-row')).toBe(true);
+    act(() => controls.setFilter('few'));
+    expect(row().hasAttribute('aria-rowindex')).toBe(false);
+    expect(row().classList.contains('rop-pro-virtual-row')).toBe(false);
+    act(() => controls.setFilter('all'));
+    expect(row().getAttribute('aria-rowindex')).toBe('5');
+    expect(row().classList.contains('rop-pro-virtual-row')).toBe(true);
+  });
+
+  it('a jump of the whole range renders each new row once and not the pinned focused row', () => {
+    render(<Host />);
+    const box = screen.getByRole('checkbox', { name: 'Select Item 3' });
+    act(() => box.focus());
+    reset();
+    scrollBy(2_000);
+    expect(mountedIds()).toContain('r3');
+    expect(renders.has('r3')).toBe(false);
+    expect(renders.size).toBeGreaterThan(0);
+    for (const [, n] of renders) expect(n).toBe(1);
   });
 });
