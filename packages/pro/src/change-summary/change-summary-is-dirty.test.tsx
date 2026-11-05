@@ -66,6 +66,42 @@ const CORPUS: Case[] = Object.entries(SHAPES).flatMap(([shapeName, shape]) =>
   Object.entries(ATOMS).map(([atomName, atom]) => ({ name: `${shapeName} ${atomName}`, make: () => shape(atom()) })),
 );
 
+// Equal for `isDirty`, but `Object.is` does not match the ids of two fresh copies (0 against -0 aside).
+const ID_ATOMS: Record<string, () => unknown> = {
+  'array with id 0': () => [{ id: 0 }],
+  'array with id -0': () => [{ id: -0 }],
+  'array with a date id': () => [{ id: new Date(1) }],
+  'array with an object id': () => [{ id: { a: 1 } }],
+};
+
+const ID_SHAPES: Record<string, (value: unknown) => Loose> = {
+  ...SHAPES,
+  'f[id].g:': (value) => ({ f: [{ id: 1, ...put('g', value) }] }),
+};
+
+const ID_CORPUS: Case[] = Object.entries(ID_SHAPES).flatMap(([shapeName, shape]) =>
+  Object.entries({ ...ATOMS, ...ID_ATOMS }).map(([atomName, atom]) => ({
+    name: `${shapeName} ${atomName}`,
+    make: () => shape(atom()),
+  })),
+);
+
+const idOf = (item: unknown): unknown => (item as Loose | null | undefined)?.id;
+
+/** On a clean pair: is an item on the id-keyed levels `keys` left unmatched by `Object.is`? */
+function hasUnmatchedItem(baseline: unknown, values: unknown, [key, ...rest]: string[]): boolean {
+  if (key === undefined) return false;
+  const before = (baseline as Loose | null | undefined)?.[key];
+  const after = (values as Loose | null | undefined)?.[key];
+  if (!Array.isArray(before) || !Array.isArray(after)) return hasUnmatchedItem(before, after, rest);
+  // Array.from: a hole is an item too, `some` would skip it.
+  return Array.from(after).some((item, index) => {
+    const id = idOf(item);
+    if (id === undefined || id === null || !Object.is(id, idOf(before[index]))) return true;
+    return hasUnmatchedItem(before[index], item, rest);
+  });
+}
+
 function useForm() {
   return useObjectPageForm<Form>({ baseline: { root: {} } });
 }
@@ -100,35 +136,34 @@ describe('no entries if and only if isDirty is false', () => {
     expect(dirty).toBeGreaterThan(CORPUS.length ** 2 / 2);
   }, CORPUS_TIMEOUT);
 
-  it('holds with a declared id key, but for items without id (never matched, not even when equal)', () => {
+  it(`holds with id keys on 3 levels on every pair of ${ID_CORPUS.length} values, but for ids not matched by Object.is`, () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     resetChangeSummaryWarnings();
     const { result } = renderHook(useForm);
-    const arrayIdKeys = { 'root.f': 'id' };
-    const hasItemWithoutId = (root: Loose) =>
-      Array.isArray(root.f) && root.f.some((item) => typeof (item as Loose | null | undefined)?.id !== 'number');
-    const cases = Object.entries(ATOMS).map(([name, atom]) => ({ name, make: () => put('f', atom()) }));
+    const arrayIdKeys = { 'root.f': 'id', 'root.f.g': 'id', 'root.f.g.h': 'id' };
     const wrong: string[] = [];
     let unmatched = 0;
-    for (const baseline of cases) {
-      for (const values of cases) {
+    let matched = 0;
+    for (const baseline of ID_CORPUS) {
+      for (const values of ID_CORPUS) {
         act(() => {
           result.current.reset({ root: baseline.make() });
           result.current.setValue('root', values.make());
         });
         const form = result.current;
         const entries = computeChangeSummary({ values: form.values, baseline: form.baseline, arrayIdKeys });
-        if (!form.isDirty && hasItemWithoutId(form.values.root)) {
-          unmatched += 1;
-          if (entries.length === 0) wrong.push(`${baseline.name} → ${values.name}: an item without id was matched`);
-        } else if (form.isDirty !== entries.length > 0) {
+        const exempt = !form.isDirty && hasUnmatchedItem(form.baseline.root, form.values.root, ['f', 'g', 'h']);
+        if (exempt) unmatched += 1;
+        else if (!form.isDirty) matched += 1;
+        if (exempt ? entries.length === 0 : form.isDirty !== entries.length > 0) {
           wrong.push(`${baseline.name} → ${values.name}: isDirty ${form.isDirty}, ${entries.length} entries`);
         }
       }
     }
     expect(wrong).toEqual([]);
-    expect(unmatched).toBe(2); // [null] and [undefined] against a copy of themselves.
-  });
+    // Pinned: a change in how ids pair moves these counts even when `wrong` stays empty.
+    expect({ unmatched, matched }).toEqual({ unmatched: 94, matched: 100 });
+  }, CORPUS_TIMEOUT);
 
   it('a pure reorder with an id key is the declared exception: dirty, no entries', () => {
     const { result } = renderHook(useForm);

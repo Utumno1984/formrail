@@ -362,9 +362,10 @@ classi **Assente** (`undefined`, `null`, chiave mancante) e **Vuoto** (Assente �
 oggetto semplice con soli valori Vuoto) e non generava entry tra due lati Vuoti; era il punto 2 di
 questo elenco. Da #202 segue il **Livello 1** come `isDirty`: invariante "nessuna entry ⇔ `isDirty
 === false`" (senza `isEqual` personalizzato e senza `arrayIdKeys`: dichiarando un `idKey` restano due
-differenze volute, il riordino senza modifiche, che è dirty ma non dà entry, e gli elementi senza id,
-mai abbinati, che danno `added` + `removed` anche su array uguali). La leggibilità ("da (vuoto) a
-(vuoto)") si risolve nella **resa**: `ChangeEntry` ha `beforeMissing`/`afterMissing` per distinguere
+differenze volute, il riordino senza modifiche, che è dirty ma non dà entry, e gli elementi il cui id
+non è abbinato da `Object.is`, che danno `added` + `removed` anche su array uguali: elementi senza id,
+id oggetto confrontati per riferimento (una `Date` o un oggetto clonati sono un altro id), `0` contro
+`-0`). La leggibilità ("da (vuoto) a (vuoto)") si risolve nella **resa**: `ChangeEntry` ha `beforeMissing`/`afterMissing` per distinguere
 la chiave mancante da `undefined`, e il componente usa testi distinti nella resa precisa (`nullValue`,
 `undefinedValue`, `missingValue` in `ChangeSummaryValueLabels`, default `Null`, `Undefined`,
 `Missing`); la resa compatta resta `No value`. Regola nel TSDoc "No value rule" di

@@ -91,7 +91,9 @@ With a row changed, one added without id, one removed and two rows swapped, `ent
 - `''`, `null`, `undefined` and a missing key are four distinct states, as for `isDirty` in
   `useObjectPageForm`: without `isEqual` and `arrayIdKeys`, `entries` is empty if and only if `isDirty`
   is `false`. Declaring `arrayIdKeys` adds two exceptions: a reorder without changes is dirty but gives no
-  entry, and an item without id is never matched, not even with an equal one.
+  entry, and an item whose id is not matched by `Object.is` gives `added` + `removed` even against an equal
+  one. The second covers items without id, ids that are objects (compared by reference: a cloned `Date` or
+  object is another id) and `0` against `-0`.
 - **Absent** = `undefined`, `null`, missing key: it only decides the kind of the entry. Both sides Absent
   → `changed` (`null` → `undefined`). One side Absent → one `added`/`removed` entry on the node, whatever
   the other side holds (`null` → `''` is `added`, `[]` → `null` is `removed`). Anything else is compared

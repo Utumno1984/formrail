@@ -49,8 +49,10 @@ export interface ChangeEntry {
  * `''`, `null`, `undefined` and a missing key are four distinct states, as for `isDirty` in core's
  * `useObjectPageForm`: without `isEqual` and `arrayIdKeys`, `entries` is empty if and only if
  * `isDirty` is `false` for the same pair. With `arrayIdKeys` the two differ on purpose in two cases:
- * a reorder without changes is dirty but gives no entry, and an item without id is never matched,
- * so it gives `added` plus `removed` even on two equal arrays.
+ * a reorder without changes is dirty but gives no entry, and an item whose id is not matched by
+ * `Object.is` gives `added` plus `removed` even on two equal arrays. The second case covers items
+ * without id, ids that are objects (compared by reference: a cloned `Date` or object is another
+ * id) and `0` against `-0`.
  *
  * **Absent** = `undefined`, `null`, missing key. It does not make two values equal, it only decides
  * the kind of the entry. Applied in this order to every pair that differs (after `isEqual`):
@@ -100,7 +102,8 @@ export interface ChangeSummaryOptions<Values extends object> {
    * Identity key per array, keyed by a path **without indexes**, e.g.
    * `{ lineItems: 'id', 'lineItems.taxes': 'code' }` (the second is an array inside every item).
    *
-   * With an id key, items are matched by id (compared with `Object.is`, so `1` and `'1'` differ):
+   * With an id key, items are matched by id (compared with `Object.is`, so `1` and `'1'` differ,
+   * `0` and `-0` differ, and an object id, `Date` included, matches only the same reference):
    * an id only in the baseline is `removed` (path on its baseline index), a new id is `added`
    * (path on its `values` index), a matched item yields one entry per changed field (path on its
    * `values` index), and a reorder without changes yields no entry. Items without id

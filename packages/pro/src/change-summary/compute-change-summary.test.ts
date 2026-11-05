@@ -513,6 +513,15 @@ describe('arrays with arrayIdKeys', () => {
     ]);
   });
 
+  it('an object id matches only the same reference: a cloned Date or object is another id', () => {
+    const unmatched = ['added lineItems.0', 'removed lineItems.0'];
+    for (const id of [() => new Date(1), () => ({ a: 1 })]) {
+      expect(paths(diff({ lineItems: [item(id())] }, { lineItems: [item(id())] }, { arrayIdKeys: ids }))).toEqual(unmatched);
+      const shared = id();
+      expect(diff({ lineItems: [item(shared)] }, { lineItems: [item(shared)] }, { arrayIdKeys: ids })).toEqual([]);
+    }
+  });
+
   it('an array with id key that becomes [] or Absent gives one removed per item', () => {
     for (const after of [[], undefined, null]) {
       expect(paths(diff({ lineItems: [item(1), item(2)] }, { lineItems: after }, { arrayIdKeys: ids }))).toEqual([
