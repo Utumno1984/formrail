@@ -54,7 +54,7 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
     };
   }, [scrollerRef]);
 
-  // Keeps the active link visible in the (horizontally scrolling) list. Scrolls the list itself, never
+  // Keeps the active link centered in the (horizontally scrolling) list. Scrolls the list itself, never
   // `scrollIntoView`, which would also move the vertical scroller.
   useEffect(() => {
     const list = listRef.current;
