@@ -135,6 +135,21 @@ describe('StatusBadge', () => {
       const { container } = render(<StatusBadge>x</StatusBadge>);
       expect(container.querySelector('[aria-hidden]')).toBeNull();
     });
+
+    it('only the warning tone carries the optical shift of the icon (an unknown tone falls back to none)', () => {
+      const SHIFT = '[&_svg]:[translate:0_-4%]';
+      const tones: Array<StatusBadgeTone | 'bogus'> = [...TONES, 'bogus'];
+      for (const tone of tones) {
+        const { container, unmount } = render(
+          <StatusBadge tone={tone as StatusBadgeTone} icon={<Svg />}>
+            x
+          </StatusBadge>,
+        );
+        const slot = container.querySelector('[data-rop-badge-icon]') as HTMLElement;
+        expect(slot.className.split(' ').includes(SHIFT), tone).toBe(tone === 'warning');
+        unmount();
+      }
+    });
   });
 
   describe('props', () => {
