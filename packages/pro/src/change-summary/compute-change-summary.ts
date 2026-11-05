@@ -101,6 +101,9 @@ function labelPathOf(node: Node): string[] {
 
 type Task = () => void;
 
+/** Stand-in pushed into a probe: its only use is `length > 0`, so no entry is built for it. */
+const PROBE_HIT = Object.freeze({}) as ChangeEntry;
+
 /**
  * The visit is iterative: instead of recursing, a node schedules its children as tasks on an
  * explicit LIFO stack (in reverse, so they run in document order, each one's subtree completing
@@ -110,6 +113,11 @@ type Task = () => void;
 class Differ {
   private readonly onStack = new Map<object, Set<object>>();
   private readonly pending: Task[] = [];
+  /**
+   * Lists that only answer "is there any difference?" (see `diffBlock`). Building a real entry
+   * for them costs O(depth) (label path), which makes nested blocks O(depth^2) overall.
+   */
+  private readonly probes = new WeakSet<ChangeEntry[]>();
 
   constructor(
     private readonly arrayIdKeys: Readonly<Record<string, string>> | undefined,
@@ -128,6 +136,10 @@ class Differ {
   }
 
   private emit(out: ChangeEntry[], node: Node, kind: ChangeKind, before: unknown, after: unknown): void {
+    if (this.probes.has(out)) {
+      out.push(PROBE_HIT);
+      return;
+    }
     const labelPath = labelPathOf(node);
     out.push({
       path: node.path,
@@ -285,6 +297,7 @@ class Differ {
       return;
     }
     const probe: ChangeEntry[] = [];
+    this.probes.add(probe);
     const tasks: Task[] = [];
     for (let i = 0; i < after.length; i += 1) {
       tasks.push(() => {

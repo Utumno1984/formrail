@@ -36,7 +36,9 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     expect(onNavigate).toHaveBeenCalledTimes(2);
     expect(onNavigate).toHaveBeenLastCalledWith({ to: 'list' });
     await waitFor(() => expect(screen.getByRole('link', { name: 'FT-2026-0012' })).toBe(document.activeElement));
-  });
+    // Full-page jsdom integration: wall time is dominated by role queries and user-event over the whole
+    // showcase and scales with CPU contention. Same budget as the sibling tests below.
+  }, 20_000);
 
   it('save in flight + Back + Leave anyway: leaves at once, the store gets the saved value, no React warning', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
