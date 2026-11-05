@@ -39,7 +39,11 @@
   --color-rop-surface-subtle: #f5f6f7;
   /* Pressed background of a neutral surface (button, pill, option): one step darker than hover. */
   --color-rop-surface-pressed: color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black);
-  --color-rop-border: #c4cdd6;
+  /* Outline of a control or container: at least 3:1 on the surface and on the subtle surface (WCAG 1.4.11). */
+  --color-rop-border: #7b8fa5;
+  /* Soft neutral for fills (progress track, skeleton, hover tints), which must stay light enough for the
+     tones drawn on top of them; not for outlines that identify a control. */
+  --color-rop-border-subtle: #c4cdd6;
   /* Primary scale: blue-600 is the only hardcoded value; every other step is mixed from it. */
   --color-rop-blue-600: #0a6ed1;
   --color-rop-blue-50: color-mix(in srgb, var(--color-rop-blue-600) 8%, white);

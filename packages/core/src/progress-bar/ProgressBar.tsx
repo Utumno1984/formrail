@@ -97,7 +97,7 @@ export const ProgressBar = /* @__PURE__ */ forwardRef<HTMLDivElement, ProgressBa
       aria-valuetext={clamped === null ? undefined : getValueLabel(clamped, max, min)}
       className={cn(
         // Fixed height in every state; the contour keeps the track visible in forced-colors mode.
-        'relative block h-2 w-full min-w-0 overflow-hidden rounded-full bg-rop-border forced-colors:[outline-style:solid] forced-colors:[outline-width:1px] forced-colors:[outline-color:CanvasText]',
+        'relative block h-2 w-full min-w-0 overflow-hidden rounded-full bg-rop-border-subtle forced-colors:[outline-style:solid] forced-colors:[outline-width:1px] forced-colors:[outline-color:CanvasText]',
         className,
       )}
     >
