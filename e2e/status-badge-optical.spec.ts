@@ -42,20 +42,32 @@ for (const dpr of [1, 2]) {
   });
 }
 
-test('the shift is scoped to StatusBadge: no other icon next to text is moved', async ({ page }) => {
+test('no other CapIconSlot consumer is shifted (svg centred on the zero-height anchor); only the warning badge icon is moved', async ({ page }) => {
   await expectPlayToPass(page, 'internal-icontextalignment--all-pairs');
   const rows = await page.evaluate(() =>
     Array.from(document.querySelectorAll<HTMLElement>('[data-align-case]')).map((c) => {
       const icon = c.querySelector(c.dataset.alignIcon!) as Element;
-      return { name: c.dataset.alignCase!, translate: getComputedStyle(icon).translate };
+      const svg = (icon instanceof SVGElement ? icon : icon.querySelector('svg')) as SVGElement | null;
+      // The zero-height box CapIconSlot puts on baseline - 0.5cap: the svg is centred on it unless
+      // something (a shift on the inner span OR on the svg) moves the content off it.
+      const anchor = svg?.closest('.h-0') as HTMLElement | null;
+      let offset: number | null = null;
+      if (svg && anchor) {
+        const r = svg.getBoundingClientRect();
+        offset = r.top + r.height / 2 - anchor.getBoundingClientRect().top;
+      }
+      return { name: c.dataset.alignCase!, translate: getComputedStyle(icon).translate, offset };
     }),
   );
   const others = rows.filter((r) => !r.name.startsWith('status-badge-'));
   // The page has the non-portaled consumers of the shared alignment (MessageStrip, FieldMessage,
-  // controls, List Report sort arrow, footer, Text): none of them is translated.
+  // controls, List Report sort arrow, footer, Text).
   expect(others.length).toBeGreaterThanOrEqual(8);
+  const measured = others.filter((r) => r.offset !== null);
+  expect(measured.length, JSON.stringify(rows)).toBeGreaterThanOrEqual(4);
+  for (const r of measured) expect(r.offset!, r.name).toBeCloseTo(0, 1);
   for (const r of others) expect(r.translate, r.name).toBe('none');
-  // On the same page, the warning badge is the only badge whose icon is translated.
+  // On the same page, the warning badge is the only badge whose icon is moved.
   const badges = rows.filter((r) => r.name.startsWith('status-badge-'));
   expect(badges.map((r) => r.name)).toEqual([
     'status-badge-info',
@@ -64,7 +76,9 @@ test('the shift is scoped to StatusBadge: no other icon next to text is moved', 
     'status-badge-error',
   ]);
   for (const r of badges) {
-    if (r.name === 'status-badge-warning') expect(r.translate, r.name).not.toBe('none');
-    else expect(r.translate, r.name).toBe('none');
+    if (r.name === 'status-badge-warning') {
+      expect(r.offset!, r.name).toBeLessThan(-0.2);
+      expect(r.offset!, r.name).toBeGreaterThan(-1);
+    } else expect(r.offset!, r.name).toBeCloseTo(0, 1);
   }
 });

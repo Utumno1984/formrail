@@ -27,8 +27,8 @@ const TONE_CLASS: Record<StatusBadgeTone, string> = {
 // (`CapIconSlot`, baseline - 0.5cap); for the round icons of the other tones that box centre is
 // also where the eye puts the shape, so they are left exactly there. A triangle is not
 // symmetric top to bottom: its weight (the base, plus the exclamation mark) sits low, and its area
-// centroid lies 1/6 of its height below the box centre (on the 24-unit grid the triangle is 16.5
-// units tall, so ~0.11 of the icon size). Centred geometrically, it reads as sitting low against
+// centroid lies 1/6 of the triangle's height below the triangle's centre; on the 24-unit grid the
+// centroid is at y=14.5, ~2.5/24 (about 0.10) of the icon size below the box centre. Centred geometrically, it reads as sitting low against
 // the text. It is moved up by 4% of its own height, about a third of that gap: a full shift makes
 // the base float above the baseline (checked on rendered screenshots, 0.04/0.06 of the icon size
 // compared side by side). A percentage of the icon's own box, not a px or em value, so the
@@ -57,11 +57,19 @@ function warnEmpty(): void {
 }
 
 export interface StatusBadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'role' | 'children'> {
-  /** Default `neutral`. A value outside the union (untyped JS) falls back to `neutral`. */
+  /**
+   * Default `neutral`. A value outside the union (untyped JS) falls back to `neutral`. `warning`
+   * also nudges an `<svg>` icon up by 4% of its height (see `icon`).
+   */
   tone?: StatusBadgeTone;
   /**
    * Decorative icon before the text (an SVG, sized to the `xs` step of the icon scale). It is
    * hidden from assistive technology: the status is always carried by the text.
+   *
+   * With `tone="warning"` the icon is moved up by 4% of its height (optical correction for the
+   * apex-up triangle). The shift applies to `<svg>` children only (also nested ones); non-SVG icons
+   * (`img`, icon fonts) are not moved, and a round icon with `tone="warning"` is moved by about
+   * 0.5px.
    */
   icon?: ReactNode;
   /**
