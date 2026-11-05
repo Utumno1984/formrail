@@ -179,6 +179,64 @@ describe('<ListReport> selection bar', () => {
   });
 });
 
+describe('<ListReport> two selectable instances on the same page', () => {
+  function Pair() {
+    return (
+      <>
+        <Host selectable title="Invoices" />
+        <Host selectable title="Credit notes" />
+      </>
+    );
+  }
+
+  const barOf = (title: string) => screen.getByRole('group', { name: `Selection ${title}` });
+  const regionOf = (title: string) => screen.getByRole('table', { name: title });
+  const headerOf = (title: string) => within(regionOf(title)).getByRole('checkbox', { name: 'Select all results' });
+  const rowOf = (title: string, n: number) => within(regionOf(title)).getByRole('checkbox', { name: `Select INV-${n}` });
+  const clearOf = (title: string) => within(barOf(title)).getByText('Clear selection').closest('button') as HTMLButtonElement;
+
+  it('exposes distinct group names, each pointing at its own table', () => {
+    render(<Pair />);
+    const first = barOf('Invoices');
+    const second = barOf('Credit notes');
+    expect(first).not.toBe(second);
+    expect(first.getAttribute('aria-controls')).toBe(regionOf('Invoices').parentElement?.id);
+    expect(second.getAttribute('aria-controls')).toBe(regionOf('Credit notes').parentElement?.id);
+    expect(first.getAttribute('aria-controls')).not.toBe(second.getAttribute('aria-controls'));
+  });
+
+  it('keeps the selection state of each instance independent', async () => {
+    const user = userEvent.setup();
+    render(<Pair />);
+    await user.click(rowOf('Invoices', 1));
+    await user.click(rowOf('Invoices', 2));
+    expect(barOf('Invoices')).toHaveTextContent('2 selected');
+    expect(barOf('Credit notes')).toHaveTextContent('No items selected');
+    expect(rowOf('Credit notes', 1)).not.toBeChecked();
+
+    await user.click(headerOf('Credit notes'));
+    expect(barOf('Credit notes')).toHaveTextContent('4 selected');
+    await user.click(clearOf('Credit notes'));
+    expect(barOf('Credit notes')).toHaveTextContent('No items selected');
+    expect(barOf('Invoices')).toHaveTextContent('2 selected');
+    expect(rowOf('Invoices', 1)).toBeChecked();
+  });
+
+  it('"Clear selection" moves the focus to the header checkbox of its own instance only', async () => {
+    const user = userEvent.setup();
+    render(<Pair />);
+    await user.click(rowOf('Invoices', 1));
+    await user.click(rowOf('Credit notes', 1));
+    await user.click(clearOf('Invoices'));
+    expect(headerOf('Invoices')).toHaveFocus();
+    expect(headerOf('Credit notes')).not.toHaveFocus();
+
+    await user.click(clearOf('Credit notes'));
+    expect(headerOf('Credit notes')).toHaveFocus();
+    expect(headerOf('Invoices')).not.toHaveFocus();
+  });
+});
+
 describe('<ListReport> selection and URL state', () => {
   function UrlHost({ adapter }: { adapter: ListReportUrlAdapter }) {
     const url = useListReportUrlState({ filters: FILTERS, sortableColumnIds: ['number'], adapter });
