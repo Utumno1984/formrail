@@ -33,6 +33,7 @@ test.describe('Forms/Select: stories play', () => {
     'long-list',
     'long-labels',
     'async-load',
+    'empty',
     'inside-dialog',
   ]) {
     test(`${name}: the play function passes`, async ({ page }) => {
@@ -258,5 +259,29 @@ test.describe('accessibility', () => {
     await combobox(page).click();
     await expect(listbox(page)).toBeVisible();
     await expectNoA11yViolations(page);
+  });
+
+  test('axe: no violations with no options; the emptyLabel is a disabled option that is never picked', async ({ page }) => {
+    await expectPlayToPass(page, STORY('empty'));
+    // The play function ends with the list closed; the gestures below start from there.
+    await expect(listbox(page)).toHaveCount(0);
+    const trigger = combobox(page);
+    await trigger.click();
+    const list = listbox(page);
+    await expect(list).toBeVisible();
+    await expect(list.getByRole('option')).toHaveCount(1);
+    const empty = list.getByRole('option', { name: 'No countries available', disabled: true });
+    await expect(empty).toBeVisible();
+    await expectNoA11yViolations(page);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    // `force`: Playwright never clicks an aria-disabled node on its own; a user still can.
+    await empty.click({ force: true });
+    await expect(list).toBeVisible();
+    await expect(empty).not.toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(list).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveText('Select a country');
   });
 });

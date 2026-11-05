@@ -209,6 +209,28 @@ describe('Select', () => {
     expect(screen.getByText('No options')).toBeInTheDocument();
   });
 
+  it('empty options: the listbox owns only a disabled option with the message, never selectable', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <form>
+        <Select aria-label="Paese" options={[]} emptyLabel="Nothing here" onValueChange={onValueChange} />
+      </form>,
+    );
+    await user.click(screen.getByRole('combobox'));
+    const list = screen.getByRole('listbox');
+    const owned = within(list).getAllByRole('option');
+    expect(owned.map((o) => [o.textContent, o.getAttribute('aria-disabled'), o.getAttribute('aria-selected')])).toEqual([
+      ['Nothing here', 'true', 'false'],
+    ]);
+    // Out of Radix's collection: no native option is rendered for it.
+    expect(document.querySelector('select option[value]:not([value=""])')).toBeNull();
+    await user.keyboard('{ArrowDown}{Enter}');
+    await user.click(owned[0]!);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(owned[0]).not.toHaveFocus();
+  });
+
   it('an explicit emptyLabel (any language) replaces the English default', async () => {
     const user = userEvent.setup();
     render(<Select aria-label="Paese" options={[]} emptyLabel="Nessuna opzione" />);

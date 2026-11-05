@@ -93,6 +93,8 @@ const escapeKey = (key: string): string =>
  * - A selection outside the filtered results stays selected; leaving the field reverts the text.
  * - While showing the selection (not typing) the list is unfiltered.
  * - Keep the listbox mounted (e.g. `hidden`) while closed so `aria-controls` points at a node.
+ * - A listbox may own only options: with no `filteredItems`, render the "no results" message as an
+ *   option with `aria-disabled="true"`. It is not in `filteredItems`, so it is never made active.
  */
 export function useCombobox<T>(options: UseComboboxOptions<T>): UseComboboxReturn<T> {
   const {

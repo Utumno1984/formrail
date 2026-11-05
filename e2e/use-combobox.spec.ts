@@ -81,7 +81,9 @@ test.describe('useCombobox: real keyboard', () => {
     await page.keyboard.type('mil');
     await page.keyboard.press('Enter');
     await page.keyboard.type('xyz');
-    await expect(page.getByRole('option')).toHaveCount(0);
+    // The only option left is the disabled "No results" message.
+    await expect(page.getByRole('option', { disabled: false })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: 'No results', disabled: true })).toHaveCount(1);
     await expect(page.getByTestId('active-index')).toHaveText('-1');
     await expect(page.getByTestId('selected')).toHaveText('Milano');
     await page.keyboard.press('Tab');

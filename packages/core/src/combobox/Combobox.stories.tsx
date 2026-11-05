@@ -198,8 +198,13 @@ export const NoResults: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.type(input(canvasElement), 'zzz');
     const list = await listbox();
-    await expect(within(list).getByText('No results')).toBeInTheDocument();
-    await expect(within(list).queryAllByRole('option')).toHaveLength(0);
+    // The message is the listbox's only option, disabled: the arrows never make it active.
+    const [empty, ...others] = within(list).getAllByRole('option');
+    await expect(others).toHaveLength(0);
+    await expect(empty).toHaveTextContent('No results');
+    await expect(empty).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{ArrowDown}');
+    await expect(input(canvasElement)).not.toHaveAttribute('aria-activedescendant');
   },
 };
 
