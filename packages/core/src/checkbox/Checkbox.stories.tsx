@@ -47,6 +47,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// These stories render fixed content: besides the `onCheckedChange` spy (Actions panel), no meta arg reaches the DOM.
+const NO_CONTROLS = { controls: { disable: true } };
+
 const column = { display: 'grid', gap: 16, maxWidth: 320 } as const;
 const stateProps = (state: FieldState) =>
   ({ state, stateReason: state === 'default' ? undefined : 'Decided by the framework agreement.' }) as FieldStateProps;
@@ -297,6 +300,7 @@ const MATRIX_CHECKED: { name: string; value: CheckedState }[] = [
 /** State matrix: unchecked / checked / indeterminate against default, disabled, forced, locked and invalid. */
 export const StateMatrix: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
       {MATRIX_CHECKED.flatMap(({ name, value }) =>
@@ -319,6 +323,7 @@ export const StateMatrix: Story = {
 /** Inside a Field with help and error, a long inline label that wraps with the box on top, and a box without label. */
 export const FieldMessages: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <div style={column}>
       <Field label="Terms" help="You can change this later." required>
@@ -345,6 +350,7 @@ const ITEMS = ['Invoices', 'Credit notes', 'Receipts'];
 
 /** "Select all": the parent is indeterminate when only some children are ticked. */
 export const SelectAll: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => {
     function SelectAllDemo() {
       const [selected, setSelected] = useState<string[]>([]);
@@ -392,6 +398,7 @@ export const SelectAll: Story = {
 
 /** Uncontrolled inside a native form: `name`/`value` are submitted only when ticked, and Reset restores `defaultChecked` without reporting. */
 export const InForm: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <form
       style={column}
@@ -419,6 +426,7 @@ export const InForm: Story = {
 
 /** Mounted unchecked, then `true` arrives from a "fetch": the box updates and nothing is reported. */
 export const AsyncHydration: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => {
     function Demo() {
       const [value, setValue] = useState(false);

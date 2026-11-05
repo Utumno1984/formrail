@@ -82,6 +82,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// Only Playground/Manual map `state` onto the Field; elsewhere `Controlled` drops it, so the control would be inert.
+const NO_STATE = { controls: { exclude: ['state'] } };
+
 const column = { display: 'grid', gap: 16, maxWidth: 320 } as const;
 const stateProps = (state: FieldState) =>
   ({
@@ -167,6 +170,7 @@ export const Manual: Story = {
 /** Page-level shot with the list open and a selection (check and highlight visible). */
 export const Base: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune" help="Sede legale del fornitore">
@@ -183,6 +187,7 @@ export const Base: Story = {
 
 export const NoResults: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune">
@@ -200,6 +205,7 @@ export const NoResults: Story = {
 
 export const WithError: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune" error="Seleziona un comune" required>
@@ -216,6 +222,7 @@ export const WithError: Story = {
 
 export const Disabled: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune" state="disabled" stateReason="Non modificabile in bozza">
@@ -233,6 +240,7 @@ export const Disabled: Story = {
 /** Focusable, shows the value, and nothing opens it: not typing, the arrows, Enter or a click. */
 export const Forced: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune" state="forced" stateReason="Deciso dal contratto quadro.">
@@ -255,6 +263,7 @@ export const Forced: Story = {
 
 /** A value the catalogue no longer has: the input shows the declared label (or the raw value), and nothing is reported. */
 export const UnknownValue: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune">
@@ -275,6 +284,7 @@ export const UnknownValue: Story = {
 /** 200 options: the list scrolls inside a declared maximum height and the arrows keep the active option in view. */
 export const LongList: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Cliente">
@@ -291,6 +301,7 @@ export const LongList: Story = {
 /** Very long labels: the input stays inside the Field's width; the list wraps them. */
 export const LongLabels: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Ragione sociale">
@@ -312,6 +323,8 @@ export const LongLabels: Story = {
  */
 export const AsyncLoad: Story = {
   tags: ['visual'],
+  // This render builds a bare Combobox from `size` and `placeholder` only.
+  parameters: { controls: { exclude: ['state', 'emptyLabel', 'clearOnEmpty'] } },
   render: ({ size, placeholder, onValueChange }) => {
     function Host() {
       const [data, setData] = useState<{
@@ -348,6 +361,7 @@ export const AsyncLoad: Story = {
 
 /** Two Comboboxes on the page: distinct ids, and opening the second closes the first. */
 export const Two: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Comune di nascita">
@@ -362,6 +376,7 @@ export const Two: Story = {
 
 /** Close to the bottom edge of the viewport: the list opens upward (or shrinks) and stays on screen. */
 export const NearBottom: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <div>
       <div style={{ height: '70vh' }} />
@@ -376,6 +391,7 @@ export const NearBottom: Story = {
 
 /** The same field low in a tall page, for the virtual keyboard e2e (`visualViewport` simulated). */
 export const KeyboardSafe: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <div>
       <div style={{ height: '40vh' }} />
@@ -392,6 +408,7 @@ export const KeyboardSafe: Story = {
 /** The popover is above the dialog: the options take the click and the dialog stays open. */
 export const InsideDialog: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <Dialog defaultOpen>
       <DialogTrigger asChild>
@@ -434,6 +451,7 @@ export const InsideDialog: Story = {
 
 /** Same stacking as in a Dialog: the options are above the sheet and a pick leaves it open. */
 export const InsideSheet: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>

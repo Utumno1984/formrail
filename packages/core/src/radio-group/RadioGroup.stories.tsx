@@ -52,6 +52,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// These stories render fixed content: besides the `onValueChange` spy (Actions panel), no meta arg reaches the DOM.
+const NO_CONTROLS = { controls: { disable: true } };
+
 const column = { display: 'grid', gap: 16, maxWidth: 360 } as const;
 const stateProps = (state: FieldState) =>
   ({ state, stateReason: state === 'default' ? undefined : 'Decided by the framework agreement.' }) as FieldStateProps;
@@ -311,6 +314,7 @@ export const UncontrolledBlockedWalkthrough: Story = {
 /** Orientation × Field state, with help and an error, for the visual regression. */
 export const StateMatrix: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
       {(['vertical', 'horizontal'] as const).flatMap((orientation) =>
@@ -343,6 +347,7 @@ const LONG = [
 /** Five long options, horizontal: they wrap, with no horizontal overflow on a 375px screen. */
 export const LongHorizontal: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <Field label="Billing" help="Choose how you want to be billed.">
       <Controlled initial="b" orientation="horizontal" options={LONG} onValueChange={onValueChange} />
@@ -352,6 +357,7 @@ export const LongHorizontal: Story = {
 
 /** Uncontrolled inside a native form: `name`/`value` are submitted, and Reset restores `defaultValue` without reporting. */
 export const InForm: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <form
       style={column}
@@ -381,6 +387,7 @@ export const InForm: Story = {
 
 /** Mounted with nothing selected, then `team` arrives from a "fetch": the selection updates and nothing is reported. */
 export const AsyncHydration: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => {
     function Demo() {
       const [value, setValue] = useState<string | null>(null);

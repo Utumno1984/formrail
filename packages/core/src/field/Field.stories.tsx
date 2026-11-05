@@ -110,7 +110,8 @@ export const Playground: Story = {
  */
 export const Forced: Story = {
   args: { state: 'forced', stateReason: 'Valore imposto dal listino del cliente.' },
-  render: ({ label, state, stateReason, onChange }) => (
+  parameters: { controls: { include: ['label', 'state', 'stateReason'] } },
+  render:({ label, state, stateReason, onChange }) => (
     <div style={column}>
       <Field label={label} {...stateProps(state, stateReason)}>
         <Input value="Listino A" onChange={onChange} />
@@ -132,7 +133,8 @@ export const Forced: Story = {
 /** A forced `type="number"`: arrow keys and the mouse wheel must not step the value. */
 export const ForcedNumber: Story = {
   args: { label: 'Quantità', state: 'forced', stateReason: 'Fissata dal contratto quadro.' },
-  render: ({ label, state, stateReason, onChange }) => (
+  parameters: { controls: { include: ['label', 'state', 'stateReason'] } },
+  render:({ label, state, stateReason, onChange }) => (
     <div style={column}>
       <Field label={label} {...stateProps(state, stateReason)}>
         <Input type="number" value={5} onChange={onChange} />
@@ -171,6 +173,7 @@ function LoadData({ onChange }: { onChange: PlaygroundArgs['onChange'] }) {
  * Actions panel stays empty (no `onChange`); typing afterwards is a real change and does log.
  */
 export const ExternalValue: Story = {
+  parameters: { controls: { disable: true } },
   render: ({ onChange }) => <LoadData onChange={onChange} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
@@ -217,6 +220,7 @@ function HookToggle() {
  * are readable but do not travel through `{...control}`.
  */
 export const RenderPropLocked: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={column}>
       <Field label="Attivo" state="locked" stateReason="Gestito dall'amministratore">
@@ -237,6 +241,7 @@ export const RenderPropLocked: Story = {
 
 /** The same wiring through `useFieldControl()` called in a child of the Field; here it is not blocked. */
 export const HookToggleEnabled: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={column}>
       <Field label="Notifiche">
@@ -258,6 +263,7 @@ export const HookToggleEnabled: Story = {
  * scroll far enough. Exercised by `e2e/field.spec.ts` with a simulated visualViewport.
  */
 export const KeyboardSafe: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ ...column, paddingBottom: 'var(--rop-keyboard-inset, 0px)' }} data-testid="kb-page">
       <div style={{ height: '120dvh' }}>Contenuto lungo prima del campo.</div>
@@ -322,6 +328,7 @@ export const ErrorReservesSpace: Story = {
  */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ ...column, color: 'var(--color-rop-text)' }}>
       <Field label="Semplice" data-testid="f-plain">

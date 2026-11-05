@@ -34,7 +34,8 @@ interface DemoArgs {
 // The meta controls of the props a story does not wire up are hidden there, so no control in the
 // panel does nothing.
 const ONLY_DELAY = { controls: { exclude: ['content', 'side', 'align'] } };
-const NO_CONTROLS = { controls: { exclude: ['content', 'side', 'align', 'delayDuration'] } };
+// `exclude` is ignored for a story whose `render` takes no args, so these use `disable`.
+const NO_CONTROLS = { controls: { disable: true } };
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Tooltip',

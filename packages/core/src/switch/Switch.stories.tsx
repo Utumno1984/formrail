@@ -46,6 +46,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// These stories render fixed content: besides the `onCheckedChange` spy (Actions panel), no meta arg reaches the DOM.
+const NO_CONTROLS = { controls: { disable: true } };
+
 const column = { display: 'grid', gap: 16, maxWidth: 320 } as const;
 const stateProps = (state: FieldState) =>
   ({ state, stateReason: state === 'default' ? undefined : 'Decided by the framework agreement.' }) as FieldStateProps;
@@ -294,6 +297,7 @@ export const UncontrolledBlockedWalkthrough: Story = {
 /** State matrix: off / on against default, disabled, forced, locked and invalid. */
 export const StateMatrix: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
       {[
@@ -316,6 +320,7 @@ export const StateMatrix: Story = {
 /** Inside a Field with help and error, a long inline label that wraps with the switch on top, and a switch without label. */
 export const FieldMessages: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <div style={column}>
       <Field label="Notifications" help="Applied immediately." required>
@@ -341,6 +346,7 @@ export const FieldMessages: Story = {
 /** Right-to-left: the thumb starts at the right edge and moves to the left when on. */
 export const Rtl: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <div dir="rtl" style={column}>
       <Field label="Notifications">
@@ -355,6 +361,7 @@ export const Rtl: Story = {
 
 /** Uncontrolled inside a native form: `name`/`value` are submitted only when on, and Reset restores `defaultChecked` without reporting. */
 export const InForm: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
     <form
       style={column}
@@ -382,6 +389,7 @@ export const InForm: Story = {
 
 /** A switch with an asynchronous save: on, then the "server" rejects and the value goes back to off from outside, without echo. */
 export const AsyncSave: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => {
     function Demo() {
       const [value, setValue] = useState(false);
@@ -418,6 +426,7 @@ export const AsyncSave: Story = {
 
 /** Mounted off, then `true` arrives from a "fetch": the switch updates and nothing is reported. */
 export const AsyncHydration: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => {
     function Demo() {
       const [value, setValue] = useState(false);

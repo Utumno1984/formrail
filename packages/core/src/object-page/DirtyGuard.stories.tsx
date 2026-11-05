@@ -138,6 +138,8 @@ export const UnmountsPage: Story = {
 
 /** Fixture for the e2e suite: `guard` is called from inside another open Dialog; the confirmation stacks above it. */
 export const InsideDialog: Story = {
+  // `when` is fixed and `close` is not passed to the hook in this render.
+  parameters: { controls: { exclude: ['when', 'close'] } },
   render: ({ title, description, stay, leave }) => {
     function Root() {
       const [open, setOpen] = useState(false);
@@ -171,6 +173,8 @@ export const InsideDialog: Story = {
  * opens and the route does not move until "Leave without saving".
  */
 export const BrowserHistory: Story = {
+  // `when` follows the typed field and `close` is not passed to the hook in this render.
+  parameters: { controls: { exclude: ['when', 'close'] } },
   render: ({ title, description, stay, leave }) => {
     function Root() {
       const [hash, setHash] = useState(() => window.location.hash);

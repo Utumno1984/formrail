@@ -77,6 +77,8 @@ export const IconOnly: Story = {
 /** `asChild`: the `<a>` is rendered with the Button classes; no nested `<button>`. */
 export const AsLink: Story = {
   args: { variant: 'primary', asChild: true },
+  // The render supplies the `<a>` child, so the `children` text control would not reach the DOM.
+  parameters: { controls: { exclude: ['children'] } },
   render: (args) => (
     <Button {...args}>
       <a href="#destinazione" onClick={(e) => e.preventDefault()}>
@@ -102,6 +104,7 @@ const row = { display: 'flex', flexWrap: 'wrap', alignItems: 'center', alignCont
  */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 24, maxWidth: 640, color: 'var(--color-rop-text)' }}>
       <section aria-label="Variants and sizes" style={{ display: 'grid', gap: 12 }}>
@@ -204,6 +207,7 @@ export const Overview: Story = {
  * and spills out of the button horizontally instead. Documented trade-off, covered by an e2e; not photographed.
  */
 export const InlineNarrow: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div data-testid="narrow" style={{ width: 120, border: '1px dashed var(--color-rop-border)' }}>
       <Text>
@@ -221,6 +225,7 @@ export const InlineNarrow: Story = {
  * icon-only buttons and `asChild` links. Not photographed.
  */
 export const TextDecoration: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 12, color: 'var(--color-rop-text)' }}>
       <div style={row}>

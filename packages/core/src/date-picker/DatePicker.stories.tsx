@@ -65,6 +65,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// These stories fix every DatePicker prop themselves: besides the two spies (Actions panel), no meta arg reaches the DOM.
+const NO_CONTROLS = { controls: { disable: true } };
+
 const stateProps = (state: FieldState) =>
   (state === 'default' ? { state } : { state, stateReason: 'Set by the framework agreement.' }) as FieldStateProps;
 
@@ -145,6 +148,7 @@ export const Manual: Story = {
 
 /** Mounted empty, then a date arrives from a "fetch": the text and the button follow, nothing is reported. */
 export const AsyncHydration: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => {
     function Demo() {
       const [value, setValue] = useState<IsoDate | null>(null);
@@ -185,6 +189,7 @@ export const AsyncHydration: Story = {
 
 /** Field states switched at run time (also while the calendar is open): disabled, forced, locked. */
 export const FieldStates: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => {
     function Demo() {
       const [state, setState] = useState<FieldState>('default');
@@ -251,6 +256,7 @@ function DialogDemo({ args, defaultOpen }: { args: DemoArgs; defaultOpen: boolea
  */
 export const InsideDialog: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: (args) => <DialogDemo args={args} defaultOpen />,
   play: async ({ args }) => {
     const body = within(document.body);
@@ -276,6 +282,7 @@ export const InsideDialog: Story = {
 
 /** Same stacking inside a Sheet. For the e2e. */
 export const InsideSheet: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
@@ -297,6 +304,7 @@ export const InsideSheet: Story = {
 
 /** The field low on a tall page, for the virtual keyboard e2e (spec §1.10). */
 export const KeyboardSafe: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => (
     // Same layout as Forms/Field KeyboardSafe: enough content above for the field to be scrolled to
     // the bottom edge of the screen (where the keyboard will cover it), and the inset reserved below.
@@ -317,6 +325,7 @@ const column = { display: 'grid', gap: 8, maxWidth: 340 } as const;
 /** Closed, empty and with a value, both sizes, every Field state with its reason, an error. For the visual regression. */
 export const States: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={column}>
       <Field label="Empty">
@@ -347,6 +356,7 @@ export const States: Story = {
 /** Placeholder and text in the locale's order and separator. For the visual regression. */
 export const Locales: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={column}>
       {(['it-IT', 'de-DE', 'ja-JP', 'en-US'] as const).map((locale) => (
@@ -366,6 +376,7 @@ export const Locales: Story = {
 /** The calendar open under the field (`it-IT`, Monday first). For the visual regression on every viewport. */
 export const Open: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={{ maxWidth: 320 }}>
       <Field label="Due date (it-IT)">

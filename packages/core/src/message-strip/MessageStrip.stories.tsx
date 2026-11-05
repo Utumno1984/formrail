@@ -47,6 +47,7 @@ export const Playground: Story = {
 
 /** Each key press on the close button calls `onDismiss` exactly once; the strip stays mounted. */
 export const DismissCount: Story = {
+  parameters: { controls: { disable: true } },
   render: () => {
     return <DismissCounter />;
   },
@@ -111,6 +112,7 @@ export const Dismissible: Story = {
 
 /** Two strips on one page: the close buttons are told apart by the title in their name. */
 export const DistinctCloseNames: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 8, maxWidth: 480 }}>
       <MessageStrip tone="error" title="Salvataggio non riuscito" onDismiss={fn()}>
@@ -139,6 +141,7 @@ const stack = { display: 'grid', gap: 8, maxWidth: 520 } as const;
  */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 24, color: 'var(--color-rop-text)' }}>
       <section aria-label="Tones" style={stack} data-testid="tones">

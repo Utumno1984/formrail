@@ -163,7 +163,7 @@ export const StackedMixed: Story = {
 /** `auto` in two containers side by side in the same viewport: the narrow one stacks, the wide one stays inline. */
 export const AutoSideBySide: Story = {
   tags: ['visual'],
-  argTypes: { width: { control: false } },
+  argTypes: { width: { table: { disable: true } }, layout: { table: { disable: true } } },
   render: ({ valueKind, emptyLabel }) => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
       {[600, 280].map((w) => (

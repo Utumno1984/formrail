@@ -61,6 +61,7 @@ const cell = { display: 'grid', justifyItems: 'center', gap: 6 } as const;
 /** The whole scale, the internal icons in every state colour, and an arbitrary 100x100 SVG. */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 24, maxWidth: 560, color: 'var(--color-rop-text)' }}>
       <section aria-label="Scale">

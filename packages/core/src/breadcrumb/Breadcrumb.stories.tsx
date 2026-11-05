@@ -212,7 +212,11 @@ const RouterLink = forwardRef<HTMLAnchorElement, AnchorHTMLAttributes<HTMLAnchor
 /** Recipe: `asChild` hands the classes, `aria-*` and ref to the router's `Link`; no nested anchor. */
 export const AsChildRecipe: Story = {
   args: { onNavigate: fn() },
-  argTypes: { items: { table: { disable: true } }, textLength: { table: { disable: true } } },
+  argTypes: {
+    items: { table: { disable: true } },
+    textLength: { table: { disable: true } },
+    width: { table: { disable: true } },
+  },
   render: ({ separator, onNavigate }) => (
     <Breadcrumb separator={separator}>
       <BreadcrumbItem>
