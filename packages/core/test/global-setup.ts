@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
  */
 export default function setup(): void {
   const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const entries = ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts'];
+  const entries = ['index.js', 'index.cjs', 'index.d.ts', 'index.d.cts', 'internal.js', 'internal.cjs', 'internal.d.ts', 'internal.d.cts'];
   if (entries.every((entry) => existsSync(join(packageDir, 'dist', entry)))) return;
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   execFileSync(npm, ['run', 'build'], { cwd: packageDir, stdio: 'inherit' });

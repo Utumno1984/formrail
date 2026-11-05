@@ -22,8 +22,15 @@ const cssRaw: Plugin = {
 };
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  // Two entries: the public API and `/internal` (facade for @react-object-page/pro, no semver
+  // guarantee). `splitting: true` makes esbuild hoist the code they share — most of the List
+  // Report, since `internal.ts` exports the exact building blocks `index.ts`'s `ListReportTable`/
+  // `ListReport` are made of — into one shared chunk both entries import, instead of bundling two
+  // copies (which would duplicate module-level state, e.g. React Context instances, silently).
+  // Verified on the built `dist/` by `test/internal-identity.test.ts` (ESM and CJS).
+  entry: { index: 'src/index.ts', internal: 'src/internal.ts' },
   format: ['esm', 'cjs'],
+  splitting: true,
   dts: true,
   clean: true,
   sourcemap: true,

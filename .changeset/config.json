@@ -2,7 +2,7 @@
   "$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [["@react-object-page/core", "@react-object-page/pro"]],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
