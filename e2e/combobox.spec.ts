@@ -332,6 +332,39 @@ test.describe('layout and a11y', () => {
     await expect(listbox(page)).toBeVisible();
     await expectNoA11yViolations(page);
   });
+
+  test('no results: no axe violations, the message is a disabled option the keyboard never reaches', async ({ page }) => {
+    await gotoStory(page, STORY('manual'));
+    const box = input(page);
+    await box.click();
+    await page.keyboard.type('zzz');
+    const list = listbox(page);
+    await expect(list).toBeVisible();
+    await expect(list.getByRole('option')).toHaveCount(1);
+    const empty = list.getByRole('option', { name: 'No results', disabled: true });
+    await expect(empty).toBeVisible();
+    await expectNoA11yViolations(page);
+    for (const key of ['ArrowDown', 'ArrowUp', 'Home', 'End', 'Enter']) {
+      await page.keyboard.press(key);
+      await expect(box).not.toHaveAttribute('aria-activedescendant');
+    }
+    // `force`: Playwright never clicks an aria-disabled node on its own; a user still can.
+    await empty.click({ force: true });
+    await expect(box).toBeFocused();
+    await expect(box).toHaveValue('zzz');
+    await expect(list).toBeVisible();
+    // Results again: the arrows reach the options as before.
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('mod');
+    await expect(list.getByRole('option')).toHaveCount(1);
+    await expect(list.getByRole('option', { name: 'No results' })).toHaveCount(0);
+    await page.keyboard.press('ArrowDown');
+    const id = await box.getAttribute('aria-activedescendant');
+    await expect(list.getByRole('option', { name: 'Modena' })).toHaveAttribute('id', id!);
+    await page.keyboard.press('Enter');
+    await expect(box).toHaveValue('Modena');
+    await expect(list).toBeHidden();
+  });
 });
 
 // Keyboard-safe list (spec §1.10). Same stand-in as `e2e/field.spec.ts`: `__setKeyboard(px)`

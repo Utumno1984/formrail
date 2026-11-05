@@ -75,8 +75,10 @@ describe('Combobox', () => {
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Città di Castello']);
     await user.clear(input);
     await user.type(input, 'zzz');
-    expect(screen.queryAllByRole('option')).toHaveLength(0);
-    expect(screen.getByText('No results')).toBeInTheDocument();
+    // No selectable option: the only one is the disabled message.
+    expect(screen.getAllByRole('option').map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+      ['No results', 'true'],
+    ]);
   });
 
   it('arrows skip the disabled option, Enter picks once and the input shows the label; focus stays on the input', async () => {
@@ -225,6 +227,41 @@ describe('Combobox', () => {
     await user.click(screen.getByRole('combobox'));
     expect(screen.getByText('Nessun risultato')).toBeInTheDocument();
     expect(screen.queryByText('No results')).toBeNull();
+  });
+
+  it('no results: the listbox owns only a disabled option with the message, never active nor selectable', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<Controlled onValueChange={onValueChange} initial="mi" aria-label="Comune" />);
+    const input = screen.getByRole('combobox');
+    await user.click(input);
+    await user.clear(input);
+    await user.type(input, 'zzz');
+    const list = screen.getByRole('listbox');
+    expect(Array.from(list.children).map((el) => el.getAttribute('role'))).toEqual(['option']);
+    const empty = screen.getByRole('option', { name: 'No results' });
+    expect(empty).toHaveAttribute('aria-disabled', 'true');
+    expect(empty).toHaveAttribute('aria-selected', 'false');
+    expect(empty).not.toHaveAttribute('id');
+    for (const key of ['{ArrowDown}', '{ArrowUp}', '{Home}', '{End}']) {
+      await user.keyboard(key);
+      expect(input).not.toHaveAttribute('aria-activedescendant');
+      expect(empty).not.toHaveAttribute('data-active');
+    }
+    await user.keyboard('{Enter}');
+    await user.click(empty);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(input).toHaveFocus();
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(input).toHaveValue('zzz');
+    // Results again: the message goes and the arrows reach the options.
+    await user.clear(input);
+    await user.type(input, 'mo');
+    expect(screen.queryByRole('option', { name: 'No results' })).toBeNull();
+    await user.keyboard('{ArrowDown}');
+    expect(input.getAttribute('aria-activedescendant')).toBe(screen.getByRole('option', { name: 'Modena' }).id);
+    await user.keyboard('{Escape}');
+    expect(input).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('empty options: the list opens with the empty text, Enter does nothing, no crash', async () => {

@@ -59,7 +59,11 @@ function ComboboxDemo({ clearOnEmpty, onSelectedItemChange, onInputValueChange }
             {city.label}
           </li>
         ))}
-        {combobox.filteredItems.length === 0 && <li aria-hidden="true">No results</li>}
+        {combobox.filteredItems.length === 0 && (
+          <li role="option" aria-disabled="true" aria-selected="false">
+            No results
+          </li>
+        )}
       </ul>
       <button type="button" onClick={() => setSelected(OUTSIDE)}>
         Set from outside
@@ -124,7 +128,11 @@ export const SelectionOutsideResults: Story = {
     await userEvent.click(input);
     await userEvent.keyboard('mil{Enter}');
     await userEvent.keyboard('xyz');
-    await waitFor(() => expect(canvas.queryAllByRole('option')).toHaveLength(0));
+    await waitFor(() =>
+      expect(canvas.getAllByRole('option').map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+        ['No results', 'true'],
+      ]),
+    );
     await expect(canvas.getByTestId('selected')).toHaveTextContent('Milano');
     await userEvent.tab();
     await waitFor(() => expect(input).toHaveValue('Milano'));

@@ -243,7 +243,13 @@ export const Combobox = /* @__PURE__ */ forwardRef<HTMLInputElement, ComboboxPro
             className={cn(LISTBOX_CONTENT_POPOVER, overlayLayer.popover)}
           >
             <div {...listbox} className={cn(LISTBOX_VIEWPORT, COMBOBOX_LIST)}>
-              {combobox.filteredItems.length === 0 ? <div className={LISTBOX_EMPTY}>{emptyLabel}</div> : null}
+              {combobox.filteredItems.length === 0 ? (
+                // A listbox may own only options: the message is one, disabled and outside
+                // `filteredItems`, so the arrows, `aria-activedescendant` and Enter never reach it.
+                <div role="option" aria-disabled="true" aria-selected="false" data-disabled="" className={LISTBOX_EMPTY}>
+                  {emptyLabel}
+                </div>
+              ) : null}
               {combobox.filteredItems.map((option, index) => {
                 const selected = combobox.selectedItem?.value === option.value;
                 return (

@@ -45,6 +45,8 @@ interface DemoArgs {
   size: SelectSize;
   placeholder: string;
   state: FieldState;
+  /** Only the `Empty` story declares it as a control: elsewhere there are options. */
+  emptyLabel?: string;
   onValueChange: (value: string) => void;
 }
 
@@ -351,6 +353,40 @@ export const AsyncLoad: Story = {
     await userEvent.click(trigger(canvasElement));
     const list = await listbox();
     await expect(within(list).getByRole('option', { name: 'Spagna' })).toHaveAttribute('aria-selected', 'true');
+  },
+};
+
+/**
+ * No options: the open list shows `emptyLabel` as its only option, disabled. Control: `emptyLabel`.
+ * The play function opens the list, presses the arrows and Enter and clicks the message: nothing is
+ * picked, the trigger keeps the placeholder and Actions stays empty.
+ */
+export const Empty: Story = {
+  parameters: { controls: { exclude: ['state'] } },
+  argTypes: { emptyLabel: { control: 'text' } },
+  args: { placeholder: 'Select a country', emptyLabel: 'No countries available' },
+  render: ({ size, placeholder, emptyLabel, onValueChange }) => (
+    <div style={column}>
+      <Field label="Country">
+        <Select options={[]} size={size} placeholder={placeholder} emptyLabel={emptyLabel} onValueChange={onValueChange} />
+      </Field>
+    </div>
+  ),
+  play: async ({ args, canvasElement }) => {
+    await userEvent.click(trigger(canvasElement, 'Country'));
+    const list = await listbox();
+    const [empty, ...others] = within(list).getAllByRole('option');
+    await expect(others).toHaveLength(0);
+    await expect(empty).toHaveTextContent(args.emptyLabel!);
+    await expect(empty).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    await userEvent.click(empty!);
+    await expect(args.onValueChange).not.toHaveBeenCalled();
+    await expect(within(document.body).getByRole('listbox')).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(within(document.body).queryByRole('listbox')).toBeNull());
+    await expect(trigger(canvasElement, 'Country')).toHaveTextContent(args.placeholder);
+    await expect(trigger(canvasElement, 'Country')).toHaveFocus();
   },
 };
 

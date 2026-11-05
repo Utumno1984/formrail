@@ -38,7 +38,9 @@ test.describe('useCombobox QA', () => {
     await page.keyboard.press('Enter'); // re-select same
     await expect(log(page)).toHaveCount(1);
     await page.keyboard.type('xyz');
-    await expect(page.getByRole('option')).toHaveCount(0);
+    // The only option left is the disabled "No results" message.
+    await expect(page.getByRole('option', { disabled: false })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: 'No results', disabled: true })).toHaveCount(1);
     await expect(input(page)).not.toHaveAttribute('aria-activedescendant');
     await page.keyboard.press('Enter'); // empty list: no-op
     await expect(log(page)).toHaveCount(1);

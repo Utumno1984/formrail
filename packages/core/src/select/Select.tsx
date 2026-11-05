@@ -247,7 +247,14 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
           className={cn(LISTBOX_CONTENT, overlayLayer.popover)}
         >
           <RadixSelect.Viewport className={LISTBOX_VIEWPORT}>
-            {options.length === 0 ? <div className={LISTBOX_EMPTY}>{emptyLabel}</div> : null}
+            {options.length === 0 ? (
+              // A listbox may own only options. A plain node, not a `RadixSelect.Item`: it stays out of
+              // Radix's collection (focus, typeahead, the hidden native select) and can never be picked;
+              // `data-disabled` keeps it out of the refocus on an options change above.
+              <div role="option" aria-disabled="true" aria-selected="false" data-disabled="" className={LISTBOX_EMPTY}>
+                {emptyLabel}
+              </div>
+            ) : null}
             {options.map((option) =>
               byValue.get(option.value) === option ? (
                 <RadixSelect.Item
