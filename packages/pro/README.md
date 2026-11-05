@@ -100,7 +100,9 @@ With a row changed, one added without id, one removed and two rows swapped, `ent
   structurally; no other normalization (`' '` vs `''`, `5` vs `'5'` are changes).
 - `NaN` equals `NaN`, `0` equals `-0`, `Date`s by `getTime()`; `Map`, `Set`, class instances and
   functions are leaves compared by reference. Circular structures are supported, and so are very deep
-  ones: the visit is iterative (no call-stack overflow, tested at 10 000 levels) and linear in the nodes.
+  ones: the visit is iterative (no call-stack overflow, tested at 10 000 levels). The cost is linear in the
+  visited nodes, and a subtree shared by several paths is visited once per path, so a graph of shared
+  subtrees can cost exponential time in its size.
 - **Arrays**: declare an identity key per array path without indexes (`arrayIdKeys`, e.g.
   `{ lineItems: 'id', 'lineItems.taxes': 'code' }`) to get per-field entries for matched rows,
   `added`/`removed` per row and no entry for a reorder; `[]` against an Absent side has no row to report

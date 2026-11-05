@@ -781,6 +781,8 @@ interface ChangeEntry {
   kind: 'added' | 'removed' | 'changed';
   before: unknown; // undefined when kind === 'added'
   after: unknown;  // undefined when kind === 'removed'
+  beforeMissing: boolean; // no own key in the baseline, or no counterpart for an array item
+  afterMissing: boolean;  // same, for values
 }
 
 function useChangeSummary<Values extends object>(

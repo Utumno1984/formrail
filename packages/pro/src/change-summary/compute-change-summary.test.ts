@@ -205,7 +205,7 @@ describe('"no value" rule: structures', () => {
     expect(brief(diff({ s: 0 }, { s: '' }))).toEqual([{ path: 's', kind: 'changed', before: 0, after: '' }]);
   });
 
-  it('0, false and NaN are not Empty', () => {
+  it('0, false and NaN are ordinary values', () => {
     for (const value of [0, false, NaN]) {
       expect(brief(diff({}, { v: value }))).toEqual([{ path: 'v', kind: 'added', before: undefined, after: value }]);
       expect(brief(diff({ v: value }, { v: null }))).toEqual([{ path: 'v', kind: 'removed', before: value, after: undefined }]);
@@ -256,7 +256,7 @@ describe('scalars, objects, special types', () => {
     expect(entries[0]?.label).toBe('Supplier > Address > City');
   });
 
-  it('a structural type change between two non-Empty values is one entry on the node', () => {
+  it('a structural type change between two non-Absent values is one entry on the node', () => {
     const cases: [unknown, unknown][] = [
       [{ a: 1 }, 'text'],
       ['text', { a: 1 }],
@@ -272,7 +272,7 @@ describe('scalars, objects, special types', () => {
     }
   });
 
-  it('treats Map, Set, class instances and functions as leaves compared by reference, never Empty', () => {
+  it('treats Map, Set, class instances and functions as leaves compared by reference', () => {
     class Money {
       constructor(readonly cents: number) {}
     }
@@ -283,7 +283,7 @@ describe('scalars, objects, special types', () => {
     expect(diff({ s: new Set() }, { s: new Set() })).toHaveLength(1);
     expect(diff({ c: new Money(1) }, { c: new Money(1) })).toHaveLength(1);
     expect(diff({ f: () => 1 }, { f: () => 1 })).toHaveLength(1);
-    // Never Empty: an empty Map / Set / instance against Absent is a real change.
+    // An empty Map / Set / instance against Absent is a real change.
     expect(paths(diff({}, { m: new Map(), s: new Set(), c: new Money(0) }))).toEqual(['added m', 'added s', 'added c']);
   });
 
@@ -351,7 +351,7 @@ describe('circular structures', () => {
     expect(paths(diff({ o }, { o: null }))).toEqual(['removed o']);
   });
 
-  it('a non-Empty circular object against Absent is one entry', () => {
+  it('a circular object with content against Absent is one entry', () => {
     const o: Loose = { a: 'x' };
     o.self = o;
     expect(paths(diff({ o }, {}))).toEqual(['removed o']);
@@ -408,7 +408,7 @@ describe('deep structures (iterative visit, no call-stack limit)', () => {
     expect(paths(diff(chain(null), chain(''), { isEqual: strict }))).toEqual([`added ${deepPath}`]);
   });
 
-  it('a deep non-Empty object against Absent is one entry on the node', () => {
+  it('a deep object with content against Absent is one entry on the node', () => {
     expect(paths(diff({ o: chain(1) }, {}))).toEqual(['removed o']);
   });
 
