@@ -59,11 +59,7 @@ export type VirtualListReportTableProps<Row> = ListReportTableProps<Row> & {
 
 const DEFAULT_THRESHOLD = 200;
 const DEFAULT_OVERSCAN = 10;
-interface CachedRowProps {
-  index: number;
-  virtual: boolean;
-  props: HTMLAttributes<HTMLTableRowElement>;
-}
+type RowPropsById = Map<string, HTMLAttributes<HTMLTableRowElement>>;
 
 const FORCE_TRUNCATE ={ forceTruncate: true } as const;
 // Pro stylesheet (`styles.css`): caps the content of a cell at the row height, so a `node` cell can
@@ -281,21 +277,18 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // --- Rendering ----------------------------------------------------------------------------------
   // `rowProps` per id, so a row that stays mounted across a range change receives the same object and
   // `ListReportTableRow` can skip its render. Rebuilt on every body pass from the ids actually rendered,
-  // so it never holds more than the mounted rows. An entry is reused only for the same index and mode.
-  const rowPropsCache = useRef(new Map<string, CachedRowProps>());
-  const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number, nextRowProps: Map<string, CachedRowProps>): ReactNode => {
+  // so it never holds more than the mounted rows. An entry is reused only while its `aria-rowindex`
+  // (absent when not virtualized) is the one the row needs.
+  const rowPropsCache = useRef(new Map<string, HTMLAttributes<HTMLTableRowElement>>());
+  const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number, nextRowProps: RowPropsById): ReactNode => {
     const row = ctx.table.rows[index]!;
     const id = ctx.table.getRowId(row);
     let cached = rowPropsCache.current.get(id);
-    if (!cached || cached.index !== index || cached.virtual !== virtual) {
-      const handlers = {
-        onFocus: () => onRowFocus(id),
-        onBlur: (event: FocusEvent<HTMLTableRowElement>) => onRowBlur(id, event),
-      };
+    if (!cached || cached['aria-rowindex'] !== (virtual ? index + 2 : undefined)) {
       cached = {
-        index,
-        virtual,
-        props: virtual ? { ...handlers, 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS } : handlers,
+        onFocus: () => onRowFocus(id),
+        onBlur: (event) => onRowBlur(id, event),
+        ...(virtual && { 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS }),
       };
     }
     nextRowProps.set(id, cached);
@@ -306,7 +299,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         row={row}
         selectable={ctx.selectable}
         labels={ctx.labels}
-        rowProps={cached.props}
+        rowProps={cached}
         onToggle={ctx.selectable ? onToggle : undefined}
         renderCellOptions={virtual ? FORCE_TRUNCATE : undefined}
       />
@@ -316,7 +309,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // One flat keyed list in both modes: crossing the threshold keeps every row's DOM node (and the focus).
   const renderBody = (ctx: ListReportTableBodyContext<Row>): ReactNode => {
     const children: ReactNode[] = [];
-    const nextRowProps = new Map<string, CachedRowProps>();
+    const nextRowProps: RowPropsById = new Map();
     if (!virtual) {
       for (let i = 0; i < count; i++) children.push(renderRow(ctx, i, nextRowProps));
     } else {
