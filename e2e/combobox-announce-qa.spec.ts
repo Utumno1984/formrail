@@ -39,9 +39,14 @@ test.describe('QA #250: "no results" live region, uncovered cases', () => {
       await gotoStory(page, STORY(name));
       await expect(page.locator('[role="status"]')).toHaveCount(1);
       await expect(status(page)).toHaveText('');
-      await input(page).focus({ timeout: 1000 }).catch(() => undefined);
-      await page.keyboard.type('zzz');
-      await page.keyboard.press('ArrowDown');
+      if (name === 'disabled') {
+        // A disabled input cannot receive keys: assert that instead of typing into nothing.
+        await expect(input(page)).toBeDisabled();
+      } else {
+        await input(page).focus();
+        await page.keyboard.type('zzz');
+        await page.keyboard.press('ArrowDown');
+      }
       await expect(status(page)).toHaveText('');
     });
   }
