@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type FocusEvent,
+  type HTMLAttributes,
   type KeyboardEvent,
   type MouseEvent,
   type ReactElement,
@@ -58,7 +59,13 @@ export type VirtualListReportTableProps<Row> = ListReportTableProps<Row> & {
 
 const DEFAULT_THRESHOLD = 200;
 const DEFAULT_OVERSCAN = 10;
-const FORCE_TRUNCATE = { forceTruncate: true } as const;
+interface CachedRowProps {
+  index: number;
+  virtual: boolean;
+  props: HTMLAttributes<HTMLTableRowElement>;
+}
+
+const FORCE_TRUNCATE ={ forceTruncate: true } as const;
 // Pro stylesheet (`styles.css`): caps the content of a cell at the row height, so a `node` cell can
 // never make a row taller than the pitch the range is computed with.
 const VIRTUAL_ROW_CLASS = 'rop-pro-virtual-row';
@@ -132,8 +139,13 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
     if (anchor.current !== null && indexOfResult(anchor.current) < 0) anchor.current = null;
   }, [indexOfResult]);
 
+  // Stable identity (the rows are memoized on it): the live values are read through a ref at gesture
+  // time, not captured, so a skipped row render never leaves it with a stale selection or result index.
+  const toggleDeps = useRef({ indexOfResult, resultIds, selection });
+  toggleDeps.current = { indexOfResult, resultIds, selection };
   const onToggle = useCallback(
     (id: string, event: MouseEvent<HTMLInputElement>) => {
+      const { indexOfResult, resultIds, selection } = toggleDeps.current;
       const shift = event.shiftKey || shiftSpace.current;
       shiftSpace.current = false;
       const from = anchor.current === null ? -1 : indexOfResult(anchor.current);
@@ -149,7 +161,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         anchor.current = id;
       }
     },
-    [indexOfResult, resultIds, selection],
+    [],
   );
 
   // Tab / Shift+Tab from the last / first tab stop of a row go to the next / previous ROW, as in the Free
@@ -267,13 +279,26 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   );
 
   // --- Rendering ----------------------------------------------------------------------------------
-  const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number): ReactNode => {
+  // `rowProps` per id, so a row that stays mounted across a range change receives the same object and
+  // `ListReportTableRow` can skip its render. Rebuilt on every body pass from the ids actually rendered,
+  // so it never holds more than the mounted rows. An entry is reused only for the same index and mode.
+  const rowPropsCache = useRef(new Map<string, CachedRowProps>());
+  const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number, nextRowProps: Map<string, CachedRowProps>): ReactNode => {
     const row = ctx.table.rows[index]!;
     const id = ctx.table.getRowId(row);
-    const handlers = {
-      onFocus: () => onRowFocus(id),
-      onBlur: (event: FocusEvent<HTMLTableRowElement>) => onRowBlur(id, event),
-    };
+    let cached = rowPropsCache.current.get(id);
+    if (!cached || cached.index !== index || cached.virtual !== virtual) {
+      const handlers = {
+        onFocus: () => onRowFocus(id),
+        onBlur: (event: FocusEvent<HTMLTableRowElement>) => onRowBlur(id, event),
+      };
+      cached = {
+        index,
+        virtual,
+        props: virtual ? { ...handlers, 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS } : handlers,
+      };
+    }
+    nextRowProps.set(id, cached);
     return (
       <ListReportTableRow
         key={id}
@@ -281,7 +306,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         row={row}
         selectable={ctx.selectable}
         labels={ctx.labels}
-        rowProps={virtual ? { ...handlers, 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS } : handlers}
+        rowProps={cached.props}
         onToggle={ctx.selectable ? onToggle : undefined}
         renderCellOptions={virtual ? FORCE_TRUNCATE : undefined}
       />
@@ -291,12 +316,13 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // One flat keyed list in both modes: crossing the threshold keeps every row's DOM node (and the focus).
   const renderBody = (ctx: ListReportTableBodyContext<Row>): ReactNode => {
     const children: ReactNode[] = [];
+    const nextRowProps = new Map<string, CachedRowProps>();
     if (!virtual) {
-      for (let i = 0; i < count; i++) children.push(renderRow(ctx, i));
+      for (let i = 0; i < count; i++) children.push(renderRow(ctx, i, nextRowProps));
     } else {
       for (const segment of segments) {
         if (segment.type === 'rows') {
-          for (let i = segment.start; i < segment.end; i++) children.push(renderRow(ctx, i));
+          for (let i = segment.start; i < segment.end; i++) children.push(renderRow(ctx, i, nextRowProps));
         } else {
           children.push(
             <tr key={`rop-spacer-${segment.key}`} aria-hidden="true" data-rop-spacer="">
@@ -307,6 +333,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
       }
     }
     children.push(<Filler key="rop-filler" columnCount={ctx.columnCount} rows={ctx.minRows - count} />);
+    rowPropsCache.current = nextRowProps;
     return children;
   };
 

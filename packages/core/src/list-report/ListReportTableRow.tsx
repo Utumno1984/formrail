@@ -1,4 +1,4 @@
-import { useRef, type HTMLAttributes, type MouseEvent } from 'react';
+import { memo, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
 import { Checkbox } from '../checkbox/Checkbox';
 import { cn } from '../utils/cn';
 import { renderCell, type RenderCellOptions } from './list-report-cell';
@@ -31,13 +31,7 @@ export interface ListReportTableRowProps<Row> {
   renderCellOptions?: RenderCellOptions;
 }
 
-/**
- * @internal One data `<tr>` of the List Report table body: the optional leading checkbox cell and
- * one `<td>` per column. The default `renderBody` of `ListReportTable` renders one of these per
- * row; a virtualized table (`@react-object-page/pro`) renders the same row for whatever subset it
- * mounts. Exported from `@react-object-page/core/internal`; not public API, no semver guarantee.
- */
-export function ListReportTableRow<Row>({
+function ListReportTableRowImpl<Row>({
   table,
   row,
   selectable,
@@ -89,3 +83,52 @@ export function ListReportTableRow<Row>({
     </tr>
   );
 }
+
+const sameRowProps = (a: HTMLAttributes<HTMLTableRowElement> | undefined, b: HTMLAttributes<HTMLTableRowElement> | undefined): boolean => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keys = Object.keys(a) as (keyof typeof a)[];
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((key) => Object.is(a[key], b[key]));
+};
+
+/**
+ * The render reads only the members of `table` checked here. A skipped render keeps a stale `table`
+ * object, which is safe only because everything it is used for is unchanged: `selection.toggle` is
+ * stable in the hook, and `isSelected` changes identity on every selection change, so it is compared
+ * through its result for this row.
+ */
+function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListReportTableRowProps<Row>): boolean {
+  if (
+    prev.row !== next.row ||
+    prev.selectable !== next.selectable ||
+    prev.onToggle !== next.onToggle ||
+    prev.renderCellOptions !== next.renderCellOptions ||
+    prev.labels.selectRow !== next.labels.selectRow ||
+    !sameRowProps(prev.rowProps, next.rowProps)
+  ) {
+    return false;
+  }
+  const a = prev.table;
+  const b = next.table;
+  if (a.columns !== b.columns || a.selection.toggle !== b.selection.toggle) return false;
+  // `getRowId` and `getRowLabel` are compared by result: an inline `getRowId` changes identity on every
+  // render of the consumer, and with it `getRowLabel`, which would defeat the memo for every row.
+  const id = b.getRowId(next.row);
+  if (a.getRowId(prev.row) !== id) return false;
+  if (!next.selectable) return true;
+  return a.selection.isSelected(id) === b.selection.isSelected(id) && a.selection.getRowLabel(prev.row) === b.selection.getRowLabel(next.row);
+}
+
+/**
+ * @internal One data `<tr>` of the List Report table body: the optional leading checkbox cell and
+ * one `<td>` per column. The default `renderBody` of `ListReportTable` renders one of these per
+ * row; a virtualized table (`@react-object-page/pro`) renders the same row for whatever subset it
+ * mounts. Memoized: it re-renders only when its row, its selected state, `columns`, its id and
+ * label, `labels.selectRow`, `rowProps` (shallow) or the extension props change; a `cell` that
+ * reads state outside `columns`/`row` is not re-evaluated by a parent render. Exported from
+ * `@react-object-page/core/internal`; not public API, no semver guarantee.
+ */
+export const ListReportTableRow = /* @__PURE__ */ memo(ListReportTableRowImpl, rowPropsAreEqual) as <Row>(
+  props: ListReportTableRowProps<Row>,
+) => ReactElement | null;
