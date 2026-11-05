@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, startTransition, useMemo, useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useListReport, type ListReportColumn } from '@react-object-page/core';
 import { VirtualListReportTable } from './VirtualListReportTable';
@@ -32,8 +32,12 @@ interface Controls {
   setRows: (r: Item[]) => void;
   setSelectRow: (f: (label: string) => string) => void;
   setFilter: (f: string) => void;
+  setSuspended: (suspended: boolean) => void;
 }
 let controls: Controls;
+
+/** Suspends forever: the transition that mounts it renders but never commits. */
+const NeverReady = lazy(() => new Promise<{ default: () => null }>(() => undefined));
 
 function Host() {
   const [, setTick] = useState(0);
@@ -41,7 +45,8 @@ function Host() {
   const [rows, setRows] = useState(ROWS);
   const [selectRow, setSelectRow] = useState<(label: string) => string>(() => (label: string) => `Select ${label}`);
   const [filter, setFilter] = useState('all');
-  controls = { rerender: () => setTick((t) => t + 1), setColumns, setRows, setSelectRow: (f) => setSelectRow(() => f), setFilter };
+  const [suspended, setSuspended] = useState(false);
+  controls = { rerender: () => setTick((t) => t + 1), setColumns, setRows, setSelectRow: (f) => setSelectRow(() => f), setFilter, setSuspended };
   const filters = useMemo(
     () => [
       { id: 'all', label: 'All' },
@@ -52,7 +57,12 @@ function Host() {
   );
   const table = useListReport<Item>({ rows, columns, getRowId: (r) => r.id, selectable: true, filters, filter });
   const labels = useMemo(() => ({ selectRow }), [selectRow]);
-  return <VirtualListReportTable table={table} aria-label="Items" labels={labels} />;
+  return (
+    <Suspense fallback={null}>
+      <VirtualListReportTable table={table} aria-label="Items" labels={labels} />
+      {suspended ? <NeverReady /> : null}
+    </Suspense>
+  );
 }
 
 const scroller = () => screen.getByRole('table', { name: 'Items' }).parentElement as HTMLElement;
@@ -153,9 +163,42 @@ describe('ListReportTableRow memoization in the virtualized table', () => {
     fireEvent.click(box(1));
     fireEvent.click(box(5), { shiftKey: true });
     for (const n of [1, 3, 5]) expect(box(n)).toBeChecked();
+    expect(box(7)).not.toBeChecked();
     act(() => controls.setFilter('all'));
-    for (const n of [0, 2, 4]) expect(box(n)).not.toBeChecked();
+    for (const n of [0, 2, 4, 7]) expect(box(n)).not.toBeChecked();
     for (const n of [1, 3, 5]) expect(box(n)).toBeChecked();
+  });
+
+  it('a shift-click during a suspended transition walks the results on screen, not the pending ones', async () => {
+    render(<Host />);
+    const box = (n: number) => screen.getByRole('checkbox', { name: `Select Item ${n}` });
+    fireEvent.click(box(1));
+    await act(async () => {
+      startTransition(() => {
+        controls.setSuspended(true);
+        controls.setFilter('odd');
+      });
+      await Promise.resolve();
+    });
+    // The transition is rendered, not committed: the even rows are still on screen.
+    fireEvent.click(box(4), { shiftKey: true });
+    for (const n of [1, 2, 3, 4]) expect(box(n)).toBeChecked();
+    expect(box(5)).not.toBeChecked();
+  });
+
+  it('the row props cache never holds more than the mounted rows, however far the scroll went', () => {
+    const maps = new Set<Map<unknown, unknown>>();
+    const realSet = Map.prototype.set;
+    const spy = vi.spyOn(Map.prototype, 'set').mockImplementation(function (this: Map<unknown, unknown>, key, value) {
+      if ((value as { onBlur?: unknown } | null)?.onBlur) maps.add(this);
+      return realSet.call(this, key, value);
+    });
+    render(<Host />);
+    for (let rows = 100; rows <= 1_000; rows += 100) scrollBy(rows);
+    spy.mockRestore();
+    expect(maps.size).toBeGreaterThan(0);
+    const mounted = mountedIds().length;
+    for (const map of maps) expect(map.size).toBeLessThanOrEqual(mounted);
   });
 
   it('changing the columns renders every mounted row with the new cell', () => {

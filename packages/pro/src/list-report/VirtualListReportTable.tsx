@@ -137,8 +137,12 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
 
   // Stable identity (the rows are memoized on it): the live values are read through a ref at gesture
   // time, not captured, so a skipped row render never leaves it with a stale selection or result index.
+  // Written on commit: a render that never commits (a suspended transition) must not change what a
+  // gesture on the rows on screen acts on.
   const toggleDeps = useRef({ indexOfResult, resultIds, selection });
-  toggleDeps.current = { indexOfResult, resultIds, selection };
+  useIsomorphicLayoutEffect(() => {
+    toggleDeps.current = { indexOfResult, resultIds, selection };
+  });
   const onToggle = useCallback(
     (id: string, event: MouseEvent<HTMLInputElement>) => {
       const { indexOfResult, resultIds, selection } = toggleDeps.current;

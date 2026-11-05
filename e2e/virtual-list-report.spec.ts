@@ -453,8 +453,8 @@ test.describe('performance (reported, not gating)', () => {
   test('100,000 rows: wheel-like scroll, commit latency and frame interval (P50 / P95)', async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await openDefault(page);
-    // Main-thread CPU time of the loop (CDP TaskDuration): unlike wall-clock latency it does not grow
-    // with the load of the machine running the suite.
+    // Main-thread CPU time of the loop (CDP TaskDuration). Not load-independent: under CPU contention the
+    // same build more than doubled it, so compare builds only with alternated, repeated runs.
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Performance.enable');
     const taskDuration = async (): Promise<number> =>
