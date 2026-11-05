@@ -9,9 +9,11 @@
 export const ROW_HEIGHT_CLASS = 'h-(--rop-list-report-row-height)';
 
 // The one scroller: the consumer sizes it (flex parent or `maxHeight`). Focusable so that a
-// keyboard user can scroll it; `min-h-0` lets it shrink inside a flex column.
+// keyboard user can scroll it; `min-h-0` lets it shrink inside a flex column. The scroll padding equals
+// the sticky header height: an element focused behind the header is still inside the scrollport, so the
+// browser does not scroll it into view; the padding moves the snapport edge below the header.
 export const containerClass =
-  '[--rop-list-report-row-height:2.75rem] relative min-h-0 max-w-full overflow-auto font-rop-sans text-rop-body text-rop-text ' +
+  '[--rop-list-report-row-height:2.75rem] relative min-h-0 max-w-full scroll-pt-(--rop-list-report-row-height) overflow-auto font-rop-sans text-rop-body text-rop-text ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2';
 
 // Separate borders (not merged ones): cell borders and sticky cells behave with them.
