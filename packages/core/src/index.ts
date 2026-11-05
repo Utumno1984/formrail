@@ -110,6 +110,7 @@ export type {
   ListReportSortDirection,
   ListReportHeaderProps,
   ListReportSortButtonProps,
+  ListReportSelection,
   UseListReportOptions,
   UseListReportReturn,
 } from './list-report/types';

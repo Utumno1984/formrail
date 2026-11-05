@@ -5,6 +5,7 @@ import type {
   ListReportColumn,
   ListReportFilter,
   ListReportHeaderProps,
+  ListReportSelection,
   ListReportSort,
   ListReportSortButtonProps,
   ListReportSortDirection,
@@ -77,6 +78,11 @@ const acknowledge = (emitted: string[], value: string): boolean => {
  * - Memoize `getSearchText` (like `columns`): the search is recomputed whenever it changes.
  * - `onSortChange` is called only for a gesture (`toggleSort`/`setSort`), never when a controlled
  *   `sort` changes from outside.
+ * - Selection (`selectable`): a set of ids on the data, controlled (`selectedIds`) or not
+ *   (`defaultSelectedIds`), with the same contract: `onSelectedIdsChange` only for gestures, always a new
+ *   `Set`, the received one never mutated. Sorting, filtering, searching and new data never change it; the
+ *   derived counts follow the current results (see `ListReportSelection`). The gestures are no-ops while
+ *   `selectable` is off.
  */
 export function useListReport<Row>(options: UseListReportOptions<Row>): UseListReportReturn<Row> {
   const {
@@ -84,6 +90,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
     filters: filtersOption, filter: controlledFilter, defaultFilter, onFilterChange,
     searchQuery: controlledQuery, defaultSearchQuery, onSearchQueryChange,
     searchCommitDelay, getSearchText,
+    selectable, selectedIds: controlledSelected, defaultSelectedIds, onSelectedIdsChange, getRowLabel: getRowLabelOption,
   } = options;
   const controlled = controlledSort !== undefined;
 
@@ -393,6 +400,18 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
     }
   }, [invalidId, unknownFilter, columns, rows, getRowId]);
 
+  const selection = useSelection({
+    enabled: selectable === true,
+    rows,
+    resultRows: sortedRows,
+    columns,
+    getRowId,
+    controlledSelected,
+    defaultSelectedIds,
+    onSelectedIdsChange,
+    getRowLabel: getRowLabelOption,
+  });
+
   return {
     rows: sortedRows,
     columns,
@@ -412,5 +431,150 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
     clearFilters,
     totalCount: rows.length,
     resultCount: searchedRows.length,
+    selection,
   };
+}
+
+const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
+const NO_IDS: readonly string[] = [];
+
+interface SelectionInput<Row> {
+  enabled: boolean;
+  rows: readonly Row[];
+  resultRows: readonly Row[];
+  columns: readonly ListReportColumn<Row>[];
+  getRowId: (row: Row) => string;
+  controlledSelected: ReadonlySet<string> | undefined;
+  defaultSelectedIds: ReadonlySet<string> | undefined;
+  onSelectedIdsChange: ((ids: ReadonlySet<string>) => void) | undefined;
+  getRowLabel: ((row: Row) => string) | undefined;
+}
+
+/** Number of ids of `a` that are in `b`, walking the smaller of the two. */
+function countShared(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  let n = 0;
+  for (const id of small) if (large.has(id)) n++;
+  return n;
+}
+
+/**
+ * The selection: a set of ids on the data, never the DOM. The ids of the input and of the results are
+ * computed once per change of the data/results (one `getRowId` per row); a change of the selection only
+ * walks the selected ids (or the result ids, whichever is smaller), never calls `getRowId` and never does
+ * work per rendered row. With `enabled: false` nothing is computed.
+ */
+function useSelection<Row>(input: SelectionInput<Row>): ListReportSelection<Row> {
+  const { enabled, rows, resultRows, columns, getRowId, controlledSelected, defaultSelectedIds, onSelectedIdsChange } = input;
+  const getRowLabelOption = input.getRowLabel;
+  const controlled = controlledSelected !== undefined;
+  const [internalSelected, setInternalSelected] = useState<ReadonlySet<string>>(defaultSelectedIds ?? EMPTY_IDS);
+  const selectedIds = (controlled ? controlledSelected : internalSelected) ?? EMPTY_IDS;
+
+  // Ids of the input rows and of the results (in the order of the results), per change of the data.
+  const inputIds = useMemo<ReadonlySet<string>>(
+    () => (enabled ? new Set(rows.map((row) => getRowId(row))) : EMPTY_IDS),
+    [enabled, rows, getRowId],
+  );
+  const resultIds = useMemo<readonly string[]>(
+    () => (enabled ? resultRows.map((row) => getRowId(row)) : NO_IDS),
+    [enabled, resultRows, getRowId],
+  );
+  const resultIdSet = useMemo<ReadonlySet<string>>(() => (enabled ? new Set(resultIds) : EMPTY_IDS), [enabled, resultIds]);
+
+  const counts = useMemo(() => {
+    if (!enabled || selectedIds.size === 0) return { inResults: 0, hidden: 0 };
+    const inResults = countShared(selectedIds, resultIdSet);
+    return { inResults, hidden: countShared(selectedIds, inputIds) - inResults };
+  }, [enabled, selectedIds, resultIdSet, inputIds]);
+
+  const allResultsState: boolean | 'indeterminate' =
+    resultIdSet.size === 0 || counts.inResults === 0 ? false : counts.inResults === resultIdSet.size ? true : 'indeterminate';
+
+  // Latest values for the gestures (assigned during render; a gesture also updates `selectedIds` right
+  // away when uncontrolled, so a second gesture in the same batch starts from the first).
+  const latest = useRef({ enabled, controlled, selectedIds, resultIds, onSelectedIdsChange });
+  latest.current = { enabled, controlled, selectedIds, resultIds, onSelectedIdsChange };
+
+  const emit = useCallback((next: ReadonlySet<string>) => {
+    const current = latest.current;
+    if (!current.controlled) {
+      setInternalSelected(next);
+      current.selectedIds = next;
+    }
+    current.onSelectedIdsChange?.(next);
+  }, []);
+
+  const toggle = useCallback(
+    (id: string) => {
+      const current = latest.current;
+      if (!current.enabled) return;
+      const next = new Set(current.selectedIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      emit(next);
+    },
+    [emit],
+  );
+
+  const setSelectedIds = useCallback(
+    (ids: ReadonlySet<string>) => {
+      if (!latest.current.enabled) return;
+      // A copy: a later mutation of the caller's set must not change the state behind the hook's back.
+      emit(new Set(ids));
+    },
+    [emit],
+  );
+
+  const toggleAllResults = useCallback(() => {
+    const current = latest.current;
+    if (!current.enabled || current.resultIds.length === 0) return;
+    const allSelected = current.resultIds.every((id) => current.selectedIds.has(id));
+    const next = new Set(current.selectedIds);
+    if (allSelected) for (const id of current.resultIds) next.delete(id);
+    else for (const id of current.resultIds) next.add(id);
+    emit(next);
+  }, [emit]);
+
+  const clearSelection = useCallback(() => {
+    const current = latest.current;
+    if (!current.enabled || current.selectedIds.size === 0) return;
+    emit(new Set<string>());
+  }, [emit]);
+
+  const isSelected = useCallback((id: string) => enabled && selectedIds.has(id), [enabled, selectedIds]);
+
+  const getSelectedRows = useCallback(
+    (): readonly Row[] => (enabled && selectedIds.size > 0 ? resultRows.filter((_, index) => selectedIds.has(resultIds[index] as string)) : []),
+    [enabled, selectedIds, resultRows, resultIds],
+  );
+
+  const labelColumn = useMemo(() => columns.find((column) => column.accessor !== undefined), [columns]);
+  const getRowLabel = useCallback(
+    (row: Row): string => {
+      if (getRowLabelOption) return getRowLabelOption(row);
+      const value = labelColumn?.accessor?.(row);
+      const text = value === null || value === undefined ? '' : String(value).trim();
+      return text !== '' ? text : getRowId(row);
+    },
+    [getRowLabelOption, labelColumn, getRowId],
+  );
+
+  return useMemo(
+    () => ({
+      enabled,
+      selectedIds,
+      isSelected,
+      toggle,
+      setSelectedIds,
+      toggleAllResults,
+      clearSelection,
+      allResultsState,
+      selectedResultCount: counts.inResults,
+      hiddenSelectedCount: counts.hidden,
+      getSelectedRows,
+      getRowLabel,
+    }),
+    [enabled, selectedIds, isSelected, toggle, setSelectedIds, toggleAllResults, clearSelection, allResultsState, counts, getSelectedRows, getRowLabel],
+  );
 }

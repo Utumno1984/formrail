@@ -581,3 +581,101 @@ export const StatusTransitions: Story = {
     await expect(tableWidth()).toBe(width);
   },
 };
+
+// --- Selection -----------------------------------------------------------------------------------
+
+interface TableSelectionArgs {
+  selectable: boolean;
+  controlled: boolean;
+  preselected: 'none' | 'some' | 'all';
+  status: 'ready' | 'loading' | 'error';
+  dataset: 'rows' | 'empty' | 'noResults';
+  onSelectedIdsChange: (ids: ReadonlySet<string>) => void;
+}
+
+const SELECTION_INVOICES = makeInvoices(12);
+const SELECTION_COLUMNS: ListReportColumn<Invoice>[] = [
+  { id: 'id', header: 'No.', accessor: (r) => r.id, width: 90 },
+  { id: 'customer', header: 'Customer', accessor: (r) => r.customer, minWidth: 160 },
+  { id: 'amount', header: 'Amount', accessor: (r) => r.amount, cell: (r) => money(r.amount), align: 'end', width: 120 },
+  { id: 'date', header: 'Date', accessor: (r) => r.date, width: 120 },
+];
+const NO_INVOICES: Invoice[] = [];
+const TABLE_PRESELECTED: Record<TableSelectionArgs['preselected'], ReadonlySet<string>> = {
+  none: new Set(),
+  some: new Set(['F-0002', 'F-0003']),
+  all: new Set(SELECTION_INVOICES.map((r) => r.id)),
+};
+
+function TableSelectionDemo({ selectable, controlled, preselected, status, dataset, onSelectedIdsChange }: TableSelectionArgs) {
+  const [parentIds, setParentIds] = useState<ReadonlySet<string>>(TABLE_PRESELECTED[preselected]);
+  const table = useListReport<Invoice>({
+    rows: dataset === 'empty' ? NO_INVOICES : SELECTION_INVOICES,
+    columns: SELECTION_COLUMNS,
+    getRowId: (r) => r.id,
+    filters: DEMO_FILTERS,
+    filter: dataset === 'noResults' ? 'none' : 'all',
+    selectable,
+    defaultSelectedIds: controlled ? undefined : TABLE_PRESELECTED[preselected],
+    selectedIds: controlled ? parentIds : undefined,
+    onSelectedIdsChange: (ids) => {
+      if (controlled) setParentIds(ids);
+      onSelectedIdsChange(ids);
+    },
+  });
+  return (
+    <div style={{ ...PAGE, width: 760, maxWidth: '100%', boxSizing: 'border-box' }}>
+      <p style={{ margin: '0 0 8px', fontSize: 14 }}>
+        Selected: <output data-testid="selected-count">{table.selection.selectedResultCount}</output>
+        {controlled ? ` (parent state: ${parentIds.size} ids)` : null}
+      </p>
+      <ListReportTable table={table} aria-label="Invoices" maxHeight={420} status={status} />
+    </div>
+  );
+}
+
+/**
+ * The table alone with `useListReport({ selectable: true })`: a leading checkbox column (as wide as a row
+ * is tall), a tri-state "Select all results" header and one distinctly named checkbox per row ("Select
+ * F-0001"). A selected row is tinted; a click elsewhere in the row does nothing. Controls: `selectable`,
+ * `controlled`, the initial selection, `status` and the dataset (the column keeps its place in every state);
+ * `onSelectedIdsChange` shows up in Actions.
+ * The play function selects two rows (the header becomes indeterminate), then uses the header to select
+ * all and to deselect all, and checks the four reported changes.
+ */
+export const Selection: StoryObj<TableSelectionArgs> = {
+  argTypes: {
+    selectable: { control: 'boolean', description: '`selectable` of `useListReport`' },
+    controlled: { control: 'boolean', description: 'Controlled `selectedIds` (parent state shown above) or uncontrolled' },
+    preselected: { control: 'select', options: ['none', 'some', 'all'], description: 'Initial selection' },
+    status: { control: 'radio', options: ['ready', 'loading', 'error'], description: '`status` of the table: the selection column keeps its place in every state' },
+    dataset: {
+      control: { type: 'select', labels: { rows: '12 rows', empty: 'empty', noResults: 'no results' } },
+      options: ['rows', 'empty', 'noResults'], description: 'The rows, none at all, or a filter that hides them all (the header checkbox is then disabled)' },
+    onSelectedIdsChange: { control: false },
+    ...Object.fromEntries(
+      ['maxHeight', 'containerWidth', 'dir', 'dateFirstSort', 'loadingRowCount', 'onSortChange', 'onRetry', 'onClearFilters'].map(
+        (key) => [key, { control: false, table: { disable: true } }],
+      ),
+    ),
+  },
+  args: { selectable: true, controlled: false, preselected: 'none', status: 'ready', dataset: 'rows', onSelectedIdsChange: fn() },
+  render: (args) => <TableSelectionDemo key={`${String(args.controlled)}-${args.preselected}`} {...args} />,
+  play: async ({ args, canvasElement }) => {
+    if (!args.selectable || args.preselected !== 'none' || args.status !== 'ready' || args.dataset !== 'rows') return;
+    const canvas = within(canvasElement);
+    const all = canvas.getByRole('checkbox', { name: 'Select all results' }) as HTMLInputElement;
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'Select F-0001' }));
+    await userEvent.click(canvas.getByRole('checkbox', { name: 'Select F-0004' }));
+    await expect(all.indeterminate).toBe(true);
+    await expect(canvas.getByRole('checkbox', { name: 'Select F-0004' }).closest('tr')).toHaveAttribute('data-selected');
+    await expect(canvas.getByTestId('selected-count')).toHaveTextContent('2');
+    await userEvent.click(all);
+    await expect(all).toBeChecked();
+    await expect(canvas.getByTestId('selected-count')).toHaveTextContent('12');
+    await userEvent.click(all);
+    await expect(all).not.toBeChecked();
+    await expect(canvas.getByTestId('selected-count')).toHaveTextContent('0');
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(4);
+  },
+};

@@ -87,3 +87,36 @@ describe('useListReport on the server (node environment, no DOM globals)', () =>
     vi.restoreAllMocks();
   });
 });
+
+function SelectionDemo() {
+  const report = useListReport<Row>({
+    rows: ROWS,
+    columns: [{ id: 'amount', header: 'Amount', accessor: (r) => r.amount }],
+    getRowId: (r) => r.id,
+    selectable: true,
+    defaultSelectedIds: new Set(['a', 'zzz']),
+    filters: [
+      { id: 'all', label: 'All' },
+      { id: 'big', label: 'Big', predicate: (r) => (r.amount ?? 0) > 5 },
+    ],
+  });
+  const s = report.selection;
+  return (
+    <p>
+      {`${String(s.enabled)}|${String(s.allResultsState)}|${s.selectedResultCount}|${s.hiddenSelectedCount}|${s.getSelectedRows().map((r) => r.id).join(',')}|${s.getRowLabel(ROWS[0] as Row)}`}
+    </p>
+  );
+}
+
+describe('useListReport selection on the server', () => {
+  it('derives the selection without touching the DOM, with no error and no warning', () => {
+    expect(typeof document).toBe('undefined');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const html = renderToString(<SelectionDemo />);
+    expect(html).toContain('true|indeterminate|1|0|a|10');
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+});

@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { Checkbox } from '../checkbox/Checkbox';
 import { Icon } from '../icon/Icon';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
@@ -26,6 +27,11 @@ import {
   containerClass,
   headerCellClass,
   nodeWrapperClass,
+  SELECT_COLUMN_WIDTH,
+  selectableRowClass,
+  selectBodyCellClass,
+  selectBoxClass,
+  selectHeaderCellClass,
   sortButtonClass,
   sortIconAscendingClass,
   sortIconClass,
@@ -114,9 +120,10 @@ function pixels(value: number | string | undefined): number | null {
  * and percentages as shares of the table): each column keeps the width it declared in a container
  * wider than the sum. Otherwise the table fills the container.
  */
-function tableSize<Row>(columns: readonly ListReportColumn<Row>[]): { width: string; minWidth: string } {
+function tableSize<Row>(columns: readonly ListReportColumn<Row>[], lead?: string): { width: string; minWidth: string } {
   let px = 0;
-  const other: string[] = [];
+  // `lead`: the width of the selection column, a fixed CSS length counted like any declared width.
+  const other: string[] = lead ? [lead] : [];
   for (const column of columns) {
     const base = column.width !== undefined && !isPercent(column.width) ? column.width : (column.minWidth ?? DEFAULT_MIN_WIDTH);
     const known = pixels(base);
@@ -131,14 +138,14 @@ function tableSize<Row>(columns: readonly ListReportColumn<Row>[]): { width: str
   // is exactly as wide as its columns (else `table-layout: fixed` would stretch all of them).
   // Percentages are shares of the table itself: the absolute widths are (1 - shares) of it.
   let fixedPx = 0;
-  const fixedOther: string[] = [];
+  const fixedOther: string[] = lead ? [lead] : [];
   let share = 0;
   for (const column of columns) {
     if (isPercent(column.width)) share += Number.parseFloat(column.width as string) / 100;
     else if (pixels(column.width) !== null) fixedPx += pixels(column.width) as number;
     else fixedOther.push(toCss(column.width as string));
   }
-  if (share >= 1 || (fixedPx === 0 && fixedOther.length === 0)) return { minWidth, width: '100%' };
+  if (share >= 1 || (fixedPx === 0 && fixedOther.length === (lead ? 1 : 0))) return { minWidth, width: '100%' };
   const absolute = sum(fixedPx, fixedOther);
   const total = share === 0 ? absolute : `calc(${absolute} / ${1 - share})`;
   return { minWidth: total, width: total };
@@ -182,7 +189,10 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
     'aria-labelledby': ariaLabelledby,
     ...rest
   } = props;
-  const { columns } = table;
+  const { columns, selection } = table;
+  const selectable = selection.enabled;
+  // The selection column is not one of `columns`: every full-width row spans one more cell.
+  const columnCount = columns.length + (selectable ? 1 : 0);
   const labels = { ...DEFAULT_LABELS, ...labelOverrides };
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mergedRef = useMemo(() => composeRefs(ref, containerRef), [ref]);
@@ -249,7 +259,7 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
     }
   }, [named]);
 
-  const size = tableSize(columns);
+  const size = tableSize(columns, selectable ? SELECT_COLUMN_WIDTH : undefined);
   const containerStyle: CSSProperties = { ...(maxHeight !== undefined ? { maxHeight } : null), ...style };
 
   return (
@@ -272,12 +282,25 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
       >
         {hasContent(caption) ? <caption className={captionClass}>{caption}</caption> : null}
         <colgroup>
+          {selectable ? <col style={{ width: SELECT_COLUMN_WIDTH }} /> : null}
           {columns.map((column) => (
             <col key={column.id} style={column.width !== undefined ? { width: toCss(column.width) } : undefined} />
           ))}
         </colgroup>
         <thead>
           <tr>
+            {selectable ? (
+              <th scope="col" data-rop-select="" className={selectHeaderCellClass}>
+                <div className={selectBoxClass}>
+                  <Checkbox
+                    checked={selection.allResultsState}
+                    disabled={table.resultCount === 0}
+                    aria-label={labels.selectAllResults}
+                    onCheckedChange={selection.toggleAllResults}
+                  />
+                </div>
+              </th>
+            ) : null}
             {columns.map((column) => {
               const align = column.align ?? 'start';
               const sortable = table.getSortButtonProps(column.id).onClick !== undefined;
@@ -309,32 +332,51 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
         <tbody>
           {view === 'rows' ? (
             <>
-              {table.rows.map((row) => (
-                <tr key={table.getRowId(row)}>
+              {table.rows.map((row) => {
+                const id = table.getRowId(row);
+                const selected = selectable && selection.isSelected(id);
+                return (
+                <tr
+                  key={id}
+                  data-selected={selected ? '' : undefined}
+                  className={selectable ? selectableRowClass : undefined}
+                >
+                  {selectable ? (
+                    <td className={selectBodyCellClass}>
+                      <div className={selectBoxClass}>
+                        <Checkbox
+                          checked={selected}
+                          aria-label={labels.selectRow(selection.getRowLabel(row))}
+                          onCheckedChange={() => selection.toggle(id)}
+                        />
+                      </div>
+                    </td>
+                  ) : null}
                   {columns.map((column) => (
                     <td key={column.id} className={cn(bodyCellClass, ALIGN_TEXT[column.align ?? 'start'])}>
                       {renderCell(column, row)}
                     </td>
                   ))}
                 </tr>
-              ))}
-              <Filler columnCount={columns.length} rows={minRows - table.rows.length} />
+                );
+              })}
+              <Filler columnCount={columnCount} rows={minRows - table.rows.length} />
             </>
           ) : null}
           {view === 'skeleton' ? (
             <>
-              <SkeletonRows columns={columns} count={minRows} />
+              <SkeletonRows columns={columns} count={minRows} selectable={selectable} />
               {/* loadingRowCount={0}: no skeleton, but the body keeps the height of one row */}
-              <Filler columnCount={columns.length} rows={1 - minRows} />
+              <Filler columnCount={columnCount} rows={1 - minRows} />
             </>
           ) : null}
           {view === 'empty' ? (
-            <StateRow columnCount={columns.length} rows={Math.max(1, minRows)}>
+            <StateRow columnCount={columnCount} rows={Math.max(1, minRows)}>
               <p className="m-0">{labels.empty}</p>
             </StateRow>
           ) : null}
           {view === 'noResults' ? (
-            <StateRow columnCount={columns.length} rows={Math.max(1, minRows)}>
+            <StateRow columnCount={columnCount} rows={Math.max(1, minRows)}>
               <NoResultsContent
                 message={labels.noResults}
                 clearLabel={labels.clearFilters}
@@ -343,7 +385,7 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
             </StateRow>
           ) : null}
           {view === 'error' ? (
-            <StateRow columnCount={columns.length} rows={Math.max(1, minRows)}>
+            <StateRow columnCount={columnCount} rows={Math.max(1, minRows)}>
               <ErrorContent
                 message={hasContent(errorMessage) ? errorMessage : labels.error}
                 retryLabel={labels.retry}
@@ -382,6 +424,14 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   whether there is no data at all or no result for the current filters. The header, the column
  *   widths and a body of at least `loadingRowCount` rows are the same in every state. A polite live
  *   region, always mounted, announces each change of state (never the first render).
+ *
+ * - Selection (`useListReport({ selectable: true })`): a leading column, not one of `columns`, as wide as a
+ *   row is tall, with a tri-state "select all results" checkbox in the header (over the current results
+ *   only; disabled with none) and one checkbox per row named `labels.selectRow(getRowLabel(row))`. A
+ *   selected row has `data-selected` and a tinted background. There is no `aria-selected` on the rows (not
+ *   allowed in a native table): the checkbox carries the state. A click elsewhere in the row does nothing,
+ *   so cells can hold their own links and buttons. Selecting announces nothing beyond the checkbox itself.
+ *   Without `selectable` the DOM is the same as before.
  *
  * An accessible name is required: `aria-label`, `aria-labelledby` or a (visually hidden) `caption`.
  */

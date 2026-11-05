@@ -925,3 +925,296 @@ export const ScrollRestorationNoPlay: StoryObj<ScrollRestorationArgs> = {
   ...ScrollRestoration,
   play: undefined,
 };
+
+// --- Selection -----------------------------------------------------------------------------------
+
+const SELECTION_ROWS = makeDemoInvoices(200);
+// The scenario of the play function and of the "some" preset: the first open invoice and the first two
+// that are not open, in the input order. On the "Open" pill two of the three are hidden.
+const FIRST_OPEN = SELECTION_ROWS.find((r) => r.status === 'pending')!;
+const FIRST_TWO_OTHERS = SELECTION_ROWS.filter((r) => r.status !== 'pending').slice(0, 2);
+const SCENARIO = [FIRST_OPEN, ...FIRST_TWO_OTHERS];
+const OPEN_COUNT = SELECTION_ROWS.filter((r) => r.status === 'pending').length;
+
+type Preselected = 'none' | 'some' | 'all';
+const PRESELECTED: Record<Preselected, ReadonlySet<string>> = {
+  none: new Set(),
+  some: new Set(SCENARIO.map((r) => r.id)),
+  all: new Set(SELECTION_ROWS.map((r) => r.id)),
+};
+
+interface SelectionArgs {
+  selectable: boolean;
+  controlled: boolean;
+  preselected: Preselected;
+  onSelectedIdsChange: (ids: ReadonlySet<string>) => void;
+  onApprove: (numbers: string[]) => void;
+  onExport: (numbers: string[]) => void;
+  /** Fixture: not in Controls. */
+  defaultFilter?: string;
+}
+
+function SelectionReport({
+  selectable,
+  controlled,
+  preselected,
+  onSelectedIdsChange,
+  onApprove,
+  onExport,
+  defaultFilter,
+}: SelectionArgs) {
+  // Controlled: the parent owns the set and applies what the hook reports (a new Set every time).
+  const [parentIds, setParentIds] = useState<ReadonlySet<string>>(PRESELECTED[preselected]);
+  const table = useListReport<DemoInvoice>({
+    rows: SELECTION_ROWS,
+    columns: URL_COLUMNS,
+    getRowId: (r) => r.id,
+    filters: URL_FILTERS,
+    defaultFilter,
+    selectable,
+    defaultSelectedIds: controlled ? undefined : PRESELECTED[preselected],
+    selectedIds: controlled ? parentIds : undefined,
+    onSelectedIdsChange: (ids) => {
+      if (controlled) setParentIds(ids);
+      onSelectedIdsChange(ids);
+    },
+  });
+  const numbers = () => table.selection.getSelectedRows().map((r) => r.number);
+  return (
+    <div style={PAGE}>
+      {controlled ? (
+        <p style={{ margin: 0, fontSize: 14 }}>
+          Parent state: <output data-testid="parent-state">{parentIds.size} ids</output>
+        </p>
+      ) : null}
+      <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
+        <ListReport
+          title="Invoices"
+          table={table}
+          filtersLabel="Filters"
+          searchLabel="Search"
+          bulkActions={(selection) => (
+            <>
+              <Button size="sm" variant="primary" disabled={selection.selectedResultCount === 0} onClick={() => onApprove(numbers())}>
+                Approve
+              </Button>
+              <Button size="sm" disabled={selection.selectedResultCount === 0} onClick={() => onExport(numbers())}>
+                Export
+              </Button>
+            </>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+const SELECTION_ARG_TYPES = {
+  selectable: { control: 'boolean', description: '`selectable` of `useListReport`: without it there is no checkbox column and no selection bar' },
+  controlled: { control: 'boolean', description: 'Controlled `selectedIds` (the parent state is shown above the report) or uncontrolled `defaultSelectedIds`' },
+  preselected: {
+    control: 'select',
+    options: ['none', 'some', 'all'],
+    description: 'Initial selection: none, three invoices (one open, two not) or all 200',
+  },
+  onSelectedIdsChange: { control: false },
+  onApprove: { control: false },
+  onExport: { control: false },
+  defaultFilter: HIDDEN,
+  ...{ status: HIDDEN, dataset: HIDDEN, searchCommitDelay: HIDDEN, firstSortDirection: HIDDEN, containerWidth: HIDDEN, onRetry: HIDDEN },
+  ...{ onSortChange: HIDDEN, onFilterChange: HIDDEN, onSearchQueryChange: HIDDEN },
+} as const;
+
+const SELECTION_ARGS: SelectionArgs = {
+  selectable: true,
+  controlled: false,
+  preselected: 'none',
+  onSelectedIdsChange: fn(),
+  onApprove: fn(),
+  onExport: fn(),
+};
+
+const selectionBar = (canvas: ReturnType<typeof within>) => canvas.getByRole('group', { name: 'Selection Invoices' });
+const rowBox = (canvas: ReturnType<typeof within>, number: string) => canvas.getByRole('checkbox', { name: `Select ${number}` });
+const allBox = (canvas: ReturnType<typeof within>) => canvas.getByRole('checkbox', { name: 'Select all results' }) as HTMLInputElement;
+
+/**
+ * Multiple selection on the data (`useListReport({ selectable: true })`): a checkbox column with a tri-state
+ * "Select all results" header, and a selection bar between the filters and the table that is always there
+ * (the table never moves), with the count, "Clear selection" and the bulk actions ("Approve", "Export",
+ * disabled at 0; they receive only the selected rows the user can see). Ids hidden by a pill stay selected:
+ * the bar says how many. Controls: `selectable`, `controlled` (the parent's set is shown above) and the
+ * initial selection; `onSelectedIdsChange` and the bulk actions show up in Actions.
+ * The play function selects three invoices, picks "Open" (one left visible, two hidden; the header is
+ * indeterminate), approves (Actions gets only the visible invoice), goes back to "All" (the three are
+ * still selected), selects all, then clears the selection and checks that the focus is on the header checkbox.
+ */
+export const Selection: StoryObj<SelectionArgs> = {
+  argTypes: SELECTION_ARG_TYPES,
+  args: SELECTION_ARGS,
+  render: (args) => <SelectionReport key={`${String(args.controlled)}-${args.preselected}`} {...args} />,
+  play: async ({ args, canvasElement }) => {
+    // Written for the default configuration (selectable, nothing preselected).
+    if (!args.selectable || args.preselected !== 'none') return;
+    const canvas = within(canvasElement);
+    await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
+    for (const row of SCENARIO) await userEvent.click(rowBox(canvas, row.number));
+    await expect(selectionBar(canvas)).toHaveTextContent('3 selected');
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(3);
+    await expect(allBox(canvas).indeterminate).toBe(true);
+
+    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await expect(selectionBar(canvas)).toHaveTextContent('1 selected (2 hidden by filters)');
+    await expect(allBox(canvas).indeterminate).toBe(OPEN_COUNT > 1);
+    await userEvent.click(canvas.getByRole('button', { name: 'Approve' }));
+    await expect(args.onApprove).toHaveBeenLastCalledWith([FIRST_OPEN.number]);
+
+    await userEvent.click(canvas.getByRole('radio', { name: 'All' }));
+    for (const row of SCENARIO) await expect(rowBox(canvas, row.number)).toBeChecked();
+    await userEvent.click(allBox(canvas));
+    await expect(allBox(canvas)).toBeChecked();
+    await expect(selectionBar(canvas)).toHaveTextContent('200 selected');
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear selection' }));
+    await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
+    await expect(allBox(canvas)).not.toBeChecked();
+    await expect(allBox(canvas)).toHaveFocus();
+    await expect(canvas.getByRole('button', { name: 'Approve' })).toBeDisabled();
+  },
+};
+
+/** Fixture of the e2e suite: `Selection` without the play function. */
+export const SelectionNoPlay: StoryObj<SelectionArgs> = {
+  ...Selection,
+  play: undefined,
+};
+
+/** Selectable, nothing selected: the bar says so and the bulk actions are disabled. */
+export const SelectionNone: StoryObj<SelectionArgs> = {
+  ...Selection,
+  tags: ['visual'],
+  parameters: NO_CONTROLS,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
+    await expect(allBox(canvas)).not.toBeChecked();
+  },
+};
+
+/** Three invoices selected: the header checkbox is indeterminate, the rows are tinted. */
+export const SelectionSome: StoryObj<SelectionArgs> = {
+  ...Selection,
+  tags: ['visual'],
+  parameters: NO_CONTROLS,
+  args: { ...SELECTION_ARGS, preselected: 'some' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(selectionBar(canvas)).toHaveTextContent('3 selected');
+    await expect(allBox(canvas).indeterminate).toBe(true);
+  },
+};
+
+/** Every invoice selected. */
+export const SelectionAll: StoryObj<SelectionArgs> = {
+  ...Selection,
+  tags: ['visual'],
+  parameters: NO_CONTROLS,
+  args: { ...SELECTION_ARGS, preselected: 'all' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(selectionBar(canvas)).toHaveTextContent('200 selected');
+    await expect(allBox(canvas)).toBeChecked();
+  },
+};
+
+/** The same three invoices on the "Open" pill: one visible, two hidden by the filter. */
+export const SelectionHiddenByFilter: StoryObj<SelectionArgs> = {
+  ...Selection,
+  tags: ['visual'],
+  parameters: NO_CONTROLS,
+  args: { ...SELECTION_ARGS, preselected: 'some', defaultFilter: 'open' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(selectionBar(canvas)).toHaveTextContent('1 selected (2 hidden by filters)');
+  },
+};
+
+// --- Selection recipe: delete the selected rows ---
+
+interface DeleteRecipeArgs {
+  onDelete: (numbers: string[]) => void;
+  onSelectedIdsChange: (ids: ReadonlySet<string>) => void;
+}
+
+function DeleteRecipe({ onDelete, onSelectedIdsChange }: DeleteRecipeArgs) {
+  const [rows, setRows] = useState<readonly DemoInvoice[]>(() => makeDemoInvoices(20));
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const table = useListReport<DemoInvoice>({
+    rows,
+    columns: URL_COLUMNS,
+    getRowId: (r) => r.id,
+    filters: URL_FILTERS,
+    selectable: true,
+    selectedIds,
+    onSelectedIdsChange: (ids) => {
+      setSelectedIds(ids);
+      onSelectedIdsChange(ids);
+    },
+  });
+  // Delete only what the user sees selected; then drop those ids from the selection: the hook never
+  // prunes ids that left the data (that would be a change nobody asked for), the consumer does.
+  const remove = () => {
+    const gone = table.selection.getSelectedRows();
+    const goneIds = new Set(gone.map((r) => r.id));
+    setRows((current) => current.filter((r) => !goneIds.has(r.id)));
+    setSelectedIds((current) => new Set([...current].filter((id) => !goneIds.has(id))));
+    onDelete(gone.map((r) => r.number));
+  };
+  return (
+    <div style={PAGE}>
+      <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
+        <ListReport
+          title="Invoices"
+          table={table}
+          filtersLabel="Filters"
+          searchLabel="Search"
+          bulkActions={(selection) => (
+            <Button size="sm" variant="danger" disabled={selection.selectedResultCount === 0} onClick={remove}>
+              Delete
+            </Button>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Recipe: a "Delete" bulk action. It deletes `selection.getSelectedRows()` (only the selected rows that are
+ * visible) and removes those ids from its own controlled `selectedIds`: the hook keeps ids that left the
+ * data, so the consumer that deletes rows updates the selection itself. Ids hidden by a pill stay selected.
+ * The play function selects two invoices, deletes them and checks that 18 are left and nothing is selected.
+ */
+export const SelectionDeleteRecipe: StoryObj<DeleteRecipeArgs> = {
+  argTypes: {
+    onDelete: { control: false },
+    onSelectedIdsChange: { control: false },
+    ...{ status: HIDDEN, dataset: HIDDEN, searchCommitDelay: HIDDEN, firstSortDirection: HIDDEN, containerWidth: HIDDEN, onRetry: HIDDEN },
+    ...{ onSortChange: HIDDEN, onFilterChange: HIDDEN, onSearchQueryChange: HIDDEN },
+  },
+  args: { onDelete: fn(), onSelectedIdsChange: fn() },
+  render: (args) => <DeleteRecipe {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const [first, second] = makeDemoInvoices(20);
+    await userEvent.click(rowBox(canvas, first!.number));
+    await userEvent.click(rowBox(canvas, second!.number));
+    await expect(selectionBar(canvas)).toHaveTextContent('2 selected');
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete' }));
+    await expect(args.onDelete).toHaveBeenCalledWith([first!.number, second!.number]);
+    await expect(canvas.getByRole('heading', { name: /Invoices/ })).toHaveTextContent('Invoices (18)');
+    await expect(canvas.queryByRole('checkbox', { name: `Select ${first!.number}` })).toBeNull();
+    await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
+    await expect(canvas.getByRole('button', { name: 'Delete' })).toBeDisabled();
+  },
+};
