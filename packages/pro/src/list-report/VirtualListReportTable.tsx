@@ -14,6 +14,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { composeRefs } from '@react-object-page/core';
 import {
   Filler,
@@ -61,6 +62,13 @@ const FORCE_TRUNCATE = { forceTruncate: true } as const;
 // Pro stylesheet (`styles.css`): caps the content of a cell at the row height, so a `node` cell can
 // never make a row taller than the pitch the range is computed with.
 const VIRTUAL_ROW_CLASS = 'rop-pro-virtual-row';
+
+const TAB_STOPS = 'a[href], button, input, select, textarea, [tabindex]';
+/** The keyboard tab stops of a row, in document order. */
+const tabStops = (row: Element): HTMLElement[] =>
+  Array.from(row.querySelectorAll<HTMLElement>(TAB_STOPS)).filter(
+    (el) => el.tabIndex >= 0 && !(el as HTMLInputElement).disabled && el.getAttribute('aria-hidden') !== 'true',
+  );
 
 const isRowCheckbox = (target: EventTarget | null): target is HTMLInputElement =>
   target instanceof HTMLInputElement && target.type === 'checkbox' && target.closest('tbody') !== null;
@@ -144,6 +152,35 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
     [indexOfResult, resultIds, selection],
   );
 
+  // Tab / Shift+Tab from the last / first tab stop of a row go to the next / previous ROW, as in the Free
+  // table, even when that row is not mounted next to it (the focused row is pinned far from the range):
+  // the row is scrolled into view, rendered, then focused. Without this the browser would jump to the
+  // first mounted row after the spacer.
+  const moveAcrossRows = (event: KeyboardEvent<HTMLDivElement>): boolean => {
+    const target = event.target as HTMLElement;
+    const row = target.closest('tbody > tr[aria-rowindex]');
+    if (!row) return false;
+    const index = Number(row.getAttribute('aria-rowindex')) - 2;
+    const step = event.shiftKey ? -1 : 1;
+    const next = index + step;
+    if (!Number.isInteger(index) || next < 0 || next >= count) return false;
+    const sibling = step > 0 ? row.nextElementSibling : row.previousElementSibling;
+    if (sibling?.getAttribute('aria-rowindex') === String(next + 2)) return false; // mounted next to it: native order
+    const stops = tabStops(row);
+    if (target !== (step > 0 ? stops.at(-1) : stops[0])) return false; // still inside the row
+    const el = scrollerRef.current;
+    if (!el) return false;
+    event.preventDefault();
+    flushSync(() => {
+      scrollToIndex(next, 'auto');
+    });
+    const nextRow = el.querySelector(`tbody > tr[aria-rowindex="${next + 2}"]`);
+    const nextStops = nextRow ? tabStops(nextRow) : [];
+    const focusTarget = step > 0 ? nextStops[0] : nextStops.at(-1);
+    (focusTarget ?? el).focus({ preventScroll: true });
+    return true;
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (event.key === ' ' && event.shiftKey && isRowCheckbox(event.target)) {
@@ -151,6 +188,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
     } else if (event.key !== 'Shift') {
       shiftSpace.current = false;
     }
+    if (event.key === 'Tab' && virtual && !event.defaultPrevented && !event.altKey && !event.ctrlKey && !event.metaKey) moveAcrossRows(event);
   };
 
   // Escape inside the table empties a non-empty selection, and only then stops the event. A parent
@@ -303,9 +341,10 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
  *   when virtualized (warning in development, cells truncated), and `node` cells are capped at the
  *   row height — this needs the Pro `styles.css`.
  * - **Focus is never lost**: the row holding it stays mounted when it scrolls out of the range; a
- *   filter that removes it moves the focus to the scroll container. Rows that are not mounted cannot be
- *   reached with Tab (scroll the container, which is focusable), and the browser's find (Ctrl+F) does
- *   not see them: use the List Report search. Arrow-key grid navigation is not provided.
+ *   filter that removes it moves the focus to the scroll container. Tab / Shift+Tab go from a row to the
+ *   next / previous one as in the Free table (a row that is not mounted is scrolled in first). The
+ *   browser's find (Ctrl+F) does not see unmounted rows: use the List Report search. Arrow-key grid
+ *   navigation is not provided.
  * - **Selection** (`useListReport({ selectable: true })`, the core model unchanged) gains a range
  *   gesture: shift-click or Shift+Space on a row checkbox applies, from the anchor (the last row changed
  *   with a plain gesture) to that row, the state the row gets — over the indices of the current results,

@@ -254,6 +254,24 @@ describe('focus', () => {
     expect(dataRows().length).toBeLessThanOrEqual(BOUND + 1);
   });
 
+  it('Tab / Shift+Tab after scrolling away go on from the focused row to the next / previous one', async () => {
+    render(<Host selectable />);
+    const user = userEvent.setup();
+    const checkbox = screen.getByRole('checkbox', { name: 'Select Item 3' });
+    act(() => checkbox.focus());
+    for (let i = 1; i <= 50; i++) scrollTo(i * (CLIENT - HEAD));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Select Item 4' }));
+    // scrolled back to it (auto: at the top edge, below the header)
+    expect(scroller().scrollTop).toBe(4 * PITCH);
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Select Item 3' }));
+    // inside the range: the native order (no interception)
+    await user.tab();
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Select Item 5' }));
+  });
+
   it('a filter that removes the focused row moves the focus to the container, never the body', () => {
     const { rerender } = render(<Host selectable />);
     const checkbox = screen.getByRole('checkbox', { name: 'Select Item 5' });
