@@ -2,6 +2,7 @@ import { createRef, type ReactNode } from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChangeSummary } from './ChangeSummary';
+import { computeChangeSummary } from './compute-change-summary';
 import { formatChangeValue } from './format-change-value';
 import type { ChangeEntry } from './types';
 
@@ -363,6 +364,37 @@ describe('<ChangeSummary />', () => {
         'Amount, changed, from EUR 100 to EUR 120',
         'Paid, added, Yes',
       ]);
+    });
+
+    it('a delegate with precise: true keeps the no-value states apart', () => {
+      const entries = computeChangeSummary<Record<string, unknown>>({
+        baseline: { a: null, b: undefined, c: '', d: null },
+        values: { a: undefined, b: null, c: null },
+      });
+      render(<ChangeSummary entries={entries} renderValue={(v) => formatChangeValue(v, { ...common, precise: true })} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+        'A, changed, from Null to Undefined',
+        'B, changed, from Undefined to Null',
+        'C, removed, ""',
+        'D, changed, from Null to Undefined',
+      ]);
+    });
+
+    it('a compact delegate reads the same on both sides of null against undefined', () => {
+      const entries = computeChangeSummary<Record<string, unknown>>({ baseline: { a: null }, values: { a: undefined } });
+      render(<ChangeSummary entries={entries} renderValue={(v) => formatChangeValue(v, common)} />);
+      expect(readText(screen.getByRole('listitem'))).toBe('A, changed, from No value to No value');
+    });
+
+    it('cannot tell the side on undefined against a missing key: both calls get the same arguments', () => {
+      const entries = computeChangeSummary<Record<string, unknown>>({ baseline: { a: undefined }, values: {} });
+      const renderValue = vi.fn((v: unknown): ReactNode => formatChangeValue(v, { ...common, precise: true }));
+      render(<ChangeSummary entries={entries} renderValue={renderValue} />);
+      expect(renderValue.mock.calls).toEqual([
+        [undefined, entries[0]],
+        [undefined, entries[0]],
+      ]);
+      expect(readText(screen.getByRole('listitem'))).toBe('A, changed, from Undefined to Undefined');
     });
 
     it('propagates an exception thrown by renderValue', () => {

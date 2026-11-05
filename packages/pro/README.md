@@ -157,6 +157,12 @@ const { entries } = useChangeSummary({ values: form.values, baseline: form.basel
   characters); if even that matches (two class instances), the after side ends with
   `(contents differ)`. `formatChangeValue` never throws (revoked Proxy, throwing traps or getters give
   `Unsupported value`).
-- `renderValue` is called once for each value shown (never for the missing side of `added`/`removed`);
-  a missing key arrives as `undefined`, with `beforeMissing` / `afterMissing` on the entry. Returning
-  `null` leaves the value empty. An exception thrown by `renderValue` propagates.
+- `renderValue` is called once for each value shown (never for the missing side of `added`/`removed`).
+  Returning `null` leaves the value empty. An exception thrown by `renderValue` propagates.
+- To delegate the values you do not handle, use `formatChangeValue(value, { precise: true })`: the compact
+  rendering gives `No value` for both `null` and `undefined`, so `null` → `undefined` would read
+  `from No value to No value`. `precise` also quotes strings and adds the time to dates.
+- A missing key reaches `renderValue` as `undefined`. On `undefined` against a missing key both calls get
+  the same arguments (`undefined` and the same entry), so `beforeMissing` / `afterMissing` do not tell which
+  side is being rendered, and a delegate shows `Undefined` on both. The default rendering has no such
+  limit: to keep it, leave `renderValue` unset or build your own list on `useChangeSummary`.

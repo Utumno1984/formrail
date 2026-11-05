@@ -18,8 +18,16 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * value and its entry; never for the absent side of an `added` / `removed` entry. Returning
    * `null` leaves the value empty (the label and the kind of change stay). An exception thrown
    * here propagates to the caller (it is not caught): wrap the call if it can fail.
-   * Delegate to `formatChangeValue` for the values you do not handle. A missing key arrives as
-   * `undefined`: `entry.beforeMissing` / `entry.afterMissing` tell it from a real `undefined`.
+   *
+   * Delegate with `formatChangeValue(value, { precise: true })` for the values you do not handle:
+   * the compact rendering gives `No value` for both `null` and `undefined`, so `null` → `undefined`
+   * would read `from No value to No value`. `precise` also quotes strings and adds the time to dates.
+   *
+   * A missing key arrives as `undefined`. On `undefined` against a missing key both calls get the
+   * same arguments (`undefined` and the same entry), so `entry.beforeMissing` /
+   * `entry.afterMissing` do not tell which side is being rendered, and a delegate shows `Undefined`
+   * on both. The default rendering has no such limit: to keep it, leave `renderValue` unset or
+   * build your own list on `useChangeSummary`.
    */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
   /** Text shown when `entries` is empty. Default `No changes`. */
