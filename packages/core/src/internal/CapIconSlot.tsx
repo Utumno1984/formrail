@@ -21,8 +21,9 @@ import { cn } from '../utils/cn';
  * `vertical-align: middle` and moved by `0.5ex - 0.5cap`, both resolved against the same font, so
  * the x-height cancels out and it lands on `baseline - 0.5cap`. The content is then centred on
  * that point by a -50% translation of its own height. The zero-height box never grows the line, so
- * the slot's footprint is the same for every font and icon size. Without `cap` support the offset
- * is dropped and the icon falls back to the x-height middle (`vertical-align: middle`).
+ * the slot's footprint is the same for every font and icon size. Where the `cap` unit is not
+ * supported (Safari < 17.2) the declaration would be dropped and the icon would sit on the x-height
+ * middle, ~1px too low; there a fixed `-0.1em` approximates the same offset instead.
  *
  * The slot must inherit the font, size and line-height of the text it is aligned with, and start
  * at the same top as that text's first line (same padding). `className` goes on the outer slot.
@@ -30,7 +31,7 @@ import { cn } from '../utils/cn';
 export function CapIconSlot({ className, children, ...rest }: HTMLAttributes<HTMLSpanElement>) {
   return (
     <span {...rest} className={cn('block shrink-0', className)}>
-      <span className="relative top-[calc(0.5ex-0.5cap)] inline-block h-0 align-middle">
+      <span className="relative top-[-0.1em] supports-[top:1cap]:top-[calc(0.5ex-0.5cap)] inline-block h-0 align-middle">
         <span className="relative flex [translate:0_-50%]">{children}</span>
       </span>
     </span>
