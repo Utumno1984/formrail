@@ -30,7 +30,7 @@ function saveGate() {
   return { gate, release };
 }
 
-const amountField =() => screen.findByRole('textbox', { name: /Amount/ });
+const amountField = () => screen.findByRole('textbox', { name: /Amount/ });
 // jsdom loads no CSS: a hidden footer is still in the tree, but `inert`.
 const footer = () => {
   const el = screen.queryByRole('region', { name: 'Save actions', hidden: true });
