@@ -63,10 +63,11 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
     if (!link) return;
     const listBox = list.getBoundingClientRect();
     const linkBox = link.getBoundingClientRect();
-    if (linkBox.left >= listBox.left && linkBox.right <= listBox.right) return;
-    // Centers rather than aligning to the nearest edge: it matches what the native focus scroll does
-    // for an off-screen link, so the final position does not depend on which links were active on the
-    // way there. The browser clamps at both ends of the list.
+    // Always centers, even when the link is already visible: the native focus scroll of a click centers
+    // the link while it still has the idle weight (the active style then widens it), and a scroll that
+    // only acts on an off-screen link would leave that position or its own depending on which links
+    // were active on the way. Centering with the final geometry makes the position a function of the
+    // active link alone. The browser clamps at both ends of the list.
     list.scrollLeft += (linkBox.left + linkBox.right) / 2 - (listBox.left + listBox.right) / 2;
   }, [activeId]);
 
