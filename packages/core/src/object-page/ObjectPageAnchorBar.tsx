@@ -63,8 +63,11 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
     if (!link) return;
     const listBox = list.getBoundingClientRect();
     const linkBox = link.getBoundingClientRect();
-    if (linkBox.left < listBox.left) list.scrollLeft += linkBox.left - listBox.left;
-    else if (linkBox.right > listBox.right) list.scrollLeft += linkBox.right - listBox.right;
+    if (linkBox.left >= listBox.left && linkBox.right <= listBox.right) return;
+    // Centers rather than aligning to the nearest edge: it matches what the native focus scroll does
+    // for an off-screen link, so the final position does not depend on which links were active on the
+    // way there. The browser clamps at both ends of the list.
+    list.scrollLeft += (linkBox.left + linkBox.right) / 2 - (listBox.left + listBox.right) / 2;
   }, [activeId]);
 
   const navigate = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
