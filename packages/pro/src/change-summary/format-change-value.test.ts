@@ -114,6 +114,19 @@ describe('formatChangeValue', () => {
       expect(formatChangeValue('', { precise: true })).toBe('""');
     });
 
+    it('gives null and undefined their own texts, also through labels; the compact text stays', () => {
+      expect(formatChangeValue(null, { precise: true })).toBe('Null');
+      expect(formatChangeValue(undefined, { precise: true })).toBe('Undefined');
+      expect(formatChangeValueAt(null, base, 2)).toBe('Null');
+      expect(formatChangeValueAt(undefined, base, 2)).toBe('Undefined');
+      expect(formatChangeValueAt(undefined, base, 3)).toBe('Undefined');
+      const labels = { noValue: 'None', nullValue: 'Nil', undefinedValue: 'Unset' };
+      expect(formatChangeValue(null, { labels, precise: true })).toBe('Nil');
+      expect(formatChangeValue(undefined, { labels, precise: true })).toBe('Unset');
+      expect(formatChangeValueAt(null, { labels }, 0)).toBe('None');
+      expect(formatChangeValueAt(undefined, { labels }, 0)).toBe('None');
+    });
+
     it('level 2 renders dates as ISO 8601', () => {
       expect(formatChangeValueAt(new Date('2026-03-05T12:00:00.250Z'), base, 2)).toBe('2026-03-05T12:00:00.250Z');
       expect(formatChangeValueAt(new Date('nope'), base, 2)).toBe('Invalid date');
@@ -133,7 +146,7 @@ describe('formatChangeValue', () => {
       expect(formatChangeValueAt({ a: { x: 1 } }, base, 3)).toBe('{a: {x: 1}}');
       expect(formatChangeValueAt(new Map([['k', 1]]), base, 3)).toBe('Map {"k" => 1}');
       expect(formatChangeValueAt(new Set([1, 2n]), base, 3)).toBe('Set {1, 2n}');
-      expect(formatChangeValueAt([NOON, null, true], base, 3)).toBe('[2026-03-05T12:00:00.000Z, No value, Yes]');
+      expect(formatChangeValueAt([NOON, null, true], base, 3)).toBe('[2026-03-05T12:00:00.000Z, Null, Yes]');
     });
 
     it('stops at cycles and deep nesting, truncates long contents', () => {

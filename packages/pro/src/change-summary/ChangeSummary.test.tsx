@@ -2,6 +2,7 @@ import { createRef, type ReactNode } from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChangeSummary } from './ChangeSummary';
+import { computeChangeSummary } from './compute-change-summary';
 import { formatChangeValue } from './format-change-value';
 import type { ChangeEntry } from './types';
 
@@ -10,7 +11,16 @@ afterEach(cleanup);
 function entry(partial: Partial<ChangeEntry> & Pick<ChangeEntry, 'kind'>): ChangeEntry {
   const path = partial.path ?? 'amount';
   const label = partial.label ?? 'Amount';
-  return { path, label, labelPath: label.split(' > '), before: undefined, after: undefined, ...partial };
+  return {
+    path,
+    label,
+    labelPath: label.split(' > '),
+    before: undefined,
+    after: undefined,
+    beforeMissing: false,
+    afterMissing: false,
+    ...partial,
+  };
 }
 
 /** Text a screen reader gets: DOM order, hidden-visually text included, aria-hidden excluded. */
@@ -182,6 +192,64 @@ describe('<ChangeSummary />', () => {
       expect(items).toEqual(['A, added, Empty', 'B, changed, from No value to No', 'C, added, 0']);
     });
 
+    it.each([
+      ['null to undefined', { before: null, after: undefined }, 'from Null to Undefined'],
+      ['undefined to null', { before: undefined, after: null }, 'from Undefined to Null'],
+      ['null to a missing key', { before: null, afterMissing: true }, 'from Null to Missing'],
+      ['undefined to a missing key', { before: undefined, afterMissing: true }, 'from Undefined to Missing'],
+      ['a missing key to null', { beforeMissing: true, after: null }, 'from Missing to Null'],
+      ['a missing key to undefined', { beforeMissing: true, after: undefined }, 'from Missing to Undefined'],
+    ])('gives each no-value state its own text on a changed entry: %s', (_, sides, expected) => {
+      render(<ChangeSummary entries={[entry({ kind: 'changed', ...sides })]} {...common} />);
+      expect(readText(screen.getByRole('listitem'))).toBe(`Amount, changed, ${expected}`);
+      cleanup();
+    });
+
+    it('the texts of the no-value states follow valueLabels', () => {
+      const e = [
+        entry({ kind: 'changed', path: 'a', before: null, after: undefined }),
+        entry({ kind: 'changed', path: 'b', beforeMissing: true, after: null }),
+      ];
+      render(<ChangeSummary entries={e} valueLabels={{ nullValue: 'Nullo', undefinedValue: 'Indefinito', missingValue: 'Assente' }} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+        'Amount, changed, from Nullo to Indefinito',
+        'Amount, changed, from Assente to Nullo',
+      ]);
+    });
+
+    it('writes out no-value states inside arrays that would otherwise look the same', () => {
+      const e = [
+        entry({ kind: 'changed', path: 'a', before: [null], after: [undefined] }),
+        entry({ kind: 'changed', path: 'b', before: [{ x: null }], after: [{}] }),
+      ];
+      render(<ChangeSummary entries={e} {...common} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+        'Amount, changed, from [Null] to [Undefined]',
+        'Amount, changed, from [{x: Null}] to [{}]',
+      ]);
+    });
+
+    it('the compact text stays when only one side is a no-value state', () => {
+      render(<ChangeSummary entries={[entry({ kind: 'changed', before: null, after: 'x' })]} {...common} />);
+      expect(readText(screen.getByRole('listitem'))).toBe('Amount, changed, from No value to x');
+    });
+
+    it('a missing key does not change the text of the side shown by added / removed', () => {
+      const e = [
+        entry({ kind: 'added', path: 'a', after: '', beforeMissing: true }),
+        entry({ kind: 'removed', path: 'b', before: [], afterMissing: true }),
+      ];
+      render(<ChangeSummary entries={e} {...common} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual(['Amount, added, Empty', 'Amount, removed, No items']);
+    });
+
+    it('renderValue gets a missing key as undefined, with the flag on the entry', () => {
+      const e = entry({ kind: 'changed', before: null, afterMissing: true });
+      const renderValue = vi.fn((v: unknown, en: ChangeEntry): ReactNode => (v === undefined && en.afterMissing ? 'gone' : 'null'));
+      render(<ChangeSummary entries={[e]} renderValue={renderValue} />);
+      expect(readText(screen.getByRole('listitem'))).toBe('Amount, changed, from null to gone');
+    });
+
     it('mutes the empty / no value texts only', () => {
       const e = [entry({ kind: 'changed', before: '', after: 'x' })];
       render(<ChangeSummary entries={e} />);
@@ -296,6 +364,37 @@ describe('<ChangeSummary />', () => {
         'Amount, changed, from EUR 100 to EUR 120',
         'Paid, added, Yes',
       ]);
+    });
+
+    it('a delegate with precise: true keeps the no-value states apart', () => {
+      const entries = computeChangeSummary<Record<string, unknown>>({
+        baseline: { a: null, b: undefined, c: '', d: null },
+        values: { a: undefined, b: null, c: null },
+      });
+      render(<ChangeSummary entries={entries} renderValue={(v) => formatChangeValue(v, { ...common, precise: true })} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+        'A, changed, from Null to Undefined',
+        'B, changed, from Undefined to Null',
+        'C, removed, ""',
+        'D, changed, from Null to Undefined',
+      ]);
+    });
+
+    it('a compact delegate reads the same on both sides of null against undefined', () => {
+      const entries = computeChangeSummary<Record<string, unknown>>({ baseline: { a: null }, values: { a: undefined } });
+      render(<ChangeSummary entries={entries} renderValue={(v) => formatChangeValue(v, common)} />);
+      expect(readText(screen.getByRole('listitem'))).toBe('A, changed, from No value to No value');
+    });
+
+    it('cannot tell the side on undefined against a missing key: both calls get the same arguments', () => {
+      const entries = computeChangeSummary<Record<string, unknown>>({ baseline: { a: undefined }, values: {} });
+      const renderValue = vi.fn((v: unknown): ReactNode => formatChangeValue(v, { ...common, precise: true }));
+      render(<ChangeSummary entries={entries} renderValue={renderValue} />);
+      expect(renderValue.mock.calls).toEqual([
+        [undefined, entries[0]],
+        [undefined, entries[0]],
+      ]);
+      expect(readText(screen.getByRole('listitem'))).toBe('A, changed, from Undefined to Undefined');
     });
 
     it('propagates an exception thrown by renderValue', () => {

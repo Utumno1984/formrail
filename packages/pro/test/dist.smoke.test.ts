@@ -38,6 +38,7 @@ const values = {
 };
 
 const expected = [
+  { path: 'note', label: 'Note', kind: 'added' },
   { path: 'supplier.vatNumber', label: 'Supplier > VAT number', kind: 'changed' },
   { path: 'lineItems.0.price', label: 'Line Items > Item 1 > Price', kind: 'changed' },
   { path: 'lineItems.3', label: 'Line Items > Item 4', kind: 'added' },
@@ -60,7 +61,7 @@ describe('built bundle (dist)', () => {
     expect(existsSync(distCjs)).toBe(true);
   });
 
-  it('ESM: exact entries on a sample invoice (swapped rows and null → "" note do not appear)', () => {
+  it('ESM: exact entries on a sample invoice (swapped rows do not appear, null → "" note does)', () => {
     expect(run(esm)).toEqual(expected);
   });
 

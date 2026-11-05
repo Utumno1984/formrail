@@ -31,26 +31,26 @@ describe('"no value" rule: full matrix', () => {
   // [baseline, values, expected kind or null for "no entry"] — written out in full on purpose.
   const table: [Cell, Cell, 'added' | 'removed' | 'changed' | null][] = [
     ['undefined', 'undefined', null],
-    ['undefined', 'null', null],
-    ['undefined', 'missing', null],
-    ['undefined', 'empty', null],
+    ['undefined', 'null', 'changed'],
+    ['undefined', 'missing', 'changed'],
+    ['undefined', 'empty', 'added'],
     ['undefined', 'x', 'added'],
     ['undefined', 'y', 'added'],
-    ['null', 'undefined', null],
+    ['null', 'undefined', 'changed'],
     ['null', 'null', null],
-    ['null', 'missing', null],
-    ['null', 'empty', null],
+    ['null', 'missing', 'changed'],
+    ['null', 'empty', 'added'],
     ['null', 'x', 'added'],
     ['null', 'y', 'added'],
-    ['missing', 'undefined', null],
-    ['missing', 'null', null],
+    ['missing', 'undefined', 'changed'],
+    ['missing', 'null', 'changed'],
     ['missing', 'missing', null],
-    ['missing', 'empty', null],
+    ['missing', 'empty', 'added'],
     ['missing', 'x', 'added'],
     ['missing', 'y', 'added'],
-    ['empty', 'undefined', null],
-    ['empty', 'null', null],
-    ['empty', 'missing', null],
+    ['empty', 'undefined', 'removed'],
+    ['empty', 'null', 'removed'],
+    ['empty', 'missing', 'removed'],
     ['empty', 'empty', null],
     ['empty', 'x', 'changed'],
     ['empty', 'y', 'changed'],
@@ -87,29 +87,37 @@ describe('"no value" rule: full matrix', () => {
         after: kind === 'removed' ? undefined : v(after),
       },
     ]);
+    expect(entries[0]).toMatchObject({ beforeMissing: before === 'missing', afterMissing: after === 'missing' });
   });
 });
 
 describe('"no value" rule: structures', () => {
   const absents = [undefined, null];
 
-  it('[] against Absent gives no entry, both ways', () => {
+  it('[] against Absent is one atomic entry, both ways', () => {
+    const removed = [{ path: 'list', kind: 'removed', before: [], after: undefined }];
+    const added = [{ path: 'list', kind: 'added', before: undefined, after: [] }];
     for (const absent of absents) {
-      expect(diff({ list: [] }, { list: absent })).toEqual([]);
-      expect(diff({ list: absent }, { list: [] })).toEqual([]);
-      expect(diff({ list: [] }, {})).toEqual([]);
-      expect(diff({}, { list: [] })).toEqual([]);
+      expect(brief(diff({ list: [] }, { list: absent }))).toEqual(removed);
+      expect(brief(diff({ list: absent }, { list: [] }))).toEqual(added);
     }
+    expect(brief(diff({ list: [] }, {}))).toEqual(removed);
+    expect(brief(diff({}, { list: [] }))).toEqual(added);
   });
 
-  it('a recursively Empty object against Absent gives no entry, both ways', () => {
+  it('a recursively empty object against Absent is one atomic entry, both ways', () => {
     const empty = { a: '', b: { c: null }, d: [] };
+    const removed = [{ path: 'o', kind: 'removed', before: empty, after: undefined }];
+    const added = [{ path: 'o', kind: 'added', before: undefined, after: empty }];
     for (const absent of absents) {
-      expect(diff({ o: empty }, { o: absent })).toEqual([]);
-      expect(diff({ o: absent }, { o: empty })).toEqual([]);
+      expect(brief(diff({ o: empty }, { o: absent }))).toEqual(removed);
+      expect(brief(diff({ o: absent }, { o: empty }))).toEqual(added);
     }
-    expect(diff({ o: empty }, {})).toEqual([]);
-    expect(diff({ o: {} }, { o: { a: undefined, b: { c: '' } } })).toEqual([]);
+    expect(brief(diff({ o: empty }, {}))).toEqual(removed);
+    expect(brief(diff({ o: {} }, { o: { a: undefined, b: { c: '' } } }))).toEqual([
+      { path: 'o.a', kind: 'changed', before: undefined, after: undefined },
+      { path: 'o.b', kind: 'added', before: undefined, after: { c: '' } },
+    ]);
   });
 
   it('a non-empty object against Absent is one entry on the node, not on its leaves', () => {
@@ -134,15 +142,61 @@ describe('"no value" rule: structures', () => {
     ]);
   });
 
-  it('mixed Empty kinds are equal to each other', () => {
-    expect(diff({ v: '' }, { v: [] })).toEqual([]);
-    expect(diff({ v: [] }, { v: {} })).toEqual([]);
-    expect(diff({ v: '' }, { v: { a: null } })).toEqual([]);
-    expect(diff({}, { v: { a: [], b: { c: '' } } })).toEqual([]);
+  it('mixed empty kinds are a structural type change', () => {
+    expect(brief(diff({ v: '' }, { v: [] }))).toEqual([{ path: 'v', kind: 'changed', before: '', after: [] }]);
+    expect(brief(diff({ v: [] }, { v: '' }))).toEqual([{ path: 'v', kind: 'changed', before: [], after: '' }]);
+    expect(brief(diff({ v: [] }, { v: {} }))).toEqual([{ path: 'v', kind: 'changed', before: [], after: {} }]);
+    expect(brief(diff({ v: '' }, { v: { a: null } }))).toEqual([{ path: 'v', kind: 'changed', before: '', after: { a: null } }]);
+    expect(brief(diff({}, { v: { a: [], b: { c: '' } } }))).toEqual([
+      { path: 'v', kind: 'added', before: undefined, after: { a: [], b: { c: '' } } },
+    ]);
   });
 
-  it('applies the rule at the root too: two Empty roots give no entry', () => {
-    expect(diff({ a: null }, { a: '', b: [] })).toEqual([]);
+  it('applies the rule at the root too: two empty-looking roots differ key by key', () => {
+    expect(brief(diff({ a: null }, { a: '', b: [] }))).toEqual([
+      { path: 'a', kind: 'added', before: undefined, after: '' },
+      { path: 'b', kind: 'added', before: undefined, after: [] },
+    ]);
+  });
+
+  it('{} against { a: undefined } is a change on the key at the root as well as nested', () => {
+    expect(paths(diff({}, { a: undefined }))).toEqual(['changed a']);
+    expect(paths(diff({ a: undefined }, {}))).toEqual(['changed a']);
+    expect(paths(diff({ o: { a: undefined } }, { o: {} }))).toEqual(['changed o.a']);
+    expect(paths(diff({ o: {} }, { o: { a: null } }))).toEqual(['changed o.a']);
+    expect(paths(diff({ o: { a: null } }, { o: { a: undefined } }))).toEqual(['changed o.a']);
+  });
+
+  it('[null], [undefined] and [] all differ, as one block', () => {
+    expect(paths(diff({ l: [null] }, { l: [undefined] }))).toEqual(['changed l']);
+    expect(paths(diff({ l: [] }, { l: [null] }))).toEqual(['changed l']);
+    expect(paths(diff({ l: [undefined] }, { l: [] }))).toEqual(['changed l']);
+    expect(diff({ l: [null] }, { l: [null] })).toEqual([]);
+    expect(diff({ l: [undefined] }, { l: [undefined] })).toEqual([]);
+  });
+
+  it('beforeMissing / afterMissing tell a missing key from a key present with undefined', () => {
+    const flags = (entries: ChangeEntry[]) => entries.map(({ beforeMissing, afterMissing }) => [beforeMissing, afterMissing]);
+    expect(flags(diff({}, { v: undefined }))).toEqual([[true, false]]);
+    expect(flags(diff({ v: undefined }, {}))).toEqual([[false, true]]);
+    expect(flags(diff({ v: null }, {}))).toEqual([[false, true]]);
+    expect(flags(diff({}, { v: null }))).toEqual([[true, false]]);
+    expect(flags(diff({ v: null }, { v: undefined }))).toEqual([[false, false]]);
+    expect(flags(diff({ v: 1 }, { v: 2 }))).toEqual([[false, false]]);
+    // Both flags survive the normalization of the absent side of added / removed.
+    expect(flags(diff({}, { v: 'x' }))).toEqual([[true, false]]);
+    expect(flags(diff({ v: null }, { v: 'x' }))).toEqual([[false, false]]);
+    expect(flags(diff({ v: undefined }, { v: 'x' }))).toEqual([[false, false]]);
+    expect(flags(diff({ v: 'x' }, {}))).toEqual([[false, true]]);
+    expect(flags(diff({ v: 'x' }, { v: null }))).toEqual([[false, false]]);
+  });
+
+  it('an array item without a counterpart is reported as missing on the other side', () => {
+    const ids = { l: 'id' };
+    const [added, removed] = diff({ l: [{ id: 1 }] }, { l: [{ id: 2 }] }, { arrayIdKeys: ids });
+    expect(added).toMatchObject({ kind: 'added', beforeMissing: true, afterMissing: false });
+    expect(removed).toMatchObject({ kind: 'removed', beforeMissing: false, afterMissing: true });
+    expect(diff({ l: null }, { l: [{ id: 1 }] }, { arrayIdKeys: ids })[0]).toMatchObject({ kind: 'added', beforeMissing: true });
   });
 
   it('does not normalize anything else', () => {
@@ -151,7 +205,7 @@ describe('"no value" rule: structures', () => {
     expect(brief(diff({ s: 0 }, { s: '' }))).toEqual([{ path: 's', kind: 'changed', before: 0, after: '' }]);
   });
 
-  it('0, false and NaN are not Empty', () => {
+  it('0, false and NaN are ordinary values', () => {
     for (const value of [0, false, NaN]) {
       expect(brief(diff({}, { v: value }))).toEqual([{ path: 'v', kind: 'added', before: undefined, after: value }]);
       expect(brief(diff({ v: value }, { v: null }))).toEqual([{ path: 'v', kind: 'removed', before: value, after: undefined }]);
@@ -202,7 +256,7 @@ describe('scalars, objects, special types', () => {
     expect(entries[0]?.label).toBe('Supplier > Address > City');
   });
 
-  it('a structural type change between two non-Empty values is one entry on the node', () => {
+  it('a structural type change between two non-Absent values is one entry on the node', () => {
     const cases: [unknown, unknown][] = [
       [{ a: 1 }, 'text'],
       ['text', { a: 1 }],
@@ -218,7 +272,7 @@ describe('scalars, objects, special types', () => {
     }
   });
 
-  it('treats Map, Set, class instances and functions as leaves compared by reference, never Empty', () => {
+  it('treats Map, Set, class instances and functions as leaves compared by reference', () => {
     class Money {
       constructor(readonly cents: number) {}
     }
@@ -229,7 +283,7 @@ describe('scalars, objects, special types', () => {
     expect(diff({ s: new Set() }, { s: new Set() })).toHaveLength(1);
     expect(diff({ c: new Money(1) }, { c: new Money(1) })).toHaveLength(1);
     expect(diff({ f: () => 1 }, { f: () => 1 })).toHaveLength(1);
-    // Never Empty: an empty Map / Set / instance against Absent is a real change.
+    // An empty Map / Set / instance against Absent is a real change.
     expect(paths(diff({}, { m: new Map(), s: new Set(), c: new Money(0) }))).toEqual(['added m', 'added s', 'added c']);
   });
 
@@ -289,15 +343,15 @@ describe('circular structures', () => {
     expect(diff({ o: a1 }, { o: b })).toEqual([]);
   });
 
-  it('an Empty circular object against Absent terminates with no entry', () => {
+  it('an empty circular object against Absent terminates with one atomic entry', () => {
     const o: Loose = {};
     o.self = o;
-    expect(diff({ o }, {})).toEqual([]);
-    expect(diff({}, { o })).toEqual([]);
-    expect(diff({ o }, { o: null })).toEqual([]);
+    expect(paths(diff({ o }, {}))).toEqual(['removed o']);
+    expect(paths(diff({}, { o }))).toEqual(['added o']);
+    expect(paths(diff({ o }, { o: null }))).toEqual(['removed o']);
   });
 
-  it('a non-Empty circular object against Absent is one entry', () => {
+  it('a circular object with content against Absent is one entry', () => {
     const o: Loose = { a: 'x' };
     o.self = o;
     expect(paths(diff({ o }, {}))).toEqual(['removed o']);
@@ -345,14 +399,16 @@ describe('deep structures (iterative visit, no call-stack limit)', () => {
     expect(isEqual.mock.calls.at(-1)?.[2]).toBe(deepPath);
   });
 
-  it('settles a deep Empty pair with no entry, and still reaches the leaf for isEqual', () => {
-    expect(diff(chain(null), chain(''))).toEqual([]);
-    expect(diff(chain(null), {})).toEqual([]);
+  it('finds a deep difference between no-value states, and still reaches the leaf for isEqual', () => {
+    expect(paths(diff(chain(null), chain('')))).toEqual([`added ${deepPath}`]);
+    expect(paths(diff(chain(null), chain(undefined)))).toEqual([`changed ${deepPath}`]);
+    expect(diff(chain(null), chain(null))).toEqual([]);
+    expect(paths(diff(chain(null), {}))).toEqual(['removed c']);
     const strict = (a: unknown, b: unknown) => (a === null && b === '' ? false : undefined);
     expect(paths(diff(chain(null), chain(''), { isEqual: strict }))).toEqual([`added ${deepPath}`]);
   });
 
-  it('a deep non-Empty object against Absent is one entry on the node', () => {
+  it('a deep object with content against Absent is one entry on the node', () => {
     expect(paths(diff({ o: chain(1) }, {}))).toEqual(['removed o']);
   });
 
@@ -457,6 +513,15 @@ describe('arrays with arrayIdKeys', () => {
     ]);
   });
 
+  it('an object id matches only the same reference: a cloned Date or object is another id', () => {
+    const unmatched = ['added lineItems.0', 'removed lineItems.0'];
+    for (const id of [() => new Date(1), () => ({ a: 1 })]) {
+      expect(paths(diff({ lineItems: [item(id())] }, { lineItems: [item(id())] }, { arrayIdKeys: ids }))).toEqual(unmatched);
+      const shared = id();
+      expect(diff({ lineItems: [item(shared)] }, { lineItems: [item(shared)] }, { arrayIdKeys: ids })).toEqual([]);
+    }
+  });
+
   it('an array with id key that becomes [] or Absent gives one removed per item', () => {
     for (const after of [[], undefined, null]) {
       expect(paths(diff({ lineItems: [item(1), item(2)] }, { lineItems: after }, { arrayIdKeys: ids }))).toEqual([
@@ -480,8 +545,52 @@ describe('arrays with arrayIdKeys', () => {
     }
   });
 
-  it('[] against Absent with an id key gives no entry', () => {
-    expect(diff({ lineItems: [] }, { lineItems: null }, { arrayIdKeys: ids })).toEqual([]);
+  it('[] against Absent with an id key is one atomic entry on the array', () => {
+    const removed = [{ path: 'lineItems', kind: 'removed', before: [], after: undefined }];
+    const added = [{ path: 'lineItems', kind: 'added', before: undefined, after: [] }];
+    for (const absent of [undefined, null]) {
+      expect(brief(diff({ lineItems: [] }, { lineItems: absent }, { arrayIdKeys: ids }))).toEqual(removed);
+      expect(brief(diff({ lineItems: absent }, { lineItems: [] }, { arrayIdKeys: ids }))).toEqual(added);
+    }
+    expect(brief(diff({ lineItems: [] }, {}, { arrayIdKeys: ids }))).toEqual(removed);
+    expect(brief(diff({}, { lineItems: [] }, { arrayIdKeys: ids }))).toEqual(added);
+  });
+
+  it('two Absent states under an id key are one changed entry on the array', () => {
+    expect(paths(diff({ lineItems: null }, { lineItems: undefined }, { arrayIdKeys: ids }))).toEqual(['changed lineItems']);
+    expect(paths(diff({ lineItems: null }, {}, { arrayIdKeys: ids }))).toEqual(['changed lineItems']);
+    expect(paths(diff({}, { lineItems: undefined }, { arrayIdKeys: ids }))).toEqual(['changed lineItems']);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('a reorder gives no entry when the items hold null, empty, undefined and missing fields', () => {
+    const first = { id: 1, a: null, b: '', c: undefined };
+    const second = { id: 2, b: null, d: undefined };
+    const third = { id: 3, a: '', c: [] };
+    const copy = <T extends object>(o: T): T => ({ ...o });
+    const before = { lineItems: [first, second, third] };
+    const after = { lineItems: [copy(third), copy(first), copy(second)] };
+    expect(diff(before, after, { arrayIdKeys: ids })).toEqual([]);
+  });
+
+  it('a reorder gives no entry on a nested array with its own id key', () => {
+    const line = (id: string, taxes: Loose[]) => ({ id, note: null, taxes });
+    const vat = () => ({ code: 'V', rate: null, label: '' });
+    const eco = () => ({ code: 'E', rate: undefined });
+    const before = { lineItems: [line('a', [vat(), eco()]), line('b', [eco(), vat()])] };
+    const after = { lineItems: [line('b', [vat(), eco()]), line('a', [eco(), vat()])] };
+    expect(diff(before, after, { arrayIdKeys: { lineItems: 'id', 'lineItems.taxes': 'code' } })).toEqual([]);
+  });
+
+  it('a reorder still reports a difference between two no-value states on a matched item', () => {
+    const before = { lineItems: [{ id: 1, note: null }, { id: 2, note: '' }, { id: 3, note: undefined }, { id: 4 }] };
+    const after = { lineItems: [{ id: 4, note: undefined }, { id: 3 }, { id: 2, note: null }, { id: 1, note: '' }] };
+    expect(paths(diff(before, after, { arrayIdKeys: ids }))).toEqual([
+      'changed lineItems.0.note',
+      'changed lineItems.1.note',
+      'removed lineItems.2.note',
+      'added lineItems.3.note',
+    ]);
   });
 
   it('diffs a nested array inside matched items with its own id key', () => {
@@ -599,8 +708,10 @@ describe('arrays without id key (block diff)', () => {
     expect(diff({ l: [{ a: 1, b: [1, 2] }] }, { l: [{ a: 1, b: [1, 2] }] })).toEqual([]);
   });
 
-  it('positional pairs follow the same rules (Empty against Empty is equal)', () => {
-    expect(diff({ l: [{ a: null }, ''] }, { l: [{ a: '' }, null] })).toEqual([]);
+  it('positional pairs follow the same rules (no-value states differ, one block entry)', () => {
+    const before = { l: [{ a: null }, ''] };
+    const after = { l: [{ a: '' }, null] };
+    expect(brief(diff(before, after))).toEqual([{ path: 'l', kind: 'changed', before: before.l, after: after.l }]);
   });
 
   it('different arrays give one changed entry on the array with the whole arrays', () => {
@@ -713,7 +824,7 @@ describe('isEqual', () => {
     expect(paths(diff({ name: 'n', note: '' }, { name: 'n', note: null }, { isEqual: strict }))).toEqual(['removed note']);
   });
 
-  it('is consulted inside a subtree where both sides are Empty (same verdict as with a non-empty sibling)', () => {
+  it('is consulted on no-value pairs (same verdict with or without a non-empty sibling)', () => {
     const strict = (a: unknown, b: unknown) => (a === null && b === '') || (a === '' && b === null) ? false : undefined;
     const expected = [{ path: 'note', kind: 'added', before: undefined, after: '' }];
     expect(brief(diff({ note: null }, { note: '' }, { isEqual: strict }))).toEqual(expected);
@@ -726,33 +837,64 @@ describe('isEqual', () => {
     ]);
   });
 
-  it('is consulted on the children of an Empty object against an Absent side', () => {
+  it('an atomic entry against an Absent side is not descended: its children are not asked', () => {
     const isEqual = vi.fn((_a: unknown, _b: unknown, path: string) => (path === 'a.b' ? false : undefined));
     expect(brief(diff({ a: { b: null } }, { a: { b: '' } }, { isEqual }))).toEqual([
       { path: 'a.b', kind: 'added', before: undefined, after: '' },
     ]);
-    expect(brief(diff({}, { a: { b: '' } }, { isEqual }))).toEqual([{ path: 'a.b', kind: 'added', before: undefined, after: '' }]);
-    expect(brief(diff({ a: { b: '' } }, { a: null }, { isEqual }))).toEqual([{ path: 'a.b', kind: 'removed', before: '', after: undefined }]);
+    expect(brief(diff({}, { a: { b: '' } }, { isEqual }))).toEqual([{ path: 'a', kind: 'added', before: undefined, after: { b: '' } }]);
+    expect(brief(diff({ a: { b: '' } }, { a: null }, { isEqual }))).toEqual([{ path: 'a', kind: 'removed', before: { b: '' }, after: undefined }]);
+    expect(isEqual.mock.calls.map((c) => c[2])).toEqual(['a', 'a.b', 'a', 'a']);
   });
 
-  it('inside an Empty subtree the default stays "no entry" and the visit asks every descendant once', () => {
+  it('an undefined verdict falls back to the structural rules and the visit asks every pair once', () => {
     const isEqual = vi.fn<NonNullable<ChangeSummaryOptions<Loose>['isEqual']>>(() => undefined);
-    expect(diff({ a: { b: null, c: { d: '' } } }, { a: { b: '', e: [] } }, { isEqual })).toEqual([]);
-    expect(isEqual.mock.calls.map((c) => c[2])).toEqual(['a', 'a.b', 'a.e', 'a.c', 'a.c.d']);
+    expect(paths(diff({ a: { b: null, c: { d: '' } } }, { a: { b: '', e: [] } }, { isEqual }))).toEqual([
+      'added a.b',
+      'added a.e',
+      'removed a.c',
+    ]);
+    expect(isEqual.mock.calls.map((c) => c[2])).toEqual(['a', 'a.b', 'a.e', 'a.c']);
+    isEqual.mockClear();
+    expect(diff({ a: { b: null, c: { d: '' } } }, { a: { b: null, c: { d: '' } } }, { isEqual })).toEqual([]);
+    expect(isEqual.mock.calls.map((c) => c[2])).toEqual(['a', 'a.b', 'a.c', 'a.c.d']);
   });
 
-  it('does not loop on an Empty circular object inside an Empty subtree', () => {
+  it('a missing key reaches isEqual as undefined, never as an internal marker', () => {
+    const isEqual = vi.fn<NonNullable<ChangeSummaryOptions<Loose>['isEqual']>>(() => undefined);
+    diff({ a: 1 }, { b: 2 }, { isEqual });
+    expect(isEqual.mock.calls).toEqual([
+      [undefined, 2, 'b'],
+      [1, undefined, 'a'],
+    ]);
+  });
+
+  it('true on undefined against a missing key silences the entry, false reports it with the flag', () => {
+    const verdict = (value: boolean) => () => value;
+    expect(diff({}, { a: undefined }, { isEqual: verdict(true) })).toEqual([]);
+    expect(diff({}, { a: undefined }, { isEqual: verdict(false) })[0]).toMatchObject({
+      kind: 'changed',
+      before: undefined,
+      after: undefined,
+      beforeMissing: true,
+      afterMissing: false,
+    });
+  });
+
+  it('does not loop on a circular object made of no-value states', () => {
     const o: Loose = {};
     o.self = o;
     const p: Loose = { n: null };
     p.self = p;
+    const q: Loose = { n: null };
+    q.self = q;
     const isEqual = vi.fn((): boolean | undefined => undefined);
-    expect(diff({ o }, { o: null }, { isEqual })).toEqual([]);
-    expect(diff({ o }, { o: p }, { isEqual })).toEqual([]);
+    expect(paths(diff({ o }, { o: null }, { isEqual }))).toEqual(['removed o']);
+    expect(paths(diff({ o }, { o: p }, { isEqual }))).toEqual(['changed o.n']);
     // The cycle is cut at the pair already on the stack: 'o.self.n' is never visited.
-    expect(diff({ o: p }, {}, { isEqual: (_a, _b, path) => (path === 'o.self.n' ? false : undefined) })).toEqual([]);
-    // null against a missing key: both Absent → 'changed'.
-    expect(paths(diff({ o: p }, {}, { isEqual: (_a, _b, path) => (path === 'o.n' ? false : undefined) }))).toEqual(['changed o.n']);
+    expect(diff({ o: p }, { o: q }, { isEqual: (_a, _b, path) => (path === 'o.self.n' ? false : undefined) })).toEqual([]);
+    // Two null: both Absent → 'changed'.
+    expect(paths(diff({ o: p }, { o: q }, { isEqual: (_a, _b, path) => (path === 'o.n' ? false : undefined) }))).toEqual(['changed o.n']);
   });
 
   it('false with both sides Absent is a changed entry', () => {

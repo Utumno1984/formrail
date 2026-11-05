@@ -18,7 +18,16 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * value and its entry; never for the absent side of an `added` / `removed` entry. Returning
    * `null` leaves the value empty (the label and the kind of change stay). An exception thrown
    * here propagates to the caller (it is not caught): wrap the call if it can fail.
-   * Delegate to `formatChangeValue` for the values you do not handle.
+   *
+   * Delegate with `formatChangeValue(value, { precise: true })` for the values you do not handle:
+   * the compact rendering gives `No value` for both `null` and `undefined`, so `null` → `undefined`
+   * would read `from No value to No value`. `precise` also quotes strings and adds the time to dates.
+   *
+   * A missing key arrives as `undefined`. On `undefined` against a missing key both calls get the
+   * same arguments (`undefined` and the same entry), so `entry.beforeMissing` /
+   * `entry.afterMissing` do not tell which side is being rendered, and a delegate shows `Undefined`
+   * on both. The default rendering has no such limit: to keep it, leave `renderValue` unset or
+   * build your own list on `useChangeSummary`.
    */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
   /** Text shown when `entries` is empty. Default `No changes`. */
@@ -75,6 +84,9 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
 
   const text = (value: unknown, level: FormatLevel): string => formatChangeValueAt(value, format, level);
 
+  const side = (value: unknown, missing: boolean, level: FormatLevel): string =>
+    missing && level > 0 ? labels.missingValue : text(value, level);
+
   const show = (value: unknown, entry: ChangeEntry, shown?: string): ReactNode => {
     if (renderValue) return renderValue(value, entry);
     return (
@@ -88,13 +100,14 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
 
   /**
    * Default texts of both sides of a `changed`, more and more precise while they would look the
-   * same: precise, ISO dates, then the contents written out (`["a", "b"]` / `["a", "c"]`). If even
-   * that matches (two class instances, a difference past the truncation), the after side says so.
+   * same: precise (`null`, `undefined` and a missing key get their own texts), ISO dates, then the
+   * contents written out (`["a", "b"]` / `["a", "c"]`). If even that matches (two class instances,
+   * a difference past the truncation), the after side says so.
    */
   const pair = (entry: ChangeEntry): [string, string] => {
     let last: [string, string] = ['', ''];
     for (const level of [0, 1, 2, 3] as const) {
-      last = [text(entry.before, level), text(entry.after, level)];
+      last = [side(entry.before, entry.beforeMissing, level), side(entry.after, entry.afterMissing, level)];
       // Whitespace-insensitive: 'abc ' and 'abc' print differently but look the same.
       if (looks(last[0]) !== looks(last[1])) return last;
     }

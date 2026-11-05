@@ -39,6 +39,8 @@ describe('public types', () => {
       kind: ChangeKind;
       before: unknown;
       after: unknown;
+      beforeMissing: boolean;
+      afterMissing: boolean;
     }>();
     expectTypeOf<UseChangeSummaryReturn>().toEqualTypeOf<{ entries: ChangeEntry[]; isEmpty: boolean }>();
     expectTypeOf(pro.computeChangeSummary).returns.toEqualTypeOf<ChangeEntry[]>();

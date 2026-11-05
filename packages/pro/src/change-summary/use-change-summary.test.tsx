@@ -169,12 +169,14 @@ describe('useChangeSummary with useObjectPageForm (core)', () => {
     act(() => result.current.form.setValue('number', 'A-1'));
     expect(result.current.summary.isEmpty).toBe(true);
 
-    // `note` from null to '' is not a change.
+    // `note` from null to '' is a change, as for isDirty.
     act(() => result.current.form.setValue('note', ''));
-    expect(result.current.summary.isEmpty).toBe(true);
+    expect(result.current.form.isDirty).toBe(true);
+    expect(result.current.summary.isEmpty).toBe(false);
+    expect(result.current.summary.entries).toMatchObject([{ path: 'note', kind: 'added', before: undefined, after: '' }]);
 
     act(() => result.current.form.setValue('lineItems', [{ id: 2, price: 25 }, { id: 1, price: 10 }]));
-    expect(result.current.summary.entries.map((e) => e.path)).toEqual(['lineItems.0.price']);
+    expect(result.current.summary.entries.map((e) => e.path)).toEqual(['note', 'lineItems.0.price']);
 
     await act(async () => {
       expect(await result.current.form.save(() => undefined)).toBe(true);

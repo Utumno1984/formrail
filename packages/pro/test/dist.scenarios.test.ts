@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Extra consumer scenarios on the BUILT bundle (ESM + CJS), beyond dist.smoke.test.ts:
-// Empty/Absent rules, special types, cycles, duplicate ids, isEqual precedence, labels.
+// "No value" rules, special types, cycles, duplicate ids, isEqual precedence, labels.
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import * as esm from '../dist/index.js';
@@ -17,13 +17,19 @@ describe.each([
   const sum = (o: Parameters<Api['computeChangeSummary']>[0]) =>
     api.computeChangeSummary(o).map((e) => `${e.kind}:${e.path}`);
 
-  it('null/""/undefined/{}/[] against each other produce no entries', () => {
+  it('null/""/undefined/{}/[] against each other are all entries', () => {
     expect(
       sum({
         values: { a: '', b: undefined, c: {}, d: [], e: null, f: { x: '' } },
         baseline: { a: null, b: '', c: undefined, d: null, e: [], f: undefined },
       }),
-    ).toEqual([]);
+    ).toEqual(['added:a', 'removed:b', 'added:c', 'added:d', 'removed:e', 'added:f']);
+  });
+
+  it('a missing key is told from undefined by the flags', () => {
+    expect(api.computeChangeSummary({ values: { a: undefined }, baseline: {} })).toMatchObject([
+      { kind: 'changed', path: 'a', beforeMissing: true, afterMissing: false },
+    ]);
   });
 
   it('"" -> "abc" is changed with before "" ; null -> "abc" is added', () => {
