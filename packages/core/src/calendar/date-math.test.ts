@@ -125,7 +125,8 @@ describe('day numbers', () => {
     }
     expect(problems).toEqual([]);
     expect(previous).toBe('9999-12-31');
-  });
+    // CPU-bound loop of ~3.65M iterations (about 2s alone): wall time scales with CPU contention.
+  }, 20_000);
 });
 
 describe('dayOfWeek', () => {

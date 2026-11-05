@@ -128,7 +128,8 @@ describe('below the threshold, with no rows and in every state: the Free table',
     expect(pro).not.toContain('data-rop-spacer');
     expect(pro).not.toContain('aria-rowcount');
     expect(pro).not.toContain('aria-rowindex');
-  });
+    // Two full renders of up to 199 rows (jsdom) plus HTML serialization: CPU-bound, scales with contention.
+  }, 20_000);
 
   it.each(cases)('%s: no scroll listener, no ResizeObserver beyond those of the Free table', (_label, props) => {
     const ro = installResizeObserverStub();
@@ -156,7 +157,8 @@ describe('below the threshold, with no rows and in every state: the Free table',
     render(<Host count={1000} threshold={2000} />);
     expect(spacers()).toHaveLength(0);
     expect(scroller().querySelectorAll('tbody > tr')).toHaveLength(1000);
-  });
+    // Mounts 1,000 plain rows in jsdom (about 2s alone): wall time scales with CPU contention.
+  }, 20_000);
 });
 
 describe('virtualized (100,000 rows)', () => {
@@ -307,7 +309,8 @@ describe('focus', () => {
     expect(rowIndices()[0]).toBe(5);
     expect(spacers().length).toBe(3);
     expect(dataRows().length).toBeLessThanOrEqual(BOUND + 1);
-  });
+    // 50 full re-commits of a selectable table in jsdom (about 2s alone): wall time scales with CPU contention.
+  }, 20_000);
 
   it('Tab / Shift+Tab after scrolling away go on from the focused row to the next / previous one', async () => {
     render(<Host selectable />);
@@ -325,7 +328,8 @@ describe('focus', () => {
     await user.tab();
     await user.tab();
     expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Select Item 5' }));
-  });
+    // 50 full re-commits of a selectable table plus userEvent tabs in jsdom (about 2s alone): wall time scales with CPU contention.
+  }, 20_000);
 
   it('a filter that removes the focused row moves the focus to the container, never the body', () => {
     const { rerender } = render(<Host selectable />);

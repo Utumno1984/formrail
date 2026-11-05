@@ -807,7 +807,8 @@ describe('Calendar: time zones (no day shift)', () => {
         });
         unmount();
       }
-    });
+      // Full-DOM integration: renders 5 months and clicks every cell (about 1s alone); wall time scales with CPU contention.
+    }, 20_000);
 
     it(`${zone}: the default today is the local wall-clock date`, () => {
       process.env.TZ = zone;

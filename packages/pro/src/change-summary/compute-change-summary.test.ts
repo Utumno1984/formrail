@@ -418,6 +418,18 @@ describe('deep structures (iterative visit, no call-stack limit)', () => {
     expect(diff(nested(1), nested(1))).toEqual([]);
   });
 
+  it('does not build a label path for every level of nested array blocks', () => {
+    // A block only needs to know whether some item differs; building an entry per level is O(depth^2).
+    const reverse = vi.spyOn(Array.prototype, 'reverse');
+    try {
+      const nested = (leaf: unknown) => ({ l: chain(leaf, (inner) => [inner]) });
+      expect(paths(diff(nested(1), nested(2)))).toEqual(['changed l']);
+      expect(reverse.mock.calls.length).toBeLessThan(10);
+    } finally {
+      reverse.mockRestore();
+    }
+  });
+
   it('diffs id-matched arrays nested 2000 levels deep, item by item', () => {
     // 2000, not DEPTH: one arrayIdKeys entry per level, whose keys grow with the depth.
     const levels = 2000;

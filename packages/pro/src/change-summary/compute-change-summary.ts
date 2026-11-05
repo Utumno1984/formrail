@@ -101,6 +101,11 @@ function labelPathOf(node: Node): string[] {
 
 type Task = () => void;
 
+/** Stand-in pushed into a probe: its only use is `length > 0`, so no entry is built for it. */
+const PROBE_HIT = {} as ChangeEntry;
+
+type Probe = ChangeEntry[] & { probe?: true };
+
 /**
  * The visit is iterative: instead of recursing, a node schedules its children as tasks on an
  * explicit LIFO stack (in reverse, so they run in document order, each one's subtree completing
@@ -128,6 +133,12 @@ class Differ {
   }
 
   private emit(out: ChangeEntry[], node: Node, kind: ChangeKind, before: unknown, after: unknown): void {
+    // A probe only answers "is there any difference?"; a real entry costs O(depth) (label path),
+    // which makes nested blocks O(depth^2) overall.
+    if ((out as Probe).probe) {
+      out.push(PROBE_HIT);
+      return;
+    }
     const labelPath = labelPathOf(node);
     out.push({
       path: node.path,
@@ -284,7 +295,7 @@ class Differ {
       this.emit(out, node, 'changed', before, after);
       return;
     }
-    const probe: ChangeEntry[] = [];
+    const probe: Probe = Object.assign([], { probe: true as const });
     const tasks: Task[] = [];
     for (let i = 0; i < after.length; i += 1) {
       tasks.push(() => {

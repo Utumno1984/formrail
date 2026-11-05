@@ -66,6 +66,23 @@ describe('createInvoiceStore', () => {
     expect((await store.get('inv-1')).amount).toBe(12.35);
   });
 
+  it('a promise as saveDelayMs holds the save until it resolves, whatever the clock does', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const store = createInvoiceStore(undefined, { saveDelayMs: gate });
+    const record = await store.get('inv-1');
+    const spy = vi.fn();
+    const pending = store.save({ ...record, amount: 7 }).then(spy);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(spy).not.toHaveBeenCalled();
+    expect(store.snapshot().find((r) => r.id === 'inv-1')?.amount).toBe(record.amount);
+    release();
+    await pending;
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'inv-1', amount: 7 }));
+  });
+
   it('save with outcome error rejects and leaves the store unchanged', async () => {
     const store = createInvoiceStore(undefined, { saveOutcome: 'error' });
     const record = await store.get('inv-1');

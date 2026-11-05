@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InvoiceListToRecord } from './InvoiceListToRecord';
@@ -9,6 +9,15 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/?filter=open');
 });
 afterEach(cleanup);
+
+// A save held in flight until `release()`: no timer, so CPU contention cannot let it finish early.
+function saveGate() {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { gate, release };
+}
 
 describe('InvoiceListToRecord (StrictMode)', () => {
   it('list -> record -> list: one history entry, the list parameters back, the focus on the opened link', async () => {
@@ -36,18 +45,21 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     expect(onNavigate).toHaveBeenCalledTimes(2);
     expect(onNavigate).toHaveBeenLastCalledWith({ to: 'list' });
     await waitFor(() => expect(screen.getByRole('link', { name: 'FT-2026-0012' })).toBe(document.activeElement));
-  });
+    // Full-page jsdom integration: wall time is dominated by role queries and user-event over the whole
+    // showcase and scales with CPU contention. Same budget as the sibling tests below.
+  }, 20_000);
 
   it('save in flight + Back + Leave anyway: leaves at once, the store gets the saved value, no React warning', async () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onSaved = vi.fn();
+    const { gate, release } = saveGate();
     render(
       <StrictMode>
         <InvoiceListToRecord
           history="replace"
           listLoadDelayMs={0}
           recordLoadDelayMs={0}
-          saveDelayMs={150}
+          saveDelayMs={gate}
           onNavigate={vi.fn()}
           onSaved={onSaved}
         />
@@ -61,6 +73,8 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
     await waitFor(() => expect(window.location.search).not.toContain('record='));
+    expect(onSaved).not.toHaveBeenCalled();
+    release();
     await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(window.__ropShowcaseStore?.snapshot().find((r) => r.id === 'inv-12')?.amount).toBe(4242.42);
     // The list reloading after the return is async and outside `act`: a harness notice, not a React warning
@@ -70,19 +84,32 @@ describe('InvoiceListToRecord (StrictMode)', () => {
   }, 20_000);
 
   it('leaving during a save and re-opening the record: it shows the saved value, a second save keeps it', async () => {
-    render(
-      <StrictMode>
-        <InvoiceListToRecord history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={1500} onNavigate={vi.fn()} />
-      </StrictMode>,
-    );
-    await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }));
-    const amount = await screen.findByRole('textbox', { name: /Amount/ });
-    await userEvent.clear(amount);
-    await userEvent.type(amount, '4242.424');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
-    // Re-open at once: the read waits for the save in flight.
+    const { gate, release } = saveGate();
+    try {
+      render(
+        <StrictMode>
+          <InvoiceListToRecord history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={gate} onNavigate={vi.fn()} />
+        </StrictMode>,
+      );
+      await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }));
+      const amount = await screen.findByRole('textbox', { name: /Amount/ });
+      await userEvent.clear(amount);
+      await userEvent.type(amount, '4242.424');
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
+      await waitFor(() => expect(window.location.search).not.toContain('record='));
+      // The list read waits for the save in flight: with the gate closed it cannot settle, however many
+      // task turns pass (with zero load delays it would otherwise settle within the first one).
+      for (let turn = 0; turn < 5; turn += 1) {
+        await act(async () => {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        });
+      }
+      expect(screen.queryByRole('link', { name: 'FT-2026-0012' })).toBeNull();
+    } finally {
+      release();
+    }
     await userEvent.click(await screen.findByRole('link', { name: 'FT-2026-0012' }, { timeout: 5000 }));
     const reopened = await screen.findByRole('textbox', { name: /Amount/ }, { timeout: 5000 });
     expect(reopened).toHaveProperty('value', '4242.42');
