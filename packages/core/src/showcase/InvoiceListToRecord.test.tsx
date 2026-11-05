@@ -49,7 +49,10 @@ describe('InvoiceListToRecord (StrictMode)', () => {
           history="replace"
           listLoadDelayMs={0}
           recordLoadDelayMs={0}
-          saveDelayMs={150}
+          // The save must still be in flight when 'Back to list' is clicked: the delay has to outlast the two
+          // user-event clicks between them, whose wall time grows with CPU contention. A shorter one lets the
+          // save resolve first, the form turns clean and no 'Unsaved changes' dialog appears.
+          saveDelayMs={1500}
           onNavigate={vi.fn()}
           onSaved={onSaved}
         />
@@ -63,7 +66,7 @@ describe('InvoiceListToRecord (StrictMode)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
     await waitFor(() => expect(window.location.search).not.toContain('record='));
-    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1), { timeout: 5000 });
     expect(window.__ropShowcaseStore?.snapshot().find((r) => r.id === 'inv-12')?.amount).toBe(4242.42);
     // The list reloading after the return is async and outside `act`: a harness notice, not a React warning
     // about the save resolving after the page is gone.
