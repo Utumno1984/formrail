@@ -54,6 +54,7 @@ function CardDemo({ onLoad, loaded: initiallyLoaded = false, variant, textVarian
       <div>
         <Button
           variant="secondary"
+          disabled={loaded}
           onClick={() => {
             setLoaded(true);
             onLoad();
