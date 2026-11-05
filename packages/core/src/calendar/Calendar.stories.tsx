@@ -66,6 +66,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// These stories fix every Calendar prop themselves: besides the two spies (Actions panel), no meta arg reaches the DOM.
+const NO_CONTROLS = { controls: { disable: true } };
+
 const toProps = (args: DemoArgs) => ({
   locale: args.locale,
   weekStartsOn: args.weekStartsOn === 'auto' ? undefined : (Number(args.weekStartsOn) as Weekday),
@@ -151,6 +154,7 @@ export const Manual: Story = {
 
 /** Mounted with nothing selected, then a date in July arrives from a "fetch": the month follows, nothing is reported. */
 export const AsyncHydration: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => {
     function Demo() {
       const [value, setValue] = useState<IsoDate | null>(null);
@@ -177,6 +181,7 @@ export const AsyncHydration: Story = {
 
 /** A controlled month changed by buttons outside the calendar: while the grid has the focus, it stays on the same day. */
 export const ControlledMonth: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => {
     function Demo() {
       const [month, setMonth] = useState<IsoMonth>('2026-01');
@@ -216,6 +221,7 @@ export const ControlledMonth: Story = {
 
 /** Field states: the calendar follows `disabled` (out of the tab order) and `forced`/`locked` (navigable, read-only). */
 export const InField: Story = {
+  parameters: NO_CONTROLS,
   render: (args) => {
     function Demo() {
       const [state, setState] = useState<FieldState>('default');
@@ -247,6 +253,7 @@ const tile = { display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fill,
  */
 export const States: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={tile}>
       <Field label="Selected and today">
@@ -283,6 +290,7 @@ export const States: Story = {
 /** First day of the week from the locale: `it-IT` starts on Monday, `en-US` on Sunday (and German names). */
 export const Locales: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={tile}>
       {(['it-IT', 'en-US', 'de-DE'] as const).map((locale) => (
@@ -300,6 +308,7 @@ export const Locales: Story = {
  */
 export const StableFootprint: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'start' }}>
       <Calendar data-testid="february" aria-label="February" locale="en-US" today={TODAY} defaultMonth="2026-02" onValueChange={onValueChange} />
@@ -314,6 +323,7 @@ export const StableFootprint: Story = {
  * only the e2e on the arrow keys and the axe check.
  */
 export const RightToLeft: Story = {
+  parameters: NO_CONTROLS,
   render: ({ onValueChange, onMonthChange }) => (
     <div dir="rtl">
       <Calendar aria-label="التاريخ" locale="ar-EG" today={TODAY} defaultValue="2026-03-17" onValueChange={onValueChange} onMonthChange={onMonthChange} />

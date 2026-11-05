@@ -299,6 +299,9 @@ circular.self = circular;
 const fixed = ({ emptyLabel, label }: DemoArgs) =>
   ({ emptyLabel, label, locale: 'en-US', timeZone: 'UTC' }) as const;
 
+// `fixed` pins locale and time zone and these stories have no `renderValue`, so these three controls are inert.
+const FIXED_FORMAT = { controls: { exclude: ['locale', 'timeZone', 'valueFormat'] } };
+
 const valueTypes: ChangeEntry[] = [
   entry('changed', 'paid', 'Paid', false, true),
   entry('changed', 'dueDate', 'Due Date', new Date('2026-03-05T12:00:00Z'), new Date('2026-04-01T12:00:00Z')),
@@ -330,6 +333,7 @@ const valueTypes: ChangeEntry[] = [
 /** One of each kind of value: booleans, dates, `''` / `null`, numbers, arrays, an added row, odd objects and render collisions. */
 export const ValueTypes: Story = {
   tags: ['visual'],
+  parameters: FIXED_FORMAT,
   render: (args) => <ChangeSummary entries={valueTypes} {...fixed(args)} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -346,6 +350,7 @@ export const ValueTypes: Story = {
 /** No changes: the empty text, no list. */
 export const Empty: Story = {
   tags: ['visual'],
+  parameters: FIXED_FORMAT,
   render: (args) => <ChangeSummary entries={[]} {...fixed(args)} />,
 };
 
@@ -354,6 +359,7 @@ const longValue = 'x'.repeat(300);
 /** A 300-character value without spaces and a five-level label: everything wraps, nothing overflows. */
 export const LongValues: Story = {
   tags: ['visual'],
+  parameters: FIXED_FORMAT,
   render: (args) => (
     <ChangeSummary
       entries={[
@@ -390,6 +396,7 @@ const editedValues: InvoiceValues = {
 /** The summary of an edited invoice: a changed amount, due date and flag, an added and a removed line. */
 export const EditedInvoice: Story = {
   tags: ['visual'],
+  parameters: FIXED_FORMAT,
   render: (args) => (
     <ChangeSummary
       entries={computeChangeSummary({ values: editedValues, baseline: editedBaseline, arrayIdKeys: ARRAY_ID_KEYS })}

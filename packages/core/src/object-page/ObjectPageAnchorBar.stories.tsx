@@ -137,6 +137,7 @@ export const Scrollable: Story = {
 /** The page scrolled to the middle: the active link is the section that has passed the bar. */
 export const MidPage: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -156,6 +157,7 @@ export const MidPage: Story = {
 /** Ten sections with long titles: on a narrow screen the bar scrolls inside itself and the active link is brought into view. */
 export const ManySections: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -189,6 +191,7 @@ export const ManySections: Story = {
  * button sits right under the bar, its tooltip (above it) overlaps the bar and must stay on top.
  */
 export const TooltipOverBar: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -209,6 +212,7 @@ export const TooltipOverBar: Story = {
 
 /** Sections that fit entirely in the scroller: nothing to scroll; the first link is active, clicking the last one activates it. */
 export const NothingToScroll: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={FRAME}>
       <ObjectPage>

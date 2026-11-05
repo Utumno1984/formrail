@@ -64,6 +64,9 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+// Only Playground/Manual map `state` onto the Field; elsewhere `Controlled` drops it, so the control would be inert.
+const NO_STATE = { controls: { exclude: ['state'] } };
+
 const column = { display: 'grid', gap: 16, maxWidth: 320 } as const;
 const stateProps = (state: FieldState) =>
   ({ state, stateReason: state === 'default' ? undefined : 'Deciso dal contratto quadro.' }) as FieldStateProps;
@@ -140,6 +143,7 @@ export const Manual: Story = {
 /** Page-level shot with the list open and the second option selected (check and highlight visible). */
 export const Base: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Paese" help="Sede legale del fornitore">
@@ -156,6 +160,7 @@ export const Base: Story = {
 
 export const WithError: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Paese" error="Seleziona un paese" required>
@@ -172,6 +177,7 @@ export const WithError: Story = {
 
 export const Disabled: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Paese" state="disabled" stateReason="Non modificabile in bozza">
@@ -189,6 +195,7 @@ export const Disabled: Story = {
 /** Focusable, shows the value, and nothing opens it: not Enter, Space, the arrows, a letter or a click. */
 export const Forced: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Paese" state="forced" stateReason="Deciso dal contratto quadro.">
@@ -211,6 +218,7 @@ export const Forced: Story = {
 
 /** Same stacking as in a Dialog: the options are above the sheet and a pick leaves it open. */
 export const InsideSheet: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
@@ -245,6 +253,7 @@ export const InsideSheet: Story = {
 
 /** A value the catalogue no longer has: the trigger shows the declared label (or the raw value), and nothing is reported. */
 export const UnknownValue: Story = {
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Paese">
@@ -265,6 +274,7 @@ export const UnknownValue: Story = {
 /** 200 options: the list scrolls inside a declared maximum height and opens on the selected one. */
 export const LongList: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Cliente">
@@ -287,6 +297,7 @@ export const LongList: Story = {
 /** Very long labels: the trigger truncates inside the Field's width; the list wraps them. */
 export const LongLabels: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
       <Field label="Ragione sociale">
@@ -308,6 +319,7 @@ export const LongLabels: Story = {
  */
 export const AsyncLoad: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: ({ size, placeholder, onValueChange }) => {
     function Host() {
       const [data, setData] = useState<{ options: SelectOption[]; value?: string }>({ options: [] });
@@ -345,6 +357,7 @@ export const AsyncLoad: Story = {
 /** The popover is above the dialog: the options take the click and the dialog stays open. */
 export const InsideDialog: Story = {
   tags: ['visual'],
+  parameters: NO_STATE,
   render: (args) => (
     <Dialog defaultOpen>
       <DialogTrigger asChild>

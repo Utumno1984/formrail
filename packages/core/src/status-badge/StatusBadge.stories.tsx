@@ -93,6 +93,7 @@ const row = { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' } 
  */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 24, color: 'var(--color-rop-text)' }}>
       <section aria-label="Tones" style={stack}>

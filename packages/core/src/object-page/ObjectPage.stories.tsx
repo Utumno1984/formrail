@@ -47,6 +47,9 @@ const meta: Meta<PlaygroundArgs> = {
 export default meta;
 type Story = StoryObj<PlaygroundArgs>;
 
+// These stories render fixed pages: no meta arg reaches the DOM.
+const NO_CONTROLS = { controls: { disable: true } };
+
 // Inline styles: the stories are not scanned by Tailwind, so a class only used here would not exist.
 const FRAME: CSSProperties = { height: '100dvh', boxSizing: 'border-box', background: 'var(--color-rop-surface, #fff)' };
 const BLOCK_BG = 'var(--color-rop-blue-50, #eef5fc)';
@@ -162,6 +165,7 @@ const LONG_TITLE =
  */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -185,6 +189,7 @@ export const Overview: Story = {
 /** The same page scrolled to the end: the last section and its field, under the header that has scrolled away. */
 export const ScrolledToEnd: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: Overview.render,
   play: async ({ canvasElement }) => {
     const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
@@ -196,6 +201,7 @@ export const ScrolledToEnd: Story = {
 /** The field of the last section with the keyboard focus: its ring must not be cut by the section body (visual regression). */
 export const FocusedField: Story = {
   tags: ['visual'],
+  parameters: NO_CONTROLS,
   render: Overview.render,
   play: async ({ canvasElement }) => {
     const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
@@ -208,6 +214,7 @@ export const FocusedField: Story = {
 
 /** Header only: no sections, no crash, still one scroller. */
 export const HeaderOnly: Story = {
+  parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -223,6 +230,7 @@ export const HeaderOnly: Story = {
  * `--rop-keyboard-inset`, scrolls the focused field above the keyboard.
  */
 export const KeyboardSafe: Story = {
+  parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -242,6 +250,7 @@ export const KeyboardSafe: Story = {
 
 /** A section of text only (the scroller is reached with Tab) and a table wider than the page (it scrolls inside its section). */
 export const TextAndWideContent: Story = {
+  parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
@@ -265,6 +274,7 @@ export const TextAndWideContent: Story = {
 
 /** No height on the parent: the page grows with its content and the document is the only scroller. */
 export const NoParentHeight: Story = {
+  parameters: NO_CONTROLS,
   render: () => (
     <ObjectPage>
       <ObjectPageHeader title="Fattura 2026/0142" />

@@ -45,6 +45,7 @@ export const Playground: Story = {
 /** Help and error side by side: same type size, spacing and height; only colour (and the error icon) differ. */
 export const SideBySide: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start', flexWrap: 'wrap' }}>
       <div style={{ width: 240, display: 'grid', gap: 4 }} data-testid="help-col">

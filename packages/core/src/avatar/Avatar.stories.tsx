@@ -120,6 +120,7 @@ const row = { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }
  */
 export const Overview: Story = {
   tags: ['visual'],
+  parameters: { controls: { disable: true } },
   render: () => (
     <div style={stack}>
       {SHAPES.map((shape) => (
