@@ -6,7 +6,9 @@ export type ChangeKind = 'added' | 'removed' | 'changed';
  *
  * `before` is always `undefined` when `kind === 'added'` and `after` is always `undefined` when
  * `kind === 'removed'`, even when the absent side was `null`: both are normalized to `undefined`
- * (see "Absent" in {@link ChangeSummaryOptions}).
+ * (see "Absent" in {@link ChangeSummaryOptions}). On a `changed` entry `before` and `after` keep
+ * `null` and `undefined` as they are, and `beforeMissing` / `afterMissing` tell a missing key from
+ * a key present with value `undefined`.
  */
 export interface ChangeEntry {
   /**
@@ -29,6 +31,14 @@ export interface ChangeEntry {
   before: unknown;
   /** Value in `values` (`undefined` when `kind === 'removed'`). */
   after: unknown;
+  /**
+   * `true` when the baseline has no own key at this position, or no counterpart for an array item.
+   * `before` is then `undefined`, but `undefined` alone does not imply this flag: it stays `false`
+   * for a key present with value `undefined`, and for a `null` normalized on an `added` entry.
+   */
+  beforeMissing: boolean;
+  /** Same as `beforeMissing`, for `values` and `after`. */
+  afterMissing: boolean;
 }
 
 /**
@@ -36,39 +46,39 @@ export interface ChangeEntry {
  *
  * ## "No value" rule
  *
- * Two classes of value:
- * - **Absent** = `undefined`, `null`, missing key (a key present with value `undefined` is the
- *   same as a missing key).
- * - **Empty** = Absent ∪ `''` ∪ `[]` ∪ plain object (prototype `Object.prototype` or `null`)
- *   whose own enumerable properties are all Empty, recursively (`{}` included).
+ * `''`, `null`, `undefined` and a missing key are four distinct states, as for `isDirty` in core's
+ * `useObjectPageForm`: without `isEqual` and `arrayIdKeys`, `entries` is empty if and only if
+ * `isDirty` is `false` for the same pair. With `arrayIdKeys` the two differ on purpose in two cases:
+ * a reorder without changes is dirty but gives no entry, and an item without id is never matched,
+ * so it gives `added` plus `removed` even on two equal arrays.
  *
- * Applied in this order to every node (after `isEqual`):
- * 1. Both sides Empty → no entry for that node nor for its descendants (unless a custom `isEqual`
- *    returns `false` on one of them: see `isEqual`).
- * 2. One side Absent and the other not Empty → **one** entry on the node, `added` (baseline
- *    absent) or `removed` (values absent), without descending to the leaves. Only exception: an
- *    array with a declared id key, where Absent counts as `[]` (one entry per item).
- * 3. Otherwise (including `''`/`[]`/empty object against a non-empty value) → structural
- *    comparison: `''` → `'abc'` is `changed` with `before: ''`; `[]` → `[x]` without id key is a
- *    block `changed`; `{}` → `{ a: 'x' }` descends and gives `added` on `a`.
+ * **Absent** = `undefined`, `null`, missing key. It does not make two values equal, it only decides
+ * the kind of the entry. Applied in this order to every pair that differs (after `isEqual`):
+ * 1. Both sides Absent (`null` against `undefined`, `undefined` against a missing key, ...) →
+ *    `changed` on the node.
+ * 2. One side Absent → **one** entry on the node, `added` (baseline absent) or `removed` (values
+ *    absent), without descending to the leaves, whatever the other side holds (`''`, `[]` and
+ *    `{}` included). Only exception: a non-empty array with a declared id key gives one entry per
+ *    item.
+ * 3. Otherwise → structural comparison: `''` → `'abc'` is `changed` with `before: ''`; `''` → `[]`
+ *    is `changed`; `[]` → `[x]` without id key is a block `changed`; `{}` → `{ a: 'x' }` descends
+ *    and gives `added` on `a`.
  *
  * No other normalization: `' '` against `''` is `changed`, there is no type coercion (`5` against
- * `'5'` is `changed`) and `0`, `false`, `NaN` are not Empty.
+ * `'5'` is `changed`) and `0`, `false`, `NaN` are ordinary values.
  *
  * ## Default leaf comparison
  *
- * Same rules as the structural equality behind `isDirty` in core's `useObjectPageForm`, with the
- * deliberate differences above (Absent/Empty classes, a key with value `undefined` equals a
- * missing key):
+ * Same rules as the structural equality behind `isDirty` in core's `useObjectPageForm`:
  * - primitives with `===`, except `NaN` equals `NaN` (`0` equals `-0`);
  * - `Date` by `getTime()` (two invalid dates are equal);
  * - arrays and plain objects by content; own enumerable string keys only (`Symbol` keys and
  *   non-enumerable properties are ignored; `constructor`, `__proto__`, ... as own properties are
  *   ordinary keys);
  * - anything else (`Map`, `Set`, class instances, functions) is a leaf compared by reference,
- *   never traversed and never Empty;
- * - a change of structural type between two non-Empty values (object ↔ string, array ↔ object,
- *   `Date` ↔ string, ...) is one `changed` entry on the node.
+ *   never traversed;
+ * - a change of structural type between two values that are not Absent (object ↔ string, array ↔
+ *   object, `Date` ↔ string, ...) is one `changed` entry on the node.
  *
  * Circular structures are supported: a (baseline, values) pair already being compared higher up
  * the stack is assumed equal. Depth is not limited by the JavaScript call stack (the visit is
@@ -115,15 +125,10 @@ export interface ChangeSummaryOptions<Values extends object> {
    * Custom equality, called with `a` = baseline side, `b` = values side and the concrete path
    * (with indexes) on every visited pair of nodes except the root — before the "no value" rules
    * and the default comparison, arrays and id-matched items included (not for `added`/`removed`
-   * items without a counterpart). Return `true` → no entry for that subtree; `false` → one atomic
-   * entry on the node, without descending (`changed`, or `added`/`removed` when one side is
-   * Absent; `changed` when both are); `undefined` → default rules.
-   *
-   * Rule 1 does not cut the visit short for `isEqual`: under a pair where both sides are Empty
-   * (e.g. `{ note: null }` against `{ note: '' }`, or an Empty object against an Absent side) the
-   * descendants are still visited and `isEqual` is asked on each of them, so the verdict on a node
-   * does not depend on whether it has a non-empty sibling. Their default stays "no entry"; only an
-   * explicit `false` produces one. Without `isEqual` such subtrees are not visited at all.
+   * items without a counterpart). A missing key is passed as `undefined`. Return `true` → no entry
+   * for that subtree; `false` → one atomic entry on the node, without descending (`changed`, or
+   * `added`/`removed` when one side is Absent; `changed` when both are); `undefined` → default
+   * rules. The subtree of an atomic entry is not visited: `isEqual` is not asked on its descendants.
    *
    * `useChangeSummary` compares this function by identity: pass a stable function (module scope
    * or `useCallback`), an inline one recomputes the summary on every render.

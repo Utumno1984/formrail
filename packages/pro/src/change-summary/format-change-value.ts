@@ -8,8 +8,15 @@ export interface ChangeSummaryValueLabels {
   no: string;
   /** The empty string `''`. Default `Empty`. */
   empty: string;
-  /** `undefined` / `null`. Default `No value`. */
+  /** `undefined` / `null` in the compact rendering. Default `No value`. */
   noValue: string;
+  /** `null` in the precise renderings (`precise: true`). Default `Null`. */
+  nullValue: string;
+  /** `undefined` in the precise renderings (`precise: true`). Default `Undefined`. */
+  undefinedValue: string;
+  /** A missing key in the precise renderings of `<ChangeSummary />`, told from `undefined` with
+   *  `beforeMissing` / `afterMissing` of the entry. Default `Missing`. */
+  missingValue: string;
   /** A `Date` whose time is `NaN`. Default `Invalid date`. */
   invalidDate: string;
   /** Kind of an `added` entry. Default `added`; shown with its first letter upper-cased (CSS), the
@@ -37,6 +44,9 @@ export const DEFAULT_VALUE_LABELS: ChangeSummaryValueLabels = {
   no: 'No',
   empty: 'Empty',
   noValue: 'No value',
+  nullValue: 'Null',
+  undefinedValue: 'Undefined',
+  missingValue: 'Missing',
   invalidDate: 'Invalid date',
   added: 'added',
   removed: 'removed',
@@ -58,7 +68,8 @@ export interface FormatChangeValueOptions {
   labels?: Partial<ChangeSummaryValueLabels>;
   /**
    * Unambiguous rendering, used to tell apart two values that would otherwise look the same:
-   * dates with the time of day, numbers with `String(value)`, strings in double quotes.
+   * dates with the time of day, numbers with `String(value)`, strings in double quotes, `null` and
+   * `undefined` with their own texts (`nullValue`, `undefinedValue`).
    */
   precise?: boolean;
 }
@@ -188,7 +199,10 @@ function format(value: unknown, r: Resolved, level: FormatLevel): string {
 }
 
 function formatUnsafe(value: unknown, r: Resolved, level: FormatLevel): string {
-  if (value === undefined || value === null) return r.labels.noValue;
+  if (value === undefined || value === null) {
+    if (level === 0) return r.labels.noValue;
+    return value === null ? r.labels.nullValue : r.labels.undefinedValue;
+  }
   switch (typeof value) {
     case 'boolean':
       return value ? r.labels.yes : r.labels.no;
@@ -233,6 +247,8 @@ export function formatChangeValueAt(
  *
  * Never throws for odd values or an invalid `locale` / `timeZone` (fall back to the runtime
  * defaults). `precise: true` gives the unambiguous variant (see {@link FormatChangeValueOptions}).
+ * A missing key is not a value: `before` / `after` hold `undefined` for it, see `beforeMissing` /
+ * `afterMissing` on `ChangeEntry`.
  */
 export function formatChangeValue(value: unknown, options?: FormatChangeValueOptions): string {
   return formatChangeValueAt(value, options, options?.precise ? 1 : 0);

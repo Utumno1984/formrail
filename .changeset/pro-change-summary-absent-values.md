@@ -1,0 +1,5 @@
+---
+'@react-object-page/pro': minor
+---
+
+Change of behaviour: the Change Summary now follows `isDirty` on "no value" states. `''`, `null`, `undefined` and a missing key are four distinct states, so without `isEqual` and `arrayIdKeys` `computeChangeSummary` returns no entry if and only if `isDirty` is `false`. The Absent / Empty classes are gone: `null` → `''` is an `added` entry, `null` → `undefined` a `changed` one, `[]` against an Absent side one atomic entry (also with an id key), and `''` → `[]` a `changed` one, where all of these used to give no entry. `isEqual` is no longer asked on the descendants of an empty object against an Absent side (the entry is atomic, as for any other object). `ChangeEntry` gains the required booleans `beforeMissing` and `afterMissing`, which tell a missing key from a key present with value `undefined`. `<ChangeSummary />` and `formatChangeValue` give `null`, `undefined` and a missing key their own texts in the precise rendering (`nullValue`, `undefinedValue`, `missingValue` in `ChangeSummaryValueLabels`), while the compact rendering stays `No value`.

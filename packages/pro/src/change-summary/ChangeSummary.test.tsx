@@ -10,7 +10,16 @@ afterEach(cleanup);
 function entry(partial: Partial<ChangeEntry> & Pick<ChangeEntry, 'kind'>): ChangeEntry {
   const path = partial.path ?? 'amount';
   const label = partial.label ?? 'Amount';
-  return { path, label, labelPath: label.split(' > '), before: undefined, after: undefined, ...partial };
+  return {
+    path,
+    label,
+    labelPath: label.split(' > '),
+    before: undefined,
+    after: undefined,
+    beforeMissing: false,
+    afterMissing: false,
+    ...partial,
+  };
 }
 
 /** Text a screen reader gets: DOM order, hidden-visually text included, aria-hidden excluded. */
@@ -180,6 +189,64 @@ describe('<ChangeSummary />', () => {
       render(<ChangeSummary entries={e} />);
       const items = screen.getAllByRole('listitem').map(readText);
       expect(items).toEqual(['A, added, Empty', 'B, changed, from No value to No', 'C, added, 0']);
+    });
+
+    it.each([
+      ['null to undefined', { before: null, after: undefined }, 'from Null to Undefined'],
+      ['undefined to null', { before: undefined, after: null }, 'from Undefined to Null'],
+      ['null to a missing key', { before: null, afterMissing: true }, 'from Null to Missing'],
+      ['undefined to a missing key', { before: undefined, afterMissing: true }, 'from Undefined to Missing'],
+      ['a missing key to null', { beforeMissing: true, after: null }, 'from Missing to Null'],
+      ['a missing key to undefined', { beforeMissing: true, after: undefined }, 'from Missing to Undefined'],
+    ])('gives each no-value state its own text on a changed entry: %s', (_, sides, expected) => {
+      render(<ChangeSummary entries={[entry({ kind: 'changed', ...sides })]} {...common} />);
+      expect(readText(screen.getByRole('listitem'))).toBe(`Amount, changed, ${expected}`);
+      cleanup();
+    });
+
+    it('the texts of the no-value states follow valueLabels', () => {
+      const e = [
+        entry({ kind: 'changed', path: 'a', before: null, after: undefined }),
+        entry({ kind: 'changed', path: 'b', beforeMissing: true, after: null }),
+      ];
+      render(<ChangeSummary entries={e} valueLabels={{ nullValue: 'Nullo', undefinedValue: 'Indefinito', missingValue: 'Assente' }} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+        'Amount, changed, from Nullo to Indefinito',
+        'Amount, changed, from Assente to Nullo',
+      ]);
+    });
+
+    it('writes out no-value states inside arrays that would otherwise look the same', () => {
+      const e = [
+        entry({ kind: 'changed', path: 'a', before: [null], after: [undefined] }),
+        entry({ kind: 'changed', path: 'b', before: [{ x: null }], after: [{}] }),
+      ];
+      render(<ChangeSummary entries={e} {...common} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual([
+        'Amount, changed, from [Null] to [Undefined]',
+        'Amount, changed, from [{x: Null}] to [{}]',
+      ]);
+    });
+
+    it('the compact text stays when only one side is a no-value state', () => {
+      render(<ChangeSummary entries={[entry({ kind: 'changed', before: null, after: 'x' })]} {...common} />);
+      expect(readText(screen.getByRole('listitem'))).toBe('Amount, changed, from No value to x');
+    });
+
+    it('a missing key does not change the text of the side shown by added / removed', () => {
+      const e = [
+        entry({ kind: 'added', path: 'a', after: '', beforeMissing: true }),
+        entry({ kind: 'removed', path: 'b', before: [], afterMissing: true }),
+      ];
+      render(<ChangeSummary entries={e} {...common} />);
+      expect(screen.getAllByRole('listitem').map(readText)).toEqual(['Amount, added, Empty', 'Amount, removed, No items']);
+    });
+
+    it('renderValue gets a missing key as undefined, with the flag on the entry', () => {
+      const e = entry({ kind: 'changed', before: null, afterMissing: true });
+      const renderValue = vi.fn((v: unknown, en: ChangeEntry): ReactNode => (v === undefined && en.afterMissing ? 'gone' : 'null'));
+      render(<ChangeSummary entries={[e]} renderValue={renderValue} />);
+      expect(readText(screen.getByRole('listitem'))).toBe('Amount, changed, from null to gone');
     });
 
     it('mutes the empty / no value texts only', () => {

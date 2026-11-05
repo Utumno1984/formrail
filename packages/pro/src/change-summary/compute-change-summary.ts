@@ -12,55 +12,25 @@ const isPlainObject = (value: unknown): value is PlainObject => {
   return proto === Object.prototype || proto === null;
 };
 
-/** Absent = `undefined` or `null` (a missing key is read as `undefined`). */
-const isAbsent = (value: unknown): value is null | undefined => value === undefined || value === null;
+/**
+ * Internal side of a pair with no own key or no counterpart item, so a missing key never compares
+ * equal to a key present with value `undefined`. Never leaves this module: `isEqual` and
+ * `ChangeEntry` get `undefined`, the entry with `beforeMissing` / `afterMissing` set.
+ */
+const MISSING = Symbol('missing');
+
+const isAbsent = (value: unknown): value is null | undefined | typeof MISSING =>
+  value === undefined || value === null || value === MISSING;
+
+const kindOf = (before: unknown, after: unknown): ChangeKind =>
+  isAbsent(before) === isAbsent(after) ? 'changed' : isAbsent(before) ? 'added' : 'removed';
 
 /** `===`, except `NaN` equals `NaN` (`0` equals `-0`). */
 const sameLeaf = (a: unknown, b: unknown): boolean => a === b || (a !== a && b !== b);
 
-const own = (object: PlainObject, key: string): unknown => (Object.hasOwn(object, key) ? object[key] : undefined);
+const own = (object: PlainObject, key: string): unknown => (Object.hasOwn(object, key) ? object[key] : MISSING);
 
-/** A value that is not a plain object: Empty or not on its own. */
-const isEmptyLeaf = (value: unknown): boolean =>
-  isAbsent(value) || value === '' || (Array.isArray(value) && value.length === 0);
-
-/**
- * Empty = Absent ∪ '' ∪ [] ∪ plain object whose own enumerable values are all Empty.
- *
- * Iterative (the depth is not bounded by the call stack) and cycle-safe: an object already met in
- * this search is either Empty or would have ended it, so it adds no non-empty leaf when met again.
- * `cache` (one per diff) keeps the verdict of every object it can settle: all objects met by a
- * search that ends Empty are Empty, and every object on the discovery path to a non-empty leaf is
- * not. Asking again on each level of a deep structure therefore stays linear overall.
- */
-function isEmptyValue(value: unknown, cache: Map<object, boolean>): boolean {
-  if (!isPlainObject(value)) return isEmptyLeaf(value);
-  const known = cache.get(value);
-  if (known !== undefined) return known;
-  const parentOf = new Map<PlainObject, PlainObject | undefined>([[value, undefined]]);
-  const markNonEmpty = (from: PlainObject): false => {
-    for (let o: PlainObject | undefined = from; o; o = parentOf.get(o)) cache.set(o, false);
-    return false;
-  };
-  const todo: PlainObject[] = [value];
-  for (let current = todo.pop(); current; current = todo.pop()) {
-    for (const key of Object.keys(current)) {
-      const child = current[key];
-      if (!isPlainObject(child)) {
-        if (!isEmptyLeaf(child)) return markNonEmpty(current);
-        continue;
-      }
-      if (parentOf.has(child)) continue;
-      const verdict = cache.get(child);
-      if (verdict === false) return markNonEmpty(current);
-      if (verdict === true) continue;
-      parentOf.set(child, current);
-      todo.push(child);
-    }
-  }
-  for (const o of parentOf.keys()) cache.set(o, true);
-  return true;
-}
+const exposed = (side: unknown): unknown => (side === MISSING ? undefined : side);
 
 const warned = new Set<string>();
 
@@ -101,9 +71,6 @@ function indexById(items: readonly unknown[], idKey: string): Map<unknown, numbe
   return map;
 }
 
-/** Stand-in for an Empty side that has no keys of its own (Absent, `''`, `[]`). */
-const NO_KEYS: PlainObject = /* @__PURE__ */ Object.freeze({});
-
 /**
  * A visited position. Linked to its parent instead of copying the segments, so a node costs O(1)
  * whatever its depth; `labelPath` is rebuilt from the chain only when an entry is emitted.
@@ -143,7 +110,6 @@ type Task = () => void;
 class Differ {
   private readonly onStack = new Map<object, Set<object>>();
   private readonly pending: Task[] = [];
-  private readonly emptiness = new Map<object, boolean>();
 
   constructor(
     private readonly arrayIdKeys: Readonly<Record<string, string>> | undefined,
@@ -168,8 +134,10 @@ class Differ {
       labelPath,
       label: labelPath.join(' > '),
       kind,
-      before: kind === 'added' ? undefined : before,
-      after: kind === 'removed' ? undefined : after,
+      before: kind === 'added' ? undefined : exposed(before),
+      after: kind === 'removed' ? undefined : exposed(after),
+      beforeMissing: before === MISSING,
+      afterMissing: after === MISSING,
     });
   }
 
@@ -195,10 +163,6 @@ class Differ {
       label: itemLabel(index),
       isItem: true,
     };
-  }
-
-  private isEmpty(value: unknown): boolean {
-    return isEmptyValue(value, this.emptiness);
   }
 
   /** The id key declared for this node, after checking it is usable (dev warnings otherwise). */
@@ -229,12 +193,10 @@ class Differ {
 
   private visit(before: unknown, after: unknown, node: Node, out: ChangeEntry[]): void {
     if (node.depth > 0 && this.isEqual) {
-      const verdict = this.isEqual(before, after, node.path);
+      const verdict = this.isEqual(exposed(before), exposed(after), node.path);
       if (verdict === true) return;
       if (verdict === false) {
-        const kind: ChangeKind =
-          isAbsent(before) && !isAbsent(after) ? 'added' : isAbsent(after) && !isAbsent(before) ? 'removed' : 'changed';
-        this.emit(out, node, kind, before, after);
+        this.emit(out, node, kindOf(before, after), before, after);
         return;
       }
     }
@@ -244,25 +206,16 @@ class Differ {
     const beforeAbsent = isAbsent(before);
     const afterAbsent = isAbsent(after);
 
-    // Rule 1: both Empty.
-    if (beforeAbsent && afterAbsent) return;
     if (beforeAbsent || afterAbsent) {
-      const present = beforeAbsent ? after : before;
-      if (this.isEmpty(present)) {
-        this.descendEmpty(before, after, node, out);
+      // Id-key exception of rule 2. `[]` has no item to report, so against Absent it stays atomic:
+      // it differs from Absent like any other value.
+      const items = beforeAbsent ? after : before;
+      if (idKey !== undefined && Array.isArray(items) && items.length > 0) {
+        this.diffById(beforeAbsent ? [] : items, afterAbsent ? [] : items, idKey, node, out);
         return;
       }
-      // Rule 2, id-key exception: Absent counts as [].
-      if (idKey !== undefined) {
-        this.diffById(beforeAbsent ? [] : (before as unknown[]), afterAbsent ? [] : (after as unknown[]), idKey, node, out);
-        return;
-      }
-      // Rule 2: one atomic entry.
-      this.emit(out, node, beforeAbsent ? 'added' : 'removed', before, after);
-      return;
-    }
-    if (this.isEmpty(before) && this.isEmpty(after)) {
-      this.descendEmpty(before, after, node, out);
+      // Rules 1 and 2: one atomic entry.
+      this.emit(out, node, kindOf(before, after), before, after);
       return;
     }
 
@@ -288,20 +241,6 @@ class Differ {
     }
     // Type change, or two different non-traversable leaves.
     this.emit(out, node, 'changed', before, after);
-  }
-
-  /**
-   * Rule 1 with a custom `isEqual`: the default verdict on the whole subtree stays "no entry"
-   * (every descendant pair of two Empty sides is Empty too), but `isEqual` is still asked on every
-   * descendant pair, exactly as when the subtree has a non-empty sibling. Without `isEqual`
-   * nothing is visited (unchanged cost). Only plain objects have children here (Empty array = `[]`).
-   */
-  private descendEmpty(before: unknown, after: unknown, node: Node, out: ChangeEntry[]): void {
-    if (!this.isEqual) return;
-    const b = isPlainObject(before) ? before : NO_KEYS;
-    const a = isPlainObject(after) ? after : NO_KEYS;
-    if (b === NO_KEYS && a === NO_KEYS) return;
-    this.guarded(b, a, () => this.diffObject(b, a, node, out));
   }
 
   /**
@@ -331,7 +270,7 @@ class Differ {
       tasks.push(() => this.visit(own(before, key), after[key], this.keyChild(node, key), out));
     }
     for (const key of Object.keys(before)) {
-      if (!Object.hasOwn(after, key)) tasks.push(() => this.visit(before[key], undefined, this.keyChild(node, key), out));
+      if (!Object.hasOwn(after, key)) tasks.push(() => this.visit(before[key], MISSING, this.keyChild(node, key), out));
     }
     this.schedule(tasks);
   }
@@ -367,14 +306,14 @@ class Differ {
       const id = itemId(item, idKey);
       const i = id === NO_ID ? undefined : beforeIndex.get(idMapKey(id));
       if (i === undefined) {
-        tasks.push(() => this.emit(out, this.indexChild(node, j), 'added', undefined, item));
+        tasks.push(() => this.emit(out, this.indexChild(node, j), 'added', MISSING, item));
       } else {
         matched.add(i);
         tasks.push(() => this.visit(before[i], item, this.indexChild(node, j), out));
       }
     }
     for (let i = 0; i < before.length; i += 1) {
-      if (!matched.has(i)) tasks.push(() => this.emit(out, this.indexChild(node, i), 'removed', before[i], undefined));
+      if (!matched.has(i)) tasks.push(() => this.emit(out, this.indexChild(node, i), 'removed', before[i], MISSING));
     }
     this.schedule(tasks);
   }

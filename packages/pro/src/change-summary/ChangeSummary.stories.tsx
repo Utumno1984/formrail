@@ -281,6 +281,79 @@ export const Playground: Story = {
 };
 
 // ---------------------------------------------------------------------------------------------
+// "No value" states: a form whose baseline has `null` and `''`, edited through a real `Input` that
+// emits `''` and a clear action that emits `undefined` (what Select and Combobox emit).
+// ---------------------------------------------------------------------------------------------
+
+interface NoteValues {
+  note: string | null | undefined;
+  memo: string;
+}
+
+const NOTE_BASELINE: NoteValues = { note: null, memo: '' };
+
+function NoValueDemo({ emptyLabel, label, locale, timeZone }: DemoArgs) {
+  const form = useObjectPageForm<NoteValues>({ baseline: NOTE_BASELINE });
+  const { entries } = useChangeSummary({ values: form.values, baseline: form.baseline });
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
+      <Field label="Note" name="note">
+        <Input value={form.values.note ?? ''} onChange={(event) => form.setValue('note', event.target.value)} />
+      </Field>
+      <Field label="Memo" name="memo">
+        <Input value={form.values.memo} onChange={(event) => form.setValue('memo', event.target.value)} />
+      </Field>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <Button variant="secondary" onClick={() => form.setValue('note', undefined)}>
+          Clear note to undefined
+        </Button>
+        <Button variant="secondary" onClick={() => form.reset()}>
+          Discard
+        </Button>
+      </div>
+      <Text>{form.isDirty ? 'Unsaved changes' : 'All saved'}</Text>
+      <ChangeSummary entries={entries} emptyLabel={emptyLabel} label={label} locale={locale} timeZone={timeZone} />
+    </div>
+  );
+}
+
+/**
+ * `''`, `null`, `undefined` and a missing key are different values: the summary follows the dirty
+ * state of the form. Typing and clearing "Note" (baseline `null`) leaves `''`, a real change;
+ * typing and clearing "Memo" (baseline `''`) restores the saved value, no change. The clear action
+ * shows two no-value states side by side, each with its own text.
+ */
+export const NoValueStates: Story = {
+  render: (args) => <NoValueDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Memo: baseline '', typed and cleared: back to the saved value.
+    const memo = canvas.getByRole('textbox', { name: 'Memo' });
+    await userEvent.type(memo, 'abc');
+    await expect(canvas.getByText('Unsaved changes')).toBeVisible();
+    await userEvent.clear(memo);
+    await expect(canvas.getByText('All saved')).toBeVisible();
+    await expect(canvas.getByText(args.emptyLabel)).toBeVisible();
+
+    // Note: baseline null, typed and cleared: '' is not null.
+    const note = canvas.getByRole('textbox', { name: 'Note' });
+    await userEvent.type(note, 'abc');
+    await userEvent.clear(note);
+    await expect(canvas.getByText('Unsaved changes')).toBeVisible();
+    await expect(readText(await item(canvas, /^Note/))).toBe('Note, added, Empty');
+
+    // Two no-value states on one entry: never "No value" twice.
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear note to undefined' }));
+    await expect(readText(await item(canvas, /^Note/))).toBe('Note, changed, from Null to Undefined');
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Discard' }));
+    await expect(canvas.getByText('All saved')).toBeVisible();
+    await expect(canvas.getByText(args.emptyLabel)).toBeVisible();
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
 // Static stories (visual regression). Fixed dates at noon UTC, locale and time zone explicit.
 // ---------------------------------------------------------------------------------------------
 
@@ -290,7 +363,16 @@ const entry = (
   label: string,
   before: unknown,
   after: unknown,
-): ChangeEntry => ({ kind, path, label, labelPath: label.split(' > '), before, after });
+): ChangeEntry => ({
+  kind,
+  path,
+  label,
+  labelPath: label.split(' > '),
+  before,
+  after,
+  beforeMissing: false,
+  afterMissing: false,
+});
 
 const circular: Record<string, unknown> = { name: 'Loop' };
 circular.self = circular;
