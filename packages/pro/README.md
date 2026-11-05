@@ -84,26 +84,29 @@ With a row changed, one added without id, one removed and two rows swapped, `ent
 | `label` | `labelPath.join(' > ')`. |
 | `kind` | `'added' \| 'removed' \| 'changed'`. |
 | `before` / `after` | Baseline / current value; `before` is `undefined` for `added`, `after` is `undefined` for `removed` (even when that side was `null`). |
+| `beforeMissing` / `afterMissing` | `true` when that side has no own key at this position, or no counterpart for an array item: tells a missing key from a key present with value `undefined`. |
 
 ### Rules (full reference in the TSDoc of `ChangeSummaryOptions`)
 
-- **Absent** = `undefined`, `null`, missing key. **Empty** = Absent, `''`, `[]`, or a plain object whose
-  own enumerable values are all Empty. Both sides Empty → no entry (`null` → `''` is not a change).
-  Absent against a non-Empty value → one `added`/`removed` entry on the node. Anything else is compared
-  structurally; no other normalization (`' '` vs `''`, `5` vs `'5'` are changes; `0`, `false`, `NaN`
-  are not Empty).
+- `''`, `null`, `undefined` and a missing key are four distinct states, as for `isDirty` in
+  `useObjectPageForm`: without `isEqual` and `arrayIdKeys`, `entries` is empty if and only if `isDirty`
+  is `false`. Declaring `arrayIdKeys` adds two exceptions: a reorder without changes is dirty but gives no
+  entry, and an item without id is never matched, not even with an equal one.
+- **Absent** = `undefined`, `null`, missing key: it only decides the kind of the entry. Both sides Absent
+  → `changed` (`null` → `undefined`). One side Absent → one `added`/`removed` entry on the node, whatever
+  the other side holds (`null` → `''` is `added`, `[]` → `null` is `removed`). Anything else is compared
+  structurally; no other normalization (`' '` vs `''`, `5` vs `'5'` are changes).
 - `NaN` equals `NaN`, `0` equals `-0`, `Date`s by `getTime()`; `Map`, `Set`, class instances and
   functions are leaves compared by reference. Circular structures are supported, and so are very deep
   ones: the visit is iterative (no call-stack overflow, tested at 10 000 levels) and linear in the nodes.
 - **Arrays**: declare an identity key per array path without indexes (`arrayIdKeys`, e.g.
   `{ lineItems: 'id', 'lineItems.taxes': 'code' }`) to get per-field entries for matched rows,
-  `added`/`removed` per row and no entry for a reorder. Without it, an array is diffed as a block (one
-  `changed` entry, even for a reorder). Duplicate ids degrade that array to the block diff with a
-  development warning.
+  `added`/`removed` per row and no entry for a reorder; `[]` against an Absent side has no row to report
+  and is one entry on the array. Without it, an array is diffed as a block (one `changed` entry, even for
+  a reorder). Duplicate ids degrade that array to the block diff with a development warning.
 - **`isEqual(a, b, path)`**: custom equality, called before the default rules on every visited pair
-  except the root. `true` → no entry for that subtree, `false` → one atomic entry, `undefined` → default.
-  It is asked inside Empty subtrees too (`{ note: null }` → `{ note: '' }` reaches `note`), so its
-  verdict on a node does not depend on the siblings; there the default stays "no entry".
+  except the root (a missing key is passed as `undefined`). `true` → no entry for that subtree, `false`
+  → one atomic entry, `undefined` → default. The subtree of an atomic entry is not visited.
 - **Order**: depth-first; keys in the order of `values`, then baseline-only keys; id-matched arrays in
   the order of `values`, then the `removed` items in baseline order.
 
@@ -136,7 +139,7 @@ const { entries } = useChangeSummary({ values: form.values, baseline: form.basel
 
 - Props: `entries`, `renderValue?(value, entry)`, `emptyLabel` (`"No changes"`), `label` (accessible name of
   the list, `"Changes"`), `locale`, `timeZone`, `valueLabels` (`yes`, `no`, `empty`, `noValue`,
-  `invalidDate`, `added`, `removed`, `changed`, `from`, `to`, `contentsDiffer`, `items`), `className`
+  `nullValue`, `undefinedValue`, `missingValue`, `invalidDate`, `added`, `removed`, `changed`, `from`, `to`, `contentsDiffer`, `items`), `className`
   (merged with `tailwind-merge`; a core utility wins over the component's default, see above), `ref`
   and other HTML attributes on the root.
 - Text read by assistive technology: `Amount, changed, from 100 to 120`. The kind of change is visible
@@ -146,10 +149,12 @@ const { entries } = useChangeSummary({ values: form.values, baseline: form.basel
   `Intl.DateTimeFormat` (`dateStyle: 'medium'`), `Invalid date` for invalid ones; numbers with
   `Intl.NumberFormat`; `''` is `Empty`, `null`/`undefined` is `No value`; arrays `N items`; plain objects
   a compact `Label: value` list. If before and after would look identical, both are re-rendered
-  precisely (time, ISO string, full number with `n` for a bigint, quoted string), then with their
-  contents written out (`["a", "b"]` / `["a", "c"]`, `{a: {x: 1}}`, `Map {"k" => 1}`, truncated to 120
+  precisely (time, ISO string, full number with `n` for a bigint, quoted string, `Null` / `Undefined` /
+  `Missing` for the no-value states, never `from No value to No value`), then with their contents written
+  out (`["a", "b"]` / `["a", "c"]`, `{a: {x: 1}}`, `Map {"k" => 1}`, truncated to 120
   characters); if even that matches (two class instances), the after side ends with
   `(contents differ)`. `formatChangeValue` never throws (revoked Proxy, throwing traps or getters give
   `Unsupported value`).
 - `renderValue` is called once for each value shown (never for the missing side of `added`/`removed`);
-  returning `null` leaves the value empty. An exception thrown by `renderValue` propagates.
+  a missing key arrives as `undefined`, with `beforeMissing` / `afterMissing` on the entry. Returning
+  `null` leaves the value empty. An exception thrown by `renderValue` propagates.

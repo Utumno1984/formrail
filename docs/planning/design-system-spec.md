@@ -361,16 +361,19 @@ Il motore di #174 (`packages/pro/src/change-summary/compute-change-summary.ts`) 
 classi **Assente** (`undefined`, `null`, chiave mancante) e **Vuoto** (Assente ∪ `''` ∪ `[]` ∪
 oggetto semplice con soli valori Vuoto) e non generava entry tra due lati Vuoti; era il punto 2 di
 questo elenco. Da #202 segue il **Livello 1** come `isDirty`: invariante "nessuna entry ⇔ `isDirty
-=== false`" (senza `isEqual` personalizzato). La leggibilità ("da (vuoto) a (vuoto)") si risolve
-nella **resa** (testi distinti per `null`/`undefined`/chiave mancante nel componente), non
-nascondendo la modifica nel diff. Il TSDoc "No value rule" di `change-summary/types.ts` viene
-riscritto in #202; fino al merge di #202 il codice su `main` ha ancora il vecchio comportamento.
+=== false`" (senza `isEqual` personalizzato e senza `arrayIdKeys`: dichiarando un `idKey` restano due
+differenze volute, il riordino senza modifiche, che è dirty ma non dà entry, e gli elementi senza id,
+mai abbinati, che danno `added` + `removed` anche su array uguali). La leggibilità ("da (vuoto) a
+(vuoto)") si risolve nella **resa**: `ChangeEntry` ha `beforeMissing`/`afterMissing` per distinguere
+la chiave mancante da `undefined`, e il componente usa testi distinti nella resa precisa (`nullValue`,
+`undefinedValue`, `missingValue` in `ChangeSummaryValueLabels`, default `Null`, `Undefined`,
+`Missing`); la resa compatta resta `No value`. Regola nel TSDoc "No value rule" di
+`change-summary/types.ts`.
 
 **Divergenza "form dirty con Change Summary vuoto": non più accettata, risolta da #202.** Era la
-conseguenza del vecchio collasso. Casi concreti che #202 deve coprire: baseline `{ note: null }`,
-l'utente scrive e poi cancella in un `Input` (che emette `''`); un `Combobox` con `clearOnEmpty` che
-emette `undefined` su una baseline `null`. Dopo #202 in entrambi i casi il form è dirty **e** il
-riepilogo mostra la voce. Resta valido, come buona pratica e non più come rimedio a un difetto,
+conseguenza del vecchio collasso. Casi concreti: baseline `{ note: null }`, l'utente scrive e poi
+cancella in un `Input` (che emette `''`); un `Combobox` con `clearOnEmpty` che emette `undefined` su
+una baseline `null`. In entrambi i casi il form è dirty **e** il riepilogo mostra la voce. Resta valido, come buona pratica e non più come rimedio a un difetto,
 costruire la baseline con la stessa rappresentazione di "vuoto" che il controllo emette
 (normalizzando al confine idratazione/schema), così che svuotare un campo già vuoto non renda il
 form dirty.
@@ -676,10 +679,10 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    deciso consapevolmente se ha priorità più alta del completamento di vistato/FiC o se procede in
    parallelo a ritmo più lento (sezione MVP sotto assume ritmo "lento ma con moat", non uno sprint).
 7. **Valori assenti tra form e Change Summary** (aperta il 2026-11-03, vedi §1.13.1).
-   (a) **Decisa il 2026-11-03, fix in corso in #202.** `isDirty` (core) resta rigoroso e invariato
+   (a) **Decisa il 2026-11-03, risolta da #202.** `isDirty` (core) resta rigoroso e invariato
    (riflette il payload reale; nessuna modifica al Free); è il Change Summary (Pro) ad allinearsi al
    Livello 1, distinguendo `''`/`null`/`undefined`/chiave mancante come `isDirty`. "Dirty ma nessuna
-   modifica nel riepilogo" non sarà più possibile dopo #202. Un'eventuale opzione di equivalenza
+   modifica nel riepilogo" resta possibile solo per il riordino dichiarato con `idKey`. Un'eventuale opzione di equivalenza
    dei valori assenti resta materia del futuro **dirty-tracking robusto Pro** (§3), da applicare a
    form e riepilogo insieme, mai a uno solo dei due.
    (b) Valore vuoto emesso dai controlli di selezione: `undefined` come Select/Combobox oggi
@@ -797,7 +800,8 @@ function ChangeSummary(props: {
 - **Tre stati di "nessun valore" distinti** (stringa vuota vs `undefined` vs `null`, vincolo già
   fissato in §1.4): #174 li aveva collassati nelle classi Assente/Vuoto (assente ↔ `''` senza
   entry); **la decisione del 2026-11-03 lo inverte** e #202 li rende distinti come in `isDirty`
-  (Livello 1, §1.13.1), con resa distinta nel componente. La regola canonica è in §1.13.1.
+  (Livello 1, §1.13.1), con `beforeMissing`/`afterMissing` su `ChangeEntry` e resa distinta nel
+  componente. La regola canonica è in §1.13.1.
 - **Identity degli array**: un `id` presente nella baseline ma non nei `values` → `removed`; un `id`
   nuovo nei `values` → `added`; stesso `id` con contenuto diverso → `changed`, con un
   `ChangeEntry` per ciascun campo del singolo elemento cambiato (non un unico entry "la riga N è
