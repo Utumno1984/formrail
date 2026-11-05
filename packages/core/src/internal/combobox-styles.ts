@@ -23,3 +23,6 @@ export const COMBOBOX_LIST = 'min-h-0';
 
 /** Long labels in the list wrap anywhere instead of overflowing. */
 export const COMBOBOX_OPTION = '[overflow-wrap:anywhere]';
+
+/** The always-mounted live region that announces the "no results" state (visually hidden, not `display: none`). */
+export const COMBOBOX_STATUS = 'sr-only';

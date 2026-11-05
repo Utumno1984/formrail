@@ -155,7 +155,8 @@ export const Playground: Story = {
     await expect(args.onValueChange).toHaveBeenLastCalledWith('mc');
     await userEvent.clear(control);
     await userEvent.type(control, 'xyz');
-    await expect(await within(document.body).findByText(args.emptyLabel)).toBeInTheDocument();
+    // Scoped to the list: the live region next to the input carries the same text.
+    await expect(await within(await listbox()).findByText(args.emptyLabel)).toBeInTheDocument();
     await userEvent.tab();
     await waitFor(() => expect(control).toHaveValue('Macerata'));
     await expect(args.onValueChange).toHaveBeenCalledTimes(1);
@@ -185,6 +186,13 @@ export const Base: Story = {
   },
 };
 
+/**
+ * Controls: `emptyLabel` (the list message and the screen reader announcement), `size`,
+ * `placeholder`, `clearOnEmpty`. The play function checks that the visually hidden status region
+ * is there, empty, before typing; types a text with no results and checks the same node now
+ * carries `emptyLabel` while the message is a disabled option the arrows never reach; then types
+ * a matching text and checks the region is empty again.
+ */
 export const NoResults: Story = {
   tags: ['visual'],
   parameters: NO_STATE,
@@ -195,14 +203,24 @@ export const NoResults: Story = {
       </Field>
     </div>
   ),
-  play: async ({ canvasElement }) => {
+  play: async ({ args, canvasElement }) => {
+    const status = within(canvasElement).getByRole('status');
+    await expect(status).toHaveTextContent(/^$/u);
+    // Results first: the region stays empty.
+    await userEvent.type(input(canvasElement), 'tor');
+    await expect(await within(await listbox()).findByRole('option', { name: 'Torino' })).toBeInTheDocument();
+    await expect(status).toHaveTextContent(/^$/u);
+    await userEvent.clear(input(canvasElement));
     await userEvent.type(input(canvasElement), 'zzz');
     const list = await listbox();
     // The message is the listbox's only option, disabled: the arrows never make it active.
-    const [empty, ...others] = within(list).getAllByRole('option');
-    await expect(others).toHaveLength(0);
-    await expect(empty).toHaveTextContent('No results');
+    await waitFor(() => expect(within(list).getAllByRole('option')).toHaveLength(1));
+    const empty = within(list).getByRole('option');
+    await expect(empty).toHaveTextContent(args.emptyLabel);
     await expect(empty).toHaveAttribute('aria-disabled', 'true');
+    // Announced through the region mounted from the start, not by the option (the focus is on the input).
+    await waitFor(() => expect(status).toHaveTextContent(args.emptyLabel));
+    await expect(within(canvasElement).getByRole('status')).toBe(status);
     await userEvent.keyboard('{ArrowDown}');
     await expect(input(canvasElement)).not.toHaveAttribute('aria-activedescendant');
   },

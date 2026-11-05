@@ -367,6 +367,105 @@ test.describe('layout and a11y', () => {
   });
 });
 
+test.describe('"no results" announcement', () => {
+  const status = (page: Page): Locator => page.getByRole('status');
+
+  /** Tags the region node and counts every mutation of its subtree from now on. */
+  const watchStatus = (page: Page) =>
+    page.evaluate(() => {
+      const region = document.querySelector('[role="status"]') as (HTMLElement & { __ropTag?: string }) | null;
+      if (!region) throw new Error('no status region');
+      region.__ropTag = 'original';
+      const w = window as unknown as { __ropMutations: number };
+      w.__ropMutations = 0;
+      new MutationObserver((records) => {
+        w.__ropMutations += records.length;
+      }).observe(region, { childList: true, characterData: true, subtree: true });
+    });
+  const mutations = (page: Page) =>
+    page.evaluate(() => (window as unknown as { __ropMutations: number }).__ropMutations);
+  const sameNode = (page: Page) =>
+    page.evaluate(
+      () => (document.querySelector('[role="status"]') as (HTMLElement & { __ropTag?: string }) | null)?.__ropTag,
+    );
+
+  test('the region is in the DOM before typing, visually hidden but not display:none, and empty', async ({ page }) => {
+    await gotoStory(page, STORY('manual'));
+    await expect(status(page)).toHaveCount(1);
+    await expect(status(page)).toHaveAttribute('aria-live', 'polite');
+    await expect(status(page)).toHaveText('');
+    const box = await status(page).evaluate((el) => {
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return { display: s.display, visibility: s.visibility, position: s.position, w: r.width, h: r.height };
+    });
+    expect(box.display).not.toBe('none');
+    expect(box.visibility).toBe('visible');
+    expect(box.position).toBe('absolute');
+    expect(box.w).toBeLessThanOrEqual(1);
+    expect(box.h).toBeLessThanOrEqual(1);
+  });
+
+  test('typing to no results fills the same node; results again empty it; axe clean in both states', async ({
+    page,
+  }) => {
+    await gotoStory(page, STORY('manual'));
+    await watchStatus(page);
+    const box = input(page);
+    await box.click();
+    await page.keyboard.type('mi');
+    await expect(listbox(page).getByRole('option', { name: 'Milano' })).toBeVisible();
+    await expect(status(page)).toHaveText('');
+    await page.keyboard.type('zz');
+    await expect(listbox(page).getByRole('option', { name: 'No results', disabled: true })).toBeVisible();
+    await expect(status(page)).toHaveText('No results');
+    expect(await sameNode(page)).toBe('original');
+    await expectNoA11yViolations(page);
+    // The message option is not itself live: the screen reader reads the announcement once.
+    await expect(listbox(page).locator('[aria-live], [role="status"], [role="alert"]')).toHaveCount(0);
+    await expect(page.locator('[aria-live]')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('mod');
+    await expect(listbox(page).getByRole('option', { name: 'Modena' })).toBeVisible();
+    await expect(status(page)).toHaveText('');
+    expect(await sameNode(page)).toBe('original');
+    // The announcement leaves the options' navigation alone.
+    await page.keyboard.press('ArrowDown');
+    const id = await box.getAttribute('aria-activedescendant');
+    await expect(listbox(page).getByRole('option', { name: 'Modena' })).toHaveAttribute('id', id!);
+    await expectNoA11yViolations(page);
+  });
+
+  test('keystrokes that keep the "no results" state never touch the region; a new entry does', async ({ page }) => {
+    await gotoStory(page, STORY('manual'));
+    const box = input(page);
+    await box.click();
+    await page.keyboard.type('z');
+    await expect(status(page)).toHaveText('No results');
+    await watchStatus(page);
+    for (const key of ['z', 'q', 'x', 'Backspace', 'ArrowDown', 'ArrowUp', 'w']) await page.keyboard.press(key);
+    await expect(box).toHaveValue('zzqw');
+    await expect(status(page)).toHaveText('No results');
+    expect(await mutations(page)).toBe(0);
+    // Out (results) and back in: one change each way, on the same node.
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('t');
+    await expect(status(page)).toHaveText('');
+    const out = await mutations(page);
+    expect(out).toBeGreaterThan(0);
+    await page.keyboard.type('zz');
+    await expect(status(page)).toHaveText('No results');
+    expect(await mutations(page)).toBeGreaterThan(out);
+    expect(await sameNode(page)).toBe('original');
+  });
+
+  test('NoResults story with a custom emptyLabel: the announcement uses that label', async ({ page }) => {
+    await expectPlayToPass(page, STORY('no-results'), 'emptyLabel:Nothing found');
+    await expect(status(page)).toHaveText('Nothing found');
+    await expect(listbox(page).getByRole('option', { name: 'Nothing found', disabled: true })).toBeVisible();
+  });
+});
+
 // Keyboard-safe list (spec §1.10). Same stand-in as `e2e/field.spec.ts`: `__setKeyboard(px)`
 // shrinks the visual viewport from the bottom and fires `resize`.
 test.describe('virtual keyboard', () => {

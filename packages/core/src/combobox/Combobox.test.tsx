@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -225,7 +225,8 @@ describe('Combobox', () => {
     const user = userEvent.setup();
     render(<Combobox options={[]} emptyLabel="Nessun risultato" aria-label="Comune" />);
     await user.click(screen.getByRole('combobox'));
-    expect(screen.getByText('Nessun risultato')).toBeInTheDocument();
+    // Scoped to the list: the live region next to the input carries the same text.
+    expect(within(screen.getByRole('listbox')).getByText('Nessun risultato')).toBeInTheDocument();
     expect(screen.queryByText('No results')).toBeNull();
   });
 
@@ -270,7 +271,7 @@ describe('Combobox', () => {
     render(<Combobox options={[]} onValueChange={onValueChange} aria-label="Comune" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
-    expect(screen.getByText('No results')).toBeInTheDocument();
+    expect(within(screen.getByRole('listbox')).getByText('No results')).toBeInTheDocument();
     await user.keyboard('{Enter}');
     expect(onValueChange).not.toHaveBeenCalled();
   });
@@ -405,5 +406,153 @@ describe('Combobox', () => {
     input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
     await user.keyboard('{Enter}');
     expect(onValueChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('Combobox: "no results" live region', () => {
+  const status = () => screen.getByRole('status');
+  /** Records every change to the region's subtree (what a screen reader would react to). */
+  const watch = (node: Element) => {
+    // The callback drains the queue on its own microtask: count what it saw plus what is pending.
+    let seen = 0;
+    const observer = new MutationObserver((records) => {
+      seen += records.length;
+    });
+    observer.observe(node, { childList: true, characterData: true, subtree: true, attributes: true });
+    return {
+      count: () => (seen += observer.takeRecords().length),
+      stop: () => observer.disconnect(),
+    };
+  };
+
+  it('is mounted, polite, atomic, visually hidden and empty before any interaction', () => {
+    render(
+      <Field label="Comune">
+        <Combobox options={CITIES} />
+      </Field>,
+    );
+    const region = status();
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region).toHaveAttribute('aria-atomic', 'true');
+    expect(region).toHaveClass('sr-only');
+    expect(region).toHaveTextContent(/^$/u);
+    expect(region).not.toHaveAttribute('id');
+    expect(region).not.toHaveAttribute('hidden');
+    // Not part of the listbox: a listbox may own only options.
+    expect(region.closest('[role="listbox"]')).toBeNull();
+  });
+
+  it('the same node gets the message when typing empties the results, and is emptied when results return', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={CITIES} aria-label="Comune" />);
+    const region = status();
+    const input = screen.getByRole('combobox');
+    await user.type(input, 'mi');
+    expect(region).toHaveTextContent(/^$/u);
+    await user.type(input, 'zz');
+    expect(status()).toBe(region);
+    expect(region).toHaveTextContent(/^No results$/u);
+    await user.clear(input);
+    await user.type(input, 'mo');
+    expect(status()).toBe(region);
+    expect(region).toHaveTextContent(/^$/u);
+    expect(screen.getByRole('option', { name: 'Modena' })).toBeInTheDocument();
+  });
+
+  it('keystrokes that keep the "no results" state do not touch the region (no repeated announcement)', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={CITIES} aria-label="Comune" />);
+    const input = screen.getByRole('combobox');
+    await user.type(input, 'z');
+    const region = status();
+    expect(region).toHaveTextContent('No results');
+    const changes = watch(region);
+    await user.type(input, 'zzqx');
+    await user.keyboard('{Backspace}{Backspace}{ArrowDown}{ArrowUp}{Home}{End}');
+    expect(input).toHaveValue('zzz');
+    expect(changes.count()).toBe(0);
+    // A real transition out and back in is a new announcement.
+    await user.clear(input);
+    await user.type(input, 'to');
+    expect(region).toHaveTextContent(/^$/u);
+    await user.type(input, 'x');
+    expect(region).toHaveTextContent('No results');
+    expect(changes.count()).toBeGreaterThan(0);
+    changes.stop();
+  });
+
+  it('keystrokes among results never touch the region, and aria-activedescendant works as before', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={CITIES} aria-label="Comune" />);
+    const region = status();
+    const changes = watch(region);
+    const input = screen.getByRole('combobox');
+    await user.type(input, 'm');
+    await user.keyboard('{ArrowDown}');
+    expect(input.getAttribute('aria-activedescendant')).toBe(screen.getByRole('option', { name: 'Modena' }).id);
+    expect(changes.count()).toBe(0);
+    changes.stop();
+  });
+
+  it('uses emptyLabel, and the message option itself is not a live region (read once)', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={CITIES} emptyLabel="Nessun risultato" aria-label="Comune" />);
+    await user.type(screen.getByRole('combobox'), 'zzz');
+    expect(status()).toHaveTextContent(/^Nessun risultato$/u);
+    const list = screen.getByRole('listbox');
+    expect(list.querySelector('[aria-live], [role="status"], [role="alert"]')).toBeNull();
+    expect(list.closest('[aria-live]')).toBeNull();
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+  });
+
+  it('closing the list (Escape, Tab) empties the region; reopening on the same text announces again', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Combobox options={CITIES} aria-label="Comune" />
+        <button type="button">After</button>
+      </>,
+    );
+    const input = screen.getByRole('combobox');
+    await user.type(input, 'zzz');
+    expect(status()).toHaveTextContent('No results');
+    await user.keyboard('{Escape}');
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(status()).toHaveTextContent(/^$/u);
+    await user.keyboard('{ArrowDown}');
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(status()).toHaveTextContent('No results');
+    await user.tab();
+    expect(status()).toHaveTextContent(/^$/u);
+  });
+
+  it('options arriving under an open empty list empty the region; options removed fill it', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Combobox options={[]} aria-label="Comune" />);
+    const region = status();
+    await user.click(screen.getByRole('combobox'));
+    expect(region).toHaveTextContent('No results');
+    rerender(<Combobox options={CITIES} aria-label="Comune" />);
+    expect(screen.getAllByRole('option')).toHaveLength(CITIES.length);
+    expect(region).toHaveTextContent(/^$/u);
+    rerender(<Combobox options={[]} aria-label="Comune" />);
+    expect(region).toHaveTextContent('No results');
+    expect(status()).toBe(region);
+  });
+
+  it('a blocked Field (forced, locked) never announces', async () => {
+    const user = userEvent.setup();
+    for (const state of ['forced', 'locked'] as const) {
+      render(
+        <Field label="Comune" state={state} stateReason="Deciso dal contratto.">
+          <Combobox options={[]} />
+        </Field>,
+      );
+      const input = screen.getByRole('combobox');
+      await user.click(input);
+      await user.keyboard('{ArrowDown}');
+      expect(status()).toHaveTextContent(/^$/u);
+      cleanup();
+    }
   });
 });

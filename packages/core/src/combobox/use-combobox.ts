@@ -95,6 +95,11 @@ const escapeKey = (key: string): string =>
  * - Keep the listbox mounted (e.g. `hidden`) while closed so `aria-controls` points at a node.
  * - A listbox may own only options: with no `filteredItems`, render the "no results" message as an
  *   option with `aria-disabled="true"`. It is not in `filteredItems`, so it is never made active.
+ *   The focus stays on the input, so that option is not read on its own: announce the state with a
+ *   live region (`role="status"`) mounted from the start, whose text is set only while the open list
+ *   is empty. The hook knows nothing of loading: a consumer that fetches `items` must keep that text
+ *   empty while a request is in flight and ignore superseded responses, or it announces a stale
+ *   "no results".
  */
 export function useCombobox<T>(options: UseComboboxOptions<T>): UseComboboxReturn<T> {
   const {
