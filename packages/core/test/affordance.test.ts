@@ -14,12 +14,8 @@ const HOVER_MEDIA = '@media (hover: hover) and (pointer: fine)';
  * Known exceptions, each with the reason and the ticket that removes it. An entry with no
  * occurrence left makes the test fail, so the list cannot rot.
  */
-const SOURCE_ALLOWLIST: Record<string, string> = {
-  // Calendar day cells use `group-hover/day:`; migrating them to `rop-hover` (and adding a pressed
-  // state) is a follow-up of #196, tracked in #222.
-  'calendar/Calendar.tsx': 'follow-up of #196 (Calendar day cells), see #222',
-};
-const CSS_ALLOWLIST = [/group-hover\\\/day\\:/];
+const SOURCE_ALLOWLIST: Record<string, string> = {};
+const CSS_ALLOWLIST: RegExp[] = [];
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
