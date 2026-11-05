@@ -9,13 +9,29 @@ export interface ListReportColumn<Row> {
   /** Unique, stable id of the column. */
   id: string;
   header: ReactNode;
-  /** Value used for sorting (and, in later tickets, filtering and searching). */
+  /**
+   * Value used for sorting (and, in later tickets, filtering and searching). Without `cell` it is also
+   * the text of the cell: the rules on `cell` about memoized rows apply to it in that role.
+   */
   accessor?: (row: Row) => unknown;
   /**
-   * Cell content for the table that consumes the hook; the hook itself never calls it. Must depend
-   * only on `row` and on what changes with `columns`: table rows are memoized, so a render of the
-   * parent does not call it again when the row object, `columns` and the selection of the row are
-   * unchanged. A row mutated in place is not detected either: pass a new object.
+   * Cell content for the table that consumes the hook; the hook itself never calls it.
+   *
+   * Table rows are memoized, so a render of the parent alone does not call `cell`. It runs for a row
+   * only when that row renders: when the row object or the `columns` array is a different one, when
+   * the row becomes selected or deselected, or when its id, its selection label or the function
+   * `labels.selectRow` changes.
+   *
+   * - **Compute the content from `row` and from values `columns` was built with.** With the same
+   *   `columns` array, a value read in any other way (a ref, a module variable such as the current
+   *   language, a store snapshot, `Date.now()`, the selection of other rows) stays on screen as it was
+   *   when the row last rendered, even if the parent renders with a new value. To refresh every row,
+   *   make that value a dependency of the `useMemo` that builds `columns`. To refresh only a part of
+   *   the cell, return a component that subscribes to the value itself (context, store hook): it
+   *   updates on its own, without a render of the row.
+   * - **Replace a changed row, never mutate it.** `row.status = 'paid'` followed by a render of the
+   *   parent shows the old status, because the object is the same: pass a new object in `rows`
+   *   (`rows.map((r) => (r.id === id ? { ...r, status: 'paid' } : r))`).
    */
   cell?: (row: Row) => ReactNode;
   /** Sortable only with an `accessor` or a `compare`; `false` opts out. */

@@ -125,9 +125,10 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
  * one `<td>` per column. The default `renderBody` of `ListReportTable` renders one of these per
  * row; a virtualized table (`@react-object-page/pro`) renders the same row for whatever subset it
  * mounts. Memoized: it re-renders only when its row, its selected state, `columns`, its id and
- * label, `labels.selectRow`, `rowProps` (shallow) or the extension props change; a `cell` that
- * reads state outside `columns`/`row` is not re-evaluated by a parent render. Exported from
- * `@react-object-page/core/internal`; not public API, no semver guarantee.
+ * label, `labels.selectRow`, `rowProps` (shallow) or the extension props change; see
+ * `ListReportColumn.cell` for what that means for a cell. `onToggle` and `renderCellOptions` are
+ * compared by identity: keep them stable, or every render of the parent renders the row. Exported
+ * from `@react-object-page/core/internal`; not public API, no semver guarantee.
  */
 export const ListReportTableRow = /* @__PURE__ */ memo(ListReportTableRowImpl, rowPropsAreEqual) as <Row>(
   props: ListReportTableRowProps<Row>,

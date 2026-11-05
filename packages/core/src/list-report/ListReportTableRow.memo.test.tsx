@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ListReportTable } from './ListReportTable';
@@ -77,6 +77,64 @@ describe('ListReportTableRow memoization', () => {
     render(<Host />);
     act(() => setColumns([{ id: 'name', header: 'Name', accessor: (r) => `${r.name}!` }]));
     expect(screen.getByRole('checkbox', { name: 'Select Item 1!' })).toBeInTheDocument();
+  });
+});
+
+describe('the contract documented on ListReportColumn.cell', () => {
+  const Lang = createContext('en');
+  let language = 'en';
+  const LangCell = () => <>{useContext(Lang)}</>;
+
+  function ContractHost({ rows, columns }: { rows: Item[]; columns: ListReportColumn<Item>[] }) {
+    const table = useListReport<Item>({ rows, columns, getRowId: (r) => r.id });
+    return <ListReportTable table={table} aria-label="Items" />;
+  }
+
+  beforeEach(() => {
+    language = 'en';
+  });
+
+  it('a `cell` reading a module variable keeps the old value on a parent render, and refreshes with a new `columns`', () => {
+    const build = (): ListReportColumn<Item>[] => [{ id: 'name', header: 'Name', cell: (r) => `${language} ${r.name}` }];
+    const columns = build();
+    const { rerender: update } = render(<ContractHost rows={ROWS} columns={columns} />);
+    language = 'it';
+    update(<ContractHost rows={ROWS} columns={columns} />);
+    expect(screen.getByText('en Item 1')).toBeInTheDocument();
+    update(<ContractHost rows={ROWS} columns={build()} />);
+    expect(screen.getByText('it Item 1')).toBeInTheDocument();
+  });
+
+  it('an `accessor` that provides the cell text follows the same rule', () => {
+    const columns: ListReportColumn<Item>[] = [{ id: 'name', header: 'Name', accessor: (r) => `${language} ${r.name}` }];
+    const { rerender: update } = render(<ContractHost rows={ROWS} columns={columns} />);
+    language = 'it';
+    update(<ContractHost rows={ROWS} columns={columns} />);
+    expect(screen.getByText('en Item 1')).toBeInTheDocument();
+  });
+
+  it('a row mutated in place keeps the old content; a new object shows the change', () => {
+    const rows = ROWS.map((r) => ({ ...r }));
+    const columns: ListReportColumn<Item>[] = [{ id: 'name', header: 'Name', cell: (r) => r.name }];
+    const { rerender: update } = render(<ContractHost rows={rows} columns={columns} />);
+    (rows[1] as Item).name = 'Changed';
+    update(<ContractHost rows={[...rows]} columns={columns} />);
+    expect(screen.queryByText('Changed')).toBeNull();
+    update(<ContractHost rows={rows.map((r) => ({ ...r }))} columns={columns} />);
+    expect(screen.getByText('Changed')).toBeInTheDocument();
+  });
+
+  it('a component returned by `cell` that subscribes to a context updates without a render of the row', () => {
+    const columns: ListReportColumn<Item>[] = [{ id: 'lang', header: 'Lang', cell: () => <LangCell /> }];
+    const ui = (value: string) => (
+      <Lang.Provider value={value}>
+        <ContractHost rows={ROWS.slice(0, 1)} columns={columns} />
+      </Lang.Provider>
+    );
+    const { rerender: update } = render(ui('en'));
+    expect(screen.getByText('en')).toBeInTheDocument();
+    update(ui('it'));
+    expect(screen.getByText('it')).toBeInTheDocument();
   });
 });
 
