@@ -54,16 +54,7 @@ function rangeOf(m: Metrics, overscan: number, count: number): VirtualRange {
   return computeRange(m.scrollTop + m.stickyHeight - m.bodyStart, m.clientHeight - m.stickyHeight, m.pitch, overscan, count);
 }
 
-const sameMetrics = (a: Metrics, b: Metrics): boolean =>
-  a.scrollTop === b.scrollTop &&
-  a.clientHeight === b.clientHeight &&
-  a.stickyHeight === b.stickyHeight &&
-  a.bodyStart === b.bodyStart &&
-  a.pitch === b.pitch &&
-  a.measured === b.measured;
-
-/** The first mounted data row (spacers have no `aria-rowindex`). */
-const firstDataRow = (el: HTMLElement): HTMLElement | null => el.querySelector<HTMLElement>('tbody > tr[aria-rowindex]');
+const sameMetrics = (a: Metrics, b: Metrics): boolean => (Object.keys(a) as (keyof Metrics)[]).every((key) => a[key] === b[key]);
 
 /**
  * Reads the layout. Anything without a layout (jsdom, `display: none`) reads 0: the previous value is
@@ -75,7 +66,8 @@ function measure(el: HTMLElement, previous: Metrics): Metrics {
   const box = el.getBoundingClientRect();
   const stickyHeight = thead ? thead.getBoundingClientRect().height : 0;
   const bodyStart = tbody ? tbody.getBoundingClientRect().top - box.top - el.clientTop + el.scrollTop : stickyHeight;
-  const row = firstDataRow(el);
+  // Spacers have no `aria-rowindex`.
+  const row = el.querySelector('tbody > tr[aria-rowindex]');
   const rowHeight = row ? row.getBoundingClientRect().height : 0;
   const clientHeight = el.clientHeight;
   return {
@@ -124,7 +116,7 @@ export interface UseVirtualRowsReturn {
  *
  * - Range O(1) from `scrollTop / pitch`, the header height subtracted.
  * - The pitch is measured from a mounted data row (fractional px), re-measured by a ResizeObserver on
- *   that row (a change of `--rop-list-report-row-height` from `className`/`style`, zoom, font size), on
+ *   the body (a change of `--rop-list-report-row-height` from `className`/`style`, zoom, font size), on
  *   the header and on the scroller (viewport).
  * - A scroll that changes the range re-renders synchronously (`flushSync`) inside the `scroll` event,
  *   which the browser dispatches before painting: no blank frame at normal speed.
@@ -142,9 +134,11 @@ export function useVirtualRows({ enabled, count, overscan, pinnedIndex, scroller
     setMetrics((current) => (sameMetrics(current, next) ? current : next));
   }, []);
 
+  // The metrics a scroll event has just read: their commit does not read `scrollTop` again, because the
+  // getter forces a synchronous layout of the rows that commit has just changed.
+  const scrollRead = useRef<Metrics | null>(null);
+
   // Listeners and observers: only while enabled.
-  const observedRow = useRef<Element | null>(null);
-  const observer = useRef<ResizeObserver | null>(null);
   useIsomorphicLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!enabled || !el) return undefined;
@@ -154,47 +148,40 @@ export function useVirtualRows({ enabled, count, overscan, pinnedIndex, scroller
       const { metrics: m, overscan: o, count: c, range: rendered } = latest.current;
       const next = { ...m, scrollTop: el.scrollTop };
       if (rendered && sameRange(rangeOf(next, o, c), rendered)) return;
+      scrollRead.current = next;
       flushSync(() => update(next));
     };
     el.addEventListener('scroll', onScroll, { passive: true });
 
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => update(measure(el, latest.current.metrics)));
+      // Geometry only: a `scrollTop` taken here would commit the new range at default priority, after
+      // paint, and the scroll event that follows would find nothing to flush.
+      ro = new ResizeObserver(() => {
+        const { metrics: m } = latest.current;
+        update({ ...measure(el, m), scrollTop: m.scrollTop });
+      });
       ro.observe(el);
-      const thead = el.querySelector('thead');
-      if (thead) ro.observe(thead);
-      const row = firstDataRow(el);
-      if (row) ro.observe(row);
-      observedRow.current = row;
+      // The body, not a row: it stays mounted and its height changes with the pitch, not with the range,
+      // so a scroll never triggers the observer.
+      el.querySelectorAll('thead, tbody').forEach((part) => ro?.observe(part));
     }
-    observer.current = ro;
     return () => {
       el.removeEventListener('scroll', onScroll);
       ro?.disconnect();
-      observer.current = null;
-      observedRow.current = null;
     };
   }, [enabled, scrollerRef, update]);
 
-  // After every commit while enabled: keep a mounted row observed (the observed one may have been
-  // unmounted by the range) and pick up a `scrollTop` changed outside a scroll event.
+  // After every commit while enabled: pick up a `scrollTop` changed outside a scroll event.
   useIsomorphicLayoutEffect(() => {
     const el = scrollerRef.current;
     if (!enabled || !el) return;
-    const ro = observer.current;
-    if (ro && !observedRow.current?.isConnected) {
-      if (observedRow.current) ro.unobserve(observedRow.current);
-      const row = firstDataRow(el);
-      if (row) {
-        ro.observe(row);
-        observedRow.current = row;
-      }
-    }
     const { metrics: m } = latest.current;
+    const justRead = m === scrollRead.current;
+    scrollRead.current = null;
     if (!m.measured) {
       update(measure(el, m));
-    } else if (el.scrollTop !== m.scrollTop) {
+    } else if (!justRead && el.scrollTop !== m.scrollTop) {
       update({ ...m, scrollTop: el.scrollTop });
     }
   });

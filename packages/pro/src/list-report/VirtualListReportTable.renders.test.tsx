@@ -186,7 +186,7 @@ describe('ListReportTableRow memoization in the virtualized table', () => {
     expect(box(5)).not.toBeChecked();
   });
 
-  it('the row props cache never holds more than the mounted rows, however far the scroll went', () => {
+  it('the handlers cache never holds more than the mounted rows, however far the scroll went', () => {
     const maps = new Set<Map<unknown, unknown>>();
     const realSet = Map.prototype.set;
     const spy = vi.spyOn(Map.prototype, 'set').mockImplementation(function (this: Map<unknown, unknown>, key, value) {
@@ -237,7 +237,7 @@ describe('ListReportTableRow memoization in the virtualized table', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Item 5' }).closest('tr')!.getAttribute('aria-rowindex')).toBe('4');
   });
 
-  it('crossing the threshold rebuilds the cached row props in both directions', () => {
+  it('crossing the threshold gives the rows the right props in both directions', () => {
     render(<Host />);
     const row = () => screen.getByRole('checkbox', { name: 'Select Item 3' }).closest('tr')!;
     expect(row().getAttribute('aria-rowindex')).toBe('5');

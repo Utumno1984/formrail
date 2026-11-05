@@ -64,7 +64,7 @@ const FORCE_TRUNCATE = { forceTruncate: true } as const;
 // never make a row taller than the pitch the range is computed with.
 const VIRTUAL_ROW_CLASS = 'rop-pro-virtual-row';
 
-type RowPropsById = Map<string, HTMLAttributes<HTMLTableRowElement>>;
+type RowHandlersById = Map<string, Pick<HTMLAttributes<HTMLTableRowElement>, 'onFocus' | 'onBlur'>>;
 
 const TAB_STOPS = 'a[href], button, input, select, textarea, [tabindex]';
 /** The keyboard tab stops of a row, in document order. */
@@ -139,13 +139,13 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // time, not captured, so a skipped row render never leaves it with a stale selection or result index.
   // Written on commit: a render that never commits (a suspended transition) must not change what a
   // gesture on the rows on screen acts on.
-  const toggleDeps = useRef({ indexOfResult, resultIds, selection });
+  const live = useRef({ indexOfResult, resultIds, selection });
   useIsomorphicLayoutEffect(() => {
-    toggleDeps.current = { indexOfResult, resultIds, selection };
+    live.current = { indexOfResult, resultIds, selection };
   });
   const onToggle = useCallback(
     (id: string, event: MouseEvent<HTMLInputElement>) => {
-      const { indexOfResult, resultIds, selection } = toggleDeps.current;
+      const { indexOfResult, resultIds, selection } = live.current;
       const shift = event.shiftKey || shiftSpace.current;
       shiftSpace.current = false;
       const from = anchor.current === null ? -1 : indexOfResult(anchor.current);
@@ -208,15 +208,13 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // listener is on `window`, capture phase — attached only while something is selected: with an empty
   // selection Escape is not even seen here and goes on (the Dialog closes as usual).
   const hasSelection = selection.enabled && selection.selectedIds.size > 0;
-  const clearSelection = useRef(selection.clearSelection);
-  clearSelection.current = selection.clearSelection;
   useEffect(() => {
     if (!hasSelection) return undefined;
     const onEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return;
       const el = scrollerRef.current;
       if (!el || !(event.target instanceof Node) || !el.contains(event.target)) return;
-      clearSelection.current();
+      live.current.selection.clearSelection();
       event.stopPropagation();
     };
     window.addEventListener('keydown', onEscape, true);
@@ -279,23 +277,19 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   );
 
   // --- Rendering ----------------------------------------------------------------------------------
-  // `rowProps` per id, so a row that stays mounted across a range change receives the same object and
-  // `ListReportTableRow` can skip its render. Rebuilt on every body pass from the ids actually rendered,
-  // so it never holds more than the mounted rows. An entry is reused only while its `aria-rowindex`
-  // (absent when not virtualized) is the one the row needs.
-  const rowPropsCache = useRef<RowPropsById>(new Map());
-  const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number, nextRowProps: RowPropsById): ReactNode => {
+  // Handlers per id, so a row that stays mounted across a range change gets the same functions and the
+  // shallow `rowProps` comparison of `ListReportTableRow` skips its render. Rebuilt on every body pass
+  // from the ids actually rendered, so it never holds more than the mounted rows.
+  const rowHandlers = useRef<RowHandlersById>(new Map());
+  const nextRowHandlers: RowHandlersById = new Map();
+  const renderRow = (ctx: ListReportTableBodyContext<Row>, index: number): ReactNode => {
     const row = ctx.table.rows[index]!;
     const id = ctx.table.getRowId(row);
-    let cached = rowPropsCache.current.get(id);
-    if (!cached || cached['aria-rowindex'] !== (virtual ? index + 2 : undefined)) {
-      cached = {
-        onFocus: () => onRowFocus(id),
-        onBlur: (event) => onRowBlur(id, event),
-        ...(virtual && { 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS }),
-      };
-    }
-    nextRowProps.set(id, cached);
+    const handlers = rowHandlers.current.get(id) ?? {
+      onFocus: () => onRowFocus(id),
+      onBlur: (event) => onRowBlur(id, event),
+    };
+    nextRowHandlers.set(id, handlers);
     return (
       <ListReportTableRow
         key={id}
@@ -303,7 +297,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         row={row}
         selectable={ctx.selectable}
         labels={ctx.labels}
-        rowProps={cached}
+        rowProps={virtual ? { ...handlers, 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS } : handlers}
         onToggle={ctx.selectable ? onToggle : undefined}
         renderCellOptions={virtual ? FORCE_TRUNCATE : undefined}
       />
@@ -313,13 +307,12 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // One flat keyed list in both modes: crossing the threshold keeps every row's DOM node (and the focus).
   const renderBody = (ctx: ListReportTableBodyContext<Row>): ReactNode => {
     const children: ReactNode[] = [];
-    const nextRowProps: RowPropsById = new Map();
     if (!virtual) {
-      for (let i = 0; i < count; i++) children.push(renderRow(ctx, i, nextRowProps));
+      for (let i = 0; i < count; i++) children.push(renderRow(ctx, i));
     } else {
       for (const segment of segments) {
         if (segment.type === 'rows') {
-          for (let i = segment.start; i < segment.end; i++) children.push(renderRow(ctx, i, nextRowProps));
+          for (let i = segment.start; i < segment.end; i++) children.push(renderRow(ctx, i));
         } else {
           children.push(
             <tr key={`rop-spacer-${segment.key}`} aria-hidden="true" data-rop-spacer="">
@@ -330,7 +323,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
       }
     }
     children.push(<Filler key="rop-filler" columnCount={ctx.columnCount} rows={ctx.minRows - count} />);
-    rowPropsCache.current = nextRowProps;
+    rowHandlers.current = nextRowHandlers;
     return children;
   };
 

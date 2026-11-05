@@ -3,7 +3,9 @@
 '@react-object-page/pro': patch
 ---
 
-`ListReportTableRow` (`/internal`) is memoized: a row re-renders only when its row object, selected state, `columns`, id, selection label, `labels.selectRow`, `rowProps` or extension props change, not on every render of its parent. `VirtualListReportTable` now hands each mounted row a stable `rowProps` object (cached per id) and a stable `onToggle`, so a range change during scroll renders only the rows that enter the range.
+`ListReportTableRow` (`/internal`) is memoized: a row re-renders only when its row object, selected state, `columns`, id, selection label, `labels.selectRow`, `rowProps` or extension props change, not on every render of its parent. `VirtualListReportTable` now hands each mounted row stable handlers (cached per id) and a stable `onToggle`, so a range change during scroll renders only the rows that enter the range.
+
+`VirtualListReportTable` commits a range change inside the scroll event for every scroll: a programmatic scroll used to commit it at default priority, after paint. The `ResizeObserver` watches the table body instead of a row, so a scroll no longer triggers it, and the commit of a scroll event no longer forces a synchronous layout. A closed `Tooltip` no longer mounts its Portal.
 
 **Behaviour change on the public `ListReportTable`:** a render of the parent no longer re-evaluates `cell`, or `accessor` when it provides the cell text, for an unchanged row. If your `columns` array stays the same:
 

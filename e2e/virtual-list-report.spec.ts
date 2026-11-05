@@ -344,6 +344,47 @@ test.describe('memoized rows keep their state through the scroll', () => {
   });
 });
 
+test.describe('range commit and pitch in a real browser', () => {
+  test('a programmatic scroll per frame commits every range inside the scroll event, not in a later task', async ({ page }) => {
+    await openDefault(page);
+    const { inside, outside } = await scroller(page).evaluate(async (el) => {
+      let dispatching = false;
+      let inside = 0;
+      let outside = 0;
+      // The capture listener on `window` runs before the table's own, this bubbling one after it.
+      window.addEventListener('scroll', () => { dispatching = true; }, { capture: true, passive: true });
+      el.addEventListener('scroll', () => { dispatching = false; }, { passive: true });
+      // Runs as a microtask right after the table's listener returns, while `dispatching` still holds.
+      new MutationObserver(() => {
+        if (dispatching) inside++;
+        else outside++;
+      }).observe(el.querySelector('tbody')!, { childList: true });
+      for (let i = 0; i < 60; i++) {
+        el.scrollBy(0, 94);
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      }
+      return { inside, outside };
+    });
+    expect(inside).toBeGreaterThan(50);
+    expect(outside).toBe(0);
+  });
+
+  test('a row height changed after the mount is picked up: pitch, scroll height and range follow it', async ({ page }) => {
+    await openDefault(page);
+    await scroller(page).evaluate((el) => el.style.setProperty('--rop-list-report-row-height', '4rem'));
+    await expect.poll(async () => (await geometry(page)).pitch).toBeCloseTo(67, 0);
+    const n = 100_000;
+    await expect.poll(async () => {
+      const g = await geometry(page);
+      return Math.abs(g.scrollHeight - (g.header + n * g.pitch));
+    }).toBeLessThanOrEqual(1);
+    const g = await geometry(page);
+    await scrollToTop(page, 50_000 * g.pitch);
+    expect((await rowIndices(page))[0]).toBe(50_002 - OVERSCAN);
+    expect(await centreHit(page)).toBe('data');
+  });
+});
+
 test.describe('scroll restoration (core hook, unchanged)', () => {
   async function scrollThenOpen(page: Page, top: number): Promise<number> {
     await expect(table(page)).toHaveAttribute('aria-rowcount', '100001');

@@ -7,12 +7,12 @@
       "limit": 2165
     },
     "VirtualListReport": {
-      "baseline": 4365,
-      "limit": 4802
+      "baseline": 3924,
+      "limit": 4317
     },
     "VirtualListReportTable": {
-      "baseline": 4006,
-      "limit": 4407
+      "baseline": 3561,
+      "limit": 3918
     },
     "computeChangeSummary": {
       "baseline": 2187,

@@ -225,7 +225,9 @@ export function TooltipInternal({
       <RadixTooltip.Trigger asChild ref={triggerRef} onFocus={gateFocus} onPointerMove={gatePointer} onBlur={handleTriggerBlur}>
         {trigger}
       </RadixTooltip.Trigger>
-      {empty ? null : (
+      {/* Mounted only while open: a closed tooltip must not cost a Portal and a Presence per trigger, and
+          no exit animation needs them after the close. */}
+      {open ? (
         <RadixTooltip.Portal>
           <RadixTooltip.Content
             side={side}
@@ -237,7 +239,7 @@ export function TooltipInternal({
             {content}
           </RadixTooltip.Content>
         </RadixTooltip.Portal>
-      )}
+      ) : null}
     </RadixTooltip.Root>
   );
 
