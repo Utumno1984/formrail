@@ -11,9 +11,31 @@ import { expectPlayToPass } from './helpers/story';
 // 1px up (deliberate, covered by e2e/button.spec.ts).
 
 const STORY = 'internal-icontextalignment--all-pairs';
+// Cases rendered in a portal (or only once opened) cannot share the AllPairs page: each has its own
+// story, the play function of which tags the portaled node as a `data-align-case`.
+const PORTALED_STORIES = [
+  'internal-icontextalignment--toast-pair',
+  'internal-icontextalignment--select-option-pair',
+  'internal-icontextalignment--combobox-option-pair',
+];
 // Half a device pixel of quantisation of the ink at 1x, plus anti-aliasing: well below the 1-3px
 // offsets this test guards against (WenQuanYi Zen Hei: +2px before the fix, Text icons: +1.2-2px).
 const TOLERANCE = 0.75;
+
+// Cases measured with the extreme-metrics font: every CapIconSlot consumer except the ones whose
+// own e2e covers them (badges, Text, Button).
+const CROSS_FONT_CASES = [
+  'checkbox',
+  'switch',
+  'radio',
+  'message-strip',
+  'field-message-error',
+  'list-report-sort-arrow',
+  'object-page-footer',
+  'toast',
+  'select-option',
+  'combobox-option',
+];
 
 interface Measure {
   name: string;
@@ -93,7 +115,7 @@ async function measure(page: Page, dpr: number): Promise<Measure[]> {
         let node = walker.nextNode() as Text | null;
         while (node && !node.data.trim()) node = walker.nextNode() as Text | null;
         const s = node!.data;
-        const idx = s.search(/[A-Z]/);
+        const idx = s.search(/[A-Z0-9]/);
         const range = document.createRange();
         range.setStart(node!, idx);
         range.setEnd(node!, idx + 1);
@@ -128,6 +150,8 @@ for (const dpr of [1, 2, 3]) {
         'radio',
         'field-message-error',
         'message-strip',
+        'list-report-sort-arrow',
+        'object-page-footer',
         'text-caption-icon',
         'text-body-icon',
       ]);
@@ -148,14 +172,21 @@ test('the alignment does not depend on the font: a font whose glyphs sit high in
   // A font with an unusually large descent (glyphs high in the line box): line-box centring puts
   // the icon well below the capitals, cap centring does not care. Built from the local sans-serif
   // with `descent-override`, so no font file is needed.
-  await expectPlayToPass(page, STORY);
-  await page.addStyleTag({
-    content:
-      "@font-face { font-family: 'RopHighGlyphs'; src: local('Liberation Sans'), local('Arial'), local('DejaVu Sans'), local('Helvetica'); ascent-override: 80%; descent-override: 60%; }" +
-      ':root { --font-rop-sans: RopHighGlyphs, sans-serif !important; }',
-  });
-  await page.evaluate(() => document.fonts.ready);
-  const rows = (await measure(page, 1)).filter((r) => ['checkbox', 'switch', 'radio', 'message-strip', 'field-message-error'].includes(r.name));
+  const rows: Measure[] = [];
+  for (const story of [STORY, ...PORTALED_STORIES]) {
+    await expectPlayToPass(page, story);
+    await page.addStyleTag({
+      content:
+        "@font-face { font-family: 'RopHighGlyphs'; src: local('Liberation Sans'), local('Arial'), local('DejaVu Sans'), local('Helvetica'); ascent-override: 80%; descent-override: 60%; }" +
+        ':root { --font-rop-sans: RopHighGlyphs, sans-serif !important; }',
+    });
+    await page.evaluate(() => document.fonts.ready);
+    rows.push(...(await measure(page, 1)).filter((r) => CROSS_FONT_CASES.includes(r.name)));
+  }
+  // Explicit count: a component added to a fixture but not to this list (or dropped from a fixture)
+  // fails here instead of going unmeasured.
+  expect(rows).toHaveLength(CROSS_FONT_CASES.length);
+  expect(rows.map((r) => r.name).sort()).toEqual([...CROSS_FONT_CASES].sort());
   for (const r of rows) {
     expect(r.capCentre, r.name).not.toBeNull();
     expect(Math.abs(r.iconCentre - r.capCentre!), `${r.name}: icon ${r.iconCentre} cap ${r.capCentre}`).toBeLessThanOrEqual(TOLERANCE);

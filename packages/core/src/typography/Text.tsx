@@ -38,9 +38,10 @@ export const Text = /* @__PURE__ */ forwardRef<HTMLElement, TextProps>(function 
       // An icon that is a direct child is centred on the cap height of the line, not on the
       // x-height middle of `vertical-align: middle` (1.2-2px lower, ticket #217): `middle` puts it
       // on baseline + 0.5ex and the relative offset adds 0.5ex - 0.5cap (same font, so the x-height
-      // cancels out). Without `cap` support the offset is dropped and `middle` remains.
+      // cancels out). Without `cap` support (Safari < 17.2) the declaration would be dropped and `middle`
+      // alone leaves the icon ~1px too low, so a fixed -0.1em stands in for that offset there.
       className={cn(
-        'm-0 [&_svg]:my-[-0.25em] [&>svg]:relative [&>svg]:top-[calc(0.5ex-0.5cap)] [&>svg]:align-middle',
+        'm-0 [&_svg]:my-[-0.25em] [&>svg]:relative [&>svg]:top-[-0.1em] [&>svg]:supports-[top:1cap]:top-[calc(0.5ex-0.5cap)] [&>svg]:align-middle',
         VARIANT_CLASS[variant],
         mono ? 'font-rop-mono' : 'font-rop-sans',
         className,
