@@ -284,11 +284,13 @@ export const OpenedByArrowDown: Story = {
       const [open, setOpen] = useState(false);
       return (
         <Page>
-          {/* A tooltip already mounted elsewhere on the page, as in any real app. */}
-          <Tooltip content="Azione della pagina" delayDuration={delayDuration}>
-            <TrashButton label="Azione della pagina" />
-          </Tooltip>
-          <Button onKeyDown={(event) => event.key === 'ArrowDown' && setOpen(true)}>Menu</Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {/* A tooltip already mounted elsewhere on the page, as in any real app. */}
+            <Tooltip content="Azione della pagina" delayDuration={delayDuration}>
+              <TrashButton label="Azione della pagina" />
+            </Tooltip>
+            <Button onKeyDown={(event) => event.key === 'ArrowDown' && setOpen(true)}>Menu</Button>
+          </div>
           {open && (
             <div
               role="menu"
