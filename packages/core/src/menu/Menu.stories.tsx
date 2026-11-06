@@ -24,6 +24,7 @@ interface DemoArgs {
   align: Align;
   disabledItem: DisabledItem;
   modal: boolean;
+  loop: boolean;
   onOpenChange: (open: boolean) => void;
   onRename: (event: Event) => void;
   onDuplicate: (event: Event) => void;
@@ -50,6 +51,7 @@ const meta: Meta<DemoArgs> = {
       options: ['none', 'rename', 'duplicate', 'archive'] satisfies DisabledItem[],
     },
     modal: { control: 'boolean' },
+    loop: { control: 'boolean' },
     onOpenChange: { control: false },
     onRename: { control: false },
     onDuplicate: { control: false },
@@ -61,6 +63,7 @@ const meta: Meta<DemoArgs> = {
     align: 'start',
     disabledItem: 'archive',
     modal: true,
+    loop: true,
     onOpenChange: fn(),
     onRename: fn(),
     onDuplicate: fn(),
@@ -121,7 +124,7 @@ function BasicMenu({ args }: { args: DemoArgs }) {
       <MenuTrigger asChild>
         <Button variant="secondary">More actions</Button>
       </MenuTrigger>
-      <MenuContent side={args.side} align={args.align}>
+      <MenuContent side={args.side} align={args.align} loop={args.loop}>
         <Items args={args} />
       </MenuContent>
     </Menu>
@@ -129,7 +132,7 @@ function BasicMenu({ args }: { args: DemoArgs }) {
 }
 
 /**
- * Controls: `side`, `align`, `modal`, and which item is disabled; every `onSelect` and
+ * Controls: `side`, `align`, `modal`, `loop`, and which item is disabled; every `onSelect` and
  * `onOpenChange` is in Actions. The play function opens the menu with ArrowDown, checks that the
  * disabled item is skipped, picks "Duplicate" with Enter and checks the action, the closing and the
  * focus back on the trigger.

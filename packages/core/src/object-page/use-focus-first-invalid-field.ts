@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
+import { compareDocumentOrder } from '../internal/focus';
 import { isDev } from '../internal/is-dev';
 
 import { invalidPaths, isClearing } from './field-errors';
@@ -86,7 +87,7 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors, trigger }
       }
     }
     // Document order, never the order of the keys of `fieldErrors`.
-    candidates.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    candidates.sort(compareDocumentOrder);
 
     // A candidate that cannot take focus (`type="hidden"`, disabled, `display: none`, inert, a
     // `fieldset`) is skipped: the first one that really receives focus wins.
