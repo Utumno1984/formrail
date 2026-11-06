@@ -396,6 +396,51 @@ describe('Tabs', () => {
     expect(screen.getByRole('tabpanel')).toHaveAttribute('tabindex', '0');
   });
 
+  it('a panel that starts with plain text and receives an input after mount drops its tabindex', async () => {
+    function Late() {
+      const [show, setShow] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setShow(true)}>
+            add
+          </button>
+          <Tabs defaultValue="a">
+            <TabsList aria-label="S">
+              <TabsTrigger value="a">A</TabsTrigger>
+            </TabsList>
+            <TabsContent value="a">{show ? <input aria-label="late" /> : 'plain'}</TabsContent>
+          </Tabs>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Late />);
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('tabindex', '0');
+    await user.click(screen.getByRole('button', { name: 'add' }));
+    await screen.findByLabelText('late');
+    await vi.waitFor(() => expect(screen.getByRole('tabpanel')).not.toHaveAttribute('tabindex'));
+  });
+
+  it('removing the focused tab does not steal the focus the consumer moved elsewhere in the same render', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    function Host({ removed }: { removed: boolean }) {
+      return (
+        <>
+          <Demo value="a" tabs={removed ? ['b', 'c'] : ['a', 'b', 'c']} onValueChange={onValueChange} />
+          {removed ? <input aria-label="elsewhere" ref={(el) => el?.focus()} /> : null}
+        </>
+      );
+    }
+    const { rerender } = render(<Host removed={false} />);
+    await user.click(screen.getByRole('tab', { name: 'Tab a' }));
+    onValueChange.mockClear();
+    rerender(<Host removed />);
+    await Promise.resolve();
+    expect(screen.getByLabelText('elsewhere')).toHaveFocus();
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
   it('SSR: the server markup hydrates without errors', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const container = document.createElement('div');

@@ -161,7 +161,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     if (!parent || rest.dir) return;
     const computed = getComputedStyle(parent).direction === 'rtl' ? 'rtl' : 'ltr';
     setInheritedDir((prev) => (prev === computed ? prev : computed));
-  });
+  }, [rest.dir]);
   const state = useMemo(() => ({ orientation, keepMounted, current }), [orientation, keepMounted, current]);
 
   useEffect(() => {
