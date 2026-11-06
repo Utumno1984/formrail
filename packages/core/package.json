@@ -64,7 +64,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup && node scripts/build-css.mjs",
+    "build": "tsup && node scripts/relativize-sourcemaps.mjs && node scripts/build-css.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
   },
