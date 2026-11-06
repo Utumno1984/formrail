@@ -6,7 +6,7 @@ import { gotoStory } from "./helpers/story";
 // (no echo, clearOnEmpty, revert) by counting the calls that reach the Actions channel.
 
 const STORY = (name: string) => `forms-combobox--${name}`;
-const input = (page: Page, name = "Comune"): Locator =>
+const input = (page: Page, name = "City"): Locator =>
   page.getByRole("combobox", { name });
 const listbox = (page: Page): Locator => page.getByRole("listbox");
 
@@ -44,7 +44,7 @@ async function recordCalls(page: Page) {
   });
 }
 /**
- * The AsyncLoad story clicks "Carica dati" in its own play function. To drive the parent's change
+ * The AsyncLoad story clicks "Load data" in its own play function. To drive the parent's change
  * by hand (and mid-typing) the first synthetic click on that button is swallowed in the capture
  * phase until the test releases it with `window.__release()`. The play then fails on purpose; only
  * the state of the page matters here.
@@ -60,7 +60,7 @@ async function holdLoadButton(page: Page) {
       (e) => {
         if (
           blocked &&
-          (e.target as HTMLElement | null)?.textContent === "Carica dati"
+          (e.target as HTMLElement | null)?.textContent === "Load data"
         )
           e.stopPropagation();
       },
@@ -136,7 +136,7 @@ test.describe("QA #45: onValueChange contract", () => {
     await release(page);
     // A click that does not move the focus (the real parent would do it from a timer / a fetch).
     await page
-      .getByRole("button", { name: "Carica dati" })
+      .getByRole("button", { name: "Load data" })
       .evaluate((b: HTMLElement) => b.click());
     await expect(box).toHaveValue("abc");
     expect(await calls(page)).toEqual([]);
@@ -161,7 +161,7 @@ test.describe("QA #45: onValueChange contract", () => {
     await page.keyboard.press("Enter"); // empty options: nothing happens
     await page.keyboard.press("ArrowDown");
     await page
-      .getByRole("button", { name: "Carica dati" })
+      .getByRole("button", { name: "Load data" })
       .evaluate((b: HTMLElement) => b.click());
     await expect(box).toHaveValue("Torino");
     expect(errors).toEqual([]);
@@ -202,7 +202,7 @@ test.describe("QA #45: odd interactions", () => {
     page,
   }) => {
     await gotoStory(page, STORY("long-list"));
-    const box = input(page, "Cliente");
+    const box = input(page, "Customer");
     await box.click();
     const r = (await listbox(page).boundingBox())!;
     // Right edge of the list = scrollbar track.
@@ -311,7 +311,7 @@ for (const [name, container] of [
       await gotoStory(page, STORY(container));
       const box = page
         .getByRole("dialog")
-        .getByRole("combobox", { name: "Comune" });
+        .getByRole("combobox", { name: "City" });
       await box.fill("o");
       await expect(listbox(page)).toBeVisible();
       await box.click();
@@ -328,7 +328,7 @@ for (const [name, container] of [
       await gotoStory(page, STORY(container));
       const box = page
         .getByRole("dialog")
-        .getByRole("combobox", { name: "Comune" });
+        .getByRole("combobox", { name: "City" });
       await box.fill("mi");
       await expect(listbox(page)).toBeVisible();
       await page.keyboard.press("ArrowDown");
@@ -363,7 +363,7 @@ test.describe("QA #45: touch @touch", () => {
     await gotoStory(page, STORY("inside-dialog"));
     const box = page
       .getByRole("dialog")
-      .getByRole("combobox", { name: "Comune" });
+      .getByRole("combobox", { name: "City" });
     await box.fill("o");
     await expect(listbox(page)).toBeVisible();
     await page.getByRole("option", { name: "Torino" }).tap();
@@ -409,7 +409,7 @@ test.describe("QA #45: locked Field state (the stories cover disabled and forced
     await expect(listbox(page)).toHaveCount(0);
     await expect(box).toHaveValue("");
     await expect(box).toHaveAccessibleDescription(
-      /Deciso dal contratto quadro\./,
+      /Set by the master agreement\./,
     );
   });
 });

@@ -20,7 +20,7 @@ const CITIES: City[] = [
   { id: 'mi', label: 'Milano' },
   { id: 'mo', label: 'Modena' },
   { id: 'mn', label: 'Mantova', disabled: true },
-  { id: 'cdc', label: 'Città di Castello' },
+  { id: 'sp', label: 'São Paulo' },
   { id: 'to', label: 'Torino' },
 ];
 
@@ -68,10 +68,10 @@ const activeOption = () => {
 describe('defaultComboboxFilter', () => {
   const toString = (c: City) => c.label;
   it('is case and diacritics insensitive, by substring', () => {
-    expect(defaultComboboxFilter(CITIES, 'citta', toString).map((c) => c.id)).toEqual(['cdc']);
-    expect(defaultComboboxFilter(CITIES, 'CASTELLO', toString).map((c) => c.id)).toEqual(['cdc']);
+    expect(defaultComboboxFilter(CITIES, 'sao', toString).map((c) => c.id)).toEqual(['sp']);
+    expect(defaultComboboxFilter(CITIES, 'PAULO', toString).map((c) => c.id)).toEqual(['sp']);
     expect(defaultComboboxFilter(CITIES, 'ila', toString).map((c) => c.id)).toEqual(['mi']);
-    expect(defaultComboboxFilter(CITIES, 'città', toString)).toHaveLength(1);
+    expect(defaultComboboxFilter(CITIES, 'são', toString)).toHaveLength(1);
   });
   it('keeps everything for an empty input and returns a copy', () => {
     const all = defaultComboboxFilter(CITIES, '', toString);
@@ -128,9 +128,9 @@ describe('useCombobox: filter', () => {
     const user = userEvent.setup();
     render(<Demo />);
     await user.click(input());
-    await user.keyboard('citta');
+    await user.keyboard('sao');
     expect(state()).toEqual({ open: true, active: 0, n: 1 });
-    expect(screen.getByRole('option', { name: 'Città di Castello' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'São Paulo' })).toBeInTheDocument();
     await user.clear(input());
     expect(state().n).toBe(CITIES.length);
     await user.keyboard('xyz');
@@ -453,7 +453,7 @@ describe('useCombobox: no echo', () => {
         <button type="button" onClick={() => setSelected(CITIES[1]!)}>
           set-in-list
         </button>
-        <button type="button" onClick={() => setSelected({ id: 'zz', label: 'Zzz (fuori lista)' })}>
+        <button type="button" onClick={() => setSelected({ id: 'zz', label: 'Zzz (not in list)' })}>
           set-outside
         </button>
       </>
@@ -467,7 +467,7 @@ describe('useCombobox: no echo', () => {
     await user.click(screen.getByRole('button', { name: 'set-in-list' }));
     expect(input()).toHaveValue('Modena');
     await user.click(screen.getByRole('button', { name: 'set-outside' }));
-    expect(input()).toHaveValue('Zzz (fuori lista)');
+    expect(input()).toHaveValue('Zzz (not in list)');
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -483,7 +483,7 @@ describe('useCombobox: no echo', () => {
     expect(input()).toHaveValue('tor');
     expect(onChange).not.toHaveBeenCalled();
     await user.tab();
-    expect(input()).toHaveValue('Zzz (fuori lista)');
+    expect(input()).toHaveValue('Zzz (not in list)');
     expect(onChange).not.toHaveBeenCalled();
   });
 

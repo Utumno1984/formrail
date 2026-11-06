@@ -202,7 +202,7 @@ test.describe('useFocusFirstInvalidField: behavior in a real browser', () => {
     await save(page).click();
     await expect(page.getByRole('combobox', { name: 'Field B' })).toBeFocused();
     await page.getByRole('combobox', { name: 'Field B' }).click();
-    await page.getByRole('option', { name: 'Italia' }).click();
+    await page.getByRole('option', { name: 'Italy' }).click();
     await save(page).click();
     await expect(page.getByRole('combobox', { name: 'Field C' })).toBeFocused();
   });

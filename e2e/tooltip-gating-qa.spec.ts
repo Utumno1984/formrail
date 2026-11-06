@@ -15,13 +15,13 @@ test.describe('Tooltip gating (QA)', () => {
   test('a programmatic focus() after a Tab has been released does not open the tooltip', async ({ page }) => {
     await gotoStory(page, STORY('toolbar'));
     await page.keyboard.press('Tab');
-    await expect(tooltips(page)).toHaveText('Modifica');
-    await page.keyboard.press('Tab'); // Duplica
+    await expect(tooltips(page)).toHaveText('Edit');
+    await page.keyboard.press('Tab'); // Duplicate
     await page.waitForTimeout(100);
     await page.evaluate(() => {
-      Array.from(document.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Archivia')?.focus();
+      Array.from(document.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Archive')?.focus();
     });
-    await expect(page.getByRole('button', { name: 'Archivia' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Archive' })).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
   });
@@ -54,7 +54,7 @@ test.describe('Tooltip gating (QA)', () => {
 
   test('focus given by a mouse click does not open it after the pointerdown (no tooltip left after the click)', async ({ page }) => {
     await gotoStory(page, STORY('toolbar'));
-    const trigger = page.getByRole('button', { name: 'Duplica' });
+    const trigger = page.getByRole('button', { name: 'Duplicate' });
     const b = (await trigger.boundingBox())!;
     // Press without hovering first long enough to open (delay 600ms): move and press at once.
     await page.mouse.move(b.x + 8, b.y + 8);
@@ -68,17 +68,17 @@ test.describe('Tooltip gating (QA)', () => {
 
   test('Space on a dialog opener: the focus moved into the dialog opens no tooltip', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).focus();
+    await page.getByRole('button', { name: 'Open' }).focus();
     await page.keyboard.press('Space');
-    const dialog = page.getByRole('dialog', { name: 'Elimina riga' });
-    await expect(dialog.getByRole('button', { name: 'Elimina riga' })).toBeFocused();
+    const dialog = page.getByRole('dialog', { name: 'Delete row' });
+    await expect(dialog.getByRole('button', { name: 'Delete row' })).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
   });
 
   test('keyboard-opened dialog with the key still held down (keydown only) opens no tooltip', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).focus();
+    await page.getByRole('button', { name: 'Open' }).focus();
     await page.keyboard.down('Enter');
     await page.waitForTimeout(SETTLE);
     await page.keyboard.up('Enter');
@@ -87,7 +87,7 @@ test.describe('Tooltip gating (QA)', () => {
 
   test('mouse resting on the trigger position before a reload: nothing opens at mount before the pointer moves', async ({ page }) => {
     await gotoStory(page, STORY('auto-focus'));
-    const trigger = page.getByRole('button', { name: 'Con autofocus' });
+    const trigger = page.getByRole('button', { name: 'With autofocus' });
     const b = (await trigger.boundingBox())!;
     await page.mouse.move(b.x + 4, b.y + 4);
     await page.reload();

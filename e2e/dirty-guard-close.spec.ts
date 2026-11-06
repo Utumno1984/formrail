@@ -4,7 +4,7 @@ import { expectPlayToPass } from './helpers/story';
 const PLAYGROUND = 'patterns-dirtyguard--playground';
 const confirmDialog = (page: import('@playwright/test').Page) =>
   page.getByRole('dialog', { name: 'Unsaved changes' });
-const opener = (page: import('@playwright/test').Page) => page.getByRole('button', { name: 'Torna alla lista' });
+const opener = (page: import('@playwright/test').Page) => page.getByRole('button', { name: 'Back to list' });
 
 test.describe('useDirtyGuard labels.close (#148)', () => {
   test('close="Close": X named "Close", no default "Close:" in the dialog DOM, X = stay with focus back, no attribute leak', async ({

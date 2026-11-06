@@ -65,9 +65,19 @@ describe('Calendar: structure', () => {
   });
 
   it('labels are merged key by key with the English defaults', () => {
-    render(<Calendar {...BASE} labels={{ previousMonth: 'Mese precedente', nextMonth: undefined }} />);
-    expect(screen.getByRole('button', { name: 'Mese precedente' })).toBeInTheDocument();
+    render(<Calendar {...BASE} labels={{ previousMonth: 'Go back one month', nextMonth: undefined }} />);
+    expect(screen.getByRole('button', { name: 'Go back one month' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next month' })).toBeInTheDocument();
+  });
+
+  // The it-IT case below is deliberately kept in Italian: the localized names are the subject of the test.
+  it('en-US: Sunday first and English names; weekStartsOn wins over the locale', () => {
+    const { rerender } = render(<Calendar locale="en-US" today="2026-03-10" />);
+    expect(screen.getAllByRole('columnheader')[0]).toHaveAttribute('aria-label', 'Sunday');
+    expect(screen.getByText('March 2026')).toBeInTheDocument();
+    expect(day('Tuesday, March 3, 2026')).toBeInTheDocument();
+    rerender(<Calendar locale="en-US" today="2026-03-10" weekStartsOn={3} />);
+    expect(screen.getAllByRole('columnheader')[0]).toHaveAttribute('aria-label', 'Wednesday');
   });
 
   it('it-IT: Monday first and Italian names; weekStartsOn wins over the locale', () => {
@@ -760,7 +770,7 @@ describe('Calendar: DOM contract', () => {
 
 describe('Calendar: SSR', () => {
   it('renderToString + hydrateRoot with explicit locale and today: no hydration error', async () => {
-    const element = <Calendar locale="it-IT" today="2026-03-10" defaultValue="2026-03-17" aria-label="Data" />;
+    const element = <Calendar locale="it-IT" today="2026-03-10" defaultValue="2026-03-17" aria-label="Date" />;
     const html = renderToString(element);
     expect(html).toContain('marzo 2026');
     expect(html).toContain('aria-selected="true"');

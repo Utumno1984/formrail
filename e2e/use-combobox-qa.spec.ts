@@ -47,7 +47,7 @@ test.describe('useCombobox QA', () => {
     await page.keyboard.press('Tab');
     await expect(input(page)).toHaveValue('Milano');
     await page.getByRole('button', { name: 'Set from outside' }).click();
-    await expect(input(page)).toHaveValue('Roma (da fuori)');
+    await expect(input(page)).toHaveValue('Roma (set from outside)');
     await expect(log(page)).toHaveCount(1);
   });
 
@@ -178,11 +178,11 @@ test.describe('useCombobox QA', () => {
     await expect(input(page)).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('typing diacritics-insensitive: "CITTA" finds Città di Castello', async ({ page }) => {
+  test('typing diacritics-insensitive: "SAO" finds São Paulo', async ({ page }) => {
     await gotoStory(page, STORY);
     await input(page).click();
-    await page.keyboard.type('CITTA');
-    await expect(page.getByRole('option')).toHaveText(['Città di Castello']);
+    await page.keyboard.type('SAO');
+    await expect(page.getByRole('option')).toHaveText(['São Paulo']);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await page.keyboard.type('ò');

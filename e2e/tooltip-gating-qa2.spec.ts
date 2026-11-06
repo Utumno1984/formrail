@@ -12,7 +12,7 @@ test.describe('Tooltip gating, round 2 (QA)', () => {
     await page.getByRole('button', { name: 'Menu' }).focus();
     await page.keyboard.down('ArrowDown');
     await page.keyboard.down('ArrowDown'); // auto-repeat
-    await expect(page.getByRole('button', { name: 'Prima voce' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'First item' })).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
     await page.keyboard.up('ArrowDown');
@@ -23,24 +23,24 @@ test.describe('Tooltip gating, round 2 (QA)', () => {
   test('a pre-existing trigger opens with Tab, the autofocused one stays quiet until a real Tab move', async ({ page }) => {
     await openStory(page, STORY('opened-by-arrow-down'));
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Azione della pagina' })).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Azione della pagina');
+    await expect(page.getByRole('button', { name: 'Page action' })).toBeFocused();
+    await expect(tooltips(page)).toHaveText('Page action');
     await page.keyboard.press('Tab'); // Menu
     await page.keyboard.press('ArrowDown');
-    const item = page.getByRole('button', { name: 'Prima voce' });
+    const item = page.getByRole('button', { name: 'First item' });
     await expect(item).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
     // Back onto the page action (it existed before the key): opens.
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Shift+Tab');
-    await expect(page.getByRole('button', { name: 'Azione della pagina' })).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Azione della pagina');
+    await expect(page.getByRole('button', { name: 'Page action' })).toBeFocused();
+    await expect(tooltips(page)).toHaveText('Page action');
     // And the item (now older than the key) opens on a real Tab move.
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await expect(item).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Dettaglio della voce');
+    await expect(tooltips(page)).toHaveText('Item detail');
   });
 
   for (const key of ['ArrowRight', 'ArrowLeft', 'Home', 'End', 'ArrowUp', 'ArrowDown']) {
@@ -53,17 +53,17 @@ test.describe('Tooltip gating, round 2 (QA)', () => {
           buttons[buttons.length - 1]!.focus();
         });
       }, key);
-      await page.getByRole('button', { name: 'Modifica' }).focus();
+      await page.getByRole('button', { name: 'Edit' }).focus();
       await page.waitForTimeout(100);
       await page.keyboard.press(key);
-      await expect(page.getByRole('button', { name: 'Archivia' })).toBeFocused();
-      await expect(tooltips(page)).toHaveText('Archivia');
+      await expect(page.getByRole('button', { name: 'Archive' })).toBeFocused();
+      await expect(tooltips(page)).toHaveText('Archive');
     });
   }
 
   test('a script focus() with no key down still opens nothing (regression)', async ({ page }) => {
     await expectPlayToPass(page, STORY('toolbar'));
-    await page.evaluate(() => document.querySelector<HTMLButtonElement>('button[aria-label="Duplica"]')!.focus());
+    await page.evaluate(() => document.querySelector<HTMLButtonElement>('button[aria-label="Duplicate"]')!.focus());
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
   });

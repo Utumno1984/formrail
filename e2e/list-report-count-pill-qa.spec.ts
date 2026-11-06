@@ -14,7 +14,7 @@ test.describe('ListReport count pill (QA extras)', () => {
         [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((el) => el.textContent?.trim() === name)!;
       const el = document.querySelector('[data-rop-count]')!;
       const out: boolean[] = [];
-      for (const name of ['Da approvare', 'Tutte', 'Da approvare']) {
+      for (const name of ['To approve', 'All', 'To approve']) {
         radio(name).click();
         await new Promise((r) => setTimeout(r, 80));
         out.push(el.hasAttribute('data-changed'));
@@ -27,7 +27,7 @@ test.describe('ListReport count pill (QA extras)', () => {
 
   test('selecting the already selected filter does not flash', async ({ page }) => {
     await gotoStory(page, NO_PLAY);
-    await page.getByRole('radio', { name: 'Tutte' }).click();
+    await page.getByRole('radio', { name: 'All' }).click();
     await page.waitForTimeout(100);
     await expect(pill(page)).not.toHaveAttribute('data-changed');
   });
@@ -59,7 +59,7 @@ test.describe('ListReport count pill (QA extras)', () => {
     const vw = page.viewportSize()!.width;
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(vw);
-    await page.getByRole('radio', { name: 'Da approvare' }).click();
+    await page.getByRole('radio', { name: 'To approve' }).click();
     await expect(pill(page)).toHaveAttribute('data-changed', '');
   });
 });

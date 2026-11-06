@@ -19,11 +19,11 @@ async function gotoStory(page: Page, id: string): Promise<void> {
 
 /** The two ways of opening the same dialog, with the controls that open each. */
 const PATHS = [
-  { name: 'trigger', story: STORY('playground'), opener: 'Apri' },
-  { name: 'external state', story: STORY('external-state'), opener: 'Apri da stato' },
+  { name: 'trigger', story: STORY('playground'), opener: 'Open' },
+  { name: 'external state', story: STORY('external-state'), opener: 'Open from state' },
 ] as const;
 
-const dialogOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Modifica fornitore' });
+const dialogOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Edit supplier' });
 
 test.describe('Overlays/Dialog: stories play', () => {
   for (const name of [
@@ -55,7 +55,7 @@ for (const path of PATHS) {
       const dialog = dialogOf(page);
       await expect(dialog).toBeVisible();
       await expect(dialog).toHaveAttribute('aria-modal', 'true');
-      await expect(dialog).toHaveAccessibleDescription('Aggiorna i dati anagrafici e salva.');
+      await expect(dialog).toHaveAccessibleDescription('Update the supplier details and save.');
       expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
 
       const inside = () => dialog.evaluate((el) => el.contains(document.activeElement));
@@ -98,7 +98,7 @@ for (const path of PATHS) {
     test('the close button is named after the title and closes', async ({ page }) => {
       await gotoStory(page, path.story);
       await page.getByRole('button', { name: path.opener }).click();
-      await page.getByRole('button', { name: 'Close: Modifica fornitore' }).click();
+      await page.getByRole('button', { name: 'Close: Edit supplier' }).click();
       await expect(dialogOf(page)).toHaveCount(0);
       await expect(page.getByRole('button', { name: path.opener })).toBeFocused();
     });
@@ -116,7 +116,7 @@ test.describe('browsers that do not focus a button on click', () => {
       }),
     );
     // Not by role: the page is aria-hidden while the dialog is open.
-    const opener = page.locator('button').filter({ hasText: /^Apri$/ });
+    const opener = page.locator('button').filter({ hasText: /^Open$/ });
     await opener.click();
     await expect(dialogOf(page)).toBeVisible();
     await expect(opener).not.toBeFocused();
@@ -129,13 +129,13 @@ test.describe('browsers that do not focus a button on click', () => {
 test.describe('dismissible={false}', () => {
   test('Escape and the backdrop do nothing; an explicit button closes', async ({ page }) => {
     await gotoStory(page, STORY('not-dismissible'));
-    const dialog = page.getByRole('dialog', { name: 'Eliminare il fornitore?' });
+    const dialog = page.getByRole('dialog', { name: 'Delete the supplier?' });
     await expect(dialog).toBeVisible();
     await page.keyboard.press('Escape');
     await page.mouse.click(4, 4);
     await expect(dialog).toBeVisible();
     await expectNoA11yViolations(page);
-    await page.getByRole('button', { name: 'Annulla' }).click();
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
   });
 });
@@ -183,8 +183,8 @@ test.describe('layout', () => {
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y + box!.height).toBeLessThanOrEqual(600);
 
-    const title = dialog.getByRole('heading', { name: 'Modifica fornitore' });
-    const save = dialog.getByRole('button', { name: 'Salva' });
+    const title = dialog.getByRole('heading', { name: 'Edit supplier' });
+    const save = dialog.getByRole('button', { name: 'Save' });
     const before = [(await title.boundingBox())!.y, (await save.boundingBox())!.y];
     const body = dialog.locator('[tabindex="0"]');
     await body.evaluate((el) => (el.scrollTop = el.scrollHeight));
@@ -259,10 +259,10 @@ test.describe('edge cases', () => {
   }) => {
     // After the play function: the first dialog is open, the second closed, the focus on its opener.
     await gotoStory(page, STORY('nested'));
-    const first = page.getByRole('dialog', { name: 'Primo dialog' });
+    const first = page.getByRole('dialog', { name: 'First dialog' });
     await expect(first).toBeVisible();
-    await first.getByRole('button', { name: 'Apri il secondo' }).click();
-    const second = page.getByRole('dialog', { name: 'Secondo dialog' });
+    await first.getByRole('button', { name: 'Open the second' }).click();
+    const second = page.getByRole('dialog', { name: 'Second dialog' });
     await expect(second).toBeVisible();
 
     // The element on top at the first dialog's centre is the second layer, not the first dialog.
@@ -277,7 +277,7 @@ test.describe('edge cases', () => {
     await page.keyboard.press('Escape');
     await expect(second).toHaveCount(0);
     await expect(first).toBeVisible();
-    await expect(first.getByRole('button', { name: 'Apri il secondo' })).toBeFocused();
+    await expect(first.getByRole('button', { name: 'Open the second' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(first).toHaveCount(0);
   });
@@ -306,8 +306,8 @@ test.describe('edge cases', () => {
     await expect(dialogOf(page)).toHaveCount(0);
     expect(await page.evaluate(() => document.body.hasAttribute('data-scroll-locked'))).toBe(false);
     expect(await page.evaluate(() => document.querySelectorAll('[data-aria-hidden]').length)).toBe(0);
-    await expect(page.getByRole('button', { name: 'Pulsante della pagina' })).toBeVisible();
-    await page.getByRole('button', { name: 'Pulsante della pagina' }).click();
+    await expect(page.getByRole('button', { name: 'Page button' })).toBeVisible();
+    await page.getByRole('button', { name: 'Page button' }).click();
   });
 });
 
@@ -339,7 +339,7 @@ test.describe('virtual keyboard', () => {
     });
     await gotoStory(page, STORY('with-form'));
     const dialog = dialogOf(page);
-    const input = dialog.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = dialog.getByRole('textbox', { name: 'Company name' });
     await input.focus();
     const keyboard = 300;
     await page.evaluate((px) => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(px), keyboard);
@@ -347,8 +347,8 @@ test.describe('virtual keyboard', () => {
     await expect.poll(async () => (await dialog.boundingBox())!.y + (await dialog.boundingBox())!.height).toBeLessThanOrEqual(limit);
     expect((await dialog.boundingBox())!.y).toBeGreaterThanOrEqual(0);
     expect((await input.boundingBox())!.y + (await input.boundingBox())!.height).toBeLessThanOrEqual(limit);
-    await expect(dialog.getByRole('button', { name: 'Salva' })).toBeInViewport();
-    expect((await dialog.getByRole('button', { name: 'Salva' }).boundingBox())!.y).toBeLessThan(limit);
+    await expect(dialog.getByRole('button', { name: 'Save' })).toBeInViewport();
+    expect((await dialog.getByRole('button', { name: 'Save' }).boundingBox())!.y).toBeLessThan(limit);
 
     // Keyboard gone: back to the full viewport.
     await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(0));

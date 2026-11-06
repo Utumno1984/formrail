@@ -51,9 +51,9 @@ test.describe('mouse and keyboard', () => {
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     // Portal: the listbox is not inside the story root.
     expect(await listbox(page).evaluate((el) => !el.closest('#storybook-root'))).toBe(true);
-    await page.getByRole('option', { name: 'Portogallo' }).click();
+    await page.getByRole('option', { name: 'Portugal' }).click();
     await expect(listbox(page)).toHaveCount(0);
-    await expect(trigger).toHaveText('Portogallo');
+    await expect(trigger).toHaveText('Portugal');
     await expect(trigger).toBeFocused();
   });
 
@@ -71,50 +71,50 @@ test.describe('mouse and keyboard', () => {
     const trigger = combobox(page);
     await trigger.focus();
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Italia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Italy' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Francia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Spagna' })).toBeFocused(); // Germania skipped
+    await expect(page.getByRole('option', { name: 'Spain' })).toBeFocused(); // Germany skipped
     await page.keyboard.press('End');
     await expect(page.getByRole('option', { name: 'Austria' })).toBeFocused();
     await page.keyboard.press('Home');
-    await expect(page.getByRole('option', { name: 'Italia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Italy' })).toBeFocused();
     await page.keyboard.type('po');
-    await expect(page.getByRole('option', { name: 'Portogallo' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Portugal' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(listbox(page)).toHaveCount(0);
-    await expect(trigger).toHaveText('Seleziona');
+    await expect(trigger).toHaveText('Select');
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Italia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Italy' })).toBeFocused();
     await page.keyboard.type('fr');
-    await expect(page.getByRole('option', { name: 'Francia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(trigger).toHaveText('Francia');
+    await expect(trigger).toHaveText('France');
   });
 
   test('the disabled option cannot be picked with the mouse', async ({ page }) => {
     await gotoStory(page, STORY('manual'));
     await combobox(page).click();
-    await page.getByRole('option', { name: 'Germania' }).click({ force: true });
+    await page.getByRole('option', { name: 'Germany' }).click({ force: true });
     await expect(listbox(page)).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(combobox(page)).toHaveText('Seleziona');
+    await expect(combobox(page)).toHaveText('Select');
   });
 
   test('the current option shows the decorative check and aria-selected', async ({ page }) => {
     await expectPlayToPass(page, STORY('base')); // ends with the list open
-    const selected = page.getByRole('option', { name: 'Francia' });
+    const selected = page.getByRole('option', { name: 'France' });
     await expect(selected).toHaveAttribute('aria-selected', 'true');
     await expect(selected.locator('svg')).toHaveCount(1);
     await expect(selected.locator('svg')).toHaveAttribute('aria-hidden', 'true');
-    await expect(page.getByRole('option', { name: 'Italia' }).locator('svg')).toHaveCount(0);
+    await expect(page.getByRole('option', { name: 'Italy' }).locator('svg')).toHaveCount(0);
   });
 });
 
 test.describe('no echo', () => {
   test('a value set from outside after the mount never calls onValueChange', async ({ page }) => {
-    // Records the story's Actions events from before the play function runs ("Carica dati" is clicked there).
+    // Records the story's Actions events from before the play function runs ("Load data" is clicked there).
     await page.addInitScript(() => {
       const w = window as unknown as {
         __actions: unknown[];
@@ -129,11 +129,11 @@ test.describe('no echo', () => {
     });
     await expectPlayToPass(page, STORY('async-load')); // ends with the list open
     const actions = () => page.evaluate(() => (window as unknown as { __actions: unknown[] }).__actions.length);
-    await expect(combobox(page)).toHaveText('Spagna');
+    await expect(combobox(page)).toHaveText('Spain');
     expect(await actions()).toBe(0);
     // A real pick afterwards is reported: the probe does work.
-    await page.getByRole('option', { name: 'Italia' }).click();
-    await expect(combobox(page)).toHaveText('Italia');
+    await page.getByRole('option', { name: 'Italy' }).click();
+    await expect(combobox(page)).toHaveText('Italy');
     await expect.poll(actions).toBe(1);
   });
 });
@@ -141,7 +141,7 @@ test.describe('no echo', () => {
 test.describe('inside a Dialog', () => {
   test('the options are above the overlay (elementFromPoint), a pick leaves the dialog open, Escape closes the list first', async ({ page }) => {
     await expectPlayToPass(page, STORY('inside-dialog')); // ends with the list open
-    const dialog = page.getByRole('dialog', { name: 'Modifica fornitore' });
+    const dialog = page.getByRole('dialog', { name: 'Edit supplier' });
     const trigger = combobox(page);
     const options = page.getByRole('option');
     const count = await options.count();
@@ -154,10 +154,10 @@ test.describe('inside a Dialog', () => {
       });
       expect(hit, `option ${i} is not the topmost element at its centre`).toBe(true);
     }
-    await page.getByRole('option', { name: 'Spagna' }).click();
+    await page.getByRole('option', { name: 'Spain' }).click();
     await expect(listbox(page)).toHaveCount(0);
     await expect(dialog).toBeVisible();
-    await expect(trigger).toHaveText('Spagna');
+    await expect(trigger).toHaveText('Spain');
 
     await trigger.click();
     await expect(listbox(page)).toBeVisible();
@@ -205,18 +205,18 @@ test.describe('Field states', () => {
     const trigger = combobox(page);
     await trigger.focus();
     await expect(trigger).toBeFocused();
-    await expect(trigger).toHaveText('Italia');
+    await expect(trigger).toHaveText('Italy');
     for (const key of ['Enter', 'Space', 'ArrowDown', 'ArrowUp', 'f', 'r']) {
       await page.keyboard.press(key);
       await expect(listbox(page)).toHaveCount(0);
     }
     await trigger.click();
     await expect(listbox(page)).toHaveCount(0);
-    await expect(trigger).toHaveText('Italia');
+    await expect(trigger).toHaveText('Italy');
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     const describedBy = await trigger.getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
-    await expect(page.locator(`[id="${describedBy}"]`)).toHaveText('Deciso dal contratto quadro.');
+    await expect(page.locator(`[id="${describedBy}"]`)).toHaveText('Set by the master agreement.');
   });
 });
 
@@ -229,7 +229,7 @@ test.describe('geometry', () => {
     }));
     expect(info.scrolls).toBe(true);
     expect(info.height).toBeLessThanOrEqual(21 * 16);
-    await expect(page.getByRole('option', { name: 'Cliente 150' })).toBeInViewport();
+    await expect(page.getByRole('option', { name: 'Customer 150' })).toBeInViewport();
     await openedListHasNoOverflow(page);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
   });

@@ -23,9 +23,9 @@ interface Row {
 
 const ROWS: Row[] = [
   { id: 'a', name: 'Rossi Mario', city: 'Roma', amount: 1250.5, open: true },
-  { id: 'b', name: 'Bianchi Anna', city: 'Città', amount: 2, open: false },
+  { id: 'b', name: 'Bianchi Anna', city: 'Café', amount: 2, open: false },
   { id: 'c', name: 'Rossi Luca', city: 'Milano', amount: 30, open: true },
-  { id: 'd', name: 'Verdi (SRL)', city: 'Citta', amount: null, open: true },
+  { id: 'd', name: 'Verdi (SRL)', city: 'Cafe', amount: null, open: true },
 ];
 const COLUMNS: ListReportColumn<Row>[] = [
   { id: 'name', header: 'Name', accessor: (r) => r.name },
@@ -49,11 +49,11 @@ function setup(options: Partial<UseListReportOptions<Row>> = {}) {
 
 describe('normalizeText / search helpers', () => {
   it('normalizeText lower-cases and strips diacritics without trimming', () => {
-    expect(normalizeText(' Città ')).toBe(' citta ');
+    expect(normalizeText(' Café ')).toBe(' cafe ');
   });
 
   it('parseSearchTerms trims, splits on whitespace, normalizes; blank gives no terms', () => {
-    expect(parseSearchTerms('  Rossi   CITTÀ ')).toEqual(['rossi', 'citta']);
+    expect(parseSearchTerms('  Rossi   CAFÉ ')).toEqual(['rossi', 'cafe']);
     expect(parseSearchTerms('   ')).toEqual([]);
     expect(parseSearchTerms('')).toEqual([]);
   });
@@ -368,8 +368,8 @@ describe('useListReport: search matching', () => {
 
   it('every term must match, case and diacritics insensitive, across columns', () => {
     expect(ids(search('ROSSI roma').rows)).toEqual(['a']);
-    expect(ids(search('citta').rows)).toEqual(['b', 'd']);
-    expect(ids(search('città').rows)).toEqual(['b', 'd']);
+    expect(ids(search('cafe').rows)).toEqual(['b', 'd']);
+    expect(ids(search('café').rows)).toEqual(['b', 'd']);
     expect(ids(search('rossi milano').rows)).toEqual(['c']);
   });
 

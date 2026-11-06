@@ -7,9 +7,9 @@ import { expectPlayToPass } from './helpers/story';
 const SLOW = 900;
 const slowDown = (page: Page, ms = SLOW) =>
   page.addStyleTag({ content: `:root { --motion-rop-overlay-duration: ${ms}ms; }` });
-const dialogOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Modifica fornitore' });
-const sheetOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Dettaglio fornitore' });
-const opener = (page: Page) => page.locator('button').filter({ hasText: /^Apri$/ });
+const dialogOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Edit supplier' });
+const sheetOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Supplier detail' });
+const opener = (page: Page) => page.locator('button').filter({ hasText: /^Open$/ });
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -143,7 +143,7 @@ for (const [label, story, panel] of [
 test('dirty-guard: "Leave without saving" with a slow exit still runs the action and leaves no orphan', async ({ page }) => {
   await expectPlayToPass(page, 'patterns-dirtyguard--playground', 'when:!true');
   await slowDown(page);
-  await page.getByRole('button', { name: 'Torna alla lista' }).click();
+  await page.getByRole('button', { name: 'Back to list' }).click();
   await page.getByRole('button', { name: 'Leave without saving' }).click();
   await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toHaveCount(0, { timeout: 5000 });
   const state = await page.evaluate(() => ({

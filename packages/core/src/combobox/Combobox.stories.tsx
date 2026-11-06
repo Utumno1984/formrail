@@ -26,25 +26,25 @@ const CITIES: ComboboxOption[] = [
   { value: 'mo', label: 'Modena' },
   { value: 'mn', label: 'Mantova', disabled: true },
   { value: 'mc', label: 'Macerata' },
-  { value: 'cdc', label: 'Città di Castello' },
+  { value: 'sp', label: 'São Paulo' },
   { value: 'to', label: 'Torino' },
   { value: 'rm', label: 'Roma' },
 ];
 
 const MANY: ComboboxOption[] = Array.from({ length: 200 }, (_, i) => ({
   value: `c${i + 1}`,
-  label: `Cliente ${String(i + 1).padStart(3, '0')}`,
+  label: `Customer ${String(i + 1).padStart(3, '0')}`,
 }));
 
 const LONG: ComboboxOption[] = [
   {
     value: 'a',
-    label: 'Associazione temporanea di imprese tra fornitori di servizi di manutenzione e di logistica del Nord-Est',
+    label: 'Temporary association of enterprises between maintenance and logistics service providers of the North-East',
   },
-  { value: 'b', label: 'Breve' },
+  { value: 'b', label: 'Short' },
   {
     value: 'c',
-    label: 'Consorzio stabile per le infrastrutture e le costruzioni generali dell’area metropolitana',
+    label: 'Permanent consortium for the infrastructure and general construction of the metropolitan area',
   },
 ];
 
@@ -76,7 +76,7 @@ const meta: Meta<DemoArgs> = {
   },
   args: {
     size: 'md',
-    placeholder: 'Cerca un comune',
+    placeholder: 'Search for a city',
     emptyLabel: 'No results',
     clearOnEmpty: false,
     state: 'default',
@@ -94,7 +94,7 @@ const column = { display: 'grid', gap: 16, maxWidth: 320 } as const;
 const stateProps = (state: FieldState) =>
   ({
     state,
-    stateReason: state === 'default' ? undefined : 'Deciso dal contratto quadro.',
+    stateReason: state === 'default' ? undefined : 'Set by the master agreement.',
   }) as FieldStateProps;
 
 /** A controlled Combobox that reports every user pick to `onValueChange` (the Actions panel). */
@@ -130,7 +130,7 @@ function Controlled({
   );
 }
 
-const input = (canvasElement: HTMLElement, name = 'Comune') => within(canvasElement).getByRole('combobox', { name });
+const input = (canvasElement: HTMLElement, name = 'City') => within(canvasElement).getByRole('combobox', { name });
 const listbox = () => within(document.body).findByRole('listbox');
 
 /**
@@ -142,7 +142,7 @@ const listbox = () => within(document.body).findByRole('listbox');
 export const Playground: Story = {
   render: ({ state, ...args }) => (
     <div style={column}>
-      <Field label="Comune" help="Sede legale del fornitore" {...stateProps(state)}>
+      <Field label="City" help="Supplier registered office" {...stateProps(state)}>
         <Controlled {...args} />
       </Field>
     </div>
@@ -179,7 +179,7 @@ export const Base: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune" help="Sede legale del fornitore">
+      <Field label="City" help="Supplier registered office">
         <Controlled {...args} initial="mo" />
       </Field>
     </div>
@@ -203,7 +203,7 @@ export const NoResults: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune">
+      <Field label="City">
         <Controlled {...args} />
       </Field>
     </div>
@@ -237,7 +237,7 @@ export const WithError: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune" error="Seleziona un comune" required>
+      <Field label="City" error="Select a city" required>
         <Controlled {...args} />
       </Field>
     </div>
@@ -255,7 +255,7 @@ export const Disabled: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune" state="disabled" stateReason="Non modificabile in bozza">
+      <Field label="City" state="disabled" stateReason="Not editable while in draft">
         <Controlled {...args} initial="mi" />
       </Field>
     </div>
@@ -273,7 +273,7 @@ export const Forced: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune" state="forced" stateReason="Deciso dal contratto quadro.">
+      <Field label="City" state="forced" stateReason="Set by the master agreement.">
         <Controlled {...args} initial="mi" />
       </Field>
     </div>
@@ -286,7 +286,7 @@ export const Forced: Story = {
     await userEvent.click(control);
     await expect(within(document.body).queryByRole('listbox')).toBeNull();
     await expect(control).toHaveValue('Milano');
-    await expect(control).toHaveAccessibleDescription('Deciso dal contratto quadro.');
+    await expect(control).toHaveAccessibleDescription('Set by the master agreement.');
     await expect(args.onValueChange).not.toHaveBeenCalled();
   },
 };
@@ -296,17 +296,17 @@ export const UnknownValue: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune">
-        <Controlled {...args} initial="zz" unknownValueLabel="(non più disponibile)" />
+      <Field label="City">
+        <Controlled {...args} initial="zz" unknownValueLabel="(no longer available)" />
       </Field>
-      <Field label="Comune (senza etichetta)">
+      <Field label="City (no label)">
         <Controlled {...args} initial="yy" />
       </Field>
     </div>
   ),
   play: async ({ args, canvasElement }) => {
-    await expect(input(canvasElement)).toHaveValue('(non più disponibile)');
-    await expect(input(canvasElement, 'Comune (senza etichetta)')).toHaveValue('yy');
+    await expect(input(canvasElement)).toHaveValue('(no longer available)');
+    await expect(input(canvasElement, 'City (no label)')).toHaveValue('yy');
     await expect(args.onValueChange).not.toHaveBeenCalled();
   },
 };
@@ -317,13 +317,13 @@ export const LongList: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Cliente">
+      <Field label="Customer">
         <Controlled {...args} options={MANY} />
       </Field>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    await userEvent.click(input(canvasElement, 'Cliente'));
+    await userEvent.click(input(canvasElement, 'Customer'));
     await listbox();
   },
 };
@@ -348,7 +348,7 @@ export const LongLabels: Story = {
 };
 
 /**
- * "Carica dati": the parent sets the options and the value after the mount. The selection shows up
+ * "Load data": the parent sets the options and the value after the mount. The selection shows up
  * and `onValueChange` is never called (the Actions panel stays empty).
  */
 export const AsyncLoad: Story = {
@@ -363,8 +363,8 @@ export const AsyncLoad: Story = {
       }>({ options: [] });
       return (
         <div style={column}>
-          <Button onClick={() => setData({ options: CITIES, value: 'to' })}>Carica dati</Button>
-          <Field label="Comune">
+          <Button onClick={() => setData({ options: CITIES, value: 'to' })}>Load data</Button>
+          <Field label="City">
             <Combobox
               options={data.options}
               value={data.value}
@@ -383,7 +383,7 @@ export const AsyncLoad: Story = {
   },
   play: async ({ args, canvasElement }) => {
     await expect(input(canvasElement)).toHaveValue('');
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Carica dati' }));
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Load data' }));
     await waitFor(() => expect(input(canvasElement)).toHaveValue('Torino'));
     await expect(args.onValueChange).not.toHaveBeenCalled();
   },
@@ -394,10 +394,10 @@ export const Two: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Comune di nascita">
+      <Field label="City of birth">
         <Controlled {...args} />
       </Field>
-      <Field label="Comune di residenza">
+      <Field label="City of residence">
         <Controlled {...args} />
       </Field>
     </div>
@@ -411,7 +411,7 @@ export const NearBottom: Story = {
     <div>
       <div style={{ height: '70vh' }} />
       <div style={column}>
-        <Field label="Comune">
+        <Field label="City">
           <Controlled {...args} />
         </Field>
       </div>
@@ -426,7 +426,7 @@ export const KeyboardSafe: Story = {
     <div>
       <div style={{ height: '40vh' }} />
       <div style={column} data-testid="kb-field">
-        <Field label="Comune">
+        <Field label="City">
           <Controlled {...args} options={MANY} />
         </Field>
       </div>
@@ -442,21 +442,21 @@ export const InsideDialog: Story = {
   render: (args) => (
     <Dialog defaultOpen>
       <DialogTrigger asChild>
-        <Button variant="primary">Apri</Button>
+        <Button variant="primary">Open</Button>
       </DialogTrigger>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Modifica fornitore</DialogTitle>
+          <DialogTitle>Edit supplier</DialogTitle>
           <DialogClose />
         </DialogHeader>
         <DialogBody>
-          <Field label="Comune">
+          <Field label="City">
             <Controlled {...args} />
           </Field>
         </DialogBody>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="ghost">Annulla</Button>
+            <Button variant="ghost">Cancel</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -465,9 +465,9 @@ export const InsideDialog: Story = {
   play: async ({ args }) => {
     const body = within(document.body);
     const dialog = await body.findByRole('dialog', {
-      name: 'Modifica fornitore',
+      name: 'Edit supplier',
     });
-    await userEvent.type(within(dialog).getByRole('combobox', { name: 'Comune' }), 'm');
+    await userEvent.type(within(dialog).getByRole('combobox', { name: 'City' }), 'm');
     const list = await listbox();
     for (const option of within(list).getAllByRole('option')) {
       const box = option.getBoundingClientRect();
@@ -485,14 +485,14 @@ export const InsideSheet: Story = {
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Fornitori</h1>
+        <h1 style={{ margin: 0, fontSize: 20 }}>Suppliers</h1>
       </main>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>Modifica fornitore</SheetTitle>
+          <SheetTitle>Edit supplier</SheetTitle>
         </SheetHeader>
         <SheetBody>
-          <Field label="Comune">
+          <Field label="City">
             <Controlled {...args} />
           </Field>
         </SheetBody>
@@ -502,9 +502,9 @@ export const InsideSheet: Story = {
   play: async () => {
     const body = within(document.body);
     const sheet = await body.findByRole('dialog', {
-      name: 'Modifica fornitore',
+      name: 'Edit supplier',
     });
-    await userEvent.type(within(sheet).getByRole('combobox', { name: 'Comune' }), 'o');
+    await userEvent.type(within(sheet).getByRole('combobox', { name: 'City' }), 'o');
     const list = await listbox();
     for (const option of within(list).getAllByRole('option')) {
       const box = option.getBoundingClientRect();
@@ -513,7 +513,7 @@ export const InsideSheet: Story = {
       );
     }
     await userEvent.click(within(list).getByRole('option', { name: 'Torino' }));
-    await expect(body.getByRole('dialog', { name: 'Modifica fornitore' })).toBeInTheDocument();
-    await waitFor(() => expect(within(sheet).getByRole('combobox', { name: 'Comune' })).toHaveValue('Torino'));
+    await expect(body.getByRole('dialog', { name: 'Edit supplier' })).toBeInTheDocument();
+    await waitFor(() => expect(within(sheet).getByRole('combobox', { name: 'City' })).toHaveValue('Torino'));
   },
 };

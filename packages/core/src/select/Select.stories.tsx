@@ -22,23 +22,23 @@ const SIZES: SelectSize[] = ['sm', 'md'];
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
 
 const COUNTRIES: SelectOption[] = [
-  { value: 'it', label: 'Italia' },
-  { value: 'fr', label: 'Francia' },
-  { value: 'de', label: 'Germania', disabled: true },
-  { value: 'es', label: 'Spagna' },
-  { value: 'pt', label: 'Portogallo' },
+  { value: 'it', label: 'Italy' },
+  { value: 'fr', label: 'France' },
+  { value: 'de', label: 'Germany', disabled: true },
+  { value: 'es', label: 'Spain' },
+  { value: 'pt', label: 'Portugal' },
   { value: 'at', label: 'Austria' },
 ];
 
 const MANY: SelectOption[] = Array.from({ length: 200 }, (_, i) => ({
   value: `c${i + 1}`,
-  label: `Cliente ${String(i + 1).padStart(3, '0')}`,
+  label: `Customer ${String(i + 1).padStart(3, '0')}`,
 }));
 
 const LONG: SelectOption[] = [
-  { value: 'a', label: 'Associazione temporanea di imprese tra fornitori di servizi di manutenzione e di logistica del Nord-Est' },
-  { value: 'b', label: 'Breve' },
-  { value: 'c', label: 'Consorzio stabile per le infrastrutture e le costruzioni generali dell’area metropolitana' },
+  { value: 'a', label: 'Temporary association of enterprises between maintenance and logistics service providers of the North-East' },
+  { value: 'b', label: 'Short' },
+  { value: 'c', label: 'Permanent consortium for the infrastructure and general construction of the metropolitan area' },
 ];
 
 interface DemoArgs {
@@ -65,7 +65,7 @@ const meta: Meta<DemoArgs> = {
     state: { control: 'radio', options: STATES },
     onValueChange: { control: false },
   },
-  args: { size: 'md', placeholder: 'Seleziona', state: 'default', onValueChange: fn() },
+  args: { size: 'md', placeholder: 'Select', state: 'default', onValueChange: fn() },
 };
 
 export default meta;
@@ -76,7 +76,7 @@ const NO_STATE = { controls: { exclude: ['state'] } };
 
 const column = { display: 'grid', gap: 16, maxWidth: 320 } as const;
 const stateProps = (state: FieldState) =>
-  ({ state, stateReason: state === 'default' ? undefined : 'Deciso dal contratto quadro.' }) as FieldStateProps;
+  ({ state, stateReason: state === 'default' ? undefined : 'Set by the master agreement.' }) as FieldStateProps;
 
 /** A controlled Select that reports every user pick to `onValueChange` (the Actions panel). */
 function Controlled({
@@ -107,7 +107,7 @@ function Controlled({
   );
 }
 
-const trigger = (canvasElement: HTMLElement, name = 'Paese') => within(canvasElement).getByRole('combobox', { name });
+const trigger = (canvasElement: HTMLElement, name = 'Country') => within(canvasElement).getByRole('combobox', { name });
 const listbox = () => within(document.body).findByRole('listbox');
 
 /**
@@ -118,7 +118,7 @@ const listbox = () => within(document.body).findByRole('listbox');
 export const Playground: Story = {
   render: ({ state, ...args }) => (
     <div style={column}>
-      <Field label="Paese" help="Sede legale del fornitore" {...stateProps(state)}>
+      <Field label="Country" help="Supplier registered office" {...stateProps(state)}>
         <Controlled {...args} />
       </Field>
     </div>
@@ -128,15 +128,15 @@ export const Playground: Story = {
     if (args.state !== 'default') return;
     await userEvent.click(trigger(canvasElement));
     await listbox();
-    await userEvent.click(body.getByRole('option', { name: 'Francia' }));
-    await expect(trigger(canvasElement)).toHaveTextContent('Francia');
+    await userEvent.click(body.getByRole('option', { name: 'France' }));
+    await expect(trigger(canvasElement)).toHaveTextContent('France');
     await expect(args.onValueChange).toHaveBeenLastCalledWith('fr');
     trigger(canvasElement).focus();
     await userEvent.keyboard('{ArrowDown}');
     await listbox();
     await userEvent.keyboard('{ArrowDown}{Enter}');
-    // Germania is disabled: the arrow went on to Spagna.
-    await waitFor(() => expect(trigger(canvasElement)).toHaveTextContent('Spagna'));
+    // Germany is disabled: the arrow went on to Spain.
+    await waitFor(() => expect(trigger(canvasElement)).toHaveTextContent('Spain'));
     await expect(args.onValueChange).toHaveBeenCalledTimes(2);
     await expect(args.onValueChange).toHaveBeenLastCalledWith('es');
   },
@@ -153,7 +153,7 @@ export const Base: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Paese" help="Sede legale del fornitore">
+      <Field label="Country" help="Supplier registered office">
         <Controlled {...args} initial="fr" />
       </Field>
     </div>
@@ -161,7 +161,7 @@ export const Base: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.click(trigger(canvasElement));
     const list = await listbox();
-    await expect(within(list).getByRole('option', { name: 'Francia' })).toHaveAttribute('aria-selected', 'true');
+    await expect(within(list).getByRole('option', { name: 'France' })).toHaveAttribute('aria-selected', 'true');
   },
 };
 
@@ -171,7 +171,7 @@ export const WithError: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Paese" error="Seleziona un paese" required>
+      <Field label="Country" error="Select a country" required>
         <Controlled {...args} />
       </Field>
     </div>
@@ -189,7 +189,7 @@ export const Disabled: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Paese" state="disabled" stateReason="Non modificabile in bozza">
+      <Field label="Country" state="disabled" stateReason="Not editable while in draft">
         <Controlled {...args} initial="it" />
       </Field>
     </div>
@@ -207,7 +207,7 @@ export const Forced: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Paese" state="forced" stateReason="Deciso dal contratto quadro.">
+      <Field label="Country" state="forced" stateReason="Set by the master agreement.">
         <Controlled {...args} initial="it" />
       </Field>
     </div>
@@ -219,8 +219,8 @@ export const Forced: Story = {
     await userEvent.keyboard('{Enter}{ }{ArrowDown}{ArrowUp}fr');
     await userEvent.click(control);
     await expect(within(document.body).queryByRole('listbox')).toBeNull();
-    await expect(control).toHaveTextContent('Italia');
-    await expect(control).toHaveAccessibleDescription('Deciso dal contratto quadro.');
+    await expect(control).toHaveTextContent('Italy');
+    await expect(control).toHaveAccessibleDescription('Set by the master agreement.');
     await expect(args.onValueChange).not.toHaveBeenCalled();
   },
 };
@@ -231,14 +231,14 @@ export const InsideSheet: Story = {
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Fornitori</h1>
+        <h1 style={{ margin: 0, fontSize: 20 }}>Suppliers</h1>
       </main>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>Modifica fornitore</SheetTitle>
+          <SheetTitle>Edit supplier</SheetTitle>
         </SheetHeader>
         <SheetBody>
-          <Field label="Paese">
+          <Field label="Country">
             <Controlled {...args} />
           </Field>
         </SheetBody>
@@ -247,16 +247,16 @@ export const InsideSheet: Story = {
   ),
   play: async () => {
     const body = within(document.body);
-    const sheet = await body.findByRole('dialog', { name: 'Modifica fornitore' });
-    await userEvent.click(within(sheet).getByRole('combobox', { name: 'Paese' }));
+    const sheet = await body.findByRole('dialog', { name: 'Edit supplier' });
+    await userEvent.click(within(sheet).getByRole('combobox', { name: 'Country' }));
     const list = await listbox();
     for (const option of within(list).getAllByRole('option')) {
       const box = option.getBoundingClientRect();
       await expect(option.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2))).toBe(true);
     }
-    await userEvent.click(within(list).getByRole('option', { name: 'Spagna' }));
-    await expect(body.getByRole('dialog', { name: 'Modifica fornitore' })).toBeInTheDocument();
-    await waitFor(() => expect(within(sheet).getByRole('combobox', { name: 'Paese' })).toHaveTextContent('Spagna'));
+    await userEvent.click(within(list).getByRole('option', { name: 'Spain' }));
+    await expect(body.getByRole('dialog', { name: 'Edit supplier' })).toBeInTheDocument();
+    await waitFor(() => expect(within(sheet).getByRole('combobox', { name: 'Country' })).toHaveTextContent('Spain'));
   },
 };
 
@@ -265,17 +265,17 @@ export const UnknownValue: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Paese">
-        <Controlled {...args} initial="zz" unknownValueLabel="(non più disponibile)" />
+      <Field label="Country">
+        <Controlled {...args} initial="zz" unknownValueLabel="(no longer available)" />
       </Field>
-      <Field label="Paese (senza etichetta)">
+      <Field label="Country (no label)">
         <Controlled {...args} initial="yy" />
       </Field>
     </div>
   ),
   play: async ({ args, canvasElement }) => {
-    await expect(trigger(canvasElement)).toHaveTextContent('(non più disponibile)');
-    await expect(trigger(canvasElement, 'Paese (senza etichetta)')).toHaveTextContent('yy');
+    await expect(trigger(canvasElement)).toHaveTextContent('(no longer available)');
+    await expect(trigger(canvasElement, 'Country (no label)')).toHaveTextContent('yy');
     await expect(args.onValueChange).not.toHaveBeenCalled();
   },
 };
@@ -286,15 +286,15 @@ export const LongList: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Cliente">
+      <Field label="Customer">
         <Controlled {...args} options={MANY} initial="c150" />
       </Field>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    await userEvent.click(trigger(canvasElement, 'Cliente'));
+    await userEvent.click(trigger(canvasElement, 'Customer'));
     const list = await listbox();
-    const selected = within(list).getByRole('option', { name: 'Cliente 150' });
+    const selected = within(list).getByRole('option', { name: 'Customer 150' });
     await waitFor(() => {
       const box = selected.getBoundingClientRect();
       expect(box.top).toBeGreaterThanOrEqual(0);
@@ -323,7 +323,7 @@ export const LongLabels: Story = {
 };
 
 /**
- * "Carica dati": the parent sets the options and the value after the mount. The selection shows up
+ * "Load data": the parent sets the options and the value after the mount. The selection shows up
  * and `onValueChange` is never called (the Actions panel stays empty).
  */
 export const AsyncLoad: Story = {
@@ -334,8 +334,8 @@ export const AsyncLoad: Story = {
       const [data, setData] = useState<{ options: SelectOption[]; value?: string }>({ options: [] });
       return (
         <div style={column}>
-          <Button onClick={() => setData({ options: COUNTRIES, value: 'es' })}>Carica dati</Button>
-          <Field label="Paese">
+          <Button onClick={() => setData({ options: COUNTRIES, value: 'es' })}>Load data</Button>
+          <Field label="Country">
             <Select
               options={data.options}
               value={data.value}
@@ -353,13 +353,13 @@ export const AsyncLoad: Story = {
     return <Host />;
   },
   play: async ({ args, canvasElement }) => {
-    await expect(trigger(canvasElement)).toHaveTextContent('Seleziona');
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Carica dati' }));
-    await waitFor(() => expect(trigger(canvasElement)).toHaveTextContent('Spagna'));
+    await expect(trigger(canvasElement)).toHaveTextContent('Select');
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Load data' }));
+    await waitFor(() => expect(trigger(canvasElement)).toHaveTextContent('Spain'));
     await expect(args.onValueChange).not.toHaveBeenCalled();
     await userEvent.click(trigger(canvasElement));
     const list = await listbox();
-    await expect(within(list).getByRole('option', { name: 'Spagna' })).toHaveAttribute('aria-selected', 'true');
+    await expect(within(list).getByRole('option', { name: 'Spain' })).toHaveAttribute('aria-selected', 'true');
   },
 };
 
@@ -404,21 +404,21 @@ export const InsideDialog: Story = {
   render: (args) => (
     <Dialog defaultOpen>
       <DialogTrigger asChild>
-        <Button variant="primary">Apri</Button>
+        <Button variant="primary">Open</Button>
       </DialogTrigger>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Modifica fornitore</DialogTitle>
+          <DialogTitle>Edit supplier</DialogTitle>
           <DialogClose />
         </DialogHeader>
         <DialogBody>
-          <Field label="Paese">
+          <Field label="Country">
             <Controlled {...args} />
           </Field>
         </DialogBody>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="ghost">Annulla</Button>
+            <Button variant="ghost">Cancel</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -426,8 +426,8 @@ export const InsideDialog: Story = {
   ),
   play: async ({ args }) => {
     const body = within(document.body);
-    const dialog = await body.findByRole('dialog', { name: 'Modifica fornitore' });
-    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Paese' }));
+    const dialog = await body.findByRole('dialog', { name: 'Edit supplier' });
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Country' }));
     const list = await listbox();
     for (const option of within(list).getAllByRole('option')) {
       const box = option.getBoundingClientRect();

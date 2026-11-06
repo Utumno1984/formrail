@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { gotoStory } from './helpers/story';
 
 const STORY = (name: string) => `forms-combobox--${name}`;
-const input = (page: Page) => page.getByRole('combobox', { name: 'Comune' });
+const input = (page: Page) => page.getByRole('combobox', { name: 'City' });
 const status = (page: Page) => page.getByRole('status');
 
 test.describe('QA #250: "no results" live region, uncovered cases', () => {

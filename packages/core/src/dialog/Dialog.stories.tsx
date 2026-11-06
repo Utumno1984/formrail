@@ -47,9 +47,9 @@ type Story = StoryObj<DemoArgs>;
 function Page({ children }: { children?: ReactNode }) {
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
-      <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Fornitori</h1>
+      <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Suppliers</h1>
       <p style={{ margin: '0 0 16px', maxWidth: 480 }}>
-        La pagina sotto il dialog: mentre è aperto non è raggiungibile da tastiera né dagli screen reader.
+        The page under the dialog: while it is open it cannot be reached by keyboard or by screen readers.
       </p>
       {children}
     </main>
@@ -58,8 +58,8 @@ function Page({ children }: { children?: ReactNode }) {
 
 const LONG = Array.from({ length: 24 }, (_, i) => (
   <p key={i} style={{ margin: '0 0 12px' }}>
-    Riga {i + 1}: condizioni di fornitura, termini di pagamento e note interne che occupano abbastanza spazio da
-    far scorrere il corpo del dialog mentre intestazione e piè di pagina restano visibili.
+    Row {i + 1}: supply conditions, payment terms and internal notes that take up enough space to
+    make the dialog body scroll while the header and footer stay visible.
   </p>
 ));
 
@@ -80,20 +80,20 @@ function Panel({
     <DialogContent size={size} dismissible={dismissible} className={className}>
       <DialogHeader>
         <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
-          <DialogTitle>Modifica fornitore</DialogTitle>
-          <DialogDescription>Aggiorna i dati anagrafici e salva.</DialogDescription>
+          <DialogTitle>Edit supplier</DialogTitle>
+          <DialogDescription>Update the supplier details and save.</DialogDescription>
         </div>
         <DialogClose />
       </DialogHeader>
-      <DialogBody>{children ?? <p style={{ margin: 0 }}>Contenuto del dialog, size {size}.</p>}</DialogBody>
+      <DialogBody>{children ?? <p style={{ margin: 0 }}>Dialog content, size {size}.</p>}</DialogBody>
       <DialogFooter>
         {footer ?? (
           <>
             <DialogClose asChild>
-              <Button variant="ghost">Annulla</Button>
+              <Button variant="ghost">Cancel</Button>
             </DialogClose>
             <DialogClose asChild>
-              <Button variant="primary">Salva</Button>
+              <Button variant="primary">Save</Button>
             </DialogClose>
           </>
         )}
@@ -112,17 +112,17 @@ export const Playground: Story = {
     <Page>
       <Dialog onOpenChange={onOpenChange}>
         <DialogTrigger asChild>
-          <Button variant="primary">Apri</Button>
+          <Button variant="primary">Open</Button>
         </DialogTrigger>
         <Panel size={size} dismissible={dismissible} />
       </Dialog>
     </Page>
   ),
   play: async ({ args, canvasElement }) => {
-    const trigger = within(canvasElement).getByRole('button', { name: 'Apri' });
+    const trigger = within(canvasElement).getByRole('button', { name: 'Open' });
     await userEvent.click(trigger);
     const body = within(document.body);
-    const dialog = await body.findByRole('dialog', { name: 'Modifica fornitore' });
+    const dialog = await body.findByRole('dialog', { name: 'Edit supplier' });
     await expect(dialog).toHaveAttribute('aria-modal', 'true');
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(true);
     // Tab stays inside: after more presses than there are controls, the focus is still in the dialog.
@@ -149,7 +149,7 @@ const renderOpen: Story['render'] = ({ size, dismissible, onOpenChange }) => (
   <Page>
     <Dialog defaultOpen onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="primary">Apri</Button>
+        <Button variant="primary">Open</Button>
       </DialogTrigger>
       <Panel size={size} dismissible={dismissible} />
     </Dialog>
@@ -157,7 +157,7 @@ const renderOpen: Story['render'] = ({ size, dismissible, onOpenChange }) => (
 );
 
 const playOpen: Story['play'] = async () => {
-  const dialog = await within(document.body).findByRole('dialog', { name: 'Modifica fornitore' });
+  const dialog = await within(document.body).findByRole('dialog', { name: 'Edit supplier' });
   await settleMotion(); // measure the final state, not a frame of the entry
   await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(window.innerWidth);
 };
@@ -191,7 +191,7 @@ export const LongContent: Story = {
     await expect(scroller!.scrollHeight).toBeGreaterThan(scroller!.clientHeight);
     await expect(dialog.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight);
     scroller!.scrollTop = scroller!.scrollHeight;
-    await expect(within(dialog).getByRole('button', { name: 'Salva' })).toBeVisible();
+    await expect(within(dialog).getByRole('button', { name: 'Save' })).toBeVisible();
   },
 };
 
@@ -247,7 +247,7 @@ export const ExternalState: Story = {
       return (
         <Page>
           <Button variant="primary" onClick={() => setOpen(true)}>
-            Apri da stato
+            Open from state
           </Button>
           <Dialog
             open={open}
@@ -264,13 +264,13 @@ export const ExternalState: Story = {
     return <Host />;
   },
   play: async ({ args, canvasElement }) => {
-    const opener = within(canvasElement).getByRole('button', { name: 'Apri da stato' });
+    const opener = within(canvasElement).getByRole('button', { name: 'Open from state' });
     await userEvent.click(opener);
     const body = within(document.body);
-    const dialog = await body.findByRole('dialog', { name: 'Modifica fornitore' });
+    const dialog = await body.findByRole('dialog', { name: 'Edit supplier' });
     await expect(dialog).toHaveAttribute('aria-modal', 'true');
     // The rest of the page is out of the accessibility tree while it is open.
-    await expect(body.queryByRole('button', { name: 'Apri da stato' })).toBeNull();
+    await expect(body.queryByRole('button', { name: 'Open from state' })).toBeNull();
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(false);
@@ -283,7 +283,7 @@ export const ExternalStateOpen: Story = {
   tags: ['visual'],
   render: ({ size, dismissible, onOpenChange }) => (
     <Page>
-      <Button variant="primary">Apri da stato</Button>
+      <Button variant="primary">Open from state</Button>
       <Dialog open onOpenChange={onOpenChange}>
         <Panel size={size} dismissible={dismissible} />
       </Dialog>
@@ -303,17 +303,17 @@ export const NotDismissible: Story = {
       <Dialog defaultOpen onOpenChange={onOpenChange}>
         <DialogContent size={size} dismissible={dismissible}>
           <DialogHeader>
-            <DialogTitle>Eliminare il fornitore?</DialogTitle>
+            <DialogTitle>Delete the supplier?</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <DialogDescription>Devi scegliere: Escape e clic fuori non chiudono questo dialog.</DialogDescription>
+            <DialogDescription>You must choose: Escape and clicking outside do not close this dialog.</DialogDescription>
           </DialogBody>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="ghost">Annulla</Button>
+              <Button variant="ghost">Cancel</Button>
             </DialogClose>
             <DialogClose asChild>
-              <Button variant="danger">Elimina</Button>
+              <Button variant="danger">Delete</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -322,7 +322,7 @@ export const NotDismissible: Story = {
   ),
   play: async ({ args }) => {
     const body = within(document.body);
-    await body.findByRole('dialog', { name: 'Eliminare il fornitore?' });
+    await body.findByRole('dialog', { name: 'Delete the supplier?' });
     await userEvent.keyboard('{Escape}');
     await userEvent.click(document.body.querySelector('.z-rop-overlay') as HTMLElement);
     await expect(body.getByRole('dialog')).toBeInTheDocument();
@@ -337,22 +337,22 @@ export const Nested: Story = {
     <Page>
       <Dialog>
         <DialogTrigger asChild>
-          <Button variant="primary">Apri</Button>
+          <Button variant="primary">Open</Button>
         </DialogTrigger>
         <DialogContent size={size} dismissible={dismissible}>
           <DialogHeader>
-            <DialogTitle>Primo dialog</DialogTitle>
+            <DialogTitle>First dialog</DialogTitle>
           </DialogHeader>
           <DialogBody>
             <Dialog>
               <DialogTrigger asChild>
-                <Button>Apri il secondo</Button>
+                <Button>Open the second</Button>
               </DialogTrigger>
               <DialogContent size="sm">
                 <DialogHeader>
-                  <DialogTitle>Secondo dialog</DialogTitle>
+                  <DialogTitle>Second dialog</DialogTitle>
                 </DialogHeader>
-                <DialogBody>Sopra il primo.</DialogBody>
+                <DialogBody>On top of the first.</DialogBody>
               </DialogContent>
             </Dialog>
           </DialogBody>
@@ -362,17 +362,17 @@ export const Nested: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(document.body);
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Apri' }));
-    await body.findByRole('dialog', { name: 'Primo dialog' });
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open' }));
+    await body.findByRole('dialog', { name: 'First dialog' });
     const second = await (async () => {
-      await userEvent.click(body.getByRole('button', { name: 'Apri il secondo' }));
-      return body.findByRole('dialog', { name: 'Secondo dialog' });
+      await userEvent.click(body.getByRole('button', { name: 'Open the second' }));
+      return body.findByRole('dialog', { name: 'Second dialog' });
     })();
     await expect(second).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Secondo dialog' })).toBeNull());
-    await expect(body.getByRole('dialog', { name: 'Primo dialog' })).toBeInTheDocument();
-    await waitFor(() => expect(body.getByRole('button', { name: 'Apri il secondo' })).toHaveFocus());
+    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Second dialog' })).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'First dialog' })).toBeInTheDocument();
+    await waitFor(() => expect(body.getByRole('button', { name: 'Open the second' })).toHaveFocus());
   },
 };
 
@@ -414,7 +414,7 @@ export const UnmountWhileOpen: Story = {
       }, []);
       return (
         <Page>
-          <Button>Pulsante della pagina</Button>
+          <Button>Page button</Button>
           {mounted && (
             <Dialog defaultOpen>
               <Panel size={size} dismissible={dismissible} />
@@ -433,7 +433,7 @@ export const WithForm: Story = {
     <Page>
       <Dialog defaultOpen>
         <Panel size={size} dismissible={dismissible}>
-          <Field label="Ragione sociale">
+          <Field label="Company name">
             <Input />
           </Field>
         </Panel>
@@ -441,14 +441,14 @@ export const WithForm: Story = {
     </Page>
   ),
   play: async () => {
-    const field = await within(document.body).findByRole('textbox', { name: 'Ragione sociale' });
+    const field = await within(document.body).findByRole('textbox', { name: 'Company name' });
     await userEvent.type(field, 'Rossi S.r.l.');
     await expect(field).toHaveValue('Rossi S.r.l.');
   },
 };
 
 /**
- * A chain: "Continua" closes the first dialog and opens a second one in the same handler, and the
+ * A chain: "Continue" closes the first dialog and opens a second one in the same handler, and the
  * second has a field that takes the focus at once. The first one animates out while the second is
  * already open: its delayed focus return must not pull the focus away from the second (it would
  * select the text typed in the field). The play function types straight after the click.
@@ -461,12 +461,12 @@ export const Chained: Story = {
       return (
         <Page>
           <Button variant="primary" onClick={() => setFirst(true)}>
-            Apri la procedura
+            Open the procedure
           </Button>
           <Dialog open={first} onOpenChange={setFirst}>
             <DialogContent size={size} dismissible={dismissible}>
               <DialogHeader>
-                <DialogTitle>Passo uno</DialogTitle>
+                <DialogTitle>Step one</DialogTitle>
               </DialogHeader>
               <DialogFooter>
                 <Button
@@ -476,7 +476,7 @@ export const Chained: Story = {
                     setSecond(true);
                   }}
                 >
-                  Continua
+                  Continue
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -484,10 +484,10 @@ export const Chained: Story = {
           <Dialog open={second} onOpenChange={setSecond}>
             <DialogContent size={size} dismissible={dismissible}>
               <DialogHeader>
-                <DialogTitle>Passo due</DialogTitle>
+                <DialogTitle>Step two</DialogTitle>
               </DialogHeader>
               <DialogBody>
-                <Field label="Nome">
+                <Field label="Name">
                   {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the autoFocus field is the case under test */}
                   <Input autoFocus />
                 </Field>
@@ -500,19 +500,19 @@ export const Chained: Story = {
     return <Host />;
   },
   play: async ({ canvasElement }) => {
-    const opener = within(canvasElement).getByRole('button', { name: 'Apri la procedura' });
+    const opener = within(canvasElement).getByRole('button', { name: 'Open the procedure' });
     await userEvent.click(opener);
     const body = within(document.body);
-    await userEvent.click(await body.findByRole('button', { name: 'Continua' }));
+    await userEvent.click(await body.findByRole('button', { name: 'Continue' }));
     // From here on the first dialog's opener must never get the focus back: the second one has it.
     let bounced = false;
     opener.addEventListener('focus', () => {
       bounced = true;
     });
-    const field = await body.findByRole('textbox', { name: 'Nome' });
+    const field = await body.findByRole('textbox', { name: 'Name' });
     await expect(field).toHaveFocus();
     await userEvent.keyboard('Mario');
-    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Passo uno' })).toBeNull(), { timeout: 5000 });
+    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Step one' })).toBeNull(), { timeout: 5000 });
     await settleMotion();
     // One more frame: the (skipped) focus return of the first dialog is scheduled after its unmount.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));

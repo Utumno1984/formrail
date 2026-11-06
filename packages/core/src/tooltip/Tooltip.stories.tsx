@@ -52,7 +52,7 @@ const meta: Meta<DemoArgs> = {
     delayDuration: { control: { type: 'number', min: 0, step: 100 } },
     onOpenChange: { control: false },
   },
-  args: { content: 'Elimina riga', side: 'top', align: 'center', delayDuration: 500, onOpenChange: fn() },
+  args: { content: 'Delete row', side: 'top', align: 'center', delayDuration: 500, onOpenChange: fn() },
   // Optional in the library (a `Tooltip` supplies its own); here it is shared like in an app.
   decorators: [(Story) => <TooltipProvider>{Story()}</TooltipProvider>],
 };
@@ -69,7 +69,7 @@ function Page({ children, style }: { children?: ReactNode; style?: CSSProperties
 // Forwards its props and ref: a `Tooltip` trigger (`asChild`) hands its handlers to this component,
 // which must put them on the button.
 const TrashButton = forwardRef<HTMLButtonElement, { label?: string } & ButtonHTMLAttributes<HTMLButtonElement>>(
-  function TrashButton({ label = 'Elimina riga', ...rest }, ref) {
+  function TrashButton({ label = 'Delete row', ...rest }, ref) {
     return <Button {...rest} ref={ref} size="icon-sm" aria-label={label} leadingIcon={internalIcons.error} />;
   },
 );
@@ -116,7 +116,7 @@ export const Playground: Story = {
     </Page>
   ),
   play: async ({ args, canvasElement }) => {
-    const button = within(canvasElement).getByRole('button', { name: 'Elimina riga' });
+    const button = within(canvasElement).getByRole('button', { name: 'Delete row' });
     await expect(within(document.body).queryByRole('tooltip')).toBeNull();
     if (!args.content.trim() || (args.disabled && !args.disabledTriggerFocusable)) {
       await userEvent.hover(button);
@@ -156,8 +156,8 @@ export const Sides: Story = {
   render: () => (
     <Page style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 160, minHeight: 320 }}>
       {SIDES.map((side) => (
-        <Tooltip key={side} content={`Lato ${side}`} side={side} open>
-          <TrashButton label={`Lato ${side}`} />
+        <Tooltip key={side} content={`Side ${side}`} side={side} open>
+          <TrashButton label={`Side ${side}`} />
         </Tooltip>
       ))}
     </Page>
@@ -172,18 +172,18 @@ export const LongText: Story = {
   tags: ['visual'],
   args: {
     content:
-      'Questo fornitore ha una o più fatture in attesa di approvazione: aprire la scheda per vedere il dettaglio completo e lo storico delle modifiche.',
+      'This supplier has one or more invoices awaiting approval: open the card to see the full detail and the change history.',
     delayDuration: 0,
   },
   render: ({ content, side, align, delayDuration }) => (
     <Page style={{ paddingTop: 160 }}>
       <Tooltip content={content} side={side} align={align} delayDuration={delayDuration}>
-        <TrashButton label="Dettaglio" />
+        <TrashButton label="Detail" />
       </Tooltip>
     </Page>
   ),
   play: async ({ canvasElement }) => {
-    await userEvent.hover(within(canvasElement).getByRole('button', { name: 'Dettaglio' }));
+    await userEvent.hover(within(canvasElement).getByRole('button', { name: 'Detail' }));
     const tooltip = await within(document.body).findByRole('tooltip');
     await expect(tooltip.getBoundingClientRect().width).toBeLessThanOrEqual(320 + 1);
     await expect(tooltip.getBoundingClientRect().height).toBeGreaterThan(40);
@@ -196,16 +196,16 @@ export const LongText: Story = {
  */
 export const ViewportEdge: Story = {
   tags: ['visual'],
-  args: { content: 'Tooltip vicino al bordo destro della finestra, con testo abbastanza lungo da andare a capo.', side: 'right', delayDuration: 0 },
+  args: { content: 'Tooltip near the right edge of the window, with text long enough to wrap onto a new line.', side: 'right', delayDuration: 0 },
   render: ({ content, side, align, delayDuration }) => (
     <Page style={{ padding: '120px 0 0', display: 'flex', justifyContent: 'flex-end' }}>
       <Tooltip content={content} side={side} align={align} delayDuration={delayDuration}>
-        <TrashButton label="Bordo" />
+        <TrashButton label="Edge" />
       </Tooltip>
     </Page>
   ),
   play: async ({ canvasElement }) => {
-    await userEvent.hover(within(canvasElement).getByRole('button', { name: 'Bordo' }));
+    await userEvent.hover(within(canvasElement).getByRole('button', { name: 'Edge' }));
     const tooltip = await within(document.body).findByRole('tooltip');
     await waitFor(() => {
       const box = tooltip.getBoundingClientRect();
@@ -227,19 +227,19 @@ export const InsideDialog: Story = {
     <Page>
       <Dialog>
         <DialogTrigger asChild>
-          <Button variant="primary">Apri</Button>
+          <Button variant="primary">Open</Button>
         </DialogTrigger>
         <DialogContent size="sm">
           <DialogHeader>
-            <DialogTitle>Elimina riga</DialogTitle>
+            <DialogTitle>Delete row</DialogTitle>
           </DialogHeader>
           <DialogBody>
             <Tooltip content={content} side={side} align={align} delayDuration={delayDuration}>
-              <TrashButton label="Elimina riga" />
+              <TrashButton label="Delete row" />
             </Tooltip>
           </DialogBody>
           <DialogFooter>
-            <DialogClose>Annulla</DialogClose>
+            <DialogClose>Cancel</DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -247,8 +247,8 @@ export const InsideDialog: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(document.body);
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Apri' }));
-    const trash = await body.findByRole('button', { name: 'Elimina riga' });
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open' }));
+    const trash = await body.findByRole('button', { name: 'Delete row' });
     await waitFor(() => expect(trash).toHaveFocus());
     await new Promise((resolve) => setTimeout(resolve, 200));
     await expect(body.queryByRole('tooltip')).toBeNull();
@@ -259,7 +259,7 @@ export const InsideDialog: Story = {
     await expect(await body.findByRole('tooltip')).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(body.queryByRole('tooltip')).toBeNull());
-    await expect(body.getByRole('dialog', { name: 'Elimina riga' })).toBeInTheDocument();
+    await expect(body.getByRole('dialog', { name: 'Delete row' })).toBeInTheDocument();
 
     // The pointer arrives on the button (the modal makes the body itself non-interactive).
     await userEvent.hover(trash);
@@ -291,8 +291,8 @@ export const OpenedByArrowDown: Story = {
         <Page>
           <div style={{ display: 'flex', gap: 8 }}>
             {/* A tooltip already mounted elsewhere on the page, as in any real app. */}
-            <Tooltip content="Azione della pagina" delayDuration={delayDuration}>
-              <TrashButton label="Azione della pagina" />
+            <Tooltip content="Page action" delayDuration={delayDuration}>
+              <TrashButton label="Page action" />
             </Tooltip>
             <Button onKeyDown={(event) => event.key === 'ArrowDown' && setOpen(true)}>Menu</Button>
           </div>
@@ -312,9 +312,9 @@ export const OpenedByArrowDown: Story = {
               {/* side="right": a menu panel is vertically dense, there is rarely enough room above or
                   below an item for a "top"/"bottom" tooltip not to cover a neighbour (even the menu's
                   own trigger, as this story caught) — the standard fix is to open tooltips sideways. */}
-              <Tooltip content="Dettaglio della voce" side="right" delayDuration={delayDuration}>
+              <Tooltip content="Item detail" side="right" delayDuration={delayDuration}>
                 {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the autoFocus item is the case under test */}
-                <Button autoFocus>Prima voce</Button>
+                <Button autoFocus>First item</Button>
               </Tooltip>
             </div>
           )}
@@ -336,11 +336,11 @@ export const DisabledTrigger: Story = {
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => (
     <Page style={{ display: 'flex', gap: 24 }}>
-      <Tooltip content="Non visibile: nessun tooltip di default" delayDuration={delayDuration}>
-        <Button disabled>Disattivo</Button>
+      <Tooltip content="Not visible: no tooltip by default" delayDuration={delayDuration}>
+        <Button disabled>Disabled</Button>
       </Tooltip>
-      <Tooltip content="Manca il permesso di modifica" delayDuration={delayDuration} disabledTriggerFocusable>
-        <Button disabled>Disattivo con motivo</Button>
+      <Tooltip content="Missing edit permission" delayDuration={delayDuration} disabledTriggerFocusable>
+        <Button disabled>Disabled with reason</Button>
       </Tooltip>
     </Page>
   ),
@@ -352,7 +352,7 @@ export const DisabledTrigger: Story = {
     await expect(body.queryByRole('tooltip')).toBeNull();
     await userEvent.tab();
     await expect(withReason.parentElement).toHaveFocus();
-    await expect(await body.findByRole('tooltip')).toHaveTextContent('Manca il permesso di modifica');
+    await expect(await body.findByRole('tooltip')).toHaveTextContent('Missing edit permission');
     await settle(plain);
   },
 };
@@ -364,12 +364,12 @@ export const EmptyContent: Story = {
   render: ({ delayDuration }) => (
     <Page>
       <Tooltip content="" delayDuration={delayDuration}>
-        <TrashButton label="Senza testo" />
+        <TrashButton label="No text" />
       </Tooltip>
     </Page>
   ),
   play: async ({ canvasElement }) => {
-    const button = within(canvasElement).getByRole('button', { name: 'Senza testo' });
+    const button = within(canvasElement).getByRole('button', { name: 'No text' });
     await userEvent.hover(button);
     await userEvent.tab();
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -386,12 +386,12 @@ export const AutoFocus: Story = {
     <Page>
       <Tooltip content={content} side={side} align={align} delayDuration={delayDuration}>
         {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the autoFocus trigger is the case under test */}
-        <Button autoFocus>Con autofocus</Button>
+        <Button autoFocus>With autofocus</Button>
       </Tooltip>
     </Page>
   ),
   play: async ({ canvasElement }) => {
-    const button = within(canvasElement).getByRole('button', { name: 'Con autofocus' });
+    const button = within(canvasElement).getByRole('button', { name: 'With autofocus' });
     await expect(button).toHaveFocus();
     await new Promise((resolve) => setTimeout(resolve, 200));
     await expect(within(document.body).queryByRole('tooltip')).toBeNull();
@@ -408,7 +408,7 @@ export const Toolbar: Story = {
     <Page>
       <TooltipProvider delayDuration={600} skipDelayDuration={400}>
         <div style={{ display: 'flex', gap: 4 }}>
-          {['Modifica', 'Duplica', 'Archivia'].map((label) => (
+          {['Edit', 'Duplicate', 'Archive'].map((label) => (
             <Tooltip key={label} content={label}>
               <TrashButton label={label} />
             </Tooltip>
@@ -420,18 +420,18 @@ export const Toolbar: Story = {
   play: async ({ canvasElement }) => {
     const body = within(document.body);
     const canvas = within(canvasElement);
-    await userEvent.hover(canvas.getByRole('button', { name: 'Modifica' }));
-    await expect(await body.findByRole('tooltip', undefined, { timeout: 3000 })).toHaveTextContent('Modifica');
-    await userEvent.unhover(canvas.getByRole('button', { name: 'Modifica' }));
-    const next = canvas.getByRole('button', { name: 'Duplica' });
+    await userEvent.hover(canvas.getByRole('button', { name: 'Edit' }));
+    await expect(await body.findByRole('tooltip', undefined, { timeout: 3000 })).toHaveTextContent('Edit');
+    await userEvent.unhover(canvas.getByRole('button', { name: 'Edit' }));
+    const next = canvas.getByRole('button', { name: 'Duplicate' });
     await userEvent.hover(next);
     // Radix ignores the first move while the pointer is "in transit" between the two triggers: a
     // person's hand makes several, so does this.
     const box = next.getBoundingClientRect();
     await userEvent.pointer({ target: next, coords: { clientX: box.left + 6, clientY: box.top + 6 } });
-    await waitFor(() => expect(body.getByRole('tooltip')).toHaveTextContent('Duplica'), { timeout: 400 });
+    await waitFor(() => expect(body.getByRole('tooltip')).toHaveTextContent('Duplicate'), { timeout: 400 });
     await expect(body.getAllByRole('tooltip')).toHaveLength(1);
-    await settle(canvas.getByRole('button', { name: 'Duplica' }));
+    await settle(canvas.getByRole('button', { name: 'Duplicate' }));
   },
 };
 
@@ -445,21 +445,21 @@ export const ClippedAndInSheet: Story = {
   render: ({ delayDuration }) => (
     <Page>
       <div style={{ overflow: 'hidden', width: 80, height: 40, border: '1px solid var(--color-rop-border)', marginBottom: 24 }}>
-        <Tooltip content="Non tagliato dal contenitore" delayDuration={delayDuration} side="right">
-          <TrashButton label="Nel contenitore" />
+        <Tooltip content="Not clipped by the container" delayDuration={delayDuration} side="right">
+          <TrashButton label="In the container" />
         </Tooltip>
       </div>
       <Sheet>
         <SheetTrigger asChild>
-          <Button>Apri sheet</Button>
+          <Button>Open sheet</Button>
         </SheetTrigger>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Pannello</SheetTitle>
+            <SheetTitle>Panel</SheetTitle>
           </SheetHeader>
           <SheetBody>
-            <Tooltip content="Sopra lo sheet" delayDuration={delayDuration} side="left">
-              <TrashButton label="Nello sheet" />
+            <Tooltip content="Above the sheet" delayDuration={delayDuration} side="left">
+              <TrashButton label="In the sheet" />
             </Tooltip>
           </SheetBody>
         </SheetContent>
@@ -468,9 +468,9 @@ export const ClippedAndInSheet: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(document.body);
-    await userEvent.hover(within(canvasElement).getByRole('button', { name: 'Nel contenitore' }));
-    await expect(await body.findByRole('tooltip')).toHaveTextContent('Non tagliato dal contenitore');
-    await settle(within(canvasElement).getByRole('button', { name: 'Nel contenitore' }));
+    await userEvent.hover(within(canvasElement).getByRole('button', { name: 'In the container' }));
+    await expect(await body.findByRole('tooltip')).toHaveTextContent('Not clipped by the container');
+    await settle(within(canvasElement).getByRole('button', { name: 'In the container' }));
   },
 };
 
@@ -488,11 +488,11 @@ export const ContentChangesWhileOpen: Story = {
       return (
         <Page style={{ paddingTop: 120, paddingLeft: 280 }}>
           <Tooltip
-            content={long ? 'Un testo molto più lungo, che cambia la larghezza del tooltip mentre è aperto' : 'Breve'}
+            content={long ? 'A much longer text, which changes the width of the tooltip while it is open' : 'Short'}
             delayDuration={delayDuration}
           >
             <Button onKeyDown={(event) => (event.key === '+' || event.key === '-') && setLong(event.key === '+')}>
-              Premi + o -
+              Press + or -
             </Button>
           </Tooltip>
         </Page>
@@ -502,15 +502,15 @@ export const ContentChangesWhileOpen: Story = {
   },
   play: async ({ canvasElement }) => {
     const body = within(document.body);
-    const trigger = within(canvasElement).getByRole('button', { name: 'Premi + o -' });
+    const trigger = within(canvasElement).getByRole('button', { name: 'Press + or -' });
     await userEvent.tab();
     await expect(trigger).toHaveFocus();
-    await expect(await body.findByRole('tooltip')).toHaveTextContent('Breve');
+    await expect(await body.findByRole('tooltip')).toHaveTextContent('Short');
     const narrow = body.getByRole('tooltip').getBoundingClientRect().width;
     await userEvent.keyboard('+');
     await waitFor(() => {
       const tooltip = body.getByRole('tooltip');
-      expect(tooltip).toHaveTextContent('Un testo molto più lungo');
+      expect(tooltip).toHaveTextContent('A much longer text');
       const box = tooltip.getBoundingClientRect();
       const anchor = trigger.getBoundingClientRect();
       expect(box.width).toBeGreaterThan(narrow + 40);
@@ -530,8 +530,8 @@ export const ClickAction: Story = {
       const [count, setCount] = useState(0);
       return (
         <Page>
-          <Tooltip content={`Cliccato ${count} volte`} delayDuration={delayDuration}>
-            <Button onClick={() => setCount((c) => c + 1)}>Conta</Button>
+          <Tooltip content={`Clicked ${count} times`} delayDuration={delayDuration}>
+            <Button onClick={() => setCount((c) => c + 1)}>Count</Button>
           </Tooltip>
           <p data-testid="count">{count}</p>
         </Page>
@@ -541,9 +541,9 @@ export const ClickAction: Story = {
   },
   play: async ({ canvasElement }) => {
     const body = within(document.body);
-    const button = within(canvasElement).getByRole('button', { name: 'Conta' });
+    const button = within(canvasElement).getByRole('button', { name: 'Count' });
     await userEvent.hover(button);
-    await expect(await body.findByRole('tooltip')).toHaveTextContent('Cliccato 0 volte');
+    await expect(await body.findByRole('tooltip')).toHaveTextContent('Clicked 0 times');
     await settle(button);
   },
 };

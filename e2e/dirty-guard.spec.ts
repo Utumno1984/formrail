@@ -17,7 +17,7 @@ async function gotoStory(page: Page, id: string, args?: string): Promise<void> {
 const openPlayground = (page: Page, args?: string) => gotoStory(page, PLAYGROUND, args);
 
 const confirmDialog = (page: Page) => page.getByRole('dialog', { name: 'Unsaved changes' });
-const opener = (page: Page) => page.getByRole('button', { name: 'Torna alla lista' });
+const opener = (page: Page) => page.getByRole('button', { name: 'Back to list' });
 const noOrphans = (page: Page) =>
   page.evaluate(() => ({
     locked: document.body.hasAttribute('data-scroll-locked'),
@@ -70,7 +70,7 @@ test.describe('beforeunload (real browser dialog)', () => {
       const id = new URLSearchParams(location.search).get('id');
       channel.emit('updateStoryArgs', { storyId: id, updatedArgs: { when: false } });
     });
-    await expect(page.getByText('Nessuna modifica')).toBeVisible();
+    await expect(page.getByText('No changes')).toBeVisible();
     const seen: string[] = [];
     page.on('dialog', (d) => {
       seen.push(d.type());
@@ -128,7 +128,7 @@ test.describe('guard with changes', () => {
     await gotoStory(page, 'patterns-dirtyguard--unmounts-page');
     await opener(page).click();
     await page.getByRole('button', { name: 'Leave without saving' }).click();
-    await expect(page.getByText('Pagina chiusa')).toBeVisible();
+    await expect(page.getByText('Page closed')).toBeVisible();
     expect(await noOrphans(page)).toEqual({ locked: false, hidden: 0, dialogs: 0 });
     const inert = await page.evaluate(() => document.querySelectorAll('[inert]').length);
     expect(inert).toBe(0);
@@ -153,10 +153,10 @@ test.describe('guard with changes', () => {
 
   test('the confirmation sits above another open modal and Escape closes only the confirmation', async ({ page }) => {
     await gotoStory(page, 'patterns-dirtyguard--inside-dialog');
-    await page.getByRole('button', { name: 'Apri la scheda' }).click();
-    const outer = page.getByRole('dialog', { name: 'Scheda fornitore' });
+    await page.getByRole('button', { name: 'Open the card' }).click();
+    const outer = page.getByRole('dialog', { name: 'Supplier card' });
     await expect(outer).toBeVisible();
-    await page.getByRole('button', { name: 'Chiudi scheda' }).click();
+    await page.getByRole('button', { name: 'Close card' }).click();
     await expect(confirmDialog(page)).toBeVisible();
     const topIsConfirm = await page.evaluate(() => {
       const confirm = [...document.querySelectorAll<HTMLElement>('[role=dialog]')].find(

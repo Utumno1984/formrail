@@ -7,7 +7,7 @@ import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTri
 import { TruncatedText } from './TruncatedText';
 
 const LONG =
-  'Fornitore Bianchi & Associati S.r.l. - fattura 2026/0142 in attesa di approvazione da parte dell’ufficio acquisti';
+  'Supplier Bianchi & Associates Ltd - invoice 2026/0142 awaiting approval from the purchasing department';
 const BORDER = '1px dashed var(--color-rop-border)';
 // Demo frame: generous padding so the dashed border never touches the content (content-box keeps the
 // content width the stories measure). Table cells use BORDER alone: tight on purpose.
@@ -18,7 +18,7 @@ interface DemoArgs {
   children: string;
   /** Width of the demo container, px. */
   width: number;
-  tabIndex: 'nessuno' | '0';
+  tabIndex: 'none' | '0';
   onFocus: (event: unknown) => void;
 }
 
@@ -32,15 +32,15 @@ const meta: Meta<DemoArgs> = {
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     children: { control: 'text' },
-    width: { control: { type: 'range', min: 80, max: 600, step: 10 }, description: 'Larghezza del contenitore demo (px)' },
+    width: { control: { type: 'range', min: 80, max: 600, step: 10 }, description: 'Width of the demo container (px)' },
     tabIndex: {
       control: 'select',
-      options: ['nessuno', '0'],
-      description: 'Senza tabIndex il testo non è un tab stop; con 0 il fuoco da tastiera apre il tooltip.',
+      options: ['none', '0'],
+      description: 'Without tabIndex the text is not a tab stop; with 0, keyboard focus opens the tooltip.',
     },
     onFocus: { control: false },
   },
-  args: { children: LONG, width: 200, tabIndex: 'nessuno', onFocus: fn() },
+  args: { children: LONG, width: 200, tabIndex: 'none', onFocus: fn() },
 };
 
 export default meta;
@@ -133,7 +133,7 @@ export const InFlexRow: Story = {
     <Page>
       <div data-testid="container" style={{ display: 'flex', alignItems: 'center', gap: 8, width: 240, ...FRAME }}>
         <TruncatedText data-testid="text">{LONG}</TruncatedText>
-        <Button size="sm">Apri</Button>
+        <Button size="sm">Open</Button>
       </div>
     </Page>
   ),
@@ -152,7 +152,7 @@ export const NotTruncated: Story = {
   render: () => (
     <Page>
       <div data-testid="container" style={{ width: 320, ...FRAME }}>
-        <TruncatedText data-testid="text">Fattura 2026/0142</TruncatedText>
+        <TruncatedText data-testid="text">Invoice 2026/0142</TruncatedText>
       </div>
     </Page>
   ),
@@ -225,10 +225,10 @@ export const RichChildren: Story = {
     <Page>
       <div style={{ width: 160, ...FRAME, display: 'grid', gap: 8 }}>
         <TruncatedText data-testid="plain">
-          <strong>Fornitore</strong> Bianchi &amp; <em>Associati</em> S.r.l., sede legale di Milano
+          <strong>Supplier</strong> Bianchi &amp; <em>Associates</em> Ltd, registered office in Milan
         </TruncatedText>
-        <TruncatedText data-testid="custom" tooltipContent="Descrizione personalizzata">
-          <strong>Fornitore</strong> Bianchi &amp; Associati S.r.l., sede legale di Milano
+        <TruncatedText data-testid="custom" tooltipContent="Custom description">
+          <strong>Supplier</strong> Bianchi &amp; Associates Ltd, registered office in Milan
         </TruncatedText>
         <TruncatedText data-testid="empty" style={{ minHeight: 20 }}>
           {null}
@@ -240,12 +240,12 @@ export const RichChildren: Story = {
     const canvas = within(canvasElement);
     await userEvent.hover(canvas.getByTestId('plain'));
     await expect(await within(document.body).findByRole('tooltip', undefined, { timeout: 3000 })).toHaveTextContent(
-      'Fornitore Bianchi & Associati S.r.l., sede legale di Milano',
+      'Supplier Bianchi & Associates Ltd, registered office in Milan',
     );
     await settle(canvas.getByTestId('plain'));
     await userEvent.hover(canvas.getByTestId('custom'));
     await expect(await within(document.body).findByRole('tooltip', undefined, { timeout: 3000 })).toHaveTextContent(
-      'Descrizione personalizzata',
+      'Custom description',
     );
     await settle(canvas.getByTestId('custom'));
     await userEvent.hover(canvas.getByTestId('empty'));
@@ -285,11 +285,11 @@ export const InsideDialog: Story = {
     <Page>
       <Dialog>
         <DialogTrigger asChild>
-          <Button>Apri</Button>
+          <Button>Open</Button>
         </DialogTrigger>
         <DialogContent size="sm">
           <DialogHeader>
-            <DialogTitle>Dettaglio</DialogTitle>
+            <DialogTitle>Detail</DialogTitle>
           </DialogHeader>
           <DialogBody>
             <div style={{ width: 160, ...FRAME }}>
@@ -303,7 +303,7 @@ export const InsideDialog: Story = {
     </Page>
   ),
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Apri' }));
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open' }));
     const text = await within(document.body).findByTestId('text');
     await waitFor(() => expect(text).toHaveFocus());
     await wait(800);
@@ -328,7 +328,7 @@ export const ChangesWhileOpen: Story = {
               tabIndex={0}
               onKeyDown={(event) => (event.key === '+' || event.key === '-') && setShort(event.key === '-')}
             >
-              {short ? 'Breve' : LONG}
+              {short ? 'Short' : LONG}
             </TruncatedText>
           </div>
         </Page>
@@ -340,11 +340,11 @@ export const ChangesWhileOpen: Story = {
     const text = within(canvasElement).getByTestId('text');
     await userEvent.tab();
     await expect(text).toHaveFocus();
-    await expect(await within(document.body).findByRole('tooltip')).toHaveTextContent('Fornitore Bianchi');
+    await expect(await within(document.body).findByRole('tooltip')).toHaveTextContent('Supplier Bianchi');
     await userEvent.keyboard('-');
     await waitFor(() => expect(tooltip()).toBeNull());
     await userEvent.keyboard('+');
-    await expect(text).toHaveTextContent('Fornitore Bianchi');
+    await expect(text).toHaveTextContent('Supplier Bianchi');
     await settle(text);
   },
 };
@@ -362,15 +362,15 @@ export const ChangesWhileOpenInDialog: Story = {
         <Page>
           <Dialog>
             <DialogTrigger asChild>
-              <Button>Apri</Button>
+              <Button>Open</Button>
             </DialogTrigger>
             <DialogContent size="sm">
               <DialogHeader>
-                <DialogTitle>Dettaglio</DialogTitle>
+                <DialogTitle>Detail</DialogTitle>
               </DialogHeader>
               <DialogBody>
                 <Button size="sm" data-testid="before">
-                  Prima
+                  Before
                 </Button>
                 <div style={{ width: 160, ...FRAME }}>
                   <TruncatedText
@@ -378,7 +378,7 @@ export const ChangesWhileOpenInDialog: Story = {
                     tabIndex={0}
                     onKeyDown={(event) => (event.key === '+' || event.key === '-') && setShort(event.key === '-')}
                   >
-                    {short ? 'Breve' : LONG}
+                    {short ? 'Short' : LONG}
                   </TruncatedText>
                 </div>
               </DialogBody>
@@ -390,7 +390,7 @@ export const ChangesWhileOpenInDialog: Story = {
     return <Host />;
   },
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Apri' }));
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open' }));
     await within(document.body).findByTestId('text');
     await wait(800);
     // The dialog's own focus move is programmatic: no tooltip. The keyboard sequence that opens it
@@ -420,11 +420,11 @@ export const ChangesWhileOpenSharedProvider: Story = {
                   tabIndex={0}
                   onKeyDown={(event) => (event.key === '+' || event.key === '-') && setShort(event.key === '-')}
                 >
-                  {short ? 'Breve' : LONG}
+                  {short ? 'Short' : LONG}
                 </TruncatedText>
               </div>
-              <Tooltip content="Apri il dettaglio">
-                <Button size="sm">Apri</Button>
+              <Tooltip content="Open the detail">
+                <Button size="sm">Open</Button>
               </Tooltip>
             </div>
           </TooltipProvider>
@@ -443,12 +443,12 @@ export const ChangesWhileOpenSharedProvider: Story = {
     try {
       await userEvent.tab();
       await expect(text).toHaveFocus();
-      await expect(await within(document.body).findByRole('tooltip')).toHaveTextContent('Fornitore Bianchi');
+      await expect(await within(document.body).findByRole('tooltip')).toHaveTextContent('Supplier Bianchi');
       await userEvent.keyboard('-');
       await waitFor(() => expect(tooltip()).toBeNull());
       await expect(escapes).toBe(0);
       await userEvent.keyboard('+');
-      await expect(text).toHaveTextContent('Fornitore Bianchi');
+      await expect(text).toHaveTextContent('Supplier Bianchi');
     } finally {
       window.removeEventListener('keydown', count);
     }
@@ -467,9 +467,9 @@ export const SharedProvider: Story = {
     <Page>
       <TooltipProvider>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, width: 320, ...FRAME }}>
-          <TruncatedText data-testid="text">Breve</TruncatedText>
-          <Tooltip content="Apri il dettaglio">
-            <Button size="sm">Apri</Button>
+          <TruncatedText data-testid="text">Short</TruncatedText>
+          <Tooltip content="Open the detail">
+            <Button size="sm">Open</Button>
           </Tooltip>
         </div>
       </TooltipProvider>
@@ -478,7 +478,7 @@ export const SharedProvider: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const text = canvas.getByTestId('text');
-    const button = canvas.getByRole('button', { name: 'Apri' });
+    const button = canvas.getByRole('button', { name: 'Open' });
     await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
     await userEvent.hover(text);
     await wait(800);
@@ -487,7 +487,7 @@ export const SharedProvider: Story = {
     await userEvent.hover(button);
     await expect(tooltip()).toBeNull();
     await expect(await within(document.body).findByRole('tooltip', undefined, { timeout: 3000 })).toHaveTextContent(
-      'Apri il dettaglio',
+      'Open the detail',
     );
     await settle(button);
   },

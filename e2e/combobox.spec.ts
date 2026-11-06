@@ -4,7 +4,7 @@ import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const STORY = (name: string) => `forms-combobox--${name}`;
-const input = (page: Page, name = 'Comune'): Locator => page.getByRole('combobox', { name });
+const input = (page: Page, name = 'City'): Locator => page.getByRole('combobox', { name });
 const listbox = (page: Page): Locator => page.getByRole('listbox');
 
 const activeIsInput = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute('role') === 'combobox');
@@ -71,7 +71,7 @@ test.describe('keyboard', () => {
 
   test('on 200 options the active option is scrolled into view inside the list', async ({ page }) => {
     await gotoStory(page, STORY('long-list'));
-    const box = input(page, 'Cliente');
+    const box = input(page, 'Customer');
     await box.click();
     await expect(listbox(page)).toBeVisible();
     await page.keyboard.press('ArrowDown');
@@ -180,7 +180,7 @@ test.describe('touch @touch', () => {
 });
 
 test.describe('no echo and late data', () => {
-  test('"Carica dati": the value and the options arrive from outside; the Actions log stays empty', async ({
+  test('"Load data": the value and the options arrive from outside; the Actions log stays empty', async ({
     page,
   }) => {
     await expectPlayToPass(page, STORY('async-load'));
@@ -200,7 +200,7 @@ test.describe('overlays', () => {
       page,
     }) => {
       await gotoStory(page, STORY(container));
-      const box = page.getByRole('dialog').getByRole('combobox', { name: 'Comune' });
+      const box = page.getByRole('dialog').getByRole('combobox', { name: 'City' });
       // The story's play function has typed in the field already: start from a known text.
       await box.fill('o');
       await expect(listbox(page)).toBeVisible();
@@ -260,8 +260,8 @@ test.describe('overlays', () => {
 
   test('two comboboxes: distinct ids; opening the second closes the first', async ({ page }) => {
     await gotoStory(page, STORY('two'));
-    const a = input(page, 'Comune di nascita');
-    const b = input(page, 'Comune di residenza');
+    const a = input(page, 'City of birth');
+    const b = input(page, 'City of residence');
     expect(await a.getAttribute('aria-controls')).not.toBe(await b.getAttribute('aria-controls'));
     await a.click();
     await expect(listbox(page)).toHaveCount(1);
@@ -312,7 +312,7 @@ test.describe('Field states', () => {
     await box.click();
     await expect(listbox(page)).toHaveCount(0);
     await expect(box).toHaveValue('Milano');
-    await expect(box).toHaveAccessibleDescription('Deciso dal contratto quadro.');
+    await expect(box).toHaveAccessibleDescription('Set by the master agreement.');
   });
 });
 
@@ -557,11 +557,11 @@ test.describe('virtual keyboard', () => {
 
   test('reopening with an arrow brings a deep selected option into view', async ({ page }) => {
     await gotoStory(page, STORY('long-list'));
-    const box = input(page, 'Cliente');
+    const box = input(page, 'Customer');
     await box.click();
     await page.keyboard.type('150');
     await page.keyboard.press('Enter');
-    await expect(box).toHaveValue('Cliente 150');
+    await expect(box).toHaveValue('Customer 150');
     await page.keyboard.press('ArrowDown');
     await expect(listbox(page)).toBeVisible();
     await expect

@@ -25,17 +25,17 @@ interface PlaygroundArgs {
 }
 
 const LONG_MESSAGE =
-  'Salvataggio non riuscito: il server ha rifiutato la modifica perché la fattura è stata aggiornata da un altro utente nel frattempo. Ricarica la pagina e riprova.';
+  'Save failed: the server rejected the change because the invoice was updated by another user in the meantime. Reload the page and try again.';
 
 const meta: Meta<PlaygroundArgs> = {
   title: 'Floorplans/Object Page/Footer',
   component: ObjectPageFooter,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    visible: { control: 'boolean', description: 'Visibile e interattivo; nascosto occupa comunque lo stesso spazio ed è inert' },
-    message: { control: 'text', description: 'Messaggio di stato su una riga (troncato; testo completo su hover/focus)' },
-    messageTone: { control: 'radio', options: ['error', 'success', 'info'], description: 'Icona e colore del messaggio' },
-    label: { control: 'text', description: 'Nome accessibile della region' },
+    visible: { control: 'boolean', description: 'Visible and interactive; when hidden it still takes up the same space and is inert' },
+    message: { control: 'text', description: 'Single-line status message (truncated; full text on hover/focus)' },
+    messageTone: { control: 'radio', options: ['error', 'success', 'info'], description: 'Icon and colour of the message' },
+    label: { control: 'text', description: 'Accessible name of the region' },
     onSave: { control: false },
     onCancel: { control: false },
   },
@@ -66,16 +66,16 @@ function Filler({ height, children }: { height: number; children: ReactNode }) {
 function LongContent() {
   return (
     <>
-      <ObjectPageSection id="dati" title="Dati generali">
-        <Filler height={520}>Contenuto di Dati generali</Filler>
+      <ObjectPageSection id="general" title="General data">
+        <Filler height={520}>Content of General data</Filler>
       </ObjectPageSection>
-      <ObjectPageSection id="importi" title="Importi">
-        <Filler height={520}>Contenuto di Importi</Filler>
+      <ObjectPageSection id="amounts" title="Amounts">
+        <Filler height={520}>Content of Amounts</Filler>
       </ObjectPageSection>
-      <ObjectPageSection id="note" title="Note">
-        <Filler height={200}>Contenuto di Note</Filler>
+      <ObjectPageSection id="notes-section" title="Notes">
+        <Filler height={200}>Content of Notes</Filler>
         <div style={{ marginTop: 12 }}>
-          <Field label="Note interne" help="Visibili solo al team.">
+          <Field label="Internal notes" help="Visible to the team only.">
             <Input />
           </Field>
         </div>
@@ -88,8 +88,8 @@ const scrollerOf = (root: HTMLElement) => root.querySelector('[data-object-page-
 
 /**
  * The footer is a presentational bar: here it is driven by the `visible` control, and by two buttons
- * that behave like a real save (Salva and Annulla modifiche both hide it, as a clean form would).
- * "Modifica" (in a toolbar above the page, so reachable at any scroll position) shows it again,
+ * that behave like a real save (Save and Cancel changes both hide it, as a clean form would).
+ * "Edit" (in a toolbar above the page, so reachable at any scroll position) shows it again,
  * standing in for the first edit of a field.
  */
 export const Playground: Story = {
@@ -107,11 +107,11 @@ export const Playground: Story = {
       <div style={TOOLBAR_FRAME}>
         <div style={TOOLBAR}>
           <Button variant="secondary" onClick={() => setVisible(true)}>
-            Modifica
+            Edit
           </Button>
         </div>
         <ObjectPage>
-          <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+          <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
           <ObjectPageFooter visible={visible} message={message} messageTone={messageTone} label={label}>
             <Button
               onClick={() => {
@@ -119,7 +119,7 @@ export const Playground: Story = {
                 setVisible(false);
               }}
             >
-              Salva
+              Save
             </Button>
             <Button
               variant="secondary"
@@ -128,7 +128,7 @@ export const Playground: Story = {
                 setVisible(false);
               }}
             >
-              Annulla modifiche
+              Cancel changes
             </Button>
           </ObjectPageFooter>
           <LongContent />
@@ -143,17 +143,17 @@ export const Playground: Story = {
     scroller.scrollTop = 300;
     const before = { top: scroller.scrollTop, height: scroller.clientHeight };
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Modifica' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit' }));
     const region = await canvas.findByRole('region', { name: args.label });
     await expect(region).toBeVisible();
     await expect(scroller.scrollTop).toBe(before.top);
     await expect(scroller.clientHeight).toBe(before.height);
 
-    // Salva: the demo hides the footer as a successful save would, with the focus still on the button.
-    await userEvent.click(within(region).getByRole('button', { name: 'Salva' }));
+    // Save: the demo hides the footer as a successful save would, with the focus still on the button.
+    await userEvent.click(within(region).getByRole('button', { name: 'Save' }));
     await expect(args.onSave).toHaveBeenCalled();
     await waitFor(() => expect(canvas.queryByRole('region', { name: args.label })).not.toBeInTheDocument());
-    await expect(canvas.getByRole('heading', { level: 1, name: 'Fattura 2026/0142' })).toHaveFocus();
+    await expect(canvas.getByRole('heading', { level: 1, name: 'Invoice 2026/0142' })).toHaveFocus();
     await expect(scroller.scrollTop).toBe(before.top);
     await expect(scroller.clientHeight).toBe(before.height);
   },
@@ -172,10 +172,10 @@ export const Hidden: Story = {
   render: (args) => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <ObjectPageFooter visible={args.visible} label={args.label}>
-          <Button>Salva</Button>
-          <Button variant="secondary">Annulla modifiche</Button>
+          <Button>Save</Button>
+          <Button variant="secondary">Cancel changes</Button>
         </ObjectPageFooter>
         <LongContent />
       </ObjectPage>
@@ -190,10 +190,10 @@ export const WithActions: Story = {
   render: (args) => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <ObjectPageFooter visible={args.visible} label={args.label}>
-          <Button>Salva</Button>
-          <Button variant="secondary">Annulla modifiche</Button>
+          <Button>Save</Button>
+          <Button variant="secondary">Cancel changes</Button>
         </ObjectPageFooter>
         <LongContent />
       </ObjectPage>
@@ -208,10 +208,10 @@ export const LongError: Story = {
   render: (args) => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <ObjectPageFooter visible={args.visible} message={args.message} messageTone="error" label={args.label}>
-          <Button>Salva</Button>
-          <Button variant="secondary">Annulla modifiche</Button>
+          <Button>Save</Button>
+          <Button variant="secondary">Cancel changes</Button>
         </ObjectPageFooter>
         <LongContent />
       </ObjectPage>
