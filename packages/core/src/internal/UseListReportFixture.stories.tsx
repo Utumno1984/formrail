@@ -145,6 +145,8 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
 
 const meta: Meta<DemoArgs> = {
   title: 'Internal/UseListReportFixture',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'padded' },
   argTypes: { controlled: { control: 'boolean' }, onSortChange: { control: false } },
   args: { controlled: false, onSortChange: fn() },

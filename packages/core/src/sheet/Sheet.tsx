@@ -68,6 +68,7 @@ export interface SheetContentProps
   dismissible?: boolean;
   /** Receives the focus on close when the opener is gone or disabled (or there never was one). */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /** `SheetTrigger` and `SheetContent`. */
   children?: ReactNode;
 }
 
@@ -110,5 +111,5 @@ export const SheetFooter = ModalFooter;
 
 export type SheetCloseProps = ModalCloseProps;
 
-/** Closes the sheet; same default button as `DialogClose`, named "Close: <title>". */
+/** Closes the sheet; same default button as `DialogClose`, named "Close: `<title>`". */
 export const SheetClose = ModalClose;

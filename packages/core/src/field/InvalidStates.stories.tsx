@@ -18,6 +18,8 @@ const OPTIONS = [
 
 const meta: Meta<MatrixArgs> = {
   title: 'Internal/InvalidStates',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'fullscreen' },
   argTypes: {
     size: { control: 'radio', options: ['sm', 'md'], description: 'Height scale of the three controls' },

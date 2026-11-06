@@ -38,6 +38,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/DatePicker',
+  component: DatePicker,
   parameters: { layout: 'padded' },
   argTypes: {
     locale: { control: 'select', options: LOCALES, description: 'Order and separator of the typed text, calendar names.' },

@@ -30,6 +30,7 @@ export type ObjectPageProps = HTMLAttributes<HTMLDivElement> & {
   sectionNavigation?: 'anchors' | 'none';
   /** Texts for assistive technology. `anchorBar`: the name of the Anchor Bar's `<nav>` (default "Sections"). */
   labels?: { anchorBar?: string };
+  /** An `ObjectPageHeader` followed by the `ObjectPageSection`s (and an `ObjectPageFooter` if the page has a save-bar). */
   children?: ReactNode;
 };
 

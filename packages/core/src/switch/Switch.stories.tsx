@@ -21,6 +21,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Switch',
+  component: Switch,
   parameters: { layout: 'padded' },
   argTypes: {
     checked: { control: 'boolean' },

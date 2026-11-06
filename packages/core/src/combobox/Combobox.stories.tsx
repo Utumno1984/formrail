@@ -59,6 +59,9 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Combobox',
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: Combobox as never,
   parameters: { layout: 'padded' },
   argTypes: {
     size: { control: 'radio', options: SIZES },
@@ -226,6 +229,7 @@ export const NoResults: Story = {
   },
 };
 
+/** A Combobox in an invalid Field: the input is `aria-invalid` and the message is linked to it. Click the input to open the list. */
 export const WithError: Story = {
   tags: ['visual'],
   parameters: NO_STATE,
@@ -243,6 +247,7 @@ export const WithError: Story = {
   },
 };
 
+/** A disabled Field: the input is not focusable and clicking it does not open the list; the reason is read by assistive technology. */
 export const Disabled: Story = {
   tags: ['visual'],
   parameters: NO_STATE,

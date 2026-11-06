@@ -48,7 +48,7 @@ const TONE_CLASS: Record<ToastTone, { box: string; icon: string }> = {
 };
 
 export interface ToastLabels {
-  /** Close button name. Default "Dismiss notification"; the title is appended: "Dismiss notification: <title>". */
+  /** Close button name. Default "Dismiss notification"; the title is appended: "Dismiss notification: `<title>`". */
   dismiss?: string;
   /** Visually hidden tone name read before the message (colour alone is not enough). */
   tones?: Partial<Record<ToastTone, string>>;
@@ -61,6 +61,7 @@ export interface ToastProviderProps extends Omit<HTMLAttributes<HTMLDivElement>,
   hotkey?: string | null;
   /** Milliseconds a toast without an action stays. Default 5000. A toast with an action stays until closed. */
   defaultDuration?: number;
+  /** The part of the app that can call `useToast()`; the toast itself is rendered by the provider. */
   children?: ReactNode;
 }
 

@@ -28,6 +28,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Dialog',
+  component: Dialog,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     size: { control: 'radio', options: SIZES },

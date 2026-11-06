@@ -6,6 +6,8 @@ import { useLayoutEffect, type ReactNode } from 'react';
 
 const meta = {
   title: 'Internal/GeometryFixtures',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'padded' },
 } satisfies Meta;
 

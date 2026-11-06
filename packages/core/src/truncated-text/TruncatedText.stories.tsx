@@ -24,6 +24,9 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Data/TruncatedText',
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: TruncatedText as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     children: { control: 'text' },

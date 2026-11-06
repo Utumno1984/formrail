@@ -22,7 +22,7 @@ export interface DirtyGuardLabels {
   leave: string;
   /**
    * Accessible name of the close button (X) of the dialog, used verbatim (e.g. `Close`).
-   * Optional: when absent, empty or whitespace-only the X keeps the default "Close: <title>".
+   * Optional: when absent, empty or whitespace-only the X keeps the default "Close: `<title>`".
    */
   close?: string;
 }

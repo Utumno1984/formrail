@@ -22,6 +22,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Checkbox',
+  component: Checkbox,
   parameters: { layout: 'padded' },
   argTypes: {
     checked: { control: 'radio', options: CHECKED_OPTIONS },

@@ -68,6 +68,8 @@ interface StoryArgs {
 
 const meta: Meta<StoryArgs> = {
   title: 'Foundations/Interaction states',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'fullscreen' },
   argTypes: {
     disabled: { control: 'boolean', description: 'Disables every control (cursor not-allowed, no hover, no pressed look)' },

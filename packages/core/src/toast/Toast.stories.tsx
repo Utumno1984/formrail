@@ -26,6 +26,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Toast',
+  component: ToastProvider,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     tone: { control: 'radio', options: TONES },

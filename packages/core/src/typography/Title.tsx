@@ -20,6 +20,10 @@ export interface TitleProps extends HTMLAttributes<HTMLHeadingElement> {
   size?: TitleSize;
 }
 
+/**
+ * Heading (`h1`..`h6`) in the design-system type scale. The semantic `level` and the visual `size` are
+ * independent: pick the level for the document outline, the size for the look.
+ */
 export const Title = /* @__PURE__ */ forwardRef<HTMLHeadingElement, TitleProps>(function Title(
   { level, size, className, ...rest },
   ref,

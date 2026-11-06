@@ -19,6 +19,7 @@ const TONE_CLASS: Record<FieldMessageTone, string> = {
 export interface FieldMessageProps extends Omit<HTMLAttributes<HTMLDivElement>, 'role'> {
   /** Reference it from the control with `aria-describedby`, only while the message exists. */
   id: string;
+  /** `help` is muted neutral text; `error` uses the error colour and adds the error icon. Same layout for both. */
   tone: FieldMessageTone;
 }
 

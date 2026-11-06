@@ -32,6 +32,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Sheet',
+  component: Sheet,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     side: { control: 'radio', options: SIDES },

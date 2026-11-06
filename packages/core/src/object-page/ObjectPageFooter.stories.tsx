@@ -29,6 +29,7 @@ const LONG_MESSAGE =
 
 const meta: Meta<PlaygroundArgs> = {
   title: 'Floorplans/Object Page/Footer',
+  component: ObjectPageFooter,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     visible: { control: 'boolean', description: 'Visibile e interattivo; nascosto occupa comunque lo stesso spazio ed è inert' },

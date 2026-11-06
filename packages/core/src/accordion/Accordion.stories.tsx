@@ -70,6 +70,7 @@ function Demo({ type, collapsible, disabled, headingLevel, disabledItem, open, l
 
 const meta = {
   title: 'Navigation/Accordion',
+  component: Accordion,
   parameters: { layout: 'padded' },
   argTypes: {
     type: { control: 'radio', options: ['single', 'multiple'] },

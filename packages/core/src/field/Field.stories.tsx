@@ -25,22 +25,33 @@ interface PlaygroundArgs {
 
 const meta: Meta<PlaygroundArgs> = {
   title: 'Forms/Field',
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: Field as never,
   parameters: { layout: 'padded' },
   argTypes: {
     label: { control: 'text' },
-    name: { control: 'text', description: 'Nome logico: data-rop-name sul controllo (e name nativo su Input/Combobox)' },
+    name: { control: 'text' },
     help: { control: 'text' },
     error: { control: 'text' },
     required: { control: 'boolean' },
-    hideLabel: { control: 'boolean', description: 'Etichetta nascosta alla vista, ma nome accessibile del campo' },
+    hideLabel: { control: 'boolean' },
     reserveMessageSpace: {
       control: 'boolean',
       description: 'Reserve one caption line for the error, so a one-line error appearing moves nothing below. Turn off for a Field that never shows one.',
     },
     // forced = value decided by a business rule; locked = not editable (permissions / record status).
     // Same interaction: focusable, read-only, reason read by the screen reader.
-    state: { control: 'radio', options: STATES },
-    stateReason: { control: 'text' },
+    state: {
+      control: 'radio',
+      options: STATES,
+      description: '`default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only.',
+      table: { defaultValue: { summary: "'default'" } },
+    },
+    stateReason: {
+      control: 'text',
+      description: 'Why the field is not editable, read by assistive technology. Required with `forced` and `locked`.',
+    },
     placeholder: { control: 'text' },
     onChange: { control: false },
   },
@@ -259,7 +270,7 @@ export const HookToggleEnabled: Story = {
 /**
  * Keyboard-safe fixture (spec §1.10): the field is the last thing in a long page. When the virtual
  * keyboard covers the bottom of the screen, Field scrolls itself above it. The wrapper pads with
- * `--rop-keyboard-inset`, which Field publishes on <html> while it has focus, so the page can
+ * `--rop-keyboard-inset`, which Field publishes on `<html>` while it has focus, so the page can
  * scroll far enough. Exercised by `e2e/field.spec.ts` with a simulated visualViewport.
  */
 export const KeyboardSafe: Story = {

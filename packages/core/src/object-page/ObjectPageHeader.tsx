@@ -17,6 +17,7 @@ import {
 export type ObjectPageHeaderProps = Omit<HTMLAttributes<HTMLDivElement>, 'title' | 'children'> & {
   /** Identity of the object. Wraps when long, never truncated. */
   title: ReactNode;
+  /** Secondary line under the title (an id, a date, a customer). Wraps when long, never truncated. */
   subtitle?: ReactNode;
   /** Next to the title (a status badge, say). */
   status?: ReactNode;

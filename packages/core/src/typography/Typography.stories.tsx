@@ -9,6 +9,7 @@ import { Title } from './Title';
 // No `component` on the meta: the page documents Text AND Title, each story types its own args.
 const meta = {
   title: 'Foundations/Typography',
+  component: Text,
   parameters: { layout: 'padded' },
 } satisfies Meta;
 

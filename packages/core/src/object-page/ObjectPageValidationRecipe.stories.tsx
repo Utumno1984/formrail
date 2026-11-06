@@ -257,7 +257,10 @@ function Recipe(args: RecipeArgs) {
 
 const meta: Meta<RecipeArgs> = {
   title: 'Floorplans/Object Page con validazione',
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    docs: { description: { component: "A copy-paste recipe that combines the Object Page pieces: form state with a baseline, per-field validation, the error summary, focus on the first invalid field and the dirty-guard. Switch the record between empty and valid and press Save." } },
+  },
   argTypes: {
     record: {
       control: 'radio',

@@ -87,6 +87,9 @@ interface PlaygroundArgs {
 
 const meta: Meta<PlaygroundArgs> = {
   title: 'Data/ListReportFilterBar',
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: ListReportFilterBar as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     searchCommitDelay: {

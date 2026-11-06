@@ -43,12 +43,14 @@ export interface SelectProps
     ButtonHTMLAttributes<HTMLButtonElement>,
     'value' | 'defaultValue' | 'onChange' | 'children' | 'role' | 'type' | 'dir' | 'name' | 'form'
   > {
+  /** The choices, each with a unique `value` (a duplicate value is reported in development and the first wins). */
   options: readonly SelectOption[];
   /**
    * Controlled value. `undefined` (the key being present) means "nothing selected" and shows the
    * placeholder: the consumer never handles a sentinel value. Omit the prop to leave it uncontrolled.
    */
   value?: string | undefined;
+  /** Initial value of the uncontrolled Select. Ignored once `value` is passed. Default: nothing selected. */
   defaultValue?: string;
   /**
    * Called with the chosen option's value, **only** when the user picks an option (click, Enter,

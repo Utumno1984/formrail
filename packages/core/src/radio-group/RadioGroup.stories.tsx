@@ -27,6 +27,7 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/RadioGroup',
+  component: RadioGroup,
   parameters: { layout: 'padded' },
   argTypes: {
     orientation: { control: 'radio', options: ['vertical', 'horizontal'] satisfies RadioGroupOrientation[] },

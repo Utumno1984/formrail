@@ -1,0 +1,123 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Introduction" />
+
+# react-object-page
+
+An open-core React design system built around two enterprise UI patterns: the **List Report** (a list
+with filters and bulk actions) and the **Object Page** (a sectioned editor with an anchor bar, a sticky
+save bar and a dirty-guard). The components are headless-first, accessible by default (keyboard, focus
+management, ARIA) and styled through plain CSS custom properties, so a consumer can re-theme them
+without touching the source.
+
+It is an independent implementation of generic interaction patterns; it is not affiliated with, and
+contains no code, asset or style from, any third-party design system.
+
+- **`@react-object-page/core`**: MIT, free, on the public npm registry. Primitives and the simple
+  versions of the two floorplans. This is what this Storybook documents.
+- **`packages/pro`**: commercial add-ons that live in the same public monorepo.
+
+Source and issues: [github.com/Utumno1984/react-object-page](https://github.com/Utumno1984/react-object-page).
+Release notes: [GitHub releases](https://github.com/Utumno1984/react-object-page/releases)
+(the per-package changelog is generated from the changesets in `.changeset/` at each release).
+
+## Install
+
+```bash
+npm install @react-object-page/core
+```
+
+React 18 or 19 is required as a peer dependency.
+
+## Use it
+
+Import the stylesheet once, at the root of your app, then use the components:
+
+```tsx
+import '@react-object-page/core/styles.css';
+import { Button, StatusBadge } from '@react-object-page/core';
+
+export function Example() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <StatusBadge tone="success">Approved</StatusBadge>
+      <Button variant="primary" onClick={() => console.log('saved')}>
+        Save
+      </Button>
+    </div>
+  );
+}
+```
+
+On a Tailwind v4 project you can import `@react-object-page/core/theme.css` instead, to get only the
+design tokens (`--color-rop-*`, `--text-rop-*`, `--radius-rop-*`, `--motion-rop-*`, ...).
+
+## How to read this Storybook
+
+- Every component has a **Docs** page: description, the props table generated from the TypeScript
+  types and their JSDoc, and a **Show code** snippet for each story.
+- Stories marked with an **Interactions** panel run a scripted interaction (typing, clicking, opening an
+  overlay) and assert the result, so they document a behaviour and prove it at the same time.
+- Use the **Controls** panel to try the props live and the **Actions** panel to see the callbacks fire.
+
+## Index
+
+**Foundations**: design tokens and shared building blocks.
+[Tokens](?path=/docs/foundations-tokens--docs) ·
+[Typography](?path=/docs/foundations-typography--docs) ·
+[Icon](?path=/docs/foundations-icon--docs)
+
+**Primitives**: the smallest building blocks.
+[Button](?path=/docs/primitives-button--docs) ·
+[Avatar](?path=/docs/primitives-avatar--docs) ·
+[Card](?path=/docs/primitives-card--docs) ·
+[Divider](?path=/docs/primitives-divider--docs) ·
+[FieldMessage](?path=/docs/primitives-fieldmessage--docs) ·
+[MessageStrip](?path=/docs/primitives-messagestrip--docs) ·
+[ProgressBar](?path=/docs/primitives-progressbar--docs) ·
+[Skeleton](?path=/docs/primitives-skeleton--docs) ·
+[Spinner](?path=/docs/primitives-spinner--docs) ·
+[StatusBadge](?path=/docs/primitives-statusbadge--docs)
+
+**Forms**: fields and inputs.
+[Field](?path=/docs/forms-field--docs) ·
+[Checkbox](?path=/docs/forms-checkbox--docs) ·
+[Switch](?path=/docs/forms-switch--docs) ·
+[RadioGroup](?path=/docs/forms-radiogroup--docs) ·
+[Select](?path=/docs/forms-select--docs) ·
+[Combobox](?path=/docs/forms-combobox--docs) ·
+[DatePicker](?path=/docs/forms-datepicker--docs) ·
+[Calendar](?path=/docs/forms-calendar--docs)
+
+**Navigation**: moving around and disclosing content.
+[Tabs](?path=/docs/navigation-tabs--docs) ·
+[Breadcrumb](?path=/docs/navigation-breadcrumb--docs) ·
+[Pagination](?path=/docs/navigation-pagination--docs) ·
+[Accordion](?path=/docs/navigation-accordion--docs) ·
+[Collapsible](?path=/docs/navigation-collapsible--docs)
+
+**Overlays**: layers above the page.
+[Dialog](?path=/docs/overlays-dialog--docs) ·
+[Sheet](?path=/docs/overlays-sheet--docs) ·
+[Toast](?path=/docs/overlays-toast--docs) ·
+[Tooltip](?path=/docs/overlays-tooltip--docs)
+
+**Data**: lists, tables and read-only data.
+[ListReportTable](?path=/docs/data-listreporttable--docs) ·
+[ListReportFilterBar](?path=/docs/data-listreportfilterbar--docs) ·
+[DescriptionList](?path=/docs/data-descriptionlist--docs) ·
+[TruncatedText](?path=/docs/data-truncatedtext--docs)
+
+**Floorplans** (layout): full pages built from the pieces above.
+[List Report](?path=/docs/floorplans-list-report--docs) ·
+[Object Page](?path=/docs/floorplans-object-page-layout--docs) ·
+[Object Page: Anchor Bar](?path=/docs/floorplans-object-page-anchor-bar--docs) ·
+[Object Page: Footer](?path=/docs/floorplans-object-page-footer--docs) ·
+[Object Page: Validation](?path=/docs/floorplans-object-page-validation--docs) ·
+[Object Page: Schema validation](?path=/docs/floorplans-object-page-schema-validation--docs)
+
+**Patterns**: behaviours that span several components.
+[DirtyGuard](?path=/docs/patterns-dirtyguard--docs)
+
+**Showcase**: a complete worked example.
+[Invoices](?path=/docs/showcase-invoices--docs)

@@ -135,6 +135,9 @@ function Showcase({
 
 const meta: Meta<ShowcaseArgs> = {
   title: 'Floorplans/List Report',
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: ListReport as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     status: { control: 'radio', options: ['ready', 'loading', 'error'], description: '`status` di `ListReport`' },

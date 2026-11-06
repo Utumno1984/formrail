@@ -6,7 +6,11 @@ import { previewAnnotations, storyGlobs } from './story-globs.mjs';
 
 const config: StorybookConfig = {
   // Core always; packages/pro unless STORYBOOK_EXCLUDE_PRO is set (public deploy: Free only).
-  stories: storyGlobs() as string[],
+  stories: [...(storyGlobs() as string[]), './Introduction.mdx'],
+  // Docs tab (autodocs, MDX pages): addon-docs is a separate package since Storybook 9.
+  addons: ['@storybook/addon-docs'],
+  // Favicon for the manager (see manager-head.html).
+  staticDirs: ['./public'],
   // Absolute paths: relative ones would be resolved from the working directory, not `.storybook/`.
   previewAnnotations: (entry: string[] = []) => [
     ...entry,
