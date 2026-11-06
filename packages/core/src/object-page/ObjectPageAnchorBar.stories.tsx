@@ -18,6 +18,7 @@ interface PlaygroundArgs {
 
 const meta: Meta<PlaygroundArgs> = {
   title: 'Floorplans/Object Page/Anchor Bar',
+  component: ObjectPage,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     sectionNavigation: {

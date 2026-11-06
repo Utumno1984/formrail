@@ -49,12 +49,14 @@ export interface ComboboxProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,
   'value' | 'defaultValue' | 'onChange' | 'size' | 'role' | 'type' | 'children'
 > {
+  /** The choices, filtered by the text typed in the input. Each has a unique `value`. */
   options: readonly ComboboxOption[];
   /**
    * Controlled value. `undefined` (the key being present) means "nothing selected" and shows the
    * placeholder: the consumer never handles a sentinel value. Omit the prop to leave it uncontrolled.
    */
   value?: string | undefined;
+  /** Initial value of the uncontrolled Combobox. Ignored once `value` is passed. Default: nothing selected. */
   defaultValue?: string;
   /**
    * Called only when the user picks an option (click, Enter) or, with `clearOnEmpty`, empties the

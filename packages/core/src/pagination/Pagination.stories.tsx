@@ -121,6 +121,10 @@ function LoadingDemo({ onPageChange, ...args }: DemoArgs) {
   );
 }
 
+/**
+ * Click "Next page" (or focus it and press Enter): the control is disabled for 300 ms, as a parent would while
+ * fetching the page. When it is enabled again the focus is on the new current page, not lost on `<body>`.
+ */
 export const LoadingOnChange: Story = {
   parameters: noControls,
   args: { page: 5, pageCount: 10 },

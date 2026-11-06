@@ -76,6 +76,8 @@ function OverlayLayersFixture({ onPopoverClick, onModalClick }: LayersArgs) {
 
 const meta: Meta<LayersArgs> = {
   title: 'Internal/OverlayLayers',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'fullscreen' },
   argTypes: {
     onPopoverClick: { control: false },

@@ -15,7 +15,7 @@ export interface ToastOptions {
   id?: string;
   /** Default `info`. `error` is announced assertively (`role="alert"`), the other tones politely. */
   tone?: ToastTone;
-  /** Bold first line. It is also part of the close button's name ("Dismiss notification: <title>"). */
+  /** Bold first line. It is also part of the close button's name ("Dismiss notification: `<title>`"). */
   title?: ReactNode;
   /** The message. An empty or whitespace-only value shows nothing (and logs an error in development). */
   description: ReactNode;

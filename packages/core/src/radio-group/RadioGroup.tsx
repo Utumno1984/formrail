@@ -49,9 +49,13 @@ export interface RadioGroupProps
   disabled?: boolean;
   /** Shared native `name` of the radios. Default: the Field's `name`, else generated. */
   name?: string;
+  /** Set by a surrounding `Field` with an error; pass it by hand only outside a Field. */
   'aria-invalid'?: boolean | 'true' | 'false';
+  /** Set by a surrounding `Field` that is `required`; pass it by hand only outside a Field. */
   'aria-required'?: boolean | 'true' | 'false';
+  /** Set by a surrounding `Field` that is `forced` or `locked`; pass it by hand only outside a Field. */
   'aria-readonly'?: boolean | 'true' | 'false';
+  /** The `RadioGroupItem`s. */
   children?: ReactNode;
 }
 

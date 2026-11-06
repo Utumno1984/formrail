@@ -25,7 +25,10 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Patterns/DirtyGuard',
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    docs: { story: { inline: false, height: '360px' }, description: { component: "`useDirtyGuard({ when, labels })` protects a page with unsaved changes. `guard(action)` runs `action` right away when nothing is dirty, otherwise opens a confirmation dialog first (focus on \"Keep editing\", focus back on the opener when closed). The same dialog also intercepts the browser's Back/Forward, and a reload or tab close asks the browser for its own confirmation. Render the `dialog` the hook returns anywhere in the page." } },
+  },
   argTypes: {
     when: { control: 'boolean' },
     title: { control: 'text' },
@@ -112,9 +115,10 @@ export const DialogOpen: Story = {
 };
 
 /**
- * Fixture for the e2e suite: the guarded action unmounts the whole page. It records how many dialogs
- * were in the DOM when it ran (the confirmation must already be closed); nothing may be left behind
- * (scroll lock, `aria-hidden`, `inert`).
+ * The guarded action unmounts the whole page. To try it: click "Torna alla lista", then "Leave without
+ * saving": the page is replaced by "Pagina chiusa" and nothing is left behind (scroll lock, `aria-hidden`,
+ * `inert`). The story records how many dialogs were in the DOM when the action ran (the confirmation
+ * must already be closed); the e2e suite reads that number.
  */
 export const UnmountsPage: Story = {
   render: (args) => {
@@ -136,7 +140,10 @@ export const UnmountsPage: Story = {
   },
 };
 
-/** Fixture for the e2e suite: `guard` is called from inside another open Dialog; the confirmation stacks above it. */
+/**
+ * `guard` called from inside another open Dialog. To try it: click "Apri la scheda", then "Chiudi scheda": the
+ * confirmation opens above the first dialog (and gets the focus), and "Keep editing" returns to it.
+ */
 export const InsideDialog: Story = {
   // `when` is fixed and `close` is not passed to the hook in this render.
   parameters: { controls: { exclude: ['when', 'close'] } },
@@ -167,10 +174,15 @@ export const InsideDialog: Story = {
 };
 
 /**
- * Fixture for the e2e suite and the smoke test: browser Back/Forward with a modified field. Three
- * history entries (`#step-1`, `#step-2`, `#step-3`, the last one current); the "router" below only
- * reads `location.hash` on `popstate`. Type in the field, press the browser's Back/Forward: the dialog
- * opens and the route does not move until "Leave without saving".
+ * Browser Back/Forward with a modified field. **To try it:** type something in "Supplier name", then press
+ * the browser's Back button (or Alt+Left): `useDirtyGuard` intercepts the `popstate` and opens the
+ * "Unsaved changes" dialog instead of letting the route change. "Keep editing" stays on `#step-3`;
+ * "Leave without saving" goes back. With the field empty, Back is immediate and no dialog appears.
+ *
+ * There is no automatic play function: a real history navigation cannot be scripted reliably inside the
+ * Storybook iframe, so the e2e suite covers it. The story pushes three history entries (`#step-1`,
+ * `#step-2`, `#step-3`, the last one current) and the small "router" below only reads `location.hash`
+ * on `popstate`.
  */
 export const BrowserHistory: Story = {
   // `when` follows the typed field and `close` is not passed to the hook in this render.

@@ -52,7 +52,12 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Select',
-  parameters: { layout: 'padded' },
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: Select as never,
+  // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
+  // were rendered inline: each story gets its own iframe there.
+  parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     size: { control: 'radio', options: SIZES },
     placeholder: { control: 'text' },
@@ -160,6 +165,7 @@ export const Base: Story = {
   },
 };
 
+/** A Select in an invalid Field: the trigger is `aria-invalid` and the message is linked to it. Click the trigger to open the list. */
 export const WithError: Story = {
   tags: ['visual'],
   parameters: NO_STATE,
@@ -177,6 +183,7 @@ export const WithError: Story = {
   },
 };
 
+/** A disabled Field: the trigger is not focusable and clicking it does not open the list; the reason is read by assistive technology. */
 export const Disabled: Story = {
   tags: ['visual'],
   parameters: NO_STATE,

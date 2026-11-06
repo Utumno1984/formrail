@@ -40,6 +40,7 @@ export interface TooltipProviderProps {
   delayDuration?: number;
   /** Time in ms after a close during which the next tooltip opens with no delay. Default `300`. */
   skipDelayDuration?: number;
+  /** The part of the app whose tooltips share these delays (usually the whole app). */
   children?: ReactNode;
 }
 

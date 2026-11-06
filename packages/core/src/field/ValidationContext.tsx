@@ -11,6 +11,7 @@ export interface ValidationProviderProps {
    * when this object does.
    */
   fieldErrors: FieldErrors;
+  /** The form: every `Field` below shows the error found at its `name` in `fieldErrors`. */
   children?: ReactNode;
 }
 

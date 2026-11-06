@@ -14,14 +14,27 @@ import { ValidationContext } from './ValidationContext';
  * required in both; `disabled` may have one. In `default` there is none.
  */
 export type FieldStateProps =
-  | { state?: 'default'; stateReason?: never }
-  | { state: 'disabled'; stateReason?: ReactNode }
-  | { state: 'forced' | 'locked'; stateReason: ReactNode };
+  | {
+      /** `default` (editable), `disabled`, `forced` or `locked`. Default `default`. */
+      state?: 'default';
+      stateReason?: never;
+    }
+  | {
+      state: 'disabled';
+      /** Why the field is disabled; read by assistive technology through `aria-describedby`. Optional here. */
+      stateReason?: ReactNode;
+    }
+  | {
+      state: 'forced' | 'locked';
+      /** Why the value cannot be changed (a business rule, permissions, the record's status). Required, and read by assistive technology. */
+      stateReason: ReactNode;
+    };
 
 export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'> &
   FieldStateProps & {
     /** Accessible name of the control. A required marker is added visually, never to the name. */
     label: ReactNode;
+    /** Hint shown under the control and linked to it with `aria-describedby`, after the state reason and the error. */
     help?: ReactNode;
     /**
      * Logical name of the field (the key used in the form's errors). Exposed on the control as
@@ -37,6 +50,7 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
      * even if blank; the message is rendered only when it has content (blank: `console.error` in dev).
      */
     error?: ReactNode;
+    /** Marks the field as required: a visual marker next to the label (not part of the accessible name) and `aria-required` on the control. Default `false`. */
     required?: boolean;
     /**
      * Default `true`: the Field always reserves one caption line for its error, even with no
@@ -74,7 +88,7 @@ const KEYBOARD_INSET = '--rop-keyboard-inset';
 /**
  * While focus is inside the Field, keeps it clear of the on-screen keyboard (spec §1.10). The
  * keyboard shrinks the visual viewport, not the layout one, so media queries and `vh` do not see
- * it: the covered height is published as `--rop-keyboard-inset` on <html> (consumers can pad their
+ * it: the covered height is published as `--rop-keyboard-inset` on `<html>` (consumers can pad their
  * scroll container with it) and, if the Field is not inside the visual viewport, it is scrolled
  * into view. Re-run on every visual-viewport resize (the keyboard animates in after the focus).
  */

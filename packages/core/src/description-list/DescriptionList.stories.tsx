@@ -99,7 +99,10 @@ function Demo({ layout, width, valueKind, emptyLabel, onOpen }: DemoProps) {
 const meta = {
   title: 'Data/DescriptionList',
   component: Demo,
-  parameters: { layout: 'padded' },
+  parameters: {
+    layout: 'padded',
+    docs: { story: { inline: false, height: '360px' }, description: { component: "`DescriptionList` / `DescriptionListItem`: a read-only list of term/value pairs that lays itself out from the width of its own container (inline terms when wide, stacked when narrow), with a placeholder for empty values. The stories below drive it through a small demo wrapper; the table lists the wrapper's controls." } },
+  },
   argTypes: {
     layout: { control: 'radio', options: ['auto', 'inline', 'stacked'] satisfies DescriptionListLayout[] },
     width: { control: { type: 'range', min: 200, max: 800, step: 10 } },

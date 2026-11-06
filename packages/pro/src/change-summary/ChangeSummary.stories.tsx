@@ -415,7 +415,9 @@ const valueTypes: ChangeEntry[] = [
 /** One of each kind of value: booleans, dates, `''` / `null`, numbers, arrays, an added row, odd objects and render collisions. */
 export const ValueTypes: Story = {
   tags: ['visual'],
-  parameters: FIXED_FORMAT,
+  // `valueTypes` holds an invalid Date on purpose; the Docs "Show code" JSX serializer would call
+  // `toISOString()` on it and throw while rendering the story. Show the source text instead.
+  parameters: { ...FIXED_FORMAT, docs: { source: { type: 'code' } } },
   render: (args) => <ChangeSummary entries={valueTypes} {...fixed(args)} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

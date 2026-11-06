@@ -88,6 +88,8 @@ function ComboboxDemo({ clearOnEmpty, onSelectedItemChange, onInputValueChange }
 
 const meta: Meta<DemoArgs> = {
   title: 'Internal/UseComboboxFixture',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'padded' },
   argTypes: {
     clearOnEmpty: { control: 'boolean' },

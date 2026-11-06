@@ -48,7 +48,10 @@ function RecordPageDemo({ recordId, loadDelayMs, saveDelayMs, saveOutcome, loadO
 
 const meta: Meta<RecordPageArgs> = {
   title: 'Showcase/Invoices',
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    docs: { description: { component: "A complete worked example: an invoice record page (Object Page with sections, validation, a sticky save-bar and a dirty-guard) opened from a List Report, built only from the library's components. Use the controls to open another invoice, slow down the load or open one that does not exist; edit a field and try to leave to see the guard." } },
+  },
   argTypes: {
     recordId: {
       control: 'select',

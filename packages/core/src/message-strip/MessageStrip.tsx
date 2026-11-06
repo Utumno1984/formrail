@@ -36,7 +36,7 @@ export interface MessageStripProps extends Omit<HTMLAttributes<HTMLDivElement>, 
    */
   onDismiss?: () => void;
   /**
-   * Accessible name of the close button. Default: "Dismiss message: <title>", so strips with
+   * Accessible name of the close button. Default: "Dismiss message: `<title>`", so strips with
    * different titles get different names ("Dismiss message" alone when there is no title text).
    * The text is read from the `title` node itself: a title produced by a component that renders
    * its text on its own (e.g. a translation component) has none, so pass `dismissLabel` then.

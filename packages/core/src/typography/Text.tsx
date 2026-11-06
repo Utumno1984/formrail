@@ -19,7 +19,12 @@ interface TextBaseProps {
 
 export type TextProps = TextBaseProps &
   (
-    | ({ as?: 'p' | 'span' | 'div'; htmlFor?: never } & HTMLAttributes<HTMLElement>)
+    | ({
+        /** Element rendered, a closed set. Default `p`; `label` is the other branch of the type and also takes `htmlFor`. */
+        as?: 'p' | 'span' | 'div';
+        /** Only with `as="label"`: the id of the control the label names. */
+        htmlFor?: never;
+      } & HTMLAttributes<HTMLElement>)
     | ({ as: 'label' } & LabelHTMLAttributes<HTMLElement>)
   );
 

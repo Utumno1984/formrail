@@ -1,0 +1,17 @@
+<script>
+  // Docs pages render stories in iframes; one that focuses an element on mount (autofocus demos) makes the
+  // browser scroll the Docs page down to that iframe. Until the reader first touches the page, keep it at the
+  // top. Only the Docs page itself (viewMode=docs), not the story iframes inside it.
+  (function () {
+    if (new URLSearchParams(location.search).get('viewMode') !== 'docs') return;
+    var touched = false;
+    var stop = function () { touched = true; };
+    ['wheel', 'keydown', 'pointerdown', 'touchstart'].forEach(function (t) {
+      window.addEventListener(t, stop, { capture: true, once: true, passive: true });
+    });
+    window.addEventListener('scroll', function () {
+      if (!touched && window.scrollY > 0) window.scrollTo(0, 0);
+    }, { passive: true });
+    setTimeout(function () { touched = true; }, 8000);
+  })();
+</script>

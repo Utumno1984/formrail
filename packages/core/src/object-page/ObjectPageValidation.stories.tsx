@@ -41,7 +41,10 @@ const GRID: CSSProperties = { display: 'grid', gap: 16, maxWidth: 420 };
 
 const meta: Meta<ValidationArgs> = {
   title: 'Floorplans/Object Page/Validation',
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    docs: { description: { component: "Validation on an Object Page: `useObjectPageForm` collects the errors, a `ValidationProvider` hands each one to the `Field` with the matching `name`, and the footer's error summary moves the focus to the first invalid field on save. Press Save with nothing filled in to see it." } },
+  },
   argTypes: {
     withProvider: {
       control: 'boolean',

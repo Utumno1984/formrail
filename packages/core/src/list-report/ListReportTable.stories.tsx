@@ -143,6 +143,9 @@ interface PlaygroundArgs {
 
 const meta: Meta<PlaygroundArgs> = {
   title: 'Data/ListReportTable',
+  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: ListReportTable as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
     maxHeight: { control: { type: 'range', min: 160, max: 700, step: 10 }, description: 'maxHeight del contenitore di scroll (px)' },

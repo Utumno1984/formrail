@@ -72,6 +72,8 @@ function ReturnFocusDemo({ removeOpenerWhileOpen, withFallback, onOpenChange }: 
 
 const meta: Meta<DemoArgs> = {
   title: 'Internal/ReturnFocus',
+  // Test fixture / state matrix, not a documented component: no Docs page.
+  tags: ['!autodocs'],
   parameters: { layout: 'padded' },
   argTypes: {
     removeOpenerWhileOpen: { control: 'boolean' },

@@ -106,6 +106,7 @@ interface ButtonBaseProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   leadingIcon?: IconElement;
   /** An `<svg>` shown after the label, sized by `size`. Decorative: never part of the name. */
   trailingIcon?: IconElement;
+  /** The label. Plain text, or any content with `asChild`. Omit it for the icon-only sizes. */
   children?: ReactNode;
 }
 
@@ -118,7 +119,17 @@ type AccessibleName =
  * accessible name (`aria-label` or `aria-labelledby`); a missing/blank one is also reported with
  * `console.error` in development.
  */
-export type ButtonProps = ButtonBaseProps & ({ size?: ButtonTextSize } | ({ size: ButtonIconSize } & AccessibleName));
+export type ButtonProps = ButtonBaseProps &
+  (
+    | {
+        /** Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a paragraph). Default `md`. */
+        size?: ButtonTextSize;
+      }
+    | ({
+        /** Square icon-only button (24, 32 or 36px). Needs `aria-label` or `aria-labelledby`: there is no visible text. */
+        size: ButtonIconSize;
+      } & AccessibleName)
+  );
 
 // Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
 // (`typeof process` is NOT replaced by bundlers, so it would keep the dev code in production.)
