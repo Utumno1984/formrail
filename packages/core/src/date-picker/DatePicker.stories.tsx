@@ -38,8 +38,8 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/DatePicker',
-  component: DatePicker,
-  parameters: { layout: 'padded' },
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
+  parameters: { layout: 'padded', docs: { description: { component: "DatePicker: a text input in the locale's numeric format plus a Calendar popover. Typing and picking give the same ISO date through `onValueChange`; text that is not a valid date is reported through `onInvalidInput`." } } },
   argTypes: {
     locale: { control: 'select', options: LOCALES, description: 'Order and separator of the typed text, calendar names.' },
     // forced = value decided by a business rule; locked = not editable. Neither ever opens the calendar.

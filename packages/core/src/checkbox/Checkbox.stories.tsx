@@ -22,8 +22,8 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Checkbox',
-  component: Checkbox,
-  parameters: { layout: 'padded' },
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
+  parameters: { layout: 'padded', docs: { description: { component: "Checkbox: a styled native `<input type=\"checkbox\">` with an optional inline label, a mixed (`indeterminate`) state, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
   argTypes: {
     checked: { control: 'radio', options: CHECKED_OPTIONS },
     // forced = value decided by a business rule; locked = not editable. Neither changes on click or Space.

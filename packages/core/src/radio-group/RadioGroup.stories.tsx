@@ -27,8 +27,8 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/RadioGroup',
-  component: RadioGroup,
-  parameters: { layout: 'padded' },
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
+  parameters: { layout: 'padded', docs: { description: { component: "RadioGroup: native `<input type=\"radio\">` items (`RadioGroupItem`) with roving focus, arrow-key selection, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
   argTypes: {
     orientation: { control: 'radio', options: ['vertical', 'horizontal'] satisfies RadioGroupOrientation[] },
     // forced = value decided by a business rule; locked = not editable. Neither changes on click or arrows.

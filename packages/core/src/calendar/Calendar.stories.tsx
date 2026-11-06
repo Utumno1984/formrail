@@ -29,10 +29,8 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Calendar',
-  // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
-  // props table of the real component without forcing the wrapper's args to match its props.
-  component: Calendar as never,
-  parameters: { layout: 'padded' },
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
+  parameters: { layout: 'padded', docs: { description: { component: "Calendar: an inline month grid to pick one date, with keyboard navigation (arrows, Home/End, PageUp/PageDown), `min` / `max` limits and `disabled` / `readOnly` states. Controlled with `value` / `onValueChange`." } } },
   argTypes: {
     locale: { control: 'select', options: LOCALES },
     // 'auto' = derived from the locale (Intl week info, else the CLDR region table, else Monday).
