@@ -29,7 +29,9 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Calendar',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
+  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
+  subcomponents: { Calendar },
   parameters: { layout: 'padded', docs: { description: { component: "Calendar: an inline month grid to pick one date, with keyboard navigation (arrows, Home/End, PageUp/PageDown), `min` / `max` limits and `disabled` / `readOnly` states. Controlled with `value` / `onValueChange`." } } },
   argTypes: {
     locale: { control: 'select', options: LOCALES },

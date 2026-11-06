@@ -27,7 +27,7 @@ const meta: Meta<DemoArgs> = {
   title: 'Patterns/DirtyGuard',
   parameters: {
     layout: 'fullscreen',
-    docs: { description: { component: "`useDirtyGuard({ when, labels })` protects a page with unsaved changes. `guard(action)` runs `action` right away when nothing is dirty, otherwise opens a confirmation dialog first (focus on \"Keep editing\", focus back on the opener when closed). The same dialog also intercepts the browser's Back/Forward, and a reload or tab close asks the browser for its own confirmation. Render the `dialog` the hook returns anywhere in the page." } },
+    docs: { story: { inline: false, height: '360px' }, description: { component: "`useDirtyGuard({ when, labels })` protects a page with unsaved changes. `guard(action)` runs `action` right away when nothing is dirty, otherwise opens a confirmation dialog first (focus on \"Keep editing\", focus back on the opener when closed). The same dialog also intercepts the browser's Back/Forward, and a reload or tab close asks the browser for its own confirmation. Render the `dialog` the hook returns anywhere in the page." } },
   },
   argTypes: {
     when: { control: 'boolean' },

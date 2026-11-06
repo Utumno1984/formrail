@@ -42,7 +42,9 @@ const meta: Meta<DemoArgs> = {
   // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
   // props table of the real component without forcing the wrapper's args to match its props.
   component: Tooltip as never,
-  parameters: { layout: 'fullscreen' },
+  // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
+  // were rendered inline: each story gets its own iframe there.
+  parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     content: { control: 'text' },
     side: { control: 'radio', options: SIDES },

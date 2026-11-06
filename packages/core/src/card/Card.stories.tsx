@@ -20,7 +20,9 @@ interface DemoArgs extends CardProps {
 const meta = {
   title: 'Primitives/Card',
   component: Card,
-  parameters: { layout: 'padded' },
+  // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
+  // were rendered inline: each story gets its own iframe there.
+  parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     as: { control: 'radio', options: ['div', 'section', 'article'] },
     level: { control: 'select', options: LEVELS, description: 'Heading level of the CardTitle' },

@@ -38,8 +38,12 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/DatePicker',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
-  parameters: { layout: 'padded', docs: { description: { component: "DatePicker: a text input in the locale's numeric format plus a Calendar popover. Typing and picking give the same ISO date through `onValueChange`; text that is not a valid date is reported through `onInvalidInput`." } } },
+  // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
+  // were rendered inline: each story gets its own iframe there.
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
+  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
+  subcomponents: { DatePicker },
+  parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' }, description: { component: "DatePicker: a text input in the locale's numeric format plus a Calendar popover. Typing and picking give the same ISO date through `onValueChange`; text that is not a valid date is reported through `onInvalidInput`." } } },
   argTypes: {
     locale: { control: 'select', options: LOCALES, description: 'Order and separator of the typed text, calendar names.' },
     // forced = value decided by a business rule; locked = not editable. Neither ever opens the calendar.

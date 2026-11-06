@@ -22,7 +22,9 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Checkbox',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject.
+  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
+  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
+  subcomponents: { Checkbox },
   parameters: { layout: 'padded', docs: { description: { component: "Checkbox: a styled native `<input type=\"checkbox\">` with an optional inline label, a mixed (`indeterminate`) state, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
   argTypes: {
     checked: { control: 'radio', options: CHECKED_OPTIONS },

@@ -27,7 +27,9 @@ interface DemoArgs {
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Toast',
   component: ToastProvider,
-  parameters: { layout: 'fullscreen' },
+  // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
+  // were rendered inline: each story gets its own iframe there.
+  parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     tone: { control: 'radio', options: TONES },
     duration: { control: 'select', options: DURATIONS },

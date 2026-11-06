@@ -68,7 +68,7 @@ export interface SheetContentProps
   dismissible?: boolean;
   /** Receives the focus on close when the opener is gone or disabled (or there never was one). */
   returnFocusRef?: RefObject<HTMLElement | null>;
-  /** `SheetTrigger` and `SheetContent`. */
+  /** Header, body and footer of the panel. */
   children?: ReactNode;
 }
 

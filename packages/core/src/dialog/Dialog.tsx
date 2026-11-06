@@ -74,7 +74,7 @@ export interface DialogContentProps
    * the focus is not returned anywhere when the second closes.
    */
   returnFocusRef?: RefObject<HTMLElement | null>;
-  /** `DialogTrigger` and `DialogContent`. */
+  /** Header, body and footer of the panel. */
   children?: ReactNode;
 }
 
