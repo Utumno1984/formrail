@@ -93,8 +93,10 @@ export function useCloseRescuesFocus(open: boolean, contentRef: MutableRefObject
  * `inert` while closed (the panel stays mounted for its exit animation). React 19 takes a boolean
  * (an empty string would be read as `false`), React 18 only forwards the attribute as a string.
  */
-const INERT_VALUE: boolean | string = parseInt(reactVersion, 10) >= 19 ? true : '';
-export const inertWhenClosed = (open: boolean) => (open ? {} : ({ inert: INERT_VALUE } as Record<string, unknown>));
+// Computed on call, not at module level: a top-level statement with a side effect would stay in the
+// shared chunk and make unrelated tiny exports (composeRefs, useToast...) heavier in the bundle budget.
+export const inertWhenClosed = (open: boolean) =>
+  open ? {} : ({ inert: parseInt(reactVersion, 10) >= 19 ? true : '' } as Record<string, unknown>);
 
 export interface CollapsibleProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defaultValue' | 'onChange'> {
   /**
