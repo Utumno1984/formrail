@@ -15,6 +15,8 @@ import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 
+const useIsomorphicLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
+
 export type TabsActivationMode = 'automatic' | 'manual';
 export type TabsOrientation = 'horizontal' | 'vertical';
 
@@ -99,13 +101,16 @@ const TRIGGER =
   'data-[orientation=vertical]:border-e-2 data-[orientation=vertical]:justify-start data-[orientation=vertical]:text-start ' +
   'not-forced-colors:data-[state=active]:border-rop-primary not-forced-colors:data-[state=active]:text-rop-text ' +
   'forced-colors:data-[state=active]:border-[Highlight] ' +
-  'not-disabled:not-data-[state=active]:hover:bg-rop-surface-subtle not-disabled:not-data-[state=active]:hover:text-rop-text ' +
+  'not-disabled:not-data-[state=active]:rop-hover:bg-rop-surface-subtle not-disabled:not-data-[state=active]:rop-hover:text-rop-text ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
-  // Inset ring: never clipped by the scrolling list.
+  // Drawn inside the box: never clipped by the scrolling list.
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:-outline-offset-2 ' +
   'motion-safe:[transition-property:border-color,color,background-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)]';
-const LABEL = 'min-w-0 truncate';
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),' +
+  'textarea:not([disabled]),summary,[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex^="-"])';
+const LABEL ='min-w-0 truncate';
 const CONTENT =
   'min-w-0 flex-1 data-[state=inactive]:hidden focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:-outline-offset-2';
 
@@ -133,19 +138,30 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
   // Radix only calls its callback for user gestures, which is what keeps `onValueChange` echo-free.
   const [internal, setInternal] = useState(defaultValue);
   const current = value !== undefined ? value : internal;
-  const latest = useRef(current);
-  // Follows the prop / state after every render (an external change included, which is no gesture).
-  latest.current = current;
-  const handleValueChange =(next: string) => {
-    // Radix reports a click on mousedown and again on focus: only a real change is a gesture's result.
-    // The ref is the value as of the last gesture: the render that follows has not happened yet.
-    if (next === latest.current) return;
-    latest.current = next;
+  // Radix reports a click on mousedown and again on focus (same task): the second report of the
+  // same gesture is dropped, but a later gesture towards the same tab (a controlled parent that
+  // refused the change) is a new request and goes through.
+  const recent = useRef<string | undefined>(undefined);
+  const handleValueChange = (next: string) => {
+    if (next === current || next === recent.current) return;
+    recent.current = next;
+    setTimeout(() => {
+      recent.current = undefined;
+    }, 0);
     if (value === undefined) setInternal(next);
     onValueChange?.(next);
   };
   const root = useRef<HTMLDivElement>(null);
   const mergedRef = useMemo(() => composeRefs(ref, root), [ref]);
+  // Radix falls back to LTR (and writes `dir="ltr"`) when no `dir` is given: inherit the real
+  // direction of the surrounding document once mounted instead.
+  const [inheritedDir, setInheritedDir] = useState<'ltr' | 'rtl' | undefined>(undefined);
+  useIsomorphicLayoutEffect(() => {
+    const parent = root.current?.parentElement;
+    if (!parent || rest.dir) return;
+    const computed = getComputedStyle(parent).direction === 'rtl' ? 'rtl' : 'ltr';
+    setInheritedDir((prev) => (prev === computed ? prev : computed));
+  });
   const state = useMemo(() => ({ orientation, keepMounted, current }), [orientation, keepMounted, current]);
 
   useEffect(() => {
@@ -163,6 +179,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     <TabsContext.Provider value={state}>
       <RadixTabs.Root
         {...rest}
+        dir={rest.dir ?? inheritedDir}
         value={current ?? ''}
         onValueChange={handleValueChange}
         orientation={orientation}
@@ -189,7 +206,7 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
 export const TabsTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, TabsTriggerProps>(
   function TabsTrigger(props, ref) {
     const { className, children, onFocus, ...rest } = props;
-    const { orientation } = useContext(TabsContext);
+    const { orientation, current } = useContext(TabsContext);
     const el = useRef<HTMLButtonElement>(null);
     const mergedRef = useMemo(() => composeRefs(ref, el), [ref]);
 
@@ -203,8 +220,10 @@ export const TabsTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, TabsTri
           if (!list.isConnected) return;
           const active = document.activeElement;
           if (active && active !== document.body) return;
+          // The selected tab first: focusing it changes nothing, whereas focusing another tab would
+          // select it (automatic activation) and overwrite the consumer's choice.
           const next =
-            list.querySelector<HTMLElement>('[role="tab"][tabindex="0"]') ??
+            list.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]:not([disabled])') ??
             list.querySelector<HTMLElement>('[role="tab"]:not([disabled])');
           next?.focus();
         });
@@ -219,6 +238,9 @@ export const TabsTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, TabsTri
 
     return (
       <RadixTabs.Trigger
+        // The tab stop follows the selection, not the last focused tab (Radix's own roving state):
+        // otherwise Shift+Tab from a panel would land on a stale tab and, in automatic mode, select it.
+        tabIndex={current === rest.value ? 0 : -1}
         {...rest}
         ref={mergedRef}
         data-orientation={orientation}
@@ -237,11 +259,32 @@ export const TabsContent = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsConten
     const { className, keepMounted, ...rest } = props;
     const state = useContext(TabsContext);
     const keep = keepMounted ?? state.keepMounted;
+    const node = useRef<HTMLDivElement>(null);
+    const mergedRef = useMemo(() => composeRefs(ref, node), [ref]);
+    // The panel is a tab stop only when it has nothing focusable inside (otherwise Tab goes straight
+    // to its first control).
+    const [hasFocusable, setHasFocusable] = useState(false);
+    useIsomorphicLayoutEffect(() => {
+      const el = node.current;
+      if (!el) return;
+      const check = () => {
+        const found = Boolean(el.querySelector(FOCUSABLE));
+        setHasFocusable((prev) => (prev === found ? prev : found));
+      };
+      check();
+      // Content can appear or change without this component rendering (Radix mounts it a beat
+      // after the panel becomes active; children can be conditional).
+      if (typeof MutationObserver === 'undefined') return;
+      const observer = new MutationObserver(check);
+      observer.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'tabindex', 'href'] });
+      return () => observer.disconnect();
+    }, []);
     // Radix only hides a panel that is not present: with `forceMount` it must be told explicitly.
     return (
       <RadixTabs.Content
+        tabIndex={hasFocusable ? undefined : 0}
         {...rest}
-        ref={ref}
+        ref={mergedRef}
         forceMount={keep ? true : undefined}
         hidden={state.current !== rest.value}
         className={cn(CONTENT, className)}

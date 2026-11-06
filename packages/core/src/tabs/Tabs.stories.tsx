@@ -140,7 +140,7 @@ export const ManyTabs: Story = {
   args: { tabCount: 12 },
 };
 
-/** Visual: horizontal, with a disabled tab. */
+/** Visual: horizontal. */
 export const Horizontal: Story = {
   tags: ['visual'],
   args: { tabCount: 4 },

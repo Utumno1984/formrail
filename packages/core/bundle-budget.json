@@ -235,20 +235,20 @@
       "limit": 13551
     },
     "Tabs": {
-      "baseline": 17781,
-      "limit": 19560
+      "baseline": 17897,
+      "limit": 19687
     },
     "TabsContent": {
-      "baseline": 17286,
-      "limit": 19015
+      "baseline": 17610,
+      "limit": 19371
     },
     "TabsList": {
-      "baseline": 18341,
+      "baseline": 18342,
       "limit": 20176
     },
     "TabsTrigger": {
-      "baseline": 18129,
-      "limit": 19942
+      "baseline": 18151,
+      "limit": 19966
     },
     "Text": {
       "baseline": 10647,

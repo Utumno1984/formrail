@@ -51,7 +51,15 @@ test.describe('Navigation/Tabs', () => {
     await expect(page.getByRole('tab', { name: 'History' })).toBeFocused();
     await page.keyboard.press('Home');
     await expect(page.getByRole('tab', { name: 'Overview' })).toBeFocused();
-    // One tab stop: Tab leaves the list into the panel.
+    // One tab stop: Tab leaves the list; the first panel has an input, so the focus goes to it.
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('textbox', { name: 'Reference' })).toBeFocused();
+    // Shift+Tab goes back to the selected tab (not a stale one) and does not change the selection.
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeFocused();
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    // A panel with nothing focusable is itself the tab stop.
+    await page.getByRole('tab', { name: 'Attachments' }).click();
     await page.keyboard.press('Tab');
     await expect(page.getByRole('tabpanel')).toBeFocused();
   });

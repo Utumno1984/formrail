@@ -35,17 +35,17 @@ describe('Tabs', () => {
     const panel = screen.getByRole('tabpanel');
     expect(tab.getAttribute('aria-controls')).toBe(panel.id);
     expect(panel.getAttribute('aria-labelledby')).toBe(tab.id);
-    expect(panel).toHaveAttribute('tabindex', '0');
+    // This panel holds an input, so Tab goes straight to it: the panel itself is no tab stop.
+    expect(panel).not.toHaveAttribute('tabindex');
   });
 
   it('roving tabindex: a single tab stop in the list', () => {
     render(<Demo />);
     const tabs = screen.getAllByRole('tab');
-    // The list itself is the only stop; it hands the focus to the selected tab, which then holds tabindex 0.
-    expect(screen.getByRole('tablist')).toHaveAttribute('tabindex', '0');
-    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['-1', '-1', '-1']);
-    act(() => tabs[0]?.focus());
+    // Only the selected tab is in the tab order; the list itself only redirects focus to it.
     expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+    act(() => tabs[1]?.focus());
+    expect(tabs.map((t) => t.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
   });
 
   it('arrows move focus with wrap, Home/End jump, disabled tabs are skipped (automatic activation selects)', async () => {
@@ -326,6 +326,90 @@ describe('Tabs', () => {
     const ids = (s: string) => Array.from(s.matchAll(/ id="([^"]+)"/g)).map((m) => m[1]);
     expect(ids(html).length).toBeGreaterThan(0);
     expect(ids(renderToString(<Demo />))).toEqual(ids(html));
+  });
+
+  it('controlled parent that refuses the change: every gesture is reported (click, arrows, Enter)', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<Demo value="a" onValueChange={onValueChange} />);
+    await user.click(screen.getByRole('tab', { name: 'Tab b' }));
+    await user.click(screen.getByRole('tab', { name: 'Tab b' }));
+    expect(onValueChange.mock.calls.map((c) => c[0])).toEqual(['b', 'b']);
+    onValueChange.mockClear();
+    render(<Demo value="a" activationMode="manual" onValueChange={onValueChange} />);
+    const tab = screen.getAllByRole('tab', { name: 'Tab a' })[1]!;
+    await user.click(tab);
+    await user.keyboard('{ArrowRight}{Enter}');
+    await user.keyboard('{ArrowLeft}{ArrowRight}{Enter}');
+    expect(onValueChange.mock.calls.map((c) => c[0])).toEqual(['b', 'b']);
+  });
+
+  it('after an external value change Shift+Tab from the panel lands on the selected tab, with no onValueChange', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const { rerender } = render(<Demo value="a" onValueChange={onValueChange} />);
+    rerender(<Demo value="c" onValueChange={onValueChange} />);
+    await user.click(screen.getByLabelText('field c'));
+    await user.tab({ shift: true });
+    expect(screen.getByRole('tab', { name: 'Tab c' })).toHaveFocus();
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it('removing the focused active tab while the consumer selects another keeps the consumer choice', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const { rerender } = render(<Demo value="a" tabs={['a', 'b', 'c']} onValueChange={onValueChange} />);
+    await user.click(screen.getByRole('tab', { name: 'Tab a' }));
+    onValueChange.mockClear();
+    rerender(<Demo value="c" tabs={['b', 'c']} onValueChange={onValueChange} />);
+    await Promise.resolve();
+    expect(screen.getByRole('tab', { name: 'Tab c' })).toHaveFocus();
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it('inherits the direction of the document when no dir is given', () => {
+    document.documentElement.dir = 'rtl';
+    try {
+      render(<Demo />);
+      expect(screen.getAllByRole('tablist')[0]!.closest('[data-rop-tabs]')).toHaveAttribute('dir', 'rtl');
+    } finally {
+      document.documentElement.removeAttribute('dir');
+    }
+  });
+
+  it('the panel is a tab stop only when it has no focusable content', async () => {
+    const user = userEvent.setup();
+    render(
+      <Tabs defaultValue="a">
+        <TabsList aria-label="S">
+          <TabsTrigger value="a">A</TabsTrigger>
+          <TabsTrigger value="b">B</TabsTrigger>
+        </TabsList>
+        <TabsContent value="a">
+          <input aria-label="x" />
+        </TabsContent>
+        <TabsContent value="b">plain</TabsContent>
+      </Tabs>,
+    );
+    expect(screen.getByRole('tabpanel')).not.toHaveAttribute('tabindex');
+    await user.click(screen.getByRole('tab', { name: 'B' }));
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('tabindex', '0');
+  });
+
+  it('SSR: the server markup hydrates without errors', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    container.innerHTML = renderToString(<Demo />);
+    const { hydrateRoot } = await import('react-dom/client');
+    let root!: ReturnType<typeof hydrateRoot>;
+    await act(async () => {
+      root = hydrateRoot(container, <Demo />);
+    });
+    expect(error).not.toHaveBeenCalled();
+    act(() => root.unmount());
+    container.remove();
+    error.mockRestore();
   });
 
   it('a controlled wrapper that follows onValueChange behaves like a normal tab set', async () => {
