@@ -112,6 +112,8 @@ describe('core package.json', () => {
     const runtime = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {})];
     expect(runtime.filter((name) => /router/i.test(name))).toEqual([]);
     expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual([
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-collapsible',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dismissable-layer',
       '@radix-ui/react-popover',

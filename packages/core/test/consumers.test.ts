@@ -15,6 +15,10 @@ function run(file: string): string[] {
 }
 
 const EXPORTS = [
+  'Accordion',
+  'AccordionContent',
+  'AccordionItem',
+  'AccordionTrigger',
   'Avatar',
   'Breadcrumb',
   'BreadcrumbItem',
@@ -29,6 +33,9 @@ const EXPORTS = [
   'CardHeader',
   'CardTitle',
   'Checkbox',
+  'Collapsible',
+  'CollapsibleContent',
+  'CollapsibleTrigger',
   'Combobox',
   'DatePicker',
   'DescriptionList',

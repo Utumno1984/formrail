@@ -141,6 +141,15 @@
   --motion-rop-spinner-duration: 0.8s;
   --motion-rop-spinner-easing: linear;
   --animate-rop-spinner: rop-spinner var(--motion-rop-spinner-duration) var(--motion-rop-spinner-easing) infinite;
+  /* Disclosure (Accordion / Collapsible): the panel height animates between 0 and the height Radix
+     measures (`--radix-collapsible-content-height`); the chevron rotates with the same duration. Applied
+     only under `motion-safe:`: with prefers-reduced-motion the panel appears / disappears at once.
+     `overflow: hidden` lives in the keyframes, so it clips only while animating (a focus ring of a
+     control inside the panel is never cut once the panel is at rest). */
+  --motion-rop-disclosure-duration: 200ms;
+  --motion-rop-disclosure-easing: cubic-bezier(0.2, 0, 0, 1);
+  --animate-rop-disclosure-down: rop-disclosure-down var(--motion-rop-disclosure-duration) var(--motion-rop-disclosure-easing);
+  --animate-rop-disclosure-up: rop-disclosure-up var(--motion-rop-disclosure-duration) var(--motion-rop-disclosure-easing) forwards;
   /* Invisible (no visual change): only keeps the wrapper of the portal mounted for as long as its
      children animate out. */
   --animate-rop-modal-hold: rop-modal-hold var(--motion-rop-overlay-duration) linear forwards;
@@ -169,6 +178,26 @@
   @keyframes rop-spinner {
     to {
       rotate: 360deg;
+    }
+  }
+  @keyframes rop-disclosure-down {
+    from {
+      height: 0;
+      overflow: hidden;
+    }
+    to {
+      height: var(--radix-collapsible-content-height);
+      overflow: hidden;
+    }
+  }
+  @keyframes rop-disclosure-up {
+    from {
+      height: var(--radix-collapsible-content-height);
+      overflow: hidden;
+    }
+    to {
+      height: 0;
+      overflow: hidden;
     }
   }
   @keyframes rop-skeleton-pulse {
