@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, waitFor, within } from "storybook/test";
-import { Button } from "../button/Button";
+import { useRef, useState } from 'react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { Button } from '../button/Button';
 import {
   Dialog,
   DialogBody,
@@ -11,28 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../dialog/Dialog";
-import {
-  Sheet,
-  SheetBody,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "../sheet/Sheet";
-import {
-  Menu,
-  MenuContent,
-  MenuGroup,
-  MenuItem,
-  MenuLabel,
-  MenuSeparator,
-  MenuTrigger,
-} from "./Menu";
+} from '../dialog/Dialog';
+import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
+import { Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from './Menu';
 
-type Side = "top" | "right" | "bottom" | "left";
-type Align = "start" | "center" | "end";
-type DisabledItem = "none" | "rename" | "duplicate" | "archive";
+type Side = 'top' | 'right' | 'bottom' | 'left';
+type Align = 'start' | 'center' | 'end';
+type DisabledItem = 'none' | 'rename' | 'duplicate' | 'archive';
 
 interface DemoArgs {
   side: Side;
@@ -47,27 +32,22 @@ interface DemoArgs {
 }
 
 const meta: Meta<DemoArgs> = {
-  title: "Overlays/Menu",
-  parameters: { layout: "fullscreen" },
+  title: 'Overlays/Menu',
+  parameters: { layout: 'fullscreen' },
   argTypes: {
     side: {
-      control: "radio",
-      options: ["top", "right", "bottom", "left"] satisfies Side[],
+      control: 'radio',
+      options: ['top', 'right', 'bottom', 'left'] satisfies Side[],
     },
     align: {
-      control: "radio",
-      options: ["start", "center", "end"] satisfies Align[],
+      control: 'radio',
+      options: ['start', 'center', 'end'] satisfies Align[],
     },
     disabledItem: {
-      control: "select",
-      options: [
-        "none",
-        "rename",
-        "duplicate",
-        "archive",
-      ] satisfies DisabledItem[],
+      control: 'select',
+      options: ['none', 'rename', 'duplicate', 'archive'] satisfies DisabledItem[],
     },
-    modal: { control: "boolean" },
+    modal: { control: 'boolean' },
     onOpenChange: { control: false },
     onRename: { control: false },
     onDuplicate: { control: false },
@@ -75,9 +55,9 @@ const meta: Meta<DemoArgs> = {
     onDelete: { control: false },
   },
   args: {
-    side: "bottom",
-    align: "start",
-    disabledItem: "archive",
+    side: 'bottom',
+    align: 'start',
+    disabledItem: 'archive',
     modal: true,
     onOpenChange: fn(),
     onRename: fn(),
@@ -90,22 +70,16 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
-function Page({
-  children,
-  end,
-}: {
-  children?: React.ReactNode;
-  end?: boolean;
-}) {
+function Page({ children, end }: { children?: React.ReactNode; end?: boolean }) {
   return (
     <main
       style={{
         padding: 24,
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: 'system-ui, sans-serif',
         fontSize: 14,
         minHeight: 420,
-        display: "flex",
-        justifyContent: end ? "flex-end" : "flex-start",
+        display: 'flex',
+        justifyContent: end ? 'flex-end' : 'flex-start',
       }}
     >
       <div>{children}</div>
@@ -118,26 +92,17 @@ function Items({ args }: { args: DemoArgs }) {
     <>
       <MenuGroup>
         <MenuLabel>Edit</MenuLabel>
-        <MenuItem
-          onSelect={args.onRename}
-          disabled={args.disabledItem === "rename"}
-        >
+        <MenuItem onSelect={args.onRename} disabled={args.disabledItem === 'rename'}>
           Rename
         </MenuItem>
-        <MenuItem
-          onSelect={args.onDuplicate}
-          disabled={args.disabledItem === "duplicate"}
-        >
+        <MenuItem onSelect={args.onDuplicate} disabled={args.disabledItem === 'duplicate'}>
           Duplicate
         </MenuItem>
       </MenuGroup>
       <MenuSeparator />
       <MenuGroup>
         <MenuLabel>Danger zone</MenuLabel>
-        <MenuItem
-          onSelect={args.onArchive}
-          disabled={args.disabledItem === "archive"}
-        >
+        <MenuItem onSelect={args.onArchive} disabled={args.disabledItem === 'archive'}>
           Archive
         </MenuItem>
         <MenuItem tone="danger" onSelect={args.onDelete}>
@@ -168,36 +133,34 @@ function BasicMenu({ args }: { args: DemoArgs }) {
  * focus back on the trigger.
  */
 export const Playground: Story = {
-  args: { disabledItem: "rename" },
+  args: { disabledItem: 'rename' },
   render: (args) => (
     <Page>
       <BasicMenu args={args} />
     </Page>
   ),
   play: async ({ args, canvasElement }) => {
-    const trigger = within(canvasElement).getByRole("button", {
-      name: "More actions",
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'More actions',
     });
     trigger.focus();
-    await userEvent.keyboard("{ArrowDown}");
+    await userEvent.keyboard('{ArrowDown}');
     const body = within(canvasElement.ownerDocument.body);
     // "Rename" is disabled: the focus lands on "Duplicate", the first enabled item.
-    const duplicate = await body.findByRole("menuitem", { name: "Duplicate" });
+    const duplicate = await body.findByRole('menuitem', { name: 'Duplicate' });
     await waitFor(() => expect(duplicate).toHaveFocus());
-    await expect(
-      body.getByRole("menuitem", { name: "Rename" }),
-    ).toHaveAttribute("aria-disabled", "true");
-    await userEvent.keyboard("{Enter}");
+    await expect(body.getByRole('menuitem', { name: 'Rename' })).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.keyboard('{Enter}');
     await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
     await expect(args.onRename).not.toHaveBeenCalled();
-    await waitFor(() => expect(body.queryByRole("menu")).toBeNull());
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
     await waitFor(() => expect(trigger).toHaveFocus());
   },
 };
 
 /** The open menu with groups, labels, a separator, a disabled and a danger item (visual baseline). */
 export const OpenWithGroups: Story = {
-  tags: ["visual"],
+  tags: ['visual'],
   render: (args) => (
     <Page>
       <Menu defaultOpen modal={false}>
@@ -212,18 +175,14 @@ export const OpenWithGroups: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    await expect(
-      await body.findByRole("menu", { name: "More actions" }),
-    ).toBeVisible();
-    await expect(
-      body.getByRole("menuitem", { name: "Archive" }),
-    ).toHaveAttribute("aria-disabled", "true");
+    await expect(await body.findByRole('menu', { name: 'More actions' })).toBeVisible();
+    await expect(body.getByRole('menuitem', { name: 'Archive' })).toHaveAttribute('aria-disabled', 'true');
   },
 };
 
 /** Near the right edge: at 375px the menu stays inside the viewport (visual baseline). */
 export const NearRightEdge: Story = {
-  tags: ["visual"],
+  tags: ['visual'],
   render: (args) => (
     <Page end>
       <Menu defaultOpen modal={false}>
@@ -238,7 +197,7 @@ export const NearRightEdge: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    const menu = await body.findByRole("menu");
+    const menu = await body.findByRole('menu');
     await waitFor(() => {
       const r = menu.getBoundingClientRect();
       expect(r.left).toBeGreaterThanOrEqual(0);
@@ -265,13 +224,7 @@ export const LongMenu: Story = {
   ),
 };
 
-function DialogDemo({
-  args,
-  opensDialog,
-}: {
-  args: DemoArgs;
-  opensDialog: boolean;
-}) {
+function DialogDemo({ args, opensDialog }: { args: DemoArgs; opensDialog: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   return (
@@ -320,26 +273,22 @@ export const OpensADialog: Story = {
   render: (args) => <DialogDemo args={args} opensDialog />,
   play: async ({ args, canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    const trigger = within(canvasElement).getByRole("button", {
-      name: "More actions",
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'More actions',
     });
     trigger.focus();
-    await userEvent.keyboard("{ArrowDown}");
-    await body.findByRole("menu");
-    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await userEvent.keyboard('{ArrowDown}');
+    await body.findByRole('menu');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
     await expect(args.onDelete).toHaveBeenCalledTimes(1);
-    const dialog = await body.findByRole("dialog", {
-      name: "Delete this record?",
+    const dialog = await body.findByRole('dialog', {
+      name: 'Delete this record?',
     });
-    await waitFor(() =>
-      expect(dialog.contains(document.activeElement)).toBe(true),
-    );
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(body.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
     await waitFor(() => expect(trigger).toHaveFocus());
-    await waitFor(() =>
-      expect(document.body.style.pointerEvents).not.toBe("none"),
-    );
+    await waitFor(() => expect(document.body.style.pointerEvents).not.toBe('none'));
   },
 };
 
@@ -364,33 +313,35 @@ export const InsideDialog: Story = {
   ),
   play: async ({ args, canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      within(canvasElement).getByRole("button", { name: "Open dialog" }),
-    );
-    const dialog = await body.findByRole("dialog", { name: "Record" });
-    const trigger = within(dialog).getByRole("button", {
-      name: "More actions",
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open dialog' }));
+    const dialog = await body.findByRole('dialog', { name: 'Record' });
+    const trigger = within(dialog).getByRole('button', {
+      name: 'More actions',
     });
     trigger.focus();
-    await userEvent.keyboard("{ArrowDown}");
-    const item = await body.findByRole("menuitem", { name: "Duplicate" });
+    await userEvent.keyboard('{ArrowDown}');
+    const item = await body.findByRole('menuitem', { name: 'Duplicate' });
     const r = item.getBoundingClientRect();
-    await expect(
-      document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2),
-    ).toBe(item);
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(body.queryByRole("menu")).toBeNull());
-    await expect(
-      body.getByRole("dialog", { name: "Record" }),
-    ).toBeInTheDocument();
+    await expect(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)).toBe(item);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'Record' })).toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
     await expect(args.onOpenChange).toHaveBeenCalled();
+    // Again: pick "Duplicate" with Enter; the action runs once, the menu closes, the dialog stays.
+    await userEvent.keyboard('{ArrowDown}');
+    await body.findByRole('menu');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'Record' })).toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
   },
 };
 
 /** The same, with the menu open inside the Dialog (visual baseline; the play function opens it). */
 export const InsideDialogOpen: Story = {
-  tags: ["visual"],
+  tags: ['visual'],
   render: (args) => (
     <Page>
       <Dialog defaultOpen>
@@ -407,12 +358,10 @@ export const InsideDialogOpen: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    const trigger = await body.findByRole("button", { name: "More actions" });
-    await waitFor(() =>
-      expect(body.getByRole("dialog", { name: "Record" })).toBeVisible(),
-    );
+    const trigger = await body.findByRole('button', { name: 'More actions' });
+    await waitFor(() => expect(body.getByRole('dialog', { name: 'Record' })).toBeVisible());
     await userEvent.click(trigger);
-    await expect(await body.findByRole("menu")).toBeVisible();
+    await expect(await body.findByRole('menu')).toBeVisible();
   },
 };
 
@@ -435,25 +384,26 @@ export const InsideSheet: Story = {
       </Sheet>
     </Page>
   ),
-  play: async ({ canvasElement }) => {
+  play: async ({ args, canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      within(canvasElement).getByRole("button", { name: "Open sheet" }),
-    );
-    const sheet = await body.findByRole("dialog", { name: "Record" });
-    const trigger = within(sheet).getByRole("button", { name: "More actions" });
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open sheet' }));
+    const sheet = await body.findByRole('dialog', { name: 'Record' });
+    const trigger = within(sheet).getByRole('button', { name: 'More actions' });
     trigger.focus();
-    await userEvent.keyboard("{ArrowDown}");
-    const item = await body.findByRole("menuitem", { name: "Duplicate" });
+    await userEvent.keyboard('{ArrowDown}');
+    const item = await body.findByRole('menuitem', { name: 'Duplicate' });
     const r = item.getBoundingClientRect();
-    await expect(
-      document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2),
-    ).toBe(item);
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(body.queryByRole("menu")).toBeNull());
-    await expect(
-      body.getByRole("dialog", { name: "Record" }),
-    ).toBeInTheDocument();
+    await expect(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)).toBe(item);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'Record' })).toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await userEvent.keyboard('{ArrowDown}');
+    await body.findByRole('menu');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'Record' })).toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
   },
 };
@@ -467,7 +417,7 @@ export const ExternalState: Story = {
         <Page>
           <Button variant="primary" onClick={() => setOpen(true)}>
             Open from outside
-          </Button>{" "}
+          </Button>{' '}
           <Menu
             open={open}
             onOpenChange={(next) => {
@@ -489,15 +439,15 @@ export const ExternalState: Story = {
   },
   play: async ({ args, canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    const opener = within(canvasElement).getByRole("button", {
-      name: "Open from outside",
+    const opener = within(canvasElement).getByRole('button', {
+      name: 'Open from outside',
     });
     await userEvent.click(opener);
-    const first = await body.findByRole("menuitem", { name: "Rename" });
+    const first = await body.findByRole('menuitem', { name: 'Rename' });
     await waitFor(() => expect(first).toHaveFocus());
     // `onOpenChange` reports user closings, not the application's own opening.
-    await userEvent.keyboard("{Escape}");
-    await waitFor(() => expect(body.queryByRole("menu")).toBeNull());
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
     await expect(args.onOpenChange).toHaveBeenCalledWith(false);
     await waitFor(() => expect(opener).toHaveFocus());
   },
@@ -521,15 +471,13 @@ export const Rtl: Story = {
   ),
   play: async ({ canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
-    const trigger = within(canvasElement).getByRole("button", {
-      name: "More actions",
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'More actions',
     });
     trigger.focus();
-    await userEvent.keyboard("{ArrowDown}");
-    const menu = await body.findByRole("menu");
-    await expect(menu).toHaveAttribute("dir", "rtl");
-    await waitFor(() =>
-      expect(body.getByRole("menuitem", { name: "Rename" })).toHaveFocus(),
-    );
+    await userEvent.keyboard('{ArrowDown}');
+    const menu = await body.findByRole('menu');
+    await expect(menu).toHaveAttribute('dir', 'rtl');
+    await waitFor(() => expect(body.getByRole('menuitem', { name: 'Rename' })).toHaveFocus());
   },
 };

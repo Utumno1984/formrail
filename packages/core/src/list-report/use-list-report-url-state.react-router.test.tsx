@@ -114,6 +114,7 @@ describe('core package.json', () => {
     expect(Object.keys(pkg.dependencies ?? {}).sort()).toEqual([
       '@radix-ui/react-dialog',
       '@radix-ui/react-dismissable-layer',
+      '@radix-ui/react-dropdown-menu',
       '@radix-ui/react-popover',
       '@radix-ui/react-select',
       '@radix-ui/react-slot',
