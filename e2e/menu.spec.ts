@@ -22,6 +22,7 @@ test.describe('Overlays/Menu: stories play', () => {
     'inside-sheet',
     'external-state',
     'rtl',
+    'menu-in-dialog-from-menu',
   ]) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
@@ -48,8 +49,11 @@ test.describe('Menu: roles, keyboard, focus', () => {
     await expect(menuOf(page)).toBeVisible();
     await page.keyboard.press('Tab');
     await expect(menuOf(page)).toHaveCount(0);
-    // Nothing follows the trigger: the focus is not lost to an arbitrary node, it falls back to it.
-    await expect(trigger(page)).toBeFocused();
+    // Nothing is tabbable after the trigger (the last control of the page): the focus leaves the
+    // page, as it would have from the trigger itself; it is NOT bounced back to the trigger.
+    await expect(trigger(page)).not.toBeFocused();
+    await expect(page.locator('body')).toBeFocused();
+    await trigger(page).focus();
     await page.keyboard.press('Enter');
     await expect(menuOf(page)).toBeVisible();
     await page.keyboard.press('Shift+Tab');
@@ -251,6 +255,55 @@ test.describe('Menu: touch @touch', () => {
     await expect(menuOf(page)).toHaveCount(0);
     await page.waitForTimeout(300);
     await expect(menuOf(page)).toHaveCount(0);
+  });
+});
+
+test.describe('Menu: touch toggle and nesting @touch', () => {
+  const tapper = async (page: Page) => {
+    const cdp = await page.context().newCDPSession(page);
+    return async (target: Locator) => {
+      const b = (await target.boundingBox())!;
+      const pt = { x: b.x + b.width / 2, y: b.y + b.height / 2, id: 1 };
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+  };
+
+  test('a tap on the trigger of an open menu closes it, once, and it stays closed', async ({ page }) => {
+    await gotoStory(page, STORY('playground'));
+    const tap = await tapper(page);
+    await tap(trigger(page));
+    await expect(menuOf(page)).toBeVisible();
+    await tap(trigger(page));
+    await expect(menuOf(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await expect(menuOf(page)).toHaveCount(0);
+    expect(await bodyPointerEvents(page)).not.toBe('none');
+    await tap(trigger(page));
+    await expect(menuOf(page)).toBeVisible();
+  });
+
+  test('a menu in a Dialog opened from another menu: one outside tap closes only the inner menu', async ({ page }) => {
+    // The play function goes through the outer menu's "Details…" and leaves the Dialog open.
+    await expectPlayToPass(page, STORY('menu-in-dialog-from-menu'));
+    const tap = await tapper(page);
+    const dialog = page.getByRole('dialog', { name: 'Details' });
+    await expect(dialog).toBeVisible();
+    await tap(trigger(page, 'Inner actions'));
+    await expect(menuOf(page)).toBeVisible();
+    // The Dialog's title is under the tap: the menu closes, the Dialog stays, nothing else happens.
+    // (a CSS locator: while the menu is open the Dialog is `aria-hidden`, so a role query skips it)
+    await tap(page.locator('[role="dialog"]').getByText('Details', { exact: true }));
+    await expect(menuOf(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await expect(menuOf(page)).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    // And the inner menu still works afterwards.
+    await tap(trigger(page, 'Inner actions'));
+    await expect(menuOf(page)).toBeVisible();
+    await tap(page.getByRole('menuitem', { name: 'Duplicate' }));
+    await expect(menuOf(page)).toHaveCount(0);
+    await expect(dialog).toBeVisible();
   });
 });
 

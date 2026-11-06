@@ -439,6 +439,52 @@ describe('Menu', () => {
     expect(group).toHaveAccessibleName('First Second');
   });
 
+  it('a consumer aria-labelledby composes with the MenuLabel ids instead of replacing them', async () => {
+    render(
+      <>
+        <span id="shared-note">Shared note</span>
+        <Menu defaultOpen>
+          <MenuTrigger>Actions</MenuTrigger>
+          <MenuContent>
+            <MenuGroup data-testid="group" aria-labelledby="shared-note">
+              <MenuLabel>Edit</MenuLabel>
+              <MenuItem>One</MenuItem>
+            </MenuGroup>
+          </MenuContent>
+        </Menu>
+      </>,
+    );
+    const group = await screen.findByTestId('group');
+    const ids = group.getAttribute('aria-labelledby')!.split(' ');
+    expect(ids).toHaveLength(2);
+    expect(ids).toContain('shared-note');
+    expect(group).toHaveAccessibleName('Edit Shared note');
+  });
+
+  it('an unstable (inline) trigger ref does not close an open menu on re-render', async () => {
+    const onOpenChange = vi.fn();
+    function Host({ tick }: { tick: number }) {
+      return (
+        <Menu defaultOpen onOpenChange={onOpenChange}>
+          <MenuTrigger ref={() => undefined} data-tick={tick}>
+            Actions
+          </MenuTrigger>
+          <MenuContent>
+            <MenuItem>One</MenuItem>
+          </MenuContent>
+        </Menu>
+      );
+    }
+    const { rerender } = render(<Host tick={0} />);
+    await screen.findByRole('menu');
+    for (let i = 1; i <= 3; i++) rerender(<Host tick={i} />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it('unmounting the whole open Menu does not report a closing', async () => {
     const onOpenChange = vi.fn();
     const { unmount } = render(<Demo defaultOpen onOpenChange={onOpenChange} />);

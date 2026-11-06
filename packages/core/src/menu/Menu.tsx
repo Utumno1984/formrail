@@ -30,6 +30,8 @@ interface MenuContextValue {
   contentRef: { current: HTMLDivElement | null };
   openedBy: { current: OpenedBy };
   mounted: { current: boolean };
+  /** Set by Tab when there is nowhere to go: the focus leaves the page, it is not given back to the trigger. */
+  skipReturn: { current: boolean };
   modal: boolean;
 }
 
@@ -74,7 +76,8 @@ export interface MenuProps {
  *   focus comes back to the trigger when the dialog closes.
  * - Tab closes the menu and moves the focus to the next tabbable element after the trigger (inside
  *   the enclosing modal `Dialog`/`Sheet` when there is one, wrapping around); positive `tabindex`
- *   ordering is not honoured.
+ *   ordering is not honoured. With nothing tabbable beyond the trigger on a page, the focus leaves
+ *   the page (it ends on `body`) and is not returned to the trigger.
  */
 export function Menu({ children, open: openProp, defaultOpen = false, onOpenChange, modal = true, dir }: MenuProps) {
   const controlled = openProp !== undefined;
@@ -84,6 +87,7 @@ export function Menu({ children, open: openProp, defaultOpen = false, onOpenChan
   const contentRef = useRef<HTMLDivElement | null>(null);
   const openedBy = useRef<OpenedBy>('first');
   const mounted = useRef(true);
+  const skipReturn = useRef(false);
   const onOpenChangeRef = useRef(onOpenChange);
   onOpenChangeRef.current = onOpenChange;
   const openRef = useRef(open);
@@ -109,15 +113,21 @@ export function Menu({ children, open: openProp, defaultOpen = false, onOpenChan
   useReturnFocus({
     open,
     fallbackRef: triggerRef,
-    // Another overlay (a Dialog opened by an item) already took the focus: leave it there.
     skipWhen: () => {
+      // Tab with nothing tabbable beyond the trigger: the focus leaves the page, as it would have
+      // from the trigger itself, instead of bouncing back to it.
+      if (skipReturn.current) {
+        skipReturn.current = false;
+        return true;
+      }
+      // Another overlay (a Dialog opened by an item) already took the focus: leave it there.
       const active = document.activeElement;
       return !!active && active !== document.body && !contentRef.current?.contains(active);
     },
   });
 
   const value = useMemo(
-    () => ({ open, setOpen, triggerRef, contentRef, openedBy, mounted, modal }),
+    () => ({ open, setOpen, triggerRef, contentRef, openedBy, mounted, skipReturn, modal }),
     [open, setOpen, modal],
   );
   return (
@@ -136,6 +146,13 @@ const TABBABLE =
  * The next (or previous) tabbable element after `from`, outside `exclude`. Inside a modal panel
  * (`aria-modal`) the search stays in it and wraps around, like the panel's own focus trap; on a
  * page it stops at the end (`null`).
+ *
+ * The scope is the trigger's own `aria-modal` ancestor: `Dialog` and `Sheet` put `aria-modal` on
+ * the panel that wraps their content (`internal/modal.tsx`, the Radix portal only moves the whole
+ * panel), so a trigger inside one always has the panel as ancestor. The menu's own panel lives in a
+ * separate portal but is excluded explicitly. Cost: one `querySelectorAll` plus a layout read per
+ * candidate, once per Tab pressed in an open menu (not per render or per keystroke elsewhere): fine
+ * for a page of ordinary size; revisit if a menu per row of a very large table makes it visible.
  */
 function adjacentTabbable(from: HTMLElement, backwards: boolean, exclude: HTMLElement | null): HTMLElement | null {
   const scope = from.closest<HTMLElement>('[aria-modal="true"]');
@@ -153,7 +170,8 @@ function adjacentTabbable(from: HTMLElement, backwards: boolean, exclude: HTMLEl
   const next = backwards ? candidates.filter((el) => !after(el)).pop() : candidates.find(after);
   if (next) return next;
   if (!scope) return null;
-  return (backwards ? candidates[candidates.length - 1] : candidates[0]) ?? null;
+  // Wrap around inside the panel; if the trigger is its only tabbable, the focus stays on it.
+  return (backwards ? candidates[candidates.length - 1] : candidates[0]) ?? from;
 }
 
 export interface MenuTriggerProps extends Omit<ComponentPropsWithoutRef<'button'>, 'id'> {
@@ -182,6 +200,10 @@ export const MenuTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, MenuTri
       },
       [triggerRef, mounted, setOpen],
     );
+    // `track` is stable, so `composed` changes only with the consumer's `ref`. An unstable ref (an
+    // inline callback) detaches and re-attaches the node on every render: harmless because `track`
+    // reacts to the detach in a microtask and by then the node is attached again in the same commit
+    // (`triggerRef.current` is set again). Keep it that way: do not act synchronously on `null`.
     const composed = useMemo(() => composeRefs(ref, track), [ref, track]);
     return (
       <RadixMenu.Trigger
@@ -231,6 +253,8 @@ export interface MenuContentProps extends Omit<
 // Full literals (Tailwind scan). The stacking level is `overlayLayer.popover`, set on the element.
 // The library has no box-sizing reset, so the `max-h` subtracts what the box adds around its content
 // (4px of padding and 1px of border on each side): the panel never exceeds the room that is left.
+// The `10px` in the three `calc()` below is exactly that: 2 x (`p-1` = 4px) + 2 x (`border` = 1px).
+// Change the padding or the border classes and this number with them.
 const CONTENT =
   'min-w-[calc(10rem-10px)] max-w-[calc(var(--radix-dropdown-menu-content-available-width)-10px)] ' +
   'max-h-[calc(var(--radix-dropdown-menu-content-available-height)-10px)] ' +
@@ -273,36 +297,68 @@ const TOUCH_CLICK_WINDOW_MS = 3000;
  * press that never clicks) until the window runs out.
  */
 function TouchOutsideGuard() {
-  const { contentRef, setOpen, modal } = useMenuContext('MenuContent');
+  const { contentRef, triggerRef, setOpen, modal } = useMenuContext('MenuContent');
   useEffect(() => {
     if (!modal) return undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const disarm = () => {
-      document.removeEventListener('click', swallow, true);
-      document.removeEventListener('pointercancel', disarm, true);
-      clearTimeout(timer);
-    };
-    function swallow(event: Event) {
-      event.stopPropagation();
-      event.preventDefault();
-      disarm();
-    }
+    const me = {};
+    guards.push(me);
     const onPointerDown = (event: PointerEvent) => {
+      // Only the innermost open guard acts: with several menus open at once (one in a Dialog opened
+      // over another page) a single tap must not arm several swallows.
+      if (guards[guards.length - 1] !== me) return;
       if (event.pointerType !== 'touch') return;
       if (event.target instanceof Node && contentRef.current?.contains(event.target)) return;
-      disarm();
-      document.addEventListener('click', swallow, true);
-      document.addEventListener('pointercancel', disarm, true);
-      timer = setTimeout(disarm, TOUCH_CLICK_WINDOW_MS);
+      // The trigger's own tap is Radix's toggle, not an "outside" tap. While the menu is open the body
+      // is `pointer-events: none`, so the event's target is the root element: hit-test by position.
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (
+        r &&
+        event.clientX >= r.left &&
+        event.clientX <= r.right &&
+        event.clientY >= r.top &&
+        event.clientY <= r.bottom
+      ) {
+        return;
+      }
+      armSwallow();
       setOpen(false);
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true);
+      guards.splice(guards.indexOf(me), 1);
       // A swallow already armed outlives the panel on purpose: its click is still to come.
     };
-  }, [contentRef, setOpen, modal]);
+  }, [contentRef, triggerRef, setOpen, modal]);
   return null;
+}
+
+/** The open guards, outermost first (modal menus only). */
+const guards: object[] = [];
+
+let disarmSwallow: (() => void) | undefined;
+
+/**
+ * Swallows the next click in the capture phase. One at a time for the whole page: arming again
+ * (another menu, another tap) replaces the previous one instead of stacking.
+ */
+function armSwallow() {
+  disarmSwallow?.();
+  const swallow = (event: Event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    disarm();
+  };
+  const disarm = () => {
+    document.removeEventListener('click', swallow, true);
+    document.removeEventListener('pointercancel', disarm, true);
+    clearTimeout(timer);
+    if (disarmSwallow === disarm) disarmSwallow = undefined;
+  };
+  document.addEventListener('click', swallow, true);
+  document.addEventListener('pointercancel', disarm, true);
+  const timer = setTimeout(disarm, TOUCH_CLICK_WINDOW_MS);
+  disarmSwallow = disarm;
 }
 
 /** The menu panel, in a portal on the `popover` level. Scrolls inside when the room runs out. */
@@ -319,7 +375,7 @@ export const MenuContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMen
       children,
       ...rest
     } = props;
-    const { contentRef, openedBy, triggerRef, setOpen } = useMenuContext('MenuContent');
+    const { contentRef, openedBy, triggerRef, setOpen, skipReturn } = useMenuContext('MenuContent');
     const composed = useMemo(() => composeRefs(ref, contentRef), [ref, contentRef]);
     return (
       <RadixMenu.Portal>
@@ -341,6 +397,9 @@ export const MenuContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMen
             event.stopPropagation();
             const from = triggerRef.current;
             const target = from ? adjacentTabbable(from, event.shiftKey, contentRef.current) : null;
+            // Nowhere to go (a trigger that is the last or first tabbable of the page): do not let
+            // `useReturnFocus` bounce the focus back to the trigger; it ends on `body`.
+            if (!target) skipReturn.current = true;
             setOpen(false);
             requestAnimationFrame(() => target?.focus());
           }}
@@ -421,7 +480,12 @@ export const MenuGroup = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.
       [],
     );
     return (
-      <RadixMenu.Group {...rest} ref={ref} aria-labelledby={labelIds.join(' ') || rest['aria-labelledby']}>
+      // The labels and the consumer's own `aria-labelledby` compose into one name.
+      <RadixMenu.Group
+        {...rest}
+        ref={ref}
+        aria-labelledby={[...labelIds, rest['aria-labelledby']].filter(Boolean).join(' ') || undefined}
+      >
         <GroupContext.Provider value={group}>{children}</GroupContext.Provider>
       </RadixMenu.Group>
     );

@@ -550,3 +550,59 @@ export const TabOrderDialog: Story = {
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Middle' })).toHaveFocus());
   },
 };
+
+function NestedDemo({ args }: { args: DemoArgs }) {
+  const [details, setDetails] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <Page>
+      <Menu>
+        <MenuTrigger asChild ref={triggerRef}>
+          <Button variant="secondary">More actions</Button>
+        </MenuTrigger>
+        <MenuContent>
+          <MenuItem onSelect={() => setDetails(true)}>Details…</MenuItem>
+        </MenuContent>
+      </Menu>
+      <Dialog open={details} onOpenChange={setDetails}>
+        <DialogContent size="md" returnFocusRef={triggerRef}>
+          <DialogHeader>
+            <DialogTitle>Details</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Menu>
+              <MenuTrigger asChild>
+                <Button variant="secondary">Inner actions</Button>
+              </MenuTrigger>
+              <MenuContent>
+                <Items args={args} />
+              </MenuContent>
+            </Menu>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    </Page>
+  );
+}
+
+/** A menu whose item opens a Dialog that holds a second menu: each one opens, closes and returns the focus on its own. */
+export const MenuInDialogFromMenu: Story = {
+  render: (args) => <NestedDemo args={args} />,
+  play: async ({ args, canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const outer = within(canvasElement).getByRole('button', { name: 'More actions' });
+    outer.focus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(await body.findByRole('menuitem', { name: 'Details…' }));
+    const dialog = await body.findByRole('dialog', { name: 'Details' });
+    const inner = within(dialog).getByRole('button', { name: 'Inner actions' });
+    inner.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    await body.findByRole('menu');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await expect(dialog).toBeInTheDocument();
+    await waitFor(() => expect(inner).toHaveFocus());
+  },
+};
