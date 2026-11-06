@@ -7,8 +7,19 @@ uno stack proprietario.
 
 ## Stato
 
-Progetto in fase di avvio. Il piano completo (inventario componenti, segmentazione
-Free/Pro, architettura, roadmap) è in [`docs/planning/design-system-spec.md`](docs/planning/design-system-spec.md).
+- **Free (`@react-object-page/core`, MIT)**: i primitivi del lotto Free sono completi — tipografia e
+  icone, `Button`, `Field` e controlli di form (`Input`, `Checkbox`, `Switch`, `RadioGroup`, `Select`,
+  `Combobox`, `Calendar`, `DatePicker`), overlay (`Dialog`, `Sheet`, `Menu`, `Tooltip`, `Toast`),
+  `Tabs`/`Accordion`/`Breadcrumb`/`Pagination`, feedback (`MessageStrip`, `Spinner`, `Skeleton`...) e
+  le versioni semplici dei floorplan **List Report** e **Object Page** (con `useObjectPageForm` e
+  `useDirtyGuard`). Storybook documentato e pubblico (vedi sotto). Il pacchetto è in preparazione alla
+  prima pubblicazione su npm come `0.x`: l'API può ancora assestarsi con i primi riscontri reali.
+- **Pro (`@react-object-page/pro`)**: in sviluppo e non pubblicato. Oggi contiene il motore e il
+  componente del Change Summary e la List Report virtualizzata; il resto del lotto Pro non è ancora
+  iniziato né ha una data.
+
+Il piano completo (inventario componenti, segmentazione Free/Pro, architettura, roadmap) è in
+[`docs/planning/design-system-spec.md`](docs/planning/design-system-spec.md).
 
 ## Modello
 

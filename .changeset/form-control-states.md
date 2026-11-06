@@ -1,5 +1,0 @@
----
-'@react-object-page/core': patch
----
-
-Consistent form control states (#223). Forced and locked controls (a `Field` with `state="forced"`/`"locked"`, a read-only `Calendar`, a read-only `Input`/`Combobox`) now look different from editable ones on Checkbox, Switch, RadioGroup, Calendar, Input, DatePicker, Select and Combobox: a dashed border (same width, no layout shift), the read-only surface and a neutral "on" indicator (tick, dash, thumb, dot, selected day) that is never primary; they stay focusable and keep their full opacity (0.5 stays the disabled look). The invalid state owns the colour on the boolean and choice controls: a ticked or indeterminate invalid Checkbox, an invalid Switch that is on and the selected day of an invalid Calendar are filled with the error colour (error hover / pressed shades too), like an invalid Radio. Locked and invalid together: red dashed border, neutral indicator. New tokens `--color-rop-readonly-surface` and `--color-rop-readonly-indicator` (aliases of `surface-subtle` and `text-muted`).

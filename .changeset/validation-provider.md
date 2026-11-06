@@ -1,5 +1,0 @@
----
-'@react-object-page/core': minor
----
-
-New `ValidationProvider` (`ValidationProviderProps`: `fieldErrors: FieldErrors`, `children`): a `Field` with a `name` inside it shows `fieldErrors[name]` as its error, with the same rendering as the `error` prop (`aria-invalid`, error message, id in `aria-describedby`), so the key is written once. Lookup by exact dot-notation path (own keys only); an absent key or `undefined` means no error. "Invalid" follows the form's single rule (any value other than `undefined`): an empty or blank message from the provider still sets `aria-invalid` (the form blocks the save and the focus goes there), renders no message node and no id in `aria-describedby`, and logs a `console.error` in development. A `Field` `error` with content wins over the provider; an empty or absent `error` falls back to it. Nested providers: the innermost is the only source. A `Field` without `name` or outside any provider behaves as before. Renders no DOM, SSR-safe, independent of `useObjectPageForm`.
