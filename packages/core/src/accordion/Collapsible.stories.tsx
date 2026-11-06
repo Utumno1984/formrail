@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
@@ -53,6 +54,28 @@ export const Playground: Story = {
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await waitFor(() => expect(canvas.queryByRole('textbox', { name: 'Reference' })).toBeNull());
   },
+};
+
+function ClosedFromOutsideDemo() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ maxWidth: 520, color: 'var(--color-rop-text)' }}>
+      <button type="button" onClick={() => setOpen(false)}>
+        Close from outside
+      </button>
+      <Collapsible open={open}>
+        <CollapsibleTrigger>Advanced options</CollapsibleTrigger>
+        <CollapsibleContent>
+          <Input aria-label="Reference" placeholder="Reference" />
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
+/** Controlled from outside: the button closes the panel while the focus is inside it. */
+export const ClosedFromOutside: Story = {
+  render: () => <ClosedFromOutsideDemo />,
 };
 
 /** Visual: closed. */

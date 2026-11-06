@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
@@ -157,4 +158,28 @@ export const NotCollapsible: Story = {
     await expect(canvas.getByRole('button', { name: 'Invoice details' })).toHaveAttribute('aria-expanded', 'true');
     await expect(args.onValueChange).not.toHaveBeenCalled();
   },
+};
+
+function ClosedFromOutsideDemo() {
+  const [value, setValue] = useState('details');
+  return (
+    <div style={{ maxWidth: 520, color: 'var(--color-rop-text)' }}>
+      <button type="button" onClick={() => setValue('')}>
+        Close from outside
+      </button>
+      <Accordion type="single" value={value}>
+        <AccordionItem value="details">
+          <AccordionTrigger>Invoice details</AccordionTrigger>
+          <AccordionContent>
+            <Input aria-label="Details note" placeholder="Note" />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+}
+
+/** Controlled from outside: the button closes the open item while the focus is inside its panel. */
+export const ClosedFromOutside: Story = {
+  render: () => <ClosedFromOutsideDemo />,
 };

@@ -157,6 +157,29 @@ test.describe('Navigation/Accordion', () => {
   });
 });
 
+test.describe('focus rescue when a panel is closed from outside', () => {
+  const cases = [
+    { name: 'Accordion', story: `${ACC}closed-from-outside`, field: 'Details note', trigger: 'Invoice details' },
+    { name: 'Collapsible', story: `${COL}closed-from-outside`, field: 'Reference', trigger: 'Advanced options' },
+  ];
+  for (const c of cases) {
+    for (const reduced of [false, true]) {
+      test(`${c.name}${reduced ? ' (reduced motion)' : ''}: focus inside the panel ends on its trigger, not <body> @engines`, async ({ page }) => {
+        if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' });
+        await gotoStory(page, c.story);
+        const field = page.getByRole('textbox', { name: c.field });
+        await field.focus();
+        await expect(field).toBeFocused();
+        // Closed by the parent (controlled state), not by clicking the trigger: dispatch the click so
+        // the focus is not moved by the gesture itself.
+        await page.getByRole('button', { name: 'Close from outside' }).dispatchEvent('click');
+        await expect(page.getByRole('button', { name: c.trigger })).toBeFocused();
+        expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+      });
+    }
+  }
+});
+
 test.describe('Navigation/Collapsible', () => {
   test('Playground play passes; axe is clean in every story', async ({ page }) => {
     await expectPlayToPass(page, `${COL}playground`);

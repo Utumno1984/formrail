@@ -18,8 +18,7 @@ import {
   DISCLOSURE_CONTENT_INNER,
   DISCLOSURE_TRIGGER,
   TriggerBody,
-  inertWhenClosed,
-  useCloseRescuesFocus,
+  useDisclosureInert,
   type DisclosureState,
 } from './Collapsible';
 
@@ -124,10 +123,15 @@ export const Accordion = /* @__PURE__ */ forwardRef<HTMLDivElement, AccordionPro
     onValueChange?: (value: string | string[]) => void;
   };
   const empty = type === 'multiple' ? [] : '';
-  const [internal, setInternal] = useState<string | string[]>(defaultValue ?? empty);
-  const current = value !== undefined ? value : internal;
+  // The uncontrolled state remembers the `type` it belongs to: if `type` changes on the same mounted
+  // instance (single <-> multiple), the old shape (string vs array) is dropped for the new empty one.
+  const [internal, setInternal] = useState<{ type: string; value: string | string[] }>({
+    type,
+    value: defaultValue ?? empty,
+  });
+  const current = value !== undefined ? value : internal.type === type ? internal.value : empty;
   const handleValueChange = (next: string | string[]) => {
-    if (value === undefined) setInternal(next);
+    if (value === undefined) setInternal({ type, value: next });
     onValueChange?.(next);
   };
   const state = useMemo(
@@ -182,13 +186,14 @@ export const AccordionTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, Ac
   function AccordionTrigger(props, ref) {
     const { className, children, ...rest } = props;
     const { headingLevel } = useContext(AccordionContext);
-    const item = useContext(ItemContext);
+    // Depends on the stable ref object, not on the item context (re-created at every toggle).
+    const triggerRef = useContext(ItemContext)?.triggerRef;
     const mergedRef = useMemo(
       () =>
         composeRefs(ref, (node: HTMLButtonElement | null) => {
-          if (item) item.triggerRef.current = node;
+          if (triggerRef) triggerRef.current = node;
         }),
-      [ref, item],
+      [ref, triggerRef],
     );
     return (
       <RadixAccordion.Header asChild>
@@ -217,9 +222,9 @@ export const AccordionContent = /* @__PURE__ */ forwardRef<HTMLDivElement, Accor
     const mergedRef = useMemo(() => composeRefs(ref, node), [ref]);
     const fallback = useRef<DisclosureState>({ open: false, triggerRef: { current: null } });
     const shared = item ?? fallback.current;
-    useCloseRescuesFocus(shared.open, node, shared);
+    useDisclosureInert(shared.open, node, shared);
     return (
-      <RadixAccordion.Content {...rest} {...inertWhenClosed(shared.open)} ref={mergedRef} className={cn(DISCLOSURE_CONTENT, className)}>
+      <RadixAccordion.Content {...rest} ref={mergedRef} className={cn(DISCLOSURE_CONTENT, className)}>
         <div className={DISCLOSURE_CONTENT_INNER}>{children}</div>
       </RadixAccordion.Content>
     );

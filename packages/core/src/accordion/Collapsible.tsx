@@ -6,12 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
-  version as reactVersion,
   type ComponentPropsWithoutRef,
   type MutableRefObject,
   type ReactNode,
 } from 'react';
 import * as RadixCollapsible from '@radix-ui/react-collapsible';
+import { Icon } from '../icon/Icon';
+import { internalIcons } from '../internal/icons';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 
@@ -34,7 +35,7 @@ export const DISCLOSURE_TRIGGER =
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:-outline-offset-2';
 export const DISCLOSURE_LABEL = 'min-w-0 break-words';
 const CHEVRON =
-  'size-4 shrink-0 text-rop-text-muted group-data-[state=open]:rotate-180 ' +
+  'shrink-0 text-rop-text-muted group-data-[state=open]:rotate-180 ' +
   'motion-safe:[transition-property:rotate] motion-safe:duration-[var(--motion-rop-disclosure-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-disclosure-easing)]';
 // `overflow: hidden` is only in the keyframes (it clips while the height animates, never at rest).
@@ -43,23 +44,9 @@ export const DISCLOSURE_CONTENT =
   'motion-safe:data-[state=open]:animate-rop-disclosure-down motion-safe:data-[state=closed]:animate-rop-disclosure-up';
 export const DISCLOSURE_CONTENT_INNER = 'min-w-0 px-3 pb-3';
 
-/** Disclosure chevron: inline, decorative. */
+/** Disclosure chevron: the system's own chevron icon (as Select and the sortable headers use), decorative. */
 export function Chevron() {
-  return (
-    <svg
-      className={CHEVRON}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path d="M3.5 6 8 10.5 12.5 6" />
-    </svg>
-  );
+  return <Icon size="sm" className={CHEVRON}>{internalIcons['chevron-down']}</Icon>;
 }
 
 /** Trigger label + chevron, shared by `CollapsibleTrigger` and `AccordionTrigger`. */
@@ -74,29 +61,29 @@ export function TriggerBody({ children }: { children?: ReactNode }) {
 
 /**
  * Closed content must be unreachable: Radix unmounts it once its exit animation is over, and during
- * that animation it is made `inert`. When an open panel that holds the focus is closed from outside
- * (so the focused node goes away), the focus moves to the panel's trigger instead of falling on `<body>`.
+ * that animation it is `inert`. When an open panel that holds the focus is closed from outside, the
+ * focus moves to the panel's trigger instead of falling on `<body>`.
+ *
+ * One layout effect does both, in this order: (1) if the focus is inside, move it to the trigger,
+ * (2) only then set `inert`. `inert` is set by hand (not as a React prop) precisely so that it is
+ * applied after the rescue: a browser that drops the focus to `<body>` as soon as an ancestor turns
+ * inert (or, with the prop, in the same commit) can no longer take the focus away before we read it.
+ * It also needs no React-version handling (React 18 and 19 treat the `inert` prop differently).
  */
-export function useCloseRescuesFocus(open: boolean, contentRef: MutableRefObject<HTMLElement | null>, state: DisclosureState) {
+export function useDisclosureInert(open: boolean, contentRef: MutableRefObject<HTMLElement | null>, state: DisclosureState) {
   const wasOpen = useRef(open);
   useLayoutEffect(() => {
-    if (wasOpen.current && !open) {
-      const node = contentRef.current;
+    const node = contentRef.current;
+    if (wasOpen.current && !open && node) {
       const active = typeof document === 'undefined' ? null : document.activeElement;
-      if (node && active && node !== active && node.contains(active)) state.triggerRef.current?.focus();
+      if (active && node !== active && node.contains(active)) state.triggerRef.current?.focus();
     }
     wasOpen.current = open;
+    if (!node) return;
+    if (open) node.removeAttribute('inert');
+    else node.setAttribute('inert', '');
   }, [open, contentRef, state.triggerRef]);
 }
-
-/**
- * `inert` while closed (the panel stays mounted for its exit animation). React 19 takes a boolean
- * (an empty string would be read as `false`), React 18 only forwards the attribute as a string.
- */
-// Computed on call, not at module level: a top-level statement with a side effect would stay in the
-// shared chunk and make unrelated tiny exports (composeRefs, useToast...) heavier in the bundle budget.
-export const inertWhenClosed = (open: boolean) =>
-  open ? {} : ({ inert: parseInt(reactVersion, 10) >= 19 ? true : '' } as Record<string, unknown>);
 
 export interface CollapsibleProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defaultValue' | 'onChange'> {
   /**
@@ -143,10 +130,16 @@ export const Collapsible = /* @__PURE__ */ forwardRef<HTMLDivElement, Collapsibl
 export const CollapsibleTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, CollapsibleTriggerProps>(
   function CollapsibleTrigger(props, ref) {
     const { className, children, ...rest } = props;
-    const state = useContext(DisclosureContext);
-    const mergedRef = useMemo(() => composeRefs(ref, (node: HTMLButtonElement | null) => {
-      if (state) state.triggerRef.current = node;
-    }), [ref, state]);
+    // Depends on the stable ref object, not on the context value (re-created at every toggle): the
+    // trigger's ref must not be detached and re-attached each time the panel opens or closes.
+    const triggerRef = useContext(DisclosureContext)?.triggerRef;
+    const mergedRef = useMemo(
+      () =>
+        composeRefs(ref, (node: HTMLButtonElement | null) => {
+          if (triggerRef) triggerRef.current = node;
+        }),
+      [ref, triggerRef],
+    );
     return (
       <RadixCollapsible.Trigger {...rest} ref={mergedRef} className={cn(DISCLOSURE_TRIGGER, className)}>
         <TriggerBody>{children}</TriggerBody>
@@ -167,9 +160,9 @@ export const CollapsibleContent = /* @__PURE__ */ forwardRef<HTMLDivElement, Col
     const mergedRef = useMemo(() => composeRefs(ref, node), [ref]);
     const fallback = useRef<DisclosureState>({ open: false, triggerRef: { current: null } });
     const shared = state ?? fallback.current;
-    useCloseRescuesFocus(shared.open, node, shared);
+    useDisclosureInert(shared.open, node, shared);
     return (
-      <RadixCollapsible.Content {...rest} {...inertWhenClosed(shared.open)} ref={mergedRef} className={cn(DISCLOSURE_CONTENT, className)}>
+      <RadixCollapsible.Content {...rest} ref={mergedRef} className={cn(DISCLOSURE_CONTENT, className)}>
         <div className={DISCLOSURE_CONTENT_INNER}>{children}</div>
       </RadixCollapsible.Content>
     );

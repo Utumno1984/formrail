@@ -255,6 +255,46 @@ describe('Accordion', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
+  it('uncontrolled: switching type from single to multiple on the same instance keeps working', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const { rerender } = render(<Demo defaultValue="a" onValueChange={onValueChange} />);
+    expect(screen.getByRole('button', { name: 'First' })).toHaveAttribute('aria-expanded', 'true');
+    rerender(<Demo type="multiple" onValueChange={onValueChange} />);
+    // The old string state is dropped: nothing is open and no character of it counts as an item.
+    for (const name of ['First', 'Third']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'false');
+    }
+    await user.click(screen.getByRole('button', { name: 'First' }));
+    await user.click(screen.getByRole('button', { name: 'Third' }));
+    expect(onValueChange).toHaveBeenLastCalledWith(['a', 'c']);
+    expect(screen.getByRole('button', { name: 'First' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Third' })).toHaveAttribute('aria-expanded', 'true');
+    rerender(<Demo onValueChange={onValueChange} />);
+    expect(screen.getByRole('button', { name: 'First' })).toHaveAttribute('aria-expanded', 'false');
+    await user.click(screen.getByRole('button', { name: 'Third' }));
+    expect(onValueChange).toHaveBeenLastCalledWith('c');
+    expect(screen.getByRole('button', { name: 'Third' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('keeps the same trigger ref callback across toggles (ref is not detached and re-attached)', async () => {
+    const calls: Array<HTMLButtonElement | null> = [];
+    const stable = (node: HTMLButtonElement | null) => void calls.push(node);
+    render(
+      <Accordion type="single">
+        <AccordionItem value="a">
+          <AccordionTrigger ref={stable}>First</AccordionTrigger>
+          <AccordionContent>Body</AccordionContent>
+        </AccordionItem>
+      </Accordion>,
+    );
+    const before = calls.length;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'First' }));
+    await user.click(screen.getByRole('button', { name: 'First' }));
+    expect(calls.length).toBe(before);
+  });
+
   it('closing from outside moves the focus from the closed panel to its trigger, not <body>', () => {
     function Host() {
       const [value, setValue] = useState('a');
