@@ -174,6 +174,34 @@
       "baseline": 38492,
       "limit": 42342
     },
+    "Menu": {
+      "baseline": 8401,
+      "limit": 9241
+    },
+    "MenuContent": {
+      "baseline": 40331,
+      "limit": 44364
+    },
+    "MenuGroup": {
+      "baseline": 6710,
+      "limit": 7381
+    },
+    "MenuItem": {
+      "baseline": 18905,
+      "limit": 20796
+    },
+    "MenuLabel": {
+      "baseline": 17116,
+      "limit": 18828
+    },
+    "MenuSeparator": {
+      "baseline": 17052,
+      "limit": 18757
+    },
+    "MenuTrigger": {
+      "baseline": 7798,
+      "limit": 8578
+    },
     "MessageStrip": {
       "baseline": 14440,
       "limit": 15885

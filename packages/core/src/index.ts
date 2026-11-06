@@ -185,3 +185,14 @@ export type {
   TabsActivationMode,
   TabsOrientation,
 } from './tabs/Tabs';
+export { Menu, MenuTrigger, MenuContent, MenuItem, MenuGroup, MenuLabel, MenuSeparator } from './menu/Menu';
+export type {
+  MenuProps,
+  MenuTriggerProps,
+  MenuContentProps,
+  MenuItemProps,
+  MenuItemTone,
+  MenuGroupProps,
+  MenuLabelProps,
+  MenuSeparatorProps,
+} from './menu/Menu';
