@@ -15,10 +15,10 @@ const CITIES: City[] = [
   { id: 'mi', label: 'Milano' },
   { id: 'mo', label: 'Modena' },
   { id: 'mn', label: 'Mantova', disabled: true },
-  { id: 'cdc', label: 'Città di Castello' },
+  { id: 'sp', label: 'São Paulo' },
   { id: 'to', label: 'Torino' },
 ];
-const OUTSIDE: City = { id: 'rm', label: 'Roma (da fuori)' };
+const OUTSIDE: City = { id: 'rm', label: 'Roma (set from outside)' };
 
 interface DemoArgs {
   clearOnEmpty: boolean;

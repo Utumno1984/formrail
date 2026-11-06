@@ -21,7 +21,7 @@ test.describe('ObjectPageFooter QA', () => {
     const scroller = page.locator(SCROLLER);
     const early = await scroller.evaluate((el) => el.clientHeight);
     const footerBox = await page.locator(FOOTER).boundingBox();
-    await jsClick(page, 'Annulla modifiche');
+    await jsClick(page, 'Cancel changes');
     await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     expect(await scroller.evaluate((el) => el.clientHeight)).toBe(early);
     const hiddenBox = await page.locator(FOOTER).boundingBox();
@@ -33,7 +33,7 @@ test.describe('ObjectPageFooter QA', () => {
     await gotoStory(page, STORY('manual'), 'visible:!false');
     await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveCount(0);
-    await expect(page.getByText(/Salvataggio non riuscito/)).toBeHidden();
+    await expect(page.getByText(/Save failed/)).toBeHidden();
     const info = await page.evaluate((sel) => {
       const footer = document.querySelector(sel)!;
       const msg = footer.querySelector('[tabindex="0"]') as HTMLElement | null;
@@ -48,20 +48,20 @@ test.describe('ObjectPageFooter QA', () => {
 
   test('focus on a button that becomes disabled during the save, then the footer hides: focus lands on the title', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'visible:!true');
-    const save = page.getByRole('button', { name: 'Salva' });
+    const save = page.getByRole('button', { name: 'Save' });
     await save.focus();
     // aria-disabled, as the FormFlow demo does: a native `disabled` makes Chromium drop the focus to <body>
     // by itself, before the footer has any say (documented as a consumer concern in the QA report).
     await save.evaluate((el) => el.setAttribute('aria-disabled', 'true'));
-    await jsClick(page, 'Annulla modifiche');
+    await jsClick(page, 'Cancel changes');
     await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
   });
 
-  test('keyboard: after the footer hides from Salva, Tab continues in the page and never lands on the hidden footer', async ({ page }) => {
+  test('keyboard: after the footer hides from Save, Tab continues in the page and never lands on the hidden footer', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'visible:!true');
-    await page.getByRole('button', { name: 'Salva' }).focus();
+    await page.getByRole('button', { name: 'Save' }).focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
     for (let i = 0; i < 10; i++) {
@@ -72,11 +72,11 @@ test.describe('ObjectPageFooter QA', () => {
 
   test('the truncated message shows its full text on keyboard focus (and the footer is axe-safe via role=region)', async ({ page }) => {
     await gotoStory(page, STORY('long-error'));
-    await page.getByRole('button', { name: 'Annulla modifiche' }).focus();
+    await page.getByRole('button', { name: 'Cancel changes' }).focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Shift+Tab');
     await expect(page.locator(FOOTER).locator('[tabindex="0"]')).toBeFocused();
-    await expect(page.getByRole('tooltip')).toContainText('Ricarica la pagina e riprova.');
+    await expect(page.getByRole('tooltip')).toContainText('Reload the page and try again.');
   });
 
   test('RTL: the actions go to the visual left (end of the row inverted) and the page does not overflow', async ({ page }) => {
@@ -130,8 +130,8 @@ test.describe('ObjectPageFooter QA', () => {
     });
     await gotoStory(page, STORY('manual'), 'visible:!true');
     for (let i = 0; i < 3; i++) {
-      await jsClick(page, 'Annulla modifiche');
-      await jsClick(page, 'Modifica');
+      await jsClick(page, 'Cancel changes');
+      await jsClick(page, 'Edit');
     }
     const attrs = await page.locator(FOOTER).evaluate((el) => el.getAttributeNames());
     for (const bad of ['visible', 'message', 'messagetone', 'label', 'tonelabel']) expect(attrs).not.toContain(bad);

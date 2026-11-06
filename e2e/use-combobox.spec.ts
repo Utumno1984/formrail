@@ -38,7 +38,7 @@ test.describe('useCombobox: real keyboard', () => {
     await page.keyboard.press('ArrowDown');
     expect(await activeDescendantText(page)).toBe('Modena');
     await page.keyboard.press('ArrowDown');
-    expect(await activeDescendantText(page)).toBe('Città di Castello'); // Mantova is disabled
+    expect(await activeDescendantText(page)).toBe('São Paulo'); // Mantova is disabled
     await page.keyboard.press('End');
     expect(await activeDescendantText(page)).toBe('Torino');
     await page.keyboard.press('Home');
@@ -46,13 +46,13 @@ test.describe('useCombobox: real keyboard', () => {
     expect(await focusIsOnInput(page)).toBe(true);
 
     await input(page).fill('');
-    await page.keyboard.type('citta');
+    await page.keyboard.type('sao');
     await expect(page.getByRole('option')).toHaveCount(1);
-    expect(await activeDescendantText(page)).toBe('Città di Castello');
+    expect(await activeDescendantText(page)).toBe('São Paulo');
     await page.keyboard.press('Enter');
-    await expect(input(page)).toHaveValue('Città di Castello');
+    await expect(input(page)).toHaveValue('São Paulo');
     await expect(input(page)).not.toHaveAttribute('aria-activedescendant');
-    await expect(page.getByTestId('selected')).toHaveText('Città di Castello');
+    await expect(page.getByTestId('selected')).toHaveText('São Paulo');
     expect(await focusIsOnInput(page)).toBe(true);
     await expect(log(page)).toHaveCount(1);
   });
@@ -131,8 +131,8 @@ test.describe('useCombobox: no echo (real browser)', () => {
   test('setting the value from outside never reaches onSelectedItemChange and shows the new text', async ({ page }) => {
     await gotoStory(page, STORY('manual'));
     await page.getByRole('button', { name: 'Set from outside' }).click();
-    await expect(input(page)).toHaveValue('Roma (da fuori)');
-    await expect(page.getByTestId('selected')).toHaveText('Roma (da fuori)');
+    await expect(input(page)).toHaveValue('Roma (set from outside)');
+    await expect(page.getByTestId('selected')).toHaveText('Roma (set from outside)');
     await expect(log(page)).toHaveCount(0);
 
     // After a user selection, an external change adds no entry either.
@@ -142,7 +142,7 @@ test.describe('useCombobox: no echo (real browser)', () => {
     await page.keyboard.press('Enter');
     await expect(log(page)).toHaveCount(1);
     await page.getByRole('button', { name: 'Set from outside' }).click();
-    await expect(input(page)).toHaveValue('Roma (da fuori)');
+    await expect(input(page)).toHaveValue('Roma (set from outside)');
     await expect(log(page)).toHaveCount(1);
   });
 
@@ -152,10 +152,10 @@ test.describe('useCombobox: no echo (real browser)', () => {
     await page.keyboard.type('tor');
     // Programmatic click: a real click would blur the input and end the typing.
     await page.getByRole('button', { name: 'Set from outside' }).dispatchEvent('click');
-    await expect(page.getByTestId('selected')).toHaveText('Roma (da fuori)');
+    await expect(page.getByTestId('selected')).toHaveText('Roma (set from outside)');
     await expect(input(page)).toHaveValue('tor');
     await page.keyboard.press('Tab');
-    await expect(input(page)).toHaveValue('Roma (da fuori)');
+    await expect(input(page)).toHaveValue('Roma (set from outside)');
     await expect(log(page)).toHaveCount(0);
   });
 });

@@ -15,24 +15,24 @@ import { createMemoryUrlAdapter } from '../internal/memory-url-adapter';
 import { useListReportScrollRestoration } from './use-list-report-scroll-restoration';
 import { useListReportUrlState } from './use-list-report-url-state';
 
-/** How long "Simula caricamento" keeps the report in `loading`. */
+/** How long "Simulate loading" keeps the report in `loading`. */
 const LOADING_MS = 800;
 
 const FILTERS: ListReportFilter<DemoInvoice>[] = [
-  { id: 'all', label: 'Tutte' },
-  { id: 'pending', label: 'Da approvare', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approvate', predicate: (r) => r.status === 'approved' },
-  { id: 'rejected', label: 'Respinte', predicate: (r) => r.status === 'rejected' },
+  { id: 'all', label: 'All' },
+  { id: 'pending', label: 'To approve', predicate: (r) => r.status === 'pending' },
+  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
+  { id: 'rejected', label: 'Rejected', predicate: (r) => r.status === 'rejected' },
 ];
 
 function columns(firstDateDirection: ListReportSortDirection): ListReportColumn<DemoInvoice>[] {
   return [
-    { id: 'number', header: 'Numero', accessor: (r) => r.number, width: 150 },
-    { id: 'supplier', header: 'Fornitore', accessor: (r) => r.supplier, minWidth: 200 },
-    { id: 'date', header: 'Data', accessor: (r) => r.date, firstSortDirection: firstDateDirection, width: 130 },
+    { id: 'number', header: 'Number', accessor: (r) => r.number, width: 150 },
+    { id: 'supplier', header: 'Supplier', accessor: (r) => r.supplier, minWidth: 200 },
+    { id: 'date', header: 'Date', accessor: (r) => r.date, firstSortDirection: firstDateDirection, width: 130 },
     {
       id: 'amount',
-      header: 'Importo',
+      header: 'Amount',
       accessor: (r) => r.amount,
       cell: (r) => formatEuro(r.amount),
       align: 'end',
@@ -40,11 +40,11 @@ function columns(firstDateDirection: ListReportSortDirection): ListReportColumn<
       searchable: false,
       width: 140,
     },
-    { id: 'status', header: 'Stato', accessor: (r) => DEMO_STATUS_LABEL[r.status], searchable: false, width: 150 },
+    { id: 'status', header: 'Status', accessor: (r) => DEMO_STATUS_LABEL[r.status], searchable: false, width: 150 },
   ];
 }
 
-type DelayChoice = 0 | 300 | 800 | 'solo Invio';
+type DelayChoice = 0 | 300 | 800 | 'Enter only';
 type Dataset = 0 | 3 | 200;
 
 interface ShowcaseArgs {
@@ -101,7 +101,7 @@ function Showcase({
     filters: FILTERS,
     defaultFilter,
     defaultSearchQuery,
-    searchCommitDelay: searchCommitDelay === 'solo Invio' ? null : searchCommitDelay,
+    searchCommitDelay: searchCommitDelay === 'Enter only' ? null : searchCommitDelay,
     onSortChange,
     onFilterChange,
     onSearchQueryChange,
@@ -117,14 +117,14 @@ function Showcase({
     <div style={PAGE}>
       <div>
         <Button variant="secondary" onClick={simulate}>
-          Simula caricamento
+          Simulate loading
         </Button>
       </div>
       <div style={{ width: containerWidth, maxWidth: '100%', height: flow ? undefined : 'min(600px, calc(100dvh - 104px))' }}>
         <ListReport
-          title="Fatture"
+          title="Invoices"
           table={table}
-          actions={<Button>Nuova fattura</Button>}
+          actions={<Button>New invoice</Button>}
           status={simulating ? 'loading' : status}
           onRetry={onRetry}
         />
@@ -140,19 +140,19 @@ const meta: Meta<ShowcaseArgs> = {
   component: ListReport as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    status: { control: 'radio', options: ['ready', 'loading', 'error'], description: '`status` di `ListReport`' },
-    dataset: { control: 'select', options: [0, 3, 200], description: 'Righe della coda fatture: nessuna, 3 o 200' },
+    status: { control: 'radio', options: ['ready', 'loading', 'error'], description: '`status` of `ListReport`' },
+    dataset: { control: 'select', options: [0, 3, 200], description: 'Rows of the invoice queue: none, 3 or 200' },
     searchCommitDelay: {
       control: 'select',
-      options: [0, 300, 800, 'solo Invio'],
-      description: '`searchCommitDelay` di `useListReport` (ms); "solo Invio" = committa solo con Invio',
+      options: [0, 300, 800, 'Enter only'],
+      description: '`searchCommitDelay` of `useListReport` (ms); "Enter only" = commits only on Enter',
     },
     firstSortDirection: {
       control: 'radio',
       options: ['asc', 'desc'],
-      description: '`firstSortDirection` della colonna "Data": direzione del primo click',
+      description: '`firstSortDirection` of the "Date" column: direction of the first click',
     },
-    containerWidth: { control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Larghezza del contenitore (px)' },
+    containerWidth: { control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Container width (px)' },
     onSortChange: { control: false },
     onFilterChange: { control: false },
     onSearchQueryChange: { control: false },
@@ -180,16 +180,16 @@ type Story = StoryObj<ShowcaseArgs>;
 
 const NO_CONTROLS = { controls: { disable: true } };
 
-const heading = (canvas: ReturnType<typeof within>) => canvas.getByRole('heading', { name: /Fatture/ });
+const heading = (canvas: ReturnType<typeof within>) => canvas.getByRole('heading', { name: /Invoices/ });
 const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row').slice(1);
 
 /**
- * La coda fatture di vistato: titolo con conteggio, azioni, filtri e ricerca, e una tabella che
- * riempie lo spazio con un solo scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
- * `firstSortDirection` della colonna "Data" e larghezza del contenitore; le callback compaiono in Actions.
- * La play function sceglie "Da approvare", cerca un fornitore, ordina per importo decrescente, controlla
- * le prime righe e il conteggio "n of 200", poi cerca un testo inesistente, clicca "Clear filters" e
- * verifica che tornino 200 righe e che il fuoco sia sul campo di ricerca.
+ * The vistato invoice queue: title with count, actions, filters and search, and a table that
+ * fills the space with a single scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
+ * `firstSortDirection` of the "Date" column and container width; the callbacks show up in Actions.
+ * The play function picks "To approve", searches for a supplier, sorts by amount descending, checks
+ * the first rows and the "n of 200" count, then searches for a non-existent text, clicks "Clear filters"
+ * and checks that 200 rows are back and that the focus is on the search field.
  */
 export const Playground: Story = {
   play: async ({ args, canvasElement }) => {
@@ -200,18 +200,18 @@ export const Playground: Story = {
     const all = makeDemoInvoices(200);
     const pending = all.filter((r) => r.status === 'pending');
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Da approvare' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'To approve' }));
     await expect(args.onFilterChange).toHaveBeenLastCalledWith('pending');
-    await expect(heading(canvas)).toHaveTextContent(`Fatture (${pending.length} of 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Invoices (${pending.length} of 200)`);
 
     const search = canvas.getByRole('searchbox', { name: 'Search' });
     await userEvent.type(search, 'Ferrari{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
     const found = pending.filter((r) => r.supplier.includes('Ferrari'));
     await expect(found.length).toBeGreaterThan(2);
-    await expect(heading(canvas)).toHaveTextContent(`Fatture (${found.length} of 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Invoices (${found.length} of 200)`);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Importo' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
     await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
     const sorted = [...found].sort((a, b) => b.amount - a.amount);
     const rows = bodyRows(canvas);
@@ -225,14 +225,14 @@ export const Playground: Story = {
     await expect(canvas.getByText('No results for the current filters', { selector: 'p' })).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(bodyRows(canvas)).toHaveLength(200));
-    await expect(heading(canvas)).toHaveTextContent('Fatture (200)');
-    await expect(canvas.getByRole('radio', { name: 'Tutte' })).toBeChecked();
+    await expect(heading(canvas)).toHaveTextContent('Invoices (200)');
+    await expect(canvas.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(search).toHaveValue('');
     await expect(search).toHaveFocus();
   },
 };
 
-/** Filtro attivo ("Da approvare"): il conteggio dice "n of 200". */
+/** Active filter ("To approve"): the count says "n of 200". */
 export const WithActiveFilter: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
@@ -240,20 +240,20 @@ export const WithActiveFilter: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const pending = makeDemoInvoices(200).filter((r) => r.status === 'pending').length;
-    await expect(canvas.getByRole('radio', { name: 'Da approvare' })).toBeChecked();
-    await expect(heading(canvas)).toHaveTextContent(`Fatture (${pending} of 200)`);
+    await expect(canvas.getByRole('radio', { name: 'To approve' })).toBeChecked();
+    await expect(heading(canvas)).toHaveTextContent(`Invoices (${pending} of 200)`);
     await expect(bodyRows(canvas)).toHaveLength(pending);
   },
 };
 
-/** Caricamento senza righe: scheletri nella stessa impronta, il conteggio non c'è ancora (ma lo spazio sì). */
+/** Loading with no rows: skeletons in the same footprint, the count is not there yet (but its space is). */
 export const Loading: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   args: { status: 'loading', dataset: 0 },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('table', { name: 'Fatture' })).toBeVisible();
+    await expect(canvas.getByRole('table', { name: 'Invoices' })).toBeVisible();
     await expect(canvasElement.querySelectorAll('[data-rop-skeleton]').length).toBeGreaterThan(0);
   },
 };
@@ -266,11 +266,11 @@ export const Empty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('No data', { selector: 'p' })).toBeVisible();
-    await expect(heading(canvas)).toHaveTextContent('Fatture (0)');
+    await expect(heading(canvas)).toHaveTextContent('Invoices (0)');
   },
 };
 
-/** Una ricerca che non trova nulla: "Clear filters" funziona senza collegamenti. */
+/** A search that finds nothing: "Clear filters" works with no extra wiring. */
 export const NoResults: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
@@ -279,11 +279,11 @@ export const NoResults: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('No results for the current filters', { selector: 'p' })).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'Clear filters' })).toBeVisible();
-    await expect(heading(canvas)).toHaveTextContent('Fatture (0 of 200)');
+    await expect(heading(canvas)).toHaveTextContent('Invoices (0 of 200)');
   },
 };
 
-/** Errore: il corpo diventa una striscia con "Retry" (la callback compare in Actions). */
+/** Error: the body becomes a strip with "Retry" (the callback shows up in Actions). */
 export const ErrorState: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
@@ -297,10 +297,10 @@ export const ErrorState: Story = {
 };
 
 /**
- * Il conteggio e' una piccola pillola che si colora per un attimo quando il numero cambia (non al
- * montaggio). Senza Controls (le callback e i Controls sono nel Playground). La play function sceglie "Da approvare" e verifica
- * che la pillola segni il cambio (`data-changed`) e poi torni a riposo, poi torna a "Tutte" e controlla lo
- * stesso ciclo. Con `prefers-reduced-motion` il tono non cambia (vedi e2e): il numero compare e basta.
+ * The count is a small pill that briefly changes colour when the number changes (not on mount).
+ * No Controls (the callbacks and Controls are in the Playground). The play function picks "To approve" and checks
+ * that the pill marks the change (`data-changed`) and then returns to rest, then goes back to "All" and checks the
+ * same cycle. With `prefers-reduced-motion` the tone does not change (see e2e): the number just appears.
  */
 export const CountPill: Story = {
   parameters: NO_CONTROLS,
@@ -311,12 +311,12 @@ export const CountPill: Story = {
     await expect(pill).not.toHaveAttribute('data-changed');
     const pending = makeDemoInvoices(200).filter((r) => r.status === 'pending').length;
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Da approvare' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'To approve' }));
     await expect(pill).toHaveTextContent(`(${pending} of 200)`);
     await expect(pill).toHaveAttribute('data-changed');
     await waitFor(() => expect(pill).not.toHaveAttribute('data-changed'));
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Tutte' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'All' }));
     await expect(pill).toHaveTextContent('(200)');
     await expect(pill).toHaveAttribute('data-changed');
     await waitFor(() => expect(pill).not.toHaveAttribute('data-changed'));

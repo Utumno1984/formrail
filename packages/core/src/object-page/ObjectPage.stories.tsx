@@ -24,8 +24,8 @@ const meta: Meta<PlaygroundArgs> = {
   component: ObjectPage,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    headingLevel: { control: 'select', options: [1, 2, 3, 4], description: 'Livello del titolo dell’intestazione; le sezioni usano il successivo' },
-    sectionCount: { control: { type: 'range', min: 1, max: 8, step: 1 }, description: 'Numero di sezioni' },
+    headingLevel: { control: 'select', options: [1, 2, 3, 4], description: 'Heading level of the header title; the sections use the next one' },
+    sectionCount: { control: { type: 'range', min: 1, max: 8, step: 1 }, description: 'Number of sections' },
     title: { control: 'text' },
     subtitle: { control: 'text' },
     showActions: { control: 'boolean' },
@@ -36,7 +36,7 @@ const meta: Meta<PlaygroundArgs> = {
   args: {
     headingLevel: 1,
     sectionCount: 4,
-    title: 'Fattura 2026/0142',
+    title: 'Invoice 2026/0142',
     subtitle: 'ACME srl',
     showActions: true,
     showStatus: true,
@@ -60,7 +60,7 @@ function Filler({ height, children }: { height: number; children: ReactNode }) {
   return <div style={{ height, background: BLOCK_BG, borderRadius: 8, padding: 12, boxSizing: 'border-box' }}>{children}</div>;
 }
 
-const SECTION_TITLES = ['Dati generali', 'Fornitore', 'Righe', 'Importi', 'Pagamento', 'Allegati', 'Note', 'Cronologia'];
+const SECTION_TITLES = ['General data', 'Supplier', 'Lines', 'Amounts', 'Payment', 'Attachments', 'Notes', 'History'];
 
 /** The sections of the demo; the last one always holds a Field, the target of the keyboard scenarios. */
 function Sections({ count }: { count: number }) {
@@ -69,11 +69,11 @@ function Sections({ count }: { count: number }) {
       {Array.from({ length: count }, (_, i) => {
         const last = i === count - 1;
         return (
-          <ObjectPageSection key={SECTION_TITLES[i]} id={`sezione-${i + 1}`} title={SECTION_TITLES[i]}>
-            <Filler height={80 + (i % 4) * 90}>Contenuto di {SECTION_TITLES[i]}</Filler>
+          <ObjectPageSection key={SECTION_TITLES[i]} id={`section-${i + 1}`} title={SECTION_TITLES[i]}>
+            <Filler height={80 + (i % 4) * 90}>Content of {SECTION_TITLES[i]}</Filler>
             {last ? (
               <div style={{ marginTop: 12 }}>
-                <Field label="Note interne" help="Visibili solo al team.">
+                <Field label="Internal notes" help="Visible to the team only.">
                   <Input />
                 </Field>
               </div>
@@ -97,7 +97,7 @@ const statusBadge = (
       fontWeight: 600,
     }}
   >
-    Da approvare
+    To approve
   </span>
 );
 
@@ -119,9 +119,9 @@ export const Playground: Story = {
             showActions ? (
               <>
                 <Button variant="secondary" onClick={onReject}>
-                  Respingi
+                  Reject
                 </Button>
-                <Button onClick={onApprove}>Approva</Button>
+                <Button onClick={onApprove}>Approve</Button>
               </>
             ) : undefined
           }
@@ -140,7 +140,7 @@ export const Playground: Story = {
     }
 
     const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
-    const field = canvas.getByRole('textbox', { name: 'Note interne' });
+    const field = canvas.getByRole('textbox', { name: 'Internal notes' });
     await userEvent.click(field);
     await expect(field).toHaveFocus();
     await waitFor(() => {
@@ -151,14 +151,14 @@ export const Playground: Story = {
     });
 
     if (args.showActions) {
-      await userEvent.click(canvas.getByRole('button', { name: 'Approva' }));
+      await userEvent.click(canvas.getByRole('button', { name: 'Approve' }));
       await expect(args.onApprove).toHaveBeenCalledTimes(1);
     }
   },
 };
 
 const LONG_TITLE =
-  'Fattura 2026/0142 emessa da Rossi Costruzioni e Impianti Speciali di Precisione Società a Responsabilità Limitata Unipersonale';
+  'Invoice 2026/0142 issued by Rossi Construction and Special Precision Installations Single-Member Limited Liability Company';
 
 /**
  * Visual matrix: a header with status and actions, a very long title that wraps (never truncated), six
@@ -172,12 +172,12 @@ export const Overview: Story = {
       <ObjectPage>
         <ObjectPageHeader
           title={LONG_TITLE}
-          subtitle="Fornitore: Rossi Costruzioni · Scadenza 30/11/2026"
+          subtitle="Supplier: Rossi Construction · Due 30/11/2026"
           status={statusBadge}
           actions={
             <>
-              <Button variant="secondary">Respingi</Button>
-              <Button>Approva</Button>
+              <Button variant="secondary">Reject</Button>
+              <Button>Approve</Button>
             </>
           }
         />
@@ -206,7 +206,7 @@ export const FocusedField: Story = {
   render: Overview.render,
   play: async ({ canvasElement }) => {
     const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
-    const field = within(canvasElement).getByRole('textbox', { name: 'Note interne' });
+    const field = within(canvasElement).getByRole('textbox', { name: 'Internal notes' });
     scroller.scrollTop = scroller.scrollHeight;
     field.focus();
     await expect(field).toHaveFocus();
@@ -219,7 +219,7 @@ export const HeaderOnly: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
       </ObjectPage>
     </div>
   ),
@@ -235,12 +235,12 @@ export const KeyboardSafe: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" />
-        <ObjectPageSection id="lunga" title="Sezione lunga">
-          <Filler height={900}>Contenuto lungo prima del campo.</Filler>
+        <ObjectPageHeader title="Invoice 2026/0142" />
+        <ObjectPageSection id="long" title="Long section">
+          <Filler height={900}>Long content before the field.</Filler>
         </ObjectPageSection>
-        <ObjectPageSection id="ultima" title="Ultima sezione">
-          <Field label="Indirizzo di fatturazione">
+        <ObjectPageSection id="last" title="Last section">
+          <Field label="Billing address">
             <Input />
           </Field>
         </ObjectPageSection>
@@ -255,17 +255,17 @@ export const TextAndWideContent: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" />
-        <ObjectPageSection id="testo" title="Solo testo">
+        <ObjectPageHeader title="Invoice 2026/0142" />
+        <ObjectPageSection id="text" title="Text only">
           {Array.from({ length: 24 }, (_, i) => (
             <p key={i} style={{ margin: '0 0 12px' }}>
-              Paragrafo {i + 1}: testo senza alcun controllo interattivo, per verificare lo scorrimento da tastiera.
+              Paragraph {i + 1}: text with no interactive control, to check keyboard scrolling.
             </p>
           ))}
         </ObjectPageSection>
-        <ObjectPageSection id="tabella" title="Tabella larga">
+        <ObjectPageSection id="table" title="Wide table">
           <div style={{ width: 1400, background: BLOCK_BG, padding: 12, boxSizing: 'border-box' }} data-testid="wide">
-            Una tabella più larga della pagina.
+            A table wider than the page.
           </div>
         </ObjectPageSection>
       </ObjectPage>
@@ -278,7 +278,7 @@ export const NoParentHeight: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <ObjectPage>
-      <ObjectPageHeader title="Fattura 2026/0142" />
+      <ObjectPageHeader title="Invoice 2026/0142" />
       <Sections count={5} />
     </ObjectPage>
   ),

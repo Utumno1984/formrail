@@ -44,7 +44,7 @@ test.describe('ListReport count pill', () => {
     const strong = await tokenColor(page, '--color-rop-blue-50');
     expect(await pill.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0.12s');
 
-    await page.getByRole('radio', { name: 'Da approvare' }).click();
+    await page.getByRole('radio', { name: 'To approve' }).click();
     await expect(pill).toHaveAttribute('data-changed', '');
     // the flash is short: poll every frame for the stronger tone
     await page.waitForFunction(
@@ -75,7 +75,7 @@ test.describe('ListReport count pill', () => {
       };
       requestAnimationFrame(tick);
     });
-    await page.getByRole('radio', { name: 'Da approvare' }).click();
+    await page.getByRole('radio', { name: 'To approve' }).click();
     await expect(pill).toHaveAttribute('data-changed', '');
     await expect(pill).not.toHaveAttribute('data-changed');
     const seen = await page.evaluate(() => [...(window as unknown as { __seen: Set<string> }).__seen]);
@@ -86,16 +86,16 @@ test.describe('ListReport count pill', () => {
     await gotoStory(page, NO_PLAY);
     const live = page.locator('[aria-live="polite"]');
     await expect(live).toHaveText('');
-    await page.getByRole('radio', { name: 'Da approvare' }).click();
+    await page.getByRole('radio', { name: 'To approve' }).click();
     await expect(live).toHaveText(/\d+ results/);
     await expect(live.locator('[data-rop-count]')).toHaveCount(0);
   });
 
   test('keeps the footprint of the header: the pill does not move the actions or the table', async ({ page }) => {
     await gotoStory(page, NO_PLAY);
-    const button = page.getByRole('button', { name: 'Nuova fattura' });
+    const button = page.getByRole('button', { name: 'New invoice' });
     const before = await button.boundingBox();
-    await page.getByRole('radio', { name: 'Da approvare' }).click();
+    await page.getByRole('radio', { name: 'To approve' }).click();
     await expect(pillLocator(page)).not.toHaveAttribute('data-changed');
     const after = await button.boundingBox();
     expect(after?.y).toBeCloseTo(before?.y ?? -1, 0);

@@ -69,7 +69,7 @@ test.describe('geometry', () => {
     const widths = await container.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
     expect(widths.scroll).toBeLessThanOrEqual(widths.client);
     await expectNoHorizontalOverflow(container);
-    expect(await page.getByRole('button', { name: 'Apri' }).isVisible()).toBe(true);
+    expect(await page.getByRole('button', { name: 'Open' }).isVisible()).toBe(true);
   });
 
   test('in a fixed-layout table cell the table keeps its width', async ({ page }) => {
@@ -106,10 +106,10 @@ test.describe('hover', () => {
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
     await text.hover();
-    await expect(tooltips(page)).toContainText('Fornitore Bianchi', { timeout: 3000 });
+    await expect(tooltips(page)).toContainText('Supplier Bianchi', { timeout: 3000 });
     // No duplicate description: the text is the element's own content.
     await expect(text).not.toHaveAttribute('aria-describedby');
-    await expect(text).toContainText('in attesa di approvazione');
+    await expect(text).toContainText('awaiting approval');
   });
 
   test('not truncated: no tooltip, even after the delay', async ({ page }) => {
@@ -130,7 +130,7 @@ test.describe('hover', () => {
     await page.mouse.move(5, 5);
     await setWidth(page, 120);
     await text.hover();
-    await expect(tooltips(page)).toContainText('Fornitore Bianchi', { timeout: 3000 });
+    await expect(tooltips(page)).toContainText('Supplier Bianchi', { timeout: 3000 });
     await page.mouse.move(5, 5, { steps: 5 });
     await expect(tooltips(page)).toHaveCount(0);
     await setWidth(page, 1200);
@@ -159,11 +159,11 @@ test.describe('hover', () => {
   test('non-string children: plain text of the children, or tooltipContent; empty children open nothing', async ({ page }) => {
     await gotoStory(page, STORY('rich-children'));
     await page.getByTestId('plain').hover();
-    await expect(tooltips(page)).toHaveText('Fornitore Bianchi & Associati S.r.l., sede legale di Milano', { timeout: 3000 });
+    await expect(tooltips(page)).toHaveText('Supplier Bianchi & Associates Ltd, registered office in Milan', { timeout: 3000 });
     await page.mouse.move(600, 600, { steps: 8 });
     await expect(tooltips(page)).toHaveCount(0);
     await page.getByTestId('custom').hover();
-    await expect(tooltips(page)).toHaveText('Descrizione personalizzata', { timeout: 3000 });
+    await expect(tooltips(page)).toHaveText('Custom description', { timeout: 3000 });
     await page.mouse.move(600, 600, { steps: 8 });
     await expect(tooltips(page)).toHaveCount(0);
     await page.getByTestId('empty').hover({ force: true });
@@ -185,13 +185,13 @@ test.describe('keyboard and mount', () => {
     await gotoStory(page, STORY('playground'), 'width:120;tabIndex:0');
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('text')).toBeFocused();
-    await expect(tooltips(page)).toContainText('Fornitore Bianchi');
+    await expect(tooltips(page)).toContainText('Supplier Bianchi');
     await page.keyboard.press('Escape');
     await expect(tooltips(page)).toHaveCount(0);
   });
 
   test('tabIndex 0 on a text that fits: focus opens nothing', async ({ page }) => {
-    await gotoStory(page, STORY('playground'), 'width:600;tabIndex:0;children:Breve');
+    await gotoStory(page, STORY('playground'), 'width:600;tabIndex:0;children:Short');
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('text')).toBeFocused();
     await page.waitForTimeout(SETTLE);
@@ -218,9 +218,9 @@ test.describe('keyboard and mount', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
     await expect(page.getByTestId('text')).toBeFocused();
-    await expect(tooltips(page)).toContainText('Fornitore Bianchi');
+    await expect(tooltips(page)).toContainText('Supplier Bianchi');
     await page.keyboard.press('-');
-    await expect(page.getByTestId('text')).toHaveText('Breve');
+    await expect(page.getByTestId('text')).toHaveText('Short');
     await expect(tooltips(page)).toHaveCount(0);
   });
 });
@@ -231,10 +231,10 @@ test.describe('shared TooltipProvider', () => {
     await page.getByTestId('text').hover();
     await page.waitForTimeout(SETTLE);
     await page.mouse.move(5, 5, { steps: 5 });
-    await page.getByRole('button', { name: 'Apri' }).hover();
+    await page.getByRole('button', { name: 'Open' }).hover();
     await page.waitForTimeout(150);
     await expect(tooltips(page)).toHaveCount(0);
-    await expect(tooltips(page)).toContainText('Apri il dettaglio', { timeout: 3000 });
+    await expect(tooltips(page)).toContainText('Open the detail', { timeout: 3000 });
   });
 
   test('closing because the text no longer overflows: only that tooltip closes, the provider hears it, no Escape is sent', async ({ page }) => {
@@ -249,20 +249,20 @@ test.describe('shared TooltipProvider', () => {
     await page.keyboard.press('Tab');
     await page.keyboard.press('Shift+Tab');
     await expect(page.getByTestId('text')).toBeFocused();
-    await expect(tooltips(page)).toContainText('Fornitore Bianchi');
+    await expect(tooltips(page)).toContainText('Supplier Bianchi');
     await page.keyboard.press('-');
-    await expect(page.getByTestId('text')).toHaveText('Breve');
+    await expect(page.getByTestId('text')).toHaveText('Short');
     await expect(tooltips(page)).toHaveCount(0);
     await expect(page.getByTestId('text')).toBeFocused();
     expect(await page.evaluate(() => (window as unknown as { __escapes: number }).__escapes)).toBe(0);
     // Past the provider's skip window: had the provider not heard the close, the next tooltip
     // would still open with no delay.
     await page.waitForTimeout(600);
-    await page.getByRole('button', { name: 'Apri' }).hover();
+    await page.getByRole('button', { name: 'Open' }).hover();
     await page.waitForTimeout(150);
     await expect(tooltips(page)).toHaveCount(0);
     // The independent tooltip still works.
-    await expect(tooltips(page)).toContainText('Apri il dettaglio', { timeout: 3000 });
+    await expect(tooltips(page)).toContainText('Open the detail', { timeout: 3000 });
   });
 });
 
@@ -275,9 +275,9 @@ test.describe('inside a Dialog', () => {
     await page.getByTestId('before').focus();
     await page.keyboard.press('Tab');
     await expect(text).toBeFocused();
-    await expect(tooltips(page)).toContainText('Fornitore Bianchi');
+    await expect(tooltips(page)).toContainText('Supplier Bianchi');
     await page.keyboard.press('-');
-    await expect(text).toHaveText('Breve');
+    await expect(text).toHaveText('Short');
     await expect(tooltips(page)).toHaveCount(0);
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(text).toBeFocused();

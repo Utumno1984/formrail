@@ -134,11 +134,11 @@ describe('useListReport: default comparator', () => {
   });
 
   it('strings: numeric, case and diacritics insensitive', () => {
-    expect(sorted(['Fattura 10', 'Fattura 2', 'fattura 1'], 'asc')).toEqual(['fattura 1', 'Fattura 2', 'Fattura 10']);
+    expect(sorted(['Invoice 10', 'Invoice 2', 'invoice 1'], 'asc')).toEqual(['invoice 1', 'Invoice 2', 'Invoice 10']);
     const rows = [
-      { id: 'x', amount: 'città' },
-      { id: 'y', amount: 'Citta' },
-      { id: 'z', amount: 'cittá' },
+      { id: 'x', amount: 'café' },
+      { id: 'y', amount: 'Cafe' },
+      { id: 'z', amount: 'cafè' },
     ];
     const { result } = renderHook(() =>
       useListReport<Row>({ rows, columns: [col('amount')], getRowId, defaultSort: { columnId: 'amount', direction: 'desc' } }),

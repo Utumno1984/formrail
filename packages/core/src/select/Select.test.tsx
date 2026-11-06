@@ -27,26 +27,26 @@ afterEach(() => {
 });
 
 const COUNTRIES: SelectOption[] = [
-  { value: 'it', label: 'Italia' },
-  { value: 'fr', label: 'Francia' },
-  { value: 'de', label: 'Germania', disabled: true },
-  { value: 'es', label: 'Spagna' },
+  { value: 'it', label: 'Italy' },
+  { value: 'fr', label: 'France' },
+  { value: 'de', label: 'Germany', disabled: true },
+  { value: 'es', label: 'Spain' },
 ];
 
 describe('Select', () => {
   it('is a combobox named by the Field label, described by the Field messages, with aria-expanded in sync', async () => {
     const user = userEvent.setup();
     render(
-      <Field label="Paese" help="Sede legale" error="Obbligatorio" required>
-        <Select options={COUNTRIES} placeholder="Seleziona" />
+      <Field label="Country" help="Registered office" error="Required" required>
+        <Select options={COUNTRIES} placeholder="Select" />
       </Field>,
     );
-    const trigger = screen.getByRole('combobox', { name: 'Paese' });
-    expect(trigger).toHaveAccessibleDescription('Obbligatorio Sede legale');
+    const trigger = screen.getByRole('combobox', { name: 'Country' });
+    expect(trigger).toHaveAccessibleDescription('Required Registered office');
     expect(trigger).toHaveAttribute('aria-invalid', 'true');
     expect(trigger).toHaveAttribute('aria-required', 'true');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(trigger).toHaveTextContent('Seleziona');
+    expect(trigger).toHaveTextContent('Select');
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('Select', () => {
       const [v, setV] = useState<string | undefined>();
       return (
         <Select
-          aria-label="Paese"
+          aria-label="Country"
           options={COUNTRIES}
           value={v}
           onValueChange={(next) => {
@@ -71,39 +71,39 @@ describe('Select', () => {
     }
     render(<Host />);
     await user.click(screen.getByRole('combobox'));
-    await user.click(screen.getByRole('option', { name: 'Francia' }));
+    await user.click(screen.getByRole('option', { name: 'France' }));
     expect(onValueChange).toHaveBeenCalledTimes(1);
     expect(onValueChange).toHaveBeenCalledWith('fr');
     expect(screen.queryByRole('listbox')).toBeNull();
-    expect(screen.getByRole('combobox')).toHaveTextContent('Francia');
+    expect(screen.getByRole('combobox')).toHaveTextContent('France');
     await user.click(screen.getByRole('combobox'));
-    expect(screen.getByRole('option', { name: 'Francia' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('option', { name: 'Italia' })).toHaveAttribute('aria-selected', 'false');
-    expect(within(screen.getByRole('option', { name: 'Francia' })).queryByRole('img')).toBeNull();
+    expect(screen.getByRole('option', { name: 'France' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'Italy' })).toHaveAttribute('aria-selected', 'false');
+    expect(within(screen.getByRole('option', { name: 'France' })).queryByRole('img')).toBeNull();
   });
 
   it('works uncontrolled with defaultValue', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<Select aria-label="Paese" options={COUNTRIES} defaultValue="it" onValueChange={onValueChange} />);
-    expect(screen.getByRole('combobox')).toHaveTextContent('Italia');
+    render(<Select aria-label="Country" options={COUNTRIES} defaultValue="it" onValueChange={onValueChange} />);
+    expect(screen.getByRole('combobox')).toHaveTextContent('Italy');
     await user.click(screen.getByRole('combobox'));
-    await user.click(screen.getByRole('option', { name: 'Spagna' }));
-    expect(screen.getByRole('combobox')).toHaveTextContent('Spagna');
+    await user.click(screen.getByRole('option', { name: 'Spain' }));
+    expect(screen.getByRole('combobox')).toHaveTextContent('Spain');
     expect(onValueChange).toHaveBeenCalledOnce();
   });
 
   it('keyboard: ArrowDown opens, disabled options are skipped, Enter selects, Escape closes without selecting', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<Select aria-label="Paese" options={COUNTRIES} defaultValue="fr" onValueChange={onValueChange} />);
+    render(<Select aria-label="Country" options={COUNTRIES} defaultValue="fr" onValueChange={onValueChange} />);
     await user.tab();
     expect(screen.getByRole('combobox')).toHaveFocus();
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('listbox')).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Francia' })).toHaveFocus();
+    expect(screen.getByRole('option', { name: 'France' })).toHaveFocus();
     await user.keyboard('{ArrowDown}');
-    expect(screen.getByRole('option', { name: 'Spagna' })).toHaveFocus();
+    expect(screen.getByRole('option', { name: 'Spain' })).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(onValueChange).not.toHaveBeenCalled();
@@ -113,22 +113,22 @@ describe('Select', () => {
 
   it('typeahead moves to the matching option; Home and End go to the first and the last enabled', async () => {
     const user = userEvent.setup();
-    render(<Select aria-label="Paese" options={COUNTRIES} defaultValue="it" />);
+    render(<Select aria-label="Country" options={COUNTRIES} defaultValue="it" />);
     await user.click(screen.getByRole('combobox'));
     await user.keyboard('sp');
-    expect(screen.getByRole('option', { name: 'Spagna' })).toHaveFocus();
+    expect(screen.getByRole('option', { name: 'Spain' })).toHaveFocus();
     await user.keyboard('{Home}');
-    expect(screen.getByRole('option', { name: 'Italia' })).toHaveFocus();
+    expect(screen.getByRole('option', { name: 'Italy' })).toHaveFocus();
     await user.keyboard('{End}');
-    expect(screen.getByRole('option', { name: 'Spagna' })).toHaveFocus();
+    expect(screen.getByRole('option', { name: 'Spain' })).toHaveFocus();
   });
 
   it('a disabled option cannot be picked', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<Select aria-label="Paese" options={COUNTRIES} onValueChange={onValueChange} />);
+    render(<Select aria-label="Country" options={COUNTRIES} onValueChange={onValueChange} />);
     await user.click(screen.getByRole('combobox'));
-    await user.click(screen.getByRole('option', { name: 'Germania' }));
+    await user.click(screen.getByRole('option', { name: 'Germany' }));
     expect(onValueChange).not.toHaveBeenCalled();
     expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
@@ -137,30 +137,30 @@ describe('Select', () => {
     it('after the options arrive late, to a known value, to an unknown one and to undefined', () => {
       const onValueChange = vi.fn();
       const { rerender } = render(
-        <Select aria-label="Paese" options={[]} value={undefined} onValueChange={onValueChange} placeholder="Seleziona" />,
+        <Select aria-label="Country" options={[]} value={undefined} onValueChange={onValueChange} placeholder="Select" />,
       );
-      expect(screen.getByRole('combobox')).toHaveTextContent('Seleziona');
-      rerender(<Select aria-label="Paese" options={[]} value="it" onValueChange={onValueChange} />);
-      rerender(<Select aria-label="Paese" options={COUNTRIES} value="it" onValueChange={onValueChange} />);
-      expect(screen.getByRole('combobox')).toHaveTextContent('Italia');
-      rerender(<Select aria-label="Paese" options={COUNTRIES} value="xx" onValueChange={onValueChange} />);
-      rerender(<Select aria-label="Paese" options={COUNTRIES} value="de" onValueChange={onValueChange} />);
+      expect(screen.getByRole('combobox')).toHaveTextContent('Select');
+      rerender(<Select aria-label="Country" options={[]} value="it" onValueChange={onValueChange} />);
+      rerender(<Select aria-label="Country" options={COUNTRIES} value="it" onValueChange={onValueChange} />);
+      expect(screen.getByRole('combobox')).toHaveTextContent('Italy');
+      rerender(<Select aria-label="Country" options={COUNTRIES} value="xx" onValueChange={onValueChange} />);
+      rerender(<Select aria-label="Country" options={COUNTRIES} value="de" onValueChange={onValueChange} />);
       rerender(
-        <Select aria-label="Paese" options={COUNTRIES} value={undefined} onValueChange={onValueChange} placeholder="Seleziona" />,
+        <Select aria-label="Country" options={COUNTRIES} value={undefined} onValueChange={onValueChange} placeholder="Select" />,
       );
-      expect(screen.getByRole('combobox')).toHaveTextContent('Seleziona');
+      expect(screen.getByRole('combobox')).toHaveTextContent('Select');
       expect(onValueChange).not.toHaveBeenCalled();
     });
 
     it('while the list is open the selection indicator follows the value', async () => {
       const user = userEvent.setup();
       const onValueChange = vi.fn();
-      const { rerender } = render(<Select aria-label="Paese" options={COUNTRIES} value="it" onValueChange={onValueChange} />);
+      const { rerender } = render(<Select aria-label="Country" options={COUNTRIES} value="it" onValueChange={onValueChange} />);
       await user.click(screen.getByRole('combobox'));
-      expect(screen.getByRole('option', { name: 'Italia' })).toHaveAttribute('aria-selected', 'true');
-      rerender(<Select aria-label="Paese" options={COUNTRIES} value="es" onValueChange={onValueChange} />);
-      expect(screen.getByRole('option', { name: 'Spagna' })).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByRole('option', { name: 'Italia' })).toHaveAttribute('aria-selected', 'false');
+      expect(screen.getByRole('option', { name: 'Italy' })).toHaveAttribute('aria-selected', 'true');
+      rerender(<Select aria-label="Country" options={COUNTRIES} value="es" onValueChange={onValueChange} />);
+      expect(screen.getByRole('option', { name: 'Spain' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('option', { name: 'Italy' })).toHaveAttribute('aria-selected', 'false');
       expect(onValueChange).not.toHaveBeenCalled();
     });
 
@@ -171,40 +171,40 @@ describe('Select', () => {
         return (
           <>
             <button onClick={() => setData({ options: COUNTRIES, value: 'es' })}>carica</button>
-            <Select aria-label="Paese" options={data.options} value={data.value} onValueChange={onValueChange} />
+            <Select aria-label="Country" options={data.options} value={data.value} onValueChange={onValueChange} />
           </>
         );
       }
       render(<Host />);
       await act(async () => screen.getByRole('button', { name: 'carica' }).click());
-      expect(screen.getByRole('combobox')).toHaveTextContent('Spagna');
+      expect(screen.getByRole('combobox')).toHaveTextContent('Spain');
       expect(onValueChange).not.toHaveBeenCalled();
     });
   });
 
   it('a value with no option shows the raw value, or unknownValueLabel, and calls nothing', () => {
     const onValueChange = vi.fn();
-    const { rerender } = render(<Select aria-label="Paese" options={COUNTRIES} value="zz" onValueChange={onValueChange} />);
+    const { rerender } = render(<Select aria-label="Country" options={COUNTRIES} value="zz" onValueChange={onValueChange} />);
     expect(screen.getByRole('combobox')).toHaveTextContent('zz');
     rerender(
-      <Select aria-label="Paese" options={COUNTRIES} value="zz" unknownValueLabel="(non più disponibile)" onValueChange={onValueChange} />,
+      <Select aria-label="Country" options={COUNTRIES} value="zz" unknownValueLabel="(no longer available)" onValueChange={onValueChange} />,
     );
-    expect(screen.getByRole('combobox')).toHaveTextContent('(non più disponibile)');
+    expect(screen.getByRole('combobox')).toHaveTextContent('(no longer available)');
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
   it('no value shows the placeholder and exposes no sentinel value', async () => {
     const user = userEvent.setup();
-    render(<Select aria-label="Paese" options={COUNTRIES} value={undefined} placeholder="Seleziona" />);
-    expect(screen.getByRole('combobox')).toHaveTextContent('Seleziona');
+    render(<Select aria-label="Country" options={COUNTRIES} value={undefined} placeholder="Select" />);
+    expect(screen.getByRole('combobox')).toHaveTextContent('Select');
     await user.click(screen.getByRole('combobox'));
     expect(screen.getAllByRole('option').every((o) => o.getAttribute('aria-selected') !== 'true')).toBe(true);
   });
 
   it('empty options: the list opens with a declared text and the trigger shows the placeholder', async () => {
     const user = userEvent.setup();
-    render(<Select aria-label="Paese" options={[]} placeholder="Seleziona" />);
-    expect(screen.getByRole('combobox')).toHaveTextContent('Seleziona');
+    render(<Select aria-label="Country" options={[]} placeholder="Select" />);
+    expect(screen.getByRole('combobox')).toHaveTextContent('Select');
     await user.click(screen.getByRole('combobox'));
     expect(screen.getByText('No options')).toBeInTheDocument();
   });
@@ -214,7 +214,7 @@ describe('Select', () => {
     const onValueChange = vi.fn();
     render(
       <form>
-        <Select aria-label="Paese" options={[]} emptyLabel="Nothing here" onValueChange={onValueChange} />
+        <Select aria-label="Country" options={[]} emptyLabel="Nothing here" onValueChange={onValueChange} />
       </form>,
     );
     await user.click(screen.getByRole('combobox'));
@@ -233,18 +233,18 @@ describe('Select', () => {
 
   it('an explicit emptyLabel (any language) replaces the English default', async () => {
     const user = userEvent.setup();
-    render(<Select aria-label="Paese" options={[]} emptyLabel="Nessuna opzione" />);
+    render(<Select aria-label="Country" options={[]} emptyLabel="Nothing to choose from" />);
     await user.click(screen.getByRole('combobox'));
-    expect(screen.getByText('Nessuna opzione')).toBeInTheDocument();
+    expect(screen.getByText('Nothing to choose from')).toBeInTheDocument();
     expect(screen.queryByText('No options')).toBeNull();
   });
 
   it('options removed while the list is open do not crash it', async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<Select aria-label="Paese" options={COUNTRIES} />);
+    const { rerender } = render(<Select aria-label="Country" options={COUNTRIES} />);
     await user.click(screen.getByRole('combobox'));
-    rerender(<Select aria-label="Paese" options={COUNTRIES.slice(2)} />);
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Germania', 'Spagna']);
+    rerender(<Select aria-label="Country" options={COUNTRIES.slice(2)} />);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Germany', 'Spain']);
   });
 
   it('warns once in development about duplicate values and keeps the first', async () => {
@@ -252,26 +252,26 @@ describe('Select', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     render(
       <Select
-        aria-label="Paese"
+        aria-label="Country"
         options={[
-          { value: 'a', label: 'Uno' },
-          { value: 'a', label: 'Due' },
+          { value: 'a', label: 'One' },
+          { value: 'a', label: 'Two' },
         ]}
       />,
     );
     await user.click(screen.getByRole('combobox'));
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Uno']);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['One']);
     expect(warn.mock.calls.filter(([m]) => String(m).includes('unique values'))).toHaveLength(1);
   });
 
   it('warns for every Select that has duplicates, not once per session', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const dup = [
-      { value: 'a', label: 'Uno' },
-      { value: 'a', label: 'Due' },
+      { value: 'a', label: 'One' },
+      { value: 'a', label: 'Two' },
     ];
-    render(<Select aria-label="Uno" options={dup} />);
-    render(<Select aria-label="Due" options={dup} />);
+    render(<Select aria-label="One" options={dup} />);
+    render(<Select aria-label="Two" options={dup} />);
     expect(warn.mock.calls.filter(([m]) => String(m).includes('unique values'))).toHaveLength(2);
   });
 
@@ -284,7 +284,7 @@ describe('Select', () => {
         return (
           <form data-testid="form">
             <Select
-              aria-label="Paese"
+              aria-label="Country"
               options={COUNTRIES}
               value={v}
               onValueChange={(next) => {
@@ -297,11 +297,11 @@ describe('Select', () => {
       }
       render(<Host />);
       await user.click(screen.getByRole('combobox'));
-      await user.click(screen.getByRole('option', { name: 'Francia' }));
+      await user.click(screen.getByRole('option', { name: 'France' }));
       expect(onValueChange).toHaveBeenCalledExactlyOnceWith('fr');
       act(() => (screen.getByTestId('form') as HTMLFormElement).reset());
       expect(onValueChange).toHaveBeenCalledOnce();
-      expect(screen.getByRole('combobox')).toHaveTextContent('Francia');
+      expect(screen.getByRole('combobox')).toHaveTextContent('France');
     });
 
     it('a forced Select fires no change event and no onValueChange on typeahead', async () => {
@@ -310,7 +310,7 @@ describe('Select', () => {
       const onFormChange = vi.fn();
       render(
         <form onChange={onFormChange}>
-          <Field label="Paese" state="forced" stateReason="Contratto">
+          <Field label="Country" state="forced" stateReason="Contract">
             <Select options={COUNTRIES} value="it" onValueChange={onValueChange} />
           </Field>
         </form>,
@@ -325,7 +325,7 @@ describe('Select', () => {
       const onValueChange = vi.fn();
       const { container } = render(
         <form>
-          <Select aria-label="Paese" options={COUNTRIES} value="it" onValueChange={onValueChange} />
+          <Select aria-label="Country" options={COUNTRIES} value="it" onValueChange={onValueChange} />
         </form>,
       );
       const native = container.querySelector('select');
@@ -341,11 +341,11 @@ describe('Select', () => {
     const user = userEvent.setup();
     function Host({ state }: { state: 'default' | 'locked' }) {
       return state === 'default' ? (
-        <Field label="Paese">
+        <Field label="Country">
           <Select options={COUNTRIES} />
         </Field>
       ) : (
-        <Field label="Paese" state="locked" stateReason="Salvataggio in corso">
+        <Field label="Country" state="locked" stateReason="Save in progress">
           <Select options={COUNTRIES} />
         </Field>
       );
@@ -360,36 +360,36 @@ describe('Select', () => {
 
   it('the active option removed under the open list: the first enabled option takes the focus', async () => {
     const user = userEvent.setup();
-    const { rerender } = render(<Select aria-label="Paese" options={COUNTRIES} />);
+    const { rerender } = render(<Select aria-label="Country" options={COUNTRIES} />);
     await user.click(screen.getByRole('combobox'));
     await user.keyboard('{ArrowDown}');
-    rerender(<Select aria-label="Paese" options={COUNTRIES.slice(2)} />);
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Spagna' })).toHaveFocus());
+    rerender(<Select aria-label="Country" options={COUNTRIES.slice(2)} />);
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Spain' })).toHaveFocus());
   });
 
   it('inside a Sheet, picking an option leaves the sheet open and Escape closes the list first', async () => {
     const user = userEvent.setup();
     render(
       <Sheet>
-        <SheetTrigger>Apri</SheetTrigger>
+        <SheetTrigger>Open</SheetTrigger>
         <SheetContent>
-          <SheetTitle>Modifica</SheetTitle>
-          <Select aria-label="Paese" options={COUNTRIES} />
+          <SheetTitle>Edit</SheetTitle>
+          <Select aria-label="Country" options={COUNTRIES} />
         </SheetContent>
       </Sheet>,
     );
-    await user.click(screen.getByRole('button', { name: 'Apri' }));
-    await user.click(screen.getByRole('combobox', { name: 'Paese' }));
-    await user.click(screen.getByRole('option', { name: 'Spagna' }));
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await user.click(screen.getByRole('combobox', { name: 'Country' }));
+    await user.click(screen.getByRole('option', { name: 'Spain' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await user.click(screen.getByRole('combobox', { name: 'Paese' }));
+    await user.click(screen.getByRole('combobox', { name: 'Country' }));
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('keeps the consumer tabIndex and aria-readonly when the Select is outside a Field', () => {
-    render(<Select aria-label="Paese" options={COUNTRIES} tabIndex={-1} aria-readonly />);
+    render(<Select aria-label="Country" options={COUNTRIES} tabIndex={-1} aria-readonly />);
     expect(screen.getByRole('combobox')).toHaveAttribute('tabindex', '-1');
     expect(screen.getByRole('combobox')).toHaveAttribute('aria-readonly', 'true');
   });
@@ -398,11 +398,11 @@ describe('Select', () => {
     it('disabled: not focusable, not openable', async () => {
       const user = userEvent.setup();
       render(
-        <Field label="Paese" state="disabled">
+        <Field label="Country" state="disabled">
           <Select options={COUNTRIES} />
         </Field>,
       );
-      const trigger = screen.getByRole('combobox', { name: 'Paese' });
+      const trigger = screen.getByRole('combobox', { name: 'Country' });
       expect(trigger).toBeDisabled();
       await user.click(trigger);
       await user.tab();
@@ -414,13 +414,13 @@ describe('Select', () => {
       const user = userEvent.setup();
       const onValueChange = vi.fn();
       render(
-        <Field label="Paese" state={state} stateReason="Deciso dal contratto">
+        <Field label="Country" state={state} stateReason="Set by the contract">
           <Select options={COUNTRIES} value="it" onValueChange={onValueChange} />
         </Field>,
       );
-      const trigger = screen.getByRole('combobox', { name: 'Paese' });
-      expect(trigger).toHaveTextContent('Italia');
-      expect(trigger).toHaveAccessibleDescription('Deciso dal contratto');
+      const trigger = screen.getByRole('combobox', { name: 'Country' });
+      expect(trigger).toHaveTextContent('Italy');
+      expect(trigger).toHaveAccessibleDescription('Set by the contract');
       expect(trigger).toHaveAttribute('aria-readonly', 'true');
       await user.tab();
       expect(trigger).toHaveFocus();
@@ -438,12 +438,12 @@ describe('Select', () => {
     render(
       <Select
         ref={ref}
-        aria-label="Paese"
+        aria-label="Country"
         options={COUNTRIES}
         value="zz"
         unknownValueLabel="?"
-        emptyLabel="vuoto"
-        placeholder="Seleziona"
+        emptyLabel="empty"
+        placeholder="Select"
         size="sm"
         data-testid="sel"
         className="py-4"
@@ -464,19 +464,19 @@ describe('Select', () => {
     const user = userEvent.setup();
     render(
       <Dialog>
-        <DialogTrigger>Apri</DialogTrigger>
+        <DialogTrigger>Open</DialogTrigger>
         <DialogContent>
-          <DialogTitle>Modifica</DialogTitle>
-          <Select aria-label="Paese" options={COUNTRIES} />
+          <DialogTitle>Edit</DialogTitle>
+          <Select aria-label="Country" options={COUNTRIES} />
         </DialogContent>
       </Dialog>,
     );
-    await user.click(screen.getByRole('button', { name: 'Apri' }));
-    await user.click(screen.getByRole('combobox', { name: 'Paese' }));
-    await user.click(screen.getByRole('option', { name: 'Spagna' }));
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await user.click(screen.getByRole('combobox', { name: 'Country' }));
+    await user.click(screen.getByRole('option', { name: 'Spain' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Paese' })).toHaveTextContent('Spagna');
-    await user.click(screen.getByRole('combobox', { name: 'Paese' }));
+    expect(screen.getByRole('combobox', { name: 'Country' })).toHaveTextContent('Spain');
+    await user.click(screen.getByRole('combobox', { name: 'Country' }));
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(screen.getByRole('dialog')).toBeInTheDocument();

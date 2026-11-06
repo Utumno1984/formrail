@@ -32,7 +32,7 @@ test.describe('Floorplans/Object Page/Layout', () => {
     await gotoStory(page, STORY('overview'));
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     await expect(page.getByRole('region')).toHaveCount(6);
-    await expect(page.getByRole('region', { name: 'Righe' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Lines' })).toBeVisible();
     await expectNoA11yViolations(page);
   });
 
@@ -59,7 +59,7 @@ test.describe('Floorplans/Object Page/Layout', () => {
     await page.setViewportSize({ width: 320, height: 640 });
     await gotoStory(page, STORY('overview'));
     const heading = page.getByRole('heading', { level: 1 });
-    const approve = page.getByRole('button', { name: 'Approva' });
+    const approve = page.getByRole('button', { name: 'Approve' });
     const headingBox = (await heading.boundingBox())!;
     const approveBox = (await approve.boundingBox())!;
     expect(approveBox.y).toBeGreaterThanOrEqual(headingBox.y + headingBox.height);
@@ -117,7 +117,7 @@ test.describe('Floorplans/Object Page/Layout', () => {
   test('the focus ring of a control filling a section body is not clipped by the body', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('keyboard-safe'));
-    const input = page.getByRole('textbox', { name: 'Indirizzo di fatturazione' });
+    const input = page.getByRole('textbox', { name: 'Billing address' });
     await input.scrollIntoViewIfNeeded();
     await page.keyboard.press('Tab');
     await input.focus();
@@ -140,8 +140,8 @@ test.describe('Floorplans/Object Page/Layout', () => {
     // Set on the scroller, where the Anchor Bar publishes it (the bar's own, measured value is overridden here,
     // so the sections' reaction to the variable is checked with a known number). Same expectation as before.
     await scroller.evaluate((el) => el.style.setProperty('--rop-object-page-sticky-offset', '48px'));
-    await page.locator('#sezione-4').evaluate((el) => el.scrollIntoView({ block: 'start' }));
-    const delta = await page.locator('#sezione-4').evaluate((el, top) => el.getBoundingClientRect().top - top, await scroller.evaluate((el) => el.getBoundingClientRect().top));
+    await page.locator('#section-4').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    const delta = await page.locator('#section-4').evaluate((el, top) => el.getBoundingClientRect().top - top, await scroller.evaluate((el) => el.getBoundingClientRect().top));
     // The offset (48) plus the 4px a section keeps below the bar for its title's focus indicator.
     expect(Math.round(delta)).toBe(52);
   });
@@ -181,7 +181,7 @@ for (const [name, viewport] of [
 
     test('a field in the last section ends above the keyboard, scrolling the inner scroller and not the document', async ({ page }) => {
       await gotoStory(page, STORY('keyboard-safe'));
-      const input = page.getByRole('textbox', { name: 'Indirizzo di fatturazione' });
+      const input = page.getByRole('textbox', { name: 'Billing address' });
       const scroller = page.locator(SCROLLER);
       // Bottom edge of the scroll area: visible now, under the keyboard later.
       await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight));

@@ -41,7 +41,7 @@ test.describe('Overlays/Tooltip: stories play', () => {
 test.describe('hover', () => {
   test('opens after the default delay (500ms), describes the trigger, closes when the pointer leaves', async ({ page }) => {
     await gotoStory(page, STORY('playground'));
-    const trigger = page.getByRole('button', { name: 'Elimina riga' });
+    const trigger = page.getByRole('button', { name: 'Delete row' });
     await expect(tooltips(page)).toHaveCount(0);
     // The play function closed a tooltip a moment ago: wait out the provider's skip window (300ms),
     // otherwise the next one opens with no delay (that is the toolbar test below).
@@ -51,7 +51,7 @@ test.describe('hover', () => {
     await page.waitForTimeout(350);
     await expect(tooltips(page)).toHaveCount(0);
     const tooltip = tooltips(page);
-    await expect(tooltip).toHaveText('Elimina riga');
+    await expect(tooltip).toHaveText('Delete row');
     const id = await tooltip.getAttribute('id');
     await expect(trigger).toHaveAttribute('aria-describedby', id!);
     // A hand makes many moves; Radix closes it on the first one that leaves the grace area.
@@ -62,7 +62,7 @@ test.describe('hover', () => {
 
   test('hovering the tooltip keeps it open (hoverable); leaving both closes it; it never takes the focus', async ({ page }) => {
     await gotoStory(page, STORY('playground'), 'delayDuration:0');
-    const trigger = page.getByRole('button', { name: 'Elimina riga' });
+    const trigger = page.getByRole('button', { name: 'Delete row' });
     await trigger.hover();
     const tooltip = tooltips(page);
     await expect(tooltip).toBeVisible();
@@ -78,30 +78,30 @@ test.describe('hover', () => {
 
   test('moving between adjacent triggers opens the next one without the delay and closes the first', async ({ page }) => {
     await gotoStory(page, STORY('toolbar'));
-    const first = page.getByRole('button', { name: 'Modifica' });
-    const second = page.getByRole('button', { name: 'Duplica' });
+    const first = page.getByRole('button', { name: 'Edit' });
+    const second = page.getByRole('button', { name: 'Duplicate' });
     await first.hover();
-    await expect(tooltips(page)).toHaveText('Modifica', { timeout: 3000 });
+    await expect(tooltips(page)).toHaveText('Edit', { timeout: 3000 });
     const target = (await second.boundingBox())!;
     // A real hand-movement across the gap (Radix ignores the first move while the pointer is "in
     // transit" between two triggers).
     await page.mouse.move(target.x + 16, target.y + 16, { steps: 12 });
     // The provider's delay is 600ms: the second is open well before it has elapsed.
-    await expect(tooltips(page)).toHaveText('Duplica', { timeout: 450 });
+    await expect(tooltips(page)).toHaveText('Duplicate', { timeout: 450 });
     await expect(tooltips(page)).toHaveCount(1);
   });
 
   test('a click on the trigger closes it and runs the action', async ({ page }) => {
     await gotoStory(page, STORY('click-action'));
-    const trigger = page.getByRole('button', { name: 'Conta' });
+    const trigger = page.getByRole('button', { name: 'Count' });
     await trigger.hover();
-    await expect(tooltips(page)).toHaveText('Cliccato 0 volte');
+    await expect(tooltips(page)).toHaveText('Clicked 0 times');
     await trigger.click();
     await expect(tooltips(page)).toHaveCount(0);
     // Radix does not reopen it until the pointer has left the trigger and come back.
     await page.mouse.move(600, 600, { steps: 8 });
     await trigger.hover();
-    await expect(tooltips(page)).toHaveText('Cliccato 1 volte');
+    await expect(tooltips(page)).toHaveText('Clicked 1 times');
   });
 });
 
@@ -110,21 +110,21 @@ test.describe('keyboard', () => {
     await gotoStory(page, STORY('toolbar'));
     await expect(tooltips(page)).toHaveCount(0);
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Modifica' })).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Modifica');
+    await expect(page.getByRole('button', { name: 'Edit' })).toBeFocused();
+    await expect(tooltips(page)).toHaveText('Edit');
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Duplica' })).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Duplica');
+    await expect(page.getByRole('button', { name: 'Duplicate' })).toBeFocused();
+    await expect(tooltips(page)).toHaveText('Duplicate');
     await expect(tooltips(page)).toHaveCount(1);
     await page.keyboard.press('Shift+Tab');
-    await expect(tooltips(page)).toHaveText('Modifica');
+    await expect(tooltips(page)).toHaveText('Edit');
     await page.keyboard.press('Shift+Tab');
     await expect(tooltips(page)).toHaveCount(0);
   });
 
   test('a trigger with autoFocus does not open it; Shift+Tab then Tab does', async ({ page }) => {
     await gotoStory(page, STORY('auto-focus'));
-    const trigger = page.getByRole('button', { name: 'Con autofocus' });
+    const trigger = page.getByRole('button', { name: 'With autofocus' });
     await expect(trigger).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
@@ -141,7 +141,7 @@ test.describe('keyboard', () => {
     await gotoStory(page, STORY('opened-by-arrow-down'));
     await page.getByRole('button', { name: 'Menu' }).focus();
     await page.keyboard.press('ArrowDown');
-    const item = page.getByRole('button', { name: 'Prima voce' });
+    const item = page.getByRole('button', { name: 'First item' });
     await expect(item).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
@@ -149,12 +149,12 @@ test.describe('keyboard', () => {
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(item).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Dettaglio della voce');
+    await expect(tooltips(page)).toHaveText('Item detail');
   });
 
   test('content that changes while it is open: the text follows and it stays centred on the trigger', async ({ page }) => {
     await gotoStory(page, STORY('content-changes-while-open'));
-    const trigger = page.getByRole('button', { name: 'Premi + o -' });
+    const trigger = page.getByRole('button', { name: 'Press + or -' });
     // The play function tabbed to the button, pressed "+" and blurred it: the page is in the "long
     // text" state and the sequential-focus starting point is after the button, so the first Tab may
     // leave the page and a second one comes back.
@@ -165,10 +165,10 @@ test.describe('keyboard', () => {
     const tooltip = tooltips(page);
     await expect(tooltip).toBeVisible();
     await page.keyboard.press('Minus');
-    await expect(tooltip).toHaveText('Breve');
+    await expect(tooltip).toHaveText('Short');
     const narrow = (await tooltip.boundingBox())!;
     await page.keyboard.press('Shift+Equal'); // the "+" key
-    await expect(tooltip).toHaveText(/Un testo molto più lungo/);
+    await expect(tooltip).toHaveText(/A much longer text/);
     await expect
       .poll(async () => {
         const box = (await tooltip.boundingBox())!;
@@ -190,7 +190,7 @@ test.describe('keyboard', () => {
       const opener = document.createElement('button');
       opener.textContent = 'Sposta';
       opener.addEventListener('click', () =>
-        Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Con autofocus')?.focus(),
+        Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'With autofocus')?.focus(),
       );
       document.body.prepend(opener);
       (document.activeElement as HTMLElement | null)?.blur();
@@ -205,9 +205,9 @@ test.describe('keyboard', () => {
 test.describe('inside a Dialog', () => {
   test('the focus moved to the trigger by the dialog opens nothing; Shift+Tab then Tab does', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Elimina riga' });
-    const trigger = dialog.getByRole('button', { name: 'Elimina riga' });
+    await page.getByRole('button', { name: 'Open' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete row' });
+    const trigger = dialog.getByRole('button', { name: 'Delete row' });
     await expect(trigger).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
@@ -221,18 +221,18 @@ test.describe('inside a Dialog', () => {
 
   test('also when the dialog is opened with the keyboard (Enter on its trigger)', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).focus();
+    await page.getByRole('button', { name: 'Open' }).focus();
     await page.keyboard.press('Enter');
-    const dialog = page.getByRole('dialog', { name: 'Elimina riga' });
-    await expect(dialog.getByRole('button', { name: 'Elimina riga' })).toBeFocused();
+    const dialog = page.getByRole('dialog', { name: 'Delete row' });
+    await expect(dialog.getByRole('button', { name: 'Delete row' })).toBeFocused();
     await page.waitForTimeout(SETTLE);
     await expect(tooltips(page)).toHaveCount(0);
   });
 
   test('Escape closes only the tooltip; a second Escape closes the dialog', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Elimina riga' });
+    await page.getByRole('button', { name: 'Open' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete row' });
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(tooltips(page)).toHaveCount(1);
@@ -245,8 +245,8 @@ test.describe('inside a Dialog', () => {
 
   test('the tooltip is on the tooltip level: content and positioning wrapper, topmost at its centre', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Elimina riga' }).hover();
+    await page.getByRole('button', { name: 'Open' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete row' }).hover();
     const tooltip = tooltips(page);
     await expect(tooltip).toBeVisible();
     const info = await tooltip.evaluate((el) => {
@@ -271,8 +271,8 @@ test.describe('inside a Dialog', () => {
 
   test('axe: no violations with the tooltip open', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog-manual'));
-    await page.getByRole('button', { name: 'Apri' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Elimina riga' }).hover();
+    await page.getByRole('button', { name: 'Open' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete row' }).hover();
     await expect(tooltips(page)).toBeVisible();
     await expectNoA11yViolations(page);
   });
@@ -282,15 +282,15 @@ test.describe('disabled trigger and empty content', () => {
   test('a disabled trigger has no tooltip by default; with disabledTriggerFocusable it opens on hover and on Tab', async ({ page }) => {
     await gotoStory(page, STORY('disabled-trigger'));
     const [plain, withReason] = [
-      page.getByRole('button', { name: 'Disattivo', exact: true }),
-      page.getByRole('button', { name: 'Disattivo con motivo' }),
+      page.getByRole('button', { name: 'Disabled', exact: true }),
+      page.getByRole('button', { name: 'Disabled with reason' }),
     ];
     await plain.hover({ force: true });
     await page.waitForTimeout(300);
     await expect(tooltips(page)).toHaveCount(0);
 
     await withReason.hover({ force: true });
-    await expect(tooltips(page)).toHaveText('Manca il permesso di modifica');
+    await expect(tooltips(page)).toHaveText('Missing edit permission');
     await page.mouse.move(700, 700, { steps: 8 });
     await expect(tooltips(page)).toHaveCount(0);
 
@@ -302,12 +302,12 @@ test.describe('disabled trigger and empty content', () => {
       await page.keyboard.press('Tab');
     }
     await expect(span).toBeFocused();
-    await expect(tooltips(page)).toHaveText('Manca il permesso di modifica');
+    await expect(tooltips(page)).toHaveText('Missing edit permission');
   });
 
   test('empty content: no tooltip, no aria-describedby, not even on keyboard focus', async ({ page }) => {
     await gotoStory(page, STORY('empty-content'));
-    const trigger = page.getByRole('button', { name: 'Senza testo' });
+    const trigger = page.getByRole('button', { name: 'No text' });
     await trigger.hover();
     await page.keyboard.press('Tab');
     await page.waitForTimeout(300);
@@ -324,7 +324,7 @@ test.describe('viewport edges and wrapping', () => {
     test(`trigger flush with the right edge (${viewport.width}px): the tooltip stays inside the window`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await gotoStory(page, STORY('viewport-edge'));
-      await page.getByRole('button', { name: 'Bordo' }).hover();
+      await page.getByRole('button', { name: 'Edge' }).hover();
       const tooltip = tooltips(page);
       await expect(tooltip).toBeVisible();
       await expect.poll(async () => {
@@ -336,7 +336,7 @@ test.describe('viewport edges and wrapping', () => {
 
   test('long text wraps inside a real maximum width (20rem)', async ({ page }) => {
     await gotoStory(page, STORY('long-text'));
-    await page.getByRole('button', { name: 'Dettaglio' }).hover();
+    await page.getByRole('button', { name: 'Detail' }).hover();
     const tooltip = tooltips(page);
     await expect(tooltip).toBeVisible();
     const box = (await tooltip.boundingBox())!;
@@ -349,7 +349,7 @@ test.describe('viewport edges and wrapping', () => {
 
   test('a trigger in an overflow:hidden container and in a Sheet: the tooltip is not clipped and is on top', async ({ page }) => {
     await gotoStory(page, STORY('clipped-and-in-sheet'));
-    await page.getByRole('button', { name: 'Nel contenitore' }).hover();
+    await page.getByRole('button', { name: 'In the container' }).hover();
     const clipped = tooltips(page);
     await expect(clipped).toBeVisible();
     const box = (await clipped.boundingBox())!;
@@ -363,10 +363,10 @@ test.describe('viewport edges and wrapping', () => {
     await page.mouse.move(700, 700, { steps: 8 });
     await expect(tooltips(page)).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Apri sheet' }).click();
-    await page.getByRole('dialog').getByRole('button', { name: 'Nello sheet' }).hover();
+    await page.getByRole('button', { name: 'Open sheet' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'In the sheet' }).hover();
     const inSheet = tooltips(page);
-    await expect(inSheet).toHaveText('Sopra lo sheet');
+    await expect(inSheet).toHaveText('Above the sheet');
     expect(await inSheet.evaluate((el) => {
       const r = el.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
@@ -379,7 +379,7 @@ test.describe('page scroll', () => {
   test('scrolling the page with the tooltip open closes it (declared behaviour)', async ({ page }) => {
     await gotoStory(page, STORY('playground'), 'delayDuration:0');
     await page.evaluate(() => (document.body.style.minHeight = '3000px'));
-    await page.getByRole('button', { name: 'Elimina riga' }).hover();
+    await page.getByRole('button', { name: 'Delete row' }).hover();
     await expect(tooltips(page)).toBeVisible();
     await page.evaluate(() => window.scrollTo(0, 200));
     await expect(tooltips(page)).toHaveCount(0);
@@ -389,7 +389,7 @@ test.describe('page scroll', () => {
 test.describe('unmount', () => {
   test('a trigger removed while the tooltip is open leaves no orphan in the DOM', async ({ page }) => {
     await gotoStory(page, STORY('playground'), 'delayDuration:0');
-    await page.getByRole('button', { name: 'Elimina riga' }).hover();
+    await page.getByRole('button', { name: 'Delete row' }).hover();
     await expect(tooltips(page)).toBeVisible();
     // Storybook re-renders on args change: switching to another story unmounts the tree.
     await page.evaluate(() => {
@@ -397,7 +397,7 @@ test.describe('unmount', () => {
         .__STORYBOOK_ADDONS_CHANNEL__;
       channel.emit('setCurrentStory', { storyId: 'overlays-tooltip--empty-content', viewMode: 'story' });
     });
-    await expect(page.getByRole('button', { name: 'Senza testo' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'No text' })).toBeVisible();
     await expect(tooltips(page)).toHaveCount(0);
     expect(await page.locator('[data-radix-popper-content-wrapper]').count()).toBe(0);
   });
@@ -410,7 +410,7 @@ test.describe('no leak', () => {
       if (m.type() === 'error' || m.type() === 'warning') logged.push(m.text());
     });
     await gotoStory(page, STORY('playground'), 'delayDuration:0;side:bottom;align:start');
-    const trigger = page.getByRole('button', { name: 'Elimina riga' });
+    const trigger = page.getByRole('button', { name: 'Delete row' });
     await trigger.hover();
     const tooltip = tooltips(page);
     await expect(tooltip).toBeVisible();
@@ -428,7 +428,7 @@ test.describe('no leak', () => {
 test.describe('touch @touch', () => {
   test('a tap runs the button action and leaves no tooltip open', async ({ page }) => {
     await gotoStory(page, STORY('click-action'));
-    const trigger = page.getByRole('button', { name: 'Conta' });
+    const trigger = page.getByRole('button', { name: 'Count' });
     await trigger.tap();
     await expect(page.getByTestId('count')).toHaveText('1');
     await page.waitForTimeout(SETTLE);

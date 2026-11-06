@@ -30,8 +30,8 @@ test.describe('select gate QA (round 2)', () => {
   test('mouse click: exactly one onValueChange', async ({ page }) => {
     await open(page);
     await combobox(page).click();
-    await page.getByRole('option', { name: 'Francia' }).click();
-    await expect(combobox(page)).toHaveText('Francia');
+    await page.getByRole('option', { name: 'France' }).click();
+    await expect(combobox(page)).toHaveText('France');
     await page.waitForTimeout(300);
     expect(await actions(page)).toHaveLength(1);
   });
@@ -42,10 +42,10 @@ test.describe('select gate QA (round 2)', () => {
     await page.mouse.move(t!.x + 10, t!.y + t!.height / 2);
     await page.mouse.down();
     await expect(listbox(page)).toBeVisible();
-    const o = (await page.getByRole('option', { name: 'Spagna' }).boundingBox())!;
+    const o = (await page.getByRole('option', { name: 'Spain' }).boundingBox())!;
     await page.mouse.move(o.x + 20, o.y + o.height / 2, { steps: 8 });
     await page.mouse.up();
-    await expect(combobox(page)).toHaveText('Spagna');
+    await expect(combobox(page)).toHaveText('Spain');
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual(['["es"]']);
   });
@@ -53,12 +53,12 @@ test.describe('select gate QA (round 2)', () => {
   test('slow click: >100ms (and 700ms) between pointerdown and pointerup on an option', async ({ page }) => {
     await open(page);
     await combobox(page).click();
-    const o = (await page.getByRole('option', { name: 'Portogallo' }).boundingBox())!;
+    const o = (await page.getByRole('option', { name: 'Portugal' }).boundingBox())!;
     await page.mouse.move(o.x + 20, o.y + o.height / 2, { steps: 4 });
     await page.mouse.down();
     await page.waitForTimeout(700);
     await page.mouse.up();
-    await expect(combobox(page)).toHaveText('Portogallo');
+    await expect(combobox(page)).toHaveText('Portugal');
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual(['["pt"]']);
   });
@@ -69,17 +69,17 @@ test.describe('select gate QA (round 2)', () => {
     await page.keyboard.press('ArrowDown');
     await expect(listbox(page)).toBeVisible();
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Francia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(combobox(page)).toHaveText('Francia');
+    await expect(combobox(page)).toHaveText('France');
     await expect(combobox(page)).toBeFocused();
     await page.keyboard.press('Space');
     await expect(listbox(page)).toBeVisible();
-    await expect(page.getByRole('option', { name: 'Francia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('option', { name: 'Spagna' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Spain' })).toBeFocused();
     await page.keyboard.press('Space');
-    await expect(combobox(page)).toHaveText('Spagna');
+    await expect(combobox(page)).toHaveText('Spain');
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual(['["fr"]', '["es"]']);
   });
@@ -88,10 +88,10 @@ test.describe('select gate QA (round 2)', () => {
     await open(page);
     await combobox(page).focus();
     await page.keyboard.press('f');
-    await expect(combobox(page)).toHaveText('Francia');
+    await expect(combobox(page)).toHaveText('France');
     await page.waitForTimeout(1200);
     await page.keyboard.press('s');
-    await expect(combobox(page)).toHaveText('Spagna');
+    await expect(combobox(page)).toHaveText('Spain');
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual(['["fr"]', '["es"]']);
   });
@@ -100,9 +100,9 @@ test.describe('select gate QA (round 2)', () => {
     await open(page);
     await combobox(page).click();
     await page.keyboard.press('p');
-    await expect(page.getByRole('option', { name: 'Portogallo' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Portugal' })).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(combobox(page)).toHaveText('Portogallo');
+    await expect(combobox(page)).toHaveText('Portugal');
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual(['["pt"]']);
   });
@@ -112,9 +112,9 @@ test.describe('select gate QA (round 2)', () => {
     await combobox(page).focus();
     await page.keyboard.press('g');
     await page.waitForTimeout(300);
-    await expect(combobox(page)).not.toHaveText('Germania');
+    await expect(combobox(page)).not.toHaveText('Germany');
     await combobox(page).click();
-    await page.getByRole('option', { name: 'Germania' }).click({ force: true });
+    await page.getByRole('option', { name: 'Germany' }).click({ force: true });
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual([]);
   });
@@ -135,13 +135,13 @@ test.describe('select gate QA (round 2)', () => {
   test('touch: slow tap on an option @touch', async ({ page }) => {
     await open(page);
     await combobox(page).tap();
-    const o = (await page.getByRole('option', { name: 'Spagna' }).boundingBox())!;
+    const o = (await page.getByRole('option', { name: 'Spain' }).boundingBox())!;
     const cdp = await page.context().newCDPSession(page);
     const pt = { x: o.x + 20, y: o.y + o.height / 2, id: 1 };
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt] });
     await page.waitForTimeout(600);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await expect(combobox(page)).toHaveText('Spagna');
+    await expect(combobox(page)).toHaveText('Spain');
     await page.waitForTimeout(300);
     expect(await actions(page)).toEqual(['["es"]']);
   });
@@ -159,7 +159,7 @@ test.describe('select blocked QA (round 2)', () => {
     await page.mouse.down();
     await page.mouse.up();
     await expect(listbox(page)).toHaveCount(0);
-    await expect(t).toHaveText('Italia');
+    await expect(t).toHaveText('Italy');
     // ctrl shortcuts: not prevented
     const prevented = await t.evaluate((el) => {
       const res: Record<string, boolean> = {};

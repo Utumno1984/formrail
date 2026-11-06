@@ -14,8 +14,8 @@ async function slowDown(page: Page, ms = SLOW): Promise<void> {
   await page.addStyleTag({ content: `:root { --motion-rop-overlay-duration: ${ms}ms; }` });
 }
 
-const dialogOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Modifica fornitore' });
-const sheetOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Dettaglio fornitore' });
+const dialogOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Edit supplier' });
+const sheetOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Supplier detail' });
 
 /** Names of the CSS animations currently attached to elements of the document. */
 const runningAnimations = (page: Page): Promise<string[]> =>
@@ -37,7 +37,7 @@ test.describe('with motion allowed', () => {
   test('Dialog: opening runs the backdrop fade and the panel animation, which end on the resting state', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('playground'));
     await slowDown(page);
-    await page.getByRole('button', { name: 'Apri' }).click();
+    await page.getByRole('button', { name: 'Open' }).click();
     const dialog = dialogOf(page);
     await expect(dialog).toHaveAttribute('data-state', 'open');
     expect(await runningAnimations(page)).toEqual(expect.arrayContaining(['rop-modal-in', 'rop-overlay-in']));
@@ -60,7 +60,7 @@ test.describe('with motion allowed', () => {
   test('Sheet: slides in from its edge and ends flush with it', async ({ page }) => {
     await expectPlayToPass(page, SHEET('playground'));
     await slowDown(page);
-    await page.getByRole('button', { name: 'Apri' }).click();
+    await page.getByRole('button', { name: 'Open' }).click();
     const sheet = sheetOf(page);
     expect(await runningAnimations(page)).toEqual(expect.arrayContaining(['rop-modal-in']));
     const vw = await page.evaluate(() => window.innerWidth);
@@ -76,7 +76,7 @@ test.describe('with motion allowed', () => {
     // The story is mounted open: close it (waiting for its exit), then re-open to watch the entry.
     await page.keyboard.press('Escape');
     await expect(sheetOf(page)).toHaveCount(0);
-    await page.getByRole('button', { name: 'Apri' }).click();
+    await page.getByRole('button', { name: 'Open' }).click();
     expect(await sheetOf(page).evaluate((el) => el.getBoundingClientRect().left)).toBeLessThan(0);
     await expect.poll(() => runningAnimations(page), { timeout: 5000 }).toEqual([]);
     expect(await sheetOf(page).evaluate((el) => el.getBoundingClientRect().left)).toBe(0);
@@ -85,7 +85,7 @@ test.describe('with motion allowed', () => {
   test('closing: the panel stays mounted for its exit, then unmounts and the wrapper leaves no overlay behind', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('playground'));
     await slowDown(page);
-    const opener = page.getByRole('button', { name: 'Apri' });
+    const opener = page.getByRole('button', { name: 'Open' });
     await opener.click();
     await expect.poll(() => runningAnimations(page), { timeout: 5000 }).toEqual([]);
     await page.keyboard.press('Escape');
@@ -102,9 +102,9 @@ test.describe('with motion allowed', () => {
   });
 
   for (const [label, story, opener, panel] of [
-    ['Dialog', DIALOG('playground'), 'Apri', dialogOf],
-    ['Sheet', SHEET('playground'), 'Apri', sheetOf],
-    ['Dialog opened from external state', DIALOG('external-state'), 'Apri da stato', dialogOf],
+    ['Dialog', DIALOG('playground'), 'Open', dialogOf],
+    ['Sheet', SHEET('playground'), 'Open', sheetOf],
+    ['Dialog opened from external state', DIALOG('external-state'), 'Open from state', dialogOf],
   ] as const) {
     test(`${label}: the focus returns to the opener only AFTER the exit animation, not in the middle of it`, async ({ page }) => {
       await expectPlayToPass(page, story);
@@ -149,7 +149,7 @@ test.describe('with motion allowed', () => {
   test('the Tab trap holds while open and is released at once when closing (no stale trap during the exit)', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('playground'));
     await slowDown(page);
-    await page.getByRole('button', { name: 'Apri' }).click();
+    await page.getByRole('button', { name: 'Open' }).click();
     await expect.poll(() => runningAnimations(page), { timeout: 5000 }).toEqual([]);
     const dialog = dialogOf(page);
     for (let i = 0; i < 8; i += 1) {
@@ -164,7 +164,7 @@ test.describe('with motion allowed', () => {
   test('reopening during the exit: the dialog is open again, trapped, and the ORIGINAL opener still gets the focus at the end', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('playground'));
     await slowDown(page);
-    const opener = page.getByRole('button', { name: 'Apri' });
+    const opener = page.getByRole('button', { name: 'Open' });
     await opener.click();
     await expect.poll(() => runningAnimations(page), { timeout: 5000 }).toEqual([]);
     await page.keyboard.press('Escape');
@@ -187,7 +187,7 @@ test.describe('with motion allowed', () => {
   test('closing and reopening several times in a row never loses the opener or leaves a wrapper behind', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('playground'));
     await slowDown(page, 300);
-    const opener = page.getByRole('button', { name: 'Apri' });
+    const opener = page.getByRole('button', { name: 'Open' });
     for (let i = 0; i < 4; i += 1) {
       await opener.click();
       await expect(dialogOf(page)).toHaveAttribute('data-state', 'open');
@@ -201,11 +201,11 @@ test.describe('with motion allowed', () => {
   test('nested dialogs: the inner one animates out while the outer one stays open and trapped; the focus goes back inside the outer one afterwards', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('nested'));
     await slowDown(page, 500);
-    // After the play function the first dialog is open (its opener is the page's "Apri" button).
-    const first = page.getByRole('dialog', { name: 'Primo dialog' });
-    const second = page.getByRole('dialog', { name: 'Secondo dialog' });
+    // After the play function the first dialog is open (its opener is the page's "Open" button).
+    const first = page.getByRole('dialog', { name: 'First dialog' });
+    const second = page.getByRole('dialog', { name: 'Second dialog' });
     await expect(first).toBeVisible();
-    const inner = page.getByRole('button', { name: 'Apri il secondo' });
+    const inner = page.getByRole('button', { name: 'Open the second' });
     await inner.click();
     await expect(second).toHaveAttribute('data-state', 'open');
     await expect.poll(() => runningAnimations(page), { timeout: 5000 }).toEqual([]);
@@ -220,7 +220,7 @@ test.describe('with motion allowed', () => {
     // The outer dialog is still modal and closable.
     await page.keyboard.press('Escape');
     await expect(first).toHaveCount(0, { timeout: 5000 });
-    await expect(page.locator('button').filter({ hasText: /^Apri$/ })).toBeFocused();
+    await expect(page.locator('button').filter({ hasText: /^Open$/ })).toBeFocused();
   });
 
   test('unmounted while open (no exit possible): nothing is left behind and nothing throws', async ({ page }) => {
@@ -240,7 +240,7 @@ test.describe('with motion allowed', () => {
 
   test('the durations and the easing come from the tokens', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('playground'));
-    await page.getByRole('button', { name: 'Apri' }).click();
+    await page.getByRole('button', { name: 'Open' }).click();
     const style = await dialogOf(page).evaluate((el) => {
       const s = getComputedStyle(el);
       const root = getComputedStyle(document.documentElement);
@@ -263,7 +263,7 @@ test.describe('with motion allowed', () => {
     // leave the open panel in a frame of the entry nor break the exit.
     await expectPlayToPass(page, DIALOG('playground'));
     await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
-    const opener = page.getByRole('button', { name: 'Apri' });
+    const opener = page.getByRole('button', { name: 'Open' });
     await opener.click();
     const dialog = dialogOf(page);
     await expect(dialog).toBeVisible();
@@ -282,8 +282,8 @@ test.describe('prefers-reduced-motion: reduce', () => {
   });
 
   for (const [label, story, opener, panel] of [
-    ['Dialog', DIALOG('playground'), 'Apri', dialogOf],
-    ['Sheet', SHEET('playground'), 'Apri', sheetOf],
+    ['Dialog', DIALOG('playground'), 'Open', dialogOf],
+    ['Sheet', SHEET('playground'), 'Open', sheetOf],
   ] as const) {
     test(`${label}: no animation at all, opening and closing are instant, the focus returns at once`, async ({ page }) => {
       await expectPlayToPass(page, story);
@@ -305,19 +305,19 @@ test.describe('prefers-reduced-motion: reduce', () => {
 
   test('nested dialogs and immediate reopening behave as before', async ({ page }) => {
     await expectPlayToPass(page, DIALOG('nested'));
-    const second = page.getByRole('dialog', { name: 'Secondo dialog' });
-    await page.getByRole('button', { name: 'Apri il secondo' }).click();
+    const second = page.getByRole('dialog', { name: 'Second dialog' });
+    await page.getByRole('button', { name: 'Open the second' }).click();
     await expect(second).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(second).toHaveCount(0, { timeout: 1000 });
-    await expect(page.getByRole('button', { name: 'Apri il secondo' })).toBeFocused({ timeout: 1000 });
+    await expect(page.getByRole('button', { name: 'Open the second' })).toBeFocused({ timeout: 1000 });
     await page.keyboard.press('Escape');
-    const opener = page.locator('button').filter({ hasText: /^Apri$/ });
+    const opener = page.locator('button').filter({ hasText: /^Open$/ });
     await expect(opener).toBeFocused({ timeout: 1000 });
     await opener.click();
     await page.keyboard.press('Escape');
     await opener.click();
-    await expect(page.getByRole('dialog', { name: 'Primo dialog' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'First dialog' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(opener).toBeFocused({ timeout: 1000 });
   });

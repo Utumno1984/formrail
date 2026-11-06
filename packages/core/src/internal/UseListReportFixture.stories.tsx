@@ -17,24 +17,24 @@ const INVOICES: Invoice[] = [
   { id: 'i1', customer: 'Rossi', amount: 10, date: new Date('2025-03-10') },
   { id: 'i2', customer: 'bianchi', amount: 2, date: new Date('2025-01-05') },
   { id: 'i3', customer: 'Verdi', amount: null, date: new Date('2025-07-21') },
-  { id: 'i4', customer: 'Città', amount: 100, date: null },
+  { id: 'i4', customer: 'Café', amount: 100, date: null },
   { id: 'i5', customer: 'Rossi', amount: 2, date: new Date('2024-11-30') },
   { id: 'i6', customer: null, amount: 33, date: new Date('2025-05-02') },
-  { id: 'i7', customer: 'Citta', amount: 10, date: new Date('2025-02-14') },
+  { id: 'i7', customer: 'Cafe', amount: 10, date: new Date('2025-02-14') },
   { id: 'i8', customer: 'Neri', amount: 1, date: new Date('2025-09-09') },
 ];
 
 const COLUMNS: ListReportColumn<Invoice>[] = [
-  { id: 'id', header: 'N.' },
-  { id: 'customer', header: 'Cliente', accessor: (r) => r.customer },
-  { id: 'amount', header: 'Importo', accessor: (r) => r.amount },
-  { id: 'date', header: 'Data', accessor: (r) => r.date, firstSortDirection: 'desc' },
+  { id: 'id', header: 'No.' },
+  { id: 'customer', header: 'Customer', accessor: (r) => r.customer },
+  { id: 'amount', header: 'Amount', accessor: (r) => r.amount },
+  { id: 'date', header: 'Date', accessor: (r) => r.date, firstSortDirection: 'desc' },
 ];
 
 const FILTERS: ListReportFilter<Invoice>[] = [
-  { id: 'all', label: 'Tutte' },
-  { id: 'open', label: 'Da approvare', predicate: (r) => r.amount !== null && r.amount >= 10 },
-  { id: 'dated', label: 'Con data', predicate: (r) => r.date !== null },
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'To approve', predicate: (r) => r.amount !== null && r.amount >= 10 },
+  { id: 'dated', label: 'With date', predicate: (r) => r.date !== null },
 ];
 
 const fmt = (row: Invoice, id: string): string => {
@@ -78,7 +78,7 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
     <div style={{ fontFamily: 'sans-serif', display: 'grid', gap: 8, justifyItems: 'start' }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <input
-          aria-label="Cerca"
+          aria-label="Search"
           value={report.searchDraft}
           onChange={(e) => report.setSearchDraft(e.target.value)}
         />
@@ -91,11 +91,11 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
           </button>
         ))}
         <button type="button" onClick={report.clearFilters}>
-          Azzera
+          Reset
         </button>
         {controlled && (
           <button type="button" onClick={() => setQuery('bianchi')}>
-            Imposta ricerca: bianchi
+            Set search: bianchi
           </button>
         )}
       </div>
@@ -128,7 +128,7 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
       </table>
       {controlled && (
         <button type="button" onClick={() => setSort({ columnId: 'customer', direction: 'asc' })}>
-          Ordina per Cliente
+          Sort by Customer
         </button>
       )}
       <p data-testid="sort-state" style={{ margin: 0 }}>

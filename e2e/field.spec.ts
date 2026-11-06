@@ -47,11 +47,11 @@ test.describe('Forms/Field', () => {
 
   test('required keeps the accessible name; forced and locked announce the reason', async ({ page }) => {
     await gotoStory(page, OVERVIEW);
-    await expect(page.getByRole('textbox', { name: 'Obbligatorio', exact: true })).toHaveAttribute('aria-required', 'true');
-    const forced = page.getByRole('textbox', { name: 'Forzato', exact: true });
-    await expect(forced).toHaveAccessibleDescription('Imposto dal listino.');
+    await expect(page.getByRole('textbox', { name: 'Required', exact: true })).toHaveAttribute('aria-required', 'true');
+    const forced = page.getByRole('textbox', { name: 'Forced', exact: true });
+    await expect(forced).toHaveAccessibleDescription('Set by the price list.');
     await expect(forced).toHaveAttribute('aria-readonly', 'true');
-    await expect(page.getByRole('textbox', { name: 'Disabilitato' })).toBeDisabled();
+    await expect(page.getByRole('textbox', { name: 'Disabled' })).toBeDisabled();
   });
 
   test('the story play functions pass', async ({ page }) => {
@@ -72,13 +72,13 @@ test.describe('Forms/Field', () => {
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Control+A');
     await page.keyboard.press('Delete');
-    await expect(input).toHaveValue('Listino A');
+    await expect(input).toHaveValue('Price list A');
     expect(await inputEvents(page)).toBe(0);
   });
 
   test('forced type=number: arrows and the mouse wheel do not change the value', async ({ page }) => {
     await gotoStory(page, 'forms-field--forced-number');
-    const input = page.getByRole('spinbutton', { name: 'Quantità' });
+    const input = page.getByRole('spinbutton', { name: 'Quantity' });
     await input.focus();
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('ArrowDown');
@@ -89,8 +89,8 @@ test.describe('Forms/Field', () => {
 
   test('render-prop locked control: click, Space and Enter do not switch it', async ({ page }) => {
     await gotoStory(page, 'forms-field--render-prop-locked');
-    const toggle = page.getByRole('switch', { name: 'Attivo' });
-    await expect(toggle).toHaveAccessibleDescription("Gestito dall'amministratore");
+    const toggle = page.getByRole('switch', { name: 'Active' });
+    await expect(toggle).toHaveAccessibleDescription('Managed by the administrator');
     await toggle.click();
     await toggle.focus();
     await page.keyboard.press('Space');
@@ -112,7 +112,7 @@ test.describe('Forms/Field', () => {
     await gotoStory(page, 'forms-field--external-value');
     const input = page.getByRole('textbox', { name: 'Ragione sociale' });
     await countInputEvents(page);
-    await page.getByRole('button', { name: 'Carica dati' }).click();
+    await page.getByRole('button', { name: 'Load data' }).click();
     await expect(input).toHaveValue('Acme S.p.A.');
     expect(await inputEvents(page)).toBe(0);
     await input.focus();
@@ -226,7 +226,7 @@ for (const [name, viewport] of [
 
     test('the focused input is not left under the virtual keyboard, and the inset is released on blur', async ({ page }) => {
       await gotoStory(page, 'forms-field--keyboard-safe');
-      const input = page.getByRole('textbox', { name: 'Indirizzo di fatturazione' });
+      const input = page.getByRole('textbox', { name: 'Billing address' });
       // Bring the field to the very bottom edge of the screen: visible now, covered by the keyboard later.
       await input.evaluate((el) => el.scrollIntoView({ block: 'end' }));
       const keyboard = Math.round(viewport.height * 0.45);
@@ -247,7 +247,7 @@ for (const [name, viewport] of [
 
     test('a field already above the keyboard is not scrolled', async ({ page }) => {
       await gotoStory(page, 'forms-field--keyboard-safe');
-      const input = page.getByRole('textbox', { name: 'Indirizzo di fatturazione' });
+      const input = page.getByRole('textbox', { name: 'Billing address' });
       await page.getByTestId('kb-field').evaluate((el) => el.scrollIntoView({ block: 'start' }));
       expect(await input.evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThan(250);
       const before = await page.evaluate(() => window.scrollY);

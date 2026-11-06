@@ -52,9 +52,9 @@ type Story = StoryObj<DemoArgs>;
 function Page({ children }: { children?: ReactNode }) {
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
-      <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Fornitori</h1>
+      <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Suppliers</h1>
       <p style={{ margin: '0 0 16px', maxWidth: 480 }}>
-        La pagina sotto lo sheet: mentre è aperto non è raggiungibile da tastiera né dagli screen reader.
+        The page under the sheet: while it is open it cannot be reached by keyboard or by screen readers.
       </p>
       {children}
     </main>
@@ -63,8 +63,8 @@ function Page({ children }: { children?: ReactNode }) {
 
 const LONG = Array.from({ length: 30 }, (_, i) => (
   <p key={i} style={{ margin: '0 0 12px' }}>
-    Riga {i + 1}: condizioni di fornitura, termini di pagamento e note interne che occupano abbastanza spazio da
-    far scorrere il corpo dello sheet mentre intestazione e piè di pagina restano visibili.
+    Row {i + 1}: supply conditions, payment terms and internal notes that take up enough space to
+    make the sheet body scroll while the header and footer stay visible.
   </p>
 ));
 
@@ -78,18 +78,18 @@ function Panel({
     <SheetContent side={side} size={size} dismissible={dismissible}>
       <SheetHeader>
         <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
-          <SheetTitle>Dettaglio fornitore</SheetTitle>
-          <SheetDescription>Consulta e modifica i dati anagrafici.</SheetDescription>
+          <SheetTitle>Supplier detail</SheetTitle>
+          <SheetDescription>View and edit the supplier details.</SheetDescription>
         </div>
         <SheetClose />
       </SheetHeader>
-      <SheetBody>{children ?? <p style={{ margin: 0 }}>Contenuto dello sheet, {side}, size {size}.</p>}</SheetBody>
+      <SheetBody>{children ?? <p style={{ margin: 0 }}>Sheet content, {side}, size {size}.</p>}</SheetBody>
       <SheetFooter>
         <SheetClose asChild>
-          <Button variant="ghost">Annulla</Button>
+          <Button variant="ghost">Cancel</Button>
         </SheetClose>
         <SheetClose asChild>
-          <Button variant="primary">Salva</Button>
+          <Button variant="primary">Save</Button>
         </SheetClose>
       </SheetFooter>
     </SheetContent>
@@ -106,17 +106,17 @@ export const Playground: Story = {
     <Page>
       <Sheet onOpenChange={onOpenChange}>
         <SheetTrigger asChild>
-          <Button variant="primary">Apri</Button>
+          <Button variant="primary">Open</Button>
         </SheetTrigger>
         <Panel side={side} size={size} dismissible={dismissible} />
       </Sheet>
     </Page>
   ),
   play: async ({ args, canvasElement }) => {
-    const trigger = within(canvasElement).getByRole('button', { name: 'Apri' });
+    const trigger = within(canvasElement).getByRole('button', { name: 'Open' });
     await userEvent.click(trigger);
     const body = within(document.body);
-    const sheet = await body.findByRole('dialog', { name: 'Dettaglio fornitore' });
+    const sheet = await body.findByRole('dialog', { name: 'Supplier detail' });
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(true);
     await settleMotion(); // measure the final state, not a frame of the slide-in
@@ -148,7 +148,7 @@ const renderOpen: Story['render'] = ({ side, size, dismissible, onOpenChange }) 
   <Page>
     <Sheet defaultOpen onOpenChange={onOpenChange}>
       <SheetTrigger asChild>
-        <Button variant="primary">Apri</Button>
+        <Button variant="primary">Open</Button>
       </SheetTrigger>
       <Panel side={side} size={size} dismissible={dismissible} />
     </Sheet>
@@ -156,7 +156,7 @@ const renderOpen: Story['render'] = ({ side, size, dismissible, onOpenChange }) 
 );
 
 const playOpen: Story['play'] = async ({ args }) => {
-  const sheet = await within(document.body).findByRole('dialog', { name: 'Dettaglio fornitore' });
+  const sheet = await within(document.body).findByRole('dialog', { name: 'Supplier detail' });
   await settleMotion();
   const box = sheet.getBoundingClientRect();
   await expect(box.width).toBeLessThanOrEqual(window.innerWidth);
@@ -192,8 +192,8 @@ export const LongContent: Story = {
     await expect(scroller).not.toBeNull();
     await expect(scroller!.scrollHeight).toBeGreaterThan(scroller!.clientHeight);
     scroller!.scrollTop = scroller!.scrollHeight;
-    await expect(within(sheet).getByRole('button', { name: 'Salva' })).toBeVisible();
-    await expect(within(sheet).getByRole('heading', { name: 'Dettaglio fornitore' })).toBeVisible();
+    await expect(within(sheet).getByRole('button', { name: 'Save' })).toBeVisible();
+    await expect(within(sheet).getByRole('heading', { name: 'Supplier detail' })).toBeVisible();
   },
 };
 
@@ -215,7 +215,7 @@ export const ExternalState: Story = {
       return (
         <Page>
           <Button variant="primary" onClick={() => setOpen(true)}>
-            Apri da stato
+            Open from state
           </Button>
           <Sheet
             open={open}
@@ -232,12 +232,12 @@ export const ExternalState: Story = {
     return <Host />;
   },
   play: async ({ args, canvasElement }) => {
-    const opener = within(canvasElement).getByRole('button', { name: 'Apri da stato' });
+    const opener = within(canvasElement).getByRole('button', { name: 'Open from state' });
     await userEvent.click(opener);
     const body = within(document.body);
-    const sheet = await body.findByRole('dialog', { name: 'Dettaglio fornitore' });
+    const sheet = await body.findByRole('dialog', { name: 'Supplier detail' });
     await expect(sheet).toHaveAttribute('aria-modal', 'true');
-    await expect(body.queryByRole('button', { name: 'Apri da stato' })).toBeNull();
+    await expect(body.queryByRole('button', { name: 'Open from state' })).toBeNull();
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(false);
@@ -251,7 +251,7 @@ export const NotDismissible: Story = {
   render: renderOpen,
   play: async ({ args }) => {
     const body = within(document.body);
-    await body.findByRole('dialog', { name: 'Dettaglio fornitore' });
+    await body.findByRole('dialog', { name: 'Supplier detail' });
     await userEvent.keyboard('{Escape}');
     await userEvent.click(document.body.querySelector('.z-rop-overlay') as HTMLElement);
     await expect(body.getByRole('dialog')).toBeInTheDocument();
@@ -265,12 +265,12 @@ function overADialog(sheetOpen: boolean): Story['render'] {
       <Dialog defaultOpen>
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>Fornitore</DialogTitle>
+            <DialogTitle>Supplier</DialogTitle>
           </DialogHeader>
           <DialogBody>
             <Sheet defaultOpen={sheetOpen}>
               <SheetTrigger asChild>
-                <Button>Apri il dettaglio</Button>
+                <Button>Open the detail</Button>
               </SheetTrigger>
               <Panel side={side} size={size} dismissible={dismissible} />
             </Sheet>
@@ -289,7 +289,7 @@ export const OverADialog: Story = {
   tags: ['visual'],
   render: overADialog(true),
   play: async () => {
-    const sheet = await within(document.body).findByRole('dialog', { name: 'Dettaglio fornitore' });
+    const sheet = await within(document.body).findByRole('dialog', { name: 'Supplier detail' });
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]');
     await expect(dialog).not.toBe(sheet);
     // Hit-testing waits for the second layer to settle (Radix sets `pointer-events` after the mount).
@@ -311,12 +311,12 @@ export const OverADialogFromButton: Story = {
   render: overADialog(false),
   play: async () => {
     const body = within(document.body);
-    await userEvent.click(await body.findByRole('button', { name: 'Apri il dettaglio' }));
-    await body.findByRole('dialog', { name: 'Dettaglio fornitore' });
+    await userEvent.click(await body.findByRole('button', { name: 'Open the detail' }));
+    await body.findByRole('dialog', { name: 'Supplier detail' });
     await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Dettaglio fornitore' })).toBeNull());
-    await expect(body.getByRole('dialog', { name: 'Fornitore' })).toBeInTheDocument();
-    await waitFor(() => expect(body.getByRole('button', { name: 'Apri il dettaglio' })).toHaveFocus());
+    await waitFor(() => expect(body.queryByRole('dialog', { name: 'Supplier detail' })).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'Supplier' })).toBeInTheDocument();
+    await waitFor(() => expect(body.getByRole('button', { name: 'Open the detail' })).toHaveFocus());
   },
 };
 
@@ -326,7 +326,7 @@ export const WithForm: Story = {
     <Page>
       <Sheet defaultOpen>
         <Panel side={side} size={size} dismissible={dismissible}>
-          <Field label="Ragione sociale">
+          <Field label="Company name">
             <Input />
           </Field>
         </Panel>
@@ -334,7 +334,7 @@ export const WithForm: Story = {
     </Page>
   ),
   play: async () => {
-    const field = await within(document.body).findByRole('textbox', { name: 'Ragione sociale' });
+    const field = await within(document.body).findByRole('textbox', { name: 'Company name' });
     await userEvent.type(field, 'Rossi S.r.l.');
     await expect(field).toHaveValue('Rossi S.r.l.');
   },

@@ -56,14 +56,14 @@ function Demo({ when, title, description, stay, leave, close, action }: DemoArgs
   const { guard, dialog } = useDirtyGuard({ when, labels: { title, description, stay, leave, close } });
   return (
     <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
-      <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Fornitore ACME</h1>
+      <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Supplier ACME</h1>
       <p style={{ margin: '0 0 16px', maxWidth: 480 }}>
         {when
-          ? 'Ci sono modifiche non salvate: ricaricare la pagina chiede conferma al browser.'
-          : 'Nessuna modifica: uscire è immediato e il browser non chiede conferma.'}
+          ? 'There are unsaved changes: reloading the page asks the browser for confirmation.'
+          : 'No changes: leaving is immediate and the browser does not ask for confirmation.'}
       </p>
       <Button variant="secondary" onClick={() => guard(action)}>
-        Torna alla lista
+        Back to list
       </Button>
       {dialog}
     </main>
@@ -80,7 +80,7 @@ export const Playground: Story = {
   render: (args) => <Demo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (!args.when) return;
-    const opener = within(canvasElement).getByRole('button', { name: 'Torna alla lista' });
+    const opener = within(canvasElement).getByRole('button', { name: 'Back to list' });
     const body = within(document.body);
     await userEvent.click(opener);
     const dialog = await body.findByRole('dialog', { name: args.title });
@@ -109,14 +109,14 @@ export const DialogOpen: Story = {
   tags: ['visual'],
   render: (args) => <Demo {...args} />,
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Torna alla lista' }));
+    await userEvent.click(within(canvasElement).getByRole('button', { name: 'Back to list' }));
     await within(document.body).findByRole('dialog', { name: 'Unsaved changes' });
   },
 };
 
 /**
- * The guarded action unmounts the whole page. To try it: click "Torna alla lista", then "Leave without
- * saving": the page is replaced by "Pagina chiusa" and nothing is left behind (scroll lock, `aria-hidden`,
+ * The guarded action unmounts the whole page. To try it: click "Back to list", then "Leave without
+ * saving": the page is replaced by "Page closed" and nothing is left behind (scroll lock, `aria-hidden`,
  * `inert`). The story records how many dialogs were in the DOM when the action ran (the confirmation
  * must already be closed); the e2e suite reads that number.
  */
@@ -124,7 +124,7 @@ export const UnmountsPage: Story = {
   render: (args) => {
     function Root() {
       const [mounted, setMounted] = useState(true);
-      if (!mounted) return <p>Pagina chiusa</p>;
+      if (!mounted) return <p>Page closed</p>;
       return (
         <Demo
           {...args}
@@ -141,7 +141,7 @@ export const UnmountsPage: Story = {
 };
 
 /**
- * `guard` called from inside another open Dialog. To try it: click "Apri la scheda", then "Chiudi scheda": the
+ * `guard` called from inside another open Dialog. To try it: click "Open the card", then "Close card": the
  * confirmation opens above the first dialog (and gets the focus), and "Keep editing" returns to it.
  */
 export const InsideDialog: Story = {
@@ -153,15 +153,15 @@ export const InsideDialog: Story = {
       const { guard, dialog } = useDirtyGuard({ when: true, labels: { title, description, stay, leave } });
       return (
         <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
-          <Button onClick={() => setOpen(true)}>Apri la scheda</Button>
+          <Button onClick={() => setOpen(true)}>Open the card</Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Scheda fornitore</DialogTitle>
-                <DialogDescription>Modifiche in corso.</DialogDescription>
+                <DialogTitle>Supplier card</DialogTitle>
+                <DialogDescription>Changes in progress.</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button onClick={() => guard(() => setOpen(false))}>Chiudi scheda</Button>
+                <Button onClick={() => guard(() => setOpen(false))}>Close card</Button>
               </DialogFooter>
               {dialog}
             </DialogContent>

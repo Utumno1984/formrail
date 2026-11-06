@@ -15,11 +15,11 @@ async function gotoStory(page: Page, id: string, args?: string): Promise<void> {
 
 /** The two ways of opening the same sheet, with the controls that open each. */
 const PATHS = [
-  { name: 'trigger', story: STORY('playground'), opener: 'Apri' },
-  { name: 'external state', story: STORY('external-state'), opener: 'Apri da stato' },
+  { name: 'trigger', story: STORY('playground'), opener: 'Open' },
+  { name: 'external state', story: STORY('external-state'), opener: 'Open from state' },
 ] as const;
 
-const sheetOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Dettaglio fornitore' });
+const sheetOf = (page: Page): Locator => page.getByRole('dialog', { name: 'Supplier detail' });
 
 test.describe('Overlays/Sheet: stories play', () => {
   for (const name of [
@@ -49,7 +49,7 @@ for (const path of PATHS) {
       const sheet = sheetOf(page);
       await expect(sheet).toBeVisible();
       await expect(sheet).toHaveAttribute('aria-modal', 'true');
-      await expect(sheet).toHaveAccessibleDescription('Consulta e modifica i dati anagrafici.');
+      await expect(sheet).toHaveAccessibleDescription('View and edit the supplier details.');
       expect(await sheet.evaluate((el) => el.contains(document.activeElement))).toBe(true);
 
       const inside = () => sheet.evaluate((el) => el.contains(document.activeElement));
@@ -90,7 +90,7 @@ for (const path of PATHS) {
     test('the close button is named after the title and closes', async ({ page }) => {
       await gotoStory(page, path.story);
       await page.getByRole('button', { name: path.opener }).click();
-      await page.getByRole('button', { name: 'Close: Dettaglio fornitore' }).click();
+      await page.getByRole('button', { name: 'Close: Supplier detail' }).click();
       await expect(sheetOf(page)).toHaveCount(0);
       await expect(page.getByRole('button', { name: path.opener })).toBeFocused();
     });
@@ -105,7 +105,7 @@ test.describe('browsers that do not focus a button on click', () => {
         if ((e.target as Element).closest('button')) e.preventDefault();
       }),
     );
-    const opener = page.locator('button').filter({ hasText: /^Apri$/ });
+    const opener = page.locator('button').filter({ hasText: /^Open$/ });
     await opener.click();
     await expect(sheetOf(page)).toBeVisible();
     await expect(opener).not.toBeFocused();
@@ -124,7 +124,7 @@ test.describe('dismissible={false}', () => {
     await page.mouse.click(4, 4);
     await expect(sheet).toBeVisible();
     await expectNoA11yViolations(page);
-    await page.getByRole('button', { name: 'Annulla' }).click();
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(sheet).toHaveCount(0);
   });
 });
@@ -174,8 +174,8 @@ test.describe('geometry', () => {
     const sheet = sheetOf(page);
     await expect(sheet).toBeVisible();
     await expectSingleScroller(sheet);
-    const title = sheet.getByRole('heading', { name: 'Dettaglio fornitore' });
-    const save = sheet.getByRole('button', { name: 'Salva' });
+    const title = sheet.getByRole('heading', { name: 'Supplier detail' });
+    const save = sheet.getByRole('button', { name: 'Save' });
     const before = [(await title.boundingBox())!.y, (await save.boundingBox())!.y];
     const body = sheet.locator('[tabindex="0"]');
     await body.evaluate((el) => (el.scrollTop = el.scrollHeight));
@@ -194,8 +194,8 @@ test.describe('geometry', () => {
     await page.setViewportSize({ width: 1280, height: 400 });
     await gotoStory(page, STORY('long-content'));
     const sheet = sheetOf(page);
-    await expect(sheet.getByRole('heading', { name: 'Dettaglio fornitore' })).toBeInViewport();
-    await expect(sheet.getByRole('button', { name: 'Salva' })).toBeInViewport();
+    await expect(sheet.getByRole('heading', { name: 'Supplier detail' })).toBeInViewport();
+    await expect(sheet.getByRole('button', { name: 'Save' })).toBeInViewport();
     const body = sheet.locator('[tabindex="0"]');
     expect((await body.boundingBox())!.height).toBeGreaterThan(40);
     expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
@@ -229,7 +229,7 @@ test.describe('side changed while open', () => {
   test('the panel moves to the other edge without closing or losing the focus', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, STORY('playground'), 'side:right');
-    await page.getByRole('button', { name: 'Apri' }).click();
+    await page.getByRole('button', { name: 'Open' }).click();
     const sheet = sheetOf(page);
     await expect(sheet).toBeVisible();
     await page.keyboard.press('Tab');
@@ -299,9 +299,9 @@ test.describe('no leak', () => {
 test.describe('edge cases', () => {
   test('over a dialog: the sheet covers it, Escape closes only the sheet, the second Escape the dialog', async ({ page }) => {
     await gotoStory(page, STORY('over-a-dialog-from-button'));
-    const dialog = page.getByRole('dialog', { name: 'Fornitore' });
+    const dialog = page.getByRole('dialog', { name: 'Supplier' });
     await expect(dialog).toBeVisible();
-    await dialog.getByRole('button', { name: 'Apri il dettaglio' }).click();
+    await dialog.getByRole('button', { name: 'Open the detail' }).click();
     const sheet = sheetOf(page);
     await expect(sheet).toBeVisible();
 
@@ -325,7 +325,7 @@ test.describe('edge cases', () => {
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Apri il dettaglio' })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Open the detail' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
   });
@@ -380,7 +380,7 @@ test.describe('virtual keyboard', () => {
     });
     await gotoStory(page, STORY('with-form'));
     const sheet = sheetOf(page);
-    const input = sheet.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = sheet.getByRole('textbox', { name: 'Company name' });
     await input.focus();
     const keyboard = 300;
     await page.evaluate((px) => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(px), keyboard);
@@ -388,8 +388,8 @@ test.describe('virtual keyboard', () => {
     await expect.poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height).toBeLessThanOrEqual(limit);
     expect((await sheet.boundingBox())!.y).toBeGreaterThanOrEqual(0);
     expect((await input.boundingBox())!.y + (await input.boundingBox())!.height).toBeLessThanOrEqual(limit);
-    await expect(sheet.getByRole('button', { name: 'Salva' })).toBeInViewport();
-    expect((await sheet.getByRole('button', { name: 'Salva' }).boundingBox())!.y).toBeLessThan(limit);
+    await expect(sheet.getByRole('button', { name: 'Save' })).toBeInViewport();
+    expect((await sheet.getByRole('button', { name: 'Save' }).boundingBox())!.y).toBeLessThan(limit);
 
     await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(0));
     await expect.poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height).toBeGreaterThan(limit);

@@ -22,7 +22,7 @@ const activeInFooter = (page: Page) => page.evaluate((sel) => !!document.activeE
 test.describe('Floorplans/Object Page/Footer', () => {
   test.use({ viewport: { width: 1024, height: 700 } });
 
-  test('the play function passes (reserved space, Salva, focus on the header title)', async ({ page }) => {
+  test('the play function passes (reserved space, Save, focus on the header title)', async ({ page }) => {
     await expectPlayToPass(page, STORY('playground'));
   });
 
@@ -54,7 +54,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
   test('showing and hiding it (also in quick succession) moves nothing: scroller height, scrollTop, focused field', async ({ page }) => {
     await gotoStory(page, STORY('manual'));
     const scroller = page.locator(SCROLLER);
-    const field = page.getByRole('textbox', { name: 'Note interne' });
+    const field = page.getByRole('textbox', { name: 'Internal notes' });
     await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight));
     await field.focus();
     const measure = async () => ({
@@ -68,7 +68,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
     // there from the first render although hidden.
     expect(hidden.footerHeight).toBe(57);
 
-    await jsClick(page, 'Modifica');
+    await jsClick(page, 'Edit');
     await expect(page.getByRole('region', { name: 'Save actions' })).toBeVisible();
     const shown = await measure();
     for (const key of ['clientHeight', 'scrollTop', 'top', 'footerHeight'] as const) {
@@ -77,10 +77,10 @@ test.describe('Floorplans/Object Page/Footer', () => {
     await expect(field).toBeFocused();
 
     for (let i = 0; i < 4; i++) {
-      await jsClick(page, 'Annulla modifiche');
-      await jsClick(page, 'Modifica');
+      await jsClick(page, 'Cancel changes');
+      await jsClick(page, 'Edit');
     }
-    await jsClick(page, 'Annulla modifiche');
+    await jsClick(page, 'Cancel changes');
     const end = await measure();
     for (const key of ['clientHeight', 'scrollTop', 'top', 'footerHeight'] as const) {
       expect(Math.abs(end[key] - hidden[key]), key).toBeLessThanOrEqual(1);
@@ -91,7 +91,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
   test('hidden: not reachable with Tab, not clickable, out of the accessibility tree', async ({ page }) => {
     await gotoStory(page, STORY('manual'));
     await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Salva' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0);
     expect(await page.locator(FOOTER).evaluate((el) => el.hasAttribute('inert'))).toBe(true);
 
     await page.locator('body').click({ position: { x: 5, y: 5 } });
@@ -99,7 +99,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
       await page.keyboard.press('Tab');
       expect(await activeInFooter(page)).toBe(false);
     }
-    // Nothing of the footer sits under the point where "Salva" will be.
+    // Nothing of the footer sits under the point where "Save" will be.
     const hit = await page.evaluate((sel) => {
       const footer = document.querySelector(sel)!.getBoundingClientRect();
       const el = document.elementFromPoint(footer.right - 24 - 16, footer.top + footer.height / 2);
@@ -112,10 +112,10 @@ test.describe('Floorplans/Object Page/Footer', () => {
     await gotoStory(page, STORY('with-actions'));
     const region = page.getByRole('region', { name: 'Save actions' });
     await expect(region).toBeVisible();
-    const save = region.getByRole('button', { name: 'Salva' });
+    const save = region.getByRole('button', { name: 'Save' });
     await expect(save).toBeVisible();
     const box = await region.boundingBox();
-    const cancel = await region.getByRole('button', { name: 'Annulla modifiche' }).boundingBox();
+    const cancel = await region.getByRole('button', { name: 'Cancel changes' }).boundingBox();
     expect(Math.abs(box!.x + box!.width - 24 - (cancel!.x + cancel!.width))).toBeLessThanOrEqual(1);
     let reached = false;
     for (let i = 0; i < 12 && !reached; i++) {
@@ -125,16 +125,16 @@ test.describe('Floorplans/Object Page/Footer', () => {
     expect(reached).toBe(true);
   });
 
-  test('the focus never ends on <body> when the footer hides with the focus on Salva (click and keyboard)', async ({ page }) => {
+  test('the focus never ends on <body> when the footer hides with the focus on Save (click and keyboard)', async ({ page }) => {
     await gotoStory(page, STORY('manual'), 'visible:!true');
-    const save = page.getByRole('button', { name: 'Salva' });
+    const save = page.getByRole('button', { name: 'Save' });
     await save.click();
     await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
 
-    await jsClick(page, 'Modifica');
-    await page.getByRole('button', { name: 'Annulla modifiche' }).focus();
+    await jsClick(page, 'Edit');
+    await page.getByRole('button', { name: 'Cancel changes' }).focus();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
   });
@@ -146,11 +146,11 @@ test.describe('Floorplans/Object Page/Footer', () => {
     const footer = page.locator(FOOTER);
     expect((await footer.boundingBox())!.height).toBe(plain!.height);
     const message = footer.locator('[data-object-page-footer-message]');
-    const text = message.getByText(/Salvataggio non riuscito/);
+    const text = message.getByText(/Save failed/);
     expect(await text.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     expect(await text.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(30);
     await text.hover();
-    await expect(page.getByRole('tooltip')).toContainText('Ricarica la pagina e riprova.');
+    await expect(page.getByRole('tooltip')).toContainText('Reload the page and try again.');
   });
 
   test('a message given later is announced by the status region that was already there', async ({ page }) => {
@@ -165,9 +165,9 @@ test.describe('Floorplans/Object Page/Footer', () => {
       const channel = (window as unknown as { __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void } })
         .__STORYBOOK_ADDONS_CHANNEL__;
       const id = (window as unknown as { __STORYBOOK_PREVIEW__: { currentRender: { id: string } } }).__STORYBOOK_PREVIEW__.currentRender.id;
-      channel.emit('updateStoryArgs', { storyId: id, updatedArgs: { message: 'Errore di salvataggio' } });
+      channel.emit('updateStoryArgs', { storyId: id, updatedArgs: { message: 'Save error' } });
     });
-    await expect(status).toContainText('Errore di salvataggio');
+    await expect(status).toContainText('Save error');
     expect(await handle!.evaluate((el, now) => el === now, await status.elementHandle())).toBe(true);
   });
 
@@ -184,7 +184,7 @@ test.describe('Floorplans/Object Page/Footer', () => {
     const region = page.getByRole('region', { name: 'Save actions' });
     const box = (await region.boundingBox())!;
     expect(box.height).toBe(113);
-    for (const name of ['Salva', 'Annulla modifiche']) {
+    for (const name of ['Save', 'Cancel changes']) {
       const b = (await region.getByRole('button', { name }).boundingBox())!;
       expect(b.y).toBeGreaterThanOrEqual(box.y);
       expect(b.y + b.height).toBeLessThanOrEqual(box.y + box.height);
@@ -200,8 +200,8 @@ test.describe('Object Page footer on a narrow screen', () => {
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
     const region = page.getByRole('region', { name: 'Save actions' });
     const plain = (await region.boundingBox())!;
-    const save = (await region.getByRole('button', { name: 'Salva' }).boundingBox())!;
-    const cancel = (await region.getByRole('button', { name: 'Annulla modifiche' }).boundingBox())!;
+    const save = (await region.getByRole('button', { name: 'Save' }).boundingBox())!;
+    const cancel = (await region.getByRole('button', { name: 'Cancel changes' }).boundingBox())!;
     expect(Math.abs(save.width - cancel.width)).toBeLessThanOrEqual(1);
     expect(cancel.x + cancel.width).toBeLessThanOrEqual(plain.x + plain.width);
     expect(save.x).toBeGreaterThanOrEqual(plain.x);
@@ -250,7 +250,7 @@ for (const [name, viewport] of [
     for (const keyboardShare of [0.2, 0.45]) {
       test(`the field of the last section ends above the keyboard and above the footer (keyboard ${keyboardShare * 100}%)`, async ({ page }) => {
         await gotoStory(page, STORY('manual'), 'visible:!true');
-        const input = page.getByRole('textbox', { name: 'Note interne' });
+        const input = page.getByRole('textbox', { name: 'Internal notes' });
         await page.locator(SCROLLER).evaluate((el) => (el.scrollTop = el.scrollHeight));
         const keyboard = Math.round(viewport.height * keyboardShare);
         await input.focus();

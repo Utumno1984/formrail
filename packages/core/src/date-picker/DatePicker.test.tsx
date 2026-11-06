@@ -110,15 +110,16 @@ describe('DatePicker: inside a Field', () => {
     render(
       <DatePicker
         {...BASE}
-        aria-label="Data"
+        aria-label="Date"
         defaultValue="2026-03-03"
         locale="it-IT"
-        labels={{ chooseDateSelected: (d) => `Scegli data, selezionata ${d}` }}
+        labels={{ chooseDateSelected: (d) => `Choose date, selected ${d}` }}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Scegli data, selezionata 3 marzo 2026' })).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Data' })).toHaveValue('03/03/2026');
-    expect(screen.getByRole('textbox', { name: 'Data' })).toHaveAttribute('placeholder', 'DD/MM/YYYY');
+    // The date inside the label is formatted by the it-IT locale ("3 marzo 2026"): the locale is part of the subject here.
+    expect(screen.getByRole('button', { name: 'Choose date, selected 3 marzo 2026' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Date' })).toHaveValue('03/03/2026');
+    expect(screen.getByRole('textbox', { name: 'Date' })).toHaveAttribute('placeholder', 'DD/MM/YYYY');
   });
 });
 
@@ -604,17 +605,40 @@ describe('DatePicker: popover', () => {
         min="2026-03-05"
         max="2026-03-20"
         isDateDisabled={(d) => d === '2026-03-12'}
-        labels={{ nextMonth: 'Mese successivo', chooseDate: 'Scegli data' }}
+        labels={{ nextMonth: 'Go to next month', chooseDate: 'Pick a date' }}
       />,
     );
-    await user.click(screen.getByRole('button', { name: /^Scegli data/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Scegli data' });
+    // it-IT stays Italian on purpose: the localized month, weekday and cell names prove the locale reaches the calendar.
+    await user.click(screen.getByRole('button', { name: /^Pick a date/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Pick a date' });
     expect(within(dialog).getByText('marzo 2026')).toBeInTheDocument();
     expect(within(dialog).getAllByRole('columnheader')[0]).toHaveAttribute('aria-label', 'domenica');
     expect(within(dialog).getByRole('gridcell', { name: 'mercoledì 4 marzo 2026' })).toHaveAttribute('aria-disabled', 'true');
     expect(within(dialog).getByRole('gridcell', { name: 'giovedì 12 marzo 2026' })).toHaveAttribute('aria-disabled', 'true');
     expect(within(dialog).getByRole('gridcell', { name: 'sabato 21 marzo 2026' })).toHaveAttribute('aria-disabled', 'true');
-    expect(within(dialog).getByRole('button', { name: 'Mese successivo' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Go to next month' })).toBeDisabled();
+  });
+
+  it('min/max/isDateDisabled/weekStartsOn/locale reach the calendar (en-US counterpart of the it-IT case)', async () => {
+    const user = userEvent.setup();
+    render(
+      <Controlled
+        locale="en-US"
+        weekStartsOn={1}
+        min="2026-03-05"
+        max="2026-03-20"
+        isDateDisabled={(d) => d === '2026-03-12'}
+        labels={{ nextMonth: 'Go to next month', chooseDate: 'Pick a date' }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /^Pick a date/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Pick a date' });
+    expect(within(dialog).getByText('March 2026')).toBeInTheDocument();
+    expect(within(dialog).getAllByRole('columnheader')[0]).toHaveAttribute('aria-label', 'Monday');
+    expect(within(dialog).getByRole('gridcell', { name: 'Wednesday, March 4, 2026' })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(dialog).getByRole('gridcell', { name: 'Thursday, March 12, 2026' })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(dialog).getByRole('gridcell', { name: 'Saturday, March 21, 2026' })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Go to next month' })).toBeDisabled();
   });
 
   it('the popover content is on the popover level (no literal z-index)', async () => {

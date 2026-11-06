@@ -11,9 +11,9 @@ const STORY = (name: string) => `floorplans-list-report--${name}`;
 // the sort active), so a test that interacts starts from the same page without it.
 const PLAYGROUND = STORY('no-play');
 
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Fatture' });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
 const scroller = (page: Page): Locator => table(page).locator('..');
-const heading = (page: Page): Locator => page.getByRole('heading', { name: /Fatture/ });
+const heading = (page: Page): Locator => page.getByRole('heading', { name: /Invoices/ });
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
 const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 const bodyRows = (page: Page): Locator => table(page).locator('tbody tr:not([aria-hidden])');
@@ -78,10 +78,10 @@ test.describe('accessibility', () => {
 
   test('the table is named by the title (aria-labelledby), the count is part of the heading only', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
-    await expect(heading(page)).toHaveText('Fatture (200)');
+    await expect(heading(page)).toHaveText('Invoices (200)');
     const id = await table(page).getAttribute('aria-labelledby');
     expect(id).toBeTruthy();
-    await expect(page.locator(`[id="${id}"]`)).toHaveText('Fatture');
+    await expect(page.locator(`[id="${id}"]`)).toHaveText('Invoices');
     await expect(table(page)).not.toHaveAttribute('aria-label', /.+/);
   });
 
@@ -161,7 +161,7 @@ test.describe('responsive', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoStory(page, PLAYGROUND);
     const title = await heading(page).boundingBox();
-    const action = await page.getByRole('button', { name: 'Nuova fattura' }).boundingBox();
+    const action = await page.getByRole('button', { name: 'New invoice' }).boundingBox();
     expect(action!.y).toBeGreaterThanOrEqual(title!.y + title!.height - 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect(await scroller(page).evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
@@ -179,7 +179,7 @@ test.describe('responsive', () => {
   test('desktop: title and actions on one row', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
     const title = await heading(page).boundingBox();
-    const action = await page.getByRole('button', { name: 'Nuova fattura' }).boundingBox();
+    const action = await page.getByRole('button', { name: 'New invoice' }).boundingBox();
     expect(action!.y).toBeLessThan(title!.y + title!.height);
     expect(action!.x).toBeGreaterThan(title!.x + title!.width);
   });
@@ -190,7 +190,7 @@ test.describe('live region count', () => {
     await gotoStory(page, PLAYGROUND);
     const region = page.locator('#storybook-root [aria-live="polite"]');
     await expect(region).toHaveCount(1);
-    await pill(page, 'Tutte').focus();
+    await pill(page, 'All').focus();
     await page.keyboard.press('ArrowRight');
     await expect(region).toHaveText(`${PENDING.length} results`);
     await search(page).focus();
@@ -204,22 +204,22 @@ test.describe('live region count', () => {
 test.describe('real keyboard (no mouse)', () => {
   test('the scenario of the play function: filter, search, sort, no results, clear', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
-    await pill(page, 'Tutte').focus();
+    await pill(page, 'All').focus();
     await page.keyboard.press('ArrowRight');
-    await expect(pill(page, 'Da approvare')).toBeChecked();
-    await expect(pill(page, 'Da approvare')).toBeFocused();
-    await expect(heading(page)).toHaveText(`Fatture (${PENDING.length} of 200)`);
+    await expect(pill(page, 'To approve')).toBeChecked();
+    await expect(pill(page, 'To approve')).toBeFocused();
+    await expect(heading(page)).toHaveText(`Invoices (${PENDING.length} of 200)`);
 
     await page.keyboard.press('Tab');
     await expect(search(page)).toBeFocused();
     await page.keyboard.type('Ferrari');
     await page.keyboard.press('Enter');
-    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} of 200)`);
+    await expect(heading(page)).toHaveText(`Invoices (${FOUND.length} of 200)`);
     await expect(bodyRows(page)).toHaveCount(FOUND.length);
 
-    await tabTo(page, page.getByRole('button', { name: 'Importo' }));
+    await tabTo(page, page.getByRole('button', { name: 'Amount' }));
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('columnheader', { name: 'Importo' })).toHaveAttribute('aria-sort', 'descending');
+    await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
     await expect(bodyRows(page).nth(0)).toContainText(FOUND[0]!.number);
     await expect(bodyRows(page).nth(0)).toContainText(formatEuro(FOUND[0]!.amount));
     await expect(bodyRows(page).nth(1)).toContainText(FOUND[1]!.number);
@@ -229,13 +229,13 @@ test.describe('real keyboard (no mouse)', () => {
     await page.keyboard.type('zzz');
     await page.keyboard.press('Enter');
     await expect(table(page).getByText('No results for the current filters', { exact: true })).toBeVisible();
-    await expect(heading(page)).toHaveText('Fatture (0 of 200)');
+    await expect(heading(page)).toHaveText('Invoices (0 of 200)');
 
     await tabTo(page, page.getByRole('button', { name: 'Clear filters' }));
     await page.keyboard.press('Enter');
     await expect(bodyRows(page)).toHaveCount(200);
-    await expect(heading(page)).toHaveText('Fatture (200)');
-    await expect(pill(page, 'Tutte')).toBeChecked();
+    await expect(heading(page)).toHaveText('Invoices (200)');
+    await expect(pill(page, 'All')).toBeChecked();
     await expect(search(page)).toHaveValue('');
     await expect(search(page)).toBeFocused();
   });
@@ -255,14 +255,14 @@ test.describe('real keyboard (no mouse)', () => {
   });
 });
 
-test.describe('"Simula caricamento"', () => {
+test.describe('"Simulate loading"', () => {
   test('title, filter bar and table do not move between data, loading and data again', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
     await expect(bodyRows(page)).toHaveCount(200);
     const data = await layout(page);
     const headerCols = await table(page).locator('th').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
 
-    const button = page.getByRole('button', { name: 'Simula caricamento' });
+    const button = page.getByRole('button', { name: 'Simulate loading' });
     await button.focus();
     await page.keyboard.press('Enter');
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
@@ -283,16 +283,16 @@ test.describe('"Simula caricamento"', () => {
 
   test('a filter and a typed search survive loading -> data', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
-    await pill(page, 'Da approvare').click();
+    await pill(page, 'To approve').click();
     await search(page).fill('Ferrari');
     await search(page).press('Enter');
-    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} of 200)`);
-    await page.getByRole('button', { name: 'Simula caricamento' }).click();
+    await expect(heading(page)).toHaveText(`Invoices (${FOUND.length} of 200)`);
+    await page.getByRole('button', { name: 'Simulate loading' }).click();
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     await expect(scroller(page)).not.toHaveAttribute('aria-busy', 'true');
-    await expect(pill(page, 'Da approvare')).toBeChecked();
+    await expect(pill(page, 'To approve')).toBeChecked();
     await expect(search(page)).toHaveValue('Ferrari');
-    await expect(heading(page)).toHaveText(`Fatture (${FOUND.length} of 200)`);
+    await expect(heading(page)).toHaveText(`Invoices (${FOUND.length} of 200)`);
   });
 });
 
@@ -309,8 +309,8 @@ test.describe('controls', () => {
       ['desc', 'descending'],
     ] as const) {
       await gotoStory(page, PLAYGROUND, `firstSortDirection:${direction}`);
-      await page.getByRole('button', { name: 'Data' }).click();
-      await expect(page.getByRole('columnheader', { name: 'Data' })).toHaveAttribute('aria-sort', sort);
+      await page.getByRole('button', { name: 'Date' }).click();
+      await expect(page.getByRole('columnheader', { name: 'Date' })).toHaveAttribute('aria-sort', sort);
     }
   });
 

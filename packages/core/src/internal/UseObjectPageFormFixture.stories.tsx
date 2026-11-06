@@ -34,30 +34,30 @@ function FormDemo() {
       <label>
         Amount <input value={form.values.amount} onChange={(e) => form.setValue('amount', e.target.value)} />
       </label>
-      <p data-testid="dirty">dirty: {form.isDirty ? 'sì' : 'no'}</p>
+      <p data-testid="dirty">dirty: {form.isDirty ? 'yes' : 'no'}</p>
       <p data-testid="saving">{form.isSaving ? 'saving…' : ''}</p>
       <p role="alert" data-testid="error">
-        {form.saveError !== null ? `Errore: ${String((form.saveError as Error).message)}` : ''}
+        {form.saveError !== null ? `Error: ${String((form.saveError as Error).message)}` : ''}
       </p>
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={load}>
-          Carica dati
+          Load data
         </button>
         <button type="button" onClick={() => form.reset()}>
-          Annulla
+          Cancel
         </button>
         <button type="button" onClick={() => void form.save(async () => undefined)}>
-          Salva (ok)
+          Save (ok)
         </button>
         <button
           type="button"
           onClick={() =>
             void form.save(async () => {
-              throw new Error('server non raggiungibile');
+              throw new Error('server unreachable');
             })
           }
         >
-          Salva (errore)
+          Save (error)
         </button>
       </div>
     </div>
@@ -68,8 +68,8 @@ type Scenario = 'all-empty' | 'valid-above-invalid' | 'mixed-controls' | 'transl
 type Long = { a: string; b: string; c: string; d: string };
 
 const OPTIONS = [
-  { value: 'it', label: 'Italia' },
-  { value: 'fr', label: 'Francia' },
+  { value: 'it', label: 'Italy' },
+  { value: 'fr', label: 'France' },
 ];
 
 const SPACER = { height: '110vh', background: 'repeating-linear-gradient(#f4f4f4 0 40px, #fff 40px 80px)' } as const;

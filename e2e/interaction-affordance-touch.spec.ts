@@ -184,19 +184,19 @@ test.describe('Foundations/Interaction states: touch affordance', () => {
   // list is itself a tap, and `Surface` has no notion of "open first, then touch an option".
   test('@touch Select option: a held touch shows the pressed look, never highlighted', async ({ page }) => {
     await openManual(page, 'forms-select--manual');
-    const trigger = page.getByRole('combobox', { name: 'Paese' });
+    const trigger = page.getByRole('combobox', { name: 'Country' });
     await trigger.tap();
-    const option = page.getByRole('option', { name: 'Francia' });
+    const option = page.getByRole('option', { name: 'France' });
     await expect(option).toBeVisible();
     await expect(option, 'precondition: untouched, so not data-highlighted either').not.toHaveAttribute('data-highlighted', '');
     await armTouchOnOption(option);
-    await pressedAppearsOnHeldTouch(page, option, option, 'Select option (Francia)');
+    await pressedAppearsOnHeldTouch(page, option, option, 'Select option (France)');
     await expect(option, 'never highlighted: focus was blocked for the whole gesture').not.toHaveAttribute('data-highlighted', '');
   });
 
   test('@touch Combobox option: a held touch shows the pressed look, never highlighted', async ({ page }) => {
     await openManual(page, 'forms-combobox--manual');
-    const input = page.getByRole('combobox', { name: 'Comune' });
+    const input = page.getByRole('combobox', { name: 'City' });
     await input.tap();
     const option = page.getByRole('option', { name: 'Milano' });
     await expect(option).toBeVisible();

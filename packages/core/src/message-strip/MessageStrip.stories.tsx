@@ -18,7 +18,7 @@ const meta = {
     dismissLabel: { control: 'text' },
     onDismiss: { control: false },
   },
-  args: { tone: 'info', live: true, children: 'La bozza è stata salvata automaticamente.' },
+  args: { tone: 'info', live: true, children: 'The draft was saved automatically.' },
 } satisfies Meta<typeof MessageStrip>;
 
 export default meta;
@@ -31,16 +31,16 @@ type Story = StoryObj<typeof meta>;
 export const Playground: Story = {
   args: {
     tone: 'error',
-    title: 'Salvataggio non riuscito',
-    children: 'Controlla la connessione e riprova.',
+    title: 'Save failed',
+    children: 'Check your connection and try again.',
     onDismiss: fn(),
   },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const strip = canvas.getByRole('alert');
-    await expect(strip).toHaveTextContent('Error: Salvataggio non riuscito');
-    await expect(strip).toHaveTextContent('Controlla la connessione e riprova.');
-    await userEvent.click(canvas.getByRole('button', { name: 'Dismiss message: Salvataggio non riuscito' }));
+    await expect(strip).toHaveTextContent('Error: Save failed');
+    await expect(strip).toHaveTextContent('Check your connection and try again.');
+    await userEvent.click(canvas.getByRole('button', { name: 'Dismiss message: Save failed' }));
     await expect(args.onDismiss).toHaveBeenCalledTimes(1);
   },
 };
@@ -67,9 +67,9 @@ function DismissCounter() {
   const [count, setCount] = useState(0);
   return (
     <div style={{ maxWidth: 480 }}>
-      <MessageStrip title="Conteggio chiusure" onDismiss={() => setCount((c) => c + 1)} />
+      <MessageStrip title="Dismiss count" onDismiss={() => setCount((c) => c + 1)} />
       <p>
-        onDismiss chiamato: <span data-testid="dismiss-count">{count}</span>
+        onDismiss called: <span data-testid="dismiss-count">{count}</span>
       </p>
     </div>
   );
@@ -86,7 +86,7 @@ function DismissibleDemo({ onDismiss, ...args }: ComponentProps<typeof MessageSt
       }}
     />
   ) : (
-    <p>Messaggio chiuso.</p>
+    <p>Message dismissed.</p>
   );
 }
 
@@ -95,18 +95,18 @@ function DismissibleDemo({ onDismiss, ...args }: ComponentProps<typeof MessageSt
  * itself: here local state unmounts it, which is the consumer's job (and so is moving the focus).
  */
 export const Dismissible: Story = {
-  args: { tone: 'warning', title: 'Sessione in scadenza', children: 'Salva il lavoro entro cinque minuti.', onDismiss: fn() },
+  args: { tone: 'warning', title: 'Session expiring', children: 'Save your work within five minutes.', onDismiss: fn() },
   argTypes: { onDismiss: { control: false } },
   render: (args) => <DismissibleDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const close = canvas.getByRole('button', { name: 'Dismiss message: Sessione in scadenza' });
+    const close = canvas.getByRole('button', { name: 'Dismiss message: Session expiring' });
     await userEvent.tab();
     await expect(close).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     await expect(args.onDismiss).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(canvas.queryByRole('status')).toBeNull());
-    await expect(canvas.getByText('Messaggio chiuso.')).toBeInTheDocument();
+    await expect(canvas.getByText('Message dismissed.')).toBeInTheDocument();
   },
 };
 
@@ -115,18 +115,18 @@ export const DistinctCloseNames: Story = {
   parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'grid', gap: 8, maxWidth: 480 }}>
-      <MessageStrip tone="error" title="Salvataggio non riuscito" onDismiss={fn()}>
-        Riprova più tardi.
+      <MessageStrip tone="error" title="Save failed" onDismiss={fn()}>
+        Try again later.
       </MessageStrip>
-      <MessageStrip tone="success" title="Profilo aggiornato" onDismiss={fn()} />
+      <MessageStrip tone="success" title="Profile updated" onDismiss={fn()} />
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const names = canvas.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
     await expect(names).toEqual([
-      'Dismiss message: Salvataggio non riuscito',
-      'Dismiss message: Profilo aggiornato',
+      'Dismiss message: Save failed',
+      'Dismiss message: Profile updated',
     ]);
     await expect(canvas.getByRole('alert')).toBeInTheDocument();
     await expect(canvas.getByRole('status')).toBeInTheDocument();
@@ -147,7 +147,7 @@ export const Overview: Story = {
       <section aria-label="Tones" style={stack} data-testid="tones">
         {TONES.map((tone) => (
           <MessageStrip key={tone} tone={tone} live={false} data-testid={`tone-${tone}`}>
-            Messaggio di tipo {tone}.
+            Message of type {tone}.
           </MessageStrip>
         ))}
       </section>
@@ -158,35 +158,35 @@ export const Overview: Story = {
             key={tone}
             tone={tone}
             live={false}
-            title={`Titolo ${tone}`}
+            title={`Title ${tone}`}
             onDismiss={fn()}
             data-testid={`full-${tone}`}
           >
-            Contenuto con titolo e chiusura.
+            Content with title and close button.
           </MessageStrip>
         ))}
-        <MessageStrip tone="info" live={false} title="Solo titolo" data-testid="title-only" />
-        <MessageStrip tone="warning" live={false} title="Solo titolo, con chiusura" onDismiss={fn()} />
+        <MessageStrip tone="info" live={false} title="Title only" data-testid="title-only" />
+        <MessageStrip tone="warning" live={false} title="Title only, with close button" onDismiss={fn()} />
       </section>
 
       <section aria-label="Stacked" style={{ maxWidth: 520 }}>
         <div style={{ display: 'grid', gap: 8 }} data-testid="stack">
           <MessageStrip tone="info" live={false}>
-            Primo
+            First
           </MessageStrip>
           <MessageStrip tone="info" live={false}>
-            Secondo
+            Second
           </MessageStrip>
           <MessageStrip tone="info" live={false}>
-            Terzo
+            Third
           </MessageStrip>
         </div>
       </section>
 
       <section aria-label="Long text" data-testid="narrow" style={{ width: 280 }}>
-        <MessageStrip tone="error" live={false} title="Parola lunghissima" onDismiss={fn()}>
-          Supercalifragilistichespiralidosoeancheunpocodipiùperverificareilcapoefinedellariga e poi un testo normale che
-          prosegue su più righe.
+        <MessageStrip tone="error" live={false} title="Very long word" onDismiss={fn()}>
+          Supercalifragilisticexpialidociouswithanextrabittotestthelinebreakbehaviour and then some normal text that
+          continues over several lines.
         </MessageStrip>
       </section>
     </div>

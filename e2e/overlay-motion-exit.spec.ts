@@ -24,7 +24,7 @@ for (const [label, story] of [
     test('while exiting, the opener behind is the hit target (the backdrop does not intercept) and the panel is inert', async ({ page }) => {
       await expectPlayToPass(page, story);
       await slowDown(page, 1500);
-      const trigger = page.locator('button').filter({ hasText: /^Apri$/ });
+      const trigger = page.locator('button').filter({ hasText: /^Open$/ });
       await trigger.click();
       await expect.poll(() => settled(page), { timeout: 5000 }).toBe(0);
       await page.keyboard.press('Escape');
@@ -42,7 +42,7 @@ for (const [label, story] of [
     test('reopening DURING the exit (a real click on the opener) gives an open panel and one close at the end', async ({ page }) => {
       await expectPlayToPass(page, story);
       await slowDown(page, 1500);
-      const trigger = page.locator('button').filter({ hasText: /^Apri$/ });
+      const trigger = page.locator('button').filter({ hasText: /^Open$/ });
       await trigger.click();
       await expect.poll(() => settled(page), { timeout: 5000 }).toBe(0);
       await page.keyboard.press('Escape');
@@ -66,9 +66,9 @@ test('nested, DECLARED LIMIT: an Escape pressed while the inner dialog is still 
   // Escape. Nothing is closed twice and nothing breaks: the user presses Escape once more.
   await expectPlayToPass(page, DIALOG('nested'));
   await slowDown(page, 800);
-  const first = page.getByRole('dialog', { name: 'Primo dialog' });
-  const second = page.getByRole('dialog', { name: 'Secondo dialog' });
-  await page.getByRole('button', { name: 'Apri il secondo' }).click();
+  const first = page.getByRole('dialog', { name: 'First dialog' });
+  const second = page.getByRole('dialog', { name: 'Second dialog' });
+  await page.getByRole('button', { name: 'Open the second' }).click();
   await expect(second).toHaveAttribute('data-state', 'open');
   await expect.poll(() => settled(page), { timeout: 5000 }).toBe(0);
   await page.keyboard.press('Escape');
@@ -93,7 +93,7 @@ test('a chain "close A, open B in the same handler": text typed in B at once is 
 
 test('the exit has a safety net: if the animation never ends, the panel is removed and the page is released', async ({ page }) => {
   await expectPlayToPass(page, DIALOG('playground'));
-  const trigger = page.locator('button').filter({ hasText: /^Apri$/ });
+  const trigger = page.locator('button').filter({ hasText: /^Open$/ });
   await trigger.click();
   await expect(page.locator('[role=dialog][data-state=open]')).toHaveCount(1);
   // Freeze every animation: `animationend` will never fire.

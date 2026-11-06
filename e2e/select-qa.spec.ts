@@ -22,17 +22,17 @@ async function recordActions(page: Page): Promise<void> {
 const actions = (page: Page) => page.evaluate(() => (window as unknown as { __actions: unknown[] }).__actions.length);
 
 test.describe('select QA', () => {
-  test('trigger: combobox named Paese, describedby = help; with-error describedby has the error', async ({ page }) => {
+  test('trigger: combobox named Country, describedby = help; with-error describedby has the error', async ({ page }) => {
     await gotoStory(page, STORY('manual'));
-    const t = page.getByRole('combobox', { name: 'Paese' });
+    const t = page.getByRole('combobox', { name: 'Country' });
     await expect(t).toHaveAttribute('aria-expanded', 'false');
-    await expect(t).toHaveAccessibleDescription('Sede legale del fornitore');
+    await expect(t).toHaveAccessibleDescription('Supplier registered office');
     await t.click();
     await expect(page.locator('[role="combobox"]')).toHaveAttribute('aria-expanded', 'true');
     await gotoStory(page, STORY('with-error'));
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('combobox', { name: /Paese/ })).toHaveAccessibleDescription(/Seleziona un paese/);
-    await expect(page.getByRole('combobox', { name: /Paese/ })).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByRole('combobox', { name: /Country/ })).toHaveAccessibleDescription(/Select a country/);
+    await expect(page.getByRole('combobox', { name: /Country/ })).toHaveAttribute('aria-invalid', 'true');
   });
 
   test('no DOM leak, className wins is covered by unit; trigger attributes are all valid HTML', async ({ page }) => {
@@ -46,8 +46,8 @@ test.describe('select QA', () => {
     await recordActions(page);
     await gotoStory(page, STORY('manual'));
     await combobox(page).click();
-    await page.getByRole('option', { name: 'Francia' }).dblclick();
-    await expect(combobox(page)).toHaveText('Francia');
+    await page.getByRole('option', { name: 'France' }).dblclick();
+    await expect(combobox(page)).toHaveText('France');
     await page.waitForTimeout(300);
     expect(await actions(page)).toBe(1);
     await expect(listbox(page)).toHaveCount(0);
@@ -63,7 +63,7 @@ test.describe('select QA', () => {
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
     await expect(t).toBeFocused();
-    await expect(t).toHaveText('Italia');
+    await expect(t).toHaveText('Italy');
   });
 
   test('Tab with the list open does not leave the list stuck', async ({ page }) => {
@@ -90,12 +90,12 @@ test.describe('select QA', () => {
     await gotoStory(page, STORY('manual'));
     await combobox(page).focus();
     await page.keyboard.type('sp');
-    await expect(combobox(page)).toHaveText('Spagna');
+    await expect(combobox(page)).toHaveText('Spain');
     await expect(listbox(page)).toHaveCount(0);
-    await page.keyboard.type('ge'); // disabled Germania: must not be picked
+    await page.keyboard.type('ge'); // disabled Germany: must not be picked
     await page.waitForTimeout(1200);
     await page.keyboard.type('ge');
-    await expect(combobox(page)).not.toHaveText('Germania');
+    await expect(combobox(page)).not.toHaveText('Germany');
   });
 
   test('keyboard pick inside the Dialog keeps the dialog open and returns focus to the trigger', async ({ page }) => {
@@ -105,7 +105,7 @@ test.describe('select QA', () => {
     await expect(listbox(page)).toHaveCount(0);
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(combobox(page)).toBeFocused();
-    await expect(combobox(page)).not.toHaveText('Seleziona');
+    await expect(combobox(page)).not.toHaveText('Select');
     // Click outside the list but inside the dialog closes the list only.
     await combobox(page).click();
     const h = (await page.locator('[role="dialog"] h2').boundingBox())!;
@@ -163,11 +163,11 @@ test.describe('select QA', () => {
   test('long list: keyboard End/Home reach the extremes and the list scrolls to them', async ({ page }) => {
     await expectPlayToPass(page, STORY('long-list'));
     await page.keyboard.press('End');
-    await expect(page.getByRole('option', { name: 'Cliente 200' })).toBeFocused();
-    await expect(page.getByRole('option', { name: 'Cliente 200' })).toBeInViewport();
+    await expect(page.getByRole('option', { name: 'Customer 200' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Customer 200' })).toBeInViewport();
     await page.keyboard.press('Home');
-    await expect(page.getByRole('option', { name: 'Cliente 001' })).toBeFocused();
-    await expect(page.getByRole('option', { name: 'Cliente 001' })).toBeInViewport();
+    await expect(page.getByRole('option', { name: 'Customer 001' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Customer 001' })).toBeInViewport();
   });
 
   test('async-load: re-opening after load shows the selection, and picking then reports once', async ({ page }) => {
@@ -178,14 +178,14 @@ test.describe('select QA', () => {
     await expect(listbox(page)).toHaveCount(0);
     expect(await actions(page)).toBe(0);
     await combobox(page).click();
-    await expect(page.getByRole('option', { name: 'Spagna' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'Spain' })).toBeFocused();
     await page.keyboard.press('ArrowUp');
-    await expect(page.getByRole('option', { name: 'Francia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect.poll(() => actions(page)).toBe(1);
     // Picking the already-selected option reports nothing.
     await combobox(page).click();
-    await expect(page.getByRole('option', { name: 'Francia' })).toBeFocused();
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(listbox(page)).toHaveCount(0);
     expect(await actions(page)).toBe(1);
@@ -193,7 +193,7 @@ test.describe('select QA', () => {
 });
 
 test.describe('select QA race', () => {
-  test('ArrowDown then immediate typeahead + Enter (burst) ends on Francia', async ({ page }) => {
+  test('ArrowDown then immediate typeahead + Enter (burst) ends on France', async ({ page }) => {
     // 25 sequential gotoStory() page loads take 23-31s, which exceeds the default 30s
     // test timeout. The iteration count is the point of the race test, so raise the budget.
     test.setTimeout(90_000);
@@ -210,7 +210,7 @@ test.describe('select QA race', () => {
       const key = `${(await t.textContent()) ?? ''}|open=${await listbox(page).count()}`;
       results[key] = (results[key] ?? 0) + 1;
     }
-    expect(results).toEqual({ 'Francia|open=0': 25 });
+    expect(results).toEqual({ 'France|open=0': 25 });
   });
 });
 
