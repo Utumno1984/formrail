@@ -103,7 +103,13 @@ test.describe('Menu: roles, keyboard, focus', () => {
     const box = (await menu.boundingBox())!;
     expect(box.y + box.height).toBeLessThanOrEqual(300);
     expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-    for (let i = 0; i < 29; i++) await page.keyboard.press('ArrowDown');
+    // The first item is focused when the menu opens; each press is awaited by its own result, so a
+    // slow machine cannot outrun the focus (and a lost keypress is reported at the step it happened).
+    await expect(page.getByRole('menuitem', { name: 'Action 1', exact: true })).toBeFocused();
+    for (let i = 2; i <= 30; i++) {
+      await page.keyboard.press('ArrowDown');
+      await expect(page.getByRole('menuitem', { name: `Action ${i}`, exact: true })).toBeFocused();
+    }
     const last = page.getByRole('menuitem', { name: 'Action 30' });
     await expect(last).toBeFocused();
     const m = (await menu.boundingBox())!;
