@@ -33,7 +33,9 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Menu',
-  parameters: { layout: 'fullscreen' },
+  // Overlays opened at mount (`defaultOpen`) would take over the Docs page if the stories were rendered
+  // inline: each story gets its own iframe there.
+  parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     side: {
       control: 'radio',
