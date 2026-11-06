@@ -248,6 +248,44 @@ test.describe('Menu: touch @touch', () => {
   });
 });
 
+test.describe('Menu: Tab order', () => {
+  test('on a page: Tab goes to the next control, Shift+Tab to the previous one', async ({ page }) => {
+    await expectPlayToPass(page, STORY('tab-order-page')); // leaves the focus on "After"
+    for (const [key, expected] of [
+      ['Tab', 'After'],
+      ['Shift+Tab', 'Before'],
+    ] as const) {
+      await trigger(page).focus();
+      await page.keyboard.press('Enter');
+      await expect(menuOf(page)).toBeVisible();
+      await page.keyboard.press(key);
+      await expect(menuOf(page)).toHaveCount(0);
+      await expect(page.getByRole('button', { name: expected })).toBeFocused();
+    }
+  });
+
+  test('in a Dialog: Tab from the last control wraps to the first, Shift+Tab from the first to the last', async ({
+    page,
+  }) => {
+    await expectPlayToPass(page, STORY('tab-order-dialog'));
+    const dialog = page.getByRole('dialog', { name: 'Record' });
+    const first = dialog.getByRole('button', { name: 'First menu' });
+    const last = dialog.getByRole('button', { name: 'Last menu', includeHidden: true });
+    for (const [from, key, to] of [
+      [last, 'Tab', first],
+      [first, 'Shift+Tab', last],
+      [first, 'Tab', dialog.getByRole('button', { name: 'Middle' })],
+    ] as const) {
+      await from.focus();
+      await page.keyboard.press('Enter');
+      await expect(menuOf(page)).toBeVisible();
+      await page.keyboard.press(key);
+      await expect(menuOf(page)).toHaveCount(0);
+      await expect(to).toBeFocused();
+    }
+  });
+});
+
 test.describe('Menu: Tab inside a modal panel', () => {
   for (const name of ['inside-dialog', 'inside-sheet']) {
     test(`${name}: Tab and Shift+Tab from the menu keep the focus inside the panel`, async ({ page }) => {

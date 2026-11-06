@@ -232,7 +232,7 @@ export interface MenuContentProps extends Omit<
 // The library has no box-sizing reset, so the `max-h` subtracts what the box adds around its content
 // (4px of padding and 1px of border on each side): the panel never exceeds the room that is left.
 const CONTENT =
-  'min-w-40 max-w-(--radix-dropdown-menu-content-available-width) ' +
+  'min-w-[calc(10rem-10px)] max-w-[calc(var(--radix-dropdown-menu-content-available-width)-10px)] ' +
   'max-h-[calc(var(--radix-dropdown-menu-content-available-height)-10px)] ' +
   'overflow-y-auto overflow-x-hidden rounded-rop-md border border-rop-border bg-rop-surface p-1 font-rop-sans text-rop-body ' +
   'text-rop-text outline-none [box-shadow:0_4px_16px_rgb(0_0_0/0.2)]';

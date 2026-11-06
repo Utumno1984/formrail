@@ -481,3 +481,72 @@ export const Rtl: Story = {
     await waitFor(() => expect(body.getByRole('menuitem', { name: 'Rename' })).toHaveFocus());
   },
 };
+
+/** Tab from an open menu closes it and moves on to the next control of the page; Shift+Tab to the previous one. */
+export const TabOrderPage: Story = {
+  render: (args) => (
+    <Page>
+      <Button variant="ghost">Before</Button> <BasicMenu args={args} /> <Button variant="ghost">After</Button>
+    </Page>
+  ),
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'More actions',
+    });
+    trigger.focus();
+    await userEvent.keyboard('{Enter}');
+    await body.findByRole('menu');
+    await userEvent.keyboard('{Tab}');
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(within(canvasElement).getByRole('button', { name: 'After' })).toHaveFocus());
+  },
+};
+
+/**
+ * Two menus and a button in a Dialog: Tab from the last control wraps to the first, Shift+Tab from
+ * the first to the last, like the Dialog's own focus trap (the page behind is never reached).
+ */
+export const TabOrderDialog: Story = {
+  render: (args) => (
+    <Page>
+      <Dialog defaultOpen>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Record</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Menu>
+              <MenuTrigger asChild>
+                <Button variant="secondary">First menu</Button>
+              </MenuTrigger>
+              <MenuContent>
+                <Items args={args} />
+              </MenuContent>
+            </Menu>{' '}
+            <Button variant="ghost">Middle</Button>{' '}
+            <Menu>
+              <MenuTrigger asChild>
+                <Button variant="secondary">Last menu</Button>
+              </MenuTrigger>
+              <MenuContent>
+                <Items args={args} />
+              </MenuContent>
+            </Menu>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    </Page>
+  ),
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole('dialog', { name: 'Record' });
+    const first = within(dialog).getByRole('button', { name: 'First menu' });
+    first.focus();
+    await userEvent.keyboard('{Enter}');
+    await body.findByRole('menu');
+    await userEvent.keyboard('{Tab}');
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Middle' })).toHaveFocus());
+  },
+};
