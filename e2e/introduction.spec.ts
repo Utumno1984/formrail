@@ -9,7 +9,7 @@ test.describe('Introduction page', () => {
     await page.waitForSelector('.sbdocs-content', { timeout: 15_000 });
   });
 
-  test('List Report demo: filter and search narrow the rows', async ({ page }) => {
+  test('List Report demo: a filter narrows the rows', async ({ page }) => {
     const table = page.getByRole('table');
     await expect(table).toBeVisible();
     await expect(page.getByRole('row', { name: /INV-1001/ })).toBeVisible();
