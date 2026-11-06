@@ -49,13 +49,15 @@ export const Spinner = /* @__PURE__ */ forwardRef<HTMLSpanElement, SpinnerProps>
 
   useEffect(() => {
     if (decorative) return;
-    if (label === '' && isDev()) {
+    // Same rule as Icon: empty, whitespace-only or non-string (a JS consumer's `null`) is "no label".
+    const text = typeof label === 'string' && label.trim() !== '' ? label : '';
+    if (text === '' && isDev()) {
       console.error('[react-object-page] <Spinner> has an empty label: nothing is announced. Pass a label or use `decorative`.');
     }
     const frame = requestAnimationFrame(() => {
       // The text span is written imperatively and only here: React never owns its content, so a
       // re-render with the same label produces no DOM mutation at all.
-      if (textRef.current) textRef.current.textContent = label;
+      if (textRef.current) textRef.current.textContent = text;
     });
     // Unmounted (or label changed) before the frame: no update after unmount.
     return () => cancelAnimationFrame(frame);

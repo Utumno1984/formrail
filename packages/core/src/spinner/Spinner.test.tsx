@@ -172,6 +172,18 @@ describe('Spinner announced mode', () => {
     expect(error).toHaveBeenCalledWith(expect.stringContaining('<Spinner> has an empty label'));
   });
 
+  it.each([['spaces', '   '], ['tabs/newlines', ' \t\n '], ['null (JS consumer)', null]])(
+    'a %s label behaves like an empty one: dev error, empty region',
+    (_name, value) => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      render(<Spinner label={value as unknown as string} />);
+      nextFrame();
+      expect(screen.getByRole('status').textContent).toBe('');
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('<Spinner> has an empty label'));
+    },
+  );
+
   it('SSR renders the empty region', () => {
     const html = renderToString(<Spinner />);
     expect(html).toContain('role="status"');
