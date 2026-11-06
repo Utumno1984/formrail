@@ -38,14 +38,22 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
   });
 
   it('no published file carries an absolute path of the build machine (source maps included)', () => {
+    // Beyond the exact path of this checkout (`packageDir`), also flag any string that merely
+    // *looks like* an absolute filesystem path (Unix root or Windows drive letter) followed by a
+    // path segment this package would plausibly produce — so the test still catches a leaked
+    // absolute path even when CI's checkout root differs from the one it was built on.
+    const looksAbsolute = /(?:^|[\s"'(])(?:\/home\/|\/Users\/|\/root\/|\/tmp\/|[A-Za-z]:\\)\S*[/\\](?:src|packages)[/\\]/;
     const offenders: string[] = [];
-    for (const name of readdirSync(distDir)) {
+    for (const entry of readdirSync(distDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const name = join(entry.parentPath, entry.name).slice(distDir.length + 1);
       const text = readFileSync(join(distDir, name), 'utf8');
       if (text.includes(packageDir)) offenders.push(name);
+      else if (looksAbsolute.test(text)) offenders.push(`${name} (path-shaped string)`);
       if (name.endsWith('.map')) {
-        const map = JSON.parse(text) as { file?: string; sources?: string[] };
-        const paths = [map.file ?? '', ...(map.sources ?? [])];
-        if (paths.some((p) => isAbsolute(p))) offenders.push(`${name} (absolute file/sources)`);
+        const map = JSON.parse(text) as { file?: string; sourceRoot?: string; sources?: string[] };
+        const paths = [map.file ?? '', map.sourceRoot ?? '', ...(map.sources ?? [])];
+        if (paths.some((p) => isAbsolute(p))) offenders.push(`${name} (absolute file/sourceRoot/sources)`);
       }
     }
     expect(offenders).toEqual([]);
