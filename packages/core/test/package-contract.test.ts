@@ -44,7 +44,9 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
     // absolute path even when CI's checkout root differs from the one it was built on.
     const looksAbsolute = /(?:^|[\s"'(])(?:\/home\/|\/Users\/|\/root\/|\/tmp\/|[A-Za-z]:\\)\S*[/\\](?:src|packages)[/\\]/;
     const offenders: string[] = [];
-    for (const name of readdirSync(distDir, { recursive: true }) as string[]) {
+    for (const entry of readdirSync(distDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const name = join(entry.parentPath, entry.name).slice(distDir.length + 1);
       const text = readFileSync(join(distDir, name), 'utf8');
       if (text.includes(packageDir)) offenders.push(name);
       else if (looksAbsolute.test(text)) offenders.push(`${name} (path-shaped string)`);
