@@ -42,7 +42,7 @@ const CHEVRON =
 export const DISCLOSURE_CONTENT =
   'min-w-0 font-rop-sans text-rop-body text-rop-text ' +
   'motion-safe:data-[state=open]:animate-rop-disclosure-down motion-safe:data-[state=closed]:animate-rop-disclosure-up';
-export const DISCLOSURE_CONTENT_INNER = 'min-w-0 px-3 pb-3';
+export const DISCLOSURE_CONTENT_INNER = 'min-w-0 px-3 pt-3 pb-3';
 
 /** Disclosure chevron: the system's own chevron icon (as Select and the sortable headers use), decorative. */
 export function Chevron() {
