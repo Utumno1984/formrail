@@ -234,6 +234,22 @@
       "baseline": 12319,
       "limit": 13551
     },
+    "Tabs": {
+      "baseline": 17781,
+      "limit": 19560
+    },
+    "TabsContent": {
+      "baseline": 17286,
+      "limit": 19015
+    },
+    "TabsList": {
+      "baseline": 18341,
+      "limit": 20176
+    },
+    "TabsTrigger": {
+      "baseline": 18129,
+      "limit": 19942
+    },
     "Text": {
       "baseline": 10647,
       "limit": 11712

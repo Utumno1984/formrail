@@ -162,3 +162,12 @@ export { Calendar } from './calendar/Calendar';
 export type { CalendarProps, CalendarLabels, IsoDate, IsoMonth, Weekday } from './calendar/Calendar';
 export { DatePicker } from './date-picker/DatePicker';
 export type { DatePickerProps, DatePickerLabels, DatePickerInvalidReason, DatePickerSize } from './date-picker/DatePicker';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './tabs/Tabs';
+export type {
+  TabsProps,
+  TabsListProps,
+  TabsTriggerProps,
+  TabsContentProps,
+  TabsActivationMode,
+  TabsOrientation,
+} from './tabs/Tabs';
