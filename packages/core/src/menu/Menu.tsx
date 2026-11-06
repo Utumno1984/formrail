@@ -16,6 +16,8 @@ import {
   type ReactNode,
 } from 'react';
 import * as RadixMenu from '@radix-ui/react-dropdown-menu';
+import { adjacentTabbable } from '../internal/focus';
+import { useTouchOutsideSwallow } from '../internal/outside-interaction';
 import { composeRefs } from '../utils/compose-refs';
 import { overlayLayer } from '../overlay/layers';
 import { useReturnFocus } from '../overlay/use-return-focus';
@@ -78,6 +80,8 @@ export interface MenuProps {
  *   the enclosing modal `Dialog`/`Sheet` when there is one, wrapping around); positive `tabindex`
  *   ordering is not honoured. With nothing tabbable beyond the trigger on a page, the focus leaves
  *   the page (it ends on `body`) and is not returned to the trigger.
+ * - `MenuContent` `loop` (default `true`) wraps the arrow keys from the last item to the first and
+ *   back; `loop={false}` stops at the ends. Typeahead and Home / End are Radix's and unaffected.
  */
 export function Menu({ children, open: openProp, defaultOpen = false, onOpenChange, modal = true, dir }: MenuProps) {
   const controlled = openProp !== undefined;
@@ -137,41 +141,6 @@ export function Menu({ children, open: openProp, defaultOpen = false, onOpenChan
       </RadixMenu.Root>
     </MenuContext.Provider>
   );
-}
-
-const TABBABLE =
-  'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable="true"]';
-
-/**
- * The next (or previous) tabbable element after `from`, outside `exclude`. Inside a modal panel
- * (`aria-modal`) the search stays in it and wraps around, like the panel's own focus trap; on a
- * page it stops at the end (`null`).
- *
- * The scope is the trigger's own `aria-modal` ancestor: `Dialog` and `Sheet` put `aria-modal` on
- * the panel that wraps their content (`internal/modal.tsx`, the Radix portal only moves the whole
- * panel), so a trigger inside one always has the panel as ancestor. The menu's own panel lives in a
- * separate portal but is excluded explicitly. Cost: one `querySelectorAll` plus a layout read per
- * candidate, once per Tab pressed in an open menu (not per render or per keystroke elsewhere): fine
- * for a page of ordinary size; revisit if a menu per row of a very large table makes it visible.
- */
-function adjacentTabbable(from: HTMLElement, backwards: boolean, exclude: HTMLElement | null): HTMLElement | null {
-  const scope = from.closest<HTMLElement>('[aria-modal="true"]');
-  const candidates = [...(scope ?? document).querySelectorAll<HTMLElement>(TABBABLE)].filter(
-    (el) =>
-      el !== from &&
-      !exclude?.contains(el) &&
-      !el.hasAttribute('data-radix-focus-guard') &&
-      !el.closest('[inert]') &&
-      !el.matches(':disabled') &&
-      el.tabIndex >= 0 &&
-      el.getClientRects().length > 0,
-  );
-  const after = (el: HTMLElement) => !!(from.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
-  const next = backwards ? candidates.filter((el) => !after(el)).pop() : candidates.find(after);
-  if (next) return next;
-  if (!scope) return null;
-  // Wrap around inside the panel; if the trigger is its only tabbable, the focus stays on it.
-  return (backwards ? candidates[candidates.length - 1] : candidates[0]) ?? from;
 }
 
 export interface MenuTriggerProps extends Omit<ComponentPropsWithoutRef<'button'>, 'id'> {
@@ -242,8 +211,14 @@ export const MenuTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, MenuTri
 
 export interface MenuContentProps extends Omit<
   ComponentPropsWithoutRef<typeof RadixMenu.Content>,
-  'asChild' | 'forceMount' | 'loop'
+  'asChild' | 'forceMount'
 > {
+  /**
+   * Arrow-key navigation wraps from the last item to the first and back (default `true`). With
+   * `false` it stops at the first / last item. (Radix's own default is `false`; this component
+   * has always wrapped, so `true` is kept.)
+   */
+  loop?: boolean;
   /** Default `bottom`. */
   side?: 'top' | 'right' | 'bottom' | 'left';
   /** Default `start`. */
@@ -285,80 +260,12 @@ function OpenFocus() {
   return null;
 }
 
-/** How long an armed tap guard waits for its click: a long press, then a click, still counts. */
-const TOUCH_CLICK_WINDOW_MS = 3000;
-
-/**
- * Modal menu, touch: a tap outside closes it and must not reach what is under the finger. Radix
- * closes on the `click` that follows a touch pointerdown (not on the pointerdown itself) and by
- * then the page is interactive again, so that click lands on the element underneath (a button
- * elsewhere would be activated). The panel closes at the pointerdown instead, and the click that
- * follows is swallowed in the capture phase: once, or until the gesture is cancelled, or (for a
- * press that never clicks) until the window runs out.
- */
+/** Modal menu, touch: a tap outside closes it and does not reach the page (see `useTouchOutsideSwallow`). */
 function TouchOutsideGuard() {
   const { contentRef, triggerRef, setOpen, modal } = useMenuContext('MenuContent');
-  useEffect(() => {
-    if (!modal) return undefined;
-    const me = {};
-    guards.push(me);
-    const onPointerDown = (event: PointerEvent) => {
-      // Only the innermost open guard acts: with several menus open at once (one in a Dialog opened
-      // over another page) a single tap must not arm several swallows.
-      if (guards[guards.length - 1] !== me) return;
-      if (event.pointerType !== 'touch') return;
-      if (event.target instanceof Node && contentRef.current?.contains(event.target)) return;
-      // The trigger's own tap is Radix's toggle, not an "outside" tap. While the menu is open the body
-      // is `pointer-events: none`, so the event's target is the root element: hit-test by position.
-      const r = triggerRef.current?.getBoundingClientRect();
-      if (
-        r &&
-        event.clientX >= r.left &&
-        event.clientX <= r.right &&
-        event.clientY >= r.top &&
-        event.clientY <= r.bottom
-      ) {
-        return;
-      }
-      armSwallow();
-      setOpen(false);
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      guards.splice(guards.indexOf(me), 1);
-      // A swallow already armed outlives the panel on purpose: its click is still to come.
-    };
-  }, [contentRef, triggerRef, setOpen, modal]);
+  const close = useCallback(() => setOpen(false), [setOpen]);
+  useTouchOutsideSwallow({ enabled: modal, contentRef, anchorRef: triggerRef, close });
   return null;
-}
-
-/** The open guards, outermost first (modal menus only). */
-const guards: object[] = [];
-
-let disarmSwallow: (() => void) | undefined;
-
-/**
- * Swallows the next click in the capture phase. One at a time for the whole page: arming again
- * (another menu, another tap) replaces the previous one instead of stacking.
- */
-function armSwallow() {
-  disarmSwallow?.();
-  const swallow = (event: Event) => {
-    event.stopPropagation();
-    event.preventDefault();
-    disarm();
-  };
-  const disarm = () => {
-    document.removeEventListener('click', swallow, true);
-    document.removeEventListener('pointercancel', disarm, true);
-    clearTimeout(timer);
-    if (disarmSwallow === disarm) disarmSwallow = undefined;
-  };
-  document.addEventListener('click', swallow, true);
-  document.addEventListener('pointercancel', disarm, true);
-  const timer = setTimeout(disarm, TOUCH_CLICK_WINDOW_MS);
-  disarmSwallow = disarm;
 }
 
 /** The menu panel, in a portal on the `popover` level. Scrolls inside when the room runs out. */
@@ -368,6 +275,7 @@ export const MenuContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMen
       className,
       side = 'bottom',
       align = 'start',
+      loop = true,
       sideOffset = 4,
       collisionPadding = 8,
       onCloseAutoFocus,
@@ -386,7 +294,7 @@ export const MenuContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMen
           align={align}
           sideOffset={sideOffset}
           collisionPadding={collisionPadding}
-          loop
+          loop={loop}
           // Radix swallows Tab inside a menu; here it closes the menu and moves on in the page.
           // Captured and stopped before Radix's handler and the focus trap, then the focus goes to
           // the neighbour of the trigger once the panel (and its trap) are gone.

@@ -14,6 +14,7 @@ async function bodyPointerEvents(page: Page): Promise<string> {
 test.describe('Overlays/Menu: stories play', () => {
   for (const name of [
     'playground',
+    'loop-disabled',
     'open-with-groups',
     'near-right-edge',
     'opens-a-dialog',
@@ -59,6 +60,36 @@ test.describe('Menu: roles, keyboard, focus', () => {
     await page.keyboard.press('Shift+Tab');
     await expect(menuOf(page)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Open from outside' })).toBeFocused();
+  });
+
+  test('loop: the arrows wrap by default and stop at the first / last item with loop off', async ({ page }) => {
+    const item = (name: string) => page.getByRole('menuitem', { name });
+    // The Playground's own play function runs first and leaves the menu closed (Rename is disabled
+    // there, so the first enabled item is Duplicate).
+    // Default (loop on): ArrowUp on the first item goes to the last one.
+    await expectPlayToPass(page, STORY('playground'));
+    await trigger(page).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(item('Duplicate')).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(item('Delete…')).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(item('Duplicate')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menuOf(page)).toHaveCount(0);
+    // loop off (Controls: `loop`): the ends hold the focus.
+    await expectPlayToPass(page, STORY('playground'), 'loop:!false');
+    await trigger(page).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(item('Duplicate')).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(item('Duplicate')).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(item('Delete…')).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(item('Delete…')).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(item('Archive')).toBeFocused();
   });
 
   test('Escape from a click-opened menu returns the focus to the trigger', async ({ page }) => {

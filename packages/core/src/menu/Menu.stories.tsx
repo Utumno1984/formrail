@@ -24,6 +24,7 @@ interface DemoArgs {
   align: Align;
   disabledItem: DisabledItem;
   modal: boolean;
+  loop: boolean;
   onOpenChange: (open: boolean) => void;
   onRename: (event: Event) => void;
   onDuplicate: (event: Event) => void;
@@ -50,6 +51,7 @@ const meta: Meta<DemoArgs> = {
       options: ['none', 'rename', 'duplicate', 'archive'] satisfies DisabledItem[],
     },
     modal: { control: 'boolean' },
+    loop: { control: 'boolean' },
     onOpenChange: { control: false },
     onRename: { control: false },
     onDuplicate: { control: false },
@@ -61,6 +63,7 @@ const meta: Meta<DemoArgs> = {
     align: 'start',
     disabledItem: 'archive',
     modal: true,
+    loop: true,
     onOpenChange: fn(),
     onRename: fn(),
     onDuplicate: fn(),
@@ -121,7 +124,7 @@ function BasicMenu({ args }: { args: DemoArgs }) {
       <MenuTrigger asChild>
         <Button variant="secondary">More actions</Button>
       </MenuTrigger>
-      <MenuContent side={args.side} align={args.align}>
+      <MenuContent side={args.side} align={args.align} loop={args.loop}>
         <Items args={args} />
       </MenuContent>
     </Menu>
@@ -129,7 +132,7 @@ function BasicMenu({ args }: { args: DemoArgs }) {
 }
 
 /**
- * Controls: `side`, `align`, `modal`, and which item is disabled; every `onSelect` and
+ * Controls: `side`, `align`, `modal`, `loop`, and which item is disabled; every `onSelect` and
  * `onOpenChange` is in Actions. The play function opens the menu with ArrowDown, checks that the
  * disabled item is skipped, picks "Duplicate" with Enter and checks the action, the closing and the
  * focus back on the trigger.
@@ -157,6 +160,29 @@ export const Playground: Story = {
     await expect(args.onRename).not.toHaveBeenCalled();
     await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
     await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+
+/** `loop={false}`: arrow navigation stops at the last item instead of wrapping back to the first. */
+export const LoopDisabled: Story = {
+  args: { disabledItem: 'none', loop: false },
+  render: (args) => (
+    <Page>
+      <BasicMenu args={args} />
+    </Page>
+  ),
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'More actions' });
+    trigger.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    const body = within(canvasElement.ownerDocument.body);
+    const deleteItem = await body.findByRole('menuitem', { name: 'Delete…' });
+    // Four items (Rename, Duplicate, Archive, Delete): three more ArrowDown reach the last one.
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+    await waitFor(() => expect(deleteItem).toHaveFocus());
+    // A further ArrowDown would wrap to "Rename" with the default `loop`; here it stays on "Delete".
+    await userEvent.keyboard('{ArrowDown}');
+    await expect(deleteItem).toHaveFocus();
   },
 };
 

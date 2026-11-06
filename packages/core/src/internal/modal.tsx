@@ -25,6 +25,7 @@ import { overlayLayer } from '../overlay/layers';
 import { useReturnFocus } from '../overlay/use-return-focus';
 import { cn } from '../utils/cn';
 import { internalIcons } from './icons';
+import { useBeganBeforeOpening } from './outside-interaction';
 
 // Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
 const isDev = (): boolean => {
@@ -269,16 +270,8 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     useLayoutEffect(() => {
       fallbackHolder.current = returnFocusRef;
     });
-    // When the panel was last (re)opened. Radix can deliver a "pointer down outside" late (a touch
-    // is dispatched on the following `click`): with the exit animation, a tap on the opener while
-    // the panel is leaving reopens it, and the late dismissal of that same tap would close it again.
-    // An outside interaction that began before the current opening is not a dismissal of it.
-    const openedAt = useRef(0);
-    useLayoutEffect(() => {
-      if (open) openedAt.current = performance.now();
-    }, [open]);
-    const beganBeforeOpening = (event: CustomEvent<{ originalEvent: Event }>) =>
-      event.detail.originalEvent.timeStamp < openedAt.current;
+    // See `useBeganBeforeOpening`: a late outside dismissal of the tap that reopened the panel.
+    const beganBeforeOpening = useBeganBeforeOpening(open);
 
     const cleanupRef = useRef<(() => void) | null>(null);
     const contentNode = useRef<HTMLDivElement | null>(null);

@@ -111,6 +111,30 @@ describe('Menu', () => {
     expect(await screen.findByRole('menuitem', { name: 'Two' })).toHaveFocus();
   });
 
+  it('loop={false}: arrows stop at the first and last item instead of wrapping', async () => {
+    const user = userEvent.setup();
+    render(
+      <Menu>
+        <MenuTrigger>Actions</MenuTrigger>
+        <MenuContent loop={false}>
+          <MenuItem>One</MenuItem>
+          <MenuItem>Two</MenuItem>
+        </MenuContent>
+      </Menu>,
+    );
+    trigger().focus();
+    await user.keyboard('{ArrowDown}');
+    expect(await screen.findByRole('menuitem', { name: 'One' })).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'One' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Two' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Two' })).toHaveFocus();
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getByRole('menuitem', { name: 'One' })).toHaveFocus();
+  });
+
   it('arrows wrap, skip disabled items; Home/End; typeahead', async () => {
     const user = userEvent.setup();
     render(<Demo disabledDup />);
