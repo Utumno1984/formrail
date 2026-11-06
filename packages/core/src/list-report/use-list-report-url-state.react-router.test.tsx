@@ -117,6 +117,7 @@ describe('core package.json', () => {
       '@radix-ui/react-popover',
       '@radix-ui/react-select',
       '@radix-ui/react-slot',
+      '@radix-ui/react-tabs',
       '@radix-ui/react-tooltip',
       'clsx',
       'tailwind-merge',
