@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
-  "include": ["e2e", "playwright.config.ts", ".storybook/main.ts", ".storybook/preview.ts", ".storybook/css.d.ts"]
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": { "@react-object-page/core": ["./packages/core/src/index.ts"] }
+  },
+  "include": ["e2e", "playwright.config.ts", ".storybook/main.ts", ".storybook/preview.ts", ".storybook/css.d.ts", ".storybook/introduction-demos.tsx", "packages/core/src/types/raw.d.ts"]
 }
