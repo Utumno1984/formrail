@@ -441,6 +441,77 @@ describe('Tabs', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
+  it('a consumer tabIndex on a trigger cannot break the single tab stop', () => {
+    render(
+      <Tabs defaultValue="a">
+        <TabsList aria-label="S">
+          <TabsTrigger value="a" tabIndex={-1}>A</TabsTrigger>
+          <TabsTrigger value="b" tabIndex={0}>B</TabsTrigger>
+        </TabsList>
+      </Tabs>,
+    );
+    expect(screen.getByRole('tab', { name: 'A' })).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tab', { name: 'B' })).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('a consumer tabIndex on a panel cannot override the "tab stop only without focusable content" rule', () => {
+    render(
+      <Tabs defaultValue="a">
+        <TabsList aria-label="S">
+          <TabsTrigger value="a">A</TabsTrigger>
+          <TabsTrigger value="b">B</TabsTrigger>
+        </TabsList>
+        <TabsContent value="a" tabIndex={0}>
+          <input aria-label="x" />
+        </TabsContent>
+        <TabsContent value="b" tabIndex={-1}>plain</TabsContent>
+      </Tabs>,
+    );
+    expect(screen.getByRole('tabpanel')).not.toHaveAttribute('tabindex');
+  });
+
+  it('a tab with value="" is not selected when there is no value or defaultValue', () => {
+    render(
+      <Tabs>
+        <TabsList aria-label="S">
+          <TabsTrigger value="">Empty</TabsTrigger>
+          <TabsTrigger value="b">B</TabsTrigger>
+        </TabsList>
+        <TabsContent value="">empty panel</TabsContent>
+        <TabsContent value="b">b panel</TabsContent>
+      </Tabs>,
+    );
+    expect(screen.getByRole('tab', { name: 'Empty' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.queryByRole('tabpanel')).toBeNull();
+  });
+
+  it('a tab with value="" can be selected and controlled like any other', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(
+      <Tabs defaultValue="b" onValueChange={onValueChange}>
+        <TabsList aria-label="S">
+          <TabsTrigger value="">Empty</TabsTrigger>
+          <TabsTrigger value="b">B</TabsTrigger>
+        </TabsList>
+        <TabsContent value="">empty panel</TabsContent>
+        <TabsContent value="b">b panel</TabsContent>
+      </Tabs>,
+    );
+    await user.click(screen.getByRole('tab', { name: 'Empty' }));
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('empty panel');
+    expect(onValueChange).toHaveBeenCalledWith('');
+  });
+
+  it('the "matches no tab" warning is re-checked when the set of tabs changes while value stays', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { rerender } = render(<Demo value="b" tabs={['a', 'b']} />);
+    expect(error.mock.calls.some((c) => String(c[0]).includes('matches no tab'))).toBe(false);
+    rerender(<Demo value="b" tabs={['a', 'c']} />);
+    await vi.waitFor(() => expect(error.mock.calls.some((c) => String(c[0]).includes('matches no tab'))).toBe(true));
+    error.mockRestore();
+  });
+
   it('SSR: the server markup hydrates without errors', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const container = document.createElement('div');

@@ -3,6 +3,7 @@ import {
   forwardRef,
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -163,16 +164,29 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     setInheritedDir((prev) => (prev === computed ? prev : computed));
   }, [rest.dir]);
   const state = useMemo(() => ({ orientation, keepMounted, current }), [orientation, keepMounted, current]);
+  // Radix's root is always controlled and needs a string: "nothing selected" is a per-instance
+  // value no consumer tab can have (an empty string would select a tab with `value=""`).
+  const noSelection = `\u0000rop-no-selection:${useId()}`;
 
   useEffect(() => {
     if (!isDev() || value === undefined) return;
     const el = root.current;
     if (!el) return;
     const own = (node: Element) => node.closest('[data-rop-tabs]') === el;
-    const tabs = Array.from(el.querySelectorAll('[role="tab"]')).filter(own);
-    if (tabs.length > 0 && !tabs.some((t) => t.getAttribute('aria-selected') === 'true')) {
-      console.error(noMatchWarning(value));
-    }
+    let warned = false;
+    const check = () => {
+      const tabs = Array.from(el.querySelectorAll('[role="tab"]')).filter(own);
+      const unmatched = tabs.length > 0 && !tabs.some((t) => t.getAttribute('aria-selected') === 'true');
+      if (unmatched && !warned) console.error(noMatchWarning(value));
+      warned = unmatched;
+    };
+    check();
+    // The set of tabs can change without `Tabs` rendering (a child owns the list) while `value`
+    // stays the same: look again whenever tabs are added or removed.
+    if (typeof MutationObserver === 'undefined') return;
+    const observer = new MutationObserver(check);
+    observer.observe(el, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [value]);
 
   return (
@@ -180,7 +194,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
       <RadixTabs.Root
         {...rest}
         dir={rest.dir ?? inheritedDir}
-        value={current ?? ''}
+        value={current ?? noSelection}
         onValueChange={handleValueChange}
         orientation={orientation}
         ref={mergedRef}
@@ -238,10 +252,11 @@ export const TabsTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, TabsTri
 
     return (
       <RadixTabs.Trigger
+        {...rest}
         // The tab stop follows the selection, not the last focused tab (Radix's own roving state):
         // otherwise Shift+Tab from a panel would land on a stale tab and, in automatic mode, select it.
+        // After the spread: a consumer `tabIndex` must not break the single tab stop.
         tabIndex={current === rest.value ? 0 : -1}
-        {...rest}
         ref={mergedRef}
         data-orientation={orientation}
         onFocus={handleFocus}
@@ -282,8 +297,9 @@ export const TabsContent = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsConten
     // Radix only hides a panel that is not present: with `forceMount` it must be told explicitly.
     return (
       <RadixTabs.Content
-        tabIndex={hasFocusable ? undefined : 0}
         {...rest}
+        // After the spread: a consumer `tabIndex` must not override this rule.
+        tabIndex={hasFocusable ? undefined : 0}
         ref={mergedRef}
         forceMount={keep ? true : undefined}
         hidden={state.current !== rest.value}
