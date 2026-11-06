@@ -36,7 +36,7 @@ const meta: Meta<DemoArgs> = {
   title: 'Overlays/Menu',
   // Overlays opened at mount (`defaultOpen`) would take over the Docs page if the stories were rendered
   // inline: each story gets its own iframe there.
-  parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
+  parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '420px' } } },
   argTypes: {
     side: {
       control: 'radio',
@@ -83,6 +83,7 @@ function Page({ children, end }: { children?: React.ReactNode; end?: boolean }) 
         fontFamily: 'system-ui, sans-serif',
         fontSize: 14,
         minHeight: 420,
+        boxSizing: 'border-box',
         display: 'flex',
         justifyContent: end ? 'flex-end' : 'flex-start',
       }}
@@ -443,23 +444,25 @@ export const ExternalState: Story = {
       const [open, setOpen] = useState(false);
       return (
         <Page>
-          <Button variant="primary" onClick={() => setOpen(true)}>
-            Open from outside
-          </Button>{' '}
-          <Menu
-            open={open}
-            onOpenChange={(next) => {
-              args.onOpenChange(next);
-              setOpen(next);
-            }}
-          >
-            <MenuTrigger asChild>
-              <Button variant="secondary">More actions</Button>
-            </MenuTrigger>
-            <MenuContent>
-              <Items args={args} />
-            </MenuContent>
-          </Menu>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="primary" onClick={() => setOpen(true)}>
+              Open from outside
+            </Button>
+            <Menu
+              open={open}
+              onOpenChange={(next) => {
+                args.onOpenChange(next);
+                setOpen(next);
+              }}
+            >
+              <MenuTrigger asChild>
+                <Button variant="secondary">More actions</Button>
+              </MenuTrigger>
+              <MenuContent>
+                <Items args={args} />
+              </MenuContent>
+            </Menu>
+          </div>
         </Page>
       );
     }
@@ -544,23 +547,25 @@ export const TabOrderDialog: Story = {
             <DialogTitle>Record</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <Menu>
-              <MenuTrigger asChild>
-                <Button variant="secondary">First menu</Button>
-              </MenuTrigger>
-              <MenuContent>
-                <Items args={args} />
-              </MenuContent>
-            </Menu>{' '}
-            <Button variant="ghost">Middle</Button>{' '}
-            <Menu>
-              <MenuTrigger asChild>
-                <Button variant="secondary">Last menu</Button>
-              </MenuTrigger>
-              <MenuContent>
-                <Items args={args} />
-              </MenuContent>
-            </Menu>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Menu>
+                <MenuTrigger asChild>
+                  <Button variant="secondary">First menu</Button>
+                </MenuTrigger>
+                <MenuContent>
+                  <Items args={args} />
+                </MenuContent>
+              </Menu>
+              <Button variant="ghost">Middle</Button>
+              <Menu>
+                <MenuTrigger asChild>
+                  <Button variant="secondary">Last menu</Button>
+                </MenuTrigger>
+                <MenuContent>
+                  <Items args={args} />
+                </MenuContent>
+              </Menu>
+            </div>
           </DialogBody>
         </DialogContent>
       </Dialog>

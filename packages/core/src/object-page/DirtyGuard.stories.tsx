@@ -55,7 +55,7 @@ type Story = StoryObj<DemoArgs>;
 function Demo({ when, title, description, stay, leave, close, action }: DemoArgs) {
   const { guard, dialog } = useDirtyGuard({ when, labels: { title, description, stay, leave, close } });
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
+    <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360, boxSizing: 'border-box' }}>
       <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Supplier ACME</h1>
       <p style={{ margin: '0 0 16px', maxWidth: 480 }}>
         {when
@@ -152,7 +152,7 @@ export const InsideDialog: Story = {
       const [open, setOpen] = useState(false);
       const { guard, dialog } = useDirtyGuard({ when: true, labels: { title, description, stay, leave } });
       return (
-        <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
+        <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360, boxSizing: 'border-box' }}>
           <Button onClick={() => setOpen(true)}>Open the card</Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent>
@@ -200,7 +200,7 @@ export const BrowserHistory: Story = {
       }, []);
       const { dialog } = useDirtyGuard({ when: value !== '', labels: { title, description, stay, leave } });
       return (
-        <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
+        <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360, boxSizing: 'border-box' }}>
           <p data-testid="route">Route: {hash || '(none)'}</p>
           <label>
             Supplier name
