@@ -7,7 +7,9 @@ interaction patterns, plus the primitives they are built from (`Button`, `Field`
 layout stability (no jumps between loading, empty and loaded states) are tested, not assumed.
 
 This package is the free, MIT-licensed tier of the
-[react-object-page](https://github.com/Utumno1984/react-object-page) project. It is an independent
+[react-object-page](https://github.com/Utumno1984/react-object-page) project — see its
+[**Stato**](https://github.com/Utumno1984/react-object-page#stato) section for what is in this
+tier today versus the commercially-licensed `@react-object-page/pro`. It is an independent
 implementation of generic, publicly known UI patterns.
 
 **[Live demo and documentation (Storybook)](https://utumno1984.github.io/react-object-page/)**
