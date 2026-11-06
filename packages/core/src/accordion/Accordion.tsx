@@ -3,12 +3,14 @@ import {
   createElement,
   forwardRef,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ComponentPropsWithoutRef,
 } from 'react';
 import * as RadixAccordion from '@radix-ui/react-accordion';
+import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import {
@@ -67,7 +69,11 @@ export interface AccordionMultipleProps extends AccordionBaseProps {
 export type AccordionProps = AccordionSingleProps | AccordionMultipleProps;
 
 export interface AccordionItemProps extends Omit<ComponentPropsWithoutRef<'div'>, 'value'> {
-  /** Unique inside the accordion; this is what `value` / `onValueChange` carry. */
+  /**
+   * Unique inside the accordion; this is what `value` / `onValueChange` carry. In `type="single"`
+   * the empty string is reserved for "none open": an item with `value=""` never opens (logs an error
+   * in development).
+   */
   value: string;
   /** A disabled item cannot be toggled and is skipped by the arrow keys. */
   disabled?: boolean;
@@ -155,7 +161,13 @@ export const Accordion = /* @__PURE__ */ forwardRef<HTMLDivElement, AccordionPro
 export const AccordionItem = /* @__PURE__ */ forwardRef<HTMLDivElement, AccordionItemProps>(function AccordionItem(props, ref) {
   const { className, value, ...rest } = props;
   const { type, current } = useContext(AccordionContext);
-  const open = Array.isArray(current) ? current.includes(value) : type === 'single' && current === value;
+  // In `single`, `''` means "none open" (Radix reads it that way): an item can never be open with it.
+  const open = Array.isArray(current) ? current.includes(value) : type === 'single' && current !== '' && current === value;
+  useEffect(() => {
+    if (value === '' && type === 'single' && isDev()) {
+      console.error('[react-object-page] <AccordionItem value=""> in a `type="single"` Accordion can never open: `""` means "none open". Use a non-empty value.');
+    }
+  }, [value, type]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const state = useMemo(() => ({ open, triggerRef }), [open]);
   return (

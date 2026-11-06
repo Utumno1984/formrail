@@ -93,10 +93,23 @@ test.describe('Navigation/Accordion', () => {
     await expectFocusRingVisible(page.getByRole('button', { name: 'Invoice details' }));
   });
 
-  test('the content holds no overflow:hidden at rest (inner focus ring is not clipped)', async ({ page }) => {
-    await gotoStory(page, `${ACC}one-open`);
-    const overflow = await page.getByRole('region', { name: 'Shipping' }).evaluate((el) => getComputedStyle(el).overflow);
-    expect(overflow).toBe('visible');
+  test('after a real opening animation the panel is at rest: overflow visible and the height follows the content', async ({ page }) => {
+    // Starts closed and opens with a click, so the keyframes really run (a panel mounted open never animates).
+    await gotoStory(page, `${ACC}closed`);
+    await page.getByRole('button', { name: 'Shipping' }).click();
+    const region = page.getByRole('region', { name: 'Shipping' });
+    await expect(region).toBeVisible();
+    await page.waitForTimeout(600);
+    const state = () => region.evaluate((el) => ({ overflow: getComputedStyle(el).overflow, height: el.getBoundingClientRect().height }));
+    const before = await state();
+    expect(before.overflow).toBe('visible');
+    // Content that grows after the animation (text loaded later): the panel must follow, not stay frozen.
+    await region.evaluate((el) => {
+      const filler = document.createElement('div');
+      filler.style.height = '200px';
+      el.firstElementChild!.appendChild(filler);
+    });
+    expect((await state()).height).toBeGreaterThan(before.height + 150);
   });
 
   test('chevron rotation does not change the trigger size', async ({ page }) => {

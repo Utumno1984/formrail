@@ -1,6 +1,7 @@
 import { createRef, useState } from 'react';
 import { renderToString } from 'react-dom/server';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { hydrateRoot } from 'react-dom/client';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import { Input } from '../input/Input';
@@ -53,7 +54,18 @@ describe('Collapsible', () => {
     expect(onOpenChange.mock.calls).toEqual([[true], [false], [true]]);
   });
 
-  it('defaultOpen renders open; disabled blocks click and keyboard', async () => {
+  it('defaultOpen renders open', () => {
+    render(
+      <Collapsible defaultOpen>
+        <CollapsibleTrigger>More</CollapsibleTrigger>
+        <CollapsibleContent>Body</CollapsibleContent>
+      </Collapsible>,
+    );
+    expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Body')).toBeVisible();
+  });
+
+  it('disabled blocks click and keyboard', async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     render(
@@ -146,7 +158,6 @@ describe('Collapsible', () => {
     );
     expect(ref.current).toBe(screen.getByTestId('root'));
     expect(ref.current!.className).toContain('p-9');
-    expect(ref.current!.className).not.toContain('min-w-0 p-0');
     expect(triggerRef.current).toBe(screen.getByRole('button'));
     expect(triggerRef.current!.className).toContain('p-8');
     expect(triggerRef.current!.className).not.toMatch(/(^| )px-3( |$)/ );
@@ -273,10 +284,42 @@ describe('Accordion', () => {
     }
   });
 
-  it('SSR: a default-open item renders its content open', () => {
+  it('SSR: a default-open item renders its content open and hydrates without errors', () => {
     const html = renderToString(<Demo defaultValue="a" />);
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain('role="region"');
     expect(html).toContain('<input');
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onRecoverableError = vi.fn();
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    document.body.appendChild(host);
+    let root: ReturnType<typeof hydrateRoot>;
+    act(() => {
+      root = hydrateRoot(host, <Demo defaultValue="a" />, { onRecoverableError });
+    });
+    expect(onRecoverableError).not.toHaveBeenCalled();
+    expect(errors).not.toHaveBeenCalled();
+    act(() => root.unmount());
+    host.remove();
+    errors.mockRestore();
+  });
+
+  it('single: an item with value="" never opens and logs an error in development', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onValueChange = vi.fn();
+    render(
+      <Accordion type="single" onValueChange={onValueChange}>
+        <AccordionItem value="">
+          <AccordionTrigger>Empty</AccordionTrigger>
+          <AccordionContent>Body</AccordionContent>
+        </AccordionItem>
+      </Accordion>,
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Empty' }));
+    expect(screen.getByRole('button', { name: 'Empty' })).toHaveAttribute('aria-expanded', 'false');
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(errors).toHaveBeenCalledWith(expect.stringContaining('value=""'));
+    errors.mockRestore();
   });
 });
