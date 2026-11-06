@@ -1,5 +1,0 @@
----
-'@react-object-page/core': minor
----
-
-`Field`: container of a form control with `label`, `help`, `error`, `required` and a `state` of `default | disabled | forced | locked` (a `stateReason` is required by the type for `forced` and `locked`). It wires the control with a real `aria-describedby` (state reason, error, help: only messages that are rendered), `aria-invalid`, `aria-required`, native `disabled` or `readOnly` + `aria-readonly`; the required marker is `aria-hidden`, so the accessible name stays the label. Any control is connected through the render-prop `(control) => <X {...control} />` or `useFieldControl()` (throws outside a `Field`); `control.state` and `control.interactionBlocked` are non-enumerable, so they never leak onto the DOM through a spread. While focus is inside a `Field`, it keeps itself clear of the on-screen keyboard using `visualViewport` and publishes the covered height as `--rop-keyboard-inset` on `<html>`. `Input`: styled native input (`size` `sm | md`) that connects itself inside a `Field`, merges its own `aria-describedby`, and never calls `onChange` when `value` changes from outside.

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectDeclaredPaths, findMissingPaths } from './helpers/package-paths';
 
@@ -35,6 +35,20 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
     expect(files).toContain('index.cjs');
     expect(files).toContain('index.d.ts');
     expect(files).toContain('index.d.cts');
+  });
+
+  it('no published file carries an absolute path of the build machine (source maps included)', () => {
+    const offenders: string[] = [];
+    for (const name of readdirSync(distDir)) {
+      const text = readFileSync(join(distDir, name), 'utf8');
+      if (text.includes(packageDir)) offenders.push(name);
+      if (name.endsWith('.map')) {
+        const map = JSON.parse(text) as { file?: string; sources?: string[] };
+        const paths = [map.file ?? '', ...(map.sources ?? [])];
+        if (paths.some((p) => isAbsolute(p))) offenders.push(`${name} (absolute file/sources)`);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 
   it('the path resolver detects an exports entry pointing to a file the build did not generate', () => {

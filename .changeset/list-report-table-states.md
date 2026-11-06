@@ -1,5 +1,0 @@
----
-'@react-object-page/core': minor
----
-
-`ListReportTable` now has stable states: `status` (`ready` / `loading` / `error`), `loadingRowCount` (default 5), `errorMessage`, `onRetry`, `onClearFilters` and `labels` (type `ListReportTableLabels`, Italian defaults). Loading without rows shows skeleton rows with the same row height and columns; empty ("Nessun dato") and no results (rows exist but the filter or search hides them, with an optional "Azzera filtri" button) are one cell spanning the columns; the error is a `MessageStrip` with an optional "Riprova" button and replaces the rows. Header, column widths and a body of at least `loadingRowCount` rows stay the same in every state, so nothing jumps. The container is `aria-busy` while loading (a reload keeps its rows), and an always-mounted `aria-live="polite"` region announces loading, empty, no results, the error and the result count when the data is back (nothing at first mount). The state buttons move the focus to the table container before they disappear. Data cells now declare their 1px vertical padding (the same value the browser applied), which the filler and message cells rely on.

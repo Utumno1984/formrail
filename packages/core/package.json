@@ -1,8 +1,33 @@
 {
   "name": "@react-object-page/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Headless React implementation of public List Report and Object Page interaction patterns (Free tier, MIT).",
   "license": "MIT",
+  "author": "Daniele Ingusci",
+  "homepage": "https://utumno1984.github.io/react-object-page/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Utumno1984/react-object-page.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Utumno1984/react-object-page/issues"
+  },
+  "keywords": [
+    "react",
+    "react-components",
+    "design-system",
+    "headless",
+    "typescript",
+    "accessibility",
+    "a11y",
+    "list-report",
+    "object-page",
+    "data-table",
+    "form",
+    "dirty-tracking",
+    "tailwind"
+  ],
   "type": "module",
   "sideEffects": [
     "**/*.css"
@@ -39,7 +64,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup && node scripts/build-css.mjs",
+    "build": "tsup && node scripts/relativize-sourcemaps.mjs && node scripts/build-css.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
   },

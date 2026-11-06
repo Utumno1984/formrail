@@ -10,7 +10,7 @@ export interface ListReportColumn<Row> {
   id: string;
   header: ReactNode;
   /**
-   * Value used for sorting (and, in later tickets, filtering and searching). Without `cell` it is also
+   * Value used for sorting (and, in the future, filtering and searching). Without `cell` it is also
    * the text of the cell: the rules on `cell` about memoized rows apply to it in that role.
    */
   accessor?: (row: Row) => unknown;

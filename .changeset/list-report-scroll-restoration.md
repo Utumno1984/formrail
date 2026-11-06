@@ -1,5 +1,0 @@
----
-'@react-object-page/core': minor
----
-
-New `useListReportScrollRestoration`: saves the scroll of the List Report table's container (`scrollTop` and `scrollLeft`) in `sessionStorage`, under a key made of the pathname and the report's own URL parameters (same `prefix`/`params` as `useListReportUrlState`, or an explicit `key`), and puts it back once, in the first commit where `ready` is `true`, after the report is mounted again (detail page and back). A scroll by the user before the data arrives wins; another filter or search is another position; a shorter dataset stops at its maximum; writes are throttled and flushed on unmount and `pagehide`; storage that is missing, throws or holds a corrupt value is ignored; the window and `history.scrollRestoration` are never touched. `ListReport` gets a `scrollerRef` prop (the table's scrolling container). New types `UseListReportScrollRestorationOptions` and `UseListReportScrollRestorationReturn`. New bundle budget entry for `useListReportScrollRestoration`.

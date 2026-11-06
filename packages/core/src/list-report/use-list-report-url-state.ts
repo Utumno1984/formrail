@@ -64,8 +64,8 @@ export interface UseListReportUrlStateReturn {
 type HistoryMode = 'replace' | 'push';
 
 /**
- * Where the state lives. Internal for now: the browser URL below. A router adapter (separate ticket)
- * will make it injectable with the same shape.
+ * Where the state lives. Internal for now: the browser URL below. A future router adapter will
+ * make it injectable with the same shape.
  */
 interface UrlSource {
   /** The current query string (`?a=1&b=2`, or `''`). */

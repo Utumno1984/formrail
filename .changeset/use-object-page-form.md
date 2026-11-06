@@ -1,5 +1,0 @@
----
-'@react-object-page/core': minor
----
-
-Add `useObjectPageForm<Values>({ baseline, isEqual? })`, the headless state of a simple Object Page form: `values`, `baseline`, `isDirty` (deep structural comparison against the baseline: arrays and plain objects by content, `Date` by time, `NaN` equal to `NaN`; `''`, `null` and `undefined` are different), typed `setValue` / `setValues`, `reset(newBaseline)` to hydrate data that arrives after mount without ever marking the form dirty, `reset()` to discard edits, and `save(handler)` with `isSaving` / `saveError` (a reset during a save is not overwritten by its later success; edits made while saving stay dirty; a synchronous throw is a save error; no state update after unmount). After a successful save whose values were not edited meanwhile, the values become the baseline returned by the handler (the form stays clean on server-normalized data). The `baseline` option is read once at mount (a development warning points to `reset(newBaseline)`). SSR-safe; the action functions have a stable identity. No change callback is exposed.

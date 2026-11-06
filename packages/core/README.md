@@ -1,7 +1,54 @@
 # @react-object-page/core
 
-Headless React implementation of public List Report and Object Page interaction patterns
-(Free tier, MIT).
+React components and hooks for the **List Report** (filterable, sortable, selectable lists) and
+**Object Page** (sectioned editor with anchor bar, sticky save bar and unsaved-changes guard)
+interaction patterns, plus the primitives they are built from (`Button`, `Field`, `Input`, `Select`,
+`Combobox`, `DatePicker`, `Dialog`, `Sheet`, `Tabs`, `Toast`...). Accessibility, keyboard support and
+layout stability (no jumps between loading, empty and loaded states) are tested, not assumed.
+
+This package is the free, MIT-licensed tier of the
+[react-object-page](https://github.com/Utumno1984/react-object-page) project. It is an independent
+implementation of generic, publicly known UI patterns.
+
+**[Live demo and documentation (Storybook)](https://utumno1984.github.io/react-object-page/)**
+
+## Install
+
+```bash
+npm install @react-object-page/core
+```
+
+Peer dependencies: `react` and `react-dom` (18 or 19).
+
+## Quick start
+
+```tsx
+// once, at the root of your app (see "Styles" below for the Tailwind v4 alternative)
+import '@react-object-page/core/styles.css';
+
+import { Button, Field, Input } from '@react-object-page/core';
+
+export function SupplierForm() {
+  return (
+    <form onSubmit={(event) => event.preventDefault()}>
+      <Field label="Supplier name" name="supplier" help="As shown on the invoice." required>
+        <Input defaultValue="Acme Ltd" />
+      </Field>
+      <Button type="submit" variant="primary">
+        Save
+      </Button>
+    </form>
+  );
+}
+```
+
+`Field` wires the label, help text, error and required state to the control (real `aria-describedby`,
+`aria-invalid`, `aria-required`). For whole pages see `ListReport`, `useListReport`, `ObjectPage`,
+`useObjectPageForm` and `useDirtyGuard` in the Storybook above.
+
+## License
+
+[MIT](./LICENSE) © Daniele Ingusci
 
 ## Styles
 
