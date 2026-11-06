@@ -226,6 +226,10 @@
       "baseline": 11129,
       "limit": 12242
     },
+    "Spinner": {
+      "baseline": 11098,
+      "limit": 12208
+    },
     "StatusBadge": {
       "baseline": 11233,
       "limit": 12357

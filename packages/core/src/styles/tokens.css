@@ -137,6 +137,10 @@
   --motion-rop-skeleton-duration: 1.6s;
   --motion-rop-skeleton-easing: ease-in-out;
   --animate-rop-skeleton-pulse: rop-skeleton-pulse var(--motion-rop-skeleton-duration) var(--motion-rop-skeleton-easing) infinite;
+  /* Spinner rotation: one CSS animation (no JS timer); applied only under `motion-safe:`. */
+  --motion-rop-spinner-duration: 0.8s;
+  --motion-rop-spinner-easing: linear;
+  --animate-rop-spinner: rop-spinner var(--motion-rop-spinner-duration) var(--motion-rop-spinner-easing) infinite;
   /* Invisible (no visual change): only keeps the wrapper of the portal mounted for as long as its
      children animate out. */
   --animate-rop-modal-hold: rop-modal-hold var(--motion-rop-overlay-duration) linear forwards;
@@ -160,6 +164,11 @@
     }
     to {
       translate: 250% 0;
+    }
+  }
+  @keyframes rop-spinner {
+    to {
+      rotate: 360deg;
     }
   }
   @keyframes rop-skeleton-pulse {
