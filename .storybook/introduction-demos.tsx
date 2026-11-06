@@ -117,11 +117,12 @@ export function DirtyTrackingDemo() {
       <div style={ROW}>
         <Button
           variant="primary"
-          onClick={() =>
+          onClick={() => {
+            if (!form.isDirty) return;
             void form.save(async () => {
               setSaved(true);
-            })
-          }
+            });
+          }}
           aria-disabled={!form.isDirty || undefined}
         >
           Save
