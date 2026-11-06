@@ -202,6 +202,10 @@ describe('internal icons', () => {
     const exposed = Object.keys(publicApi);
     expect(exposed).not.toContain('internalIcons');
     expect(exposed.sort()).toEqual([
+      'Accordion',
+      'AccordionContent',
+      'AccordionItem',
+      'AccordionTrigger',
       'Avatar',
       'Breadcrumb',
       'BreadcrumbItem',
@@ -216,6 +220,9 @@ describe('internal icons', () => {
       'CardHeader',
       'CardTitle',
       'Checkbox',
+      'Collapsible',
+      'CollapsibleContent',
+      'CollapsibleTrigger',
       'Combobox',
       'DatePicker',
       'DescriptionList',
