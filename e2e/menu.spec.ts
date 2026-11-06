@@ -14,6 +14,7 @@ async function bodyPointerEvents(page: Page): Promise<string> {
 test.describe('Overlays/Menu: stories play', () => {
   for (const name of [
     'playground',
+    'loop-disabled',
     'open-with-groups',
     'near-right-edge',
     'opens-a-dialog',

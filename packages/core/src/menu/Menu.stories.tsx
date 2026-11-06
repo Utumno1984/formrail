@@ -163,6 +163,29 @@ export const Playground: Story = {
   },
 };
 
+/** `loop={false}`: arrow navigation stops at the last item instead of wrapping back to the first. */
+export const LoopDisabled: Story = {
+  args: { disabledItem: 'none', loop: false },
+  render: (args) => (
+    <Page>
+      <BasicMenu args={args} />
+    </Page>
+  ),
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'More actions' });
+    trigger.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    const body = within(canvasElement.ownerDocument.body);
+    const deleteItem = await body.findByRole('menuitem', { name: 'Delete…' });
+    // Four items (Rename, Duplicate, Archive, Delete): three more ArrowDown reach the last one.
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{ArrowDown}');
+    await waitFor(() => expect(deleteItem).toHaveFocus());
+    // A further ArrowDown would wrap to "Rename" with the default `loop`; here it stays on "Delete".
+    await userEvent.keyboard('{ArrowDown}');
+    await expect(deleteItem).toHaveFocus();
+  },
+};
+
 /** The open menu with groups, labels, a separator, a disabled and a danger item (visual baseline). */
 export const OpenWithGroups: Story = {
   tags: ['visual'],

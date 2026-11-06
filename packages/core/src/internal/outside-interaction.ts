@@ -1,6 +1,9 @@
 // Internal: the timing of "outside" interactions on overlays, in one place. Not exported from the package.
-// A future fix (a new pointer type, an iOS Safari quirk) is made here and reaches Dialog, Sheet and Menu.
+// A future fix to `useBeganBeforeOpening` (a new pointer type, an iOS Safari quirk) reaches Dialog and
+// Sheet from one place; `useTouchOutsideSwallow` has one caller today (Menu) but lives next to it for
+// the same reason.
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import type { RefObject } from 'react';
 
 /**
  * Radix can deliver a "pointer down outside" late (a touch is dispatched on the following `click`).
@@ -52,9 +55,9 @@ interface TouchOutsideSwallowOptions {
   /** Inactive when false (the overlay is not modal). */
   enabled: boolean;
   /** The overlay's panel: a tap inside it is not an outside tap. */
-  contentRef: { current: HTMLElement | null };
+  contentRef: RefObject<HTMLElement | null>;
   /** The opener: its own tap is the toggle, not an outside tap. Hit-tested by position. */
-  anchorRef: { current: HTMLElement | null };
+  anchorRef: RefObject<HTMLElement | null>;
   /** Closes the overlay; called at the pointerdown of an outside touch. */
   close: () => void;
 }

@@ -62,10 +62,7 @@ export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageP
   const sync = useCallback(() => {
     // A detached element (removed, its cleanup not run yet) has no position to compare: it is left out.
     const connected = Array.from(entries.current.values()).filter((entry) => entry.element.isConnected);
-    const sorted = connected.sort((a, b) => {
-      if (a.element === b.element) return 0;
-      return compareDocumentOrder(a.element, b.element);
-    });
+    const sorted = connected.sort((a, b) => compareDocumentOrder(a.element, b.element));
     const next = sorted.map(({ id, readTitle }) => ({ id, title: readTitle() }));
     setSections((prev) => (sameSections(prev, next) ? prev : next));
   }, []);
