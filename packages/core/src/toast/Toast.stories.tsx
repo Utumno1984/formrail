@@ -54,7 +54,13 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
-const PAGE: CSSProperties = { padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 };
+const PAGE: CSSProperties = {
+  padding: 24,
+  fontFamily: 'system-ui, sans-serif',
+  fontSize: 14,
+  minHeight: 360,
+  boxSizing: 'border-box',
+};
 
 function Page({ children }: { children?: ReactNode }) {
   return (

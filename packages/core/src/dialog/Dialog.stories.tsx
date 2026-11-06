@@ -46,7 +46,7 @@ type Story = StoryObj<DemoArgs>;
 /** Page content behind the dialog, so that the backdrop and the inert state are visible. */
 function Page({ children }: { children?: ReactNode }) {
   return (
-    <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360 }}>
+    <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif', fontSize: 14, minHeight: 360, boxSizing: 'border-box' }}>
       <h1 style={{ margin: '0 0 8px', fontSize: 20 }}>Suppliers</h1>
       <p style={{ margin: '0 0 16px', maxWidth: 480 }}>
         The page under the dialog: while it is open it cannot be reached by keyboard or by screen readers.
