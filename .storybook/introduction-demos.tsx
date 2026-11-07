@@ -194,6 +194,12 @@ const DEMO_FRAME: CSSProperties = {
   padding: 16,
   margin: '12px 0 24px',
   boxSizing: 'border-box',
+  // `sb-unstyled` also drops the page's font, so bare text in a demo (<small>, <code>) would fall back to serif:
+  // set the library's own typography on the frame.
+  fontFamily: 'var(--font-rop-sans, system-ui, sans-serif)',
+  fontSize: 'var(--text-rop-body, 0.875rem)',
+  lineHeight: 'var(--text-rop-body--line-height, 1.25rem)',
+  color: 'var(--color-rop-text, inherit)',
 };
 
 /**

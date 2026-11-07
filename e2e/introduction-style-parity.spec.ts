@@ -95,7 +95,16 @@ test.describe('Introduction demos render like the library (no .sbdocs leak)', ()
     }
     // The leak symptoms named in the ticket, asserted explicitly with a readable message.
     expect(intro.title!.borderBottomWidth, 'h2 border from .sbdocs').toBe('0px');
-    expect(intro['td-row-1']!.backgroundColor, 'zebra stripe from .sbdocs').toBe(intro['td-row-2']!.backgroundColor);
+    // .sbdocs paints the stripe on the <tr>, not the <td>: compare the rows themselves.
+    const rowBg = await page.locator('[data-testid="demo-frame"] tbody tr').evaluateAll((trs) =>
+      trs.slice(0, 4).map((tr) => getComputedStyle(tr).backgroundColor),
+    );
+    expect(new Set(rowBg).size, `zebra stripe from .sbdocs on <tr>: ${rowBg.join(' | ')}`).toBe(1);
+    // Bare text in the frame uses the library font, not the browser serif default.
+    const fonts = await page.locator('[data-testid="demo-frame"]').evaluateAll((fs) =>
+      fs.map((f) => getComputedStyle(f).fontFamily),
+    );
+    for (const f of fonts) expect(f, 'demo frame font').toMatch(/system-ui|sans-serif/);
     // And full parity of everything else we probe.
     for (const key of keys) {
       expect(intro[key], `${key} computed style`).toEqual(canvas[key]);
