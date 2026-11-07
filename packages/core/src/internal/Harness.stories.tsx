@@ -5,8 +5,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 
 const meta = {
   title: 'Internal/Harness',
-  // Test fixture / state matrix, not a documented component: no Docs page.
-  tags: ['!autodocs'],
+  // Test fixture / state matrix, not a documented component: no Docs page; `internal`: hidden from the public sidebar (#296).
+  tags: ['!autodocs', 'internal'],
   parameters: { layout: 'centered' },
 } satisfies Meta;
 

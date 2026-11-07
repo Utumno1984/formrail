@@ -325,6 +325,7 @@ export const CountPill: Story = {
 
 /** Fixture of the e2e suite: the showcase as it opens, without the play function (the e2e interacts on its own). */
 export const NoPlay: Story = {
+  tags: ['internal'],
   parameters: NO_CONTROLS,
 };
 
@@ -539,6 +540,7 @@ export const UrlState: StoryObj<UrlStateArgs> = {
 /** Fixture of the e2e suite: `UrlState` without the play function (the e2e drives the URL on its own). */
 export const UrlStateNoPlay: StoryObj<UrlStateArgs> = {
   ...UrlState,
+  tags: ['internal'],
   play: undefined,
 };
 
@@ -745,6 +747,7 @@ export const UrlStateRouterRecipe: StoryObj<UrlStateRouterRecipeArgs> = {
 /** Fixture of the e2e suite: `UrlStateRouterRecipe` without the play function. */
 export const UrlStateRouterRecipeNoPlay: StoryObj<UrlStateRouterRecipeArgs> = {
   ...UrlStateRouterRecipe,
+  tags: ['internal'],
   play: undefined,
 };
 
@@ -926,6 +929,7 @@ export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
 /** Fixture of the e2e suite: `ScrollRestoration` without the play function. */
 export const ScrollRestorationNoPlay: StoryObj<ScrollRestorationArgs> = {
   ...ScrollRestoration,
+  tags: ['internal'],
   play: undefined,
 };
 
@@ -1089,6 +1093,7 @@ export const Selection: StoryObj<SelectionArgs> = {
 /** Fixture of the e2e suite: `Selection` without the play function. */
 export const SelectionNoPlay: StoryObj<SelectionArgs> = {
   ...Selection,
+  tags: ['internal'],
   play: undefined,
 };
 

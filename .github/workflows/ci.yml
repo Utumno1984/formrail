@@ -193,6 +193,8 @@ jobs:
       - run: npm run build-storybook
         env:
           STORYBOOK_EXCLUDE_PRO: '1'
+          # Test fixtures (tag `internal`) out of the public sidebar, see .storybook/manager.ts (#296).
+          STORYBOOK_HIDE_INTERNAL: '1'
       - uses: actions/upload-pages-artifact@v5
         with:
           path: storybook-static

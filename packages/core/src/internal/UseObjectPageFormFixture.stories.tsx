@@ -204,8 +204,8 @@ function NestedDemo({ onSave }: { onSave: (v: Order) => void }) {
 
 const meta = {
   title: 'Internal/UseObjectPageFormFixture',
-  // Test fixture / state matrix, not a documented component: no Docs page.
-  tags: ['!autodocs'],
+  // Test fixture / state matrix, not a documented component: no Docs page; `internal`: hidden from the public sidebar (#296).
+  tags: ['!autodocs', 'internal'],
   component: FormDemo,
   parameters: { layout: 'padded' },
 } satisfies Meta<typeof FormDemo>;
@@ -352,7 +352,7 @@ export const ObjectPageNested: NestedStory = {
 };
 
 /** No `play`: the e2e drives Save itself (the `play` of `ObjectPageNested` would race with it). */
-export const ObjectPageNestedNoPlay: NestedStory = { ...nestedMeta, name: 'Nested Object Page (no play)' };
+export const ObjectPageNestedNoPlay: NestedStory = { ...nestedMeta, name: 'Nested Object Page (no play)', tags: ['internal'] };
 
 /** A is filled in, so the focus lands on B, a Select: its trigger is found by `data-rop-name`, not by a native `name`. */
 export const FocusFirstInvalidSelect: FocusStory = {

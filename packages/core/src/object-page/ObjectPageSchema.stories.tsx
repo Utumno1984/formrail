@@ -185,7 +185,7 @@ export const WithSchema: Story = {
 };
 
 /** No `play`: the e2e drives Save itself. */
-export const WithSchemaNoPlay: Story = { name: 'Object Page with schema (no play)' };
+export const WithSchemaNoPlay: Story = { name: 'Object Page with schema (no play)', tags: ['internal'] };
 
 /** A rule on the whole object fails: its message goes to `formErrors` (the strip), no field is marked invalid. */
 export const WholeObjectRule: Story = {

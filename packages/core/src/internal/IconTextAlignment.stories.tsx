@@ -28,8 +28,8 @@ import { internalIcons } from './icons';
 
 const meta = {
   title: 'Internal/IconTextAlignment',
-  // Test fixture / state matrix, not a documented component: no Docs page.
-  tags: ['!autodocs'],
+  // Test fixture / state matrix, not a documented component: no Docs page; `internal`: hidden from the public sidebar (#296).
+  tags: ['!autodocs', 'internal'],
   parameters: { layout: 'padded' },
 } satisfies Meta;
 
