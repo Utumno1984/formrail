@@ -65,7 +65,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     await expectNoA11yViolations(page);
   });
 
-  test('Button primary and danger: hover and pressed are shades of the scoped colours', async ({ page }) => {
+  test('Button primary and danger: hover and pressed are shades of the scoped colours @engines', async ({ page }) => {
     await expectStates(page, page.getByRole('button', { name: 'Approve', exact: true }), {
       rest: VIOLET,
       hover: hover(VIOLET),
@@ -86,7 +86,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     await expectStates(page, reminders, violet, 'borderTopColor');
   });
 
-  test('Breadcrumb: the link text follows the scoped primary on hover and pressed', async ({ page }) => {
+  test('Breadcrumb: the link text follows the scoped primary on hover and pressed @engines', async ({ page }) => {
     await expectStates(
       page,
       page.getByRole('link', { name: 'Invoices' }),
@@ -118,7 +118,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     expect(await colour(tick, 'color')).toEqual(TEXT_MUTED);
   });
 
-  test('a theme inside a theme takes the closest scope', async ({ page }) => {
+  test('a theme inside a theme takes the closest scope @engines', async ({ page }) => {
     await expectStates(page, page.getByRole('button', { name: 'Approve nested' }), {
       rest: FOREST,
       hover: hover(FOREST),
@@ -141,7 +141,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     });
   });
 
-  test('a derived token set directly on the wrapper wins over the computed shade, only for that state', async ({ page }) => {
+  test('a derived token set directly on the wrapper wins over the computed shade, only for that state @engines', async ({ page }) => {
     await page.addStyleTag({ content: '[data-testid="scoped-theme"] { --color-rop-primary-hover: #123456; }' });
     await expectStates(page, page.getByRole('button', { name: 'Approve', exact: true }), {
       rest: VIOLET,
@@ -155,7 +155,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     });
   });
 
-  test('a direct override is inherited by a nested theme, until that theme clears it with `initial`', async ({ page }) => {
+  test('a direct override is inherited by a nested theme, until that theme clears it with `initial` @engines', async ({ page }) => {
     await page.addStyleTag({ content: '[data-testid="scoped-theme"] { --color-rop-primary-hover: #123456; }' });
     const nested = page.getByRole('button', { name: 'Approve nested' });
     await nested.hover();
@@ -192,7 +192,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     await cancelPress(page);
   });
 
-  test('declared contract: a bare var() of a derived token has no value, the fallback form does', async ({ page }) => {
+  test('declared contract: a bare var() of a derived token has no value, the fallback form does @engines', async ({ page }) => {
     const read = (value: string) =>
       page.evaluate((background) => {
         const probe = document.createElement('div');
@@ -204,5 +204,45 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
       }, value);
     expect(await read('var(--color-rop-primary-hover)')).toBe('rgba(0, 0, 0, 0)');
     expect(await read('var(--color-rop-primary-hover, #123456)')).toBe('rgb(18, 52, 86)');
+  });
+
+  test('declared contract: an alias of an unset derived token is ignored, the computed shade stays @engines', async ({ page }) => {
+    await page.addStyleTag({ content: '[data-testid="scoped-theme"] { --color-rop-primary-active: var(--color-rop-primary-hover); }' });
+    const approve = page.getByRole('button', { name: 'Approve', exact: true });
+    await approve.hover();
+    await page.mouse.down();
+    expect(await colour(approve)).toEqual(active(VIOLET));
+    await cancelPress(page);
+  });
+
+  test('declared contract: the documented recipe on the element honours overrides and the scope @engines', async ({ page }) => {
+    const recipe = 'var(--color-rop-primary-hover, color-mix(in srgb, var(--color-rop-primary) 80%, black))';
+    const probe = page.getByTestId('recipe-probe');
+    await page.getByTestId('scoped-theme').evaluate((el, background) => {
+      const element = document.createElement('div');
+      element.dataset.testid = 'recipe-probe';
+      element.style.backgroundColor = background;
+      el.append(element);
+    }, recipe);
+    expect(await colour(probe)).toEqual(hover(VIOLET));
+    await page.addStyleTag({ content: '[data-testid="scoped-theme"] { --color-rop-primary-hover: #123456; }' });
+    expect(await colour(probe)).toEqual([18, 52, 86]);
+  });
+
+  test('declared contract: the same formula declared on :root is the original bug for inner scopes @engines', async ({ page }) => {
+    await page.addStyleTag({
+      content:
+        ':root { --my-hover: color-mix(in srgb, var(--color-rop-primary) 80%, black); } ' +
+        '[data-testid="scoped-theme"] button { outline: 2px solid var(--my-hover); }',
+    });
+    const outline = await page
+      .getByRole('button', { name: 'Approve', exact: true })
+      .evaluate((el) => {
+        const ctx = document.createElement('canvas').getContext('2d')!;
+        ctx.fillStyle = getComputedStyle(el).outlineColor;
+        ctx.fillRect(0, 0, 1, 1);
+        return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
+      });
+    expect(outline).toEqual(hover([10, 110, 209]));
   });
 });
