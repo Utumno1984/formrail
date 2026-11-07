@@ -84,8 +84,8 @@ test.describe('Introduction demos render like the library (no .sbdocs leak)', ()
     const canvas = await snapshotList(page, '#storybook-root');
 
     await page.goto(INTRO);
-    await page.waitForSelector('[data-testid="demo-frame"] table');
-    const intro = await snapshotList(page, '[data-testid="demo-frame"]:has(table)');
+    await page.waitForSelector('[data-testid="demo-frame-list-report"] table');
+    const intro = await snapshotList(page, '[data-testid="demo-frame-list-report"]');
 
     // Non-vacuous: every probe exists on both sides.
     const keys = ['title', 'table', 'th', 'td', 'td-row-1', 'td-row-2'];
@@ -96,12 +96,12 @@ test.describe('Introduction demos render like the library (no .sbdocs leak)', ()
     // The leak symptoms named in the ticket, asserted explicitly with a readable message.
     expect(intro.title!.borderBottomWidth, 'h2 border from .sbdocs').toBe('0px');
     // .sbdocs paints the stripe on the <tr>, not the <td>: compare the rows themselves.
-    const rowBg = await page.locator('[data-testid="demo-frame"] tbody tr').evaluateAll((trs) =>
+    const rowBg = await page.locator('[data-testid="demo-frame-list-report"] tbody tr').evaluateAll((trs) =>
       trs.slice(0, 4).map((tr) => getComputedStyle(tr).backgroundColor),
     );
     expect(new Set(rowBg).size, `zebra stripe from .sbdocs on <tr>: ${rowBg.join(' | ')}`).toBe(1);
     // Bare text in the frame uses the library font, not the browser serif default.
-    const fonts = await page.locator('[data-testid="demo-frame"]').evaluateAll((fs) =>
+    const fonts = await page.locator('[data-testid^="demo-frame-"]').evaluateAll((fs) =>
       fs.map((f) => getComputedStyle(f).fontFamily),
     );
     for (const f of fonts) expect(f, 'demo frame font').toMatch(/system-ui|sans-serif/);
@@ -124,9 +124,9 @@ test.describe('Introduction demos render like the library (no .sbdocs leak)', ()
     expect(canvas[0], 'caption size in the library (non-vacuous)').toBe('12px');
 
     await page.goto(INTRO);
-    await page.waitForSelector(`[data-testid="demo-frame"] ${BADGE}`);
+    await page.waitForSelector(`[data-testid="demo-frame-list-report"] ${BADGE}`);
     // Inside a table cell: the first rounded span of the whole demo is a filter pill, not a badge.
-    expect(await dims('[data-testid="demo-frame"] td')).toEqual(canvas);
+    expect(await dims('[data-testid="demo-frame-list-report"] td')).toEqual(canvas);
   });
 
   test('Field states demo: the status message has the same size and spacing as in forms-field--overview', async ({ page }) => {
@@ -135,8 +135,8 @@ test.describe('Introduction demos render like the library (no .sbdocs leak)', ()
     const canvas = await snapshotFieldMessage(page, '#storybook-root', 'Locked');
 
     await page.goto(INTRO);
-    await page.waitForSelector('[data-testid="demo-frame"] input');
-    const intro = await snapshotFieldMessage(page, '[data-testid="demo-frame"]:has(input[disabled])', 'Approver');
+    await page.waitForSelector('[data-testid="demo-frame-field-states"] input');
+    const intro = await snapshotFieldMessage(page, '[data-testid="demo-frame-field-states"]', 'Approver');
 
     expect(canvas.marginTop, 'canvas message margin (non-vacuous)').not.toBe('0px');
     expect(intro.marginTop).toBe(canvas.marginTop);

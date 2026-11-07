@@ -34,7 +34,9 @@ function loadIndex(): Record<string, IndexEntry> {
 }
 
 const visualStories = Object.values(loadIndex()).filter(
-  (e) => e.type !== 'docs' && e.tags?.includes('visual'),
+  // Autodocs entries inherit the `visual` tag of their stories, but are not photographed: a Docs page opts in
+  // explicitly with `visual-docs` (the Introduction).
+  (e) => (e.type === 'docs' ? e.tags?.includes('visual-docs') : e.tags?.includes('visual')),
 );
 
 if (visualStories.length === 0) {
@@ -54,7 +56,15 @@ for (const story of visualStories) {
     // Waits for the story's play function: a story whose picture needs an interaction (a tooltip
     // opened by a simulated hover) is photographed after it, not while it is still running. It
     // also throws on render errors, so we never photograph Storybook's error page.
-    await expectPlayToPass(page, story.id);
+    if (story.type === 'docs') {
+      // A Docs/MDX page (the Introduction): no play function; open the docs view and wait for the live
+      // demos to be on the page before photographing it.
+      await page.goto(`/iframe.html?id=${story.id}&viewMode=docs`);
+      await page.waitForSelector('[data-testid="demo-frame-list-report"] table');
+      await page.waitForSelector('[data-testid="demo-frame-field-states"] input');
+    } else {
+      await expectPlayToPass(page, story.id);
+    }
     await page.addStyleTag({
       content: `*, *::before, *::after { animation: none !important; transition: none !important; caret-color: transparent !important; }`,
     });

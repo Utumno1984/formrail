@@ -12,10 +12,16 @@ fixed viewports and compared with a baseline versioned in `e2e/visual/__screensh
 Tests are generated from the static Storybook `index.json` (`visual.spec.ts`): to add a story to
 the gate, tag it `tags: ['visual']`. Untagged stories are not photographed.
 
-**Docs/MDX pages are not photographed.** Live demos rendered inline in a Docs page (the Introduction) can
-inherit Storybook's `.sbdocs` CSS; they are wrapped in `sb-unstyled` (`DemoFrame`) and
+**Docs/MDX pages can be photographed too**: tag the page `<Meta ... tags={['visual-docs']} />` (the Introduction is; autodocs pages
+are not photographed even though they inherit the `visual` tag of their stories).
+Live demos rendered inline in a Docs page can inherit Storybook's Docs CSS; they are wrapped in `sb-unstyled`
+(`DemoFrame`). The screenshot catches layout problems (double scroll, a clipped demo or focus ring) and
 `e2e/introduction-style-parity.spec.ts` compares their computed style with the same component in the canvas
-(ticket #286). A new inline demo must go through `DemoFrame` and get a probe there.
+(ticket #286): the two checks complement each other. A new inline demo must go through
+`<DemoFrame name="...">`: `name` becomes the unique `data-testid="demo-frame-<name>"`, so target a frame by
+that id, never with a shared id plus extra disambiguating selectors. Then add a probe to the parity test.
+The Docs screenshot waits for the `list-report` and `field-states` frames: keep those names in `visual.spec.ts`
+in sync if they change.
 
 ## Commands
 

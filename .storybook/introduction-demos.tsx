@@ -204,12 +204,17 @@ const DEMO_FRAME: CSSProperties = {
 
 /**
  * Border and padding around a live example, so it reads as a demo and not as page text. `sb-unstyled` is
- * Storybook's own opt-out: its Docs CSS is `.sbdocs :where(h2:not(.sb-unstyled h2))`, so the demo is not
- * restyled by the page typography (border on h2, zebra tables, p/span sizes). Ticket #286.
+ * Storybook's own opt-out. Verified in the installed @storybook/addon-docs (dist/blocks.js,
+ * `toGlobalSelector`): the Docs content styles are emotion rules nested in the DocsContent wrapper, of the
+ * form `& :where(h2:not(.sb-anchor, .sb-unstyled, .sb-unstyled h2))`; an element that is `.sb-unstyled`, or
+ * inside one, is skipped by the page typography (border on h2, zebra tables, p/span sizes). Ticket #286.
+ *
+ * `name` is required and gives each frame a unique `data-testid` (`demo-frame-<name>`): tests must target
+ * a frame by that id, never by a shared id plus extra disambiguating selectors.
  */
-export function DemoFrame({ children }: { children: ReactNode }) {
+export function DemoFrame({ name, children }: { name: string; children: ReactNode }) {
   return (
-    <div className="sb-unstyled" style={DEMO_FRAME} data-testid="demo-frame">
+    <div className="sb-unstyled" style={DEMO_FRAME} data-testid={`demo-frame-${name}`}>
       {children}
     </div>
   );
