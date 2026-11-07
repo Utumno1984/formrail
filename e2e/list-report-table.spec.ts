@@ -29,28 +29,28 @@ test.describe('Data/ListReportTable: stories play', () => {
 });
 
 test.describe('sorting', () => {
-  test('mouse: Importo ascending, descending (arrow and aria-sort), then none; the focus stays on the button', async ({ page }) => {
+  test('mouse: Amount ascending, descending (arrow and aria-sort), then none; the focus stays on the button', async ({ page }) => {
     await expectPlayToPass(page, STORY('plain'));
-    const button = sortButton(page, 'Importo');
+    const button = sortButton(page, 'Amount');
     const original = await column(page, 0);
     await button.click();
-    await expect(header(page, 'Importo')).toHaveAttribute('aria-sort', 'ascending');
+    await expect(header(page, 'Amount')).toHaveAttribute('aria-sort', 'ascending');
     expect(await button.locator('svg').evaluate((el) => getComputedStyle(el).rotate)).toBe('180deg');
     const asc = (await column(page, 3)).map((t) => Number(t.replace('€ ', '')));
     expect(asc).toEqual([...asc].sort((a, b) => a - b));
     await button.click();
-    await expect(header(page, 'Importo')).toHaveAttribute('aria-sort', 'descending');
+    await expect(header(page, 'Amount')).toHaveAttribute('aria-sort', 'descending');
     const desc = (await column(page, 3)).map((t) => Number(t.replace('€ ', '')));
     expect(desc).toEqual([...desc].sort((a, b) => b - a));
     await expect(button).toBeFocused();
     // the arrow marks only the sorted column and flips with the direction
     const opacity = (name: string) => sortButton(page, name).locator('svg').evaluate((el) => getComputedStyle(el).opacity);
     const rotate = () => button.locator('svg').evaluate((el) => getComputedStyle(el).rotate);
-    expect(await opacity('Importo')).toBe('1');
-    expect(await opacity('Cliente')).toBe('0');
+    expect(await opacity('Amount')).toBe('1');
+    expect(await opacity('Customer')).toBe('0');
     expect(await rotate()).toBe('none');
     await button.click();
-    await expect(header(page, 'Importo')).not.toHaveAttribute('aria-sort');
+    await expect(header(page, 'Amount')).not.toHaveAttribute('aria-sort');
     expect(await column(page, 0)).toEqual(original);
   });
 
@@ -61,25 +61,25 @@ test.describe('sorting', () => {
     await expect(scroller(page)).toBeFocused();
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
-    const button = sortButton(page, 'Cliente');
+    const button = sortButton(page, 'Customer');
     await expect(button).toBeFocused();
     await button.evaluate((el) => ((window as unknown as { __marked: Element }).__marked = el));
 
     await page.keyboard.press('Enter');
-    await expect(header(page, 'Cliente')).toHaveAttribute('aria-sort', 'ascending');
+    await expect(header(page, 'Customer')).toHaveAttribute('aria-sort', 'ascending');
     await page.keyboard.press('Enter');
-    await expect(header(page, 'Cliente')).toHaveAttribute('aria-sort', 'descending');
+    await expect(header(page, 'Customer')).toHaveAttribute('aria-sort', 'descending');
     await page.keyboard.press('Space');
-    await expect(header(page, 'Cliente')).not.toHaveAttribute('aria-sort');
+    await expect(header(page, 'Customer')).not.toHaveAttribute('aria-sort');
     const same = await page.evaluate(() => document.activeElement === (window as unknown as { __marked: Element }).__marked);
     expect(same).toBe(true);
   });
 
-  test('"Data" starts descending (firstSortDirection desc); non-sortable "Descrizione" has no button', async ({ page }) => {
+  test('"Date" starts descending (firstSortDirection desc); non-sortable "Description" has no button', async ({ page }) => {
     await expectPlayToPass(page, STORY('plain'));
-    await sortButton(page, 'Data').click();
-    await expect(header(page, 'Data')).toHaveAttribute('aria-sort', 'descending');
-    await expect(header(page, 'Descrizione').getByRole('button')).toHaveCount(0);
+    await sortButton(page, 'Date').click();
+    await expect(header(page, 'Date')).toHaveAttribute('aria-sort', 'descending');
+    await expect(header(page, 'Description').getByRole('button')).toHaveCount(0);
     const dates = await column(page, 4);
     expect(dates).toEqual([...dates].sort().reverse());
   });
@@ -160,7 +160,7 @@ test.describe('geometry', () => {
     // (this story also scrolls vertically, which the helper would count as a nested overflow)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect((await rect(scroller(page))).width).toBeLessThanOrEqual(360);
-    const long = header(page, /Un’intestazione molto lunga/);
+    const long = header(page, /A very long header/);
     await long.scrollIntoViewIfNeeded();
     const th = await rect(long);
     const other = await rect(header(page, /^Col\. 1$/));
@@ -181,10 +181,10 @@ test.describe('geometry', () => {
       });
     const cell = await edge(page.locator('#storybook-root tbody tr').first().getByRole('cell').nth(3));
     expect(cell.boxRight - cell.textRight).toBeLessThanOrEqual(13);
-    const head = await edge(header(page, 'Importo'));
+    const head = await edge(header(page, 'Amount'));
     // header text sits before the (invisible when unsorted) arrow: inside the 12px padding + icon
     expect(head.boxRight - head.textRight).toBeLessThanOrEqual(13);
-    expect(await header(page, 'Importo').evaluate((th) => getComputedStyle(th).textAlign)).toBe('end');
+    expect(await header(page, 'Amount').evaluate((th) => getComputedStyle(th).textAlign)).toBe('end');
 
     await expectPlayToPass(page, STORY('rtl'));
     const rtl = await edge(page.locator('#storybook-root tbody tr').first().getByRole('cell').nth(3));
@@ -221,7 +221,7 @@ test.describe('one scroller and the sticky header', () => {
     await scroller(page).evaluate((el) => el.scrollTo(0, 120));
     const header0 = await rect(page.getByRole('columnheader').nth(2));
     // the first description cell fully below the header
-    const cells = page.getByRole('row').filter({ has: page.getByRole('cell') }).getByRole('cell').filter({ hasText: 'Fattura in attesa' });
+    const cells = page.getByRole('row').filter({ has: page.getByRole('cell') }).getByRole('cell').filter({ hasText: 'Invoice awaiting' });
     const count = await cells.count();
     let target: Locator | null = null;
     for (let i = 0; i < count; i++) {

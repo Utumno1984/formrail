@@ -3,7 +3,7 @@ import { expectPlayToPass, gotoStory } from './helpers/story';
 
 // The validation recipe (#104): useObjectPageForm({ schema }) + ValidationProvider +
 // useFocusFirstInvalidField + ObjectPageFooter(getErrorSummary) + useDirtyGuard, driven with real input.
-const STORY = (name: string) => `floorplans-object-page-con-validazione--${name}`;
+const STORY = (name: string) => `floorplans-object-page-with-validation--${name}`;
 const MANUAL = STORY('manual');
 const FOOTER = '[data-object-page-footer]';
 const SCROLLER = '[data-object-page-scroller]';

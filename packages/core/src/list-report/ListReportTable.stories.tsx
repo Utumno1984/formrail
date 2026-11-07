@@ -15,11 +15,11 @@ interface Invoice {
 }
 
 const CUSTOMERS = [
-  'Bianchi & Associati S.r.l. - Servizi di consulenza amministrativa',
-  'Rossi Costruzioni',
-  'Verdi Forniture Industriali S.p.A. - Divisione Nord-Ovest',
+  'Bianchi & Associates Ltd - Administrative consulting services',
+  'Rossi Construction',
+  'Verdi Industrial Supplies Inc. - North-West Division',
   'Neri',
-  'Gialli Trasporti e Logistica Internazionale S.r.l.',
+  'Gialli International Transport and Logistics Ltd',
 ];
 
 // Deterministic (no Math.random): the visual baselines must never change between runs.
@@ -27,7 +27,7 @@ function makeInvoices(count: number): Invoice[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `F-${String(i + 1).padStart(4, '0')}`,
     customer: CUSTOMERS[i % CUSTOMERS.length]!,
-    description: `Fattura in attesa di approvazione da parte dell’ufficio acquisti, riferimento ordine ${1000 + i * 7}`,
+    description: `Invoice awaiting approval from the purchasing office, order reference ${1000 + i * 7}`,
     amount: ((i * 7919) % 9973) + 0.5,
     date: new Date(Date.UTC(2026, 0, 1 + ((i * 13) % 300))).toISOString().slice(0, 10),
   }));
@@ -38,17 +38,17 @@ const money = (value: number): string => `€ ${value.toFixed(2)}`;
 function columns(firstDateDirection: ListReportSortDirection = 'desc'): ListReportColumn<Invoice>[] {
   return [
     { id: 'id', header: 'N.', accessor: (r) => r.id, width: 90 },
-    { id: 'customer', header: 'Cliente', accessor: (r) => r.customer, minWidth: 160 },
-    { id: 'description', header: 'Descrizione', accessor: (r) => r.description, sortable: false, minWidth: 200 },
-    { id: 'amount', header: 'Importo', accessor: (r) => r.amount, cell: (r) => money(r.amount), align: 'end', width: 120 },
-    { id: 'date', header: 'Data', accessor: (r) => r.date, firstSortDirection: firstDateDirection, width: 120 },
+    { id: 'customer', header: 'Customer', accessor: (r) => r.customer, minWidth: 160 },
+    { id: 'description', header: 'Description', accessor: (r) => r.description, sortable: false, minWidth: 200 },
+    { id: 'amount', header: 'Amount', accessor: (r) => r.amount, cell: (r) => money(r.amount), align: 'end', width: 120 },
+    { id: 'date', header: 'Date', accessor: (r) => r.date, firstSortDirection: firstDateDirection, width: 120 },
   ];
 }
 
 // The "none" filter excludes every row: it makes the "no results" state (rows exist, none shown).
 const DEMO_FILTERS: ListReportFilter<Invoice>[] = [
-  { id: 'all', label: 'Tutte' },
-  { id: 'none', label: 'Nessuna', predicate: () => false },
+  { id: 'all', label: 'All' },
+  { id: 'none', label: 'None', predicate: () => false },
 ];
 
 interface TableDemoProps {
@@ -76,7 +76,7 @@ function TableDemo({
   onSortChange,
   defaultSort,
   dir,
-  label = 'Fatture',
+  label = 'Invoices',
   defaultFilter,
   status,
   loadingRowCount,
@@ -126,7 +126,7 @@ function TableDemo({
   );
 }
 
-type Dataset = 'vuoto' | '3 righe' | '40 righe' | '200 righe' | 'filtro che esclude tutto';
+type Dataset = 'empty' | '3 rows' | '40 rows' | '200 rows' | 'filter that excludes everything';
 
 interface PlaygroundArgs {
   maxHeight: number;
@@ -148,27 +148,27 @@ const meta: Meta<PlaygroundArgs> = {
   component: ListReportTable as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    maxHeight: { control: { type: 'range', min: 160, max: 700, step: 10 }, description: 'maxHeight del contenitore di scroll (px)' },
-    containerWidth: { control: { type: 'range', min: 320, max: 1200, step: 10 }, description: 'Larghezza del riquadro demo (px)' },
+    maxHeight: { control: { type: 'range', min: 160, max: 700, step: 10 }, description: 'maxHeight of the scroll container (px)' },
+    containerWidth: { control: { type: 'range', min: 320, max: 1200, step: 10 }, description: 'Width of the demo box (px)' },
     dir: { control: 'radio', options: ['ltr', 'rtl'] },
     dateFirstSort: {
       control: 'radio',
       options: ['asc', 'desc'],
-      description: '`firstSortDirection` della colonna "Data"',
+      description: '`firstSortDirection` of the "Date" column',
     },
     status: {
       control: 'radio',
       options: ['ready', 'loading', 'error'],
-      description: '`loading` tiene le righe che ci sono (o mostra gli scheletri); `error` sostituisce il corpo',
+      description: '`loading` keeps the rows that are there (or shows the skeletons); `error` replaces the body',
     },
     loadingRowCount: {
       control: { type: 'number', min: 0, max: 20, step: 1 },
-      description: 'Righe scheletro e altezza minima del corpo (righe)',
+      description: 'Skeleton rows and minimum body height (rows)',
     },
     dataset: {
       control: 'select',
-      options: ['vuoto', '3 righe', '40 righe', '200 righe', 'filtro che esclude tutto'],
-      description: 'Le righe date alla tabella; "filtro che esclude tutto" parte con un filtro che nasconde ogni riga',
+      options: ['empty', '3 rows', '40 rows', '200 rows', 'filter that excludes everything'],
+      description: 'The rows given to the table; "filter that excludes everything" starts with a filter that hides every row',
     },
     onSortChange: { control: false },
     onRetry: { control: false },
@@ -181,18 +181,18 @@ const meta: Meta<PlaygroundArgs> = {
     dateFirstSort: 'desc',
     status: 'ready',
     loadingRowCount: 5,
-    dataset: '40 righe',
+    dataset: '40 rows',
     onSortChange: fn(),
     onRetry: fn(),
     onClearFilters: fn(),
   },
 };
 
-const DATASETS: Record<Exclude<Dataset, 'filtro che esclude tutto'>, Invoice[]> = {
-  vuoto: [],
-  '3 righe': makeInvoices(3),
-  '40 righe': makeInvoices(40),
-  '200 righe': makeInvoices(200),
+const DATASETS: Record<Exclude<Dataset, 'filter that excludes everything'>, Invoice[]> = {
+  empty: [],
+  '3 rows': makeInvoices(3),
+  '40 rows': makeInvoices(40),
+  '200 rows': makeInvoices(200),
 };
 
 export default meta;
@@ -204,17 +204,17 @@ const INVOICES = makeInvoices(40);
 
 /**
  * Controls: `maxHeight` of the scroll container, `containerWidth` of the demo box (narrow it to see the
- * horizontal scroll stay inside the box), `dir`, `firstSortDirection` of the "Data" column, `status`
+ * horizontal scroll stay inside the box), `dir`, `firstSortDirection` of the "Date" column, `status`
  * (`ready` / `loading` / `error`), `loadingRowCount` and the `dataset` (empty, 3, 40 or 200 rows, or a
  * filter that excludes everything); switch them and the header and the minimum body do not move.
- * `onSortChange`, `onRetry` and `onClearFilters` show up in Actions. The play function clicks "Importo"
+ * `onSortChange`, `onRetry` and `onClearFilters` show up in Actions. The play function clicks "Amount"
  * twice and checks that the rows are in descending order, that the header says so and that exactly
  * two sort changes were notified.
  */
 export const Playground: Story = {
   render: ({ maxHeight, containerWidth, dir, dateFirstSort, status, loadingRowCount, dataset, onSortChange, onRetry, onClearFilters }) => {
     const cols = columns(dateFirstSort);
-    const excludeAll = dataset === 'filtro che esclude tutto';
+    const excludeAll = dataset === 'filter that excludes everything';
     return (
       <div style={PAGE}>
         <div style={{ width: containerWidth, maxWidth: '100%' }} data-testid="box">
@@ -237,9 +237,9 @@ export const Playground: Story = {
   play: async ({ args, canvasElement }) => {
     // The sort scenario is written for the default configuration (40 rows, ready): with another
     // `status` or `dataset` (picked in Controls or by a test) there is nothing to sort.
-    if (args.status !== 'ready' || args.dataset !== '40 righe') return;
+    if (args.status !== 'ready' || args.dataset !== '40 rows') return;
     const canvas = within(canvasElement);
-    const header = canvas.getByRole('columnheader', { name: 'Importo' });
+    const header = canvas.getByRole('columnheader', { name: 'Amount' });
     const button = within(header).getByRole('button');
     await userEvent.click(button);
     await expect(header).toHaveAttribute('aria-sort', 'ascending');
@@ -286,7 +286,7 @@ export const MixedWidths: Story = {
           rows={INVOICES.slice(0, 4)}
           columns={[
             { id: 'id', header: 'N.', accessor: (r) => r.id, width: 200 },
-            { id: 'customer', header: 'Cliente', accessor: (r) => r.customer, width: '30%' },
+            { id: 'customer', header: 'Customer', accessor: (r) => r.customer, width: '30%' },
           ]}
         />
       </div>
@@ -310,7 +310,7 @@ export const RemWidths: Story = {
           rows={INVOICES.slice(0, 4)}
           columns={[
             { id: 'id', header: 'N.', accessor: (r) => r.id, width: '10rem' },
-            { id: 'customer', header: 'Cliente', accessor: (r) => r.customer, width: '10rem' },
+            { id: 'customer', header: 'Customer', accessor: (r) => r.customer, width: '10rem' },
           ]}
         />
       </div>
@@ -334,7 +334,7 @@ export const LongTexts: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('columnheader', { name: 'Importo' })).toHaveAttribute('aria-sort', 'descending');
+    await expect(canvas.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
     const first = canvas.getAllByRole('row')[1]!;
     const description = within(first).getAllByRole('cell')[2]!.firstElementChild as HTMLElement;
     await expect(description.scrollWidth).toBeGreaterThan(description.clientWidth);
@@ -382,7 +382,7 @@ export const StickyAfterScroll: Story = {
 
 const MANY: ListReportColumn<Invoice>[] = Array.from({ length: 20 }, (_, i) => ({
   id: `c${i}`,
-  header: i === 3 ? 'Un’intestazione molto lunga che non deve andare a capo' : `Col. ${i + 1}`,
+  header: i === 3 ? 'A very long header that must not wrap' : `Col. ${i + 1}`,
   accessor: (r: Invoice) => `${r.id}/${i + 1}`,
 }));
 
@@ -415,7 +415,7 @@ export const Rtl: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const th = canvas.getByRole('columnheader', { name: 'Importo' });
+    const th = canvas.getByRole('columnheader', { name: 'Amount' });
     await expect(getComputedStyle(th).textAlign).toBe('end');
     const scroller = canvas.getByTestId('scroller');
     // End in rtl is the left edge: the amount cell is to the left of the customer cell.
@@ -511,7 +511,7 @@ export const ErrorLongMessage: Story = {
           rows={[]}
           status="error"
           onRetry={fn()}
-          errorMessage={`Impossibile caricare le fatture: ${'il server non risponde '.repeat(8)}https://example.com/${'a'.repeat(60)}`}
+          errorMessage={`Unable to load the invoices: ${'the server is not responding '.repeat(8)}https://example.com/${'a'.repeat(60)}`}
         />
       </div>
     </div>
@@ -534,8 +534,8 @@ export const Reloading: Story = {
     await expect(canvasElement.querySelectorAll('[data-rop-skeleton]')).toHaveLength(0);
     await expect(rowsOf(canvas)).toHaveLength(8);
     // sortable headers still work
-    await userEvent.click(canvas.getByRole('button', { name: 'Importo' }));
-    await expect(canvas.getByRole('columnheader', { name: 'Importo' })).toHaveAttribute('aria-sort', 'ascending');
+    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
+    await expect(canvas.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'ascending');
   },
 };
 
@@ -550,11 +550,11 @@ function setArgs(storyId: string, updatedArgs: Partial<PlaygroundArgs>): void {
  */
 export const StatusTransitions: Story = {
   parameters: NO_CONTROLS,
-  args: { status: 'loading', dataset: 'vuoto', loadingRowCount: 5 },
+  args: { status: 'loading', dataset: 'empty', loadingRowCount: 5 },
   render: ({ status, dataset, loadingRowCount, onRetry }) => (
     <div style={PAGE}>
       <div style={STATE_BOX}>
-        <TableDemo columns={columns()} rows={dataset === 'vuoto' ? [] : DATASETS[dataset as '3 righe']} status={status} loadingRowCount={loadingRowCount} onRetry={onRetry} />
+        <TableDemo columns={columns()} rows={dataset === 'empty' ? [] : DATASETS[dataset as '3 rows']} status={status} loadingRowCount={loadingRowCount} onRetry={onRetry} />
       </div>
     </div>
   ),
@@ -578,7 +578,7 @@ export const StatusTransitions: Story = {
     await userEvent.click(retry);
     await expect(args.onRetry).toHaveBeenCalledTimes(1);
 
-    setArgs(id, { status: 'ready', dataset: '3 righe' });
+    setArgs(id, { status: 'ready', dataset: '3 rows' });
     await waitFor(() => expect(canvas.getAllByRole('row').filter((r) => r.querySelector('td') && !r.hasAttribute('aria-hidden'))).toHaveLength(3));
     await expect(headerTop()).toBe(top);
     await expect(tableWidth()).toBe(width);

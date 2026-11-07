@@ -6,15 +6,15 @@ import { Text } from '../typography/Text';
 import { StatusBadge, type StatusBadgeProps, type StatusBadgeTone } from './StatusBadge';
 
 const TONES: StatusBadgeTone[] = ['neutral', 'info', 'success', 'warning', 'error'];
-const ICON_NAMES = ['nessuna', 'info', 'success', 'warning', 'error'] as const;
+const ICON_NAMES = ['none', 'info', 'success', 'warning', 'error'] as const;
 const ICONS = {
-  nessuna: undefined,
+  none: undefined,
   info: internalIcons.info,
   success: internalIcons.success,
   warning: internalIcons.warning,
   error: internalIcons.error,
 };
-const LONG = 'Archiviato in attesa di approvazione da parte del responsabile di reparto';
+const LONG = 'Archived, awaiting approval from the department manager';
 
 interface DemoArgs extends StatusBadgeProps {
   /** Width of the demo container, px (story-only control). */
@@ -32,7 +32,7 @@ const meta = {
     width: { control: { type: 'range', min: 80, max: 400, step: 10 }, description: 'Demo container width (px)' },
     className: { control: false },
   },
-  args: { tone: 'neutral', children: 'Archiviato', icon: undefined, width: 300 },
+  args: { tone: 'neutral', children: 'Archived', icon: undefined, width: 300 },
   render: ({ width, ...args }) => (
     <div data-testid="container" style={{ width }}>
       <StatusBadge {...args} data-testid="badge" />
@@ -57,7 +57,7 @@ export const Playground: Story = {
     await expect(badge).not.toHaveAttribute('aria-live');
     await expect(badge).not.toHaveAttribute('role');
     await expect(badge.querySelector('[aria-hidden="true"] svg')).not.toBeNull();
-    await expect(badge).toHaveTextContent('Archiviato');
+    await expect(badge).toHaveTextContent('Archived');
   },
 };
 
@@ -120,9 +120,9 @@ export const Overview: Story = {
 
       <section aria-label="In a text line" style={stack}>
         <Text data-testid="line-with-badge">
-          Stato del record: <StatusBadge tone="warning" data-testid="line-badge">Archiviato</StatusBadge> da Mario Rossi.
+          Record status: <StatusBadge tone="warning" data-testid="line-badge">Archived</StatusBadge> by Mario Rossi.
         </Text>
-        <Text data-testid="line-plain">Stato del record: Archiviato da Mario Rossi.</Text>
+        <Text data-testid="line-plain">Record status: Archived by Mario Rossi.</Text>
       </section>
 
       <section aria-label="Truncated" style={{ width: 120 }} data-testid="narrow">
@@ -134,10 +134,10 @@ export const Overview: Story = {
       <section aria-label="In a description list" style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
         {(['inline', 'stacked'] as const).map((layout) => (
           <DescriptionList key={layout} layout={layout} data-testid={`dl-${layout}`}>
-            <DescriptionListItem label="Cliente">Acme S.r.l.</DescriptionListItem>
-            <DescriptionListItem label="Stato">
+            <DescriptionListItem label="Customer">Acme S.r.l.</DescriptionListItem>
+            <DescriptionListItem label="Status">
               <StatusBadge tone="success" data-testid={`dl-badge-${layout}`}>
-                Attivo
+                Active
               </StatusBadge>
             </DescriptionListItem>
           </DescriptionList>

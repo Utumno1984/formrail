@@ -27,49 +27,49 @@ function Items({ kind, onOpen }: { kind: ValueKind; onOpen?: () => void }): Reac
   if (kind === 'strings') {
     return (
       <>
-        <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
-        <DescriptionListItem label="Numero">INV-2026-0142</DescriptionListItem>
-        <DescriptionListItem label="Importo totale">1.240,00 €</DescriptionListItem>
-        <DescriptionListItem label="Scadenza">30/11/2026</DescriptionListItem>
+        <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
+        <DescriptionListItem label="Number">INV-2026-0142</DescriptionListItem>
+        <DescriptionListItem label="Total amount">€1,240.00</DescriptionListItem>
+        <DescriptionListItem label="Due date">30/11/2026</DescriptionListItem>
       </>
     );
   }
   if (kind === 'with-empties') {
     return (
       <>
-        <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
-        <DescriptionListItem label="Note">{null}</DescriptionListItem>
-        <DescriptionListItem label="Riferimento">{''}</DescriptionListItem>
-        <DescriptionListItem label="Allegati">{0}</DescriptionListItem>
-        <DescriptionListItem label="Approvato">{false}</DescriptionListItem>
+        <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
+        <DescriptionListItem label="Notes">{null}</DescriptionListItem>
+        <DescriptionListItem label="Reference">{''}</DescriptionListItem>
+        <DescriptionListItem label="Attachments">{0}</DescriptionListItem>
+        <DescriptionListItem label="Approved">{false}</DescriptionListItem>
       </>
     );
   }
   return (
     <>
-      <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
-      <DescriptionListItem label="Sito">
+      <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
+      <DescriptionListItem label="Website">
         <a href="#acme">acme.example</a>
       </DescriptionListItem>
-      <DescriptionListItem label="Codice">
+      <DescriptionListItem label="Code">
         <Text as="span" mono>
           INV-2026-0142
         </Text>
       </DescriptionListItem>
-      <DescriptionListItem label="Azione">
+      <DescriptionListItem label="Action">
         <Button size="inline" variant="ghost" onClick={onOpen}>
-          Apri fattura
+          Open invoice
         </Button>
       </DescriptionListItem>
-      <DescriptionListItem label="Indirizzo">
+      <DescriptionListItem label="Address">
         <div>
-          Via Roma 1<br />
-          20100 Milano
+          1 Rome Street<br />
+          20100 Milan
           <br />
-          Italia
+          Italy
         </div>
       </DescriptionListItem>
-      <DescriptionListItem label="Stato">Da approvare</DescriptionListItem>
+      <DescriptionListItem label="Status">To approve</DescriptionListItem>
     </>
   );
 }
@@ -145,7 +145,7 @@ export const Playground: Story = {
     const lefts = dds.map((d) => Math.round(rect(d).left));
     await expect(new Set(lefts).size).toBe(1);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Apri fattura' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Open invoice' }));
     await expect(args.onOpen).toHaveBeenCalledTimes(1);
     container.style.width = original;
   },
@@ -202,12 +202,12 @@ function LongAndEmptyList({ width, layout }: { width: number; layout: Descriptio
   return (
     <div data-testid={`box-${width}`} style={{ width, maxWidth: 'calc(100% - 34px)', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
       <DescriptionList layout={layout} data-testid={`list-${width}`}>
-        <DescriptionListItem label={LONG_WORD}>Valore con etichetta lunghissima</DescriptionListItem>
-        <DescriptionListItem label="Stringa senza spazi">{LONG_WORD}</DescriptionListItem>
-        <DescriptionListItem label="Troncato">
-          <TruncatedText>{'Un testo molto lungo che deve essere troncato con i puntini '.repeat(3)}</TruncatedText>
+        <DescriptionListItem label={LONG_WORD}>Value with a very long label</DescriptionListItem>
+        <DescriptionListItem label="String without spaces">{LONG_WORD}</DescriptionListItem>
+        <DescriptionListItem label="Truncated">
+          <TruncatedText>{'A very long text that must be truncated with an ellipsis '.repeat(3)}</TruncatedText>
         </DescriptionListItem>
-        <DescriptionListItem label="Vuoto">{null}</DescriptionListItem>
+        <DescriptionListItem label="Empty">{null}</DescriptionListItem>
         <DescriptionListItem label="Zero">{0}</DescriptionListItem>
       </DescriptionList>
     </div>
@@ -242,7 +242,7 @@ const VALUE_STEPS: { name: string; value: ReactNode }[] = [
   { name: 'string', value: 'Acme S.r.l.' },
   { name: 'node', value: <a href="#acme">acme.example</a> },
   { name: 'empty', value: null },
-  { name: 'multi-line', value: <div>Via Roma 1<br />20100 Milano</div> },
+  { name: 'multi-line', value: <div>1 Rome Street<br />20100 Milan</div> },
 ];
 
 function ChangingValueDemo() {
@@ -250,12 +250,12 @@ function ChangingValueDemo() {
   return (
     <div data-testid="container" style={{ width: 600, border: BORDER, padding: 16, boxSizing: 'content-box' }}>
       <Button size="sm" onClick={() => setStep((s) => (s + 1) % VALUE_STEPS.length)}>
-        Cambia valore
+        Change value
       </Button>
       <p data-testid="step">{VALUE_STEPS[step]!.name}</p>
       <DescriptionList data-testid="list">
-        <DescriptionListItem label="Variabile">{VALUE_STEPS[step]!.value}</DescriptionListItem>
-        <DescriptionListItem label="Fisso">Sempre uguale</DescriptionListItem>
+        <DescriptionListItem label="Variable">{VALUE_STEPS[step]!.value}</DescriptionListItem>
+        <DescriptionListItem label="Fixed">Always the same</DescriptionListItem>
       </DescriptionList>
     </div>
   );
@@ -273,12 +273,12 @@ export const InNarrowSheet: Story = {
   render: () => (
     <Sheet defaultOpen>
       <SheetTrigger asChild>
-        <Button variant="primary">Apri</Button>
+        <Button variant="primary">Open</Button>
       </SheetTrigger>
       <SheetContent size="sm">
         <SheetHeader>
-          <SheetTitle>Dettaglio fornitore</SheetTitle>
-          <SheetDescription>Anteprima in sola lettura</SheetDescription>
+          <SheetTitle>Supplier details</SheetTitle>
+          <SheetDescription>Read-only preview</SheetDescription>
         </SheetHeader>
         <SheetBody>
           <DescriptionList data-testid="sheet-list">
@@ -300,7 +300,7 @@ export const EdgeCases: Story = {
     <div style={{ display: 'grid', gap: 24 }}>
       <div data-testid="flex-row" style={{ display: 'flex', width: 700, border: BORDER }}>
         <DescriptionList data-testid="flex-list">
-          <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+          <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
         </DescriptionList>
       </div>
       <table>
@@ -308,7 +308,7 @@ export const EdgeCases: Story = {
           <tr>
             <td data-testid="cell" style={{ width: 500 }}>
               <DescriptionList data-testid="cell-list">
-                <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+                <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
               </DescriptionList>
             </td>
           </tr>
@@ -321,7 +321,7 @@ export const EdgeCases: Story = {
             <tr>
               <td data-testid="auto-cell">
                 <DescriptionList data-testid="auto-cell-list">
-                  <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+                  <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
                 </DescriptionList>
               </td>
             </tr>
@@ -331,7 +331,7 @@ export const EdgeCases: Story = {
       <div>
         <div data-testid="shrink-wrap" style={{ display: 'inline-block' }}>
           <DescriptionList data-testid="shrink-list">
-            <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
+            <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
           </DescriptionList>
         </div>
       </div>
@@ -342,11 +342,11 @@ export const EdgeCases: Story = {
   ),
 };
 
-type Entity = 'archiviata con audit' | 'archiviata senza audit' | 'attiva, senza stato' | 'solo dettaglio';
-const ENTITIES: Entity[] = ['archiviata con audit', 'archiviata senza audit', 'attiva, senza stato', 'solo dettaglio'];
+type Entity = 'archived with audit' | 'archived without audit' | 'active, no status' | 'detail only';
+const ENTITIES: Entity[] = ['archived with audit', 'archived without audit', 'active, no status', 'detail only'];
 const TONES: StatusBadgeTone[] = ['neutral', 'info', 'success', 'warning', 'error'];
-const AUDIT = 'Archiviato il 12/10/2026 da Maria Rossi (ufficio acquisti)';
-const AUDIT_ONLY = 'Ultima verifica il 03/11/2026 da Luca Bianchi (amministrazione)';
+const AUDIT = 'Archived on 12/10/2026 by Maria Rossi (purchasing office)';
+const AUDIT_ONLY = 'Last checked on 03/11/2026 by Luca Bianchi (accounting)';
 
 interface StatusDemoProps {
   entity: Entity;
@@ -366,8 +366,8 @@ function StatusDemo({ entity: initial, tone, width, showSummary, layout, onSelec
     setPrev(initial);
     setEntity(initial);
   }
-  const hasBadge = entity === 'archiviata con audit' || entity === 'archiviata senza audit';
-  const hasDetail = entity === 'archiviata con audit' || entity === 'solo dettaglio';
+  const hasBadge = entity === 'archived with audit' || entity === 'archived without audit';
+  const hasDetail = entity === 'archived with audit' || entity === 'detail only';
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -389,21 +389,21 @@ function StatusDemo({ entity: initial, tone, width, showSummary, layout, onSelec
       <div data-testid="container" style={{ width, maxWidth: 'calc(100% - 34px)', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
         <DescriptionListStatus
           data-testid="status"
-          status={hasBadge ? <StatusBadge tone={tone}>Archiviato</StatusBadge> : undefined}
+          status={hasBadge ? <StatusBadge tone={tone}>Archived</StatusBadge> : undefined}
           detail={hasDetail ? (hasBadge ? AUDIT : AUDIT_ONLY) : undefined}
         />
         <div style={{ height: 12 }} />
         <DescriptionList layout={layout} data-testid="list">
-          <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
-          <DescriptionListItem label="Numero">INV-2026-0142</DescriptionListItem>
-          <DescriptionListItem label="Imponibile">1.016,39 €</DescriptionListItem>
+          <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
+          <DescriptionListItem label="Number">INV-2026-0142</DescriptionListItem>
+          <DescriptionListItem label="Taxable amount">€1,016.39</DescriptionListItem>
           {showSummary ? (
             <>
-              <DescriptionListItem label="IVA 22%" variant="summary">
-                223,61 €
+              <DescriptionListItem label="VAT 22%" variant="summary">
+                €223.61
               </DescriptionListItem>
-              <DescriptionListItem label="Totale" variant="summary">
-                1.240,00 €
+              <DescriptionListItem label="Total" variant="summary">
+                €1,240.00
               </DescriptionListItem>
             </>
           ) : null}
@@ -420,7 +420,7 @@ function StatusDemo({ entity: initial, tone, width, showSummary, layout, onSelec
  * the row of an entity with no status exposes no text.
  */
 export const StatusAndSummary: Story = {
-  name: 'Stato e riepilogo',
+  name: 'Status and summary',
   render: (args) => <StatusDemo {...(args as unknown as StatusDemoProps)} />,
   argTypes: {
     entity: { control: 'radio', options: ENTITIES },
@@ -434,7 +434,7 @@ export const StatusAndSummary: Story = {
     onOpen: { table: { disable: true } },
   } as Story['argTypes'],
   args: {
-    entity: 'archiviata con audit',
+    entity: 'archived with audit',
     tone: 'warning',
     width: 600,
     showSummary: true,
@@ -451,7 +451,7 @@ export const StatusAndSummary: Story = {
       await userEvent.click(canvas.getByRole('button', { name: entity }));
       await expect(Math.abs(rect(list).top - top)).toBeLessThanOrEqual(0.5);
       await expect(Math.abs(rect(status).height - height)).toBeLessThanOrEqual(0.5);
-      if (entity === 'attiva, senza stato') {
+      if (entity === 'active, no status') {
         await expect(status.textContent).toBe('');
         await expect(status.childElementCount).toBe(0);
       }
@@ -467,16 +467,16 @@ function SummaryRows({ layout, width }: { layout: DescriptionListLayout; width: 
   return (
     <div data-testid={`summary-${layout}`} style={{ width, maxWidth: 'calc(100% - 34px)', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
       <DescriptionList layout={layout}>
-        <DescriptionListItem label="Imponibile">1.016,39 €</DescriptionListItem>
-        <DescriptionListItem label="IVA 22%" variant="summary">
-          223,61 €
+        <DescriptionListItem label="Taxable amount">€1,016.39</DescriptionListItem>
+        <DescriptionListItem label="VAT 22%" variant="summary">
+          €223.61
         </DescriptionListItem>
-        <DescriptionListItem label="Totale" variant="summary">
-          1.240,00 €
+        <DescriptionListItem label="Total" variant="summary">
+          €1,240.00
         </DescriptionListItem>
-        <DescriptionListItem label="Pagato">0,00 €</DescriptionListItem>
-        <DescriptionListItem label="Residuo" variant="summary">
-          1.240,00 €
+        <DescriptionListItem label="Paid">€0.00</DescriptionListItem>
+        <DescriptionListItem label="Balance" variant="summary">
+          €1,240.00
         </DescriptionListItem>
       </DescriptionList>
     </div>
@@ -502,7 +502,7 @@ export const StatusEdgeCases: Story = {
           data-testid="row-icon"
           status={
             <StatusBadge tone="warning" icon={internalIcons.warning}>
-              Archiviato
+              Archived
             </StatusBadge>
           }
           detail={AUDIT}
@@ -514,14 +514,14 @@ export const StatusEdgeCases: Story = {
       <div data-testid="edge-long">
         <DescriptionListStatus
           data-testid="row-long"
-          status={<StatusBadge tone="info">In attesa di approvazione del responsabile di reparto</StatusBadge>}
+          status={<StatusBadge tone="info">Awaiting approval from the department manager</StatusBadge>}
           detail={AUDIT}
         />
       </div>
       <DescriptionList data-testid="override-list" layout="inline">
-        <DescriptionListItem label="Imponibile">1.016,39 €</DescriptionListItem>
-        <DescriptionListItem label="Totale" variant="summary" className="border-0! pt-0!">
-          1.240,00 €
+        <DescriptionListItem label="Taxable amount">€1,016.39</DescriptionListItem>
+        <DescriptionListItem label="Total" variant="summary" className="border-0! pt-0!">
+          €1,240.00
         </DescriptionListItem>
       </DescriptionList>
     </div>
@@ -530,22 +530,22 @@ export const StatusEdgeCases: Story = {
 
 /** Visual: status with detail, empty status (reserved space shown as absence), truncated detail, summaries inline and stacked. */
 export const StatusAndSummaryVisual: Story = {
-  name: 'Stato e riepilogo (visual)',
+  name: 'Status and summary (visual)',
   tags: ['visual'],
   parameters: { controls: { disable: true } },
   render: () => (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'flex-start' }}>
       {[
-        { id: 'full', status: <StatusBadge tone="warning">Archiviato</StatusBadge>, detail: AUDIT, width: 420 },
+        { id: 'full', status: <StatusBadge tone="warning">Archived</StatusBadge>, detail: AUDIT, width: 420 },
         { id: 'empty', status: undefined, detail: undefined, width: 420 },
-        { id: 'truncated', status: <StatusBadge tone="warning">Archiviato</StatusBadge>, detail: AUDIT, width: 250 },
+        { id: 'truncated', status: <StatusBadge tone="warning">Archived</StatusBadge>, detail: AUDIT, width: 250 },
       ].map(({ id, status, detail, width }) => (
         <div key={id} data-testid={`box-${id}`} style={{ width, maxWidth: 'calc(100% - 34px)', border: BORDER, padding: 16, boxSizing: 'content-box' }}>
           <DescriptionListStatus data-testid={`status-${id}`} status={status} detail={detail} />
           <div style={{ height: 12 }} />
           <DescriptionList data-testid={`list-${id}`}>
-            <DescriptionListItem label="Fornitore">Acme S.r.l.</DescriptionListItem>
-            <DescriptionListItem label="Numero">INV-2026-0142</DescriptionListItem>
+            <DescriptionListItem label="Supplier">Acme S.r.l.</DescriptionListItem>
+            <DescriptionListItem label="Number">INV-2026-0142</DescriptionListItem>
           </DescriptionList>
         </div>
       ))}

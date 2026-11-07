@@ -4,7 +4,7 @@ import { gotoStory } from './helpers/story';
 
 const PLAY = 'data-descriptionlist--status-and-summary';
 const VISUAL = 'data-descriptionlist--status-and-summary-visual';
-const ENTITIES = ['archiviata con audit', 'archiviata senza audit', 'attiva, senza stato', 'solo dettaglio'];
+const ENTITIES = ['archived with audit', 'archived without audit', 'active, no status', 'detail only'];
 const select = (page: Page, e: string) => page.getByRole('button', { name: e, exact: true }).click();
 
 test.describe('DescriptionListStatus QA — mobile 375px', () => {
@@ -25,7 +25,7 @@ test.describe('DescriptionListStatus QA — mobile 375px', () => {
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
     }
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     const truncated = await status.locator('> span').last().evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(truncated).toBe(true);
   });
@@ -75,7 +75,7 @@ test.describe('DescriptionListStatus QA — markup and edge cases', () => {
   test('RTL: summary dd sits on the logical value column, ellipsis on the end side, no overflow', async ({ page }) => {
     await gotoStory(page, PLAY, 'width:250');
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     const status = page.getByTestId('status');
     const detail = status.locator('> span').last();
     const dir = await detail.evaluate((el) => [getComputedStyle(el).direction, getComputedStyle(el).textAlign]);
@@ -91,11 +91,11 @@ test.describe('DescriptionListStatus QA — markup and edge cases', () => {
 
   test('open tooltip never keeps the old detail text when the detail changes under it', async ({ page }) => {
     await gotoStory(page, PLAY, 'width:250');
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     await page.getByTestId('status').locator('> span').last().hover();
     await expect(page.getByRole('tooltip')).toContainText('Maria Rossi', { timeout: 3000 });
     // the detail stays mounted with a different text; the tooltip stays open (no Escape)
-    await page.getByRole('button', { name: 'solo dettaglio', exact: true }).evaluate((b) => (b as HTMLElement).click());
+    await page.getByRole('button', { name: 'detail only', exact: true }).evaluate((b) => (b as HTMLElement).click());
     await expect(page.getByTestId('status')).toContainText('Luca Bianchi');
     await page.waitForTimeout(500);
     const tips = page.getByRole('tooltip');

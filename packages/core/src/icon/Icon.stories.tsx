@@ -24,7 +24,7 @@ const meta = {
     label: { control: 'text', description: 'Empty = decorative (aria-hidden); filled = role="img" with this name' },
     children: { control: false },
   },
-  args: { size: 'md', label: 'Errore', children: internalIcons.error, onClick: fn() },
+  args: { size: 'md', label: 'Error', children: internalIcons.error, onClick: fn() },
 } satisfies Meta<typeof Icon>;
 
 export default meta;
@@ -36,9 +36,9 @@ type Story = StoryObj<typeof meta>;
  * image with that name (and the click reaches the Actions panel).
  */
 export const Playground: Story = {
-  args: { size: 'lg', label: 'Errore', children: foreignSvg },
+  args: { size: 'lg', label: 'Error', children: foreignSvg },
   play: async ({ args, canvasElement }) => {
-    const icon = within(canvasElement).getByRole('img', { name: 'Errore' });
+    const icon = within(canvasElement).getByRole('img', { name: 'Error' });
     const box = icon.getBoundingClientRect();
     await expect([box.width, box.height]).toEqual([24, 24]);
     await userEvent.click(icon);
@@ -96,7 +96,7 @@ export const Overview: Story = {
 
       <section aria-label="Colour from the text">
         <div data-testid="colour-box" style={{ color: 'var(--color-rop-error)', display: 'flex', gap: 12 }}>
-          <Icon size="lg" label="Errore" data-testid="icon-coloured">
+          <Icon size="lg" label="Error" data-testid="icon-coloured">
             {internalIcons.error}
           </Icon>
           <Text as="span">Inherits currentColor</Text>

@@ -68,7 +68,7 @@ test.describe('Foundations/Icon', () => {
     page,
   }) => {
     await gotoStory(page, OVERVIEW);
-    await expect(page.getByRole('img', { name: 'Errore' })).toHaveCount(1);
+    await expect(page.getByRole('img', { name: 'Error' })).toHaveCount(1);
     // Every other icon of the story is decorative: no other image role at all.
     await expect(page.getByRole('img')).toHaveCount(1);
     await expectNoA11yViolations(page);
@@ -85,7 +85,7 @@ test.describe('Foundations/Icon', () => {
 
   test('Playground and Decorative play functions (Interactions) pass', async ({ page }) => {
     await expectPlayToPass(page, 'foundations-icon--playground');
-    await expect(page.getByRole('img', { name: 'Errore' })).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Error' })).toBeVisible();
     await expectPlayToPass(page, 'foundations-icon--decorative');
     await expect(page.getByRole('img')).toHaveCount(0);
     await expectNoA11yViolations(page);

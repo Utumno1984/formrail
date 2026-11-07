@@ -110,7 +110,7 @@ export interface UseDirtyGuardReturn {
  * const { guard, dialog } = useDirtyGuard({ when: form.isDirty });
  * return (
  *   <>
- *     <Button onClick={() => guard(() => navigate('/suppliers'))}>Torna alla lista</Button>
+ *     <Button onClick={() => guard(() => navigate('/suppliers'))}>Back to the list</Button>
  *     {dialog}
  *   </>
  * );

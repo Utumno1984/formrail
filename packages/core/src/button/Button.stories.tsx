@@ -35,7 +35,7 @@ const meta = {
     trailingIcon: { control: false },
     children: { control: 'text' },
   },
-  args: { variant: 'secondary', size: 'md', disabled: false, children: 'Salva', onClick: fn() },
+  args: { variant: 'secondary', size: 'md', disabled: false, children: 'Save', onClick: fn() },
 } satisfies Meta<typeof Button>;
 
 export default meta;
@@ -47,9 +47,9 @@ type Story = StoryObj<typeof meta>;
  * Tab nor clicks.
  */
 export const Playground: Story = {
-  args: { variant: 'primary', children: 'Salva' },
+  args: { variant: 'primary', children: 'Save' },
   play: async ({ args, canvasElement }) => {
-    const button = within(canvasElement).getByRole('button', { name: 'Salva' });
+    const button = within(canvasElement).getByRole('button', { name: 'Save' });
     await expect(button).toHaveAttribute('type', 'button');
     await userEvent.click(button);
     await expect(args.onClick).toHaveBeenCalledTimes(1);
@@ -59,29 +59,29 @@ export const Playground: Story = {
 
 /** Disabled: native `disabled`, skipped by Tab, a click does not invoke `onClick`. */
 export const Disabled: Story = {
-  args: { disabled: true, children: 'Non disponibile' },
+  args: { disabled: true, children: 'Unavailable' },
   render: (args) => (
     <div style={{ display: 'flex', gap: 8 }}>
       <Button {...args} />
-      <Button variant="primary">Dopo</Button>
+      <Button variant="primary">After</Button>
     </div>
   ),
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('button', { name: 'Non disponibile' })).toBeDisabled();
-    await userEvent.click(canvas.getByRole('button', { name: 'Non disponibile' }));
+    await expect(canvas.getByRole('button', { name: 'Unavailable' })).toBeDisabled();
+    await userEvent.click(canvas.getByRole('button', { name: 'Unavailable' }));
     await expect(args.onClick).not.toHaveBeenCalled();
     await userEvent.tab();
-    await expect(canvas.getByRole('button', { name: 'Dopo' })).toHaveFocus();
+    await expect(canvas.getByRole('button', { name: 'After' })).toHaveFocus();
   },
 };
 
 /** Icon-only: the accessible name is mandatory (type error otherwise, `console.error` in dev). */
 export const IconOnly: Story = {
-  args: { size: 'icon-md', 'aria-label': 'Chiudi', variant: 'ghost', children: internalIcons.close },
+  args: { size: 'icon-md', 'aria-label': 'Close', variant: 'ghost', children: internalIcons.close },
   argTypes: { children: { control: false }, size: { control: 'radio', options: ICON_SIZES } },
   play: async ({ args, canvasElement }) => {
-    const button = within(canvasElement).getByRole('button', { name: 'Chiudi' });
+    const button = within(canvasElement).getByRole('button', { name: 'Close' });
     await userEvent.click(button);
     await expect(args.onClick).toHaveBeenCalledTimes(1);
   },
@@ -94,14 +94,14 @@ export const AsLink: Story = {
   parameters: { controls: { exclude: ['children'] } },
   render: (args) => (
     <Button {...args}>
-      <a href="#destinazione" onClick={(e) => e.preventDefault()}>
-        Vai al dettaglio
+      <a href="#destination" onClick={(e) => e.preventDefault()}>
+        Go to details
       </a>
     </Button>
   ),
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const link = canvas.getByRole('link', { name: 'Vai al dettaglio' });
+    const link = canvas.getByRole('link', { name: 'Go to details' });
     await expect(canvas.queryByRole('button')).toBeNull();
     await userEvent.click(link);
     await expect(args.onClick).toHaveBeenCalledTimes(1);
@@ -130,7 +130,7 @@ export const Overview: Story = {
                 </Button>
               ))}
               <Button variant={variant} leadingIcon={internalIcons.check} data-testid={`matrix-${variant}-lead`}>
-                Con icona
+                With icon
               </Button>
               <Button variant={variant} trailingIcon={internalIcons['chevron-down']} data-testid={`matrix-${variant}-trail`}>
                 Menu
@@ -140,7 +140,7 @@ export const Overview: Story = {
                 lines with one or two stray icons once the container ran out of width (#35). */}
             <div style={row}>
               {ICON_SIZES.map((size) => (
-                <Button key={size} variant={variant} size={size} aria-label={`Chiudi ${variant} ${size}`}>
+                <Button key={size} variant={variant} size={size} aria-label={`Close ${variant} ${size}`}>
                   {internalIcons.close}
                 </Button>
               ))}
@@ -162,7 +162,7 @@ export const Overview: Story = {
 
       <section aria-label="Focus" style={{ ...row, overflow: 'hidden', width: 220, padding: 8, border: '1px dashed var(--color-rop-border)' }}>
         <Button data-testid="focus-target" variant="primary">
-          Focus da tastiera
+          Keyboard focus
         </Button>
         {/* Static picture of the keyboard focus indicator (same declaration as :focus-visible). */}
         <Button variant="ghost" style={{ outline: '2px solid var(--color-rop-primary)', outlineOffset: 2 }}>
@@ -172,13 +172,13 @@ export const Overview: Story = {
 
       <section aria-label="Inline in text">
         <Text data-testid="inline-with">
-          Il documento{' '}
+          The document{' '}
           <Button size="inline" variant="ghost" data-testid="inline-button">
-            richiede una modifica
+            needs a change
           </Button>{' '}
-          prima della conferma.
+          before confirmation.
         </Text>
-        <Text data-testid="inline-without">Il documento richiede una modifica prima della conferma.</Text>
+        <Text data-testid="inline-without">The document needs a change before confirmation.</Text>
       </section>
 
       <section aria-label="Consumer override" style={row}>
@@ -186,25 +186,25 @@ export const Overview: Story = {
             Tailwind build generates `h-12`; here that is simulated, in the same layer. */}
         <style>{'@layer rop.utilities { .h-12 { height: 3rem; } .h-8 { height: 2rem; } }'}</style>
         <Button className="h-8" data-testid="override-lower">
-          Altezza h-8
+          Height h-8
         </Button>
         <Button className="h-12" data-testid="override-height">
-          Altezza h-12
+          Height h-12
         </Button>
-        <Button data-testid="no-override">Altezza md</Button>
+        <Button data-testid="no-override">Height md</Button>
       </section>
 
       <section aria-label="Long label" style={{ width: 160 }}>
         <Button size="sm" data-testid="long-label">
-          Un'etichetta molto lunga che deve andare a capo senza sbordare dal bottone
+          A very long label that must wrap onto several lines without overflowing the button
         </Button>
       </section>
 
       <section aria-label="Accessible names" style={row}>
-        <Button size="icon-sm" aria-label="Annulla selezione righe">
+        <Button size="icon-sm" aria-label="Clear row selection">
           {internalIcons.close}
         </Button>
-        <Button size="icon-sm" aria-label="Annulla selezione filtri">
+        <Button size="icon-sm" aria-label="Clear filter selection">
           {internalIcons.close}
         </Button>
         <Text variant="caption" as="span">
@@ -224,9 +224,9 @@ export const InlineNarrow: Story = {
   render: () => (
     <div data-testid="narrow" style={{ width: 120, border: '1px dashed var(--color-rop-border)' }}>
       <Text>
-        Vedi{' '}
+        See{' '}
         <Button size="inline" variant="ghost" data-testid="narrow-inline">
-          {"un'etichetta inline molto lunga"}
+          {'a very long inline label'}
         </Button>
       </Text>
     </div>

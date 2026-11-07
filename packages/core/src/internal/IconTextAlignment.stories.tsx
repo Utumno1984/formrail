@@ -49,7 +49,7 @@ function Case({ name, icon, text, children }: { name: string; icon: string; text
   );
 }
 
-const SORT_ROWS = [{ id: 'a', customer: 'Rossi Costruzioni' }];
+const SORT_ROWS = [{ id: 'a', customer: 'Rossi Construction' }];
 
 function SortHeader() {
   const table = useListReport({

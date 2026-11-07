@@ -24,14 +24,14 @@ const meta: Meta<PlaygroundArgs> = {
     sectionNavigation: {
       control: 'radio',
       options: ['anchors', 'none'],
-      description: 'Barra di ancore sticky (con scroll-spy) oppure nessuna navigazione',
+      description: 'Sticky anchor bar (with scroll-spy) or no navigation',
     },
-    sectionCount: { control: { type: 'range', min: 1, max: 10, step: 1 }, description: 'Numero di sezioni (la barra compare da 2)' },
+    sectionCount: { control: { type: 'range', min: 1, max: 10, step: 1 }, description: 'Number of sections (the bar appears from 2)' },
     lastSectionHeight: {
       control: { type: 'range', min: 40, max: 900, step: 10 },
-      description: 'Altezza dell’ultima sezione: se troppo corta per arrivare in cima, la voce attiva in fondo resta comunque l’ultima',
+      description: 'Height of the last section: if it is too short to reach the top, the active entry at the bottom is still the last one',
     },
-    anchorBarLabel: { control: 'text', description: 'labels.anchorBar: nome accessibile del <nav>' },
+    anchorBarLabel: { control: 'text', description: 'labels.anchorBar: accessible name of the <nav>' },
   },
   args: { sectionNavigation: 'anchors', sectionCount: 6, lastSectionHeight: 120, anchorBarLabel: 'Sections' },
 };
@@ -47,18 +47,18 @@ function Filler({ height, children }: { height: number; children: ReactNode }) {
   return <div style={{ height, background: BLOCK_BG, borderRadius: 8, padding: 12, boxSizing: 'border-box' }}>{children}</div>;
 }
 
-const TITLES = ['Dati generali', 'Fornitore', 'Righe', 'Importi', 'Pagamenti', 'Allegati', 'Note', 'Cronologia', 'Approvazioni', 'Audit'];
+const TITLES = ['General data', 'Supplier', 'Lines', 'Amounts', 'Payments', 'Attachments', 'Notes', 'History', 'Approvals', 'Audit'];
 const LONG_TITLES = [
-  'Dati generali del documento',
-  'Fornitore e coordinate bancarie',
-  'Righe della fattura e codici articolo',
-  'Importi, imposte e ritenute d’acconto',
-  'Condizioni e scadenze di pagamento',
-  'Allegati e documenti collegati',
-  'Note interne per il team amministrativo',
-  'Cronologia delle modifiche',
-  'Approvazioni richieste',
-  'Registro di audit completo',
+  'General document data',
+  'Supplier and bank details',
+  'Invoice lines and item codes',
+  'Amounts, taxes and withholdings',
+  'Payment terms and due dates',
+  'Attachments and linked documents',
+  'Internal notes for the accounting team',
+  'Change history',
+  'Required approvals',
+  'Full audit log',
 ];
 
 /** Sections of different heights; the last one has the height given and holds a Field (target of the keyboard scenario). */
@@ -68,10 +68,10 @@ function Sections({ count, lastHeight, titles = TITLES }: { count: number; lastH
       {Array.from({ length: count }, (_, i) => {
         const last = i === count - 1;
         return (
-          <ObjectPageSection key={titles[i]} id={`sezione-${i + 1}`} title={titles[i]}>
-            <Filler height={last ? lastHeight : 220 + (i % 3) * 120}>Contenuto di {titles[i]}</Filler>
+          <ObjectPageSection key={titles[i]} id={`section-${i + 1}`} title={titles[i]}>
+            <Filler height={last ? lastHeight : 220 + (i % 3) * 120}>Content of {titles[i]}</Filler>
             <div style={{ marginTop: 12 }}>
-              <Field label={`Campo ${titles[i]}`}>
+              <Field label={`Field ${titles[i]}`}>
                 <Input />
               </Field>
             </div>
@@ -94,7 +94,7 @@ export const Playground: Story = {
   render: ({ sectionNavigation, sectionCount, lastSectionHeight, anchorBarLabel }) => (
     <div style={FRAME}>
       <ObjectPage sectionNavigation={sectionNavigation} labels={{ anchorBar: anchorBarLabel }}>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <Sections count={sectionCount} lastHeight={lastSectionHeight} />
       </ObjectPage>
     </div>
@@ -142,16 +142,16 @@ export const MidPage: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <Sections count={6} lastHeight={300} />
       </ObjectPage>
     </div>
   ),
   play: async ({ canvasElement }) => {
     const scroller = scrollerOf(canvasElement);
-    const second = within(canvasElement).getByRole('region', { name: 'Fornitore' });
+    const second = within(canvasElement).getByRole('region', { name: 'Supplier' });
     scroller.scrollTop = second.offsetTop - 40 + 200;
-    await waitFor(() => expect(within(canvasElement).getByRole('link', { name: 'Fornitore' })).toHaveAttribute('aria-current', 'location'));
+    await waitFor(() => expect(within(canvasElement).getByRole('link', { name: 'Supplier' })).toHaveAttribute('aria-current', 'location'));
   },
 };
 
@@ -162,20 +162,20 @@ export const ManySections: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <Sections count={10} lastHeight={200} titles={LONG_TITLES} />
       </ObjectPage>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const link = await within(canvasElement).findByRole('link', { name: 'Condizioni e scadenze di pagamento' });
+    const link = await within(canvasElement).findByRole('link', { name: 'Payment terms and due dates' });
     await userEvent.click(link);
     await waitFor(() => expect(link).toHaveAttribute('aria-current', 'location'));
     // Wait for the smooth scroll to arrive (the section's top at the bar's bottom edge) so the picture is
     // steady, however slow the machine is: a "stopped moving" check could fire before it has started.
     const scroller = scrollerOf(canvasElement);
     const bar = within(canvasElement).getByRole('navigation');
-    const section = within(canvasElement).getByRole('region', { name: 'Condizioni e scadenze di pagamento' });
+    const section = within(canvasElement).getByRole('region', { name: 'Payment terms and due dates' });
     await waitFor(
       () => {
         const gap = section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - bar.getBoundingClientRect().height;
@@ -196,15 +196,15 @@ export const TooltipOverBar: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Fattura 2026/0142" />
-        <ObjectPageSection id="info" title="Informazioni">
-          <Tooltip content="Suggerimento che si sovrappone alla barra" delayDuration={0}>
-            <Button variant="secondary">Dettagli</Button>
+        <ObjectPageHeader title="Invoice 2026/0142" />
+        <ObjectPageSection id="info" title="Information">
+          <Tooltip content="Hint that overlaps the bar" delayDuration={0}>
+            <Button variant="secondary">Details</Button>
           </Tooltip>
-          <Filler height={900}>Contenuto lungo</Filler>
+          <Filler height={900}>Long content</Filler>
         </ObjectPageSection>
-        <ObjectPageSection id="altro" title="Altro">
-          <Filler height={700}>Altro contenuto</Filler>
+        <ObjectPageSection id="other" title="Other">
+          <Filler height={700}>More content</Filler>
         </ObjectPageSection>
       </ObjectPage>
     </div>
@@ -217,14 +217,14 @@ export const NothingToScroll: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageSection id="uno" title="Uno">
-          Breve
+        <ObjectPageSection id="one" title="One">
+          Short
         </ObjectPageSection>
-        <ObjectPageSection id="due" title="Due">
-          Breve
+        <ObjectPageSection id="two" title="Two">
+          Short
         </ObjectPageSection>
-        <ObjectPageSection id="tre" title="Tre">
-          Breve
+        <ObjectPageSection id="three" title="Three">
+          Short
         </ObjectPageSection>
       </ObjectPage>
     </div>

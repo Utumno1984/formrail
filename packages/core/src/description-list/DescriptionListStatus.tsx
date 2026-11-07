@@ -8,7 +8,7 @@ export interface DescriptionListStatusProps extends Omit<HTMLAttributes<HTMLDivE
   /** Usually a `StatusBadge`; any node works. `undefined`/`null`/empty: no badge. */
   status?: ReactNode;
   /**
-   * Audit line next to the badge (e.g. "Archiviato il 12/10/2026 da M. Rossi"): one line, cut with
+   * Audit line next to the badge (e.g. "Archived on 12/10/2026 by M. Rossi"): one line, cut with
    * an ellipsis (`TruncatedText`, full text in the DOM and in a tooltip on real hover/focus).
    * `undefined`/`null`/`''`: no detail, and no orphan gap.
    */
@@ -30,8 +30,8 @@ export interface DescriptionListStatusProps extends Omit<HTMLAttributes<HTMLDivE
  *
  * ```tsx
  * <DescriptionListStatus
- *   status={invoice.archivedAt ? <StatusBadge tone="warning">Archiviato</StatusBadge> : undefined}
- *   detail={invoice.archivedAt ? `Archiviato il ${date} da ${invoice.archivedBy}` : undefined}
+ *   status={invoice.archivedAt ? <StatusBadge tone="warning">Archived</StatusBadge> : undefined}
+ *   detail={invoice.archivedAt ? `Archived on ${date} by ${invoice.archivedBy}` : undefined}
  * />
  * <DescriptionList>…</DescriptionList>
  * ```

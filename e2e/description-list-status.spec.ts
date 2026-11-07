@@ -6,7 +6,7 @@ const EPS = 0.5;
 const PLAY = 'data-descriptionlist--status-and-summary';
 const VISUAL = 'data-descriptionlist--status-and-summary-visual';
 
-const ENTITIES = ['archiviata con audit', 'archiviata senza audit', 'attiva, senza stato', 'solo dettaglio'] as const;
+const ENTITIES = ['archived with audit', 'archived without audit', 'active, no status', 'detail only'] as const;
 
 const select = (page: Page, entity: string) => page.getByRole('button', { name: entity, exact: true }).click();
 const setWidth = (page: Page, width: number) =>
@@ -50,15 +50,15 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   }) => {
     await gotoStory(page, PLAY);
     const status = page.getByTestId('status');
-    await select(page, 'attiva, senza stato');
+    await select(page, 'active, no status');
     await setWidth(page, 280);
     const emptyHeight = (await box(status)).height;
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     expect(Math.abs((await box(status)).height - emptyHeight)).toBeLessThanOrEqual(EPS);
     const detail = status.locator('> span').last();
     const truncated = await detail.evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(truncated).toBe(true);
-    await expect(detail).toContainText('Archiviato il 12/10/2026 da Maria Rossi (ufficio acquisti)');
+    await expect(detail).toContainText('Archived on 12/10/2026 by Maria Rossi (purchasing office)');
     // not at mount
     await page.waitForTimeout(800);
     await expect(page.getByRole('tooltip')).toHaveCount(0);
@@ -68,17 +68,17 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
 
   test('detail that changes (entity switch under the pointer) leaves no orphan tooltip', async ({ page }) => {
     await gotoStory(page, PLAY);
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     await setWidth(page, 250);
     await page.getByTestId('status').locator('> span').last().hover();
     await expect(page.getByRole('tooltip')).toBeVisible({ timeout: 3000 });
-    await select(page, 'attiva, senza stato');
+    await select(page, 'active, no status');
     await expect(page.getByRole('tooltip')).toHaveCount(0);
   });
 
   test('badge and detail are vertically centred and the row is no taller than a body line', async ({ page }) => {
     await gotoStory(page, PLAY);
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     const status = page.getByTestId('status');
     const [badge, detail, row] = await Promise.all([
       box(status.locator('> span').first()),
@@ -92,7 +92,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
 
   test('order is badge then detail; RTL keeps the logical order', async ({ page }) => {
     await gotoStory(page, PLAY);
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     const status = page.getByTestId('status');
     const badge = status.locator('> span').first();
     const detail = status.locator('> span').last();
@@ -106,14 +106,14 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   test('zoom (larger root font): empty and full rows stay equal and grow with the text', async ({ page }) => {
     await gotoStory(page, PLAY);
     const status = page.getByTestId('status');
-    await select(page, 'attiva, senza stato');
+    await select(page, 'active, no status');
     const before = (await box(status)).height;
     await page.evaluate(() => {
       document.documentElement.style.fontSize = '32px';
     });
     const emptyZoom = (await box(status)).height;
     expect(emptyZoom).toBeGreaterThan(before * 1.5);
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     expect(Math.abs((await box(status)).height - emptyZoom)).toBeLessThanOrEqual(EPS);
   });
 
@@ -122,12 +122,12 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   }) => {
     await gotoStory(page, PLAY);
     const status = page.getByTestId('status');
-    await select(page, 'attiva, senza stato');
+    await select(page, 'active, no status');
     expect((await status.ariaSnapshot()).trim()).toBe('');
-    await select(page, 'archiviata con audit');
+    await select(page, 'archived with audit');
     const snap = await status.ariaSnapshot();
-    expect(snap.indexOf('Archiviato')).toBeGreaterThanOrEqual(0);
-    expect(snap.indexOf('Archiviato')).toBeLessThan(snap.indexOf('Maria Rossi'));
+    expect(snap.indexOf('Archived')).toBeGreaterThanOrEqual(0);
+    expect(snap.indexOf('Archived')).toBeLessThan(snap.indexOf('Maria Rossi'));
     await expect(page.locator('[aria-live]:not([aria-live="off"])')).toHaveCount(0);
     await expect(page.getByTestId('status').locator('[role]')).toHaveCount(0);
   });
@@ -208,7 +208,7 @@ test.describe('Data/DescriptionList — summary rows', () => {
       .getByTestId('summary-inline')
       .locator('> dl > div')
       .evaluateAll((items) => items.map((i) => getComputedStyle(i).borderTopWidth));
-    // Imponibile, IVA (run 1 start), Totale, Pagato, Residuo (run 2 start)
+    // Taxable amount, VAT (run 1 start), Total, Paid, Balance (run 2 start)
     expect(widths).toEqual(['0px', '1px', '0px', '0px', '1px']);
   });
 
@@ -221,7 +221,7 @@ test.describe('Data/DescriptionList — summary rows', () => {
       const normals = items.filter((i) => !i.hasAttribute('data-rop-summary'));
       normals.forEach((n) => n.remove());
       const onlySummaries = border();
-      // summary first, then a normal one, then summaries again: [IVA, Imponibile, Totale, Pagato, Residuo]
+      // summary first, then a normal one, then summaries again: [VAT, Taxable amount, Total, Paid, Balance]
       dl.replaceChildren(items[1]!, items[0]!, items[2]!, items[3]!, items[4]!);
       const summaryFirst = border();
       return { onlySummaries, summaryFirst };

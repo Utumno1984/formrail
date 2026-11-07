@@ -15,24 +15,24 @@ export interface DemoInvoice {
 }
 
 export const DEMO_SUPPLIERS = [
-  'Rossi Costruzioni S.r.l.',
-  'Bianchi Forniture',
-  'Verdi Impianti',
-  'Neri Trasporti',
-  'Gialli Ufficio',
-  'Esposito Servizi',
-  'Ferrari Meccanica',
-  'Romano Logistica',
-  'Colombo Informatica',
-  'Ricci Arredi',
-  'Marino Energia',
-  'Greco Consulenze',
+  'Rossi Construction Ltd',
+  'Bianchi Supplies',
+  'Verdi Installations',
+  'Neri Transport',
+  'Gialli Office',
+  'Esposito Services',
+  'Ferrari Mechanics',
+  'Romano Logistics',
+  'Colombo Computing',
+  'Ricci Furnishings',
+  'Marino Energy',
+  'Greco Consulting',
 ];
 
 export const DEMO_STATUS_LABEL: Record<DemoInvoiceStatus, string> = {
-  pending: 'Da approvare',
-  approved: 'Approvata',
-  rejected: 'Respinta',
+  pending: 'To approve',
+  approved: 'Approved',
+  rejected: 'Rejected',
 };
 
 // A multiplicative hash (Knuth): the same index always gives the same number.

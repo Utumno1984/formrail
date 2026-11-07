@@ -14,28 +14,28 @@ interface Invoice {
 }
 
 const INVOICES: Invoice[] = [
-  { id: 'F-001', customer: 'Rossi Costruzioni', status: 'pending' },
-  { id: 'F-002', customer: 'Bianchi & Associati', status: 'approved' },
-  { id: 'F-003', customer: 'Rossi Forniture', status: 'approved' },
-  { id: 'F-004', customer: 'Verdi Industriale', status: 'pending' },
-  { id: 'F-005', customer: 'Neri Trasporti', status: 'pending' },
-  { id: 'F-006', customer: 'Rossini Logistica', status: 'pending' },
+  { id: 'F-001', customer: 'Rossi Construction', status: 'pending' },
+  { id: 'F-002', customer: 'Bianchi & Associates', status: 'approved' },
+  { id: 'F-003', customer: 'Rossi Supplies', status: 'approved' },
+  { id: 'F-004', customer: 'Verdi Industrial', status: 'pending' },
+  { id: 'F-005', customer: 'Neri Transport', status: 'pending' },
+  { id: 'F-006', customer: 'Rossini Logistics', status: 'pending' },
   { id: 'F-007', customer: 'Gialli', status: 'approved' },
-  { id: 'F-008', customer: 'Rossetti Impianti', status: 'approved' },
+  { id: 'F-008', customer: 'Rossetti Installations', status: 'approved' },
 ];
 
-const COLUMNS: ListReportColumn<Invoice>[] = [{ id: 'customer', header: 'Cliente', accessor: (r) => r.customer }];
+const COLUMNS: ListReportColumn<Invoice>[] = [{ id: 'customer', header: 'Customer', accessor: (r) => r.customer }];
 
 const FILTERS: ListReportFilter<Invoice>[] = [
-  { id: 'all', label: 'Tutte' },
-  { id: 'pending', label: 'Da approvare', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approvate', predicate: (r) => r.status === 'approved' },
+  { id: 'all', label: 'All' },
+  { id: 'pending', label: 'To approve', predicate: (r) => r.status === 'pending' },
+  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
 ];
 
 const LONG_FILTERS: ListReportFilter<Invoice>[] = [
-  { id: 'all', label: 'Tutte le fatture ricevute dai fornitori nell’esercizio corrente' },
-  { id: 'pending', label: 'Da approvare entro la fine del mese da parte dell’ufficio acquisti e dell’amministrazione', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approvate', predicate: (r) => r.status === 'approved' },
+  { id: 'all', label: 'All invoices received from suppliers in the current financial year' },
+  { id: 'pending', label: 'To approve by the end of the month by the purchasing office and the accounting department', predicate: (r) => r.status === 'pending' },
+  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
 ];
 
 interface DemoProps {
@@ -73,7 +73,7 @@ function Demo({ filters = FILTERS, withRows = true, dir, showSearch, filtersLabe
 const PAGE: CSSProperties = { padding: 16, fontFamily: 'system-ui, sans-serif' };
 const NO_CONTROLS = { controls: { disable: true } };
 
-type DelayChoice = 0 | 300 | 800 | 'solo Invio';
+type DelayChoice = 0 | 300 | 800 | 'Enter only';
 
 interface PlaygroundArgs {
   searchCommitDelay: DelayChoice;
@@ -94,13 +94,13 @@ const meta: Meta<PlaygroundArgs> = {
   argTypes: {
     searchCommitDelay: {
       control: 'select',
-      options: [0, 300, 800, 'solo Invio'],
-      mapping: { 0: 0, 300: 300, 800: 800, 'solo Invio': null },
-      description: '`searchCommitDelay` di `useListReport` (ms); "solo Invio" = `null`: committa solo con Invio',
+      options: [0, 300, 800, 'Enter only'],
+      mapping: { 0: 0, 300: 300, 800: 800, 'Enter only': null },
+      description: '`searchCommitDelay` of `useListReport` (ms); "Enter only" = `null`: commits only on Enter',
     },
     showSearch: { control: 'boolean' },
-    filtersLabel: { control: 'text', description: 'Nome accessibile del gruppo di pillole' },
-    searchLabel: { control: 'text', description: 'Nome accessibile (e segnaposto) del campo di ricerca' },
+    filtersLabel: { control: 'text', description: 'Accessible name of the pill group' },
+    searchLabel: { control: 'text', description: 'Accessible name (and placeholder) of the search field' },
     dir: { control: 'radio', options: ['ltr', 'rtl'] },
     onFilterChange: { control: false },
     onSearchQueryChange: { control: false },
@@ -125,9 +125,9 @@ const customers = (canvas: ReturnType<typeof within>): string[] =>
     .map((li) => li.textContent ?? '');
 
 /**
- * Controls: `searchCommitDelay` (0 / 300 / 800 ms, or "solo Invio" = only Enter commits), `showSearch`,
+ * Controls: `searchCommitDelay` (0 / 300 / 800 ms, or "Enter only" = only Enter commits), `showSearch`,
  * the two accessible names and `dir`. `onFilterChange` and `onSearchQueryChange` show up in Actions.
- * The play function moves from "Tutte" to "Da approvare" with the arrow key, types "rossi" and presses
+ * The play function moves from "All" to "To approve" with the arrow key, types "rossi" and presses
  * Enter (one `onSearchQueryChange('rossi')`, only the matching pending invoices left), then Escape
  * clears the search and the whole filter comes back.
  */
@@ -142,9 +142,9 @@ export const Playground: Story = {
     // Controls or by a test) the scenario has nothing to type into.
     if (!args.showSearch || args.filtersLabel !== 'Filters' || args.searchLabel !== 'Search' || args.dir !== 'ltr') return;
     const canvas = within(canvasElement);
-    canvas.getByRole('radio', { name: 'Tutte' }).focus();
+    canvas.getByRole('radio', { name: 'All' }).focus();
     await userEvent.keyboard('{ArrowRight}');
-    await expect(canvas.getByRole('radio', { name: 'Da approvare' })).toHaveAttribute('aria-checked', 'true');
+    await expect(canvas.getByRole('radio', { name: 'To approve' })).toHaveAttribute('aria-checked', 'true');
     await expect(args.onFilterChange).toHaveBeenCalledTimes(1);
     await expect(args.onFilterChange).toHaveBeenCalledWith('pending');
     await expect(customers(canvas)).toHaveLength(4);
@@ -155,7 +155,7 @@ export const Playground: Story = {
     await userEvent.keyboard('{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenCalledTimes(1);
     await expect(args.onSearchQueryChange).toHaveBeenCalledWith('rossi');
-    await expect(customers(canvas)).toEqual(['Rossi Costruzioni', 'Rossini Logistica']);
+    await expect(customers(canvas)).toEqual(['Rossi Construction', 'Rossini Logistics']);
 
     await userEvent.keyboard('{Escape}');
     await expect(search).toHaveValue('');
@@ -176,7 +176,7 @@ export const ActiveFilter: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('radio', { name: 'Approvate' })).toHaveAttribute('aria-checked', 'true');
+    await expect(canvas.getByRole('radio', { name: 'Approved' })).toHaveAttribute('aria-checked', 'true');
     await expect(customers(canvas)).toHaveLength(4);
   },
 };
@@ -211,13 +211,13 @@ export const LongLabels: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const pill = canvas.getByRole('radio', { name: /Da approvare entro/ });
+    const pill = canvas.getByRole('radio', { name: /To approve by/ });
     const bar = canvas.getByRole('search');
     await expect(pill.getBoundingClientRect().right).toBeLessThanOrEqual(bar.getBoundingClientRect().right + 1);
     const label = pill.firstElementChild as HTMLElement;
     await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
     // wrapped: taller than a one-line pill
-    await expect(pill.getBoundingClientRect().height).toBeGreaterThan(canvas.getByRole('radio', { name: 'Approvate' }).getBoundingClientRect().height * 1.5);
+    await expect(pill.getBoundingClientRect().height).toBeGreaterThan(canvas.getByRole('radio', { name: 'Approved' }).getBoundingClientRect().height * 1.5);
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth);
   },
 };
@@ -248,9 +248,9 @@ export const Rtl: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    canvas.getByRole('radio', { name: 'Tutte' }).focus();
+    canvas.getByRole('radio', { name: 'All' }).focus();
     await userEvent.keyboard('{ArrowLeft}');
-    await expect(canvas.getByRole('radio', { name: 'Da approvare' })).toHaveFocus();
+    await expect(canvas.getByRole('radio', { name: 'To approve' })).toHaveFocus();
   },
 };
 
@@ -295,7 +295,7 @@ export const ExternalSearchQuery: Story = {
       return (
         <div style={PAGE}>
           <ListReportFilterBar table={table} />
-          <Button onClick={() => setQuery('verdi')}>Imposta “verdi”</Button>
+          <Button onClick={() => setQuery('verdi')}>Set “verdi”</Button>
           <output data-testid="committed">{table.searchQuery}</output>
         </div>
       );
@@ -311,12 +311,12 @@ export const InsideDialog: Story = {
     <div style={PAGE}>
       <Dialog>
         <DialogTrigger asChild>
-          <Button>Apri filtri</Button>
+          <Button>Open filters</Button>
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Filtra le fatture</DialogTitle>
-            <DialogDescription>Cerca tra le fatture.</DialogDescription>
+            <DialogTitle>Filter invoices</DialogTitle>
+            <DialogDescription>Search among the invoices.</DialogDescription>
           </DialogHeader>
           <DialogBody>
             <Demo />
@@ -332,7 +332,7 @@ export const KeyboardSafe: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <div style={{ ...PAGE, paddingBottom: 'var(--rop-keyboard-inset, 0px)' }} data-testid="kb-page">
-      <div style={{ height: '120dvh' }}>Contenuto lungo prima della barra.</div>
+      <div style={{ height: '120dvh' }}>Long content before the bar.</div>
       <Demo withRows={false} />
       <div style={{ height: '100dvh' }} />
     </div>

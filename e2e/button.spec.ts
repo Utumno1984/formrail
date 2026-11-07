@@ -267,11 +267,11 @@ test.describe('Primitives/Button', () => {
     await expectPlayToPass(page, 'primitives-button--playground');
     await expectNoA11yViolations(page);
     await expectPlayToPass(page, 'primitives-button--icon-only');
-    await expect(page.getByRole('button', { name: 'Chiudi' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close' })).toBeVisible();
     await expectNoA11yViolations(page);
     await expectPlayToPass(page, 'primitives-button--as-link');
     await expect(page.locator('#storybook-root button')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Vai al dettaglio' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Go to details' })).toBeVisible();
     await expectNoA11yViolations(page);
   });
 });
