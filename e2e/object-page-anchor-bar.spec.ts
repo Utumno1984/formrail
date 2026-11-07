@@ -32,8 +32,8 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
   test('a nav of real links in DOM order; none with one section or sectionNavigation=none', async ({ page }) => {
     await gotoStory(page, STORY('scrollable'), 'sectionCount:4');
     const nav = page.getByRole('navigation', { name: 'Sections' });
-    await expect(nav.getByRole('link')).toHaveText(['Dati generali', 'Fornitore', 'Righe', 'Importi']);
-    await expect(nav.getByRole('link').first()).toHaveAttribute('href', '#sezione-1');
+    await expect(nav.getByRole('link')).toHaveText(['General data', 'Supplier', 'Lines', 'Amounts']);
+    await expect(nav.getByRole('link').first()).toHaveAttribute('href', '#section-1');
 
     await gotoStory(page, STORY('scrollable'), 'sectionCount:1');
     await expect(page.getByRole('navigation')).toHaveCount(0);
@@ -62,37 +62,37 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
     await gotoStory(page, STORY('scrollable'));
     const hash = await page.evaluate(() => location.hash);
     const history = await page.evaluate(() => window.history.length);
-    await page.getByRole('link', { name: 'Righe' }).click();
+    await page.getByRole('link', { name: 'Lines' }).click();
     await settle(page);
 
-    const heading = page.getByRole('heading', { name: 'Righe', level: 2 });
+    const heading = page.getByRole('heading', { name: 'Lines', level: 2 });
     await expect(heading).toBeFocused();
     const barBottom = await page.locator(BAR).evaluate((el) => el.getBoundingClientRect().bottom);
     const headingTop = await heading.evaluate((el) => el.getBoundingClientRect().top);
-    const sectionTop = await page.getByRole('region', { name: 'Righe' }).evaluate((el) => el.getBoundingClientRect().top);
+    const sectionTop = await page.getByRole('region', { name: 'Lines' }).evaluate((el) => el.getBoundingClientRect().top);
     expect(sectionTop).toBeGreaterThanOrEqual(barBottom - 1);
     expect(sectionTop - barBottom).toBeLessThanOrEqual(8);
     expect(headingTop).toBeGreaterThanOrEqual(barBottom - 1);
     expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0);
     expect(await page.evaluate(() => location.hash)).toBe(hash);
     expect(await page.evaluate(() => window.history.length)).toBe(history);
-    expect(await activeNames(page)).toEqual(['Righe']);
+    expect(await activeNames(page)).toEqual(['Lines']);
 
     // Clicking the active link again brings the section back to the top and the focus to its title.
     await page.locator(SCROLLER).evaluate((el) => (el.scrollTop += 30));
-    await page.getByRole('link', { name: 'Righe' }).click();
+    await page.getByRole('link', { name: 'Lines' }).click();
     await settle(page);
     await expect(heading).toBeFocused();
-    expect((await page.getByRole('region', { name: 'Righe' }).evaluate((el) => el.getBoundingClientRect().top)) - barBottom).toBeLessThanOrEqual(8);
+    expect((await page.getByRole('region', { name: 'Lines' }).evaluate((el) => el.getBoundingClientRect().top)) - barBottom).toBeLessThanOrEqual(8);
   });
 
   test('the focus indicator of the target title is not cut by the bar', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await gotoStory(page, STORY('scrollable'));
-    await page.getByRole('link', { name: 'Importi' }).focus();
+    await page.getByRole('link', { name: 'Amounts' }).focus();
     await page.keyboard.press('Enter');
-    const heading = page.getByRole('heading', { name: 'Importi' });
+    const heading = page.getByRole('heading', { name: 'Amounts' });
     await expect(heading).toBeFocused();
     const { barBottom, top, left } = await heading.evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -110,70 +110,70 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
   test('clicking or typing in a field of the section jumped to keeps the active link', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 700 });
     await gotoStory(page, STORY('scrollable'), 'sectionCount:6;lastSectionHeight:40');
-    await page.getByRole('link', { name: 'Pagamenti' }).click();
+    await page.getByRole('link', { name: 'Payments' }).click();
     await settle(page);
-    expect(await activeNames(page)).toEqual(['Pagamenti']);
-    const field = page.getByRole('textbox', { name: 'Campo Pagamenti' });
+    expect(await activeNames(page)).toEqual(['Payments']);
+    const field = page.getByRole('textbox', { name: 'Field Payments' });
     await field.click();
     await page.keyboard.type('a b');
     await page.keyboard.press('Home');
     await page.waitForTimeout(300);
-    expect(await activeNames(page)).toEqual(['Pagamenti']);
+    expect(await activeNames(page)).toEqual(['Payments']);
   });
 
   test('the section jumped to grows after arriving (an error message, a longer textarea): the active link stays', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 700 });
-    // The last section is short, so the jump to "Pagamenti" stops short of the top: the scroller is at its end.
+    // The last section is short, so the jump to "Payments" stops short of the top: the scroller is at its end.
     await gotoStory(page, STORY('scrollable'), 'sectionCount:6;lastSectionHeight:40');
-    await page.getByRole('link', { name: 'Pagamenti' }).click();
+    await page.getByRole('link', { name: 'Payments' }).click();
     await settle(page);
-    expect(await activeNames(page)).toEqual(['Pagamenti']);
+    expect(await activeNames(page)).toEqual(['Payments']);
     await page.evaluate(() => {
       const extra = document.createElement('div');
       extra.style.height = '20px';
-      document.getElementById('sezione-5')!.appendChild(extra);
+      document.getElementById('section-5')!.appendChild(extra);
     });
     await page.waitForTimeout(400);
-    expect(await activeNames(page)).toEqual(['Pagamenti']);
+    expect(await activeNames(page)).toEqual(['Payments']);
     // Several more growths in a row.
     for (let i = 0; i < 3; i += 1) {
       await page.evaluate(() => {
         const extra = document.createElement('div');
         extra.style.height = '15px';
-        document.getElementById('sezione-5')!.appendChild(extra);
+        document.getElementById('section-5')!.appendChild(extra);
       });
       await page.waitForTimeout(100);
     }
-    expect(await activeNames(page)).toEqual(['Pagamenti']);
+    expect(await activeNames(page)).toEqual(['Payments']);
   });
 
   test('content that grows while the jump is animating: it still lands the section below the bar', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'), 'sectionCount:6');
-    await page.getByRole('link', { name: 'Importi' }).click();
+    await page.getByRole('link', { name: 'Amounts' }).click();
     await page.waitForTimeout(60);
     await page.evaluate(() => {
       const filler = document.createElement('div');
       filler.style.height = '900px';
-      document.getElementById('sezione-2')!.appendChild(filler);
+      document.getElementById('section-2')!.appendChild(filler);
     });
     await settle(page);
     await page.waitForTimeout(300);
-    expect(await activeNames(page)).toEqual(['Importi']);
+    expect(await activeNames(page)).toEqual(['Amounts']);
     const barBottom = await page.locator(BAR).evaluate((el) => el.getBoundingClientRect().bottom);
-    const sectionTop = await page.getByRole('region', { name: 'Importi' }).evaluate((el) => el.getBoundingClientRect().top);
+    const sectionTop = await page.getByRole('region', { name: 'Amounts' }).evaluate((el) => el.getBoundingClientRect().top);
     expect(Math.abs(sectionTop - barBottom - 4)).toBeLessThanOrEqual(2);
   });
 
   test('keyboard only: Enter on a link, then Tab enters the content of the section', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'));
-    await page.getByRole('link', { name: 'Pagamenti' }).focus();
+    await page.getByRole('link', { name: 'Payments' }).focus();
     await page.keyboard.press('Enter');
     await settle(page);
-    await expect(page.getByRole('heading', { name: 'Pagamenti' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Payments' })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('textbox', { name: 'Campo Pagamenti' })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Field Payments' })).toBeFocused();
     expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0);
   });
 
@@ -181,10 +181,10 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'), 'sectionCount:6;lastSectionHeight:60');
     const scroller = page.locator(SCROLLER);
-    expect(await activeNames(page)).toEqual(['Dati generali']);
+    expect(await activeNames(page)).toEqual(['General data']);
 
     const barBottom = await page.locator(BAR).evaluate((el) => el.getBoundingClientRect().bottom);
-    for (const title of ['Fornitore', 'Righe', 'Importi']) {
+    for (const title of ['Supplier', 'Lines', 'Amounts']) {
       const top = await page.getByRole('region', { name: title }).evaluate((el, edge) => {
         const sc = document.querySelector('[data-object-page-scroller]') as HTMLElement;
         return el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop - edge;
@@ -195,11 +195,11 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
       await expect.poll(async () => (await activeNames(page))[0]).not.toBe(title);
     }
     await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight));
-    await expect.poll(() => activeNames(page)).toEqual(['Allegati']);
+    await expect.poll(() => activeNames(page)).toEqual(['Attachments']);
     // The short last section cannot reach the top, yet it is the active one: and only one is.
-    expect(await page.getByRole('region', { name: 'Allegati' }).evaluate((el) => el.getBoundingClientRect().top)).toBeGreaterThan(barBottom + 20);
+    expect(await page.getByRole('region', { name: 'Attachments' }).evaluate((el) => el.getBoundingClientRect().top)).toBeGreaterThan(barBottom + 20);
     await scroller.evaluate((el) => (el.scrollTop = 0));
-    await expect.poll(() => activeNames(page)).toEqual(['Dati generali']);
+    await expect.poll(() => activeNames(page)).toEqual(['General data']);
   });
 
   test('no flicker: after a click on a far section the active link is the clicked one all along the animation', async ({ page }) => {
@@ -248,11 +248,11 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
   test('nothing to scroll: the first is active; clicking the last one activates it without scrolling', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 800 });
     await gotoStory(page, STORY('nothing-to-scroll'));
-    expect(await activeNames(page)).toEqual(['Uno']);
-    await page.getByRole('link', { name: 'Tre' }).click();
-    await expect.poll(() => activeNames(page)).toEqual(['Tre']);
+    expect(await activeNames(page)).toEqual(['One']);
+    await page.getByRole('link', { name: 'Three' }).click();
+    await expect.poll(() => activeNames(page)).toEqual(['Three']);
     expect(await scrollTopOf(page)).toBe(0);
-    await expect(page.getByRole('heading', { name: 'Tre' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Three' })).toBeFocused();
   });
 
   test('at 320px the bar scrolls inside itself, the page does not overflow and the active link is brought into view', async ({ page }) => {
@@ -268,7 +268,7 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
     expect(new Set(heights.map(Math.round)).size).toBe(1);
 
     await page.locator(SCROLLER).evaluate((el) => (el.scrollTop = el.scrollHeight));
-    await expect.poll(async () => (await activeNames(page))[0]).toBe('Registro di audit completo');
+    await expect.poll(async () => (await activeNames(page))[0]).toBe('Full audit log');
     await expect.poll(() => list.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
     const inView = await page.locator(`${BAR} a[aria-current]`).evaluate((a) => {
       const l = a.closest('ul')!.getBoundingClientRect();
@@ -281,7 +281,7 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
 
   test('at 375px an off-screen active link is centered in the bar, whatever links were active before', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 700 });
-    const target = 'Allegati e documenti collegati';
+    const target = 'Attachments and linked documents';
     const finalState = async (via: string[]) => {
       await gotoStory(page, STORY('many-sections'));
       for (const name of [...via, target]) {
@@ -302,7 +302,7 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
       return page.locator(`${BAR} ul`).evaluate((el) => el.scrollLeft);
     };
     const direct = await finalState([]);
-    const viaIntermediate = await finalState(['Fornitore e coordinate bancarie', 'Registro di audit completo']);
+    const viaIntermediate = await finalState(['Supplier and bank details', 'Full audit log']);
     expect(direct).toBeGreaterThan(0);
     expect(Math.abs(viaIntermediate - direct)).toBeLessThanOrEqual(2);
   });
@@ -310,7 +310,7 @@ test.describe('Floorplans/Object Page/Anchor Bar', () => {
   test('a tooltip opened in a section stays above the bar', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('tooltip-over-bar'));
-    const button = page.getByRole('button', { name: 'Dettagli' });
+    const button = page.getByRole('button', { name: 'Details' });
     const barBottom = await page.locator(BAR).evaluate((el) => el.getBoundingClientRect().bottom);
     // The button right under the bar: its tooltip (above it) overlaps the bar.
     await page.locator(SCROLLER).evaluate((el, edge) => {

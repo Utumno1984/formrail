@@ -83,7 +83,7 @@ test.describe('Primitives/StatusBadge', () => {
     expect(m.ellipsis).toBe('ellipsis');
     expect(m.nowrap).toBe('nowrap');
     expect(m.clipped).toBe(true);
-    expect(m.text).toContain('Archiviato in attesa di approvazione da parte del responsabile di reparto');
+    expect(m.text).toContain('Archived, awaiting approval from the department manager');
     expect(m.maxWidth).toBe('100%');
     expect(m.minWidth).toBe('0px');
   });

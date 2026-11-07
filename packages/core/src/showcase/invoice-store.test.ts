@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeDemoInvoices } from '../internal/demo-invoices';
 import { createInvoiceStore, InvoiceNetworkError, InvoiceNotFoundError } from './invoice-store';
-import { SUPPLIER_EN } from './showcase-data';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -11,7 +10,7 @@ afterEach(() => {
 });
 
 describe('createInvoiceStore', () => {
-  it('starts from the demo fixtures, only the supplier names translated, fixtures untouched', async () => {
+  it('starts from the demo fixtures, fixtures untouched', async () => {
     const before = JSON.stringify(makeDemoInvoices(200));
     const store = createInvoiceStore();
     const demo = makeDemoInvoices(200);
@@ -21,7 +20,7 @@ describe('createInvoiceStore', () => {
       const { dueDate, notes, ...base } = r;
       expect(dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(typeof notes).toBe('string');
-      expect(base).toEqual({ ...demo[i], supplier: SUPPLIER_EN[demo[i]!.supplier] });
+      expect(base).toEqual(demo[i]);
     });
     expect(JSON.stringify(makeDemoInvoices(200))).toBe(before);
   });

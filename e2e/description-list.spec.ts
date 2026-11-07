@@ -192,7 +192,7 @@ test.describe('Data/DescriptionList', () => {
       expect(Math.abs(items[0]!.ddTop - items[0]!.dtTop)).toBeLessThanOrEqual(EPS);
       // The second row never overlaps the first, whatever the first one holds.
       expect(items[1]!.dt.top).toBeGreaterThanOrEqual(items[0]!.dd.bottom - EPS);
-      await page.getByRole('button', { name: 'Cambia valore' }).click();
+      await page.getByRole('button', { name: 'Change value' }).click();
     }
     expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(EPS);
   });

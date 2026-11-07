@@ -82,7 +82,7 @@ test.describe('Data/ListReportTable states: stories play', () => {
 
 test.describe('stable footprint', () => {
   test('loading -> empty -> error -> 3 rows: table, columns, header and body do not move', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty');
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     const loading = await footprint(page);
     const row = await rowHeight(page);
@@ -99,7 +99,7 @@ test.describe('stable footprint', () => {
     const error = await footprint(page);
     expectSameFootprint(loading, error);
 
-    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 righe' });
+    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 rows' });
     await expect(page.locator('#storybook-root tbody tr:not([aria-hidden])')).toHaveCount(3);
     const data = await footprint(page);
     expectSameFootprint(loading, data);
@@ -107,17 +107,17 @@ test.describe('stable footprint', () => {
   });
 
   test('no results has the same footprint as loading', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty');
     const loading = await footprint(page);
-    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: 'filtro che esclude tutto' });
+    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: 'filter that excludes everything' });
     await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
     expectSameFootprint(loading, await footprint(page));
   });
 
   test('more rows than loadingRowCount: the body grows inside the scroller, the header stays', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty');
     const loading = await footprint(page);
-    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '200 righe' });
+    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '200 rows' });
     await expect(page.locator('#storybook-root tbody tr')).toHaveCount(200);
     const many = await footprint(page);
     close(many.header.top, loading.header.top);
@@ -130,7 +130,7 @@ test.describe('stable footprint', () => {
   });
 
   test('loadingRowCount scales the footprint: 8 rows', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto;loadingRowCount:8;maxHeight:700');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty;loadingRowCount:8;maxHeight:700');
     const row = await rowHeight(page);
     const loading = await footprint(page);
     expect(loading.body.height).toBeGreaterThanOrEqual(8 * row - EPS);
@@ -140,7 +140,7 @@ test.describe('stable footprint', () => {
   });
 
   test('loadingRowCount=0: no skeleton, one row of body, nothing breaks', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto;loadingRowCount:0');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty;loadingRowCount:0');
     await expect(page.locator('#storybook-root [data-rop-skeleton]')).toHaveCount(0);
     const loading = await footprint(page);
     const row = await rowHeight(page);
@@ -151,9 +151,9 @@ test.describe('stable footprint', () => {
   });
 
   test('skeleton rows have exactly the pitch of the data rows', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty');
     const skeleton = await page.locator('#storybook-root [data-rop-skeleton]').evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height));
-    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 righe' });
+    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 rows' });
     await expect(page.locator('#storybook-root tbody tr:not([aria-hidden])')).toHaveCount(3);
     const data = await page.locator('#storybook-root tbody tr:not([aria-hidden])').evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height));
     for (const h of [...skeleton, ...data]) close(h, skeleton[0]!);
@@ -162,15 +162,15 @@ test.describe('stable footprint', () => {
 
 test.describe('reload with data', () => {
   test('rows stay (same height), aria-busy, no skeleton, sortable headers still work', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:3 righe');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:3 rows');
     const before = await footprint(page);
     await setArgs(page, PLAYGROUND, { status: 'loading' });
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     await expect(page.locator('#storybook-root [data-rop-skeleton]')).toHaveCount(0);
     await expect(page.locator('#storybook-root tbody tr:not([aria-hidden])')).toHaveCount(3);
     expectSameFootprint(before, await footprint(page));
-    await page.getByRole('columnheader', { name: 'Importo' }).getByRole('button').click();
-    await expect(page.getByRole('columnheader', { name: 'Importo' })).toHaveAttribute('aria-sort', 'ascending');
+    await page.getByRole('columnheader', { name: 'Amount' }).getByRole('button').click();
+    await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'ascending');
   });
 });
 
@@ -178,7 +178,7 @@ test.describe('transitions without jumps', () => {
   test('loading -> error -> Retry -> loading -> data: page scroll and header position do not change', async ({ page }) => {
     // A short viewport makes the page itself scrollable.
     await page.setViewportSize({ width: 1000, height: 200 });
-    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:vuoto');
+    await expectPlayToPass(page, PLAYGROUND, 'status:loading;dataset:empty');
     await page.evaluate(() => window.scrollTo(0, 60));
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     const state = () => page.evaluate(() => ({ y: window.scrollY, top: document.querySelector('thead')!.getBoundingClientRect().top }));
@@ -195,7 +195,7 @@ test.describe('transitions without jumps', () => {
     await expect(scroller(page)).toBeFocused();
     expect(await state()).toEqual(start);
 
-    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 righe' });
+    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 rows' });
     await expect(page.locator('#storybook-root tbody tr:not([aria-hidden])')).toHaveCount(3);
     expect(await state()).toEqual(start);
   });
@@ -203,7 +203,7 @@ test.describe('transitions without jumps', () => {
 
 test.describe('"Clear filters"', () => {
   test('is shown only for no results; clicking it calls onClearFilters, shows the rows and keeps the focus on the container', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:filtro che esclude tutto');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:filter that excludes everything');
     const table = page.getByRole('table', { name: 'Fatture' });
     await expect(table.getByText('No results for the current filters')).toBeVisible();
     await page.getByRole('button', { name: 'Clear filters' }).click();
@@ -213,7 +213,7 @@ test.describe('"Clear filters"', () => {
   });
 
   test('an empty dataset shows "No data" and no button', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:vuoto');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:empty');
     await expect(page.getByRole('table').getByText('No data')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
   });
@@ -221,7 +221,7 @@ test.describe('"Clear filters"', () => {
 
 test.describe('narrow container with a wide table', () => {
   test('the message sits in the visible part of the scroller, also after scrolling sideways (ltr)', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:vuoto;containerWidth:320');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:empty;containerWidth:320');
     const box = page.locator('#storybook-root tbody [data-rop-state] > td > div');
     for (const left of [0, 150, 1000]) {
       await scroller(page).evaluate((el, x) => (el.scrollLeft = x), left);
@@ -241,7 +241,7 @@ test.describe('narrow container with a wide table', () => {
   });
 
   test('rtl too', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:vuoto;containerWidth:320;dir:rtl');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:empty;containerWidth:320;dir:rtl');
     const box = page.locator('#storybook-root tbody [data-rop-state] > td > div');
     await scroller(page).evaluate((el) => (el.scrollLeft = -150));
     const s = await scroller(page).evaluate((el) => {
@@ -261,7 +261,7 @@ test.describe('announcements', () => {
   const region = (page: Page): Locator => page.locator('#storybook-root [aria-live="polite"]');
 
   test('the live region is there from the mount, empty; it announces each state and the count', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:3 righe');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:3 rows');
     await expect(region(page)).toHaveCount(1);
     await expect(region(page)).toHaveText('');
     await setArgs(page, PLAYGROUND, { status: 'loading' });
@@ -270,14 +270,14 @@ test.describe('announcements', () => {
     await expect(region(page)).toHaveText('Unable to load data');
     await setArgs(page, PLAYGROUND, { status: 'ready' });
     await expect(region(page)).toHaveText('3 results');
-    await setArgs(page, PLAYGROUND, { dataset: 'vuoto' });
+    await setArgs(page, PLAYGROUND, { dataset: 'empty' });
     await expect(region(page)).toHaveText('No data');
-    await setArgs(page, PLAYGROUND, { dataset: 'filtro che esclude tutto' });
+    await setArgs(page, PLAYGROUND, { dataset: 'filter that excludes everything' });
     await expect(region(page)).toHaveText('No results for the current filters');
   });
 
   test('the region is the same node through the whole life of the table', async ({ page }) => {
-    await expectPlayToPass(page, PLAYGROUND, 'dataset:3 righe');
+    await expectPlayToPass(page, PLAYGROUND, 'dataset:3 rows');
     await region(page).evaluate((el) => ((window as unknown as { __live: Element }).__live = el));
     await setArgs(page, PLAYGROUND, { status: 'loading' });
     await setArgs(page, PLAYGROUND, { status: 'ready' });

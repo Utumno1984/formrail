@@ -28,7 +28,7 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
   test('resize while spying: sticky offset follows the bar height and the active link stays coherent', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'), 'sectionCount:6');
-    await page.getByRole('link', { name: 'Righe' }).click();
+    await page.getByRole('link', { name: 'Lines' }).click();
     await settle(page);
     await page.setViewportSize({ width: 320, height: 500 });
     await expect.poll(async () => (await activeNames(page)).length).toBe(1);
@@ -39,21 +39,21 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
     expect(Math.abs(offset - h)).toBeLessThanOrEqual(1);
     await page.setViewportSize({ width: 768, height: 900 });
     await page.locator(SCROLLER).evaluate((el) => (el.scrollTop = 0));
-    await expect.poll(() => activeNames(page)).toEqual(['Dati generali']);
+    await expect.poll(() => activeNames(page)).toEqual(['General data']);
   });
 
   test('a section that grows after mount keeps the active link coherent', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'), 'sectionCount:4');
-    await page.getByRole('link', { name: 'Fornitore' }).click();
+    await page.getByRole('link', { name: 'Supplier' }).click();
     await settle(page);
-    // Grow the first section by 1500px: Fornitore's top moves away from the bar, the scroller stays put.
-    await page.getByRole('region', { name: 'Dati generali' }).evaluate((el) => {
+    // Grow the first section by 1500px: Supplier's top moves away from the bar, the scroller stays put.
+    await page.getByRole('region', { name: 'General data' }).evaluate((el) => {
       const pad = document.createElement('div');
       pad.style.height = '1500px';
       el.appendChild(pad);
     });
-    // Coherence: the active link is the last section whose top has passed the bar (scroll anchoring may keep Fornitore there).
+    // Coherence: the active link is the last section whose top has passed the bar (scroll anchoring may keep Supplier there).
     const expected = () =>
       page.evaluate(() => {
         const edge = document.querySelector('nav[aria-label]')!.getBoundingClientRect().bottom + 2;
@@ -66,7 +66,7 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
     await expect.poll(async () => `${(await activeNames(page))[0]} | expected ${await expected()}`).toMatch(/^(.*) \| expected \1$/);
     // Scrolling by hand to the top after the growth: first section active.
     await page.locator(SCROLLER).evaluate((el) => (el.scrollTop = 0));
-    await expect.poll(() => activeNames(page)).toEqual(['Dati generali']);
+    await expect.poll(() => activeNames(page)).toEqual(['General data']);
   });
 
   test('removing the active section from the DOM does not crash and recalculates one active link', async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
     page.on('pageerror', (e) => errors.push(String(e)));
     await gotoStory(page, STORY('scrollable'), 'sectionCount:4');
     await page.locator(SCROLLER).evaluate((el) => (el.scrollTop = el.scrollHeight));
-    await expect.poll(() => activeNames(page)).toEqual(['Importi']);
+    await expect.poll(() => activeNames(page)).toEqual(['Amounts']);
     // Re-render with fewer sections through the Storybook args channel.
     await page.evaluate(() => {
       const ch = (window as unknown as { __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void } }).__STORYBOOK_ADDONS_CHANNEL__;
@@ -100,12 +100,12 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
   test('Tab / Shift+Tab: after Enter the focus enters the section; Shift+Tab goes back out', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'));
-    await page.getByRole('link', { name: 'Righe' }).focus();
+    await page.getByRole('link', { name: 'Lines' }).focus();
     await page.keyboard.press('Enter');
     await settle(page);
-    await expect(page.getByRole('heading', { name: 'Righe' })).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Lines' })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('textbox', { name: 'Campo Righe' })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Field Lines' })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Shift+Tab');
     // Focus is in the previous section or the bar; the focused field must remain visible below the bar.
@@ -122,20 +122,20 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('scrollable'), 'sectionCount:10');
     await page.getByRole('link', { name: 'Audit' }).click();
-    await page.getByRole('link', { name: 'Fornitore' }).click();
+    await page.getByRole('link', { name: 'Supplier' }).click();
     await settle(page);
-    expect(await activeNames(page)).toEqual(['Fornitore']);
-    await expect(page.getByRole('heading', { name: 'Fornitore' })).toBeFocused();
+    expect(await activeNames(page)).toEqual(['Supplier']);
+    await expect(page.getByRole('heading', { name: 'Supplier' })).toBeFocused();
   });
 
   test('tablet 768px: a click lands the section under the bar', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await gotoStory(page, STORY('scrollable'));
-    await page.getByRole('link', { name: 'Importi' }).click();
+    await page.getByRole('link', { name: 'Amounts' }).click();
     await settle(page);
     const d = await page.evaluate(() => {
       const bar = document.querySelector('nav[aria-label]')!.getBoundingClientRect();
-      const s = [...document.querySelectorAll('section,[role=region]')].find((e) => e.getAttribute('aria-label') === 'Importi' || e.querySelector('h2')?.textContent === 'Importi')!;
+      const s = [...document.querySelectorAll('section,[role=region]')].find((e) => e.getAttribute('aria-label') === 'Amounts' || e.querySelector('h2')?.textContent === 'Amounts')!;
       return s.getBoundingClientRect().top - bar.bottom;
     });
     expect(d).toBeGreaterThanOrEqual(-1);
@@ -146,7 +146,7 @@ test.describe('QA #56: Anchor Bar, uncovered cases', () => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     await gotoStory(page, STORY('scrollable'));
-    await page.getByRole('link', { name: 'Righe' }).click();
+    await page.getByRole('link', { name: 'Lines' }).click();
     await gotoStory(page, STORY('nothing-to-scroll'));
     await page.waitForTimeout(500);
     expect(errors).toEqual([]);

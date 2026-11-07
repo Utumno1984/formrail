@@ -28,7 +28,7 @@ test.describe('Primitives/StatusBadge (QA, extra cases)', () => {
     expect(m.badge).toBeLessThanOrEqual(80 + EPS);
     expect(m.h).toBeLessThanOrEqual(20 + EPS);
     expect(m.clipped).toBe(true);
-    expect(m.text).toContain('Archiviato in attesa');
+    expect(m.text).toContain('Archived, awaiting');
     expect(m.docOverflow).toBe(false);
   });
 
@@ -37,7 +37,7 @@ test.describe('Primitives/StatusBadge (QA, extra cases)', () => {
     const m = await page.getByTestId('line-badge').evaluate(async (el) => {
       const label = el.lastElementChild as HTMLElement;
       const before = el.getBoundingClientRect();
-      label.textContent = 'Archiviato definitivamente';
+      label.textContent = 'Permanently archived';
       await new Promise((r) => requestAnimationFrame(() => r(null)));
       const after = el.getBoundingClientRect();
       return {
@@ -107,7 +107,7 @@ test.describe('Primitives/StatusBadge (QA, extra cases)', () => {
       const nc = document.querySelector('[data-testid="narrow"]') as HTMLElement;
       const br = badge.getBoundingClientRect();
       const range = document.createRange();
-      const next = badge.nextSibling as Text; // " da Mario Rossi."
+      const next = badge.nextSibling as Text; // " by Mario Rossi."
       range.selectNodeContents(next);
       const rects = Array.from(range.getClientRects());
       const nr = narrow.getBoundingClientRect();
