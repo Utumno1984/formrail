@@ -110,7 +110,7 @@ can use `text-rop-body`, `font-rop-mono`, `z-rop-modal`, `bg-rop-primary`... in 
 | Type scale (size + line height) | `caption`, `body`, `label`, `title-sm`, `title-md`, `title-lg` |
 | Families | `font-rop-sans`, `font-rop-mono` (system stacks, no web font; the mono stack ends with `monospace`) |
 | z-index | `sticky` < `overlay` (backdrop) < `modal` < `popover` < `tooltip` |
-| Motion | `--motion-rop-feedback-*` (a value that changed), `--motion-rop-overlay-duration` / `-easing` (`Dialog` / `Sheet` enter and exit, 160 ms). With `prefers-reduced-motion: reduce` there is no animation at all. The keyframes (`rop-*`) ship in `styles.css` / `theme.css`; without them the panel simply appears and disappears at once |
+| Motion | `--motion-rop-feedback-*` (a value that changed), `--motion-rop-overlay-duration` / `-easing` (`Dialog` / `Sheet` enter and exit, 160 ms). With `prefers-reduced-motion: reduce` there is no animation at all. The keyframes (`rop-*`) ship in `styles.css` / `theme.css`; without them the panel simply appears and disappears at once. The `--animate-rop-*` shorthands are resolved on `:root`: a duration or an easing redeclared on a wrapper does not reach them, override those on `:root` |
 | Container query thresholds | `--container-rop-description-list` (24rem): the `DescriptionList` width from which `layout="auto"` is inline |
 
 Tokens are plain CSS variables: override them in your own CSS for theming. **Exception: the
@@ -138,9 +138,29 @@ uses them**.
 - **Override a derived token at any scope** only if you want a different shade:
   `.my-theme { --color-rop-primary-hover: #123456; }` wins over the computed one. Like any custom
   property it is inherited: a nested theme clears it with `--color-rop-primary-hover: initial`.
-- **Do not read a derived token with `var()`**: the name is an optional override, unset by default,
-  so `var(--color-rop-primary-hover)` resolves to nothing. In Tailwind mode (b) use the utility
-  (`bg-rop-primary-hover`); otherwise copy the formula above.
+- **Do not read a derived token with a bare `var()`**: the name is an optional override, unset by
+  default, so `var(--color-rop-primary-hover)` resolves to nothing. To use the shade in your own CSS,
+  keep the override and the formula together, **on the element**:
+
+  ```css
+  .my-link:hover {
+    color: var(--color-rop-primary-hover, color-mix(in srgb, var(--color-rop-primary) 80%, black));
+  }
+  ```
+
+  In Tailwind mode (b) use the utility (`bg-rop-primary-hover`) or `--theme(--color-rop-primary-hover)`,
+  which compiles to the same thing (`--theme(... inline)` gives the bare formula, which ignores an
+  override).
+- **Do not declare that formula on `:root`** in your own variable: it is computed there and inherited
+  as a finished colour, so a base color redeclared on a wrapper would not reach it.
+- **An alias of a derived token needs a value**: with `primary-hover` unset,
+  `--color-rop-primary-active: var(--color-rop-primary-hover)` is ignored in silence and the computed
+  shade stays. Write the color, or the full recipe above.
+
+Two more limits at wrapper scope. `--color-rop-blue-600` does not move `--color-rop-primary`: the
+primary is resolved on `:root`, redeclare it directly. The row selection and the count flash of the
+List Report are drawn with the `blue` scale, so they stay blue with any theme, on `:root` as well
+([#293](https://github.com/Utumno1984/react-object-page/issues/293)).
 
 ## `cn()`
 
