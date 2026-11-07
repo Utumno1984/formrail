@@ -149,7 +149,7 @@ test.describe('search', () => {
     await expect(rows(page)).toHaveCount(8); // "Enter only": nothing committed yet
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
-    await expect(rows(page)).toHaveText(['Verdi Industriale']);
+    await expect(rows(page)).toHaveText(['Verdi Industrial']);
     await expect(page.getByTestId('submits')).toHaveText('0');
   });
 
