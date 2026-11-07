@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cn } from '../src/index';
-import { customProperties, DERIVED_TOKENS, findGlobalLeaks, stripComments } from './helpers/css-analysis';
+import { parseDerivedTokens } from '../src/utils/token-scale';
+import { customProperties, findGlobalLeaks, stripComments } from './helpers/css-analysis';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tokensCss = readFileSync(join(packageDir, 'src/styles/tokens.css'), 'utf8');
@@ -71,15 +72,28 @@ describe('design tokens (src/styles/tokens.css, built into dist/theme.css and di
   });
 });
 
-describe('derived tokens (override slots resolved at the point of use)', () => {
-  it('none is declared in the compiled CSS: the public name stays an unset slot', () => {
-    const declared = customProperties(stylesCss);
-    for (const name of Object.keys(DERIVED_TOKENS)) expect(declared.has(`--color-rop-${name}`), name).toBe(false);
+describe('derived tokens (optional overrides resolved at the point of use)', () => {
+  const derived = parseDerivedTokens(tokensCss);
+
+  it('the `@theme reference` block holds exactly the derived tokens of the public contract', () => {
+    expect([...derived.keys()].sort()).toEqual(
+      ['error-active', 'error-hover', 'primary-active', 'primary-hover', 'readonly-indicator', 'readonly-surface', 'surface-pressed'].map(
+        (name) => `--color-rop-${name}`,
+      ),
+    );
   });
 
-  it('the utilities carry the formula on the base variable, so it resolves on the consuming element', () => {
-    for (const [name, value] of Object.entries(DERIVED_TOKENS)) {
-      expect(stylesCss, name).toContain(`var(--color-rop-${name}, ${value})`);
+  it('none is declared in the compiled CSS: the public name stays unset', () => {
+    const declared = customProperties(stylesCss);
+    for (const name of derived.keys()) expect(declared.has(name), name).toBe(false);
+  });
+
+  // Guard on an implicit Tailwind behaviour: `@theme reference` is what writes `var(<token>, <value>)`,
+  // nothing in tokens.css does. If that ever changes, the whole theming contract goes with it.
+  it('every compiled utility is var(<token>, <formula>), never a bare var(<token>)', () => {
+    for (const [name, value] of derived) {
+      expect(stylesCss, name).toContain(`var(${name}, ${value})`);
+      expect(stylesCss, name).not.toContain(`var(${name})`);
     }
   });
 
@@ -90,9 +104,16 @@ describe('derived tokens (override slots resolved at the point of use)', () => {
     }
   });
 
-  it('every derived token is a slot on its own name in tokens.css, and nothing else is', () => {
-    const slots = [...tokenVars].filter(([name, value]) => value.startsWith(`var(${name},`)).map(([name]) => name);
-    expect(slots.sort()).toEqual(Object.keys(DERIVED_TOKENS).map((name) => `--color-rop-${name}`).sort());
+});
+
+describe('parseDerivedTokens', () => {
+  it('reads the block as declared and ignores comments', () => {
+    const css = '/* @theme reference { --x: 0; } */ @theme static { --a: 1; } @theme reference { /* note */ --b: var(--a); }';
+    expect([...parseDerivedTokens(css)]).toEqual([['--b', 'var(--a)']]);
+  });
+
+  it('fails loudly without the block', () => {
+    expect(() => parseDerivedTokens('@theme static { --a: 1; }')).toThrow(/no @theme reference block/);
   });
 });
 

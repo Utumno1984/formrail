@@ -6,8 +6,8 @@
  *   and the tests derive it from here.
  * - `@theme static` emits every base token even when no utility uses it, so those are always
  *   available as plain CSS custom properties (overridable by the consumer for theming).
- * - Derived tokens (hover, pressed, read-only shades) are NOT emitted: see the
- *   `@theme reference inline` block at the end of this file for why, and what that rules out.
+ * - Derived tokens (hover, pressed, read-only shades) are NOT emitted: see the `@theme reference`
+ *   block at the end of this file for why, and what that rules out.
  * - This file is published as `theme.css` for Tailwind v4 projects, and imported by
  *   `index.css` to build `styles.css`.
  */
@@ -44,9 +44,8 @@
   /* Soft neutral for fills (progress track, skeleton, hover tints), which must stay light enough for the
      tones drawn on top of them; not for outlines that identify a control. */
   --color-rop-border-subtle: #c4cdd6;
-  /* Primary scale: blue-600 is the only hardcoded value; every other step is mixed from it. A literal
-     palette (read by value, resolved on :root), not a theming knob: the themable colour is
-     --color-rop-primary, so the scale stays here and does not follow a scoped override. */
+  /* Primary scale: blue-600 is the only hardcoded value; every other step is mixed from it. Resolved on
+     :root and independent of --color-rop-primary; what still draws with it directly is tracked in #293. */
   --color-rop-blue-600: #0a6ed1;
   --color-rop-blue-50: color-mix(in srgb, var(--color-rop-blue-600) 8%, white);
   --color-rop-blue-100: color-mix(in srgb, var(--color-rop-blue-600) 16%, white);
@@ -240,37 +239,42 @@
 }
 
 /*
- * Derived tokens: optional override slots with a computed default, resolved where they are consumed.
+ * Derived tokens: optional overrides with a computed default, resolved where they are consumed.
  *
  * A custom property declared on :root is computed there and inherited as a finished colour, so a
- * base colour redeclared on a wrapper would never reach it. Hence:
- * - `inline` writes the value into the utility, so color-mix() and the base var() are resolved on the
- *   element using it: --color-rop-primary redeclared at ANY scope moves the shades below;
- * - `reference` emits nothing on :root (the value references its own name: it would be a cycle, and a
- *   slot that is never empty). The public name stays unset, and setting it at any scope wins over
- *   the computed default, which keeps the documented direct override working.
+ * base colour redeclared on a wrapper would never reach it. `@theme reference` emits nothing on
+ * :root and makes Tailwind write each utility as `var(<token>, <value>)`. So the formula and its
+ * base var() are resolved on the element using it (the base moves the shades at ANY scope), while
+ * the public name stays unset and wins over the formula when set, at any scope.
+ *
+ * The form relies on that implicit fallback of `reference`, a Tailwind behaviour, not on anything
+ * written here: test/styles.test.ts fails if a compiled utility stops being `var(<token>, <value>)`.
+ * Two limits come with it: `--theme(<token> inline)` gives the bare formula (no override), and with
+ * an opacity modifier the polyfill for browsers without color-mix(in oklab) keeps the alpha but
+ * drops the override.
  *
  * The price, part of the public contract: these names have no value to read. A bare var() of one of
- * them resolves to nothing; use the utility (`bg-rop-primary-hover`) or copy the formula.
+ * them resolves to nothing, and an alias of one (no fallback) is ignored in silence. Use the utility,
+ * `--theme(<token>)`, or `var(<token>, <formula>)` on the element itself, never on :root.
  *
  * Rejected: `@theme inline static` (a declared token is indistinguishable from an override, so a
  * direct override stops working in silence); redeclaring on `*` (a global selector, a cost on every
  * element, and it resets an override set on a wrapper); a `.rop-theme` class on the wrapper (the
- * plain documented pattern would stay broken); `@property` with initial-value (fills the slot, so
- * the fallback never applies).
+ * plain documented pattern would stay broken); `@property` with initial-value (the name is never
+ * unset, so the formula never applies).
  *
  * The primary mixes use the same percentages as blue-700/800: identical to them by default.
  */
-@theme reference inline {
+@theme reference {
   /* Pressed background of a neutral surface (button, pill, option): one step darker than hover. */
-  --color-rop-surface-pressed: var(--color-rop-surface-pressed, color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black));
-  --color-rop-primary-hover: var(--color-rop-primary-hover, color-mix(in srgb, var(--color-rop-primary) 80%, black));
-  --color-rop-primary-active: var(--color-rop-primary-active, color-mix(in srgb, var(--color-rop-primary) 62%, black));
-  --color-rop-error-hover: var(--color-rop-error-hover, color-mix(in srgb, var(--color-rop-error) 80%, black));
-  --color-rop-error-active: var(--color-rop-error-active, color-mix(in srgb, var(--color-rop-error) 62%, black));
+  --color-rop-surface-pressed: color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black);
+  --color-rop-primary-hover: color-mix(in srgb, var(--color-rop-primary) 80%, black);
+  --color-rop-primary-active: color-mix(in srgb, var(--color-rop-primary) 62%, black);
+  --color-rop-error-hover: color-mix(in srgb, var(--color-rop-error) 80%, black);
+  --color-rop-error-active: color-mix(in srgb, var(--color-rop-error) 62%, black);
   /* Forced / locked form controls (#223): a value the user can see and focus but not change. Drawn
      neutral (never primary) on a subtle surface with a dashed border; disabled keeps the 0.5 opacity. */
-  --color-rop-readonly-surface: var(--color-rop-readonly-surface, var(--color-rop-surface-subtle));
+  --color-rop-readonly-surface: var(--color-rop-surface-subtle);
   /* The "on" part (tick, dash, thumb, dot, selected day) of a forced / locked control. */
-  --color-rop-readonly-indicator: var(--color-rop-readonly-indicator, var(--color-rop-text-muted));
+  --color-rop-readonly-indicator: var(--color-rop-text-muted);
 }

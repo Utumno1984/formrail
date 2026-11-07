@@ -25,3 +25,13 @@ export function parseTokenScale(css: string): TokenScale {
   }
   return scale;
 }
+
+/**
+ * The derived color tokens of the `@theme reference` block, as declared (variable name -> formula).
+ * Stories and tests only: `cn()` does not need it, so it never reaches the bundle.
+ */
+export function parseDerivedTokens(css: string): Map<string, string> {
+  const block = /@theme\s+reference\s*\{([^{}]*)\}/.exec(css.replace(/\/\*[\s\S]*?\*\//g, ''))?.[1];
+  if (block === undefined) throw new Error('parseDerivedTokens: no @theme reference block in tokens.css');
+  return new Map([...block.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1] as string, m[2] as string]));
+}

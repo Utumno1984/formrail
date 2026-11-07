@@ -4,7 +4,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { customProperties, DERIVED_TOKENS, hoverRules } from './helpers/css-analysis';
+import { parseDerivedTokens } from '../src/utils/token-scale';
+import { customProperties, hoverRules } from './helpers/css-analysis';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDir = join(packageDir, 'test/fixtures/tailwind-consumer');
@@ -48,14 +49,23 @@ describe('a Tailwind v4 consumer (theme.css + @source), requires a prior build',
     expect(own?.media ?? []).not.toContain(GUARD);
   });
 
-  it('the derived tokens are unset slots there too: no declaration, the formula lives in the utilities', () => {
+  it('the derived tokens are unset there too: no declaration, the formula lives in the utilities', () => {
     const css = compile('input.css');
     const declared = customProperties(css);
-    for (const [name, value] of Object.entries(DERIVED_TOKENS)) {
-      expect(declared.has(`--color-rop-${name}`), name).toBe(false);
-      expect(css, name).toContain(`var(--color-rop-${name}, ${value})`);
+    const derived = parseDerivedTokens(readFileSync(join(packageDir, 'dist/theme.css'), 'utf8'));
+    expect(derived.size).toBeGreaterThan(0);
+    for (const [name, value] of derived) {
+      expect(declared.has(name), name).toBe(false);
+      expect(css, name).toContain(`var(${name}, ${value})`);
     }
     expect(declared.has('--color-rop-primary')).toBe(true);
+  });
+
+  it('--theme(<token>) keeps the override, --theme(<token> inline) gives the bare formula (documented)', () => {
+    const css = squash(compile('theme-function.css'));
+    const formula = 'color-mix(in srgb, var(--color-rop-primary) 80%, black)';
+    expect(css).toContain(`background-color: var(--color-rop-primary-hover, ${formula});`);
+    expect(css).toContain(`background-color: ${formula};`);
   });
 
   it('a build-time @theme redefinition of a derived token replaces the slot', () => {

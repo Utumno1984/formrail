@@ -1,32 +1,36 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import tokensCss from '../styles/tokens.css?raw';
-import { parseTokenScale } from '../utils/token-scale';
+import { parseDerivedTokens, parseTokenScale } from '../utils/token-scale';
 
 // Palette, type scale and z-index list are derived from tokens.css (the source of the package's
 // styles.css): a new token shows up here with no edit. The CSS itself comes from the same entry
 // Storybook loads in .storybook/preview.ts.
 const scale = parseTokenScale(tokensCss);
 
-// A derived token is an override slot left unset, so a bare `var()` of its name paints nothing: its
-// swatch uses the value declared in tokens.css instead (the slot with its computed default).
-const declaredSlots = new Map(
-  [...tokensCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(--[\w-]+):\s*(var\(\1,[^;]+);/g)].map(
-    (m) => [m[1]!, m[2]!] as const,
-  ),
-);
-const swatchColor = (name: string): string => declaredSlots.get(`--color-${name}`) ?? `var(--color-${name})`;
+// A derived token is unset by default, so a bare `var()` of its name paints nothing: its swatch is
+// written as the compiled utilities are, `var(<token>, <formula>)`.
+const derived = parseDerivedTokens(tokensCss);
+const swatchColor = (name: string): string => {
+  const token = `--color-${name}`;
+  const formula = derived.get(token);
+  return formula === undefined ? `var(${token})` : `var(${token}, ${formula})`;
+};
 
 // The derived tokens live in their own block at the end of tokens.css: each swatch goes back next
 // to the colour it belongs with. Any other token, a new one included, keeps the file's order.
-const palette = [
+const SWATCH_AFTER: [name: string, anchor: string][] = [
   ['rop-surface-pressed', 'rop-surface-subtle'],
   ['rop-primary-hover', 'rop-primary'],
   ['rop-primary-active', 'rop-primary-hover'],
   ['rop-error-hover', 'rop-error'],
   ['rop-error-active', 'rop-error-hover'],
-].reduce((names, [name, anchor]) => {
+];
+const palette = SWATCH_AFTER.reduce((names, [name, anchor]) => {
+  if (!names.includes(name) || !names.includes(anchor)) {
+    throw new Error(`Foundations/Tokens: "${name}" or its anchor "${anchor}" is not in tokens.css`);
+  }
   const rest = names.filter((n) => n !== name);
-  rest.splice(rest.indexOf(anchor!) + 1, 0, name!);
+  rest.splice(rest.indexOf(anchor) + 1, 0, name);
   return rest;
 }, scale.color);
 

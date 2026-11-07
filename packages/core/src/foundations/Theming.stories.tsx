@@ -7,7 +7,9 @@ import { Checkbox } from '../checkbox/Checkbox';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { StatusBadge } from '../status-badge/StatusBadge';
+import tokensCss from '../styles/tokens.css?raw';
 import { Switch } from '../switch/Switch';
+import { parseDerivedTokens } from '../utils/token-scale';
 
 // Showcase only: there is no theming API. Re-theming is plain CSS: redeclare the custom properties
 // from styles/tokens.css on any element (here a wrapper <div>, in an app usually :root or a class)
@@ -140,15 +142,7 @@ const SCOPED_VARS: Record<string, string> = {
   '--color-rop-text-muted': '#5d4a73',
 };
 
-const DERIVED_TOKENS = [
-  '--color-rop-primary-hover',
-  '--color-rop-primary-active',
-  '--color-rop-error-hover',
-  '--color-rop-error-active',
-  '--color-rop-surface-pressed',
-  '--color-rop-readonly-surface',
-  '--color-rop-readonly-indicator',
-];
+const DERIVED_TOKENS = [...parseDerivedTokens(tokensCss).keys()];
 
 interface ScopedDemoProps {
   onApprove: () => void;
@@ -253,8 +247,8 @@ export const Switcher: Story = {
  * takes the closest theme; the Button outside keeps the default one.
  *
  * The `play` function proves what a script can prove: the derived tokens stay unset, the resting and
- * selected states use the scoped colours, the callbacks fire. `userEvent.hover` does not trigger the
- * CSS `:hover`, and the hover style needs a real precise pointer: the hover and pressed colours are
+ * selected states use the scoped colours, the callbacks fire. A script cannot trigger the CSS `:hover`
+ * or `:active`, and the hover style needs a real precise pointer: the hover and pressed colours are
  * proved with a real mouse in `e2e/theming-scoped.spec.ts`.
  */
 export const ScopedDerivedStates: StoryObj<ScopedDemoProps> = {
@@ -265,6 +259,7 @@ export const ScopedDerivedStates: StoryObj<ScopedDemoProps> = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const area = getComputedStyle(canvas.getByTestId('scoped-theme'));
+    await expect(DERIVED_TOKENS.length).toBeGreaterThan(0);
     for (const token of DERIVED_TOKENS) await expect(area.getPropertyValue(token)).toBe('');
     await expect(area.getPropertyValue('--color-rop-primary')).toBe('#6b3fa0');
 
@@ -278,7 +273,6 @@ export const ScopedDerivedStates: StoryObj<ScopedDemoProps> = {
     await expect(getComputedStyle(canvas.getByRole('button', { name: 'Approve outside' })).backgroundColor).toBe('rgb(10, 110, 209)');
     await expect(getComputedStyle(canvas.getByRole('textbox', { name: /Supplier/ })).backgroundColor).toBe('rgb(239, 230, 247)');
 
-    await userEvent.hover(approve);
     await userEvent.click(approve);
     await expect(args.onApprove).toHaveBeenCalledTimes(1);
     await userEvent.click(canvas.getByRole('button', { name: 'Delete' }));
@@ -291,6 +285,5 @@ export const ScopedDerivedStates: StoryObj<ScopedDemoProps> = {
     await expect(args.onCheckedChange).toHaveBeenLastCalledWith(true);
     await waitFor(() => expect(getComputedStyle(paid).backgroundColor).toBe(violet));
     paid.blur();
-    await userEvent.unhover(approve);
   },
 };
