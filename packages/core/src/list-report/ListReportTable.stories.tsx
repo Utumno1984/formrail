@@ -76,7 +76,7 @@ function TableDemo({
   onSortChange,
   defaultSort,
   dir,
-  label = 'Fatture',
+  label = 'Invoices',
   defaultFilter,
   status,
   loadingRowCount,

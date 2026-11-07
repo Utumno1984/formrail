@@ -23,7 +23,7 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  *   results, error, data back), not a change of the number of results while the data stays on screen.
  * - "Clear filters" works without wiring (`table.clearFilters()`; when the default pill itself leaves no
  *   result the hook goes to the unfiltered pill), then the focus goes to the search box or the first pill of the bar.
- * - The count is part of the heading's name ("Fatture (12 of 40)"); the table's name stays "Fatture".
+ * - The count is part of the heading's name ("Invoices (12 of 40)"); the table's name stays "Invoices".
  * - `status`, `errorMessage`, `onRetry`, `loadingRowCount` and `labels` reach `ListReportTable` unchanged;
  *   `filtersLabel`, `searchLabel` and `showSearch` reach `ListReportFilterBar`. The other props go on the root.
  *
