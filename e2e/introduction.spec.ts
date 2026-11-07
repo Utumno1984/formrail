@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectFocusRingVisible } from './helpers/geometry';
 
 // The Introduction page is dogfooded (ticket #275): the examples are real library components and must
 // work, not just compile.
@@ -23,17 +24,20 @@ test.describe('Introduction page', () => {
   test.describe('List Report demo keyboard order', () => {
     const pills = ['All', 'To approve', 'Approved', 'Rejected'];
     const headers = ['Number', 'Supplier', 'Amount', 'Status'];
+    // Every locator is scoped to the demo frame: other examples on the page reuse the same labels.
+    const listReportDemo = (page: Page): Locator => page.getByTestId('demo-frame-list-report');
+    // The scroll container is a tab stop on purpose: a keyboard user needs it to scroll the rows
+    // (axe `scrollable-region-focusable`).
+    const scroller = (demo: Locator): Locator => demo.locator('div[tabindex="0"]:has(> table)');
 
     test('Tab walks every stop in visual order, Shift+Tab walks back, and the keyboard leaves the demo @engines', async ({ page }) => {
-      const demo = page.getByTestId('demo-frame-list-report');
+      const demo = listReportDemo(page);
       const stops = [
         demo.getByRole('button', { name: 'New invoice', exact: true }),
         // Only the checked pill: the others are behind the arrow keys (see the roving test below).
         demo.getByRole('radio', { name: 'All', exact: true }),
         demo.getByRole('searchbox', { name: 'Search' }),
-        // The scroll container is a tab stop on purpose: a keyboard user needs it to scroll the rows
-        // (axe `scrollable-region-focusable`).
-        demo.locator('div[tabindex="0"]:has(> table)'),
+        scroller(demo),
         ...headers.map((name) => demo.getByRole('columnheader', { name }).getByRole('button')),
       ];
 
@@ -42,8 +46,12 @@ test.describe('Introduction page', () => {
       for (const stop of stops) {
         await page.keyboard.press('Tab');
         await expect(stop).toBeFocused();
-        // Reached and also visibly marked: a stop without a focus ring reads as "Tab skipped it".
-        expect(await stop.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
+        // Reached and also visibly marked: a stop without a focus ring reads as "Tab skipped it". The
+        // helper also fails on a transparent ring or one cut by an ancestor's overflow (the sortable
+        // headers sit inside an `overflow-hidden` <th>); it re-focuses the same element, so the next
+        // Tab still starts from here.
+        await expectFocusRingVisible(stop);
+        await expect(stop).toBeFocused();
       }
 
       await page.keyboard.press('Tab');
@@ -61,15 +69,16 @@ test.describe('Introduction page', () => {
     // pills, which are reached with the arrow keys. This is most likely what the reviewer perceived as
     // "Tab does not reach all the items": every pill is reachable, just not with Tab.
     test('pills are one roving tab stop: Tab skips the unchecked ones, the arrows reach and select each @engines', async ({ page }) => {
-      const pill = (name: string) => page.getByRole('radio', { name, exact: true });
-      const search = page.getByRole('searchbox', { name: 'Search' });
-      const newInvoice = page.getByRole('button', { name: 'New invoice', exact: true });
+      const demo = listReportDemo(page);
+      const pill = (name: string) => demo.getByRole('radio', { name, exact: true });
+      const search = demo.getByRole('searchbox', { name: 'Search' });
+      const newInvoice = demo.getByRole('button', { name: 'New invoice', exact: true });
       const expectOnly = async (name: string) => {
         await expect(pill(name)).toBeFocused();
         await expect(pill(name)).toBeChecked();
         for (const other of pills.filter((p) => p !== name)) await expect(pill(other)).not.toBeChecked();
         // The stop follows the selection: exactly one pill in the Tab sequence.
-        expect(await page.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLElement).tabIndex))).toEqual(
+        expect(await demo.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLElement).tabIndex))).toEqual(
           pills.map((p) => (p === name ? 0 : -1)),
         );
       };
@@ -86,10 +95,10 @@ test.describe('Introduction page', () => {
       // Selection follows focus (a radio group, not a toolbar): each arrow also filters the rows.
       await page.keyboard.press('ArrowRight');
       await expectOnly('To approve');
-      await expect(page.getByRole('row', { name: /INV-1002/ })).toHaveCount(0);
+      await expect(demo.getByRole('row', { name: /INV-1002/ })).toHaveCount(0);
       await page.keyboard.press('ArrowDown');
       await expectOnly('Approved');
-      await expect(page.getByRole('row', { name: /INV-1002/ })).toBeVisible();
+      await expect(demo.getByRole('row', { name: /INV-1002/ })).toBeVisible();
       await page.keyboard.press('ArrowRight');
       await expectOnly('Rejected');
       await page.keyboard.press('ArrowRight'); // wraps
@@ -117,11 +126,11 @@ test.describe('Introduction page', () => {
     });
 
     test('stops that come and go keep their place: clear-search after the input, clear-filters after the headers', async ({ page }) => {
-      const search = page.getByRole('searchbox', { name: 'Search' });
-      const clearSearch = page.getByRole('button', { name: 'Clear search', exact: true });
-      const scroller = page.getByTestId('demo-frame-list-report').locator('div[tabindex="0"]:has(> table)');
-      const header = (name: string) => page.getByRole('columnheader', { name }).getByRole('button');
-      const clearFilters = page.getByRole('button', { name: /clear filters/i });
+      const demo = listReportDemo(page);
+      const search = demo.getByRole('searchbox', { name: 'Search' });
+      const clearSearch = demo.getByRole('button', { name: 'Clear search', exact: true });
+      const header = (name: string) => demo.getByRole('columnheader', { name }).getByRole('button');
+      const clearFilters = demo.getByRole('button', { name: /clear filters/i });
 
       await search.focus();
       await page.keyboard.type('zzz-no-such-invoice');
@@ -131,7 +140,7 @@ test.describe('Introduction page', () => {
       await page.keyboard.press('Tab');
       await expect(clearSearch).toBeFocused();
       await page.keyboard.press('Tab');
-      await expect(scroller).toBeFocused();
+      await expect(scroller(demo)).toBeFocused();
       for (const name of headers) {
         await page.keyboard.press('Tab');
         await expect(header(name)).toBeFocused();
@@ -143,13 +152,14 @@ test.describe('Introduction page', () => {
       await page.keyboard.press('Enter');
       await expect(search).toBeFocused();
       await expect(search).toHaveValue('');
-      await expect(page.getByRole('row', { name: /INV-1001/ })).toBeVisible();
+      await expect(demo.getByRole('row', { name: /INV-1001/ })).toBeVisible();
     });
 
     test('a sortable header works from the keyboard and keeps the focus', async ({ page }) => {
-      const number = page.getByRole('columnheader', { name: 'Number' });
+      const demo = listReportDemo(page);
+      const number = demo.getByRole('columnheader', { name: 'Number' });
       const button = number.getByRole('button');
-      const firstCell = () => page.getByRole('row').nth(1).getByRole('cell').first();
+      const firstCell = () => demo.getByRole('row').nth(1).getByRole('cell').first();
       await button.focus();
       await page.keyboard.press('Enter');
       await expect(number).toHaveAttribute('aria-sort', 'ascending');
