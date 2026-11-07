@@ -121,7 +121,9 @@ export const Playground: Story = {
                 <Button variant="secondary" onClick={onReject}>
                   Reject
                 </Button>
-                <Button onClick={onApprove}>Approve</Button>
+                <Button variant="primary" onClick={onApprove}>
+                  Approve
+                </Button>
               </>
             ) : undefined
           }
@@ -177,7 +179,7 @@ export const Overview: Story = {
           actions={
             <>
               <Button variant="secondary">Reject</Button>
-              <Button>Approve</Button>
+              <Button variant="primary">Approve</Button>
             </>
           }
         />
