@@ -12,6 +12,11 @@ fixed viewports and compared with a baseline versioned in `e2e/visual/__screensh
 Tests are generated from the static Storybook `index.json` (`visual.spec.ts`): to add a story to
 the gate, tag it `tags: ['visual']`. Untagged stories are not photographed.
 
+**Docs/MDX pages are not photographed.** Live demos rendered inline in a Docs page (the Introduction) can
+inherit Storybook's `.sbdocs` CSS; they are wrapped in `sb-unstyled` (`DemoFrame`) and
+`e2e/introduction-style-parity.spec.ts` compares their computed style with the same component in the canvas
+(ticket #286). A new inline demo must go through `DemoFrame` and get a probe there.
+
 ## Commands
 
 ```bash

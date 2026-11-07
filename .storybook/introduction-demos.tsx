@@ -196,7 +196,15 @@ const DEMO_FRAME: CSSProperties = {
   boxSizing: 'border-box',
 };
 
-/** Border and padding around a live example, so it reads as a demo and not as page text. */
+/**
+ * Border and padding around a live example, so it reads as a demo and not as page text. `sb-unstyled` is
+ * Storybook's own opt-out: its Docs CSS is `.sbdocs :where(h2:not(.sb-unstyled h2))`, so the demo is not
+ * restyled by the page typography (border on h2, zebra tables, p/span sizes). Ticket #286.
+ */
 export function DemoFrame({ children }: { children: ReactNode }) {
-  return <div style={DEMO_FRAME}>{children}</div>;
+  return (
+    <div className="sb-unstyled" style={DEMO_FRAME} data-testid="demo-frame">
+      {children}
+    </div>
+  );
 }
