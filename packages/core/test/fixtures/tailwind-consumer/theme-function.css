@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@import '@react-object-page/core/theme.css';
+@source './src';
+/* A consumer reading a derived token in its own CSS. */
+.with-override {
+  background-color: --theme(--color-rop-primary-hover);
+}
+.bare-formula {
+  background-color: --theme(--color-rop-primary-hover inline);
+}

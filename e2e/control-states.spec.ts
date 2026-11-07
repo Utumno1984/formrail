@@ -99,23 +99,44 @@ function look(page: Page, kind: Kind, state: State): Promise<Look> {
 
 type Tokens = Record<'primary' | 'error' | 'surface' | 'readonlySurface' | 'readonlyIndicator' | 'text' | 'primaryContrast', string>;
 
-/** The real token colours, resolved by the browser (computed `background-color` of a probe). */
+/**
+ * The real token colours, resolved by the browser. A base token is read through a `var()` on a probe;
+ * a derived token has no value to read with a bare `var()` (an unset override slot, see tokens.css),
+ * so the probe gets the compiled utility the components use and the browser resolves that.
+ */
 function tokens(page: Page): Promise<Tokens> {
   return page.evaluate(() => {
-    const read = (name: string) => {
+    const computed = (setup: (probe: HTMLElement) => void, value: (style: CSSStyleDeclaration) => string) => {
       const probe = document.createElement('div');
-      probe.style.backgroundColor = `var(--color-rop-${name})`;
+      setup(probe);
       document.body.append(probe);
-      const color = getComputedStyle(probe).backgroundColor;
+      const color = value(getComputedStyle(probe));
       probe.remove();
       return color;
     };
+    const read = (name: string) =>
+      computed(
+        (probe) => {
+          probe.style.backgroundColor = `var(--color-rop-${name})`;
+        },
+        (style) => style.backgroundColor,
+      );
     return {
       primary: read('primary'),
       error: read('error'),
       surface: read('surface'),
-      readonlySurface: read('readonly-surface'),
-      readonlyIndicator: read('readonly-indicator'),
+      readonlySurface: computed(
+        (probe) => {
+          probe.className = 'not-forced-colors:bg-rop-readonly-surface';
+        },
+        (style) => style.backgroundColor,
+      ),
+      readonlyIndicator: computed(
+        (probe) => {
+          probe.className = 'not-forced-colors:border-rop-readonly-indicator';
+        },
+        (style) => style.borderTopColor,
+      ),
       text: read('text'),
       primaryContrast: read('primary-contrast'),
     };

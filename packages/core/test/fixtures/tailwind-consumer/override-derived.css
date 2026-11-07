@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+@import '@react-object-page/core/theme.css';
+/* The consumer redefines a derived token in its own build. */
+@theme {
+  --color-rop-primary-hover: #123456;
+}
+@source '../../../dist';
+@source './src';

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cn } from '../src/index';
+import { parseDerivedTokens } from '../src/utils/token-scale';
 import { customProperties, findGlobalLeaks, stripComments } from './helpers/css-analysis';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -68,6 +69,51 @@ describe('design tokens (src/styles/tokens.css, built into dist/theme.css and di
     );
     // No bare `@import "tailwindcss"` and no preflight reference in the published token file.
     expect(themeCss).not.toMatch(/@import|preflight/i);
+  });
+});
+
+describe('derived tokens (optional overrides resolved at the point of use)', () => {
+  const derived = parseDerivedTokens(tokensCss);
+
+  it('the `@theme reference` block holds exactly the derived tokens of the public contract', () => {
+    expect([...derived.keys()].sort()).toEqual(
+      ['error-active', 'error-hover', 'primary-active', 'primary-hover', 'readonly-indicator', 'readonly-surface', 'surface-pressed'].map(
+        (name) => `--color-rop-${name}`,
+      ),
+    );
+  });
+
+  it('none is declared in the compiled CSS: the public name stays unset', () => {
+    const declared = customProperties(stylesCss);
+    for (const name of derived.keys()) expect(declared.has(name), name).toBe(false);
+  });
+
+  // Guard on an implicit Tailwind behaviour: `@theme reference` is what writes `var(<token>, <value>)`,
+  // nothing in tokens.css does. If that ever changes, the whole theming contract goes with it.
+  it('every compiled utility is var(<token>, <formula>), never a bare var(<token>)', () => {
+    for (const [name, value] of derived) {
+      expect(stylesCss, name).toContain(`var(${name}, ${value})`);
+      expect(stylesCss, name).not.toContain(`var(${name})`);
+    }
+  });
+
+  it('the base tokens and the literal palette stay declared and readable', () => {
+    const declared = customProperties(stylesCss);
+    for (const name of ['primary', 'error', 'surface-subtle', 'text-muted', 'blue-50', 'blue-600', 'blue-800']) {
+      expect(declared.has(`--color-rop-${name}`), name).toBe(true);
+    }
+  });
+
+});
+
+describe('parseDerivedTokens', () => {
+  it('reads the block as declared and ignores comments', () => {
+    const css = '/* @theme reference { --x: 0; } */ @theme static { --a: 1; } @theme reference { /* note */ --b: var(--a); }';
+    expect([...parseDerivedTokens(css)]).toEqual([['--b', 'var(--a)']]);
+  });
+
+  it('fails loudly without the block', () => {
+    expect(() => parseDerivedTokens('@theme static { --a: 1; }')).toThrow(/no @theme reference block/);
   });
 });
 

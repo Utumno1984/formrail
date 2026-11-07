@@ -4,8 +4,10 @@
  * - Every variable lives in the `rop` namespace: nothing here redefines a default Tailwind token
  *   (`--color-red-500`, `--spacing`, ...). The namespace is defined ONLY in this file; `cn()`
  *   and the tests derive it from here.
- * - `@theme static` emits every variable even when no utility uses it, so the tokens are always
+ * - `@theme static` emits every base token even when no utility uses it, so those are always
  *   available as plain CSS custom properties (overridable by the consumer for theming).
+ * - Derived tokens (hover, pressed, read-only shades) are NOT emitted: see the `@theme reference`
+ *   block at the end of this file for why, and what that rules out.
  * - This file is published as `theme.css` for Tailwind v4 projects, and imported by
  *   `index.css` to build `styles.css`.
  */
@@ -37,14 +39,13 @@
   --color-rop-text-muted: #556b82;
   --color-rop-surface: #ffffff;
   --color-rop-surface-subtle: #f5f6f7;
-  /* Pressed background of a neutral surface (button, pill, option): one step darker than hover. */
-  --color-rop-surface-pressed: color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black);
   /* Outline of a control or container: at least 3:1 on the surface and on the subtle surface (WCAG 1.4.11). */
   --color-rop-border: #7b8fa5;
   /* Soft neutral for fills (progress track, skeleton, hover tints), which must stay light enough for the
      tones drawn on top of them; not for outlines that identify a control. */
   --color-rop-border-subtle: #c4cdd6;
-  /* Primary scale: blue-600 is the only hardcoded value; every other step is mixed from it. */
+  /* Primary scale: blue-600 is the only hardcoded value; every other step is mixed from it. Resolved on
+     :root and independent of --color-rop-primary; what still draws with it directly is tracked in #293. */
   --color-rop-blue-600: #0a6ed1;
   --color-rop-blue-50: color-mix(in srgb, var(--color-rop-blue-600) 8%, white);
   --color-rop-blue-100: color-mix(in srgb, var(--color-rop-blue-600) 16%, white);
@@ -55,22 +56,11 @@
   --color-rop-blue-700: color-mix(in srgb, var(--color-rop-blue-600) 80%, black);
   --color-rop-blue-800: color-mix(in srgb, var(--color-rop-blue-600) 62%, black);
   --color-rop-primary: var(--color-rop-blue-600);
-  /* Hover/active shades derive from the CURRENT primary (same expression as blue-700/800, so they are
-     identical by default), so overriding --color-rop-primary/-error moves them too. */
-  --color-rop-primary-hover: color-mix(in srgb, var(--color-rop-primary) 80%, black);
-  --color-rop-primary-active: color-mix(in srgb, var(--color-rop-primary) 62%, black);
   --color-rop-primary-contrast: #ffffff;
   --color-rop-info: #0070f2;
   --color-rop-success: #107e3e;
   --color-rop-warning: #b25f00;
   --color-rop-error: #d20a0a;
-  --color-rop-error-hover: color-mix(in srgb, var(--color-rop-error) 80%, black);
-  --color-rop-error-active: color-mix(in srgb, var(--color-rop-error) 62%, black);
-  /* Forced / locked form controls (#223): a value the user can see and focus but not change. Drawn
-     neutral (never primary) on a subtle surface with a dashed border; disabled keeps the 0.5 opacity. */
-  --color-rop-readonly-surface: var(--color-rop-surface-subtle);
-  /* The "on" part (tick, dash, thumb, dot, selected day) of a forced / locked control. */
-  --color-rop-readonly-indicator: var(--color-rop-text-muted);
 
   /* Typographic scale (size + line height) */
   --text-rop-caption: 0.75rem;
@@ -246,4 +236,45 @@
       opacity: 1;
     }
   }
+}
+
+/*
+ * Derived tokens: optional overrides with a computed default, resolved where they are consumed.
+ *
+ * A custom property declared on :root is computed there and inherited as a finished colour, so a
+ * base colour redeclared on a wrapper would never reach it. `@theme reference` emits nothing on
+ * :root and makes Tailwind write each utility as `var(<token>, <value>)`. So the formula and its
+ * base var() are resolved on the element using it (the base moves the shades at ANY scope), while
+ * the public name stays unset and wins over the formula when set, at any scope.
+ *
+ * The form relies on that implicit fallback of `reference`, a Tailwind behaviour, not on anything
+ * written here: test/styles.test.ts fails if a compiled utility stops being `var(<token>, <value>)`.
+ * Two limits come with it: `--theme(<token> inline)` gives the bare formula (no override), and with
+ * an opacity modifier the polyfill for browsers without color-mix(in oklab) keeps the alpha but
+ * drops the override.
+ *
+ * The price, part of the public contract: these names have no value to read. A bare var() of one of
+ * them resolves to nothing, and an alias of one (no fallback) is ignored in silence. Use the utility,
+ * `--theme(<token>)`, or `var(<token>, <formula>)` on the element itself, never on :root.
+ *
+ * Rejected: `@theme inline static` (a declared token is indistinguishable from an override, so a
+ * direct override stops working in silence); redeclaring on `*` (a global selector, a cost on every
+ * element, and it resets an override set on a wrapper); a `.rop-theme` class on the wrapper (the
+ * plain documented pattern would stay broken); `@property` with initial-value (the name is never
+ * unset, so the formula never applies).
+ *
+ * The primary mixes use the same percentages as blue-700/800: identical to them by default.
+ */
+@theme reference {
+  /* Pressed background of a neutral surface (button, pill, option): one step darker than hover. */
+  --color-rop-surface-pressed: color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black);
+  --color-rop-primary-hover: color-mix(in srgb, var(--color-rop-primary) 80%, black);
+  --color-rop-primary-active: color-mix(in srgb, var(--color-rop-primary) 62%, black);
+  --color-rop-error-hover: color-mix(in srgb, var(--color-rop-error) 80%, black);
+  --color-rop-error-active: color-mix(in srgb, var(--color-rop-error) 62%, black);
+  /* Forced / locked form controls (#223): a value the user can see and focus but not change. Drawn
+     neutral (never primary) on a subtle surface with a dashed border; disabled keeps the 0.5 opacity. */
+  --color-rop-readonly-surface: var(--color-rop-surface-subtle);
+  /* The "on" part (tick, dash, thumb, dot, selected day) of a forced / locked control. */
+  --color-rop-readonly-indicator: var(--color-rop-text-muted);
 }

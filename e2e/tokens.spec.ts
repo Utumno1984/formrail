@@ -24,6 +24,31 @@ test.describe('Foundations/Tokens', () => {
     expect(swatch).toBe('rgb(10, 110, 209)');
   });
 
+  test('the swatch of a derived token paints its computed default, in the same place of the palette', async ({ page }) => {
+    await gotoStory(page, STORY);
+    // A derived token is an unset override slot: a bare var() of its name would paint nothing.
+    const colour = (name: string) =>
+      page.getByTestId(`swatch-${name}`).evaluate((el) => {
+        const ctx = document.createElement('canvas').getContext('2d')!;
+        ctx.fillStyle = getComputedStyle(el).backgroundColor;
+        ctx.fillRect(0, 0, 1, 1);
+        return Array.from(ctx.getImageData(0, 0, 1, 1).data);
+      });
+    expect(await colour('rop-primary-hover')).toEqual(await colour('rop-blue-700'));
+    expect(await colour('rop-primary-active')).toEqual(await colour('rop-blue-800'));
+    expect(await colour('rop-error-hover')).toEqual([168, 8, 8, 255]); // 80% of #d20a0a + 20% black
+    expect(await colour('rop-surface-pressed')).toEqual([235, 236, 237, 255]); // 96% of #f5f6f7 + 4% black
+    expect(await colour('rop-readonly-surface')).toEqual(await colour('rop-surface-subtle'));
+    expect(await colour('rop-readonly-indicator')).toEqual(await colour('rop-text-muted'));
+    const names = await page.locator('[data-testid^="swatch-"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
+    const after = (name: string) => names[names.indexOf(`swatch-${name}`) + 1];
+    expect(after('rop-surface-subtle')).toBe('swatch-rop-surface-pressed');
+    expect(after('rop-primary')).toBe('swatch-rop-primary-hover');
+    expect(after('rop-primary-hover')).toBe('swatch-rop-primary-active');
+    expect(after('rop-error')).toBe('swatch-rop-error-hover');
+    expect(after('rop-error-hover')).toBe('swatch-rop-error-active');
+  });
+
   test('the z-index scale is listed in strictly increasing order: sticky, overlay, modal, popover, toast, tooltip', async ({
     page,
   }) => {
