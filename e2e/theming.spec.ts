@@ -16,20 +16,27 @@ test.describe('Foundations/Theming', () => {
     await gotoStory(page, STORY);
     await page.evaluate(() => ((window as unknown as { __noReload: boolean }).__noReload = true));
     const button = page.getByRole('button', { name: 'Approve' });
-    const badge = page.getByText('Pending');
+    const badge = page.getByTestId('themed-badge');
     const defaultButton = await bg(button);
     const defaultBadge = await bg(badge);
 
+    const outline = (loc: import('@playwright/test').Locator) => loc.evaluate((el) => getComputedStyle(el).outlineColor);
+    const defaultOutline = await outline(badge);
+
     await page.getByRole('radio', { name: 'Violet' }).check();
     expect(await bg(button)).toBe('rgb(107, 63, 160)');
+    expect(await bg(badge)).not.toBe(defaultBadge);
+    expect(await outline(badge)).not.toBe(defaultOutline);
     const forestRadius = await button.evaluate((el) => getComputedStyle(el).borderRadius);
     await page.getByRole('radio', { name: 'Forest' }).check();
     expect(await bg(button)).toBe('rgb(31, 107, 58)');
+    expect(await bg(badge)).not.toBe(defaultBadge);
     expect(await button.evaluate((el) => getComputedStyle(el).borderRadius)).not.toBe(forestRadius);
 
     await page.getByRole('radio', { name: 'Custom colour' }).check();
     await page.getByLabel('Primary').fill('#b4236b');
     expect(await bg(button)).toBe('rgb(180, 35, 107)');
+    expect(await bg(badge)).not.toBe(defaultBadge);
 
     await page.getByRole('radio', { name: 'Default' }).check();
     expect(await bg(button)).toBe(defaultButton);

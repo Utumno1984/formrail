@@ -22,11 +22,23 @@ const PRESETS: Record<Exclude<PresetId, 'custom'>, Preset> = {
   default: { label: 'Default', vars: {} },
   violet: {
     label: 'Violet',
-    vars: { '--color-rop-primary': '#6b3fa0', '--color-rop-text': '#2a1b3d', '--radius-rop-md': '1rem' },
+    vars: {
+      '--color-rop-primary': '#6b3fa0',
+      '--color-rop-info': '#6b3fa0',
+      '--color-rop-text': '#2a1b3d',
+      '--radius-rop-md': '1rem',
+      '--radius-rop-sm': '0.75rem',
+    },
   },
   forest: {
     label: 'Forest',
-    vars: { '--color-rop-primary': '#1f6b3a', '--color-rop-border': '#6f8f7a', '--radius-rop-md': '0.125rem' },
+    vars: {
+      '--color-rop-primary': '#1f6b3a',
+      '--color-rop-info': '#1f6b3a',
+      '--color-rop-border': '#6f8f7a',
+      '--radius-rop-md': '0.125rem',
+      '--radius-rop-sm': '0',
+    },
   },
 };
 
@@ -45,7 +57,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 function varsFor(preset: PresetId, custom: string): Record<string, string> {
   if (preset !== 'custom') return PRESETS[preset].vars;
   const hex = HEX.test(custom) ? custom : '#0a6ed1';
-  return { '--color-rop-primary': hex, '--color-rop-primary-contrast': contrastOn(hex) };
+  return { '--color-rop-primary': hex, '--color-rop-info': hex, '--color-rop-primary-contrast': contrastOn(hex) };
 }
 
 interface ThemingDemoProps {
@@ -102,7 +114,7 @@ function ThemingDemo({ preset: initialPreset, customColor: initialColor }: Themi
         <div style={row}>
           <Button variant="primary">Approve</Button>
           <Button variant="secondary">Cancel</Button>
-          <StatusBadge tone="info">Pending</StatusBadge>
+          <StatusBadge tone="info" data-testid="themed-badge">Pending</StatusBadge>
           <StatusBadge tone="success">Approved</StatusBadge>
         </div>
       </div>
