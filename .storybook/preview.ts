@@ -3,6 +3,13 @@ import type { Preview } from '@storybook/react-vite';
 import '../packages/core/src/styles/index.css';
 import { ropTheme } from './theme';
 
+// Storybook's native developer tools (grid / background / outline / measure) are for people building
+// components, not for someone evaluating the published library, and they are easy to hit by accident
+// on touch screens (the grid persists across pages and looks like a library defect, ticket #294).
+// Hidden in every static build (the public deploy and the e2e/visual builds); available in the local
+// dev server (`npm run storybook`) only.
+const devToolsDisabled = !import.meta.env.DEV;
+
 const preview: Preview = {
   // Every meta gets a Docs tab (description from the JSDoc above the component, props table,
   // "Show code" per story). Internal fixtures opt out with `tags: ['!autodocs']`.
@@ -10,6 +17,9 @@ const preview: Preview = {
   parameters: {
     layout: 'padded',
     docs: { theme: ropTheme },
+    backgrounds: { disable: devToolsDisabled },
+    outline: { disable: devToolsDisabled },
+    measure: { disable: devToolsDisabled },
     // Viewport toolbar (built into Storybook core since 9: `storybook/viewport`, no separate addon
     // package). Presets mirror the `visual-mobile|tablet|desktop` projects in playwright.config.ts,
     // so what you see in the canvas is what the visual regression captures. The default stays the
