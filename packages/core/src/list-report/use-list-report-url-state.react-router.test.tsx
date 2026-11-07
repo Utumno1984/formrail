@@ -125,6 +125,6 @@ describe('core package.json', () => {
       'clsx',
       'tailwind-merge',
     ]);
-    expect(Object.keys(pkg.peerDependencies ?? {}).sort()).toEqual(['react', 'react-dom']);
+    expect(Object.keys(pkg.peerDependencies ?? {}).sort()).toEqual(['react', 'react-dom', 'tailwindcss']);
   });
 });
