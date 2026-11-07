@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cn } from '../src/index';
-import { customProperties, findGlobalLeaks, stripComments } from './helpers/css-analysis';
+import { customProperties, DERIVED_TOKENS, findGlobalLeaks, stripComments } from './helpers/css-analysis';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const tokensCss = readFileSync(join(packageDir, 'src/styles/tokens.css'), 'utf8');
@@ -68,6 +68,31 @@ describe('design tokens (src/styles/tokens.css, built into dist/theme.css and di
     );
     // No bare `@import "tailwindcss"` and no preflight reference in the published token file.
     expect(themeCss).not.toMatch(/@import|preflight/i);
+  });
+});
+
+describe('derived tokens (override slots resolved at the point of use)', () => {
+  it('none is declared in the compiled CSS: the public name stays an unset slot', () => {
+    const declared = customProperties(stylesCss);
+    for (const name of Object.keys(DERIVED_TOKENS)) expect(declared.has(`--color-rop-${name}`), name).toBe(false);
+  });
+
+  it('the utilities carry the formula on the base variable, so it resolves on the consuming element', () => {
+    for (const [name, value] of Object.entries(DERIVED_TOKENS)) {
+      expect(stylesCss, name).toContain(`var(--color-rop-${name}, ${value})`);
+    }
+  });
+
+  it('the base tokens and the literal palette stay declared and readable', () => {
+    const declared = customProperties(stylesCss);
+    for (const name of ['primary', 'error', 'surface-subtle', 'text-muted', 'blue-50', 'blue-600', 'blue-800']) {
+      expect(declared.has(`--color-rop-${name}`), name).toBe(true);
+    }
+  });
+
+  it('every derived token is a slot on its own name in tokens.css, and nothing else is', () => {
+    const slots = [...tokenVars].filter(([name, value]) => value.startsWith(`var(${name},`)).map(([name]) => name);
+    expect(slots.sort()).toEqual(Object.keys(DERIVED_TOKENS).map((name) => `--color-rop-${name}`).sort());
   });
 });
 

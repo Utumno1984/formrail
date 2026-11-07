@@ -1,5 +1,16 @@
 /** Minimal CSS analysis helpers for the tests on the compiled stylesheet. */
 
+/** The derived color tokens (name after `--color-rop-`) and the default each utility falls back to. */
+export const DERIVED_TOKENS: Record<string, string> = {
+  'primary-hover': 'color-mix(in srgb, var(--color-rop-primary) 80%, black)',
+  'primary-active': 'color-mix(in srgb, var(--color-rop-primary) 62%, black)',
+  'error-hover': 'color-mix(in srgb, var(--color-rop-error) 80%, black)',
+  'error-active': 'color-mix(in srgb, var(--color-rop-error) 62%, black)',
+  'surface-pressed': 'color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black)',
+  'readonly-surface': 'var(--color-rop-surface-subtle)',
+  'readonly-indicator': 'var(--color-rop-text-muted)',
+};
+
 export function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
 }

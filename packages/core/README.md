@@ -105,7 +105,8 @@ can use `text-rop-body`, `font-rop-mono`, `z-rop-modal`, `bg-rop-primary`... in 
 
 | Group | Names |
 |---|---|
-| Colors | `text`, `text-muted`, `surface`, `surface-subtle`, `border`, `primary`, `primary-hover`, `primary-contrast`, `info`, `success`, `warning`, `error`, `error-hover` |
+| Colors | `text`, `text-muted`, `surface`, `surface-subtle`, `border`, `primary`, `primary-contrast`, `info`, `success`, `warning`, `error` |
+| Derived colors (see below) | `primary-hover`, `primary-active`, `error-hover`, `error-active`, `surface-pressed`, `readonly-surface`, `readonly-indicator` |
 | Type scale (size + line height) | `caption`, `body`, `label`, `title-sm`, `title-md`, `title-lg` |
 | Families | `font-rop-sans`, `font-rop-mono` (system stacks, no web font; the mono stack ends with `monospace`) |
 | z-index | `sticky` < `overlay` (backdrop) < `modal` < `popover` < `tooltip` |
@@ -119,10 +120,27 @@ the token's value into the compiled CSS: redefine `--container-rop-description-l
 top of the precompiled `styles.css` (mode a) has no effect. Or force the layout with the `layout`
 prop.
 
-`primary-hover` and `error-hover` (the hover background of the `primary` and `danger` Buttons) are
-not fixed colors: they are `color-mix(in srgb, <base> 80%, black)` of `--color-rop-primary` /
-`--color-rop-error`. Override the base color **on `:root`** (where the tokens are declared) and the
-hover follows; override the hover token too only if you want a different shade.
+The derived colors are not fixed values: they are computed from a base color **on the element that
+uses them**.
+
+| Derived | Default |
+|---|---|
+| `primary-hover` / `primary-active` | `color-mix(in srgb, var(--color-rop-primary) 80%, black)` / `62%` |
+| `error-hover` / `error-active` | `color-mix(in srgb, var(--color-rop-error) 80%, black)` / `62%` |
+| `surface-pressed` | `color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black)` |
+| `readonly-surface` | `var(--color-rop-surface-subtle)` |
+| `readonly-indicator` | `var(--color-rop-text-muted)` |
+
+- **Override a base color at any scope** (`:root`, or a class on one part of the page): the hover,
+  pressed and read-only shades inside it follow. Portaled content (`Select`, `Combobox`, `Menu`,
+  `Dialog`, `Sheet`, `Tooltip`, `Toast`) renders outside your wrapper, so it takes the theme of `:root`
+  / `body`, for base colors as well.
+- **Override a derived token at any scope** only if you want a different shade:
+  `.my-theme { --color-rop-primary-hover: #123456; }` wins over the computed one. Like any custom
+  property it is inherited: a nested theme clears it with `--color-rop-primary-hover: initial`.
+- **Do not read a derived token with `var()`**: the name is an optional override, unset by default,
+  so `var(--color-rop-primary-hover)` resolves to nothing. In Tailwind mode (b) use the utility
+  (`bg-rop-primary-hover`); otherwise copy the formula above.
 
 ## `cn()`
 

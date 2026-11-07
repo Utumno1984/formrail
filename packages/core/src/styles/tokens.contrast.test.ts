@@ -15,6 +15,9 @@ function resolve(value: string): Rgb {
   if (v === 'black') return [0, 0, 0];
   const ref = v.match(/^var\((--[\w-]+)\)$/);
   if (ref) return resolve(declarations.get(ref[1]!) ?? fail(`missing token ${ref[1]}`));
+  // A derived token is `var(--own-name, <default>)`: an override slot left unset, so its colour is the default.
+  const slot = v.match(/^var\((--[\w-]+),\s*(.+)\)$/);
+  if (slot) return resolve(slot[2]!);
   const mix = v.match(/^color-mix\(in srgb,\s*(.+?)\s+(\d+(?:\.\d+)?)%,\s*(.+)\)$/);
   if (mix) {
     const p = Number(mix[2]) / 100;
@@ -186,8 +189,8 @@ describe('contrast', () => {
   });
 
   it('the read-only tokens are aliases of the neutral scale, not new colours', () => {
-    expect(declarations.get('--color-rop-readonly-surface')).toBe('var(--color-rop-surface-subtle)');
-    expect(declarations.get('--color-rop-readonly-indicator')).toBe('var(--color-rop-text-muted)');
+    expect(declarations.get('--color-rop-readonly-surface')).toBe('var(--color-rop-readonly-surface, var(--color-rop-surface-subtle))');
+    expect(declarations.get('--color-rop-readonly-indicator')).toBe('var(--color-rop-readonly-indicator, var(--color-rop-text-muted))');
   });
 
   it('the focus ring is drawn with the primary token', () => {

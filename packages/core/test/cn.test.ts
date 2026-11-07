@@ -25,6 +25,14 @@ describe('cn', () => {
     expect(cn('bg-rop-surface', 'bg-rop-primary')).toBe('bg-rop-primary');
   });
 
+  it('knows the derived color tokens (their own block in tokens.css): they conflict as any other color', () => {
+    expect(cn('bg-rop-primary', 'bg-rop-primary-hover')).toBe('bg-rop-primary-hover');
+    expect(cn('bg-rop-primary-hover', 'bg-rop-surface-pressed')).toBe('bg-rop-surface-pressed');
+    expect(cn('bg-rop-error-active', 'bg-rop-readonly-surface')).toBe('bg-rop-readonly-surface');
+    expect(cn('text-rop-primary-active', 'text-rop-readonly-indicator')).toBe('text-rop-readonly-indicator');
+    expect(cn('text-rop-body', 'text-rop-primary-hover')).toBe('text-rop-body text-rop-primary-hover');
+  });
+
   it('does not let a color token conflict with a size token that shares a word', () => {
     // `rop-text-muted` is a color, `rop-title-sm` is a size.
     expect(cn('text-rop-text-muted', 'text-rop-title-sm')).toBe('text-rop-text-muted text-rop-title-sm');

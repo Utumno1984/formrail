@@ -59,7 +59,9 @@ react-object-page is headless the way the term is used throughout this project: 
 
 The full token list is in [Foundations: Tokens](?path=/docs/foundations-tokens--docs). Try it live in
 [Foundations: Theming](?path=/story/foundations-theming--switcher): a switcher re-declares the
-variables at runtime and the components follow.
+variables at runtime and the components follow. Hover, pressed and read-only shades are computed where
+they are used, so they follow a base colour redeclared on any wrapper; that makes them optional
+overrides with no value to read through `var()` (see the package README).
 
 It is an independent implementation of generic interaction patterns; it is not affiliated with, and
 contains no code, asset or style from, any third-party design system.
