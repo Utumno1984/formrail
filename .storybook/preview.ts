@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { Preview } from '@storybook/react-vite';
 // The SAME entry the package compiles into dist/styles.css (not a copy).
 import '../packages/core/src/styles/index.css';
@@ -7,8 +8,10 @@ import { ropTheme } from './theme';
 // components, not for someone evaluating the published library, and they are easy to hit by accident
 // on touch screens (the grid persists across pages and looks like a library defect, ticket #294).
 // Hidden in every static build (the public deploy and the e2e/visual builds); available in the local
-// dev server (`npm run storybook`) only.
-const devToolsDisabled = process.env.NODE_ENV === 'production';
+// dev server (`npm run storybook`) only. import.meta.env.PROD reflects Vite's actual build mode
+// (set by the build command itself), unlike process.env.NODE_ENV which can leak an unrelated
+// ambient value from whatever shell/CI/container runs the build.
+const devToolsDisabled = import.meta.env.PROD;
 
 const preview: Preview = {
   // Every meta gets a Docs tab (description from the JSDoc above the component, props table,
