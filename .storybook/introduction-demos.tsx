@@ -194,9 +194,28 @@ const DEMO_FRAME: CSSProperties = {
   padding: 16,
   margin: '12px 0 24px',
   boxSizing: 'border-box',
+  // `sb-unstyled` also drops the page's font, so bare text in a demo (<small>, <code>) would fall back to serif:
+  // set the library's own typography on the frame.
+  fontFamily: 'var(--font-rop-sans, system-ui, sans-serif)',
+  fontSize: 'var(--text-rop-body, 0.875rem)',
+  lineHeight: 'var(--text-rop-body--line-height, 1.25rem)',
+  color: 'var(--color-rop-text, inherit)',
 };
 
-/** Border and padding around a live example, so it reads as a demo and not as page text. */
-export function DemoFrame({ children }: { children: ReactNode }) {
-  return <div style={DEMO_FRAME}>{children}</div>;
+/**
+ * Border and padding around a live example, so it reads as a demo and not as page text. `sb-unstyled` is
+ * Storybook's own opt-out. Verified in the installed @storybook/addon-docs (dist/blocks.js,
+ * `toGlobalSelector`): the Docs content styles are emotion rules nested in the DocsContent wrapper, of the
+ * form `& :where(h2:not(.sb-anchor, .sb-unstyled, .sb-unstyled h2))`; an element that is `.sb-unstyled`, or
+ * inside one, is skipped by the page typography (border on h2, zebra tables, p/span sizes). Ticket #286.
+ *
+ * `name` is required and gives each frame a unique `data-testid` (`demo-frame-<name>`): tests must target
+ * a frame by that id, never by a shared id plus extra disambiguating selectors.
+ */
+export function DemoFrame({ name, children }: { name: string; children: ReactNode }) {
+  return (
+    <div className="sb-unstyled" style={DEMO_FRAME} data-testid={`demo-frame-${name}`}>
+      {children}
+    </div>
+  );
 }
