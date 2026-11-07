@@ -35,6 +35,22 @@ test.describe('Introduction page', () => {
     await expect(page.getByRole('textbox', { name: 'Cost center' })).toBeDisabled();
   });
 
+  test('field states demo: real Tab reaches locked then forced, and skips disabled', async ({ page }) => {
+    const locked = page.getByRole('textbox', { name: 'Approver' });
+    const forced = page.getByRole('textbox', { name: 'Currency' });
+    const disabled = page.getByRole('textbox', { name: 'Cost center' });
+    await locked.focus();
+    await expect(locked).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(forced).toBeFocused();
+    await expect(forced).toHaveAccessibleDescription(/business rule/);
+    await page.keyboard.press('Tab');
+    await expect(disabled).not.toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(locked).toBeFocused();
+  });
+
   test('theme override demo: the overridden wrapper changes the primary button colour', async ({ page }) => {
     const defaultBg = await page
       .getByRole('button', { name: 'Primary action' })

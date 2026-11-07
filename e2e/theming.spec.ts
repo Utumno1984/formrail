@@ -34,8 +34,10 @@ test.describe('Foundations/Theming', () => {
     expect(await button.evaluate((el) => getComputedStyle(el).borderRadius)).not.toBe(forestRadius);
 
     await page.getByRole('radio', { name: 'Custom colour' }).check();
-    await page.getByLabel('Primary').fill('#b4236b');
-    expect(await bg(button)).toBe('rgb(180, 35, 107)');
+    // Must differ from the story's initial `customColor` arg (#b4236b), otherwise this assertion
+    // would hold even with a disconnected colour-picker onChange. #2e8540 = rgb(46, 133, 64).
+    await page.getByLabel('Primary').fill('#2e8540');
+    expect(await bg(button)).toBe('rgb(46, 133, 64)');
     expect(await bg(badge)).not.toBe(defaultBadge);
 
     await page.getByRole('radio', { name: 'Default' }).check();
