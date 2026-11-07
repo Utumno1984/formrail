@@ -7,6 +7,29 @@ import { parseTokenScale } from '../utils/token-scale';
 // Storybook loads in .storybook/preview.ts.
 const scale = parseTokenScale(tokensCss);
 
+// A derived token is an override slot left unset, so a bare `var()` of its name paints nothing: its
+// swatch uses the value declared in tokens.css instead (the slot with its computed default).
+const declaredSlots = new Map(
+  [...tokensCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(--[\w-]+):\s*(var\(\1,[^;]+);/g)].map(
+    (m) => [m[1]!, m[2]!] as const,
+  ),
+);
+const swatchColor = (name: string): string => declaredSlots.get(`--color-${name}`) ?? `var(--color-${name})`;
+
+// The derived tokens live in their own block at the end of tokens.css: each swatch goes back next
+// to the colour it belongs with. Any other token, a new one included, keeps the file's order.
+const palette = [
+  ['rop-surface-pressed', 'rop-surface-subtle'],
+  ['rop-primary-hover', 'rop-primary'],
+  ['rop-primary-active', 'rop-primary-hover'],
+  ['rop-error-hover', 'rop-error'],
+  ['rop-error-active', 'rop-error-hover'],
+].reduce((names, [name, anchor]) => {
+  const rest = names.filter((n) => n !== name);
+  rest.splice(rest.indexOf(anchor!) + 1, 0, name!);
+  return rest;
+}, scale.color);
+
 const meta = {
   title: 'Foundations/Tokens',
   parameters: { layout: 'padded' },
@@ -43,11 +66,11 @@ function Tokens() {
           Palette
         </h2>
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
-          {scale.color.map((name) => (
+          {palette.map((name) => (
             <li key={name}>
               <div
                 data-testid={`swatch-${name}`}
-                style={{ height: 40, background: `var(--color-${name})`, border: '1px solid var(--color-rop-border)', borderRadius: 'var(--radius-rop-md)' }}
+                style={{ height: 40, background: swatchColor(name), border: '1px solid var(--color-rop-border)', borderRadius: 'var(--radius-rop-md)' }}
               />
               <code style={{ fontFamily: 'var(--font-rop-mono)', fontSize: 'var(--text-rop-caption)' }}>{name}</code>
             </li>
