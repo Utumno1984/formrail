@@ -188,7 +188,11 @@ function Recipe(args: RecipeArgs) {
           message={message}
           messageTone="error"
         >
-          <Button onClick={() => void form.save(async (v) => onSaved(v))} aria-disabled={form.isSaving || undefined}>
+          <Button
+            variant="primary"
+            onClick={() => void form.save(async (v) => onSaved(v))}
+            aria-disabled={form.isSaving || undefined}
+          >
             Save
           </Button>
           <Button variant="secondary" onClick={() => form.reset()}>

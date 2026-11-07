@@ -106,7 +106,9 @@ function ValidationDemo({ withProvider, countryError, onSave }: ValidationArgs) 
       <ObjectPage>
         <ObjectPageHeader title="New supplier" />
         <ObjectPageFooter visible label="Save actions">
-          <Button onClick={() => void form.save((values) => onSave(values))}>Save</Button>
+          <Button variant="primary" onClick={() => void form.save((values) => onSave(values))}>
+            Save
+          </Button>
           <Button variant="secondary" onClick={() => form.reset()}>
             Discard changes
           </Button>

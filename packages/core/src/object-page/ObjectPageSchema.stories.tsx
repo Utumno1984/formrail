@@ -86,7 +86,7 @@ function SchemaForm({ schema, initial, onSave }: SchemaFormArgs) {
       <ObjectPage>
         <ObjectPageHeader title="Purchase order 2026/0142" subtitle={form.values.supplier || 'New supplier'} />
         <ObjectPageFooter visible message={errorText(form.saveError)} messageTone="error" label="Save actions">
-          <Button onClick={submit} aria-disabled={form.isSaving || undefined}>
+          <Button variant="primary" onClick={submit} aria-disabled={form.isSaving || undefined}>
             Save
           </Button>
           <Button variant="secondary" onClick={() => form.reset()}>

@@ -114,6 +114,7 @@ export const Playground: Story = {
           <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
           <ObjectPageFooter visible={visible} message={message} messageTone={messageTone} label={label}>
             <Button
+              variant="primary"
               onClick={() => {
                 onSave();
                 setVisible(false);
@@ -174,7 +175,7 @@ export const Hidden: Story = {
       <ObjectPage>
         <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <ObjectPageFooter visible={args.visible} label={args.label}>
-          <Button>Save</Button>
+          <Button variant="primary">Save</Button>
           <Button variant="secondary">Cancel changes</Button>
         </ObjectPageFooter>
         <LongContent />
@@ -192,7 +193,7 @@ export const WithActions: Story = {
       <ObjectPage>
         <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <ObjectPageFooter visible={args.visible} label={args.label}>
-          <Button>Save</Button>
+          <Button variant="primary">Save</Button>
           <Button variant="secondary">Cancel changes</Button>
         </ObjectPageFooter>
         <LongContent />
@@ -210,7 +211,7 @@ export const LongError: Story = {
       <ObjectPage>
         <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
         <ObjectPageFooter visible={args.visible} message={args.message} messageTone="error" label={args.label}>
-          <Button>Save</Button>
+          <Button variant="primary">Save</Button>
           <Button variant="secondary">Cancel changes</Button>
         </ObjectPageFooter>
         <LongContent />
@@ -340,6 +341,7 @@ function SupplierForm({
             messageTone="error"
           >
             <Button
+              variant="primary"
               onClick={() =>
                 void form.save(async (values) => {
                   if (values.supplier === 'fail') throw new Error(SERVER_ERROR);
