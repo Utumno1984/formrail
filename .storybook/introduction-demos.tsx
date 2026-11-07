@@ -160,7 +160,7 @@ export function FieldStatesDemo() {
 
 /**
  * Two wrappers, same components: the second one only redefines CSS custom properties. Static on
- * purpose: the interactive theme switcher belongs to the Theming section (ticket #276).
+ * purpose: the interactive theme switcher lives in the Foundations/Theming story.
  */
 export function ThemeOverrideDemo() {
   const themed = { '--color-rop-primary': '#6b3fa0', '--radius-rop-md': '1rem' } as CSSProperties;
