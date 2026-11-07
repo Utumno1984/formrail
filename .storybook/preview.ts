@@ -8,7 +8,7 @@ import { ropTheme } from './theme';
 // on touch screens (the grid persists across pages and looks like a library defect, ticket #294).
 // Hidden in every static build (the public deploy and the e2e/visual builds); available in the local
 // dev server (`npm run storybook`) only.
-const devToolsDisabled = !import.meta.env.DEV;
+const devToolsDisabled = process.env.NODE_ENV === 'production';
 
 const preview: Preview = {
   // Every meta gets a Docs tab (description from the JSDoc above the component, props table,
