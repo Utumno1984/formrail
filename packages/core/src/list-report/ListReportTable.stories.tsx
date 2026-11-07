@@ -27,7 +27,7 @@ function makeInvoices(count: number): Invoice[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `F-${String(i + 1).padStart(4, '0')}`,
     customer: CUSTOMERS[i % CUSTOMERS.length]!,
-    description: `Invoice awaiting approval from the purchasing office, order reference${1000 + i * 7}`,
+    description: `Invoice awaiting approval from the purchasing office, order reference ${1000 + i * 7}`,
     amount: ((i * 7919) % 9973) + 0.5,
     date: new Date(Date.UTC(2026, 0, 1 + ((i * 13) % 300))).toISOString().slice(0, 10),
   }));
