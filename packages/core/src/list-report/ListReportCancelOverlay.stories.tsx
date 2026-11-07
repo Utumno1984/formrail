@@ -265,6 +265,7 @@ export const CancelActionOverlay: Story = {
 
 /** Fixture of the e2e suite: the same page without the play function. */
 export const CancelActionOverlayNoPlay: Story = {
+  tags: ['internal'],
   parameters: { controls: { disable: true } },
 };
 

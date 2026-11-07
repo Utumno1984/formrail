@@ -17,8 +17,8 @@ interface MatrixArgs {
 
 const meta: Meta<MatrixArgs> = {
   title: 'Internal/ControlStates',
-  // Test fixture / state matrix, not a documented component: no Docs page.
-  tags: ['!autodocs'],
+  // Test fixture / state matrix, not a documented component: no Docs page; `internal`: hidden from the public sidebar (#296).
+  tags: ['!autodocs', 'internal'],
   parameters: { layout: 'fullscreen' },
   argTypes: {
     withMessages: {

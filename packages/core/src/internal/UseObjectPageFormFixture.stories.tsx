@@ -204,8 +204,8 @@ function NestedDemo({ onSave }: { onSave: (v: Order) => void }) {
 
 const meta = {
   title: 'Internal/UseObjectPageFormFixture',
-  // Test fixture / state matrix, not a documented component: no Docs page.
-  tags: ['!autodocs'],
+  // Test fixture / state matrix, not a documented component: no Docs page; `internal`: hidden from the public sidebar (#296).
+  tags: ['!autodocs', 'internal'],
   component: FormDemo,
   parameters: { layout: 'padded' },
 } satisfies Meta<typeof FormDemo>;

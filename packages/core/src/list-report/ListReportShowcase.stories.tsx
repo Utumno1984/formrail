@@ -313,7 +313,7 @@ export const SmartFilterBarShowcase: Story = {
 
 /** Fixture of the e2e suite and visual baseline: the showcase without the play function, as it opens. */
 export const SmartFilterBarShowcaseNoPlay: Story = {
-  tags: ['visual'],
+  tags: ['visual', 'internal'],
   parameters: { controls: { disable: true } },
 };
 

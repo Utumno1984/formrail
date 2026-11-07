@@ -51,4 +51,12 @@ describe('storyGlobs (#175)', () => {
     expect(deployJob).toMatch(/STORYBOOK_EXCLUDE_PRO: '?1'?/);
     expect(ci.slice(0, ci.indexOf('deploy-pages:'))).not.toMatch(/STORYBOOK_EXCLUDE_PRO: /);
   });
+
+  it('STORYBOOK_HIDE_INTERNAL (public sidebar without test fixtures, #296) is set only by the deploy job', () => {
+    const ci = readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8');
+    const deployJob = ci.slice(ci.indexOf('deploy-pages:'));
+    expect(deployJob).toMatch(/STORYBOOK_HIDE_INTERNAL: '?1'?/);
+    // The e2e/visual builds must keep the fixtures in the sidebar-independent index and local dev shows them.
+    expect(ci.slice(0, ci.indexOf('deploy-pages:'))).not.toMatch(/STORYBOOK_HIDE_INTERNAL: /);
+  });
 });
