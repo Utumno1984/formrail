@@ -352,7 +352,7 @@ export const ObjectPageNested: NestedStory = {
 };
 
 /** No `play`: the e2e drives Save itself (the `play` of `ObjectPageNested` would race with it). */
-export const ObjectPageNestedNoPlay: NestedStory = { ...nestedMeta, name: 'Nested Object Page (no play)', tags: ['internal'] };
+export const ObjectPageNestedNoPlay: NestedStory = { ...nestedMeta, name: 'Nested Object Page (no play)' };
 
 /** A is filled in, so the focus lands on B, a Select: its trigger is found by `data-rop-name`, not by a native `name`. */
 export const FocusFirstInvalidSelect: FocusStory = {

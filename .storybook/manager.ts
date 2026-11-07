@@ -7,8 +7,10 @@ import { ropTheme } from './theme';
 // (job `deploy-pages`) sets STORYBOOK_HIDE_INTERNAL=1 and the sidebar filters them out. The stories
 // stay in the index and keep rendering at `iframe.html?id=...`, because the e2e/visual suites build
 // Storybook without the variable and open them by id. `!dev` is NOT used: it would hide them locally too.
-// STORYBOOK_* variables are inlined into the manager bundle at build time.
-const hideInternal = ['1', 'true'].includes(process.env.STORYBOOK_HIDE_INTERNAL ?? '');
+// STORYBOOK_* variables are inlined into the manager bundle at build time. Same truthy convention
+// as excludePro() in story-globs.mjs, so a new STORYBOOK_* flag behaves consistently either way.
+const hideInternalValue = process.env.STORYBOOK_HIDE_INTERNAL;
+const hideInternal = hideInternalValue !== undefined && hideInternalValue !== '' && hideInternalValue !== '0' && hideInternalValue !== 'false';
 
 addons.setConfig({
   theme: ropTheme,
