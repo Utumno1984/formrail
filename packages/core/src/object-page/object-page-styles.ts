@@ -43,8 +43,12 @@ export const footerToneIconClass = {
 } as const;
 
 // Title (and status) above, actions below on a narrow screen; side by side from 640px.
-export const headerClass = 'flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4';
-export const headerIdentityClass = 'flex min-w-0 flex-col gap-1';
+// From 640px the row may wrap: when the identity block (at its minimum basis) and the actions at their natural
+// width do not fit together, the actions drop below the identity block instead of being clipped by the scroller.
+export const headerClass =
+  'flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4';
+// Side by side the identity block takes the free room but never less than 16rem: below that the actions wrap.
+export const headerIdentityClass = 'flex min-w-0 flex-col gap-1 sm:flex-[1_1_16rem]';
 export const headerTitleRowClass = 'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1';
 // A very long title wraps; it is never truncated (it is the identity of the object).
 export const headerTitleClass = 'min-w-0 [overflow-wrap:anywhere]';
@@ -53,7 +57,10 @@ export const headerTitleClass = 'min-w-0 [overflow-wrap:anywhere]';
 export const headerTitleFocusClass =
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:2px]';
 export const headerSubtitleClass = 'min-w-0 text-rop-text-muted [overflow-wrap:anywhere]';
-export const headerActionsClass = 'flex min-w-0 flex-wrap items-center gap-2';
+// Beside the identity block the actions keep their max-content width: shrunk to min-content (a Button breaks
+// anywhere) a long title squeezes "Approve" into "Appro" / "ve" at tablet width. They stay flush right when
+// wrapped below, and never exceed the row (their own wrap handles a very long set).
+export const headerActionsClass = 'flex min-w-0 flex-wrap items-center gap-2 sm:ml-auto sm:max-w-full sm:shrink-0';
 
 // Sections stop below whatever the Anchor Bar will pin at the top (it sets the variable).
 export const sectionClass = 'flex min-w-0 flex-col gap-3';
