@@ -7,7 +7,7 @@
  * - `@theme static` emits every base token even when no utility uses it, so those are always
  *   available as plain CSS custom properties (overridable by the consumer for theming).
  * - Derived tokens (hover, pressed, read-only shades) are NOT emitted: see the `@theme reference`
- *   block at the end of this file for why, and what that rules out.
+ *   block at the end of this file for the mechanism, and the package README for the contract.
  * - This file is published as `theme.css` for Tailwind v4 projects, and imported by
  *   `index.css` to build `styles.css`.
  */
@@ -240,22 +240,18 @@
 
 /*
  * Derived tokens: optional overrides with a computed default, resolved where they are consumed.
+ * Their public contract (why they are not declared on :root, no value to read with a bare var(),
+ * aliases, `--theme(... inline)`, opacity modifiers) is documented in the package README
+ * (README.md, section "Tokens"); this comment covers the mechanism only.
  *
- * A custom property declared on :root is computed there and inherited as a finished colour, so a
- * base colour redeclared on a wrapper would never reach it. `@theme reference` emits nothing on
- * :root and makes Tailwind write each utility as `var(<token>, <value>)`. So the formula and its
- * base var() are resolved on the element using it (the base moves the shades at ANY scope), while
- * the public name stays unset and wins over the formula when set, at any scope.
- *
- * The form relies on that implicit fallback of `reference`, a Tailwind behaviour, not on anything
- * written here: test/styles.test.ts fails if a compiled utility stops being `var(<token>, <value>)`.
- * Two limits come with it: `--theme(<token> inline)` gives the bare formula (no override), and with
- * an opacity modifier the polyfill for browsers without color-mix(in oklab) keeps the alpha but
- * drops the override.
- *
- * The price, part of the public contract: these names have no value to read. A bare var() of one of
- * them resolves to nothing, and an alias of one (no fallback) is ignored in silence. Use the utility,
- * `--theme(<token>)`, or `var(<token>, <formula>)` on the element itself, never on :root.
+ * `@theme reference` emits nothing on :root and makes Tailwind write each utility as
+ * `var(<token>, <value>)`: the formula and its base var() are resolved on the element using it, and
+ * the public name, unset, wins over the formula when set. That fallback is a Tailwind behaviour of
+ * `reference`, not written here: test/styles.test.ts fails if a compiled utility stops being
+ * `var(<token>, <value>)`. The block holds declarations only (no nested rule or at-rule) and is the
+ * only `@theme reference` block of the file: parseDerivedTokens (src/utils/token-scale.ts) throws
+ * otherwise. Each formula's first `var(--color-…)` is its base colour, which places the swatch in
+ * Foundations/Tokens.
  *
  * Rejected: `@theme inline static` (a declared token is indistinguishable from an override, so a
  * direct override stops working in silence); redeclaring on `*` (a global selector, a cost on every

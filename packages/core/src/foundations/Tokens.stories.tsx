@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import tokensCss from '../styles/tokens.css?raw';
-import { parseDerivedTokens, parseTokenScale } from '../utils/token-scale';
+import { paletteOrder, parseDerivedTokens, parseTokenScale } from '../utils/token-scale';
 
 // Palette, type scale and z-index list are derived from tokens.css (the source of the package's
 // styles.css): a new token shows up here with no edit. The CSS itself comes from the same entry
@@ -16,26 +16,9 @@ const swatchColor = (name: string): string => {
   return formula === undefined ? `var(${token})` : `var(${token}, ${formula})`;
 };
 
-// The derived tokens live in their own block at the end of tokens.css: each swatch goes back next
-// to the colour it belongs with. Any other token, a new one included, keeps the file's order.
-const SWATCH_AFTER: [name: string, anchor: string][] = [
-  ['rop-surface-pressed', 'rop-surface-subtle'],
-  ['rop-primary-hover', 'rop-primary'],
-  ['rop-primary-active', 'rop-primary-hover'],
-  ['rop-primary-subtle', 'rop-primary-active'],
-  ['rop-primary-subtle-hover', 'rop-primary-subtle'],
-  ['rop-primary-muted', 'rop-primary-subtle-hover'],
-  ['rop-error-hover', 'rop-error'],
-  ['rop-error-active', 'rop-error-hover'],
-];
-const palette = SWATCH_AFTER.reduce((names, [name, anchor]) => {
-  if (!names.includes(name) || !names.includes(anchor)) {
-    throw new Error(`Foundations/Tokens: "${name}" or its anchor "${anchor}" is not in tokens.css`);
-  }
-  const rest = names.filter((n) => n !== name);
-  rest.splice(rest.indexOf(anchor) + 1, 0, name);
-  return rest;
-}, scale.color);
+// The derived tokens live in their own block at the end of tokens.css: each swatch is placed right
+// after the base colour its formula reads (see paletteOrder). Any other token keeps the file's order.
+const palette = paletteOrder(tokensCss);
 
 const meta = {
   title: 'Foundations/Tokens',
