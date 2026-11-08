@@ -32,6 +32,16 @@ export const internalIcons = /* @__PURE__ */ (() => ({
       <path d="M5 12.5l4.5 4.5L19 7.5" />
     </svg>
   ),
+  plus: (
+    <svg {...stroke}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  minus: (
+    <svg {...stroke}>
+      <path d="M5 12h14" />
+    </svg>
+  ),
   info: (
     <svg {...stroke}>
       <circle cx="12" cy="12" r="9" />
