@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass } from './helpers/story';
 
 test.describe('Overlays/Tooltip: sides story on mobile (#314)', () => {
@@ -7,19 +8,17 @@ test.describe('Overlays/Tooltip: sides story on mobile (#314)', () => {
   }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await expectPlayToPass(page, 'overlays-tooltip--sides');
-    const m = await page.evaluate(() => {
-      const viewport = document.documentElement.clientWidth;
-      const buttons = [...document.querySelectorAll('main button')].map((b) => {
-        const r = b.getBoundingClientRect();
-        return { name: b.getAttribute('aria-label') ?? b.textContent, left: r.left, right: r.right };
-      });
-      return { viewport, scrollWidth: document.documentElement.scrollWidth, buttons };
-    });
-    expect(m.buttons).toHaveLength(4);
-    for (const b of m.buttons) {
-      expect(b.left, `${b.name} left`).toBeGreaterThanOrEqual(0);
-      expect(b.right, `${b.name} right`).toBeLessThanOrEqual(m.viewport);
+    // Page-level check: <html> as container catches sideways page scroll and any descendant
+    // sticking out of the viewport, reusing the shared clipping-aware logic.
+    await expectNoHorizontalOverflow(page.locator('html'));
+    // Each of the four triggers must be fully inside the viewport.
+    const viewport = page.viewportSize()!.width;
+    const buttons = page.locator('main button');
+    await expect(buttons).toHaveCount(4);
+    for (const [i, b] of (await buttons.all()).entries()) {
+      const box = (await b.boundingBox())!;
+      expect(box.x, `button ${i} left`).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, `button ${i} right`).toBeLessThanOrEqual(viewport);
     }
-    expect(m.scrollWidth).toBeLessThanOrEqual(m.viewport);
   });
 });
