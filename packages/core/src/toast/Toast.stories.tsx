@@ -153,8 +153,19 @@ function ShowOnMount({ id, options }: { id: string; options: ToastOptions }) {
 function Slots({ items }: { items: ToastOptions[] }) {
   return (
     <Page>
+      {/* Below `sm` the toast is full width, so a slot at the top of the viewport would cover the
+          page heading: start the slots under the heading and the text instead (with a gap). Desktop
+          and tablet keep the top-right slots. A media query needs a stylesheet, not inline `top`. */}
+      <style>{`
+        .rop-toast-slot { top: calc(var(--rop-slot-index) * 120px + 16px); }
+        @media (max-width: 639px) { .rop-toast-slot { top: calc(var(--rop-slot-index) * 120px + 160px); } }
+      `}</style>
       {items.map((options, i) => (
-        <ToastProvider key={i} style={{ top: 16 + i * 120, bottom: 'auto' }}>
+        <ToastProvider
+          key={i}
+          className="rop-toast-slot"
+          style={{ ['--rop-slot-index' as string]: i, bottom: 'auto' }}
+        >
           <ShowOnMount id={`slot-${i}`} options={options} />
         </ToastProvider>
       ))}
