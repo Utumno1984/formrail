@@ -46,6 +46,26 @@ test.describe('Foundations/Theming', () => {
     expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true);
   });
 
+  // #316: the bare native radio showed no dot on Chrome Android. The switcher now uses RadioGroup,
+  // which draws its own indicator: the radio is `appearance: none` and a sibling dot is displayed
+  // only for the checked one, so the selected state never depends on native radio rendering.
+  test('the selected theme radio shows a drawn indicator (not the native one)', async ({ page }) => {
+    await gotoStory(page, STORY);
+    const dotOf = (name: string) =>
+      page.getByRole('radio', { name }).evaluate((el) => {
+        const dot = el.nextElementSibling as HTMLElement;
+        return { appearance: getComputedStyle(el).appearance, display: getComputedStyle(dot).display, w: dot.getBoundingClientRect().width };
+      });
+    for (const name of ['Default', 'Violet', 'Forest', 'Custom colour']) {
+      expect((await dotOf(name)).appearance).toBe('none');
+    }
+    expect(await dotOf('Default')).toMatchObject({ display: 'block', w: 8 });
+    expect((await dotOf('Violet')).display).toBe('none');
+    await page.getByRole('radio', { name: 'Violet' }).click();
+    expect(await dotOf('Violet')).toMatchObject({ display: 'block', w: 8 });
+    expect((await dotOf('Default')).display).toBe('none');
+  });
+
   test('the Introduction links to the Theming story, which exists', async ({ page }) => {
     await page.goto('/iframe.html?id=introduction--docs&viewMode=docs');
     await page.waitForSelector('.sbdocs-content', { timeout: 15_000 });
