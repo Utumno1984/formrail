@@ -189,11 +189,54 @@ test.describe('Navigation/Tabs: overflow (#309)', () => {
     // And back to the start with the other indicator.
     clicks = 0;
     while ((await edge(page, 'start').count()) > 0) {
+      const before = await list.evaluate((el) => el.scrollLeft);
       await edge(page, 'start').click();
+      // Each click moves back (no dead indicator), and the focus stays on the tab that has it.
+      expect(await list.evaluate((el) => el.scrollLeft)).toBeLessThan(before);
+      await expect(last).toBeFocused();
+      await expectCutEdgesCovered(page);
       expect(++clicks).toBeLessThan(LABELS.length);
     }
     expect(await list.evaluate((el) => el.scrollLeft)).toBe(0);
     await expectInClearView(page, first);
+  });
+
+  test('reduced motion: the click that reaches an end removes that indicator in the same task, not a frame later', async ({ page }) => {
+    // Before, the indicators followed the `scroll` event, dispatched on the next frame: for that frame
+    // the indicator of the end just reached was still there, and a second click (or a test reading
+    // the DOM right after the first) hit an indicator that was about to be removed. Checked inside the
+    // page, in the task of the click itself (a microtask later, where React flushes a discrete event):
+    // no frame, so no `scroll` event, can happen in between.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoStory(page, MANY);
+    const list = page.getByRole('tablist');
+    const clickAndReadNow = (side: 'start' | 'end') =>
+      page.evaluate(async (s) => {
+        const indicator = document.querySelector<HTMLElement>(`[data-rop-tabs-edge="${s}"]`)!;
+        indicator.click();
+        await Promise.resolve();
+        const el = document.querySelector<HTMLElement>('[role="tablist"]')!;
+        return {
+          atEnd: el.scrollWidth - el.clientWidth - el.scrollLeft <= 1,
+          atStart: el.scrollLeft <= 1,
+          start: document.querySelectorAll('[data-rop-tabs-edge="start"]').length,
+          end: document.querySelectorAll('[data-rop-tabs-edge="end"]').length,
+        };
+      }, side);
+    // A few pixels short of the end: one click reaches it.
+    await list.evaluate((el) => {
+      el.scrollLeft = el.scrollWidth - el.clientWidth - 5;
+    });
+    await expect(edge(page, 'end')).toBeVisible();
+    await expect(edge(page, 'start')).toBeVisible();
+    expect(await clickAndReadNow('end')).toEqual({ atEnd: true, atStart: false, start: 1, end: 0 });
+    // A few pixels from the start: one click reaches it.
+    await list.evaluate((el) => {
+      el.scrollLeft = 5;
+    });
+    await expect(edge(page, 'end')).toBeVisible();
+    expect(await clickAndReadNow('start')).toEqual({ atEnd: false, atStart: true, start: 0, end: 1 });
   });
 
   test('pointer: a click on an indicator scrolls smoothly when motion is allowed', async ({ page }) => {

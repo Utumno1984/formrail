@@ -1,6 +1,7 @@
 import {
   createContext,
   forwardRef,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -275,21 +276,25 @@ function useScrollEdges(
   list: RefObject<HTMLDivElement | null>,
   enabled: boolean,
   dir: 'ltr' | 'rtl' | undefined,
-): EdgeState {
+): [EdgeState, () => void] {
   const [edges, setEdges] = useState<EdgeState>(NO_EDGES);
+  // Re-reads the edges now, not when the `scroll` event arrives (the next frame): after an instant
+  // `scrollBy` the indicators match the new position before the click that caused it has returned.
+  const refresh = useCallback(() => {
+    const el = list.current;
+    if (!el) return;
+    const next = readEdges(el);
+    setEdges((prev) => (prev.start === next.start && prev.end === next.end && prev.rtl === next.rtl ? prev : next));
+  }, [list]);
   useIsomorphicLayoutEffect(() => {
     const el = list.current;
     if (!enabled || !el) {
       setEdges(NO_EDGES);
       return;
     }
-    const update = () => {
-      const next = readEdges(el);
-      setEdges((prev) => (prev.start === next.start && prev.end === next.end && prev.rtl === next.rtl ? prev : next));
-    };
-    update();
-    el.addEventListener('scroll', update, { passive: true });
-    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    refresh();
+    el.addEventListener('scroll', refresh, { passive: true });
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refresh);
     const observeAll = () => {
       if (!resize) return;
       resize.disconnect();
@@ -302,16 +307,16 @@ function useScrollEdges(
         ? null
         : new MutationObserver(() => {
             observeAll();
-            update();
+            refresh();
           });
     mutations?.observe(el, { childList: true });
     return () => {
-      el.removeEventListener('scroll', update);
+      el.removeEventListener('scroll', refresh);
       resize?.disconnect();
       mutations?.disconnect();
     };
-  }, [enabled, dir]);
-  return edges;
+  }, [enabled, dir, refresh]);
+  return [edges, refresh];
 }
 
 /**
@@ -330,7 +335,7 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
   const horizontal = orientation === 'horizontal';
   const listEl = useRef<HTMLDivElement>(null);
   const mergedRef = useMemo(() => composeRefs(ref, listEl), [ref]);
-  const edges = useScrollEdges(listEl, horizontal, dir);
+  const [edges, refreshEdges] = useScrollEdges(listEl, horizontal, dir);
 
   const scrollTowards = (side: 'start' | 'end', indicator: HTMLElement) => {
     const el = listEl.current;
@@ -350,6 +355,12 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
     }
     if (typeof el.scrollBy === 'function') el.scrollBy({ left: sign * step, behavior: reduced ? 'auto' : 'smooth' });
     else el.scrollLeft += sign * step;
+    // An instant scroll has already moved: update the indicators in this same event (React flushes
+    // a discrete event's update synchronously), instead of a frame later with the `scroll` event.
+    // Otherwise the indicator that the scroll has just made pointless (the list reached that end)
+    // stays on screen for a frame and can take a second click that does nothing. A smooth scroll
+    // has barely started: its own `scroll` events update the indicators as it goes.
+    if (reduced || typeof el.scrollBy !== 'function') refreshEdges();
   };
   const edge = (side: 'start' | 'end') => {
     // The start indicator fades towards the inline end, and vice versa.
