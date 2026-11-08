@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useCallback,
   useContext,
   useEffect,
   useId,
@@ -16,6 +15,7 @@ import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
+import { useFormResetSync } from '../internal/form-reset-sync';
 import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
@@ -113,45 +113,8 @@ export const Switch = /* @__PURE__ */ forwardRef<HTMLInputElement, SwitchProps>(
     }
   }, [controlled, defaultChecked]);
 
-  // React's value tracker is only updated through the `checked` setter. A cancelled click (or a
-  // form reset) makes the browser change `checked` behind its back, so the next real click would
-  // look like "no change" and onChange would never fire. Re-assigning the same value realigns it.
-  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
-  const later = useCallback((fn: () => void) => {
-    const timer = setTimeout(() => {
-      timers.current.delete(timer);
-      fn();
-    }, 0);
-    timers.current.add(timer);
-  }, []);
-  const realign = useCallback(() => {
-    later(() => {
-      const el = input.current;
-      if (el) {
-        const value = el.checked;
-        el.checked = value;
-      }
-    });
-  }, [later]);
-  useEffect(() => {
-    const pending = timers.current;
-    return () => {
-      pending.forEach(clearTimeout);
-      pending.clear();
-    };
-  }, []);
-  useEffect(() => {
-    const form = input.current?.form;
-    if (!form) return;
-    const onReset = () => {
-      // A controlled control must be put back to `checked` by React once the browser has reset
-      // (same mechanism as RadioGroup): the reset only touches the DOM, never the consumer's state.
-      if (controlled) later(rerender);
-      realign();
-    };
-    form.addEventListener('reset', onReset);
-    return () => form.removeEventListener('reset', onReset);
-  }, [controlled, realign, later]);
+  // A cancelled click or a form reset changes `checked` behind React's back: see `useFormResetSync`.
+  const realign = useFormResetSync(input, { controlled, rerender });
 
   const hasInline = hasContent(children);
   const labelledBy = [fieldProps['aria-labelledby'], hasInline ? inlineId : undefined].filter(Boolean).join(' ');

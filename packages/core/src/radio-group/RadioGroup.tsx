@@ -1,7 +1,6 @@
 import {
   createContext,
   forwardRef,
-  useCallback,
   useContext,
   useEffect,
   useId,
@@ -18,6 +17,7 @@ import {
 import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CapIconSlot } from '../internal/CapIconSlot';
+import { useFormResetSync } from '../internal/form-reset-sync';
 import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
@@ -192,43 +192,9 @@ export const RadioGroup = /* @__PURE__ */ forwardRef<HTMLDivElement, RadioGroupP
     }
   });
 
-  // React's value tracker is only updated through the `checked` setter. A cancelled click (or a
-  // form reset) makes the browser change `checked` behind its back, so the next real click would
-  // look like "no change" and onChange would never fire. Re-assigning the same values realigns it.
-  const timers = useRef(new Set<ReturnType<typeof setTimeout>>());
-  const later = useCallback((fn: () => void) => {
-    const timer = setTimeout(() => {
-      timers.current.delete(timer);
-      fn();
-    }, 0);
-    timers.current.add(timer);
-  }, []);
-  const realign = useCallback(() => {
-    later(() => {
-      container.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach((el) => {
-        const checked = el.checked;
-        el.checked = checked;
-      });
-    });
-  }, [later]);
-  useEffect(() => {
-    const pending = timers.current;
-    return () => {
-      pending.forEach(clearTimeout);
-      pending.clear();
-    };
-  }, []);
-  useEffect(() => {
-    const form = container.current?.closest('form');
-    if (!form) return;
-    const onReset = () => {
-      realign();
-      // A controlled group must be put back to `value` by React once the browser has reset.
-      later(refresh);
-    };
-    form.addEventListener('reset', onReset);
-    return () => form.removeEventListener('reset', onReset);
-  }, [realign, later]);
+  // A cancelled click or a form reset changes `checked` behind React's back: see `useFormResetSync`.
+  // An uncontrolled reset re-renders too, so `data-rop-name` follows the reset selection.
+  const realign = useFormResetSync(container, { controlled, rerender: refresh, rerenderUncontrolled: true });
 
   const state: RadioGroupState = {
     name,
