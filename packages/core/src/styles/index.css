@@ -22,6 +22,12 @@
 @source not '../combobox/use-combobox.ts';
 @source not '../combobox/Combobox.tsx';
 @source not '../combobox/filter.ts';
+/* Same for the MultiSelect (its classes are in internal/multi-select-styles.ts) and the helpers
+   shared with the Combobox. */
+@source not '../multi-select/use-multi-select.ts';
+@source not '../multi-select/MultiSelect.tsx';
+@source not '../internal/keyboard-open.ts';
+@source not '../internal/escape-key.ts';
 /* Same for the headless List Report (no class names, a `filter` option) and the text helper. */
 @source not '../list-report/use-list-report.ts';
 @source not '../list-report/use-list-report-url-state.ts';

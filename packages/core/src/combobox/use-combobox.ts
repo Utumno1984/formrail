@@ -9,6 +9,7 @@ import type {
   MouseEvent,
   Ref,
 } from 'react';
+import { escapeKey } from '../internal/escape-key';
 import { composeRefs } from '../utils/compose-refs';
 import { defaultComboboxFilter } from './filter';
 
@@ -78,11 +79,6 @@ const isDev = (): boolean => {
     return true;
   }
 };
-
-// `aria-activedescendant` is an ID reference list (split on whitespace): keys with spaces or any
-// other unsafe character are escaped injectively (`_` itself too, so two keys never collide).
-const escapeKey = (key: string): string =>
-  key.replace(/[^A-Za-z0-9-]/gu, (char) => `_${char.codePointAt(0)!.toString(16)}_`);
 
 /**
  * Headless synchronous combobox (ARIA "combobox with listbox"): focus stays on the input, the

@@ -24,6 +24,7 @@ import {
 } from '../internal/combobox-styles';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
+import { useKeyboardOpen } from '../internal/keyboard-open';
 import {
   LISTBOX_CONTENT_POPOVER,
   LISTBOX_EMPTY,
@@ -81,31 +82,6 @@ export interface ComboboxProps extends Omit<
 const LIST_KEYS = new Set(['ArrowDown', 'ArrowUp']);
 
 const COLLISION_PADDING = 8;
-
-/**
- * True while the on-screen keyboard covers part of the layout viewport (spec §1.10). The
- * positioning engine already measures the room on the visual viewport, but only re-measures on
- * window resize and scroll, which the keyboard does not fire: the caller switches the popover to
- * per-frame updates while this is true, so the list follows the keyboard coming, growing and going.
- */
-function useKeyboardOpen(active: boolean): boolean {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const vv = typeof window === 'undefined' ? null : window.visualViewport;
-    if (!active || !vv) return undefined;
-    // Pinch-zoom also resizes the visual viewport: the arithmetic is for scale 1 only.
-    const update = () => setOpen(vv.scale === 1 && window.innerHeight - vv.height - vv.offsetTop > 1);
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      setOpen(false);
-    };
-  }, [active]);
-  return open;
-}
 
 /**
  * Synchronous combobox (input + filtered list), built on `useCombobox`: the list is a Popover in a
