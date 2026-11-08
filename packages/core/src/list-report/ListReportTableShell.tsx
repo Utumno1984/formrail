@@ -15,6 +15,7 @@ import {
 import { hasContent, textOf } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
+import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
 import { ListReportTableHead } from './ListReportTableHead';
 import {
   DEFAULT_LABELS,
@@ -168,15 +169,13 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
 
   // The message of a state sits in the visible part of the scroller: its width goes in a CSS variable
   // set on the element itself (no re-render of the table on every resize).
-  useLayoutEffect(() => {
+  useResizeAndMutationEffect(() => {
     const el = containerRef.current;
     if (!messageShown || !el || typeof ResizeObserver === 'undefined') return undefined;
-    el.style.setProperty('--rop-list-report-view-width', `${el.clientWidth}px`);
-    const observer = new ResizeObserver(() => el.style.setProperty('--rop-list-report-view-width', `${el.clientWidth}px`));
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      el.style.removeProperty('--rop-list-report-view-width');
+    return {
+      target: el,
+      update: () => el.style.setProperty('--rop-list-report-view-width', `${el.clientWidth}px`),
+      cleanup: () => el.style.removeProperty('--rop-list-report-view-width'),
     };
   }, [messageShown]);
 
