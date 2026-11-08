@@ -80,6 +80,8 @@ export { RadioGroup, RadioGroupItem } from './radio-group/RadioGroup';
 export type { RadioGroupItemProps, RadioGroupOrientation, RadioGroupProps } from './radio-group/RadioGroup';
 export { Switch } from './switch/Switch';
 export type { SwitchProps } from './switch/Switch';
+export { FileUpload } from './file-upload/FileUpload';
+export type { FileUploadProps, FileUploadLabels, FileRejection } from './file-upload/FileUpload';
 export { Combobox } from './combobox/Combobox';
 export type { ComboboxProps, ComboboxOption, ComboboxSize } from './combobox/Combobox';
 export { useCombobox } from './combobox/use-combobox';
