@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cn } from '../src/index';
-import { parseDerivedTokens } from '../src/utils/token-scale';
+import { paletteOrder, parseDerivedTokens, parseTokenScale } from '../src/utils/token-scale';
 import { customProperties, findGlobalLeaks, stripComments } from './helpers/css-analysis';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -114,6 +114,80 @@ describe('parseDerivedTokens', () => {
 
   it('fails loudly without the block', () => {
     expect(() => parseDerivedTokens('@theme static { --a: 1; }')).toThrow(/no @theme reference block/);
+  });
+
+  it('fails loudly on a second @theme reference block, whatever its other options', () => {
+    expect(() => parseDerivedTokens('@theme reference { --a: 1; } @theme reference { --b: 2; }')).toThrow(
+      /2 @theme reference blocks/,
+    );
+    expect(() => parseDerivedTokens('@theme reference { --a: 1; } @theme inline reference { --b: 2; }')).toThrow(
+      /2 @theme reference blocks/,
+    );
+  });
+
+  it('fails loudly on a nested at-rule or rule instead of truncating the block at its first `}`', () => {
+    expect(() =>
+      parseDerivedTokens('@theme reference { --a: 1; @media (min-width: 1px) { --b: 2; } --c: 3; }'),
+    ).toThrow(/nested rule or at-rule/);
+    expect(() => parseDerivedTokens('@theme reference { @supports (color: red) { --a: 1; } }')).toThrow(
+      /nested rule or at-rule/,
+    );
+  });
+
+  it('a commented-out block or nested rule does not count (comments are stripped first)', () => {
+    const css = '/* @theme reference { --x: 0; } */ @theme reference { --a: 1; /* @media x { } */ }';
+    expect([...parseDerivedTokens(css)]).toEqual([['--a', '1']]);
+  });
+});
+
+describe('paletteOrder', () => {
+  const base = '@theme static { --color-rop-a: #000; --color-rop-b: #111; --color-rop-c: #222; }';
+
+  it('of tokens.css: each derived swatch right after the base colour its formula reads', () => {
+    const order = paletteOrder(tokensCss);
+    const after = (name: string) => order[order.indexOf(`rop-${name}`) + 1];
+    expect(after('surface-subtle')).toBe('rop-surface-pressed');
+    expect(after('surface-pressed')).toBe('rop-readonly-surface');
+    expect(after('text-muted')).toBe('rop-readonly-indicator');
+    expect(after('primary')).toBe('rop-primary-hover');
+    expect(after('primary-hover')).toBe('rop-primary-active');
+    expect(after('error')).toBe('rop-error-hover');
+    expect(after('error-hover')).toBe('rop-error-active');
+    expect([...order].sort()).toEqual([...parseTokenScale(tokensCss).color].sort());
+  });
+
+  it('keeps the declaration order among derived tokens of one base, and chains a derived-of-derived', () => {
+    const css = `${base} @theme reference {
+      --color-rop-a-2: color-mix(in srgb, var(--color-rop-a) 50%, black);
+      --color-rop-b-1: var(--color-rop-b);
+      --color-rop-a-3: var(--color-rop-a-2);
+      --color-rop-a-1: var(--color-rop-a);
+    }`;
+    expect(paletteOrder(css)).toEqual(['rop-a', 'rop-a-2', 'rop-a-3', 'rop-a-1', 'rop-b', 'rop-b-1', 'rop-c']);
+  });
+
+  it('throws on a derived token whose name is not a color token (a wrong name)', () => {
+    expect(() => paletteOrder(`${base} @theme reference { --colour-rop-a-1: var(--color-rop-a); }`)).toThrow(
+      /--colour-rop-a-1 is not a color token/,
+    );
+    expect(() => paletteOrder(`${base} @theme reference { --color-rop-a--hover: var(--color-rop-a); }`)).toThrow(
+      /--color-rop-a--hover is not a color token/,
+    );
+  });
+
+  it('throws on a formula that reads no known color (a wrong anchor)', () => {
+    expect(() => paletteOrder(`${base} @theme reference { --color-rop-x: var(--color-rop-missing); }`)).toThrow(
+      /--color-rop-x .* references no other color token/,
+    );
+    expect(() => paletteOrder(`${base} @theme reference { --color-rop-x: #fff; }`)).toThrow(/references no other color token/);
+    expect(() => paletteOrder(`${base} @theme reference { --color-rop-x: var(--color-rop-x); }`)).toThrow(
+      /references no other color token/,
+    );
+  });
+
+  it('throws on derived tokens that only read each other', () => {
+    const css = `${base} @theme reference { --color-rop-x: var(--color-rop-y); --color-rop-y: var(--color-rop-x); }`;
+    expect(() => paletteOrder(css)).toThrow(/rop-x, rop-y derive from each other in a cycle/);
   });
 });
 
