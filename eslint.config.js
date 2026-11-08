@@ -23,7 +23,7 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: {
       'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'error',
+      'react-hooks/exhaustive-deps': ['error', { additionalHooks: '^useResizeAndMutationEffect$' }],
     },
   },
   {

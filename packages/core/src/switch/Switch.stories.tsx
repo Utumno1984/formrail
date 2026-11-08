@@ -452,3 +452,49 @@ export const AsyncHydration: Story = {
     await expect(args.onCheckedChange).not.toHaveBeenCalled();
   },
 };
+
+/**
+ * A controlled Switch in a form: the native Reset only touches the DOM, so the switch keeps showing the
+ * React state (like RadioGroup), reports nothing, and the next click still reports.
+ */
+export const ControlledInForm: Story = {
+  parameters: NO_CONTROLS,
+  render: ({ onCheckedChange }) => {
+    function Demo() {
+      const [checked, setChecked] = useState(false);
+      const [calls, setCalls] = useState<boolean[]>([]);
+      return (
+        <form style={column}>
+          <Switch
+            name="news"
+            checked={checked}
+            onCheckedChange={(next) => {
+              onCheckedChange(next);
+              setChecked(next);
+              setCalls((previous) => [...previous, next]);
+            }}
+          >
+            Newsletter
+          </Switch>
+          <Button type="reset" variant="secondary">
+            Reset
+          </Button>
+          <output data-testid="state">{String(checked)}</output>
+          <output data-testid="calls">{JSON.stringify(calls)}</output>
+        </form>
+      );
+    }
+    return <Demo />;
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(control(canvasElement));
+    await expect(control(canvasElement)).toBeChecked();
+    await userEvent.click(canvas.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(control(canvasElement)).toBeChecked());
+    await expect(args.onCheckedChange).toHaveBeenCalledTimes(1);
+    await userEvent.click(control(canvasElement));
+    await expect(control(canvasElement)).not.toBeChecked();
+    await expect(args.onCheckedChange).toHaveBeenLastCalledWith(false);
+  },
+};

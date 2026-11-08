@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { cn } from '../utils/cn';
+import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
 import { useObjectPageContext } from './ObjectPageContext';
 import {
   anchorBarClass,
@@ -13,9 +14,6 @@ import {
 import { useScrollSpy } from './use-scroll-spy';
 
 export const STICKY_OFFSET_VAR = '--rop-object-page-sticky-offset';
-
-// `useLayoutEffect` warns on the server; the bar is only rendered once sections registered (client side).
-const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 interface ObjectPageAnchorBarProps {
   label: string;
@@ -40,17 +38,14 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
 
   // Publishes the bar's measured height, which sections use as `scroll-margin-top`; follows resizes
   // (the viewport width changes the bar's height, and so does a font-size change).
-  useIsoLayoutEffect(() => {
+  useResizeAndMutationEffect(() => {
     const scroller = scrollerRef?.current;
     const bar = barRef.current;
     if (!scroller || !bar) return undefined;
-    const publish = () => scroller.style.setProperty(STICKY_OFFSET_VAR, bar.getBoundingClientRect().height + 'px');
-    publish();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publish);
-    observer?.observe(bar);
-    return () => {
-      observer?.disconnect();
-      scroller.style.removeProperty(STICKY_OFFSET_VAR);
+    return {
+      target: bar,
+      update: () => scroller.style.setProperty(STICKY_OFFSET_VAR, bar.getBoundingClientRect().height + 'px'),
+      cleanup: () => scroller.style.removeProperty(STICKY_OFFSET_VAR),
     };
   }, [scrollerRef]);
 
