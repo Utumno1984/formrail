@@ -23,6 +23,21 @@ test.describe('Floorplans/Object Page/Layout', () => {
     });
   }
 
+  for (const width of [640, 700, 768, 900]) {
+    test(`many long header actions are never clipped by the scroller at ${width}px (#310)`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1024 });
+      await gotoStory(page, STORY('many-actions'));
+      const scroller = await page.locator(SCROLLER).boundingBox();
+      for (const name of ['Request more information', 'Put on hold', 'Reject', 'Approve and schedule payment']) {
+        const button = page.getByRole('button', { name });
+        const box = await button.boundingBox();
+        expect(box!.x).toBeGreaterThanOrEqual(scroller!.x);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(scroller!.x + scroller!.width + 1);
+        expect(await button.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+      }
+    });
+  }
+
   test('the root fills a 600px parent and exactly one element scrolls, header included', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('overview'));

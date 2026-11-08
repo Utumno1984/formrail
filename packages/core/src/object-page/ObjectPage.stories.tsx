@@ -189,6 +189,31 @@ export const Overview: Story = {
   ),
 };
 
+/** Many and long action labels: the actions wrap below the title instead of being clipped (e2e covers 640-900px). */
+export const ManyActions: Story = {
+  parameters: NO_CONTROLS,
+  render: () => (
+    <div style={FRAME}>
+      <ObjectPage>
+        <ObjectPageHeader
+          title={LONG_TITLE}
+          subtitle="Supplier: Rossi Construction · Due 30/11/2026"
+          status={statusBadge}
+          actions={
+            <>
+              <Button variant="secondary">Request more information</Button>
+              <Button variant="secondary">Put on hold</Button>
+              <Button variant="secondary">Reject</Button>
+              <Button variant="primary">Approve and schedule payment</Button>
+            </>
+          }
+        />
+        <Sections count={2} />
+      </ObjectPage>
+    </div>
+  ),
+};
+
 /** The same page scrolled to the end: the last section and its field, under the header that has scrolled away. */
 export const ScrolledToEnd: Story = {
   tags: ['visual'],
