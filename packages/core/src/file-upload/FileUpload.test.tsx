@@ -59,13 +59,38 @@ describe('FileUpload: Field wiring', () => {
     expect(button.getAttribute('aria-labelledby')!.split(' ')[1]).toBe(button.id);
     expect(button).toHaveAttribute('data-rop-name', 'attachments');
     expect(button).toHaveAttribute('aria-invalid', 'true');
-    // `aria-required` is not allowed on role button (axe aria-allowed-attr): it is not emitted.
+    // `aria-required` is not allowed on role button (axe aria-allowed-attr): it is not emitted, the
+    // required state reaches assistive technology as a visually hidden description instead.
     expect(button).not.toHaveAttribute('aria-required');
-    expect(button).toHaveAccessibleDescription('Wrong type PDF only');
+    expect(button).toHaveAccessibleDescription('Wrong type PDF only Required');
     expect(button.id).not.toBe('');
     expect(button).not.toHaveAttribute('name');
     expect(button).not.toHaveAttribute('readonly');
     expect(button).not.toHaveAttribute('aria-readonly');
+  });
+
+  it('a required Field adds a visually hidden "Required" to the description (translatable); a non-required one does not', () => {
+    const { rerender } = render(
+      <Field label="Docs" required>
+        <FileUpload />
+      </Field>,
+    );
+    const button = screen.getByRole('button', { name: 'Docs' });
+    expect(button).toHaveAccessibleDescription('Required');
+    expect(screen.getByText('Required', { selector: '.sr-only' })).toBeInTheDocument();
+    rerender(
+      <Field label="Docs" required>
+        <FileUpload labels={{ required: 'Obbligatorio' }} />
+      </Field>,
+    );
+    expect(button).toHaveAccessibleDescription('Obbligatorio');
+    rerender(
+      <Field label="Docs">
+        <FileUpload />
+      </Field>,
+    );
+    expect(button).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText('Required')).toBeNull();
   });
 
   it('outside a Field the button text names it and its own aria-describedby is kept', () => {

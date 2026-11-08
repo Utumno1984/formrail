@@ -294,6 +294,14 @@ test.describe('layout, focus ring and accessibility', () => {
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
   });
 
+  test('required: no aria-required on the button, "Required" in its description', async ({ page }) => {
+    await gotoStory(page, STORY('playground'), 'required:true');
+    await expect(CHOOSE(page)).not.toHaveAttribute('aria-required');
+    await expect(CHOOSE(page)).toHaveAccessibleDescription(/Required/);
+    await gotoStory(page, STORY('playground'));
+    await expect(CHOOSE(page)).not.toHaveAccessibleDescription(/Required/);
+  });
+
   test('no axe violations: empty, with files, invalid and required', async ({ page }) => {
     await gotoStory(page, STORY('playground'), 'invalid:true;required:true');
     await nativeInput(page).setInputFiles([buffer('a.pdf'), buffer('b.pdf')]);

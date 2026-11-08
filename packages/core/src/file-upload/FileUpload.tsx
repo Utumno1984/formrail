@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -34,6 +35,8 @@ export interface FileUploadLabels {
   selectedCount: (count: number) => string;
   /** Accessible name of the list of selected files. */
   listLabel: string;
+  /** Visually hidden text added to the button's description when the Field is required. */
+  required: string;
 }
 
 const DEFAULT_LABELS: FileUploadLabels = {
@@ -42,6 +45,7 @@ const DEFAULT_LABELS: FileUploadLabels = {
   remove: (name) => `Remove ${name}`,
   selectedCount: (count) => (count === 0 ? 'No files selected' : count === 1 ? '1 file selected' : `${count} files selected`),
   listLabel: 'Selected files',
+  required: 'Required',
 };
 
 export interface FileUploadProps
@@ -122,7 +126,9 @@ function droppedFiles(dataTransfer: DataTransfer): File[] {
  *
  * Inside a `Field` the button takes `id`, `aria-describedby` (merged with its own), `aria-invalid`,
  * `disabled` and `data-rop-name` from it, and is named by the Field's label followed by the button
- * text. `aria-required` is not set: it is not allowed on a `button` role (axe `aria-allowed-attr`). `forced` / `locked` (`interactionBlocked`) keep the button focusable but a click
+ * text. `aria-required` is not set (not allowed on a `button` role, axe `aria-allowed-attr`): a
+ * required Field adds a visually hidden "Required" (`labels.required`) to the button's description
+ * instead. `forced` / `locked` (`interactionBlocked`) keep the button focusable but a click
  * (also on the Field's label), Enter, Space and a drop open nothing and change nothing, and the remove
  * buttons are not rendered.
  *
@@ -148,9 +154,12 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
     ...rest
   } = props;
   const control = useContext(FieldContext);
+  const requiredId = useId();
   const fieldProps = useFieldControlProps(rest);
   const blocked = (control?.interactionBlocked ?? false) || !!fieldProps.disabled;
   const labels = useMemo(() => ({ ...DEFAULT_LABELS, ...labelsProp }), [labelsProp]);
+  const required = !!fieldProps['aria-required'];
+  const describedBy = [fieldProps['aria-describedby'], required ? requiredId : undefined].filter(Boolean).join(' ') || undefined;
 
   const controlled = value !== undefined;
   const [internal, setInternal] = useState<readonly File[]>(() => defaultValue ?? []);
@@ -296,7 +305,7 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
           variant="secondary"
           id={fieldProps.id}
           disabled={fieldProps.disabled}
-          aria-describedby={fieldProps['aria-describedby']}
+          aria-describedby={describedBy}
           aria-labelledby={labelledBy || rest['aria-labelledby']}
           aria-invalid={fieldProps['aria-invalid']}
           data-rop-name={fieldProps['data-rop-name']}
@@ -305,6 +314,11 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
         >
           {labels.chooseFiles}
         </Button>
+        {required ? (
+          <span id={requiredId} className="sr-only">
+            {labels.required}
+          </span>
+        ) : null}
         <span aria-hidden="true" className={HINT}>
           {labels.dropHint}
         </span>
