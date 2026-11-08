@@ -281,6 +281,29 @@ test.describe('form', () => {
   });
 });
 
+// #292: controlled in a form. The real Chromium Reset changes only the DOM; the switch must keep
+// showing the React state, report nothing for the reset, and the next real click must still report.
+test.describe('controlled in a form (#292)', () => {
+  test('Reset keeps the switch aligned with the state, reports nothing, and the next click reports', async ({ page }) => {
+    await gotoStory(page, STORY('controlled-in-form'));
+    const sw = toggle(page);
+    // The story's play already ran (on, Reset, off): it ends off with two calls. Drive it again by hand.
+    await expect(calls(page)).toHaveText('[true,false]');
+    await expect(sw).not.toBeChecked();
+    await sw.click();
+    await expect(sw).toBeChecked();
+    await expect(calls(page)).toHaveText('[true,false,true]');
+    await page.getByRole('button', { name: 'Reset' }).click();
+    await expect(page.getByTestId('state')).toHaveText('true');
+    await expect(sw).toBeChecked();
+    await expect(calls(page)).toHaveText('[true,false,true]');
+    await sw.click();
+    await expect(sw).not.toBeChecked();
+    await expect(page.getByTestId('state')).toHaveText('false');
+    await expect(calls(page)).toHaveText('[true,false,true,false]');
+  });
+});
+
 test.describe('layout', () => {
   test('375px: the matrix and the long label do not overflow, the switch stays on top of a wrapped label', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
