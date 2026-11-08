@@ -153,6 +153,7 @@ describe('parseDerivedTokens', () => {
   it('fails loudly on text that is not a declaration instead of dropping it', () => {
     expect(() => parseDerivedTokens('@theme reference { --a: 1 --b: 2; }')).toThrow(/not a declaration/);
     expect(() => parseDerivedTokens('@theme reference { --a: 1; stray; }')).toThrow(/not a declaration/);
+    expect(() => parseDerivedTokens('@theme reference { stray --a: 1; }')).toThrow(/not a declaration/);
     expect(() => parseDerivedTokens('@theme reference { --a: ; }')).toThrow(/not a declaration/);
   });
 });
