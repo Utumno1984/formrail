@@ -17,6 +17,27 @@ test.describe('Primitives/Divider', () => {
     }
   });
 
+  test('vertical-in-toolbar: at 375px the toolbar and the page never exceed the viewport (#312)', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoStory(page, 'primitives-divider--vertical-in-toolbar');
+    const m = await page.evaluate(() => {
+      const toolbar = document.querySelector('[data-testid="toolbar"]')!;
+      const r = toolbar.getBoundingClientRect();
+      const buttons = [...toolbar.querySelectorAll('button')].map((b) => b.getBoundingClientRect().right);
+      return {
+        viewport: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        left: r.left,
+        right: r.right,
+        maxButtonRight: Math.max(...buttons),
+      };
+    });
+    expect(m.scrollWidth).toBeLessThanOrEqual(m.viewport);
+    expect(m.left).toBeGreaterThanOrEqual(0);
+    expect(m.right).toBeLessThanOrEqual(m.viewport);
+    expect(m.maxButtonRight).toBeLessThanOrEqual(m.right);
+  });
+
   test('horizontal: exactly 1px tall, no inset/double border, no browser margins beyond the spacing', async ({ page }) => {
     await gotoStory(page, 'primitives-divider--spacings');
     for (const [spacing, margin] of [['none', 0], ['sm', 8], ['md', 16], ['lg', 24]] as const) {
