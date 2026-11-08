@@ -85,24 +85,27 @@ function ThemingDemo({ preset: initialPreset, customColor: initialColor }: Themi
 
   return (
     <div style={{ maxWidth: 560, display: 'grid', gap: 24, fontFamily: 'var(--font-rop-sans)' }}>
-      <fieldset style={{ ...row, border: 0, padding: 0, margin: 0 }}>
-        <legend style={{ marginBottom: 8, fontWeight: 600 }}>Theme</legend>
+      <div style={{ ...row, alignItems: 'end' }}>
         {/* RadioGroup draws its own indicator (peer-checked), so the selected state does not depend on
-            the browser's native radio rendering (no dot on Chrome Android, #316). */}
-        <RadioGroup aria-label="Theme" orientation="horizontal" value={preset} onValueChange={(v) => setPreset(v as PresetId)}>
-          {(['default', 'violet', 'forest', 'custom'] as const).map((id) => (
-            <RadioGroupItem key={id} value={id}>
-              {id === 'custom' ? 'Custom colour' : PRESETS[id].label}
-            </RadioGroupItem>
-          ))}
-        </RadioGroup>
+            the browser's native radio rendering (no dot on Chrome Android, #316). Named by the Field
+            label only, like every other RadioGroup: no extra fieldset/legend or aria-label, so the
+            group name is announced once. */}
+        <Field label="Theme" reserveMessageSpace={false}>
+          <RadioGroup orientation="horizontal" value={preset} onValueChange={(v) => setPreset(v as PresetId)}>
+            {(['default', 'violet', 'forest', 'custom'] as const).map((id) => (
+              <RadioGroupItem key={id} value={id}>
+                {id === 'custom' ? 'Custom colour' : PRESETS[id].label}
+              </RadioGroupItem>
+            ))}
+          </RadioGroup>
+        </Field>
         {preset === 'custom' ? (
           <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
             Primary
             <input type="color" value={HEX.test(custom) ? custom : '#0a6ed1'} onChange={(e) => setCustom(e.target.value)} />
           </label>
         ) : null}
-      </fieldset>
+      </div>
 
       <div
         data-testid="themed-area"
@@ -234,6 +237,7 @@ export const Switcher: Story = {
   tags: ['visual'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();
     const approve = canvas.getByRole('button', { name: 'Approve' });
     const before = getComputedStyle(approve).backgroundColor;
     await userEvent.click(canvas.getByRole('radio', { name: 'Violet' }));
