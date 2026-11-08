@@ -154,6 +154,10 @@
       "baseline": 11676,
       "limit": 12844
     },
+    "FileUpload": {
+      "baseline": 36105,
+      "limit": 39716
+    },
     "Icon": {
       "baseline": 11037,
       "limit": 12141

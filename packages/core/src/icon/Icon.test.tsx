@@ -240,6 +240,7 @@ describe('internal icons', () => {
       'Divider',
       'Field',
       'FieldMessage',
+      'FileUpload',
       'Icon',
       'Input',
       'ListReport',

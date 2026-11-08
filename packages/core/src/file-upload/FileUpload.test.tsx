@@ -59,7 +59,8 @@ describe('FileUpload: Field wiring', () => {
     expect(button.getAttribute('aria-labelledby')!.split(' ')[1]).toBe(button.id);
     expect(button).toHaveAttribute('data-rop-name', 'attachments');
     expect(button).toHaveAttribute('aria-invalid', 'true');
-    expect(button).toHaveAttribute('aria-required', 'true');
+    // `aria-required` is not allowed on role button (axe aria-allowed-attr): it is not emitted.
+    expect(button).not.toHaveAttribute('aria-required');
     expect(button).toHaveAccessibleDescription('Wrong type PDF only');
     expect(button.id).not.toBe('');
     expect(button).not.toHaveAttribute('name');

@@ -91,7 +91,6 @@ const ROOT = 'flex min-w-0 max-w-full flex-col gap-2 font-rop-sans text-rop-body
 const DROP =
   'flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-rop-md border-2 border-dashed border-rop-border bg-rop-surface p-3 ' +
   'data-[dragging=true]:border-rop-primary data-[dragging=true]:bg-rop-surface-subtle ' +
-  'data-[disabled=true]:opacity-50 ' +
   'motion-safe:[transition-property:background-color,border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
   'forced-colors:data-[dragging=true]:border-[Highlight]';
@@ -122,8 +121,8 @@ function droppedFiles(dataTransfer: DataTransfer): File[] {
  * (picker and drop); rejected files go to `onReject`, which the consumer shows as the `Field`'s error.
  *
  * Inside a `Field` the button takes `id`, `aria-describedby` (merged with its own), `aria-invalid`,
- * `aria-required`, `disabled` and `data-rop-name` from it, and is named by the Field's label followed
- * by the button text. `forced` / `locked` (`interactionBlocked`) keep the button focusable but a click
+ * `disabled` and `data-rop-name` from it, and is named by the Field's label followed by the button
+ * text. `aria-required` is not set: it is not allowed on a `button` role (axe `aria-allowed-attr`). `forced` / `locked` (`interactionBlocked`) keep the button focusable but a click
  * (also on the Field's label), Enter, Space and a drop open nothing and change nothing, and the remove
  * buttons are not rendered.
  *
@@ -273,7 +272,6 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
     <div className={cn(ROOT, className)}>
       <div
         data-dragging={dragging && !blocked ? 'true' : undefined}
-        data-disabled={fieldProps.disabled ? 'true' : undefined}
         className={DROP}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
@@ -301,7 +299,6 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
           aria-describedby={fieldProps['aria-describedby']}
           aria-labelledby={labelledBy || rest['aria-labelledby']}
           aria-invalid={fieldProps['aria-invalid']}
-          aria-required={fieldProps['aria-required']}
           data-rop-name={fieldProps['data-rop-name']}
           form={form}
           onClick={handleClick}
