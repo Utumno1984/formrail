@@ -62,6 +62,12 @@ describe('primary scale tokens', () => {
     expect(token('primary-active')).toEqual(token('blue-800'));
   });
 
+  it('primary-subtle / subtle-hover / muted resolve to blue-50 / 100 / 300 by default', () => {
+    expect(token('primary-subtle')).toEqual(token('blue-50'));
+    expect(token('primary-subtle-hover')).toEqual(token('blue-100'));
+    expect(token('primary-muted')).toEqual(token('blue-300'));
+  });
+
   it('the scale gets monotonically darker from 50 to 800', () => {
     const lum = [50, 100, 200, 300, 400, 500, 600, 700, 800].map((s) => luminance(token(`blue-${s}`)));
     for (let i = 1; i < lum.length; i += 1) expect(lum[i]!).toBeLessThan(lum[i - 1]!);

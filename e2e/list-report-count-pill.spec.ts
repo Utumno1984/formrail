@@ -41,7 +41,7 @@ test.describe('ListReport count pill', () => {
     await gotoStory(page, NO_PLAY);
     const pill = pillLocator(page);
     const rest = await tokenColor(page, '--color-rop-surface-subtle');
-    const strong = await tokenColor(page, '--color-rop-blue-50');
+    const strong = await tokenColor(page, '--color-rop-primary-subtle');
     expect(await pill.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0.12s');
 
     await page.getByRole('radio', { name: 'To approve' }).click();
