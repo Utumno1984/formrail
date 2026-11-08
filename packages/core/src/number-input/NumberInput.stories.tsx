@@ -101,8 +101,10 @@ export const Quantity: Story = {
   ),
   play: async ({ args, canvasElement }) => {
     const input = within(canvasElement).getByRole('spinbutton', { name: /Quantity/ });
-    if (args.fieldState !== 'default') return;
     const { min, max, step } = args;
+    // The script needs four steps of room above 1 (the defaults have it); other Controls values are
+    // left to manual play.
+    if (args.fieldState !== 'default' || min > 1 || stepFrom(1, step, 1, 4, undefined, undefined) > max) return;
     await userEvent.click(input);
     let expected = 1;
     for (let i = 0; i < 3; i++) {

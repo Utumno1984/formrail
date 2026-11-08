@@ -377,6 +377,16 @@ describe('NumberInput: steppers', () => {
     expect(screen.getByRole('button', { name: 'Increase' })).toBeEnabled();
   });
 
+  it('a press on the steppers (a disabled one included, which lets it through to its group) never takes the focus', () => {
+    render(<NumberInput aria-label="Quantity" defaultValue={1} max={1} />);
+    const inc = screen.getByRole('button', { name: 'Increase' });
+    expect(inc).toBeDisabled();
+    expect(inc).toHaveClass('disabled:pointer-events-none');
+    // fireEvent returns false when the default action was prevented.
+    expect(fireEvent.mouseDown(inc.parentElement!)).toBe(false);
+    expect(fireEvent.mouseDown(screen.getByRole('button', { name: 'Decrease' }))).toBe(false);
+  });
+
   it('labels rename the buttons', () => {
     render(<NumberInput aria-label="Quantity" labels={{ increment: 'Aumenta' }} />);
     expect(screen.getByRole('button', { name: 'Aumenta' })).toBeInTheDocument();

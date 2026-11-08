@@ -98,7 +98,7 @@ const ROOT = 'relative flex min-w-0 max-w-full flex-col';
 const STEPPERS = 'absolute inset-y-px end-px flex';
 const STEPPER =
   'm-0 inline-flex w-6 cursor-pointer items-center justify-center rounded-rop-sm border-0 bg-transparent p-0 text-rop-text-muted ' +
-  'not-disabled:rop-hover:text-rop-text disabled:cursor-not-allowed disabled:opacity-50';
+  'not-disabled:rop-hover:text-rop-text disabled:pointer-events-none disabled:opacity-50';
 
 const warn = (message: string) => {
   if (isDev()) console.warn(`[react-object-page] <NumberInput> ${message}`);
@@ -308,7 +308,10 @@ export const NumberInput = /* @__PURE__ */ forwardRef<HTMLInputElement, NumberIn
         }}
         className={cn(INPUT, CONTROL_INVALID, SIZE_CLASS[size], className)}
       />
-      <div className={STEPPERS}>
+      {/* No focus on press, so the focus stays where it is (on the input while typing). A disabled
+          button lets the press through (`pointer-events: none`) to this group, which also blocks it. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div className={STEPPERS} onMouseDown={(event) => event.preventDefault()}>
         {(
           [
             [-1, labels.decrement, atMin, stepperIcons.minus],
@@ -322,8 +325,6 @@ export const NumberInput = /* @__PURE__ */ forwardRef<HTMLInputElement, NumberIn
             aria-label={label}
             aria-controls={fieldProps.id}
             disabled={blocked || atLimit}
-            // The focus stays where it is (on the input while typing): no focus on press.
-            onMouseDown={(event) => event.preventDefault()}
             onClick={() => stepBy(direction, 1)}
             className={STEPPER}
           >
