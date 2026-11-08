@@ -294,6 +294,9 @@ export const MultiSelect = /* @__PURE__ */ forwardRef<HTMLInputElement, MultiSel
             className={cn(MULTI_SELECT_BOX, MULTI_SELECT_SIZE[size], className)}
             data-rop-multi-select=""
             data-disabled={disabled ? '' : undefined}
+            // The chips of a disabled field are inactive text (exempt from the contrast minimum, like
+            // the disabled input next to them).
+            aria-disabled={disabled ? true : undefined}
             data-readonly={fieldProps.readOnly ? '' : undefined}
             data-invalid={invalid ? '' : undefined}
             onMouseDown={onBoxMouseDown}

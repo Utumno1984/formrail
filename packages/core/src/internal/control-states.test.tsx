@@ -117,6 +117,8 @@ describe('className wins over the forced / locked and invalid classes (real merg
     expect(locked).toHaveAttribute('data-invalid');
     expect(locked).not.toHaveAttribute('data-disabled');
     expect(disabled).toHaveAttribute('data-disabled');
+    expect(disabled).toHaveAttribute('aria-disabled', 'true');
+    expect(locked).not.toHaveAttribute('aria-disabled');
     for (const name of ['data-readonly', 'data-invalid', 'data-disabled']) expect(plain).not.toHaveAttribute(name);
   });
 
