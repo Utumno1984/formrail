@@ -53,7 +53,9 @@ export const headerTitleClass = 'min-w-0 [overflow-wrap:anywhere]';
 export const headerTitleFocusClass =
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:2px]';
 export const headerSubtitleClass = 'min-w-0 text-rop-text-muted [overflow-wrap:anywhere]';
-export const headerActionsClass = 'flex min-w-0 flex-wrap items-center gap-2';
+// `sm:shrink-0`: beside the identity block the actions keep their max-content width. Shrunk to
+// min-content (a Button breaks anywhere) a long title squeezes "Approve" into "Appro" / "ve" at tablet width.
+export const headerActionsClass = 'flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0';
 
 // Sections stop below whatever the Anchor Bar will pin at the top (it sets the variable).
 export const sectionClass = 'flex min-w-0 flex-col gap-3';
