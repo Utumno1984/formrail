@@ -334,9 +334,14 @@ export const SmartFilterBarShowcaseActiveFilter: Story = {
   },
 };
 
-/** Visual variant: "New" has opened the Dialog (the Sheet on mobile). */
+/**
+ * Visual variant: "New" has opened the Dialog. Pinned to `dialog` (not `auto`) on every viewport: a Sheet is
+ * full-height by contract, so with this one-field form it would leave a ~70% empty band on mobile (#308). The
+ * Sheet-on-mobile behaviour is covered by the `overlay: auto` e2e and the Sheet stories.
+ */
 export const SmartFilterBarShowcaseOverlayOpen: Story = {
   tags: ['visual', 'visual-viewport-only'],
+  args: { overlay: 'dialog' },
   parameters: { controls: { disable: true } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
