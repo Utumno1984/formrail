@@ -60,9 +60,15 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   loadingRowCount?: number;
   /** Content of the error strip. Default: `labels.error`. */
   errorMessage?: ReactNode;
-  /** Adds a retry button to the error strip. The focus then moves to the table container. */
+  /**
+   * Adds a retry button to the error strip. The focus stays on it while the error stays; when the
+   * strip goes away (now or later, e.g. a reload), the focus moves to the table container.
+   */
   onRetry?: () => void;
-  /** Adds a "clear filters" button to the "no results" state. The focus then moves to the table container. */
+  /**
+   * Adds a "clear filters" button to the "no results" state. Same focus rule as `onRetry`: it moves to
+   * the table container only when the button goes away with the state.
+   */
   onClearFilters?: () => void;
   /** Overrides the texts (partial: the rest keeps the English defaults). */
   labels?: Partial<ListReportTableLabels>;
@@ -174,11 +180,23 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     };
   }, [messageShown]);
 
-  // The button that was clicked disappears with the state: the focus must not fall on the body.
+  // The button of a state (Retry, Clear filters) may disappear with the state it belongs to: then the
+  // focus must not fall on the body, it goes to the container. Only then: while the state (and so the
+  // button) stays, e.g. a retry that fails again or a callback that changes nothing, the focus stays on
+  // the button. Moving it eagerly would draw the container's focus indicator around the whole table (#307).
+  // The action may change the state later (an async reload): the flag waits for the next change of view.
+  const stateActionRan = useRef(false);
+  useLayoutEffect(() => {
+    if (!stateActionRan.current) return;
+    stateActionRan.current = false;
+    const active = document.activeElement;
+    // Only a focus that was lost with the button; one the action moved elsewhere on purpose is kept.
+    if (!active || active === document.body) containerRef.current?.focus();
+  }, [view]);
   const thenFocusContainer = (action: (() => void) | undefined) =>
     action
       ? () => {
-          containerRef.current?.focus();
+          stateActionRan.current = true;
           action();
         }
       : undefined;

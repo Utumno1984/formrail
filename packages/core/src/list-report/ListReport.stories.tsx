@@ -283,7 +283,10 @@ export const NoResults: Story = {
   },
 };
 
-/** Error: the body becomes a strip with "Retry" (the callback shows up in Actions). */
+/**
+ * Error: the body becomes a strip with "Retry" (the callback shows up in Actions). The status stays `error`
+ * after the click, so the button stays and keeps the focus: no focus indicator around the whole table.
+ */
 export const ErrorState: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
@@ -291,8 +294,10 @@ export const ErrorState: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('Unable to load data')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Retry' }));
+    const retry = canvas.getByRole('button', { name: 'Retry' });
+    await userEvent.click(retry);
     await expect(args.onRetry).toHaveBeenCalledTimes(1);
+    await expect(retry).toHaveFocus();
   },
 };
 
