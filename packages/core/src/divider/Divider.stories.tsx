@@ -135,7 +135,7 @@ export const VerticalInToolbar: StoryObj<ToolbarArgs> = {
   tags: ['visual'],
   parameters: { controls: { disable: true } },
   render: () => (
-    <div role="toolbar" aria-label="Formatting" data-testid="toolbar" style={{ display: 'flex', alignItems: 'center', width: 'fit-content', padding: 8, border: '1px solid var(--color-rop-border)' }}>
+    <div role="toolbar" aria-label="Formatting" data-testid="toolbar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', width: 'fit-content', maxWidth: '100%', padding: 8, border: '1px solid var(--color-rop-border)' }}>
       <Button variant="ghost">Bold</Button>
       <Button variant="ghost">Italic</Button>
       <Divider orientation="vertical" />
