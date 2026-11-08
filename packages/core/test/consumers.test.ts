@@ -93,6 +93,7 @@ const EXPORTS = [
   'TabsList',
   'TabsTrigger',
   'Text',
+  'Textarea',
   'Title',
   'ToastProvider',
   'Tooltip',

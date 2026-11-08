@@ -25,6 +25,8 @@ export { ValidationProvider } from './field/ValidationContext';
 export type { ValidationProviderProps } from './field/ValidationContext';
 export { Input } from './input/Input';
 export type { InputProps, InputSize } from './input/Input';
+export { Textarea } from './textarea/Textarea';
+export type { TextareaProps } from './textarea/Textarea';
 export {
   Dialog,
   DialogTrigger,

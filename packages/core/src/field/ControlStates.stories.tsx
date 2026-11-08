@@ -8,6 +8,7 @@ import { Input } from '../input/Input';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { Select } from '../select/Select';
 import { Switch } from '../switch/Switch';
+import { Textarea } from '../textarea/Textarea';
 import { Field, type FieldStateProps } from './Field';
 
 interface MatrixArgs {
@@ -59,6 +60,7 @@ const KINDS = [
   'switch-on',
   'radio',
   'input',
+  'textarea',
   'select',
   'combobox',
 ] as const;
@@ -72,6 +74,7 @@ const KIND_LABEL: Record<Kind, string> = {
   'switch-on': 'Switch, on',
   radio: 'RadioGroup',
   input: 'Input',
+  textarea: 'Textarea',
   select: 'Select',
   combobox: 'Combobox',
 };
@@ -145,6 +148,8 @@ function Control({ kind, own, onChange }: { kind: Kind; own: object; onChange: (
       );
     case 'input':
       return <Input {...own} defaultValue="ACME Ltd" onChange={(event) => onChange(event.currentTarget.value)} />;
+    case 'textarea':
+      return <Textarea {...own} defaultValue="ACME Ltd" onChange={(event) => onChange(event.currentTarget.value)} />;
     case 'select':
       return <Select {...own} options={OPTIONS} defaultValue="it" onValueChange={onChange} />;
     case 'combobox':
@@ -168,7 +173,7 @@ function Cell({ kind, state, withMessages, onChange }: { kind: Kind; state: Stat
 function controlsOf(cell: HTMLElement, kind: Kind): { aria: HTMLElement; box: HTMLElement } {
   const c = within(cell);
   if (kind === 'radio') return { aria: c.getByRole('radiogroup'), box: c.getByRole('radio', { name: 'Yearly' }) };
-  const role = kind.startsWith('checkbox') ? 'checkbox' : kind.startsWith('switch') ? 'switch' : kind === 'input' ? 'textbox' : 'combobox';
+  const role = kind.startsWith('checkbox') ? 'checkbox' : kind.startsWith('switch') ? 'switch' : kind === 'input' || kind === 'textarea' ? 'textbox' : 'combobox';
   const el = c.getByRole(role);
   return { aria: el, box: el };
 }
