@@ -160,7 +160,17 @@ export const Sides: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   render: () => (
-    <Page style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 160, minHeight: 320 }}>
+    <Page
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+        alignItems: 'center',
+        columnGap: 160,
+        rowGap: 96,
+        minHeight: 320,
+      }}
+    >
       {SIDES.map((side) => (
         <Tooltip key={side} content={`Side ${side}`} side={side} open>
           <TrashButton label={`Side ${side}`} />
