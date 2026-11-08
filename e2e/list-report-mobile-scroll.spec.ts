@@ -1,11 +1,28 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
+import { MOBILE_VIEWPORT } from './helpers/viewports';
 
 // #306: documents that the List Report table is horizontally scrollable on mobile and that every
 // column (down to the last one, "Status") is reachable. A first look at the visual baselines
 // suggested a clipped column, but those are post-scroll/post-sort frames and normal cell
 // truncation: there is no layout bug. This test keeps that false alarm from coming back.
-const VIEWPORT = { width: 375, height: 667 };
+const VIEWPORT = MOBILE_VIEWPORT;
+
+/** Opens a docs page; like `gotoStory`, fails loudly if the entry is missing or errors on render. */
+async function gotoDocs(page: Page, docsId: string): Promise<void> {
+  const res = await page.request.get('/index.json');
+  if (!res.ok()) throw new Error(`gotoDocs: cannot read /index.json (HTTP ${res.status()})`);
+  const index = (await res.json()) as { entries?: Record<string, { type?: string }> };
+  if (index.entries?.[docsId]?.type !== 'docs') {
+    throw new Error(`gotoDocs: docs entry "${docsId}" not found in index.json`);
+  }
+  await page.goto(`/iframe.html?id=${encodeURIComponent(docsId)}&viewMode=docs`);
+  await page.waitForSelector('body.sb-show-main, body.sb-show-errordisplay', { state: 'attached' });
+  if ((await page.locator('body.sb-show-errordisplay').count()) > 0) {
+    const message = (await page.locator('#error-message').textContent()) ?? '';
+    throw new Error(`gotoDocs: "${docsId}" failed to render: ${message}`);
+  }
+}
 
 const CASES = [
   {
@@ -14,13 +31,11 @@ const CASES = [
   },
   {
     name: 'SmartFilterBarShowcaseActiveFilter',
-    open: (p: Page) => gotoStory(p, 'floorplans-list-report--smart-filter-bar-showcase-active-filter'),
+    open: (p: Page) => expectPlayToPass(p, 'floorplans-list-report--smart-filter-bar-showcase-active-filter'),
   },
   {
     name: 'Introduction (docs page)',
-    open: async (p: Page) => {
-      await p.goto('/iframe.html?id=introduction--docs&viewMode=docs');
-    },
+    open: (p: Page) => gotoDocs(p, 'introduction--docs'),
   },
 ];
 

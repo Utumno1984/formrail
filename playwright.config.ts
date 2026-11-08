@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { VIEWPORTS } from './e2e/helpers/viewports';
 
 // Overridable so parallel git worktrees can each serve their own build (default 6007).
 const PORT = Number(process.env.PLAYWRIGHT_PORT) || 6007;
@@ -68,13 +69,7 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'] },
     },
     // Viewport grid (spec §1.10): one baseline per story per viewport, viewport fixed.
-    ...(
-      [
-        ['mobile', 375, 667],
-        ['tablet', 768, 1024],
-        ['desktop', 1280, 800],
-      ] as const
-    ).map(([name, width, height]) => ({
+    ...VIEWPORTS.map(([name, width, height]) => ({
       name: `visual-${name}`,
       testDir: './e2e/visual',
       // No retries: a screenshot that fails once and passes on retry would be reported "flaky"
