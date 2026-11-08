@@ -242,7 +242,26 @@ test.describe('Navigation/Tabs: overflow (#309)', () => {
     await expect(edge(page, 'end')).toBeVisible();
   });
 
-  test('rtl: the end indicator is on the left and scrolls towards the end; keyboard reaches every tab', async ({ page }) => {
+  test('text zoom (a larger root font size): one click scrolls a view minus the indicators as rendered @engines', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoStory(page, MANY);
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = '20px';
+    });
+    const list = page.getByRole('tablist');
+    // `w-12` is rem based: 60px at 20px, and still the list's scroll-padding.
+    await expect.poll(() => edge(page, 'end').evaluate((el) => el.getBoundingClientRect().width)).toBeCloseTo(60, 0);
+    const padding = await list.evaluate((el) => parseFloat(getComputedStyle(el).scrollPaddingInlineEnd));
+    expect(padding).toBeCloseTo(60, 0);
+    const { clientWidth, max } = await list.evaluate((el) => ({ clientWidth: el.clientWidth, max: el.scrollWidth - el.clientWidth }));
+    await edge(page, 'end').click();
+    const step = Math.min(clientWidth - 2 * 60, max);
+    await expect.poll(() => list.evaluate((el) => el.scrollLeft)).toBeCloseTo(step, 0);
+    await expectCutEdgesCovered(page);
+  });
+
+  test('rtl: the end indicator is on the left and scrolls towards the end; keyboard reaches every tab @engines', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 375, height: 667 });
     await gotoStory(page, MANY, 'dir:rtl');

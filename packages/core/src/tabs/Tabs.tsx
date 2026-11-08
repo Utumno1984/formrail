@@ -14,6 +14,7 @@ import {
 } from 'react';
 import * as RadixTabs from '@radix-ui/react-tabs';
 import { isDev } from '../internal/is-dev';
+import { scrollFromStart, towardsEndSign } from '../internal/rtl-scroll';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 
@@ -139,8 +140,12 @@ const EDGE =
 // Physical gradient direction, chosen from the computed direction (no `[dir=rtl]` selector).
 const EDGE_TOWARDS_RIGHT = 'bg-linear-to-r';
 const EDGE_TOWARDS_LEFT = 'bg-linear-to-l';
-/** Width of an edge indicator (`w-12`), kept clear by `scroll-px-12` and by the scroll step. */
-const EDGE_PX = 48;
+/**
+ * Width of an edge indicator (`w-12`) only where nothing is laid out (jsdom). In a browser the
+ * scroll step uses the indicator's rendered width instead, so it follows `w-12` / `scroll-px-12`
+ * (rem based) under text zoom or a changed root font size.
+ */
+const EDGE_FALLBACK_PX = 48;
 /** Sub-pixel tolerance: a fractional scroll position at either end does not count as hidden content. */
 const EDGE_EPSILON = 1;
 const CONTENT =
@@ -249,12 +254,15 @@ interface EdgeState {
 
 const NO_EDGES: EdgeState = { start: false, end: false, rtl: false };
 
-/** Which sides of a horizontally scrolling list hide content. RTL scroll positions are negative. */
+/**
+ * Which sides of a horizontally scrolling list hide content. The distance from the inline start is
+ * normalised over the engine's RTL `scrollLeft` convention (negative, reverse or default).
+ */
 function readEdges(list: HTMLElement): EdgeState {
   const rtl = getComputedStyle(list).direction === 'rtl';
   const max = list.scrollWidth - list.clientWidth;
   if (max <= EDGE_EPSILON) return { start: false, end: false, rtl };
-  const offset = Math.abs(list.scrollLeft);
+  const offset = scrollFromStart(list, rtl);
   return { start: offset > EDGE_EPSILON, end: offset < max - EDGE_EPSILON, rtl };
 }
 
@@ -324,14 +332,22 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
   const mergedRef = useMemo(() => composeRefs(ref, listEl), [ref]);
   const edges = useScrollEdges(listEl, horizontal, dir);
 
-  const scrollTowards = (side: 'start' | 'end') => {
+  const scrollTowards = (side: 'start' | 'end', indicator: HTMLElement) => {
     const el = listEl.current;
     if (!el) return;
+    // The indicator's rendered width (rem based: it grows with text zoom), not a copy of it in JS.
+    const edgeWidth = indicator.offsetWidth || EDGE_FALLBACK_PX;
     // One view minus both indicators, so the tab half-hidden under the indicator ends up in clear view.
-    const step = Math.max(el.clientWidth - 2 * EDGE_PX, EDGE_PX);
-    // Towards the inline end is +x in LTR and -x in RTL.
-    const sign = (side === 'end' ? 1 : -1) * (edges.rtl ? -1 : 1);
-    const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const step = Math.max(el.clientWidth - 2 * edgeWidth, edgeWidth);
+    // Towards the inline end is +x in LTR; in RTL it depends on the engine's `scrollLeft` convention.
+    const sign = (side === 'end' ? 1 : -1) * towardsEndSign(edges.rtl);
+    // A `matchMedia` that throws (a restricted embed) must not cost the scroll: smooth, as by default.
+    let reduced = false;
+    try {
+      reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      reduced = false;
+    }
     if (typeof el.scrollBy === 'function') el.scrollBy({ left: sign * step, behavior: reduced ? 'auto' : 'smooth' });
     else el.scrollLeft += sign * step;
   };
@@ -345,7 +361,7 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
         // A press must not take the focus from the tab that has it (the div is not focusable, but
         // a mousedown on it would still move the focus away from that tab).
         onMouseDown={(event) => event.preventDefault()}
-        onClick={() => scrollTowards(side)}
+        onClick={(event) => scrollTowards(side, event.currentTarget)}
         className={cn(EDGE, side === 'start' ? 'start-0 justify-start' : 'end-0 justify-end', towardsRight ? EDGE_TOWARDS_RIGHT : EDGE_TOWARDS_LEFT)}
       >
         <svg
