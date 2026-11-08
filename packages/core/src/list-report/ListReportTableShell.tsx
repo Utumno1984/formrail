@@ -184,8 +184,29 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   // focus must not fall on the body, it goes to the container. Only then: while the state (and so the
   // button) stays, e.g. a retry that fails again or a callback that changes nothing, the focus stays on
   // the button. Moving it eagerly would draw the container's focus indicator around the whole table (#307).
-  // The action may change the state later (an async reload): the flag waits for the next change of view.
+  // The action may change the state later (an async reload): the flag waits for the next change of view,
+  // but only while the focus is still the one the click left on the button. A flag that just lived until
+  // the next change of view would hand the focus to the container at a change the click did not cause
+  // (a poll after the user moved the focus away on purpose): the same ring, only later.
   const stateActionRan = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    // Any focus that leaves an element of the table ends the click's sequence: after it the focus is no
+    // longer the button's to lose (the user or the action moved it). Chromium fires a focusout also when
+    // the focused button is removed, during the removal itself: so the flag is cleared in a microtask,
+    // after the commit that removed the button, whose layout effect below has already used the flag
+    // (React runs removal and layout effects in one synchronous commit). A removal without a change of
+    // view (e.g. `onRetry` dropped) clears it too, instead of leaving it for an unrelated change later.
+    // (Prose here is read by the Tailwind scan of `src/`: no utility names as bare words.)
+    const onFocusOut = () => {
+      queueMicrotask(() => {
+        stateActionRan.current = false;
+      });
+    };
+    el.addEventListener('focusout', onFocusOut);
+    return () => el.removeEventListener('focusout', onFocusOut);
+  }, []);
   useLayoutEffect(() => {
     if (!stateActionRan.current) return;
     stateActionRan.current = false;
@@ -196,7 +217,10 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   const thenFocusContainer = (action: (() => void) | undefined) =>
     action
       ? () => {
-          stateActionRan.current = true;
+          // Only a focus inside the table can be lost with the button: a click that does not focus the
+          // button (e.g. Safari) leaves nothing to restore.
+          const active = document.activeElement;
+          stateActionRan.current = !!active && active !== document.body && !!containerRef.current?.contains(active);
           action();
         }
       : undefined;
