@@ -78,12 +78,15 @@ interface TabsState {
   keepMounted: boolean;
   /** The selected value (controlled or internal), so a panel can tell if it is the active one. */
   current: string | undefined;
+  /** The effective text direction (the `dir` prop, else the inherited one once mounted). */
+  dir: 'ltr' | 'rtl' | undefined;
 }
 
 const TabsContext = /* @__PURE__ */ createContext<TabsState>({
   orientation: 'horizontal',
   keepMounted: false,
   current: undefined,
+  dir: undefined,
 });
 
 // Full literals (Tailwind scan). The selected indicator is a transparent-by-default border of the
@@ -191,7 +194,11 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     const computed = getComputedStyle(parent).direction === 'rtl' ? 'rtl' : 'ltr';
     setInheritedDir((prev) => (prev === computed ? prev : computed));
   }, [rest.dir]);
-  const state = useMemo(() => ({ orientation, keepMounted, current }), [orientation, keepMounted, current]);
+  const dir = rest.dir ?? inheritedDir;
+  const state = useMemo(
+    () => ({ orientation, keepMounted, current, dir }),
+    [orientation, keepMounted, current, dir],
+  );
   // Radix's root is always controlled and needs a string: "nothing selected" is a per-instance
   // value no consumer tab can have (an empty string would select a tab with `value=""`).
   const noSelection = `\u0000rop-no-selection:${useId()}`;
@@ -221,7 +228,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     <TabsContext.Provider value={state}>
       <RadixTabs.Root
         {...rest}
-        dir={rest.dir ?? inheritedDir}
+        dir={dir}
         value={current ?? noSelection}
         onValueChange={handleValueChange}
         orientation={orientation}
@@ -252,11 +259,15 @@ function readEdges(list: HTMLElement): EdgeState {
 }
 
 /**
- * Tracks the hidden sides of the horizontal list: on scroll, on a resize of the list, and on a
+ * Tracks the hidden sides of the horizontal list: on scroll, on a resize of the list, on a
  * resize, addition or removal of a tab (a late web font or a new tab changes the content width
- * without changing the list's box).
+ * without changing the list's box), and on a change of direction (`dir`: same sizes, mirrored sides).
  */
-function useScrollEdges(list: RefObject<HTMLDivElement | null>, enabled: boolean): EdgeState {
+function useScrollEdges(
+  list: RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  dir: 'ltr' | 'rtl' | undefined,
+): EdgeState {
   const [edges, setEdges] = useState<EdgeState>(NO_EDGES);
   useIsomorphicLayoutEffect(() => {
     const el = list.current;
@@ -291,7 +302,7 @@ function useScrollEdges(list: RefObject<HTMLDivElement | null>, enabled: boolean
       resize?.disconnect();
       mutations?.disconnect();
     };
-  }, [enabled]);
+  }, [enabled, dir]);
   return edges;
 }
 
@@ -304,18 +315,14 @@ function useScrollEdges(list: RefObject<HTMLDivElement | null>, enabled: boolean
 export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps>(function TabsList(props, ref) {
   const { className, ...rest } = props;
   const named = Boolean(rest['aria-label'] ?? rest['aria-labelledby']);
-  const { orientation } = useContext(TabsContext);
+  const { orientation, dir } = useContext(TabsContext);
   useEffect(() => {
     if (!named && isDev()) console.error(NO_NAME_WARNING);
   }, [named]);
   const horizontal = orientation === 'horizontal';
   const listEl = useRef<HTMLDivElement>(null);
   const mergedRef = useMemo(() => composeRefs(ref, listEl), [ref]);
-  const edges = useScrollEdges(listEl, horizontal);
-
-  const list = <RadixTabs.List {...rest} ref={mergedRef} data-orientation={orientation} className={cn(LIST, className)} />;
-  // Vertical lists keep their original structure (the list is the flex item of the root).
-  if (!horizontal) return list;
+  const edges = useScrollEdges(listEl, horizontal, dir);
 
   const scrollTowards = (side: 'start' | 'end') => {
     const el = listEl.current;
@@ -358,8 +365,10 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
     );
   };
   return (
-    <div className={SCROLL_BOX} data-rop-tabs-scroll="">
-      {list}
+    // Always rendered, so switching orientation never remounts the tablist (which would drop the
+    // focus); vertical: `contents`, the list stays the flex item of the root as before.
+    <div className={horizontal ? SCROLL_BOX : 'contents'} data-rop-tabs-scroll="">
+      <RadixTabs.List {...rest} ref={mergedRef} data-orientation={orientation} className={cn(LIST, className)} />
       {edges.start ? edge('start') : null}
       {edges.end ? edge('end') : null}
     </div>

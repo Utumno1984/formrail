@@ -677,13 +677,43 @@ describe('Tabs: overflow edge indicators (horizontal)', () => {
     }
   });
 
-  it('vertical lists keep their original structure and never show indicators', () => {
+  it('vertical lists keep their layout (the box is `display: contents`) and never show indicators', () => {
     render(<Demo orientation="vertical" />);
     const list = screen.getByRole('tablist');
-    expect(list.parentElement).not.toHaveAttribute('data-rop-tabs-scroll');
-    expect(list.parentElement).toHaveAttribute('data-rop-tabs');
+    expect(list.parentElement).toHaveAttribute('data-rop-tabs-scroll');
+    expect(list.parentElement).toHaveClass('contents');
+    expect(list.parentElement?.className).toBe('contents');
     setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 150 });
     expect(edge('start')).toBeNull();
     expect(edge('end')).toBeNull();
+  });
+
+  it('switching orientation keeps the same tablist node and the focus on the tab', () => {
+    const { rerender } = render(<Demo />);
+    const list = screen.getByRole('tablist');
+    const tab = screen.getByRole('tab', { name: 'Tab a' });
+    act(() => tab.focus());
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 150 });
+    expect(edge('end')).not.toBeNull();
+    rerender(<Demo orientation="vertical" />);
+    expect(screen.getByRole('tablist')).toBe(list);
+    expect(tab).toHaveFocus();
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).toBeNull();
+    rerender(<Demo orientation="horizontal" />);
+    expect(screen.getByRole('tablist')).toBe(list);
+    expect(tab).toHaveFocus();
+    expect(edge('start')).not.toBeNull();
+  });
+
+  it('a change of `dir` at runtime mirrors the indicators without any scroll or resize', () => {
+    const { rerender } = render(<Demo dir="ltr" />);
+    const list = screen.getByRole('tablist');
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 0 });
+    expect(edge('end')).toHaveClass('bg-linear-to-l');
+    // jsdom does not derive `direction` from the attribute: set it as a browser would.
+    list.style.direction = 'rtl';
+    rerender(<Demo dir="rtl" />);
+    expect(edge('end')).toHaveClass('bg-linear-to-r');
   });
 });
