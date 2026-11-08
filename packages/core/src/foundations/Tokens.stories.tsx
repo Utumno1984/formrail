@@ -22,6 +22,9 @@ const SWATCH_AFTER: [name: string, anchor: string][] = [
   ['rop-surface-pressed', 'rop-surface-subtle'],
   ['rop-primary-hover', 'rop-primary'],
   ['rop-primary-active', 'rop-primary-hover'],
+  ['rop-primary-subtle', 'rop-primary-active'],
+  ['rop-primary-subtle-hover', 'rop-primary-subtle'],
+  ['rop-primary-muted', 'rop-primary-subtle-hover'],
   ['rop-error-hover', 'rop-error'],
   ['rop-error-active', 'rop-error-hover'],
 ];
