@@ -99,9 +99,14 @@ export function decimalPlaces(n: number): number {
   return Math.max(0, fraction - exp);
 }
 
-/** Rounds `n` to `places` decimals through the decimal string, so `0.30000000000000004` → `0.3`. */
+/**
+ * Rounds `n` to `places` decimals through the decimal string, so `0.30000000000000004` → `0.3`.
+ * Never `-0`: a tiny negative noise (`-1e-16`) rounds to `"-0.00"`, which is reported as `0` (the
+ * field would otherwise show `-0`).
+ */
 export function roundTo(n: number, places: number): number {
-  return Number(n.toFixed(Math.min(100, Math.max(0, places))));
+  const rounded = Number(n.toFixed(Math.min(100, Math.max(0, places))));
+  return rounded === 0 ? 0 : rounded;
 }
 
 /** `value` limited to `[min, max]`. When `min > max`, `min` wins. */

@@ -227,6 +227,13 @@ describe('NumberInput: limits', () => {
     warn.mockRestore();
   });
 
+  it('min === max is a valid (fixed) range: no warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(<NumberInput aria-label="Quantity" min={5} max={5} />);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('step %d: warns in dev, 1 is used', async (step) => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const user = userEvent.setup();
@@ -306,6 +313,47 @@ describe('NumberInput: keyboard', () => {
     render(<NumberInput aria-label="Quantity" step={0.01} defaultValue={19.99} onValueChange={onValueChange} />);
     press('ArrowUp');
     expect(onValueChange).toHaveBeenLastCalledWith(20);
+  });
+
+  it('a step that lands on zero through floating-point noise shows 0, never -0', () => {
+    const onValueChange = vi.fn();
+    render(<NumberInput aria-label="Quantity" step={0.07} defaultValue={0.7} onValueChange={onValueChange} />);
+    press('PageDown');
+    expect(onValueChange).toHaveBeenCalledOnce();
+    expect(Object.is(onValueChange.mock.calls[0]![0], 0)).toBe(true);
+    expect(spin()).toHaveValue('0');
+    expect(spin()).toHaveAttribute('aria-valuetext', '0');
+  });
+
+  it('a cleared text is an empty field: the next step starts from min (or 0), not from the old value', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    const { unmount } = render(<NumberInput aria-label="Quantity" min={3} defaultValue={8} onValueChange={onValueChange} />);
+    await user.clear(spin());
+    await user.keyboard('{ArrowUp}');
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith(3);
+    unmount();
+    onValueChange.mockClear();
+    render(<NumberInput aria-label="Quantity" defaultValue={8} onValueChange={onValueChange} />);
+    await user.clear(spin());
+    await user.keyboard('{ArrowUp}');
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith(0);
+  });
+
+  it('from empty with only a max below 0, the first step is limited by max', () => {
+    const onValueChange = vi.fn();
+    render(<NumberInput aria-label="Quantity" max={-5} onValueChange={onValueChange} />);
+    press('ArrowUp');
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith(-5);
+  });
+
+  it('a keydown flagged isComposing (no compositionstart seen) neither commits nor steps', () => {
+    const onValueChange = vi.fn();
+    render(<NumberInput aria-label="Quantity" defaultValue={1} onValueChange={onValueChange} />);
+    fireEvent.change(spin(), { target: { value: '5' } });
+    fireEvent.keyDown(spin(), { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(spin(), { key: 'ArrowUp', isComposing: true });
+    expect(onValueChange).not.toHaveBeenCalled();
   });
 
   it('a step from a pending draft starts from the typed value and commits once', async () => {
@@ -422,6 +470,7 @@ describe('NumberInput: forced / locked block every channel', () => {
     for (const key of ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Enter']) await user.keyboard(`{${key}}`);
     // A synthetic change (what a script or an extension could fire) is ignored too.
     fireEvent.change(input, { target: { value: '3' } });
+    expect(input).toHaveValue('5');
     fireEvent.blur(input);
     const inc = screen.getByRole('button', { name: 'Increase' });
     const dec = screen.getByRole('button', { name: 'Decrease' });
@@ -432,6 +481,20 @@ describe('NumberInput: forced / locked block every channel', () => {
     await user.tab();
     expect(onValueChange).not.toHaveBeenCalled();
     expect(input).toHaveValue('5');
+  });
+
+  it('disabled outside a Field disables the steppers too', () => {
+    const onValueChange = vi.fn();
+    render(<NumberInput aria-label="Quantity" disabled defaultValue={5} min={0} max={10} onValueChange={onValueChange} />);
+    expect(spin()).toBeDisabled();
+    const inc = screen.getByRole('button', { name: 'Increase' });
+    const dec = screen.getByRole('button', { name: 'Decrease' });
+    expect(inc).toBeDisabled();
+    expect(dec).toBeDisabled();
+    fireEvent.click(inc);
+    fireEvent.click(dec);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(spin()).toHaveValue('5');
   });
 
   it('readOnly outside a Field blocks the keys and the steppers too', () => {
@@ -489,6 +552,18 @@ describe('NumberInput: no echo and absent values (§1.13.1)', () => {
     expect(spin()).toHaveValue('');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('is not a finite number: shown as empty'));
     warn.mockRestore();
+  });
+
+  it('value={undefined} is controlled-empty, not uncontrolled: a commit is reported but the text follows the prop', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<NumberInput aria-label="Quantity" value={undefined} onValueChange={onValueChange} />);
+    await user.type(spin(), '5');
+    await user.tab();
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith(5);
+    // The parent did not update `value`: the field stays empty.
+    expect(spin()).toHaveValue('');
+    expect(spin()).not.toHaveAttribute('aria-valuenow');
   });
 
   it('floating-point noise from outside is shown as Intl formats it and not echoed', () => {
@@ -592,6 +667,35 @@ describe('NumberInput: native form', () => {
     expect(spin()).toHaveValue('4');
     expect(new FormData(form).get('qty')).toBe('4');
     expect(onValueChange).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});
+
+describe('NumberInput: native form reset with a pending draft', () => {
+  it('a programmatic form.reset() while typing drops the draft and shows defaultValue', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onValueChange = vi.fn();
+    const { container } = render(
+      <form>
+        <Field label="Quantity" name="qty">
+          <NumberInput defaultValue={4} onValueChange={onValueChange} />
+        </Field>
+      </form>,
+    );
+    const form = container.querySelector('form')!;
+    await user.clear(spin());
+    await user.type(spin(), '42');
+    expect(spin()).toHaveFocus();
+    act(() => {
+      form.reset();
+      vi.runAllTimers();
+    });
+    expect(spin()).toHaveValue('4');
+    // The draft is gone: leaving the field commits nothing.
+    await user.tab();
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(new FormData(form).get('qty')).toBe('4');
     vi.useRealTimers();
   });
 });

@@ -75,6 +75,11 @@ describe('parseNumber (it-IT)', () => {
     },
   );
 
+  it('digits beyond the double range (Infinity) are invalid, not Infinity', () => {
+    expect(it_IT.parse('1'.padEnd(400, '0'))).toEqual({ kind: 'invalid' });
+    expect(it_IT.parse(`-${'9'.repeat(400)}`)).toEqual({ kind: 'invalid' });
+  });
+
   it('-0 is reported as +0', () => {
     const r = it_IT.parse('-0');
     expect(r.kind === 'number' && Object.is(r.value, 0)).toBe(true);
@@ -167,6 +172,19 @@ describe('stepFrom (precision matrix)', () => {
     [3, 0.25, 1, 1, undefined, undefined, 3.25],
   ] as const)('stepFrom(%d, %d, %d, ×%d, [%s, %s]) = %d', (from, step, direction, multiplier, min, max, expected) => {
     expect(stepFrom(from, step, direction, multiplier, min, max)).toBe(expected);
+  });
+
+  it('never returns -0: a step that lands on zero through negative noise gives +0', () => {
+    // 0.7 - 0.07 × 10 is -1e-16, which `toFixed` turns into "-0.00".
+    for (const [from, step, direction] of [
+      [0.7, 0.07, -1],
+      [-0.9, 0.09, 1],
+      [1.4, 0.14, -1],
+    ] as const) {
+      const result = stepFrom(from, step, direction, 10, 0, undefined);
+      expect(Object.is(result, 0), `${from} ${direction > 0 ? '+' : '-'} ${step} × 10`).toBe(true);
+    }
+    expect(Object.is(roundTo(-1e-16, 2), 0)).toBe(true);
   });
 
   it('a run of 100 steps of 0.1 lands exactly on 10', () => {
