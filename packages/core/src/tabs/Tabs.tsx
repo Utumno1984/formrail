@@ -1,6 +1,7 @@
 import {
   createContext,
   forwardRef,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -10,9 +11,11 @@ import {
   useState,
   type ComponentPropsWithoutRef,
   type FocusEvent,
+  type RefObject,
 } from 'react';
 import * as RadixTabs from '@radix-ui/react-tabs';
 import { isDev } from '../internal/is-dev';
+import { scrollFromStart, towardsEndSign } from '../internal/rtl-scroll';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 
@@ -77,12 +80,15 @@ interface TabsState {
   keepMounted: boolean;
   /** The selected value (controlled or internal), so a panel can tell if it is the active one. */
   current: string | undefined;
+  /** The effective text direction (the `dir` prop, else the inherited one once mounted). */
+  dir: 'ltr' | 'rtl' | undefined;
 }
 
 const TabsContext = /* @__PURE__ */ createContext<TabsState>({
   orientation: 'horizontal',
   keepMounted: false,
   current: undefined,
+  dir: undefined,
 });
 
 // Full literals (Tailwind scan). The selected indicator is a transparent-by-default border of the
@@ -93,6 +99,11 @@ const ROOT =
 const LIST =
   'flex min-w-0 shrink-0 data-[orientation=horizontal]:flex-row data-[orientation=horizontal]:overflow-x-auto ' +
   'data-[orientation=horizontal]:border-b data-[orientation=horizontal]:border-rop-border-subtle ' +
+  // Horizontal: the edge indicators replace the native scrollbar (hidden on most platforms anyway,
+  // and a second, inconsistent affordance where it is not). `scroll-padding` keeps a tab brought
+  // into view by the keyboard clear of the indicator that sits over the edge.
+  'data-[orientation=horizontal]:[scrollbar-width:none] data-[orientation=horizontal]:[&::-webkit-scrollbar]:hidden ' +
+  'data-[orientation=horizontal]:scroll-px-12 ' +
   'data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-y-auto ' +
   'data-[orientation=vertical]:border-e data-[orientation=vertical]:border-rop-border-subtle';
 const TRIGGER =
@@ -112,6 +123,32 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),' +
   'textarea:not([disabled]),summary,[contenteditable]:not([contenteditable="false"]),[tabindex]:not([tabindex^="-"])';
 const LABEL ='min-w-0 truncate';
+// Horizontal list only: a positioning box around the tablist, so the edge indicators are not
+// children of `role="tablist"` (which may only own tabs).
+// `isolate`: the indicators' sticky-level layer stays local to this box.
+const SCROLL_BOX = 'relative isolate flex min-w-0 shrink-0 flex-col';
+// An edge indicator: a fade towards the hidden tabs ending in a chevron, shown only on the side
+// where tabs are hidden. Pointer affordance (a click scrolls one view towards that side); keyboard
+// users reach every tab with the arrows, so it is `aria-hidden` and never focusable. It stops 1px
+// above the bottom so the list's own border stays continuous under it.
+const EDGE =
+  // The chevron sits at the outer edge, on the opaque half; the inner half fades the hidden tab out.
+  // No padding on the box: the library has no box-sizing reset, so `w-12` must be its full width
+  // (it matches `scroll-px-12`); the chevron's own margin keeps it off the edge.
+  'absolute top-0 bottom-px z-rop-sticky flex w-12 cursor-pointer select-none items-center text-rop-text-muted ' +
+  'from-rop-surface from-50% to-transparent rop-hover:text-rop-text ' +
+  'forced-colors:bg-none forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]';
+// Physical gradient direction, chosen from the computed direction (no `[dir=rtl]` selector).
+const EDGE_TOWARDS_RIGHT = 'bg-linear-to-r';
+const EDGE_TOWARDS_LEFT = 'bg-linear-to-l';
+/**
+ * Width of an edge indicator (`w-12`) only where nothing is laid out (jsdom). In a browser the
+ * scroll step uses the indicator's rendered width instead, so it follows `w-12` / `scroll-px-12`
+ * (rem based) under text zoom or a changed root font size.
+ */
+const EDGE_FALLBACK_PX = 48;
+/** Sub-pixel tolerance: a fractional scroll position at either end does not count as hidden content. */
+const EDGE_EPSILON = 1;
 const CONTENT =
   'min-w-0 flex-1 data-[state=inactive]:hidden focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:-outline-offset-2';
 
@@ -163,7 +200,11 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     const computed = getComputedStyle(parent).direction === 'rtl' ? 'rtl' : 'ltr';
     setInheritedDir((prev) => (prev === computed ? prev : computed));
   }, [rest.dir]);
-  const state = useMemo(() => ({ orientation, keepMounted, current }), [orientation, keepMounted, current]);
+  const dir = rest.dir ?? inheritedDir;
+  const state = useMemo(
+    () => ({ orientation, keepMounted, current, dir }),
+    [orientation, keepMounted, current, dir],
+  );
   // Radix's root is always controlled and needs a string: "nothing selected" is a per-instance
   // value no consumer tab can have (an empty string would select a tab with `value=""`).
   const noSelection = `\u0000rop-no-selection:${useId()}`;
@@ -193,7 +234,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     <TabsContext.Provider value={state}>
       <RadixTabs.Root
         {...rest}
-        dir={rest.dir ?? inheritedDir}
+        dir={dir}
         value={current ?? noSelection}
         onValueChange={handleValueChange}
         orientation={orientation}
@@ -205,15 +246,160 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
   );
 });
 
-/** The row (or column, when vertical) of tabs. Scrolls on its own axis when it does not fit. */
+interface EdgeState {
+  /** Tabs are hidden past the inline start / end of the list. */
+  start: boolean;
+  end: boolean;
+  rtl: boolean;
+}
+
+const NO_EDGES: EdgeState = { start: false, end: false, rtl: false };
+
+/**
+ * Which sides of a horizontally scrolling list hide content. The distance from the inline start is
+ * normalised over the engine's RTL `scrollLeft` convention (negative, reverse or default).
+ */
+function readEdges(list: HTMLElement): EdgeState {
+  const rtl = getComputedStyle(list).direction === 'rtl';
+  const max = list.scrollWidth - list.clientWidth;
+  if (max <= EDGE_EPSILON) return { start: false, end: false, rtl };
+  const offset = scrollFromStart(list, rtl);
+  return { start: offset > EDGE_EPSILON, end: offset < max - EDGE_EPSILON, rtl };
+}
+
+/**
+ * Tracks the hidden sides of the horizontal list: on scroll, on a resize of the list, on a
+ * resize, addition or removal of a tab (a late web font or a new tab changes the content width
+ * without changing the list's box), and on a change of direction (`dir`: same sizes, mirrored sides).
+ */
+function useScrollEdges(
+  list: RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  dir: 'ltr' | 'rtl' | undefined,
+): [EdgeState, () => void] {
+  const [edges, setEdges] = useState<EdgeState>(NO_EDGES);
+  // Re-reads the edges now, not when the `scroll` event arrives (the next frame): after an instant
+  // `scrollBy` the indicators match the new position before the click that caused it has returned.
+  const refresh = useCallback(() => {
+    const el = list.current;
+    if (!el) return;
+    const next = readEdges(el);
+    setEdges((prev) => (prev.start === next.start && prev.end === next.end && prev.rtl === next.rtl ? prev : next));
+  }, [list]);
+  useIsomorphicLayoutEffect(() => {
+    const el = list.current;
+    if (!enabled || !el) {
+      setEdges(NO_EDGES);
+      return;
+    }
+    refresh();
+    el.addEventListener('scroll', refresh, { passive: true });
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refresh);
+    const observeAll = () => {
+      if (!resize) return;
+      resize.disconnect();
+      resize.observe(el);
+      for (const child of Array.from(el.children)) resize.observe(child);
+    };
+    observeAll();
+    const mutations =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(() => {
+            observeAll();
+            refresh();
+          });
+    mutations?.observe(el, { childList: true });
+    return () => {
+      el.removeEventListener('scroll', refresh);
+      resize?.disconnect();
+      mutations?.disconnect();
+    };
+  }, [enabled, dir, refresh]);
+  return [edges, refresh];
+}
+
+/**
+ * The row (or column, when vertical) of tabs. Scrolls on its own axis when it does not fit; the
+ * focused tab is always brought into view, so every tab is reachable with the arrow keys. A
+ * horizontal list that overflows shows an indicator on each side that hides tabs (a fade ending in
+ * a chevron); clicking it scrolls one view towards that side.
+ */
 export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps>(function TabsList(props, ref) {
   const { className, ...rest } = props;
   const named = Boolean(rest['aria-label'] ?? rest['aria-labelledby']);
-  const { orientation } = useContext(TabsContext);
+  const { orientation, dir } = useContext(TabsContext);
   useEffect(() => {
     if (!named && isDev()) console.error(NO_NAME_WARNING);
   }, [named]);
-  return <RadixTabs.List {...rest} ref={ref} data-orientation={orientation} className={cn(LIST, className)} />;
+  const horizontal = orientation === 'horizontal';
+  const listEl = useRef<HTMLDivElement>(null);
+  const mergedRef = useMemo(() => composeRefs(ref, listEl), [ref]);
+  const [edges, refreshEdges] = useScrollEdges(listEl, horizontal, dir);
+
+  const scrollTowards = (side: 'start' | 'end', indicator: HTMLElement) => {
+    const el = listEl.current;
+    if (!el) return;
+    // The indicator's rendered width (rem based: it grows with text zoom), not a copy of it in JS.
+    const edgeWidth = indicator.offsetWidth || EDGE_FALLBACK_PX;
+    // One view minus both indicators, so the tab half-hidden under the indicator ends up in clear view.
+    const step = Math.max(el.clientWidth - 2 * edgeWidth, edgeWidth);
+    // Towards the inline end is +x in LTR; in RTL it depends on the engine's `scrollLeft` convention.
+    const sign = (side === 'end' ? 1 : -1) * towardsEndSign(edges.rtl);
+    // A `matchMedia` that throws (a restricted embed) must not cost the scroll: smooth, as by default.
+    let reduced = false;
+    try {
+      reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      reduced = false;
+    }
+    if (typeof el.scrollBy === 'function') el.scrollBy({ left: sign * step, behavior: reduced ? 'auto' : 'smooth' });
+    else el.scrollLeft += sign * step;
+    // An instant scroll has already moved: update the indicators in this same event (React flushes
+    // a discrete event's update synchronously), instead of a frame later with the `scroll` event.
+    // Otherwise the indicator that the scroll has just made pointless (the list reached that end)
+    // stays on screen for a frame and can take a second click that does nothing. A smooth scroll
+    // has barely started: its own `scroll` events update the indicators as it goes.
+    if (reduced || typeof el.scrollBy !== 'function') refreshEdges();
+  };
+  const edge = (side: 'start' | 'end') => {
+    // The start indicator fades towards the inline end, and vice versa.
+    const towardsRight = (side === 'start') !== edges.rtl;
+    return (
+      <div
+        aria-hidden="true"
+        data-rop-tabs-edge={side}
+        // A press must not take the focus from the tab that has it (the div is not focusable, but
+        // a mousedown on it would still move the focus away from that tab).
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => scrollTowards(side, event.currentTarget)}
+        className={cn(EDGE, side === 'start' ? 'start-0 justify-start' : 'end-0 justify-end', towardsRight ? EDGE_TOWARDS_RIGHT : EDGE_TOWARDS_LEFT)}
+      >
+        <svg
+          viewBox="0 0 16 16"
+          className="mx-1 size-4 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          focusable="false"
+        >
+          {/* Points at the hidden tabs: left for start in LTR, right for end in LTR, mirrored in RTL. */}
+          <path d={towardsRight ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} />
+        </svg>
+      </div>
+    );
+  };
+  return (
+    // Always rendered, so switching orientation never remounts the tablist (which would drop the
+    // focus); vertical: `contents`, the list stays the flex item of the root as before.
+    <div className={horizontal ? SCROLL_BOX : 'contents'} data-rop-tabs-scroll="">
+      <RadixTabs.List {...rest} ref={mergedRef} data-orientation={orientation} className={cn(LIST, className)} />
+      {edges.start ? edge('start') : null}
+      {edges.end ? edge('end') : null}
+    </div>
+  );
 });
 
 /** One tab. The selected one is drawn with a border of the same width as the others. */
