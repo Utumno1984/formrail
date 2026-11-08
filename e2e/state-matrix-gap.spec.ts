@@ -36,5 +36,9 @@ for (const id of STORIES) {
     expect(result.gaps.length).toBeGreaterThan(5);
     const first = result.gaps[0]!;
     for (const g of result.gaps) expect(Math.abs(g - first)).toBeLessThanOrEqual(1);
+    // Box-to-box too: the grid's own row gap must not drift between entries.
+    expect(result.boxGaps).toHaveLength(result.gaps.length);
+    const firstBox = result.boxGaps[0]!;
+    for (const g of result.boxGaps) expect(Math.abs(g - firstBox)).toBeLessThanOrEqual(1);
   });
 }
