@@ -201,6 +201,23 @@ test.describe('transitions without jumps', () => {
   });
 });
 
+test.describe('a Retry that changes nothing, then the user moves the focus away (#307)', () => {
+  test('a later change of view that the click did not cause does not take the focus to the container', async ({ page }) => {
+    await expectPlayToPass(page, PLAYGROUND, 'status:error;dataset:empty');
+    const retry = page.getByRole('button', { name: 'Retry' });
+    await retry.click();
+    await expect(retry).toBeFocused();
+    // the user clicks an empty area of the page: the focus goes back to body
+    await page.mouse.click(5, 5);
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    // later, a change of state that the click did not cause (a poll, a push)
+    await setArgs(page, PLAYGROUND, { status: 'ready', dataset: '3 rows' });
+    await expect(page.locator('#storybook-root tbody tr:not([aria-hidden])')).toHaveCount(3);
+    await expect(scroller(page)).not.toBeFocused();
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  });
+});
+
 test.describe('"Clear filters"', () => {
   test('is shown only for no results; clicking it calls onClearFilters, shows the rows and keeps the focus on the container', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND, 'dataset:filter that excludes everything');

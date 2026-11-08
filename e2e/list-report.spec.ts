@@ -303,6 +303,26 @@ test.describe('controls', () => {
     await expect(heading(page).getByText('(200)')).toBeHidden();
   });
 
+  // #307: a Retry that leaves the report in the error state keeps the button, so the focus stays on it
+  // (it used to jump to the scroll container, whose focus ring then framed the whole table).
+  test('error state story: after Retry the focus is on Retry, not on the table container', async ({ page }) => {
+    await gotoStory(page, STORY('error-state'));
+    const retry = page.getByRole('button', { name: 'Retry' });
+    await expect(retry).toBeFocused();
+    await expect(scroller(page)).not.toBeFocused();
+    expect(await scroller(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
+  });
+
+  test('status=error: Retry from the keyboard keeps the focus (and the ring) on the button', async ({ page }) => {
+    await gotoStory(page, PLAYGROUND, 'status:error');
+    const retry = page.getByRole('button', { name: 'Retry' });
+    await tabTo(page, retry);
+    await page.keyboard.press('Enter');
+    await expect(retry).toBeFocused();
+    expect(await retry.evaluate((el) => el.matches(':focus-visible'))).toBe(true);
+    expect(await scroller(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
+  });
+
   test('firstSortDirection of "Data": asc or desc at the first click', async ({ page }) => {
     for (const [direction, sort] of [
       ['asc', 'ascending'],

@@ -486,7 +486,11 @@ export const NoResults: Story = {
   },
 };
 
-/** Error: a Message Strip with "Retry" in place of the body; the header stays. */
+/**
+ * Error: a Message Strip with "Retry" in place of the body; the header stays. The play function clicks
+ * "Retry": the callback here changes nothing, so the error and the button stay, and so does the focus
+ * (it moves to the table container only when the strip goes away).
+ */
 export const ErrorState: Story = {
   tags: ['visual'],
   parameters: stateParameters('Load error with `onRetry`.'),
@@ -494,8 +498,10 @@ export const ErrorState: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(within(canvas.getByRole('table')).getByText('Unable to load data')).toBeVisible();
-    await userEvent.click(canvas.getByRole('button', { name: 'Retry' }));
-    await expect(canvas.getByTestId('scroller')).toHaveFocus();
+    const retry = canvas.getByRole('button', { name: 'Retry' });
+    await userEvent.click(retry);
+    await expect(retry).toHaveFocus();
+    await expect(canvas.getByTestId('scroller')).not.toHaveFocus();
   },
 };
 

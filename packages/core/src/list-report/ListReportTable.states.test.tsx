@@ -1,5 +1,5 @@
 import { createRef, useState, type ComponentProps, type Ref } from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ListReportTable } from './ListReportTable';
@@ -152,7 +152,9 @@ describe('ListReportTable empty and no results', () => {
     rerender(<Host filter="none" onClearFilters={onClearFilters} />);
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
-    expect(container()).toHaveFocus();
+    // the callback changes nothing: the button stays, and so does the focus (#307)
+    expect(screen.getByRole('button', { name: 'Clear filters' })).toHaveFocus();
+    expect(container()).not.toHaveFocus();
   });
 
   it('keeps the header and the column widths in the empty state', () => {
@@ -178,12 +180,106 @@ describe('ListReportTable error', () => {
     expect(screen.getAllByRole('columnheader')).toHaveLength(COLUMNS.length);
   });
 
-  it('the Retry button calls onRetry once and moves the focus to the container', async () => {
+  it('the Retry button calls onRetry once; while the error stays the focus stays on it, not on the container (#307)', async () => {
     const onRetry = vi.fn();
     render(<Host status="error" onRetry={onRetry} />);
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
+    expect(container()).not.toHaveFocus();
+  });
+
+  it('a retry that reloads later (async) moves the focus to the container when the strip goes away', async () => {
+    let reload: () => void = () => undefined;
+    function Flow() {
+      const [status, setStatus] = useStatus();
+      reload = () => setStatus('loading');
+      return <Host rows={[]} status={status} onRetry={() => undefined} />;
+    }
+    render(<Flow />);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus();
+    act(() => reload());
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(container()).toHaveFocus();
+  });
+
+  it('a retry that changes nothing, then a blur by the user: a later unrelated change of view does not take the focus from body (#307)', async () => {
+    let update: () => void = () => undefined;
+    function Flow() {
+      const [status, setStatus] = useStatus();
+      update = () => setStatus('ready');
+      return <Host status={status} onRetry={() => undefined} />;
+    }
+    render(<Flow />);
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    await userEvent.click(retry);
+    expect(retry).toHaveFocus();
+    // the user moves the focus away on purpose (e.g. a click on an empty area)
+    await act(async () => retry.blur());
+    expect(document.body).toHaveFocus();
+    // later, in another task, a change of view that the click did not cause (a poll, a websocket push)
+    await act(async () => update());
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(container()).not.toHaveFocus();
+    expect(document.body).toHaveFocus();
+  });
+
+  it('a focusout fired by the removal of the focused button (as Chromium does) still hands the focus to the container', async () => {
+    // jsdom fires nothing when a focused node is removed; Chromium fires a focusout during the removal.
+    const removeChild = Node.prototype.removeChild;
+    vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(this: Node, child: T): T {
+      if (child instanceof Element && child.contains(document.activeElement)) {
+        document.activeElement!.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      }
+      return removeChild.call(this, child) as T;
+    });
+    function Flow() {
+      const [status, setStatus] = useStatus();
+      return <Host rows={[]} status={status} onRetry={() => setStatus('loading')} />;
+    }
+    render(<Flow />);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(container()).toHaveFocus();
+  });
+
+  it('a retry whose button was not focused (a click that does not focus, e.g. Safari) leaves the focus alone when the strip goes away', async () => {
+    let reload: () => void = () => undefined;
+    function Flow() {
+      const [status, setStatus] = useStatus();
+      reload = () => setStatus('loading');
+      return <Host rows={[]} status={status} onRetry={() => undefined} />;
+    }
+    render(<Flow />);
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    // a click event without the focus that a pointer press gives in most browsers
+    act(() => retry.click());
+    expect(document.body).toHaveFocus();
+    act(() => reload());
+    expect(container()).not.toHaveFocus();
+  });
+
+  it('a focus that the retry callback moves elsewhere on purpose is kept', async () => {
+    function Flow() {
+      const [status, setStatus] = useStatus();
+      return (
+        <>
+          <input aria-label="Elsewhere" />
+          <Host
+            rows={[]}
+            status={status}
+            onRetry={() => {
+              screen.getByRole('textbox', { name: 'Elsewhere' }).focus();
+              setStatus('loading');
+            }}
+          />
+        </>
+      );
+    }
+    render(<Flow />);
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(screen.getByRole('textbox', { name: 'Elsewhere' })).toHaveFocus();
   });
 
   it('the focus survives a retry that goes straight back to loading', async () => {
