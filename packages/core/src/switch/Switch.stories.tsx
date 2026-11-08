@@ -300,7 +300,9 @@ export const StateMatrix: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   render: ({ onCheckedChange }) => (
-    <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+    // No reserved error line (`reserveMessageSpace={false}`): the reserved line reads as the gap to the
+    // next Field, and an "invalid" entry fills it with its error, so the gap after it would be narrower.
+    <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
       {[
         { name: 'Off', value: false },
         { name: 'On', value: true },
@@ -308,7 +310,7 @@ export const StateMatrix: Story = {
         [...STATES, 'invalid' as const].map((state) => {
           const props = state === 'invalid' ? ({ error: 'Could not be saved.' } as const) : stateProps(state);
           return (
-            <Field key={`${name}-${state}`} label={`${name} / ${state}`} help="Help text." {...props}>
+            <Field key={`${name}-${state}`} label={`${name} / ${state}`} help="Help text." reserveMessageSpace={false} {...props}>
               <Controlled initial={value} inlineLabel="Inline label" onCheckedChange={onCheckedChange} />
             </Field>
           );

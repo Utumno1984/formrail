@@ -319,12 +319,14 @@ export const StateMatrix: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   render: ({ onValueChange }) => (
-    <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+    // No reserved error line (`reserveMessageSpace={false}`): the reserved line reads as the gap to the
+    // next Field, and an "invalid" entry fills it with its error, so the gap after it would be narrower.
+    <div style={{ display: 'grid', gap: 24, gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
       {(['vertical', 'horizontal'] as const).flatMap((orientation) =>
         [...STATES, 'invalid' as const].map((state) => {
           const props = state === 'invalid' ? ({ error: 'This plan is not available.' } as const) : stateProps(state);
           return (
-            <Field key={`${orientation}-${state}`} label={`${orientation} / ${state}`} help="Help text." {...props}>
+            <Field key={`${orientation}-${state}`} label={`${orientation} / ${state}`} help="Help text." reserveMessageSpace={false} {...props}>
               <Controlled
                 initial="team"
                 orientation={orientation}
