@@ -98,7 +98,7 @@ const LIST =
   // and a second, inconsistent affordance where it is not). `scroll-padding` keeps a tab brought
   // into view by the keyboard clear of the indicator that sits over the edge.
   'data-[orientation=horizontal]:[scrollbar-width:none] data-[orientation=horizontal]:[&::-webkit-scrollbar]:hidden ' +
-  'data-[orientation=horizontal]:scroll-px-8 ' +
+  'data-[orientation=horizontal]:scroll-px-12 ' +
   'data-[orientation=vertical]:flex-col data-[orientation=vertical]:overflow-y-auto ' +
   'data-[orientation=vertical]:border-e data-[orientation=vertical]:border-rop-border-subtle';
 const TRIGGER =
@@ -120,20 +120,24 @@ const FOCUSABLE =
 const LABEL ='min-w-0 truncate';
 // Horizontal list only: a positioning box around the tablist, so the edge indicators are not
 // children of `role="tablist"` (which may only own tabs).
+// `isolate`: the indicators' sticky-level layer stays local to this box.
 const SCROLL_BOX = 'relative isolate flex min-w-0 shrink-0 flex-col';
 // An edge indicator: a fade towards the hidden tabs ending in a chevron, shown only on the side
 // where tabs are hidden. Pointer affordance (a click scrolls one view towards that side); keyboard
 // users reach every tab with the arrows, so it is `aria-hidden` and never focusable. It stops 1px
 // above the bottom so the list's own border stays continuous under it.
 const EDGE =
-  'absolute top-0 bottom-px z-[1] flex w-8 cursor-pointer select-none items-center justify-center text-rop-text-muted ' +
+  // The chevron sits at the outer edge, on the opaque half; the inner half fades the hidden tab out.
+  // No padding on the box: the library has no box-sizing reset, so `w-12` must be its full width
+  // (it matches `scroll-px-12`); the chevron's own margin keeps it off the edge.
+  'absolute top-0 bottom-px z-rop-sticky flex w-12 cursor-pointer select-none items-center text-rop-text-muted ' +
   'from-rop-surface from-50% to-transparent rop-hover:text-rop-text ' +
   'forced-colors:bg-none forced-colors:bg-[Canvas] forced-colors:text-[CanvasText]';
 // Physical gradient direction, chosen from the computed direction (no `[dir=rtl]` selector).
 const EDGE_TOWARDS_RIGHT = 'bg-linear-to-r';
 const EDGE_TOWARDS_LEFT = 'bg-linear-to-l';
-/** Width of an edge indicator (`w-8`), kept clear by `scroll-px-8` and by the scroll step. */
-const EDGE_PX = 32;
+/** Width of an edge indicator (`w-12`), kept clear by `scroll-px-12` and by the scroll step. */
+const EDGE_PX = 48;
 /** Sub-pixel tolerance: a fractional scroll position at either end does not count as hidden content. */
 const EDGE_EPSILON = 1;
 const CONTENT =
@@ -332,14 +336,14 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
         aria-hidden="true"
         data-rop-tabs-edge={side}
         // A press must not take the focus from the tab that has it (the div is not focusable, but
-        // a mousedown on it would still blur the focused tab).
+        // a mousedown on it would still move the focus away from that tab).
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => scrollTowards(side)}
-        className={cn(EDGE, side === 'start' ? 'start-0' : 'end-0', towardsRight ? EDGE_TOWARDS_RIGHT : EDGE_TOWARDS_LEFT)}
+        className={cn(EDGE, side === 'start' ? 'start-0 justify-start' : 'end-0 justify-end', towardsRight ? EDGE_TOWARDS_RIGHT : EDGE_TOWARDS_LEFT)}
       >
         <svg
           viewBox="0 0 16 16"
-          className="size-4 shrink-0"
+          className="mx-1 size-4 shrink-0"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"

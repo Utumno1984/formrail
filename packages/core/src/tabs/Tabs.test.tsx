@@ -539,3 +539,151 @@ describe('Tabs', () => {
     expect(screen.getByRole('tab', { name: 'Tab c' })).toHaveAttribute('aria-selected', 'true');
   });
 });
+
+describe('Tabs: overflow edge indicators (horizontal)', () => {
+  /** jsdom has no layout: give the tablist a scroll geometry and report it with a scroll event. */
+  function setGeometry(list: HTMLElement, { scrollWidth, clientWidth, scrollLeft }: Record<string, number>) {
+    Object.defineProperty(list, 'scrollWidth', { configurable: true, value: scrollWidth });
+    Object.defineProperty(list, 'clientWidth', { configurable: true, value: clientWidth });
+    list.scrollLeft = scrollLeft!;
+    act(() => {
+      list.dispatchEvent(new Event('scroll'));
+    });
+  }
+  const edge = (side: 'start' | 'end') => document.querySelector<HTMLElement>(`[data-rop-tabs-edge="${side}"]`);
+
+  it('no indicator when the tabs fit; the tablist keeps ref, className and props inside a positioning box', () => {
+    const ref = createRef<HTMLDivElement>();
+    render(
+      <Tabs defaultValue="a">
+        <TabsList aria-label="Sections" ref={ref} className="custom" data-testid="list">
+          <TabsTrigger value="a">A</TabsTrigger>
+        </TabsList>
+      </Tabs>,
+    );
+    const list = screen.getByRole('tablist');
+    expect(ref.current).toBe(list);
+    expect(list).toHaveClass('custom');
+    expect(list).toHaveAttribute('data-testid', 'list');
+    expect(list.parentElement).toHaveAttribute('data-rop-tabs-scroll');
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).toBeNull();
+  });
+
+  it('shows the indicator only on the side that hides tabs, following the scroll position', () => {
+    render(<Demo />);
+    const list = screen.getByRole('tablist');
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 0 });
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).not.toBeNull();
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 150 });
+    expect(edge('start')).not.toBeNull();
+    expect(edge('end')).not.toBeNull();
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 300 });
+    expect(edge('start')).not.toBeNull();
+    expect(edge('end')).toBeNull();
+    // A sub-pixel remainder at either end is not hidden content.
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 299.5 });
+    expect(edge('end')).toBeNull();
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 0.5 });
+    expect(edge('start')).toBeNull();
+    // Content that fits again: no indicator at all.
+    setGeometry(list, { scrollWidth: 300, clientWidth: 300, scrollLeft: 0 });
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).toBeNull();
+  });
+
+  it('the indicators are hidden from assistive technology, not focusable, outside the tablist, and keep the focus', () => {
+    render(<Demo />);
+    const list = screen.getByRole('tablist');
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 150 });
+    for (const side of ['start', 'end'] as const) {
+      const el = edge(side)!;
+      expect(el).toHaveAttribute('aria-hidden', 'true');
+      expect(el).not.toHaveAttribute('tabindex');
+      expect(el.tagName).toBe('DIV');
+      expect(list.contains(el)).toBe(false);
+    }
+    // The tablist still owns only tabs.
+    expect(Array.from(list.children).every((c) => c.getAttribute('role') === 'tab')).toBe(true);
+    const tab = screen.getByRole('tab', { name: 'Tab a' });
+    act(() => tab.focus());
+    const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    edge('end')!.dispatchEvent(press);
+    expect(press.defaultPrevented).toBe(true);
+    expect(tab).toHaveFocus();
+  });
+
+  it('a click scrolls one view (minus both indicators) towards that side; mirrored in RTL', async () => {
+    const user = userEvent.setup();
+    const calls: Array<{ left?: number; behavior?: ScrollBehavior }> = [];
+    const scrollBy = vi.fn((opts: ScrollToOptions) => calls.push({ left: opts.left, behavior: opts.behavior }));
+    const { unmount } = render(<Demo />);
+    let list = screen.getByRole('tablist');
+    Object.defineProperty(list, 'scrollBy', { configurable: true, value: scrollBy });
+    setGeometry(list, { scrollWidth: 900, clientWidth: 300, scrollLeft: 150 });
+    await user.click(edge('end')!);
+    await user.click(edge('start')!);
+    expect(calls.map((c) => c.left)).toEqual([300 - 96, -(300 - 96)]);
+    expect(calls[0]?.behavior).toBe('smooth');
+    unmount();
+
+    // RTL: Chromium reports scroll positions as 0 at the start and negative towards the end.
+    calls.length = 0;
+    render(
+      <div dir="rtl" style={{ direction: 'rtl' }}>
+        <Demo dir="rtl" />
+      </div>,
+    );
+    list = screen.getByRole('tablist');
+    Object.defineProperty(list, 'scrollBy', { configurable: true, value: scrollBy });
+    setGeometry(list, { scrollWidth: 900, clientWidth: 300, scrollLeft: 0 });
+    // Nothing hidden at the start (the right edge), tabs hidden towards the end (the left edge).
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).not.toBeNull();
+    // The end indicator sits at the inline end (the left edge in RTL), solid there and fading
+    // towards the tabs on its right.
+    expect(edge('end')).toHaveClass('end-0', 'bg-linear-to-r');
+    await user.click(edge('end')!);
+    expect(calls.map((c) => c.left)).toEqual([-(300 - 96)]);
+    setGeometry(list, { scrollWidth: 900, clientWidth: 300, scrollLeft: -600 });
+    expect(edge('start')).toHaveClass('start-0', 'bg-linear-to-l');
+    expect(edge('end')).toBeNull();
+  });
+
+  it('LTR: the start indicator is solid at the left edge, the end one at the right edge', () => {
+    render(<Demo />);
+    const list = screen.getByRole('tablist');
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 150 });
+    expect(edge('start')).toHaveClass('start-0', 'bg-linear-to-r');
+    expect(edge('end')).toHaveClass('end-0', 'bg-linear-to-l');
+  });
+
+  it('prefers-reduced-motion: the click scrolls without smooth behaviour', async () => {
+    const user = userEvent.setup();
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({ matches: query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      const scrollBy = vi.fn();
+      render(<Demo />);
+      const list = screen.getByRole('tablist');
+      Object.defineProperty(list, 'scrollBy', { configurable: true, value: scrollBy });
+      setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 0 });
+      await user.click(edge('end')!);
+      expect(scrollBy).toHaveBeenCalledWith({ left: 300 - 96, behavior: 'auto' });
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('vertical lists keep their original structure and never show indicators', () => {
+    render(<Demo orientation="vertical" />);
+    const list = screen.getByRole('tablist');
+    expect(list.parentElement).not.toHaveAttribute('data-rop-tabs-scroll');
+    expect(list.parentElement).toHaveAttribute('data-rop-tabs');
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 150 });
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).toBeNull();
+  });
+});

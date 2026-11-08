@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
 import { Tabs, TabsContent, TabsList, TabsTrigger, type TabsProps } from './Tabs';
 
@@ -134,10 +134,40 @@ export const Manual: Story = {
   },
 };
 
-/** 12 tabs: the list scrolls on its own, the page does not (see the 375px visual). */
+/**
+ * 12 tabs: the list scrolls on its own, the page does not. Each side that hides tabs shows an
+ * indicator (a fade ending in a chevron); clicking it scrolls one view towards that side. The arrow
+ * keys bring the focused tab into view, clear of the indicators.
+ */
 export const ManyTabs: Story = {
   tags: ['visual'],
   args: { tabCount: 12 },
+};
+
+/**
+ * The play function walks the overflowing list with the keyboard: after the first arrow presses
+ * the list has scrolled (the start indicator appears), and End reaches the last tab, shown whole,
+ * with no end indicator left. The picture is that final state.
+ */
+export const ManyTabsKeyboard: Story = {
+  tags: ['visual'],
+  args: { tabCount: 12 },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const edge = (side: 'start' | 'end') => canvasElement.querySelector(`[data-rop-tabs-edge="${side}"]`);
+    await expect(edge('end')).not.toBeNull();
+    await expect(edge('start')).toBeNull();
+    await userEvent.click(canvas.getByRole('tab', { name: 'Overview' }));
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}{ArrowRight}');
+    await expect(canvas.getByRole('tab', { name: 'Contacts' })).toHaveFocus();
+    await expect(args.onValueChange).toHaveBeenLastCalledWith('tab-8');
+    await waitFor(() => expect(edge('start')).not.toBeNull());
+    await userEvent.keyboard('{End}');
+    const last = canvas.getByRole('tab', { name: 'Archive' });
+    await expect(last).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(edge('end')).toBeNull());
+    await expect(canvas.getByRole('tabpanel')).toHaveTextContent('Archive panel');
+  },
 };
 
 /** Visual: horizontal. */
