@@ -206,6 +206,10 @@
       "baseline": 14440,
       "limit": 15885
     },
+    "MultiSelect": {
+      "baseline": 43561,
+      "limit": 47918
+    },
     "ObjectPage": {
       "baseline": 14052,
       "limit": 15458

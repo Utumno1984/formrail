@@ -1,5 +1,5 @@
 // Class strings of the MultiSelect, kept apart from `multi-select/MultiSelect.tsx` because that file
-// is excluded from the Tailwind scan (its `filter` option would be read as the `filter` utility; see
+// is excluded from the Tailwind scan (a prop named like a utility would generate it; see
 // styles/index.css). Full literals: the CSS build scans the sources for utilities. The popover and
 // its options are the Combobox's (`listbox-styles.ts`, `combobox-styles.ts`).
 

@@ -360,6 +360,11 @@ export const MultiSelect = /* @__PURE__ */ forwardRef<HTMLInputElement, MultiSel
             updatePositionStrategy={keyboardOpen ? 'always' : 'optimized'}
             onOpenAutoFocus={(event) => event.preventDefault()}
             onCloseAutoFocus={(event) => event.preventDefault()}
+            // Radix dismisses on Escape from a capture listener, before the input's handler: an
+            // Escape that belongs to an IME composition must not close the list.
+            onEscapeKeyDown={(event) => {
+              if (event.isComposing || event.keyCode === 229 || state.isComposing()) event.preventDefault();
+            }}
             // A press inside the field (input, chip, remove button) is not "outside".
             onInteractOutside={(event) => {
               if (anchorRef.current?.contains(event.target as Node)) event.preventDefault();

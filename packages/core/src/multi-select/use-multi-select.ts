@@ -54,6 +54,8 @@ export interface UseMultiSelectReturn {
   remove: (value: string) => void;
   /** Drops the typed text without any callback (form reset). */
   clearText: () => void;
+  /** True between `compositionstart` and `compositionend` (or the blur). */
+  isComposing: () => boolean;
   inputRef: { readonly current: HTMLInputElement | null };
 }
 
@@ -300,6 +302,7 @@ export function useMultiSelect({ options, values, onChange, filter }: UseMultiSe
     close,
     remove,
     clearText: () => setText(''),
+    isComposing: () => composing.current,
     inputRef,
   };
 }
