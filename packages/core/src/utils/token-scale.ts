@@ -38,6 +38,7 @@ export function parseTokenScale(css: string): TokenScale {
  * Throws unless the source has exactly one `@theme reference` block (whatever other options it
  * carries) and that block holds plain declarations only: a nested at-rule or rule (`@media`,
  * `@supports`, ...) would end the block at its first `}` and drop the declarations after it.
+ * Also throws if the block is never closed or holds text that is not a `--name: value` declaration.
  */
 export function parseDerivedTokens(css: string): Map<string, string> {
   const source = stripComments(css);
@@ -52,7 +53,19 @@ export function parseDerivedTokens(css: string): Map<string, string> {
   if (block.includes('{')) {
     throw new Error('parseDerivedTokens: the @theme reference block holds a nested rule or at-rule; only declarations are supported');
   }
-  return new Map([...block.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1] as string, m[2] as string]));
+  // Every `;`-separated segment must be one declaration (the `;` after the last one is optional
+  // in CSS). A value that itself contains `--name:` is two declarations missing the `;` between them.
+  const tokens = new Map<string, string>();
+  for (const segment of block.split(';')) {
+    const text = segment.trim();
+    if (text === '') continue;
+    const match = /^(--[a-z0-9-]+)\s*:\s*(\S[\s\S]*)$/.exec(text);
+    if (match === null || /--[a-z0-9-]+\s*:/.test(match[2] as string)) {
+      throw new Error(`parseDerivedTokens: "${text}" in the @theme reference block is not a declaration`);
+    }
+    tokens.set(match[1] as string, match[2] as string);
+  }
+  return tokens;
 }
 
 /**

@@ -138,6 +138,23 @@ describe('parseDerivedTokens', () => {
     const css = '/* @theme reference { --x: 0; } */ @theme reference { --a: 1; /* @media x { } */ }';
     expect([...parseDerivedTokens(css)]).toEqual([['--a', '1']]);
   });
+
+  it('fails loudly on a block that is never closed', () => {
+    expect(() => parseDerivedTokens('@theme reference { --a: 1;')).toThrow(/is not closed/);
+  });
+
+  it('reads a last declaration without its optional `;`', () => {
+    expect([...parseDerivedTokens('@theme reference { --a: 1; --b: var(--a) }')]).toEqual([
+      ['--a', '1'],
+      ['--b', 'var(--a)'],
+    ]);
+  });
+
+  it('fails loudly on text that is not a declaration instead of dropping it', () => {
+    expect(() => parseDerivedTokens('@theme reference { --a: 1 --b: 2; }')).toThrow(/not a declaration/);
+    expect(() => parseDerivedTokens('@theme reference { --a: 1; stray; }')).toThrow(/not a declaration/);
+    expect(() => parseDerivedTokens('@theme reference { --a: ; }')).toThrow(/not a declaration/);
+  });
 });
 
 describe('paletteOrder', () => {
@@ -164,6 +181,15 @@ describe('paletteOrder', () => {
       --color-rop-a-1: var(--color-rop-a);
     }`;
     expect(paletteOrder(css)).toEqual(['rop-a', 'rop-a-2', 'rop-a-3', 'rop-a-1', 'rop-b', 'rop-b-1', 'rop-c']);
+  });
+
+  it('places a last derived token declared without `;` after its base', () => {
+    const css = `${base} @theme reference {
+      --color-rop-a-2: var(--color-rop-a);
+      --color-rop-b-1: var(--color-rop-b);
+      --color-rop-a-1: var(--color-rop-a)
+    }`;
+    expect(paletteOrder(css)).toEqual(['rop-a', 'rop-a-2', 'rop-a-1', 'rop-b', 'rop-b-1', 'rop-c']);
   });
 
   it('throws on a derived token whose name is not a color token (a wrong name)', () => {
