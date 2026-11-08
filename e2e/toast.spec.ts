@@ -253,6 +253,24 @@ test.describe('mobile and keyboard', () => {
     );
   });
 
+  for (const name of ['tones', 'variants', 'long-text']) {
+    test(`${name}: at 375px the page heading and text stay clear of the toasts`, async ({ page }) => {
+      await expectPlayToPass(page, STORY(name));
+      const heading = await page.getByRole('heading', { name: 'Supplier note' }).boundingBox();
+      const text = await page.getByText('Type in the field and save').boundingBox();
+      const toasts = await page.locator('[data-state="open"]').all();
+      expect(heading).not.toBeNull();
+      expect(text).not.toBeNull();
+      expect(toasts.length).toBeGreaterThan(0);
+      for (const toast of toasts) {
+        const box = (await toast.boundingBox())!;
+        // No overlap with the heading, and a visible gap under the descriptive text.
+        expect(box.y).toBeGreaterThanOrEqual(heading!.y + heading!.height);
+        expect(box.y).toBeGreaterThanOrEqual(text!.y + text!.height + 8);
+      }
+    });
+  }
+
   test('the lower edge stays above --rop-keyboard-inset', async ({ page }) => {
     await expectPlayToPass(page, STORY('playground'), 'duration:persistent');
     await save(page).click();
