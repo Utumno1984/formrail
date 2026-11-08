@@ -66,6 +66,7 @@ const EXPORTS = [
   'MenuSeparator',
   'MenuTrigger',
   'MessageStrip',
+  'NumberInput',
   'ObjectPage',
   'ObjectPageFooter',
   'ObjectPageHeader',

@@ -12,15 +12,30 @@ export interface NumberLocale {
 
 export type ParseResult = { kind: 'empty' } | { kind: 'invalid' } | { kind: 'number'; value: number };
 
-const chars = (...codes: number[]) => String.fromCharCode(...codes);
-// `-`, U+2212 MINUS SIGN, U+2012..U+2014 dashes, U+FE63 / U+FF0D: what some locales format or keyboards type.
-const MINUS_SIGNS = '-' + chars(0x2212, 0x2012, 0x2013, 0x2014, 0xfe63, 0xff0d);
 const ASCII_DIGITS = '0123456789';
-// Spaces a paste may carry around the number: NBSP (U+00A0) and narrow NBSP (U+202F) included.
-const SPACES = chars(0xa0, 0x202f);
-const EDGE_SPACE = new RegExp(`^[\\s${SPACES}]+|[\\s${SPACES}]+$`, 'g');
-// Directional marks some locales put around the sign: ALM (U+061C, `ar-EG`), LRM/RLM (U+200E/F).
-const BIDI_MARKS = new RegExp(`[${chars(0x061c, 0x200e, 0x200f)}]`, 'g');
+
+interface Patterns {
+  minusSigns: string;
+  edgeSpace: RegExp;
+  bidiMarks: RegExp;
+}
+let patternsCache: Patterns | undefined;
+// Built on first use, not at module level: a top-level call is not tree-shakable, so it would stay
+// in the bundle of every export (bundle budget).
+function patterns(): Patterns {
+  if (patternsCache) return patternsCache;
+  const chars = (...codes: number[]) => String.fromCharCode(...codes);
+  // Spaces a paste may carry around the number: NBSP (U+00A0) and narrow NBSP (U+202F) included.
+  const spaces = chars(0xa0, 0x202f);
+  patternsCache = {
+    // `-`, U+2212 MINUS SIGN, U+2012..U+2014 dashes, U+FE63 / U+FF0D: what some locales format or keyboards type.
+    minusSigns: '-' + chars(0x2212, 0x2012, 0x2013, 0x2014, 0xfe63, 0xff0d),
+    edgeSpace: new RegExp(`^[\\s${spaces}]+|[\\s${spaces}]+$`, 'g'),
+    // Directional marks some locales put around the sign: ALM (U+061C, `ar-EG`), LRM/RLM (U+200E/F).
+    bidiMarks: new RegExp(`[${chars(0x061c, 0x200e, 0x200f)}]`, 'g'),
+  };
+  return patternsCache;
+}
 
 /**
  * Builds the locale rules. `locale` must already be resolved (`resolveLocale`): `undefined` is the
@@ -50,10 +65,11 @@ export function createNumberLocale(locale: string | undefined): NumberLocale {
  * character, and a lone `-`. Surrounding whitespace is ignored; only whitespace is `empty`.
  */
 export function parseNumber(text: string, decimal: string, digits: ReadonlyMap<string, string> = new Map()): ParseResult {
-  let s = text.replace(BIDI_MARKS, '').replace(EDGE_SPACE, '');
+  const { bidiMarks, edgeSpace, minusSigns } = patterns();
+  let s = text.replace(bidiMarks, '').replace(edgeSpace, '');
   if (s === '') return { kind: 'empty' };
   let negative = false;
-  if (MINUS_SIGNS.includes(s[0]!)) {
+  if (minusSigns.includes(s[0]!)) {
     negative = true;
     s = s.slice(1);
   }

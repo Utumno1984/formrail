@@ -5,6 +5,7 @@ import { Checkbox } from '../checkbox/Checkbox';
 import { Combobox } from '../combobox/Combobox';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { NumberInput } from '../number-input/NumberInput';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { Select } from '../select/Select';
 import { Switch } from '../switch/Switch';
@@ -82,6 +83,27 @@ describe('className wins over the forced / locked and invalid classes (real merg
       expect(cls).toContain('read-only:not-disabled:border-solid');
       expect(cls).not.toContain('read-only:not-disabled:border-dashed');
     }
+  });
+
+  it('NumberInput: a consumer border style and invalid border replace the read-only and invalid ones', () => {
+    render(<NumberInput aria-label="number" className="read-only:not-disabled:border-solid aria-invalid:border-rop-warning" />);
+    const cls = classes(screen.getByRole('spinbutton', { name: 'number' }));
+    expect(cls).toContain('read-only:not-disabled:border-solid');
+    expect(cls).not.toContain('read-only:not-disabled:border-dashed');
+    expect(cls).toContain('aria-invalid:border-rop-warning');
+    expect(cls).not.toContain('aria-invalid:border-rop-error');
+  });
+
+  it.each(['forced', 'locked'] as const)('NumberInput %s: read-only look classes and disabled steppers', (state) => {
+    render(
+      <Field label="Qty" state={state} stateReason="Reason.">
+        <NumberInput defaultValue={1} />
+      </Field>,
+    );
+    const input = screen.getByRole('spinbutton', { name: 'Qty' });
+    expect(classes(input)).toContain('read-only:not-disabled:border-dashed');
+    expect(input).toHaveAttribute('readonly');
+    for (const name of ['Increase', 'Decrease']) expect(screen.getByRole('button', { name })).toBeDisabled();
   });
 
   it('Select: a consumer border style and surface replace the read-only ones', () => {

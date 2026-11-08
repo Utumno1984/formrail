@@ -16,7 +16,7 @@ import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { Icon } from '../icon/Icon';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
-import { internalIcons } from '../internal/icons';
+import { stepperIcons } from '../internal/icons';
 import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
@@ -56,7 +56,7 @@ export interface NumberInputProps extends Omit<
   /** Initial value of the uncontrolled NumberInput, and the value a native form reset restores. */
   defaultValue?: number;
   /**
-   * Called only for a user gesture, and only when the value really changes: on blur and on Enter
+   * Called only for a user gesture, and only when the value really changes: on focus loss and on Enter
    * for typed text (never per keystroke), at once for ArrowUp/ArrowDown, PageUp/PageDown, Home/End
    * and the stepper buttons. Emptying the text and leaving the field gives `undefined`. Text that is
    * not a number restores the last valid value without a call. Never called when `value` or
@@ -98,7 +98,7 @@ const ROOT = 'relative flex min-w-0 max-w-full flex-col';
 const STEPPERS = 'absolute inset-y-px end-px flex';
 const STEPPER =
   'm-0 inline-flex w-6 cursor-pointer items-center justify-center rounded-rop-sm border-0 bg-transparent p-0 text-rop-text-muted ' +
-  'enabled:hover:text-rop-text disabled:cursor-not-allowed disabled:opacity-50';
+  'not-disabled:rop-hover:text-rop-text disabled:cursor-not-allowed disabled:opacity-50';
 
 const warn = (message: string) => {
   if (isDev()) console.warn(`[react-object-page] <NumberInput> ${message}`);
@@ -110,7 +110,7 @@ const warn = (message: string) => {
  * `aria-describedby`, `aria-invalid`, `aria-required`, `aria-readonly`, `disabled`, `readOnly` and
  * `data-rop-name` from it, like `Input`.
  *
- * - Typing is a draft: the value is read on blur and on Enter, limited to `[min, max]`, and not
+ * - Typing is a draft: the value is read on focus loss and on Enter, limited to `[min, max]`, and not
  *   rounded to `step`. A `value` changed from outside while the user is typing does not replace the
  *   draft; without a draft the text follows it at once.
  * - ArrowUp/ArrowDown ± `step`, PageUp/PageDown ± `step × 10`, Home/End → `min`/`max` (only when
@@ -121,7 +121,7 @@ const warn = (message: string) => {
  *   their limit. They do not repeat while held.
  * - The mouse wheel never changes the value.
  * - `forced`/`locked` (or `readOnly`): focusable, and no channel (typing, paste, keys, steppers)
- *   changes the value; a draft pending when the Field becomes blocked is dropped on blur.
+ *   changes the value; a draft pending when the Field becomes blocked is dropped on focus loss.
  * - With a `name` (own or the Field's), a hidden native input carries the canonical value (`"1.5"`,
  *   `""` when empty) for `FormData`; the visible input has no `name`. A native form reset restores
  *   `defaultValue` without calling `onValueChange`.
@@ -311,8 +311,8 @@ export const NumberInput = /* @__PURE__ */ forwardRef<HTMLInputElement, NumberIn
       <div className={STEPPERS}>
         {(
           [
-            [-1, labels.decrement, atMin, internalIcons.minus],
-            [1, labels.increment, atMax, internalIcons.plus],
+            [-1, labels.decrement, atMin, stepperIcons.minus],
+            [1, labels.increment, atMax, stepperIcons.plus],
           ] as const
         ).map(([direction, label, atLimit, icon]) => (
           <button

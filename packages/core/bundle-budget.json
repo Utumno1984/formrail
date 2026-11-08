@@ -206,6 +206,10 @@
       "baseline": 14440,
       "limit": 15885
     },
+    "NumberInput": {
+      "baseline": 14081,
+      "limit": 15490
+    },
     "ObjectPage": {
       "baseline": 14052,
       "limit": 15458

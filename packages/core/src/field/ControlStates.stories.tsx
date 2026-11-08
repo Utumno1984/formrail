@@ -5,6 +5,7 @@ import { Calendar } from '../calendar/Calendar';
 import { Checkbox, type CheckedState } from '../checkbox/Checkbox';
 import { Combobox } from '../combobox/Combobox';
 import { Input } from '../input/Input';
+import { NumberInput } from '../number-input/NumberInput';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { Select } from '../select/Select';
 import { Switch } from '../switch/Switch';
@@ -61,6 +62,7 @@ const KINDS = [
   'input',
   'select',
   'combobox',
+  'number',
 ] as const;
 type Kind = (typeof KINDS)[number];
 
@@ -74,6 +76,7 @@ const KIND_LABEL: Record<Kind, string> = {
   input: 'Input',
   select: 'Select',
   combobox: 'Combobox',
+  number: 'NumberInput',
 };
 const STATE_LABEL: Record<State, string> = {
   default: 'default',
@@ -149,6 +152,8 @@ function Control({ kind, own, onChange }: { kind: Kind; own: object; onChange: (
       return <Select {...own} options={OPTIONS} defaultValue="it" onValueChange={onChange} />;
     case 'combobox':
       return <Combobox {...own} options={OPTIONS} defaultValue="fr" onValueChange={onChange} />;
+    case 'number':
+      return <NumberInput {...own} defaultValue={12} min={0} max={100} onValueChange={onChange} />;
   }
 }
 
@@ -168,14 +173,14 @@ function Cell({ kind, state, withMessages, onChange }: { kind: Kind; state: Stat
 function controlsOf(cell: HTMLElement, kind: Kind): { aria: HTMLElement; box: HTMLElement } {
   const c = within(cell);
   if (kind === 'radio') return { aria: c.getByRole('radiogroup'), box: c.getByRole('radio', { name: 'Yearly' }) };
-  const role = kind.startsWith('checkbox') ? 'checkbox' : kind.startsWith('switch') ? 'switch' : kind === 'input' ? 'textbox' : 'combobox';
+  const role = kind.startsWith('checkbox') ? 'checkbox' : kind.startsWith('switch') ? 'switch' : kind === 'input' ? 'textbox' : kind === 'number' ? 'spinbutton' : 'combobox';
   const el = c.getByRole(role);
   return { aria: el, box: el };
 }
 
 /**
  * Every form control in every state, side by side (#223): rows Checkbox (unchecked / checked /
- * indeterminate), Switch (off / on), RadioGroup, Input, Select, Combobox; columns default, invalid,
+ * indeterminate), Switch (off / on), RadioGroup, Input, Select, Combobox, NumberInput; columns default, invalid,
  * disabled, forced, locked, locked + invalid. Forced and locked share one look (dashed border,
  * read-only surface, neutral indicator, full opacity); invalid owns the colour (error border and
  * fill); disabled is the default look at 0.5 opacity. Photographed on mobile, tablet and desktop;

@@ -23,6 +23,7 @@ const KINDS = [
   'input',
   'select',
   'combobox',
+  'number',
 ] as const;
 type Kind = (typeof KINDS)[number];
 /** The kinds that show an "on" indicator (tick / dash, thumb at the end, dot). */
@@ -41,7 +42,7 @@ function box(page: Page, kind: Kind, state: State): Locator {
   if (kind === 'radio') return c.getByRole('radio', { name: 'Yearly' });
   if (kind.startsWith('checkbox')) return c.getByRole('checkbox');
   if (kind.startsWith('switch')) return c.getByRole('switch');
-  return c.getByRole(kind === 'input' ? 'textbox' : 'combobox');
+  return c.getByRole(kind === 'input' ? 'textbox' : kind === 'number' ? 'spinbutton' : 'combobox');
 }
 
 interface Look {

@@ -1,6 +1,6 @@
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
-import { internalIcons } from '../internal/icons';
+import { internalIcons, stepperIcons } from '../internal/icons';
 import tokensCss from '../styles/tokens.css?raw';
 import * as publicApi from '../index';
 import { Icon } from './Icon';
@@ -198,9 +198,20 @@ describe('internal icons', () => {
     }
   });
 
+  it('the stepper icons (kept apart from the shared set): plus and minus, square, currentColor', () => {
+    expect(Object.keys(stepperIcons).sort()).toEqual(['minus', 'plus']);
+    for (const name of ['plus', 'minus'] as const) {
+      const { container } = render(<Icon>{stepperIcons[name]}</Icon>);
+      const el = container.querySelector('svg');
+      expect(el?.getAttribute('viewBox'), name).toBe('0 0 24 24');
+      expect(el?.outerHTML, name).toContain('currentColor');
+    }
+  });
+
   it('are not exposed by the public entry', () => {
     const exposed = Object.keys(publicApi);
     expect(exposed).not.toContain('internalIcons');
+    expect(exposed).not.toContain('stepperIcons');
     expect(exposed.sort()).toEqual([
       'Accordion',
       'AccordionContent',
@@ -253,6 +264,7 @@ describe('internal icons', () => {
       'MenuSeparator',
       'MenuTrigger',
       'MessageStrip',
+      'NumberInput',
       'ObjectPage',
       'ObjectPageFooter',
       'ObjectPageHeader',
