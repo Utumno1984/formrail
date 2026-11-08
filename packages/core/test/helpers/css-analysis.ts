@@ -1,8 +1,7 @@
 /** Minimal CSS analysis helpers for the tests on the compiled stylesheet. */
+import { stripComments } from '../../src/utils/token-scale';
 
-export function stripComments(css: string): string {
-  return css.replace(/\/\*[\s\S]*?\*\//g, '');
-}
+export { stripComments };
 
 export interface CssBlock {
   /** Selector or at-rule prelude, e.g. `.px-2`, `@layer utilities`. */

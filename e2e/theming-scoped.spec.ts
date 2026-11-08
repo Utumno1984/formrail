@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
+import { colourOf, type ColourProperty } from './helpers/colour';
 import { expectPlayToPass } from './helpers/story';
 
 // A base colour redeclared on a wrapper reaches the derived states of everything inside it. A `play`
@@ -24,16 +25,6 @@ const active = (base: Rgb) => shade(base, 62);
 // Transitions off: every style is read in its final state.
 test.use({ reducedMotion: 'reduce' });
 
-/** A computed colour as 8-bit channels, whatever serialization the browser uses (rgb() or color(srgb ...)). */
-function colour(target: Locator, property: 'backgroundColor' | 'color' | 'borderTopColor' = 'backgroundColor'): Promise<number[]> {
-  return target.evaluate((el, prop) => {
-    const ctx = document.createElement('canvas').getContext('2d')!;
-    ctx.fillStyle = getComputedStyle(el)[prop];
-    ctx.fillRect(0, 0, 1, 1);
-    return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
-  }, property);
-}
-
 /** Moves away before releasing, so the press never turns into a click that toggles the control. */
 async function cancelPress(page: Page): Promise<void> {
   await page.mouse.move(0, 0);
@@ -45,13 +36,13 @@ async function expectStates(
   page: Page,
   target: Locator,
   expected: { rest: Rgb; hover: Rgb; pressed: Rgb },
-  property?: 'backgroundColor' | 'color' | 'borderTopColor',
+  property: ColourProperty = 'backgroundColor',
 ): Promise<void> {
-  expect(await colour(target, property), 'rest').toEqual(expected.rest);
+  expect(await colourOf(target, property), 'rest').toEqual(expected.rest);
   await target.hover();
-  expect(await colour(target, property), 'hover').toEqual(expected.hover);
+  expect(await colourOf(target, property), 'hover').toEqual(expected.hover);
   await page.mouse.down();
-  expect(await colour(target, property), 'pressed').toEqual(expected.pressed);
+  expect(await colourOf(target, property), 'pressed').toEqual(expected.pressed);
   await cancelPress(page);
 }
 
@@ -111,11 +102,11 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
 
   test('read-only shades follow the scoped neutrals', async ({ page }) => {
     const supplier = page.getByRole('textbox', { name: /Supplier/ });
-    expect(await colour(supplier)).toEqual(SURFACE_SUBTLE);
+    expect(await colourOf(supplier, 'backgroundColor')).toEqual(SURFACE_SUBTLE);
     const terms = page.getByRole('checkbox', { name: /Net 30/ });
-    expect(await colour(terms)).toEqual(SURFACE_SUBTLE);
+    expect(await colourOf(terms, 'backgroundColor')).toEqual(SURFACE_SUBTLE);
     const tick = terms.locator('xpath=following-sibling::*').first();
-    expect(await colour(tick, 'color')).toEqual(TEXT_MUTED);
+    expect(await colourOf(tick, 'color')).toEqual(TEXT_MUTED);
   });
 
   test('a theme inside a theme takes the closest scope @engines', async ({ page }) => {
@@ -127,13 +118,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
   });
 
   test('outside the wrapper the default theme is untouched', async ({ page }) => {
-    const channels = (name: string) =>
-      page.evaluate((token) => {
-        const ctx = document.createElement('canvas').getContext('2d')!;
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
-        ctx.fillRect(0, 0, 1, 1);
-        return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
-      }, name) as Promise<Rgb>;
+    const channels = (token: `--${string}`) => colourOf(page, token) as Promise<Rgb>;
     await expectStates(page, page.getByRole('button', { name: 'Approve outside' }), {
       rest: await channels('--color-rop-blue-600'),
       hover: await channels('--color-rop-blue-700'),
@@ -159,11 +144,11 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     await page.addStyleTag({ content: '[data-testid="scoped-theme"] { --color-rop-primary-hover: #123456; }' });
     const nested = page.getByRole('button', { name: 'Approve nested' });
     await nested.hover();
-    expect(await colour(nested)).toEqual([18, 52, 86]);
+    expect(await colourOf(nested, 'backgroundColor')).toEqual([18, 52, 86]);
     await page.mouse.move(0, 0);
     await page.addStyleTag({ content: '[data-testid="nested-theme"] { --color-rop-primary-hover: initial; }' });
     await nested.hover();
-    expect(await colour(nested)).toEqual(hover(FOREST));
+    expect(await colourOf(nested, 'backgroundColor')).toEqual(hover(FOREST));
   });
 
   test('a base override on :root reaches the default theme and leaves the scoped one alone', async ({ page }) => {
@@ -184,11 +169,11 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     await page.addStyleTag({ content: ':root { --color-rop-error-hover: #123456; --color-rop-primary-active: #654321; }' });
     const remove = page.getByRole('button', { name: 'Delete' });
     await remove.hover();
-    expect(await colour(remove)).toEqual([18, 52, 86]);
+    expect(await colourOf(remove, 'backgroundColor')).toEqual([18, 52, 86]);
     const outside = page.getByRole('button', { name: 'Approve outside' });
     await outside.hover();
     await page.mouse.down();
-    expect(await colour(outside)).toEqual([101, 67, 33]);
+    expect(await colourOf(outside, 'backgroundColor')).toEqual([101, 67, 33]);
     await cancelPress(page);
   });
 
@@ -211,7 +196,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
     const approve = page.getByRole('button', { name: 'Approve', exact: true });
     await approve.hover();
     await page.mouse.down();
-    expect(await colour(approve)).toEqual(active(VIOLET));
+    expect(await colourOf(approve, 'backgroundColor')).toEqual(active(VIOLET));
     await cancelPress(page);
   });
 
@@ -224,9 +209,9 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
       element.style.backgroundColor = background;
       el.append(element);
     }, recipe);
-    expect(await colour(probe)).toEqual(hover(VIOLET));
+    expect(await colourOf(probe, 'backgroundColor')).toEqual(hover(VIOLET));
     await page.addStyleTag({ content: '[data-testid="scoped-theme"] { --color-rop-primary-hover: #123456; }' });
-    expect(await colour(probe)).toEqual([18, 52, 86]);
+    expect(await colourOf(probe, 'backgroundColor')).toEqual([18, 52, 86]);
   });
 
   test('declared contract: the same formula declared on :root is the original bug for inner scopes @engines', async ({ page }) => {
@@ -235,14 +220,7 @@ test.describe('Foundations/Theming: scoped theme and derived states', () => {
         ':root { --my-hover: color-mix(in srgb, var(--color-rop-primary) 80%, black); } ' +
         '[data-testid="scoped-theme"] button { outline: 2px solid var(--my-hover); }',
     });
-    const outline = await page
-      .getByRole('button', { name: 'Approve', exact: true })
-      .evaluate((el) => {
-        const ctx = document.createElement('canvas').getContext('2d')!;
-        ctx.fillStyle = getComputedStyle(el).outlineColor;
-        ctx.fillRect(0, 0, 1, 1);
-        return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
-      });
+    const outline = await colourOf(page.getByRole('button', { name: 'Approve', exact: true }), 'outlineColor');
     expect(outline).toEqual(hover([10, 110, 209]));
   });
 });

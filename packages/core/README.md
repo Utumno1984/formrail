@@ -132,7 +132,11 @@ top of the precompiled `styles.css` (mode a) has no effect. Or force the layout 
 prop.
 
 The derived colors are not fixed values: they are computed from a base color **on the element that
-uses them**.
+uses them**. `theme.css` declares them in a `@theme reference` block, so nothing is emitted on
+`:root` and each utility is compiled as `var(<token>, <formula>)`: the formula and its base are
+resolved on the element, and the token name, unset by default, wins over the formula when you set
+it. This section is the contract; the comment above that block in `theme.css` only describes the
+mechanism.
 
 | Derived | Default |
 |---|---|
@@ -167,6 +171,8 @@ uses them**.
 - **An alias of a derived token needs a value**: with `primary-hover` unset,
   `--color-rop-primary-active: var(--color-rop-primary-hover)` is ignored in silence and the computed
   shade stays. Write the color, or the full recipe above.
+- **With an opacity modifier** (`bg-rop-primary-hover/50`), browsers without `color-mix(in oklab)`
+  get Tailwind's fallback, which keeps the alpha but ignores an override of the derived token.
 
 Two more limits at wrapper scope. `--color-rop-blue-600` does not move `--color-rop-primary`: the
 primary is resolved on `:root`, redeclare it directly. The row selection and the count flash of the
