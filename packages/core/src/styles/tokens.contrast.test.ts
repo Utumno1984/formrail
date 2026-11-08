@@ -200,3 +200,52 @@ describe('contrast', () => {
     expect(token('primary')).toEqual(token('blue-600'));
   });
 });
+
+// The tints of the primary (row selection, count flash, #293) follow whatever --color-rop-primary an app
+// declares, so the text drawn on them is checked against dark and light primaries, not only the default
+// blue. The expressions are resolved from the real tokens.css with the base colour swapped.
+function withPrimary<T>(hex: string, run: () => T): T {
+  const previous = declarations.get('--color-rop-primary');
+  declarations.set('--color-rop-primary', hex);
+  try {
+    return run();
+  } finally {
+    declarations.set('--color-rop-primary', previous!);
+  }
+}
+
+const PRIMARIES: Record<string, string> = {
+  'default blue': '#0a6ed1',
+  'dark violet': '#6b3fa0',
+  'near black': '#10081c',
+  'light yellow': '#ffd84d',
+  'near white': '#fafafa',
+};
+
+describe('primary tints with a redeclared --color-rop-primary (#293)', () => {
+  it.each(Object.entries(PRIMARIES))('%s: the tints are 8% / 16% / 50% of the primary on white', (_name, hex) => {
+    withPrimary(hex, () => {
+      const base = resolve(hex);
+      const mixed = (p: number) => base.map((c) => c * p + 255 * (1 - p));
+      expect(token('primary-subtle')).toEqual(mixed(0.08));
+      expect(token('primary-subtle-hover')).toEqual(mixed(0.16));
+      expect(token('primary-muted')).toEqual(mixed(0.5));
+    });
+  });
+
+  // What is really drawn on each tint: the cell text on a selected row at rest (subtle) and hovered or
+  // pressed (subtle-hover); the muted text of the count pill on the flash (subtle). No row cell uses the
+  // muted text, so muted on subtle-hover is not a case (it is 4.4:1 even with the default blue).
+  const cases = Object.entries(PRIMARIES).flatMap(([name, hex]) =>
+    [
+      ['text', 'primary-subtle'],
+      ['text', 'primary-subtle-hover'],
+      ['text-muted', 'primary-subtle'],
+    ].map(([fg, tint]) => [name, fg!, tint!, hex] as const),
+  );
+  it.each(cases)('%s: %s on %s is at least 4.5:1 (WCAG AA)', (_name, fg, tint, hex) => {
+    withPrimary(hex, () => {
+      expect(contrast(token(fg), token(tint))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+});
