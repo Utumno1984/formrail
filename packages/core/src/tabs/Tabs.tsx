@@ -18,6 +18,7 @@ import { isDev } from '../internal/is-dev';
 import { scrollFromStart, towardsEndSign } from '../internal/rtl-scroll';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
+import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
 
 const useIsomorphicLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -286,36 +287,38 @@ function useScrollEdges(
     const next = readEdges(el);
     setEdges((prev) => (prev.start === next.start && prev.end === next.end && prev.rtl === next.rtl ? prev : next));
   }, [list]);
-  useIsomorphicLayoutEffect(() => {
+  // `dir` is not read in the body: a change of direction mirrors the sides, so the edges are read again.
+  useResizeAndMutationEffect(() => {
     const el = list.current;
     if (!enabled || !el) {
       setEdges(NO_EDGES);
-      return;
+      return undefined;
     }
-    refresh();
-    el.addEventListener('scroll', refresh, { passive: true });
-    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(refresh);
-    const observeAll = () => {
-      if (!resize) return;
-      resize.disconnect();
-      resize.observe(el);
-      for (const child of Array.from(el.children)) resize.observe(child);
+    // At most one read per frame, taken in the frame callback: it runs after every `scroll` event
+    // of that frame, so the last position of a burst is always the one read.
+    let frame: number | null = null;
+    const onScroll = () => {
+      if (typeof requestAnimationFrame === 'undefined') {
+        refresh();
+        return;
+      }
+      if (frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        refresh();
+      });
     };
-    observeAll();
-    const mutations =
-      typeof MutationObserver === 'undefined'
-        ? null
-        : new MutationObserver(() => {
-            observeAll();
-            refresh();
-          });
-    mutations?.observe(el, { childList: true });
-    return () => {
-      el.removeEventListener('scroll', refresh);
-      resize?.disconnect();
-      mutations?.disconnect();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return {
+      target: el,
+      children: true,
+      update: refresh,
+      cleanup: () => {
+        el.removeEventListener('scroll', onScroll);
+        if (frame !== null) cancelAnimationFrame(frame);
+      },
     };
-  }, [enabled, dir, refresh]);
+  }, [list, enabled, dir, refresh]);
   return [edges, refresh];
 }
 

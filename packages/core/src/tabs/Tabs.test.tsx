@@ -542,6 +542,27 @@ describe('Tabs', () => {
 });
 
 describe('Tabs: overflow edge indicators (horizontal)', () => {
+  let frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 1;
+  beforeEach(() => {
+    frames = new Map();
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      const id = nextFrame++;
+      frames.set(id, cb);
+      return id;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  /** Runs the animation frames requested so far, as the browser does after a frame's `scroll` events. */
+  const flushFrames = () =>
+    act(() => {
+      const pending = Array.from(frames.values());
+      frames.clear();
+      for (const callback of pending) callback(0);
+    });
   /** jsdom has no layout: give the tablist a scroll geometry and report it with a scroll event. */
   function setGeometry(list: HTMLElement, { scrollWidth, clientWidth, scrollLeft }: Record<string, number>) {
     Object.defineProperty(list, 'scrollWidth', { configurable: true, value: scrollWidth });
@@ -550,6 +571,7 @@ describe('Tabs: overflow edge indicators (horizontal)', () => {
     act(() => {
       list.dispatchEvent(new Event('scroll'));
     });
+    flushFrames();
   }
   const edge = (side: 'start' | 'end') => document.querySelector<HTMLElement>(`[data-rop-tabs-edge="${side}"]`);
 
@@ -835,5 +857,88 @@ describe('Tabs: overflow edge indicators (horizontal)', () => {
     list.style.direction = 'rtl';
     rerender(<Demo dir="rtl" />);
     expect(edge('end')).toHaveClass('bg-linear-to-r');
+  });
+
+  it('a burst of `scroll` events within one frame reads the layout once, at the last position', () => {
+    render(<Demo />);
+    const list = screen.getByRole('tablist');
+    setGeometry(list, { scrollWidth: 600, clientWidth: 300, scrollLeft: 0 });
+    expect(edge('start')).toBeNull();
+    let reads = 0;
+    Object.defineProperty(list, 'scrollWidth', {
+      configurable: true,
+      get: () => {
+        reads += 1;
+        return 600;
+      },
+    });
+    act(() => {
+      for (const left of [20, 80, 150, 220, 300]) {
+        list.scrollLeft = left;
+        list.dispatchEvent(new Event('scroll'));
+      }
+    });
+    // Nothing is read during the burst; one frame is requested for all of it.
+    expect(reads).toBe(0);
+    expect(frames.size).toBe(1);
+    flushFrames();
+    expect(reads).toBe(1);
+    // The frame reads the final position (the end): only the start hides tabs.
+    expect(edge('start')).not.toBeNull();
+    expect(edge('end')).toBeNull();
+    // The next burst requests a new frame: the update after the end of a scroll is never lost.
+    act(() => {
+      list.scrollLeft = 0;
+      list.dispatchEvent(new Event('scroll'));
+    });
+    flushFrames();
+    expect(reads).toBe(2);
+    expect(edge('start')).toBeNull();
+    expect(edge('end')).not.toBeNull();
+  });
+
+  it('a frame still pending at unmount is cancelled (no state update after unmount)', () => {
+    const { unmount } = render(<Demo />);
+    const list = screen.getByRole('tablist');
+    Object.defineProperty(list, 'scrollWidth', { configurable: true, value: 600 });
+    Object.defineProperty(list, 'clientWidth', { configurable: true, value: 300 });
+    flushFrames();
+    act(() => {
+      list.dispatchEvent(new Event('scroll'));
+    });
+    expect(frames.size).toBe(1);
+    unmount();
+    expect(frames.size).toBe(0);
+  });
+
+  it('adding or removing a tab observes or unobserves only that tab, never the whole list again', async () => {
+    const calls: string[] = [];
+    const name = (el: Element) => el.getAttribute('role') === 'tablist' ? 'list' : (el.textContent ?? '');
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(el: Element) {
+          calls.push(`observe ${name(el)}`);
+        }
+        unobserve(el: Element) {
+          calls.push(`unobserve ${name(el)}`);
+        }
+        disconnect() {
+          calls.push('disconnect');
+        }
+      },
+    );
+    const { rerender } = render(<Demo tabs={['a', 'b', 'c']} />);
+    // The subscription that stays after mount (the inherited `dir` is resolved in a layout effect).
+    expect(calls.slice(calls.lastIndexOf('disconnect') + 1)).toEqual(['observe list', 'observe Tab a', 'observe Tab b', 'observe Tab c']);
+    calls.length = 0;
+    // MutationObserver delivers its records in a microtask.
+    rerender(<Demo tabs={['a', 'b', 'c', 'd']} />);
+    await act(async () => {});
+    expect(calls).toEqual(['observe Tab d']);
+    calls.length = 0;
+    rerender(<Demo tabs={['a', 'c', 'd']} />);
+    await act(async () => {});
+    expect(calls).toEqual(['unobserve Tab b']);
   });
 });
