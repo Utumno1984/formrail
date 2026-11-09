@@ -126,7 +126,15 @@ function RowActionsMenu({
         // and reaches its target (e.g. another row's trigger opens that menu).
         modal={false}
       >
-        <MenuTrigger asChild>
+        <MenuTrigger
+          asChild
+          // A press does not focus the trigger (the menu keeps the focus off it while it opens), so the
+          // menu would give the focus back, on close, to whatever had it before: e.g. another row's
+          // inline button, clicked a moment ago. The trigger takes it first: the focus comes back here.
+          onPointerDown={(event) => {
+            if (event.button === 0 && !event.ctrlKey) event.currentTarget.focus({ preventScroll: true });
+          }}
+        >
           <Button ref={setTrigger} variant="ghost" size="icon-sm" aria-label={triggerLabel}>
             {moreIcon}
           </Button>
@@ -234,7 +242,7 @@ export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, in
   }
   return (
     <td className={rowActionsBodyCellClass}>
-      <div className={rowActionsWideClass}>
+      <div data-rop-row-actions-form="wide" className={rowActionsWideClass}>
         {inlineActions.map((action) => (
           <InlineRowAction key={action.id} action={action} label={inlineLabel ? inlineLabel(action.label) : action.label} />
         ))}
@@ -242,7 +250,7 @@ export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, in
           {menuActions.length > 0 ? <RowActionsMenu actions={menuActions} triggerLabel={triggerLabel} watchForm /> : null}
         </div>
       </div>
-      <div className={rowActionsNarrowClass}>
+      <div data-rop-row-actions-form="narrow" className={rowActionsNarrowClass}>
         {actions.length > 0 ? <RowActionsMenu actions={actions} triggerLabel={triggerLabel} watchForm /> : null}
       </div>
     </td>

@@ -133,10 +133,12 @@ export interface UseListReportOptions<Row> {
 export interface ListReportRowActionContext {
   /**
    * The element that should get the focus back when an overlay opened by the action closes: the
-   * trigger of the row's actions menu while it is in the document, the table's scroll container once
-   * it is gone (the action deleted the row, e.g. after `await confirm(…)`). Read it when the focus is
-   * returned, not when the action runs. Pass it as the `returnFocusRef` of a `Dialog`, a
-   * `ConfirmDialog` or `useConfirmDialog`'s `confirm()`.
+   * control that was used (the trigger of the row's actions menu, or the action's inline button with
+   * `rowActionsInline`) while it is in the document; the visible control of the same row when the
+   * table changed form in the meantime (inline ↔ menu); the table's scroll container once it is gone
+   * (the action deleted the row, e.g. after `await confirm(…)`). Read it when the focus is returned,
+   * not when the action runs. Pass it as the `returnFocusRef` of a `Dialog`, a `ConfirmDialog` or
+   * `useConfirmDialog`'s `confirm()`.
    */
   returnFocusRef: RefObject<HTMLElement | null>;
 }
@@ -147,14 +149,21 @@ export interface ListReportRowAction {
   id: string;
   /** Text of the menu item. Name the action ("Delete…"), it is the item's accessible name. */
   label: string;
-  /** Decorative icon shown before the label (an `<svg>`, sized by the item). */
+  /**
+   * Decorative icon shown before the label (an `<svg>`, sized by the item). With `rowActionsInline`
+   * only an action with an icon can be an inline icon button (its label is then the tooltip, and part
+   * of the button's name through `labels.rowAction`).
+   */
   icon?: ReactNode;
   /**
-   * Called once per click, Enter or Space on the enabled item, before the menu closes. Never called
-   * while `disabled`.
+   * Called once per click, Enter or Space on the enabled item (before the menu closes) or on the
+   * enabled inline button. Never called while `disabled`.
    */
   onSelect: (context: ListReportRowActionContext) => void;
-  /** Shown but not selectable, by pointer or keyboard (the arrow keys skip it); `aria-disabled` on the item. */
+  /**
+   * Shown but not selectable, by pointer or keyboard (the arrow keys skip it); `aria-disabled` on the
+   * item. Inline: `aria-disabled`, still focusable (its tooltip still shows), click/Enter/Space do nothing.
+   */
   disabled?: boolean;
   /** `danger`: a destructive action (the item's danger tone). Default `'default'`. */
   tone?: 'default' | 'danger';

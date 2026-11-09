@@ -1325,30 +1325,53 @@ const FIRST_APPROVED = ROW_ACTION_ROWS.find((r) => r.status === 'approved')!;
 
 type DisabledFor = DemoInvoice['status'] | 'none';
 
+// A trash can on the 24x24 grid of the library's icons (stroke, current colour).
+const trashIcon = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+  </svg>
+);
+
+// Width of the box around the report: `wide` is well above the 40rem of the inline actions (on a
+// viewport narrower than that the box is capped to it), `narrow` is a 30rem panel, below them.
+const ROW_ACTIONS_CONTAINER_WIDTH = { wide: 1100, narrow: 480 } as const;
+
 interface RowActionsArgs {
   /** Status of the invoices whose "Delete" is disabled. */
   disabledFor: DisabledFor;
   /** Tone of the "Delete" action. */
   deleteTone: 'danger' | 'default';
+  /** Whether "Delete" has an `icon` (only actions with one can be inline). */
+  deleteIcon: boolean;
   /** Label of the "Duplicate" action. */
   duplicateLabel: string;
   selectable: boolean;
-  containerWidth: number;
+  /** `rowActionsInline` of the report. */
+  rowActionsInline: number;
+  containerWidth: keyof typeof ROW_ACTIONS_CONTAINER_WIDTH;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   /** Fixture: ids selected at mount. Not in Controls. */
   preselectedIds?: readonly string[];
+  /** Fixture: the invoices of this status have no "Delete" at all (fewer actions than the others). Not in Controls. */
+  withoutDeleteFor?: DisabledFor;
+  /** Fixture: `status` of the report. Not in Controls. */
+  status?: 'ready' | 'loading';
 }
 
 function RowActionsReport({
   disabledFor,
   deleteTone,
+  deleteIcon,
   duplicateLabel,
   selectable,
+  rowActionsInline,
   containerWidth,
   onDuplicate,
   onDelete,
   preselectedIds,
+  withoutDeleteFor = 'none',
+  status,
 }: RowActionsArgs) {
   const [rows, setRows] = useState<readonly DemoInvoice[]>(ROW_ACTION_ROWS);
   const table = useListReport<DemoInvoice>({
@@ -1363,34 +1386,47 @@ function RowActionsReport({
   // Memoized with what it reads: the rows are memoized, a stable function that read other values
   // would leave them as they were.
   const rowActions = useCallback(
-    (row: DemoInvoice): readonly ListReportRowAction[] => [
-      { id: 'duplicate', label: duplicateLabel, onSelect: () => onDuplicate(row.id) },
-      {
-        id: 'delete',
-        label: 'Delete…',
-        tone: deleteTone,
-        disabled: row.status === disabledFor,
-        // The confirmation gives the focus back to this row's "…" button when it closes (Cancel), or to
-        // the table once the row is deleted (Delete invoice).
-        onSelect: async ({ returnFocusRef }) => {
-          const confirmed = await confirm({
-            title: `Delete invoice ${row.number}?`,
-            description: 'The invoice is removed from the queue. This cannot be undone.',
-            confirmLabel: 'Delete invoice',
-            returnFocusRef,
-          });
-          if (!confirmed) return;
-          setRows((current) => current.filter((r) => r.id !== row.id));
-          onDelete(row.id);
+    (row: DemoInvoice): readonly ListReportRowAction[] => {
+      const duplicate: ListReportRowAction = { id: 'duplicate', label: duplicateLabel, onSelect: () => onDuplicate(row.id) };
+      if (row.status === withoutDeleteFor) return [duplicate];
+      return [
+        duplicate,
+        {
+          id: 'delete',
+          label: 'Delete…',
+          icon: deleteIcon ? trashIcon : undefined,
+          tone: deleteTone,
+          disabled: row.status === disabledFor,
+          // The confirmation gives the focus back to the control that was used (this row's inline button
+          // or "…" button) when it closes (Cancel), or to the table once the row is deleted (Delete invoice).
+          onSelect: async ({ returnFocusRef }) => {
+            const confirmed = await confirm({
+              title: `Delete invoice ${row.number}?`,
+              description: 'The invoice is removed from the queue. This cannot be undone.',
+              confirmLabel: 'Delete invoice',
+              returnFocusRef,
+            });
+            if (!confirmed) return;
+            setRows((current) => current.filter((r) => r.id !== row.id));
+            onDelete(row.id);
+          },
         },
-      },
-    ],
-    [confirm, deleteTone, disabledFor, duplicateLabel, onDelete, onDuplicate],
+      ];
+    },
+    [confirm, deleteIcon, deleteTone, disabledFor, duplicateLabel, onDelete, onDuplicate, withoutDeleteFor],
   );
   return (
     <div style={PAGE}>
-      <div style={{ width: containerWidth, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
-        <ListReport title="Invoices" table={table} filtersLabel="Filters" searchLabel="Search" rowActions={rowActions} />
+      <div style={{ width: ROW_ACTIONS_CONTAINER_WIDTH[containerWidth], maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
+        <ListReport
+          title="Invoices"
+          table={table}
+          filtersLabel="Filters"
+          searchLabel="Search"
+          rowActions={rowActions}
+          rowActionsInline={rowActionsInline}
+          status={status}
+        />
       </div>
       {confirmDialog}
     </div>
@@ -1404,42 +1440,125 @@ const ROW_ACTIONS_ARG_TYPES = {
     description: 'Invoices whose "Delete" is `disabled` (by status): shown in the menu, skipped by the arrows, never selected',
   },
   deleteTone: { control: 'radio', options: ['danger', 'default'], description: '`tone` of the "Delete" action' },
+  deleteIcon: {
+    control: 'boolean',
+    description: '`icon` of the "Delete" action: only actions with an icon can be inline (without one it stays in the "…" menu)',
+  },
   duplicateLabel: { control: 'text', description: '`label` of the first action: a long one wraps inside the menu' },
   selectable: { control: 'boolean', description: '`selectable` of `useListReport`: a checkbox column before, the actions column after' },
+  rowActionsInline: {
+    control: { type: 'number', min: 0, max: 3, step: 1 },
+    description:
+      '`rowActionsInline`: how many actions with an icon are inline buttons when the table is at least 40rem wide (0: the "…" menu alone)',
+  },
   containerWidth: {
-    control: { type: 'range', min: 320, max: 1280, step: 10 },
-    description: 'Container width (px): below the width of the columns the table scrolls sideways and the actions column stays in view',
+    control: 'select',
+    options: ['wide', 'narrow'],
+    description:
+      'Width of the box around the report: `wide` (1100px, capped to the viewport) or `narrow` (a 30rem panel). The inline actions follow the width of the table, not of the viewport: below 40rem they are in the "…" menu. Narrower than its columns, the table scrolls sideways and the actions column stays in view',
   },
   onDuplicate: { control: false },
   onDelete: { control: false },
   preselectedIds: HIDDEN,
+  withoutDeleteFor: HIDDEN,
   ...{ status: HIDDEN, dataset: HIDDEN, searchCommitDelay: HIDDEN, firstSortDirection: HIDDEN, onRetry: HIDDEN },
   ...{ onSortChange: HIDDEN, onFilterChange: HIDDEN, onSearchQueryChange: HIDDEN },
 } as const;
 
+// The menu-only configuration (no inline action, no icon): the fixtures of the menu alone.
 const ROW_ACTIONS_ARGS: RowActionsArgs = {
   disabledFor: 'approved',
   deleteTone: 'danger',
+  deleteIcon: false,
   duplicateLabel: 'Duplicate',
   selectable: false,
-  containerWidth: 1100,
+  rowActionsInline: 0,
+  containerWidth: 'wide',
   onDuplicate: fn(),
   onDelete: fn(),
 };
 
+// "Delete…" (with an icon) inline on a wide table, "Duplicate" (without one) in the "…" menu.
+const ROW_ACTIONS_INLINE_ARGS: RowActionsArgs = { ...ROW_ACTIONS_ARGS, deleteIcon: true, rowActionsInline: 1 };
+
+// The first invoice that "Delete…" can delete (not approved), at the top of the table.
+const FIRST_DELETABLE = ROW_ACTION_ROWS.find((r) => r.status !== 'approved')!;
+
 /**
- * Per-row actions (`rowActions`): a trailing column, sticky at the end of the table, with a "…" button per
- * row named "Actions for <number>" that opens a menu: "Duplicate" and "Delete…" (danger, disabled for the
- * approved invoices; it asks for a confirmation, then deletes the row: Cancel returns the focus to the
- * row's button, a confirmed deletion to the table). Controls: the
- * status whose "Delete" is disabled, its tone, `selectable` and the width of the container (narrow: the
- * table scrolls sideways under the actions column). `onDuplicate`/`onDelete` show up in Actions with the
- * id of the row. The play function opens the menu of an approved invoice ("Delete…" cannot be chosen),
- * then the menu of the third row from the keyboard, chooses "Duplicate" with Enter and checks the call
- * and the focus back on that row's button.
+ * Per-row actions (`rowActions`): a trailing column, sticky at the end of the table. "Delete…" (danger,
+ * with a trash icon, disabled for the approved invoices; it asks for a confirmation, then deletes the
+ * row) is an inline icon button named "Delete… <number>" (`rowActionsInline={1}`) while the table is at
+ * least 40rem wide, with its label as a tooltip on hover or keyboard focus; "Duplicate" (no icon) is in
+ * the "…" menu named "Actions for <number>". With `containerWidth: narrow` (a 30rem panel, whatever the
+ * viewport) both are in the "…" menu: the same descriptors, the same calls. Cancel on the confirmation
+ * returns the focus to the control that was used, a confirmed deletion to the table. Controls: the
+ * number of inline actions, the icon of "Delete" (without one it never goes inline), the status whose
+ * "Delete" is disabled, its tone, `selectable` and the width of the box. `onDuplicate`/`onDelete` show
+ * up in Actions with the id of the row. The play function (wide box) deletes an invoice from its inline
+ * button, checks that click and Enter on the disabled inline button of an approved invoice call nothing,
+ * then chooses "Duplicate" in that row's "…" menu from the keyboard and checks the focus back on it.
  */
 export const RowActions: StoryObj<RowActionsArgs> = {
   name: 'Row actions',
+  argTypes: ROW_ACTIONS_ARG_TYPES,
+  args: ROW_ACTIONS_INLINE_ARGS,
+  render: (args) => <RowActionsReport {...args} />,
+  play: async ({ args, canvasElement }) => {
+    // Written for the default configuration, on a viewport where the wide box is at least 40rem.
+    if (
+      args.disabledFor !== 'approved' ||
+      args.duplicateLabel !== 'Duplicate' ||
+      args.rowActionsInline !== 1 ||
+      !args.deleteIcon ||
+      args.containerWidth !== 'wide' ||
+      rowActionsScroller(canvasElement).clientWidth < 640
+    ) {
+      return;
+    }
+    // The menu and the dialog are in portals: query the whole document. The hidden form of each cell
+    // (`display: none`) is out of the accessibility tree: one control per action and row.
+    const page = within(canvasElement.ownerDocument.body);
+    const inline = (number: string) => page.getByRole('button', { name: `Delete… ${number}` });
+    const trigger = (number: string) => page.getByRole('button', { name: `Actions for ${number}` });
+
+    // Inline "Delete…": the confirmation, then the call with the row's id.
+    await userEvent.click(inline(FIRST_DELETABLE.number));
+    const dialog = await page.findByRole('dialog', { name: `Delete invoice ${FIRST_DELETABLE.number}?` });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+    await expect(args.onDelete).toHaveBeenCalledTimes(1);
+    await expect(args.onDelete).toHaveBeenCalledWith(FIRST_DELETABLE.id);
+    await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(page.queryByRole('button', { name: `Delete… ${FIRST_DELETABLE.number}` })).toBeNull());
+
+    // An approved invoice: its inline "Delete…" is aria-disabled; click and Enter open nothing, call nothing.
+    const disabled = inline(FIRST_APPROVED.number);
+    await expect(disabled).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(disabled);
+    disabled.focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(page.queryByRole('dialog')).toBeNull();
+    await expect(args.onDelete).toHaveBeenCalledTimes(1);
+
+    // Its "…" menu holds what is not inline: "Duplicate", chosen from the keyboard.
+    trigger(FIRST_APPROVED.number).focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
+    await expect(page.queryByRole('menuitem', { name: 'Delete…' })).toBeNull();
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
+    await expect(args.onDuplicate).toHaveBeenCalledWith(FIRST_APPROVED.id);
+    await waitFor(() => expect(page.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger(FIRST_APPROVED.number)).toHaveFocus());
+  },
+};
+
+/**
+ * Fixture of the e2e suite: the menu alone (`rowActionsInline` 0, "Delete…" without an icon), the
+ * play function of that configuration.
+ */
+export const RowActionsMenuOnly: StoryObj<RowActionsArgs> = {
+  name: 'Row actions: menu only',
+  tags: ['internal'],
   argTypes: ROW_ACTIONS_ARG_TYPES,
   args: ROW_ACTIONS_ARGS,
   render: (args) => <RowActionsReport {...args} />,
@@ -1474,12 +1593,42 @@ export const RowActions: StoryObj<RowActionsArgs> = {
   },
 };
 
-/** Fixture of the e2e suite: `RowActions` without the play function. */
+/** Fixture of the e2e suite: the menu alone (`rowActionsInline` 0, no icon), without a play function. */
 export const RowActionsNoPlay: StoryObj<RowActionsArgs> = {
-  ...RowActions,
+  ...RowActionsMenuOnly,
   name: 'Row actions (no play)',
   tags: ['internal'],
   play: undefined,
+};
+
+/** Fixture of the e2e suite: `RowActions` (one inline action) without the play function. */
+export const RowActionsInlineNoPlay: StoryObj<RowActionsArgs> = {
+  ...RowActions,
+  name: 'Row actions: inline (no play)',
+  tags: ['internal'],
+  play: undefined,
+};
+
+/**
+ * Visual fixture: one inline action, wide box, `selectable` with the second invoice selected. The
+ * inline "Delete…" of the approved invoices is disabled; on a mobile viewport the box is below 40rem
+ * and the narrow form (the "…" alone) shows instead.
+ */
+export const RowActionsInlineWide: StoryObj<RowActionsArgs> = {
+  name: 'Row actions: inline, wide',
+  tags: ['internal', 'visual'],
+  argTypes: ROW_ACTIONS_ARG_TYPES,
+  args: { ...ROW_ACTIONS_INLINE_ARGS, selectable: true, preselectedIds: [ROW_ACTION_ROWS[1]!.id] },
+  render: (args) => <RowActionsReport {...args} />,
+};
+
+/** Visual fixture: one inline action in a 30rem box: the narrow form on every viewport. */
+export const RowActionsInlineNarrow: StoryObj<RowActionsArgs> = {
+  name: 'Row actions: inline, narrow',
+  tags: ['internal', 'visual'],
+  argTypes: ROW_ACTIONS_ARG_TYPES,
+  args: { ...ROW_ACTIONS_INLINE_ARGS, containerWidth: 'narrow' },
+  render: (args) => <RowActionsReport {...args} />,
 };
 
 const SECOND_ROW = ROW_ACTION_ROWS[1]!;
