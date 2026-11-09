@@ -300,6 +300,29 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
     expect(page.url()).toContain('iframe.html');
   });
 
+  test('a URL with BOTH record and create: the record shows (it wins) and "Back to list" clears both', async ({ page }) => {
+    await page.goto('/index.json');
+    await page.goto(url('filter=open&record=inv-12&create=1', FAST));
+    await expect(page.getByRole('heading', { level: 1, name: /FT-2026-0012/ })).toBeVisible();
+    await backToList(page).click();
+    await expect(table(page)).toBeVisible();
+    await expect(heading(page)).toHaveCount(0);
+    expect([params(page).get('record'), params(page).get('create'), params(page).get('filter')]).toEqual([null, null, 'open']);
+  });
+
+  test('leaving for "New invoice" before the slow list after a Create has loaded: the toast still appears', async ({ page }) => {
+    await openList(page, SHOWN_QUERY, 'listLoadDelayMs:1500;recordLoadDelayMs:0;saveDelayMs:0');
+    await newInvoice(page).click();
+    await fillValid(page, '99999.9');
+    await create(page).click();
+    await expect(table(page)).toBeVisible(); // back on the list, still loading
+    await expect(page.getByText('Invoice FT-2026-0201 created')).toHaveCount(0);
+    await newInvoice(page).click(); // another navigation before the data arrived
+    await expect(heading(page)).toBeVisible();
+    await expect(page.getByText('Invoice FT-2026-0201 created')).toBeVisible();
+    expect(await store(page)).toHaveLength(201);
+  });
+
   test('the number is never reused: two Creates in a row get FT-2026-0201 and FT-2026-0202', async ({ page }) => {
     await openList(page);
     for (const expected of ['FT-2026-0201', 'FT-2026-0202']) {
