@@ -252,7 +252,11 @@ test.describe('from a menu item', () => {
     await trigger.focus();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menu')).toBeVisible();
+    // The first item has the focus once the menu is ready for its arrow keys; then move to "Delete…".
+    await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitem', { name: 'Delete…' })).toBeFocused();
+    // The double Enter under test: the first selects the item, the second must land on Cancel.
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
     await expect(confirmDialog(page)).toHaveCount(0);

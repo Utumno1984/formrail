@@ -329,7 +329,11 @@ export const FromAMenuItem: Story = {
     await userEvent.keyboard('{ArrowDown}');
     const body = within(document.body);
     await body.findByRole('menu');
-    await userEvent.keyboard('{ArrowDown}{Enter}');
+    // Arrow keys only once the menu has focused its first item (an earlier one can be lost).
+    await waitFor(() => expect(body.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
+    await userEvent.keyboard('{ArrowDown}');
+    await waitFor(() => expect(body.getByRole('menuitem', { name: 'Delete…' })).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
     const dialog = await body.findByRole('dialog', { name: args.title });
     await waitFor(() => expect(within(dialog).getByRole('button', { name: args.cancelLabel })).toHaveFocus());
     await userEvent.keyboard('{Escape}');
