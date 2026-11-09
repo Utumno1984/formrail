@@ -45,7 +45,7 @@ describe('<ListReport> count pill', () => {
   it('does not flash at mount', () => {
     render(<Host rows={ROWS} />);
     expect(flashing()).toBe(false);
-    expect(pill()).not.toHaveClass('bg-rop-blue-50');
+    expect(pill()).not.toHaveClass('bg-rop-primary-subtle');
     act(() => {
       vi.advanceTimersByTime(CHANGE_FLASH_MS * 3);
     });
@@ -57,7 +57,7 @@ describe('<ListReport> count pill', () => {
     rerender(<Host rows={ROWS.slice(0, 10)} />);
     expect(pill()).toHaveTextContent('(10)');
     expect(flashing()).toBe(true);
-    expect(pill()).toHaveClass('bg-rop-blue-50');
+    expect(pill()).toHaveClass('bg-rop-primary-subtle');
     act(() => {
       vi.advanceTimersByTime(CHANGE_FLASH_MS - 1);
     });
@@ -66,7 +66,7 @@ describe('<ListReport> count pill', () => {
       vi.advanceTimersByTime(1);
     });
     expect(flashing()).toBe(false);
-    expect(pill()).not.toHaveClass('bg-rop-blue-50');
+    expect(pill()).not.toHaveClass('bg-rop-primary-subtle');
     expect(pill()).toHaveClass('bg-rop-surface-subtle');
   });
 

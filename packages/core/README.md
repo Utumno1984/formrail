@@ -117,7 +117,7 @@ can use `text-rop-body`, `font-rop-mono`, `z-rop-modal`, `bg-rop-primary`... in 
 | Group | Names |
 |---|---|
 | Colors | `text`, `text-muted`, `surface`, `surface-subtle`, `border`, `primary`, `primary-contrast`, `info`, `success`, `warning`, `error` |
-| Derived colors (see below) | `primary-hover`, `primary-active`, `error-hover`, `error-active`, `surface-pressed`, `readonly-surface`, `readonly-indicator` |
+| Derived colors (see below) | `primary-hover`, `primary-active`, `primary-subtle`, `primary-subtle-hover`, `primary-muted`, `error-hover`, `error-active`, `surface-pressed`, `readonly-surface`, `readonly-indicator` |
 | Type scale (size + line height) | `caption`, `body`, `label`, `title-sm`, `title-md`, `title-lg` |
 | Families | `font-rop-sans`, `font-rop-mono` (system stacks, no web font; the mono stack ends with `monospace`) |
 | z-index | `sticky` < `overlay` (backdrop) < `modal` < `popover` < `tooltip` |
@@ -141,6 +141,7 @@ mechanism.
 | Derived | Default |
 |---|---|
 | `primary-hover` / `primary-active` | `color-mix(in srgb, var(--color-rop-primary) 80%, black)` / `62%` |
+| `primary-subtle` / `primary-subtle-hover` / `primary-muted` | `color-mix(in srgb, var(--color-rop-primary) 8%, white)` / `16%` / `50%` (row selection fill at rest and on hover / press; count-flash border) |
 | `error-hover` / `error-active` | `color-mix(in srgb, var(--color-rop-error) 80%, black)` / `62%` |
 | `surface-pressed` | `color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black)` |
 | `readonly-surface` | `var(--color-rop-surface-subtle)` |
@@ -174,10 +175,8 @@ mechanism.
 - **With an opacity modifier** (`bg-rop-primary-hover/50`), browsers without `color-mix(in oklab)`
   get Tailwind's fallback, which keeps the alpha but ignores an override of the derived token.
 
-Two more limits at wrapper scope. `--color-rop-blue-600` does not move `--color-rop-primary`: the
-primary is resolved on `:root`, redeclare it directly. The row selection and the count flash of the
-List Report are drawn with the `blue` scale, so they stay blue with any theme, on `:root` as well
-([#293](https://github.com/Utumno1984/react-object-page/issues/293)).
+One more limit at wrapper scope. `--color-rop-blue-600` does not move `--color-rop-primary`: the
+primary is resolved on `:root`, redeclare it directly.
 
 ## `cn()`
 

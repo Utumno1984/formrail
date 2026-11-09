@@ -77,7 +77,7 @@ describe('derived tokens (optional overrides resolved at the point of use)', () 
 
   it('the `@theme reference` block holds exactly the derived tokens of the public contract', () => {
     expect([...derived.keys()].sort()).toEqual(
-      ['error-active', 'error-hover', 'primary-active', 'primary-hover', 'readonly-indicator', 'readonly-surface', 'surface-pressed'].map(
+      ['error-active', 'error-hover', 'primary-active', 'primary-hover', 'primary-muted', 'primary-subtle', 'primary-subtle-hover', 'readonly-indicator', 'readonly-surface', 'surface-pressed'].map(
         (name) => `--color-rop-${name}`,
       ),
     );

@@ -86,4 +86,4 @@ export const selectBoxClass = 'flex items-center justify-center';
 // backgrounds are dropped and the checkbox alone carries the state.
 export const selectableRowClass =
   'rop-hover:bg-rop-surface-subtle active:bg-rop-surface-subtle ' +
-  'data-selected:bg-rop-blue-50 data-selected:rop-hover:bg-rop-blue-100 data-selected:active:bg-rop-blue-100';
+  'data-selected:bg-rop-primary-subtle data-selected:rop-hover:bg-rop-primary-subtle-hover data-selected:active:bg-rop-primary-subtle-hover';
