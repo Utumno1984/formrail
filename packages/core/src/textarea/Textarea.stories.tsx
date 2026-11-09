@@ -237,6 +237,27 @@ function ExternalValueDemo() {
 /** Fixture: a controlled `autoResize` control whose value is set from outside after mount (asynchronous hydration). */
 export const ExternalValue: Story = { ...FIXTURE, render: () => <ExternalValueDemo /> };
 
+function RowsFromOutsideDemo() {
+  const [limits, setLimits] = useState({ rows: 2, maxRows: 4 });
+  return (
+    <div style={column}>
+      <button type="button" onClick={() => setLimits({ rows: 2, maxRows: 8 })}>
+        Eight rows maximum
+      </button>
+      <button type="button" onClick={() => setLimits({ rows: 7, maxRows: 8 })}>
+        Seven rows minimum
+      </button>
+      <Field label="Rejection reason">
+        {/* No `key`: the same mounted control receives the new limits. */}
+        <Textarea autoResize rows={limits.rows} maxRows={limits.maxRows} defaultValue={'1\n2\n3\n4\n5\n6'} />
+      </Field>
+    </div>
+  );
+}
+
+/** Fixture: `rows` and `maxRows` changed from outside on a mounted `autoResize` control (no remount). */
+export const RowsFromOutside: Story = { ...FIXTURE, render: () => <RowsFromOutsideDemo /> };
+
 /** Fixture: one very long token (a pasted URL) in a narrow Field. */
 export const LongToken: Story = {
   ...FIXTURE,

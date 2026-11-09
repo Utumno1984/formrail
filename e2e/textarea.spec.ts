@@ -162,11 +162,46 @@ test.describe('autoResize geometry', () => {
     expect(control).toBeLessThanOrEqual(column + 0.5);
   });
 
-  test('(11) rows changed from outside moves the minimum height (Controls)', async ({ page }) => {
-    await gotoStory(page, 'forms-textarea--manual', 'rows:2;maxRows:6');
-    expect(await height(area(page))).toBe(2 * LINE + CHROME);
-    await gotoStory(page, 'forms-textarea--manual', 'rows:5;maxRows:6');
-    expect(await height(area(page))).toBe(5 * LINE + CHROME);
+  test('(11) maxRows and rows changed from outside on the mounted control move the limit and the minimum (no remount)', async ({ page }) => {
+    await gotoStory(page, 'forms-textarea--rows-from-outside');
+    const el = area(page);
+    // Six lines, maxRows 4: clamped, scrolls inside.
+    expect(await height(el)).toBe(4 * LINE + CHROME);
+    expect(await el.evaluate((n) => getComputedStyle(n).overflowY)).toBe('auto');
+    await el.evaluate((n) => ((window as unknown as { __node?: Element }).__node = n));
+    await page.getByRole('button', { name: 'Eight rows maximum' }).click();
+    await expect.poll(() => height(el)).toBe(6 * LINE + CHROME);
+    expect(await el.evaluate((n) => getComputedStyle(n).overflowY)).toBe('hidden');
+    await page.getByRole('button', { name: 'Seven rows minimum' }).click();
+    await expect.poll(() => height(el)).toBe(7 * LINE + CHROME);
+    // The same node all along: the limits changed in place.
+    expect(await el.evaluate((n) => (window as unknown as { __node?: Element }).__node === n)).toBe(true);
+  });
+
+  test('(15) a fractional line height: no phantom scrollbar exactly at maxRows, one more row scrolls inside', async ({ page }) => {
+    for (const [lineHeight, maxRows] of [
+      ['19.5px', 7],
+      ['21.33px', 4],
+      ['17.6px', 7],
+    ] as const) {
+      await gotoStory(page, 'forms-textarea--manual', `rows:2;maxRows:${maxRows}`);
+      const el = area(page);
+      const at = async (count: number) =>
+        el.evaluate(
+          async (n, [lh, count]) => {
+            n.style.lineHeight = lh;
+            const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
+            setValue.call(n, Array.from({ length: count }, (_, i) => `L${i}`).join('\n'));
+            n.dispatchEvent(new Event('input', { bubbles: true }));
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            n.scrollTop = 0;
+            return { overflow: getComputedStyle(n).overflowY, fits: n.scrollHeight <= n.clientHeight };
+          },
+          [lineHeight, count] as const,
+        );
+      expect(await at(maxRows), `${lineHeight} × ${maxRows}: at the limit`).toEqual({ overflow: 'hidden', fits: true });
+      expect((await at(maxRows + 1)).overflow, `${lineHeight} × ${maxRows}: one row over`).toBe('auto');
+    }
   });
 });
 
