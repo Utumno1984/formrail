@@ -188,6 +188,14 @@ describe('InvoiceCrud: Create', () => {
     expect(window.__ropShowcaseStore?.snapshot()).toHaveLength(201);
   }, 20_000);
 
+  it.each(['', 'not-a-date', '2026-13-45'])('an unusable `today` (%j) falls back to the local date instead of throwing', async (today) => {
+    render(<InvoiceCrud {...base({ today })} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'New invoice' }));
+    const date = (await screen.findByLabelText('Invoice date')) as HTMLInputElement;
+    expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect((screen.getByLabelText('Due date') as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  }, 20_000);
+
   it('deep link ?create=1: Cancel replaces the entry with the list (no history entry added or lost)', async () => {
     window.history.replaceState(null, '', '/?filter=open&create=1');
     const entries = window.history.length;

@@ -179,6 +179,10 @@ const localToday = (): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+/** A usable yyyy-mm-dd or `undefined`: the Storybook control is free text, and `''`/garbage must not throw in `addDays`. */
+const validDay = (value: string | undefined): string | undefined =>
+  value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? value : undefined;
+
 /** The defaults of a new invoice: no supplier, open, no amount, dated today, due in 30 days. */
 const defaultValues = (today: string): InvoiceValues => ({
   supplier: '',
@@ -224,7 +228,7 @@ export function InvoiceEditor({
 }: InvoiceEditorProps) {
   const creating = record === null;
   const form = useObjectPageForm<InvoiceValues>({
-    baseline: record ? toValues(record) : defaultValues(today ?? localToday()),
+    baseline: record ? toValues(record) : defaultValues(validDay(today) ?? localToday()),
     isEqual: sameValues,
     validate: (v) => {
       const errors: Partial<Record<keyof InvoiceValues, string>> = {};
