@@ -59,3 +59,18 @@ export const internalIcons = /* @__PURE__ */ (() => ({
 }) satisfies Record<string, SvgElement>)();
 
 export type InternalIconName = keyof typeof internalIcons;
+
+// Kept out of `internalIcons`: that object is bundled whole by every control that uses one of its
+// icons, so the NumberInput steppers would grow all of them (bundle budget).
+export const stepperIcons = /* @__PURE__ */ (() => ({
+  plus: (
+    <svg {...stroke}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  minus: (
+    <svg {...stroke}>
+      <path d="M5 12h14" />
+    </svg>
+  ),
+}) satisfies Record<string, SvgElement>)();
