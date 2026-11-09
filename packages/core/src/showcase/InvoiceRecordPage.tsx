@@ -18,7 +18,7 @@ import { useObjectPageForm } from '../object-page/use-object-page-form';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
-import { InvoiceNotFoundError, type InvoiceStore, type StoredInvoice } from './invoice-store';
+import { addDays, InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from './showcase-data';
 
 export interface InvoiceRecordPageProps {
@@ -155,14 +155,48 @@ export function InvoiceRecordPage({ store, recordId, onBack, onSaved }: InvoiceR
   );
 }
 
-interface InvoiceEditorProps {
+export interface InvoiceEditorProps {
   store: InvoiceStore;
-  record: StoredInvoice;
+  /** The record to edit, or `null` to CREATE one (#363): same sections, default values, "Create"/"Cancel". */
+  record: StoredInvoice | null;
   onBack: () => void;
-  onSaved: ((invoice: StoredInvoice) => void) | undefined;
+  onSaved?: ((invoice: StoredInvoice) => void) | undefined;
   /** After "Retry" the button that had the focus is gone: the title takes it (never `<body>`). */
   focusTitleOnMount: boolean;
+  /** Creation only. Today's date (yyyy-mm-dd), the default invoice date. Default: the local date. */
+  today?: string;
+  /** Creation only. Called once per successful create with the record as the server stored it, even if the page was left meanwhile. */
+  onCreated?: (invoice: StoredInvoice) => void;
+  /**
+   * Creation only. Called once after a successful create, when the form is clean again (the dirty-guard no
+   * longer intercepts): the consumer navigates away from here, never right after the `await`.
+   */
+  onCreateDone?: (invoice: StoredInvoice) => void;
 }
+
+const localToday = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** The defaults of a new invoice: no supplier, open, no amount, dated today, due in 30 days. */
+const defaultValues = (today: string): InvoiceValues => ({
+  supplier: '',
+  status: 'pending',
+  amount: '',
+  date: today,
+  dueDate: addDays(today, 30),
+  notes: '',
+});
+
+const toDraft = (v: InvoiceValues): InvoiceDraft => ({
+  supplier: v.supplier,
+  status: v.status,
+  amount: Number(v.amount),
+  date: v.date,
+  dueDate: v.dueDate,
+  notes: v.notes,
+});
 
 // The amount is text; "1295.9" and "1295.90" are the same number, so typing the shorter form of the
 // baseline is not a change.
@@ -178,9 +212,19 @@ const sameValues = (a: InvoiceValues, b: InvoiceValues): boolean =>
 const DECIMAL = /^\d+(\.\d+)?$/;
 const SAVING_HINT = 'Saving… Discard only restores the form: the save still completes.';
 
-function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: InvoiceEditorProps) {
+export function InvoiceEditor({
+  store,
+  record,
+  onBack,
+  onSaved,
+  focusTitleOnMount,
+  today,
+  onCreated,
+  onCreateDone,
+}: InvoiceEditorProps) {
+  const creating = record === null;
   const form = useObjectPageForm<InvoiceValues>({
-    baseline: toValues(record),
+    baseline: record ? toValues(record) : defaultValues(today ?? localToday()),
     isEqual: sameValues,
     validate: (v) => {
       const errors: Partial<Record<keyof InvoiceValues, string>> = {};
@@ -239,14 +283,38 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
   }, [focusTitleOnMount]);
 
   const { values, setValue } = form;
-  const save = () =>
+  // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).
+  const [created, setCreated] = useState<StoredInvoice | null>(null);
+  const save = () => {
+    // Already created (the user kept typing during the save and kept editing at the guard): never a second
+    // record; the button only asks to leave again.
+    if (created) return guard(() => onCreateDone?.(created));
     void form.save(async (v) => {
       sentRef.current = v;
+      if (!record) {
+        const made = await store.create(toDraft(v));
+        onCreated?.(made);
+        setCreated(made);
+        // The baseline becomes the created record as the "server" returned it.
+        return toValues(made);
+      }
       const saved = await store.save(toInvoice(record, v));
       onSaved?.(saved);
       // The baseline becomes what the "server" returned (normalized), not what was sent.
       return toValues(saved);
     });
+  };
+
+  // The navigation after a Create starts from HERE, after the commit of the clean form, not right after the
+  // `await`: while `isDirty`/`isSaving` are true the guard also intercepts the `popstate` of `history.back()`
+  // and would open "Unsaved changes" after a successful Create. If the user kept typing during the save the
+  // form is dirty again and the guard (rightly) asks about those newer edits.
+  const doneRef = useRef(false);
+  useEffect(() => {
+    if (!created || form.isSaving || doneRef.current) return;
+    doneRef.current = true;
+    guard(() => onCreateDone?.(created));
+  }, [created, form.isSaving, guard, onCreateDone]);
 
   // The save error, when there is one, wins over the summary (`||`, not `??`).
   const problem =
@@ -254,7 +322,7 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
     getErrorSummary(form.fieldErrors, { formErrors: form.formErrors, message: summaryText });
   // #166: while a save runs, the footer Discard only restores the form (the save still lands): say it BEFORE
   // the click, since the footer hides once the form is clean.
-  const message = problem || (form.isSaving ? SAVING_HINT : undefined);
+  const message = problem || (form.isSaving ? (creating ? 'Saving…' : SAVING_HINT) : undefined);
 
   return (
     <div
@@ -264,11 +332,14 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
       <ValidationProvider fieldErrors={form.fieldErrors}>
         <ObjectPage labels={{ anchorBar: 'Sections' }}>
           <ObjectPageHeader
-            title={record.number}
-            // The identity shows the SAVED record (the baseline), not the unsaved draft.
-            subtitle={form.baseline.supplier || 'No supplier'}
+            title={record ? record.number : 'New invoice'}
+            // The identity shows the SAVED record (the baseline), not the unsaved draft. A new invoice has
+            // neither a subtitle nor a status badge yet.
+            subtitle={record ? form.baseline.supplier || 'No supplier' : undefined}
             status={
-              <StatusBadge tone={STATUS_TONE[form.baseline.status]}>{STATUS_LABEL[form.baseline.status]}</StatusBadge>
+              record ? (
+                <StatusBadge tone={STATUS_TONE[form.baseline.status]}>{STATUS_LABEL[form.baseline.status]}</StatusBadge>
+              ) : undefined
             }
             actions={
               <Button variant="secondary" onClick={() => guard(onBack)}>
@@ -277,23 +348,30 @@ function InvoiceEditor({ store, record, onBack, onSaved, focusTitleOnMount }: In
             }
           />
           <ObjectPageFooter
-            visible={form.isDirty}
+            visible={creating || form.isDirty}
             label="Save actions"
             toneLabel={problem ? 'Error' : 'Information'}
             message={message}
             messageTone={problem ? 'error' : 'info'}
           >
             <Button onClick={save} aria-disabled={form.isSaving || undefined}>
-              Save
+              {creating ? 'Create' : 'Save'}
             </Button>
-            <Button variant="secondary" onClick={() => form.reset()}>
-              Discard
-            </Button>
+            {creating ? (
+              // Leaves the page (through the guard); it is not the "Discard" of the Update.
+              <Button variant="secondary" onClick={() => guard(onBack)}>
+                Cancel
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => form.reset()}>
+                Discard
+              </Button>
+            )}
           </ObjectPageFooter>
           <ObjectPageSection id="general" title="General">
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
               <Field label="Invoice number" state="locked" stateReason="The invoice number is assigned by the system.">
-                <Input value={record.number} readOnly />
+                <Input value={record ? record.number : 'Assigned on save'} readOnly />
               </Field>
               <Field label="Supplier" name="supplier" required>
                 <Select

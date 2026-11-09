@@ -10,6 +10,9 @@ export interface StoredInvoice extends DemoInvoice {
   notes: string;
 }
 
+/** What the client sends to create a record: everything but the identity the server assigns. */
+export type InvoiceDraft = Omit<StoredInvoice, 'id' | 'number'>;
+
 export type SaveOutcome = 'success' | 'error';
 /** `error-once`: the first read fails, the following ones succeed (to exercise "Retry"). */
 export type LoadOutcome = 'success' | 'error' | 'error-once';
@@ -51,6 +54,12 @@ export interface InvoiceStore {
    * with `InvoiceNetworkError` when `saveOutcome` is `error` (the store is then unchanged).
    */
   save: (invoice: StoredInvoice) => Promise<StoredInvoice>;
+  /**
+   * Creates a record (#363): the "server" assigns `id` (`inv-<n>`) and `number` (`FT-2026-<nnnn>`) from a
+   * monotonic counter that never reuses either, whatever happens to the records later. Same delay, outcome
+   * (`InvoiceNetworkError`, store unchanged) and amount rounding as `save`.
+   */
+  create: (draft: InvoiceDraft) => Promise<StoredInvoice>;
   /** Changes delays/outcomes; applies to the calls made from now on. */
   configure: (patch: Partial<InvoiceStoreConfig>) => void;
   /** Synchronous read of the current state (for tests and debugging). */
@@ -58,7 +67,7 @@ export interface InvoiceStore {
 }
 
 const DAY_MS = 86_400_000;
-const addDays = (iso: string, days: number): string =>
+export const addDays = (iso: string, days: number): string =>
   new Date(Date.parse(iso + 'T00:00:00Z') + days * DAY_MS).toISOString().slice(0, 10);
 
 const extend = (r: DemoInvoice, index: number): StoredInvoice => ({
@@ -88,6 +97,8 @@ export function createInvoiceStore(
   };
   const records = new Map<string, StoredInvoice>(seed.map((r, i) => [r.id, extend(r, i)]));
   let failedOnce = false;
+  // Monotonic: the next identity is one past the highest ever issued (a record removed later never frees it).
+  let sequence = seed.length;
   // Copies in and out: a caller mutating what it got can never change the store.
   const copy = (r: StoredInvoice): StoredInvoice => ({ ...r });
 
@@ -115,6 +126,20 @@ export function createInvoiceStore(
       if (saveOutcome === 'error') throw new InvoiceNetworkError('Could not save the invoice: network error');
       if (!records.has(invoice.id)) throw new InvoiceNotFoundError(invoice.id);
       const stored: StoredInvoice = { ...invoice, amount: round2(invoice.amount) };
+      records.set(stored.id, stored);
+      return copy(stored);
+    },
+    async create(draft) {
+      const { saveDelayMs, saveOutcome } = config;
+      await delay(saveDelayMs);
+      if (saveOutcome === 'error') throw new InvoiceNetworkError('Could not save the invoice: network error');
+      sequence += 1;
+      const stored: StoredInvoice = {
+        ...draft,
+        id: `inv-${sequence}`,
+        number: `FT-2026-${String(sequence).padStart(4, '0')}`,
+        amount: round2(draft.amount),
+      };
       records.set(stored.id, stored);
       return copy(stored);
     },
