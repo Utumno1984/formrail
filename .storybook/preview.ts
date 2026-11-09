@@ -19,11 +19,21 @@ const preview: Preview = {
   tags: ['autodocs'],
   parameters: {
     layout: 'padded',
-    // `source.type: 'code'` = "Show code" prints the story's original source text. The default
-    // (`dynamic`) synthesizes JSX from the rendered tree, which for a `render` that declares a local
-    // stateful component (`function XyzDemo() {...}; return <XyzDemo />`, ~27 stories) collapses into a
-    // minified placeholder such as `<t />` (ticket #333). Guarded by e2e/docs-source.spec.ts.
-    docs: { theme: ropTheme, source: { type: 'code' } },
+    docs: {
+      theme: ropTheme,
+      source: {
+        // "Show code" defaults to `dynamic` (JSX synthesized from the rendered tree, with the live args):
+        // right for `render: (args) => <X {...args} />` and for stories with no render of their own
+        // (`export const Playground: Story = {}`, where `type: 'code'` would print just `{}`). But a `render`
+        // that declares a local stateful component (`function XyzDemo() {...}; return <XyzDemo />`, ~27
+        // stories) collapses into a minified placeholder such as `<t />` (ticket #333). For exactly those
+        // stories, print the story's original source text instead. Guarded by e2e/docs-source.spec.ts.
+        transform: (code: string, storyContext: { parameters?: { docs?: { source?: { originalSource?: unknown } } } }) => {
+          const original = storyContext.parameters?.docs?.source?.originalSource;
+          return typeof original === 'string' && /\bfunction\s+[A-Za-z_$][\w$]*\s*\(/.test(original) ? original : code;
+        },
+      },
+    },
     backgrounds: { disable: devToolsDisabled },
     outline: { disable: devToolsDisabled },
     measure: { disable: devToolsDisabled },

@@ -24,7 +24,7 @@ test.describe('Storybook "Show code"', () => {
     // `function XyzDemo(`. Opening every "Show code" of every Docs page (~100) would take ~9 minutes.
     const affected = new Set(
       readdirSync('packages', { recursive: true, encoding: 'utf8' })
-        .filter((file) => file.endsWith('.stories.tsx') && /function [A-Za-z]+(Host|Demo)\(/.test(readFileSync(`packages/${file}`, 'utf8')))
+        .filter((file) => file.endsWith('.stories.tsx') && !file.includes('node_modules') && /function [A-Za-z]+(Host|Demo)\(/.test(readFileSync(`packages/${file}`, 'utf8')))
         .map((file) => `./packages/${file}`),
     );
     const docs = Object.values(index.entries).filter((e) => e.type === 'docs' && e.importPath && affected.has(e.importPath));
@@ -46,7 +46,28 @@ test.describe('Storybook "Show code"', () => {
       for (const code of await blocks.all()) await expect(code, `${entry.id}: empty source`).not.toHaveText('');
       for (const code of await blocks.allInnerTexts()) {
         expect(PLACEHOLDER.test(code), `${entry.id}: placeholder instead of source: ${code.trim()}`).toBe(false);
+        // The placeholder pattern is a known symptom, not the contract: any one-liner this short is not a story's source.
+        expect(code.trim().length, `${entry.id}: suspiciously short source: ${code.trim()}`).toBeGreaterThan(30);
       }
+    }
+  });
+
+  // Criterion 3 of the ticket: stories that were fine stay as they were (the live JSX, not the story object).
+  test.describe('stories without a local component keep the synthesized JSX', () => {
+    const cases = [
+      // `export const Playground: Story = {}`: the live props (the production build minifies the tag name, so it is not asserted).
+      { docs: 'primitives-avatar--docs', story: 'Playground', needle: 'name="Ada Lovelace"' },
+      { docs: 'forms-checkbox--docs', story: 'In Form', needle: '<form' }, // render with a direct JSX return
+    ];
+    for (const { docs, story, needle } of cases) {
+      test(`${docs} → ${story}`, async ({ page }) => {
+        await page.goto(`/iframe.html?id=${docs}&viewMode=docs`);
+        const heading = `//h3[normalize-space()="${story}"]`;
+        await page.locator(`xpath=${heading}/following::*[@role="switch"][1]`).click();
+        const block = page.locator(`xpath=${heading}/following::pre[1]`);
+        await expect(block).toContainText(needle);
+        await expect(block).not.toContainText('render:');
+      });
     }
   });
 
