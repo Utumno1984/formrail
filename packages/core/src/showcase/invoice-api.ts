@@ -1,4 +1,4 @@
-// Story-only: the store as the Invoices showcases see it (#151, #363). A write outlives the page that started
+// Story-only: the store as the Invoices showcases see it (#151, #363, #365). A write (save, create, delete) outlives the page that started
 // it (leave with "Leave anyway" while it runs), so reads wait for the writes in flight: a list or a re-opened
 // record never shows (and a later save never builds on) a value older than the one the "server" is about to
 // hold, and a list reopened while a Create is in flight shows the new record.
@@ -25,6 +25,7 @@ export function createInvoiceApi(store: InvoiceStore, delays: { readonly current
     ...store,
     save: (invoice) => track(store.save(invoice)),
     create: (draft) => track(store.create(draft)),
+    delete: (id) => track(store.delete(id)),
     list: async () => {
       await settled();
       store.configure({ loadDelayMs: delays.current.listLoadDelayMs });

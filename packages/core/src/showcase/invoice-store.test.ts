@@ -161,3 +161,54 @@ describe('createInvoiceStore', () => {
     expect(a.snapshot().find((r) => r.id === 'inv-1')!.notes).toBe('only in a');
   });
 });
+
+describe('createInvoiceStore: delete (#365)', () => {
+  const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+
+  it('removes the record after saveDelayMs; a second delete of the same id is InvoiceNotFoundError', async () => {
+    const store = createInvoiceStore(undefined, { saveDelayMs: 300 });
+    const spy = vi.fn();
+    const pending = store.delete('inv-2').then(spy);
+    await vi.advanceTimersByTimeAsync(299);
+    expect(spy).not.toHaveBeenCalled();
+    expect(store.snapshot()).toHaveLength(200);
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(store.snapshot()).toHaveLength(199);
+    expect(store.snapshot().some((r) => r.id === 'inv-2')).toBe(false);
+    const again = store.delete('inv-2');
+    const check = expect(again).rejects.toBeInstanceOf(InvoiceNotFoundError);
+    await vi.advanceTimersByTimeAsync(300);
+    await check;
+    const get = store.get('inv-2');
+    await expect(get).rejects.toBeInstanceOf(InvoiceNotFoundError);
+  });
+
+  it('deleteOutcome error rejects with InvoiceNetworkError and leaves the store unchanged; read when the call is made', async () => {
+    const store = createInvoiceStore(undefined, { deleteOutcome: 'error' });
+    const before = JSON.stringify(store.snapshot());
+    await expect(store.delete('inv-1')).rejects.toBeInstanceOf(InvoiceNetworkError);
+    expect(JSON.stringify(store.snapshot())).toBe(before);
+    // Configured while the delete waits: the outcome of the call already made does not change.
+    store.configure({ deleteOutcome: 'success', saveDelayMs: 100 });
+    const ok = store.delete('inv-1');
+    store.configure({ deleteOutcome: 'error' });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(ok).resolves.toBeUndefined();
+    expect(store.snapshot()).toHaveLength(199);
+  });
+
+  it('a record created after a delete never reuses the identity of the deleted one (nor of any other)', async () => {
+    const store = createInvoiceStore();
+    const first = await store.create(draft); // inv-201
+    await store.delete(first.id);
+    await store.delete('inv-200');
+    const next = await store.create(draft);
+    expect(next.id).toBe('inv-202');
+    expect(next.number).toBe('FT-2026-0202');
+    const ids = store.snapshot().map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).not.toContain(first.id);
+  });
+});

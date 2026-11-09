@@ -14,6 +14,7 @@ export interface StoredInvoice extends DemoInvoice {
 export type InvoiceDraft = Omit<StoredInvoice, 'id' | 'number'>;
 
 export type SaveOutcome = 'success' | 'error';
+export type DeleteOutcome = 'success' | 'error';
 /** `error-once`: the first read fails, the following ones succeed (to exercise "Retry"). */
 export type LoadOutcome = 'success' | 'error' | 'error-once';
 
@@ -27,6 +28,8 @@ export interface InvoiceStoreConfig {
   saveDelayMs: number | Promise<void>;
   saveOutcome: SaveOutcome;
   loadOutcome: LoadOutcome;
+  /** `error`: `delete` rejects with `InvoiceNetworkError` and the store is unchanged (#365). */
+  deleteOutcome: DeleteOutcome;
 }
 
 export class InvoiceNotFoundError extends Error {
@@ -60,6 +63,12 @@ export interface InvoiceStore {
    * (`InvoiceNetworkError`, store unchanged) and amount rounding as `save`.
    */
   create: (draft: InvoiceDraft) => Promise<StoredInvoice>;
+  /**
+   * Deletes a record (#365) after `saveDelayMs`. Rejects with `InvoiceNetworkError` when `deleteOutcome` is
+   * `error` (the store is then unchanged), with `InvoiceNotFoundError` for an id that does not exist (any
+   * more). The identity of a deleted record is never issued again (see `create`).
+   */
+  delete: (id: string) => Promise<void>;
   /** Changes delays/outcomes; applies to the calls made from now on. */
   configure: (patch: Partial<InvoiceStoreConfig>) => void;
   /** Synchronous read of the current state (for tests and debugging). */
@@ -93,6 +102,7 @@ export function createInvoiceStore(
     saveDelayMs: 0,
     saveOutcome: 'success',
     loadOutcome: 'success',
+    deleteOutcome: 'success',
     ...initial,
   };
   const records = new Map<string, StoredInvoice>(seed.map((r, i) => [r.id, extend(r, i)]));
@@ -142,6 +152,12 @@ export function createInvoiceStore(
       };
       records.set(stored.id, stored);
       return copy(stored);
+    },
+    async delete(id) {
+      const { saveDelayMs, deleteOutcome } = config;
+      await delay(saveDelayMs);
+      if (deleteOutcome === 'error') throw new InvoiceNetworkError('Could not delete the invoice: network error');
+      if (!records.delete(id)) throw new InvoiceNotFoundError(id);
     },
     configure: (patch) => {
       Object.assign(config, patch);
