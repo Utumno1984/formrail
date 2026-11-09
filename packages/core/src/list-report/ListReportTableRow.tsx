@@ -1,8 +1,9 @@
-import { memo, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
+import { memo, useLayoutEffect, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
 import { Checkbox } from '../checkbox/Checkbox';
 import { cn } from '../utils/cn';
 import { renderCell, type RenderCellOptions } from './list-report-cell';
 import type { ListReportTableLabels } from './ListReportTableStates';
+import { keepFocusInTable, tableContainerOf } from './keep-focus-in-table';
 import { ListReportRowActionsCell } from './ListReportRowActions';
 import {
   ALIGN_TEXT,
@@ -58,6 +59,17 @@ function ListReportTableRowImpl<Row>({
   const { columns, selection } = table;
   // The checkbox calls `onClick` before `onCheckedChange` within the same click: keep the event for `onToggle`.
   const lastClick = useRef<MouseEvent<HTMLInputElement> | null>(null);
+  // A row removed while one of its controls has the focus (its checkbox, a link in a cell, its actions
+  // trigger; deleted, filtered out): the focus goes to the table's scroll container, never `body`.
+  // Taken in a layout cleanup, while the row is still in the document.
+  const trRef = useRef<HTMLTableRowElement | null>(null);
+  useLayoutEffect(
+    () => () => {
+      const tr = trRef.current;
+      keepFocusInTable(tableContainerOf(tr), [tr]);
+    },
+    [],
+  );
   const id = table.getRowId(row);
   const selected = selectable && selection.isSelected(id);
   const { className: extraClassName, ...restRowProps } = rowProps ?? {};
@@ -71,7 +83,7 @@ function ListReportTableRowImpl<Row>({
       ? cn(rowActions && rowActionsRowClass, selectable && selectableRowClass, extraClassName)
       : extraClassName;
   return (
-    <tr {...restRowProps} data-selected={selected ? '' : undefined} className={className}>
+    <tr {...restRowProps} ref={trRef} data-selected={selected ? '' : undefined} className={className}>
       {selectable ? (
         <td className={selectBodyCellClass}>
           <div className={selectBoxClass}>

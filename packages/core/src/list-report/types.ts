@@ -133,7 +133,9 @@ export interface UseListReportOptions<Row> {
 export interface ListReportRowActionContext {
   /**
    * The element that should get the focus back when an overlay opened by the action closes: the
-   * trigger of the row's actions menu. Pass it as the `returnFocusRef` of a `Dialog`, a
+   * trigger of the row's actions menu while it is in the document, the table's scroll container once
+   * it is gone (the action deleted the row, e.g. after `await confirm(…)`). Read it when the focus is
+   * returned, not when the action runs. Pass it as the `returnFocusRef` of a `Dialog`, a
    * `ConfirmDialog` or `useConfirmDialog`'s `confirm()`.
    */
   returnFocusRef: RefObject<HTMLElement | null>;

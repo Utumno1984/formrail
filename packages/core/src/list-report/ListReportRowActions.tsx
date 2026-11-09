@@ -1,18 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Button } from '../button/Button';
 import { moreIcon } from '../internal/icons';
+import { isDev } from '../internal/is-dev';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
+import { keepFocusInTable, tableContainerOf } from './keep-focus-in-table';
 import { rowActionsBodyCellClass, rowActionsItemIconClass, rowActionsItemLabelClass, selectBoxClass } from './list-report-table-styles';
 import type { ListReportRowAction, ListReportRowActionContext } from './types';
-
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
 
 /** @internal Props of {@link ListReportRowActionsCell}. */
 export interface ListReportRowActionsCellProps {
@@ -25,7 +18,21 @@ export interface ListReportRowActionsCellProps {
 function RowActionsMenu({ actions, triggerLabel }: ListReportRowActionsCellProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const context = useMemo<ListReportRowActionContext>(() => ({ returnFocusRef: triggerRef }), []);
+  // The table's scroll container, taken while the trigger is in the document.
+  const containerRef = useRef<HTMLElement | null>(null);
+  // What an overlay opened by an action gives the focus back to: the trigger while it is there, the
+  // table's scroll container once it is gone. Dialogs read `returnFocusRef.current` when they return
+  // the focus (after their exit), which can be well after the row went away: e.g. an action that awaits
+  // `useConfirmDialog`'s `confirm()` and then deletes its row, whose continuation runs before the
+  // dialog has finished closing. Pointing the ref at a node that is still there covers every such
+  // timing, without guessing when the overlay will be done.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const context = useMemo<ListReportRowActionContext>(() => ({ returnFocusRef }), []);
+  const setTrigger = useCallback((node: HTMLButtonElement | null) => {
+    triggerRef.current = node;
+    if (node) containerRef.current = tableContainerOf(node);
+    returnFocusRef.current = node ?? containerRef.current;
+  }, []);
 
   useEffect(() => {
     if (!isDev()) return;
@@ -38,25 +45,10 @@ function RowActionsMenu({ actions, triggerLabel }: ListReportRowActionsCellProps
     }
   }, [actions]);
 
-  // Going away with the focus (the row deleted or filtered out, also by one of its own actions, or its
-  // actions becoming empty): the focused trigger or menu item leaves the document and the focus would
-  // fall on `body`. A layout cleanup runs before the nodes are removed, so it can still see where the
-  // focus is and which table this is; the scroll container gets the focus once the frame is over (the
-  // menu's own return of the focus runs in one too), unless something else took it by then.
-  useLayoutEffect(
-    () => () => {
-      const trigger = triggerRef.current;
-      const active = document.activeElement;
-      const hadFocus = !!active && (trigger?.contains(active) || contentRef.current?.contains(active));
-      const container = trigger?.closest('table')?.parentElement;
-      if (!hadFocus || !container) return;
-      requestAnimationFrame(() => {
-        const now = document.activeElement;
-        if (container.isConnected && (!now || now === document.body || !now.isConnected)) container.focus({ preventScroll: true });
-      });
-    },
-    [],
-  );
+  // Going away while the trigger or the (portalled, so outside the row) menu has the focus: the row
+  // deleted or filtered out, also synchronously by one of its own actions, or its actions becoming
+  // empty. The focus would fall on `body`; it goes to the table's scroll container instead.
+  useLayoutEffect(() => () => keepFocusInTable(containerRef.current, [triggerRef.current, contentRef.current]), []);
 
   return (
     <div className={selectBoxClass}>
@@ -68,7 +60,7 @@ function RowActionsMenu({ actions, triggerLabel }: ListReportRowActionsCellProps
         modal={false}
       >
         <MenuTrigger asChild>
-          <Button ref={triggerRef} variant="ghost" size="icon-sm" aria-label={triggerLabel}>
+          <Button ref={setTrigger} variant="ghost" size="icon-sm" aria-label={triggerLabel}>
             {moreIcon}
           </Button>
         </MenuTrigger>
@@ -98,7 +90,9 @@ function RowActionsMenu({ actions, triggerLabel }: ListReportRowActionsCellProps
 /**
  * @internal The trailing, sticky cell of a data row with `rowActions`: a "…" icon button that opens a
  * `Menu` with one item per action. Each item takes `onSelect`, `disabled` and `tone` from its
- * descriptor as they are; `onSelect` receives the trigger as `returnFocusRef`.
+ * descriptor as they are; `onSelect` receives `returnFocusRef`: the trigger, or the table's scroll
+ * container once the trigger is gone (an overlay opened by the action, e.g. a confirmation, that
+ * closes after the action deleted its row gives the focus to the container, never `body`).
  *
  * - The menu is not modal: the rest of the page keeps its accessibility tree and stays interactive;
  *   Escape, Tab and a click outside close it.

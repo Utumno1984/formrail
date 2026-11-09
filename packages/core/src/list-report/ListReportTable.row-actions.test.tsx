@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { useCallback, useState } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
 import { ListReport } from './ListReport';
 import { ListReportTable, type ListReportTableStatus } from './ListReportTable';
 import type { ListReportColumn, ListReportFilter, ListReportRowAction, ListReportRowActionContext, ListReportRowActions } from './types';
@@ -351,6 +352,99 @@ describe('ListReportTable rowActions — focus when the trigger goes away', () =
     expect(screen.queryByRole('cell', { name: 'FT-2026-0001' })).toBeNull();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(remove).toHaveFocus();
+  });
+});
+
+describe('ListReportTable rowActions — an action that awaits useConfirmDialog, then deletes its row (code review of #370)', () => {
+  function ConfirmThenDelete({ onDeleted }: { onDeleted: (id: string) => void }) {
+    const [rows, setRows] = useState(ROWS);
+    const [confirm, confirmDialog] = useConfirmDialog();
+    const rowActions = useCallback(
+      (row: Invoice): readonly ListReportRowAction[] => [
+        {
+          id: 'delete',
+          label: 'Delete…',
+          tone: 'danger',
+          // The continuation runs as soon as `confirm()` resolves, while the dialog is still closing.
+          onSelect: async ({ returnFocusRef }) => {
+            if (await confirm({ title: `Delete ${row.number}?`, confirmLabel: 'Delete invoice', returnFocusRef })) {
+              setRows((current) => current.filter((r) => r.id !== row.id));
+              onDeleted(row.id);
+            }
+          },
+        },
+      ],
+      [confirm, onDeleted],
+    );
+    return (
+      <>
+        <Host rows={rows} rowActions={rowActions} />
+        {confirmDialog}
+      </>
+    );
+  }
+
+  it('confirm: the row is deleted and the focus goes to the table container, never body', async () => {
+    const user = userEvent.setup();
+    const onDeleted = vi.fn();
+    const { container } = render(<ConfirmThenDelete onDeleted={onDeleted} />);
+    await user.click(trigger('FT-2026-0002'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete FT-2026-0002?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith('b'));
+    expect(screen.queryByRole('cell', { name: 'FT-2026-0002', hidden: true })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const scroller = container.querySelector('table')!.parentElement!;
+    await waitFor(() => expect(scroller).toHaveFocus());
+    // Still there a few frames later: nothing moves it to body afterwards.
+    for (let i = 0; i < 3; i += 1) await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(scroller).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('cancel: the row stays and the focus is back on its trigger', async () => {
+    const user = userEvent.setup();
+    const onDeleted = vi.fn();
+    render(<ConfirmThenDelete onDeleted={onDeleted} />);
+    await user.click(trigger('FT-2026-0002'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(trigger('FT-2026-0002')).toHaveFocus());
+    expect(onDeleted).not.toHaveBeenCalled();
+  });
+
+  it('returnFocusRef.current is the trigger while it exists, the table container once the row is gone', async () => {
+    const user = userEvent.setup();
+    let ref: ListReportRowActionContext['returnFocusRef'] | null = null;
+    let setRows: (rows: Invoice[]) => void = () => {};
+    function Capture() {
+      const [rows, set] = useState(ROWS);
+      setRows = set;
+      return <Host rows={rows} rowActions={() => [{ id: 'x', label: 'Capture', onSelect: (ctx) => (ref = ctx.returnFocusRef) }]} />;
+    }
+    const { container } = render(<Capture />);
+    await user.click(trigger('FT-2026-0001'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Capture' }));
+    expect(ref!.current).toBe(trigger('FT-2026-0001'));
+    act(() => setRows(ROWS.slice(1)));
+    expect(ref!.current).toBe(container.querySelector('table')!.parentElement);
+  });
+});
+
+describe('ListReportTable — a removed row that held the focus (any control of the row)', () => {
+  it('a focused row checkbox whose row is removed: the focus goes to the table container', async () => {
+    let setRows: (rows: Invoice[]) => void = () => {};
+    function Selectable() {
+      const [rows, set] = useState(ROWS);
+      setRows = set;
+      return <Host rows={rows} selectable />;
+    }
+    const { container } = render(<Selectable />);
+    screen.getByRole('checkbox', { name: 'Select FT-2026-0001' }).focus();
+    act(() => setRows(ROWS.slice(1)));
+    await waitFor(() => expect(container.querySelector('table')!.parentElement).toHaveFocus());
   });
 });
 

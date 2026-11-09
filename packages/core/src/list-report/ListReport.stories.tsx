@@ -1350,8 +1350,9 @@ function RowActionsReport({
   onDelete,
   preselectedIds,
 }: RowActionsArgs) {
+  const [rows, setRows] = useState<readonly DemoInvoice[]>(ROW_ACTION_ROWS);
   const table = useListReport<DemoInvoice>({
-    rows: ROW_ACTION_ROWS,
+    rows,
     columns: URL_COLUMNS,
     getRowId: (r) => r.id,
     filters: URL_FILTERS,
@@ -1369,7 +1370,8 @@ function RowActionsReport({
         label: 'Delete…',
         tone: deleteTone,
         disabled: row.status === disabledFor,
-        // The confirmation gives the focus back to this row's "…" button when it closes.
+        // The confirmation gives the focus back to this row's "…" button when it closes (Cancel), or to
+        // the table once the row is deleted (Delete invoice).
         onSelect: async ({ returnFocusRef }) => {
           const confirmed = await confirm({
             title: `Delete invoice ${row.number}?`,
@@ -1377,7 +1379,9 @@ function RowActionsReport({
             confirmLabel: 'Delete invoice',
             returnFocusRef,
           });
-          if (confirmed) onDelete(row.id);
+          if (!confirmed) return;
+          setRows((current) => current.filter((r) => r.id !== row.id));
+          onDelete(row.id);
         },
       },
     ],
@@ -1426,7 +1430,8 @@ const ROW_ACTIONS_ARGS: RowActionsArgs = {
 /**
  * Per-row actions (`rowActions`): a trailing column, sticky at the end of the table, with a "…" button per
  * row named "Actions for <number>" that opens a menu: "Duplicate" and "Delete…" (danger, disabled for the
- * approved invoices; it asks for a confirmation that returns the focus to the row's button). Controls: the
+ * approved invoices; it asks for a confirmation, then deletes the row: Cancel returns the focus to the
+ * row's button, a confirmed deletion to the table). Controls: the
  * status whose "Delete" is disabled, its tone, `selectable` and the width of the container (narrow: the
  * table scrolls sideways under the actions column). `onDuplicate`/`onDelete` show up in Actions with the
  * id of the row. The play function opens the menu of an approved invoice ("Delete…" cannot be chosen),

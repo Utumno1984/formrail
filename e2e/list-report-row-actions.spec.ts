@@ -118,6 +118,22 @@ test.describe('List Report row actions', () => {
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
   });
 
+  test('confirming deletes the row: the focus goes to the table container, never body (code review of #370)', async ({ page }) => {
+    await gotoStory(page, STORY);
+    await trigger(page, PENDING.number).click();
+    await item(page, 'Delete…').click();
+    const dialog = page.getByRole('dialog', { name: `Delete invoice ${PENDING.number}?` });
+    await dialog.getByRole('button', { name: 'Delete invoice' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger(page, PENDING.number)).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /Invoices/ })).toContainText(`(${ROWS.length - 1})`);
+    // The return happens after the exit animation of the dialog.
+    await expect(scroller(page)).toBeFocused();
+    await page.waitForTimeout(500);
+    await expect(scroller(page)).toBeFocused();
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+  });
+
   test('the same from the keyboard, with Escape on the confirmation', async ({ page }) => {
     await gotoStory(page, STORY);
     await trigger(page, PENDING.number).focus();
