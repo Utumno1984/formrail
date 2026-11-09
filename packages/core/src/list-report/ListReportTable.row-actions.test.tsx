@@ -139,6 +139,15 @@ describe('ListReportTable rowActions — structure', () => {
     expect(screen.queryAllByRole('button', { name: /^Actions for / })).toHaveLength(0);
   });
 
+  it('status="loading" with rows (a refetch): the triggers stay usable, like the rest of the row', async () => {
+    const user = userEvent.setup();
+    const duplicate = vi.fn();
+    render(<Host status="loading" rowActions={actionsFor({ duplicate })} />);
+    await user.click(trigger('FT-2026-0001'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
+    expect(duplicate).toHaveBeenCalledTimes(1);
+  });
+
   it('counts the column in the minimum width of the table', () => {
     const { rerender } = render(<Host />);
     const before = screen.getByRole('table').style.minWidth;
