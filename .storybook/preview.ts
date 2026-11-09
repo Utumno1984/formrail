@@ -19,7 +19,11 @@ const preview: Preview = {
   tags: ['autodocs'],
   parameters: {
     layout: 'padded',
-    docs: { theme: ropTheme },
+    // `source.type: 'code'` = "Show code" prints the story's original source text. The default
+    // (`dynamic`) synthesizes JSX from the rendered tree, which for a `render` that declares a local
+    // stateful component (`function XyzDemo() {...}; return <XyzDemo />`, ~27 stories) collapses into a
+    // minified placeholder such as `<t />` (ticket #333). Guarded by e2e/docs-source.spec.ts.
+    docs: { theme: ropTheme, source: { type: 'code' } },
     backgrounds: { disable: devToolsDisabled },
     outline: { disable: devToolsDisabled },
     measure: { disable: devToolsDisabled },
