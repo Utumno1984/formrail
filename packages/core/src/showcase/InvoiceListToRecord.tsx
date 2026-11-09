@@ -4,23 +4,29 @@
 // detail INSTEAD of the list (the list is unmounted); Back brings the list back with pill, search, sort,
 // scroll and focus restored.
 //
-// RECIPE (documented here, no new library API): the "router" below is ~40 lines on `history` + `popstate`.
-//   - the route is the `record` query parameter; every other parameter (the list's own, the page's) is kept
-//     byte for byte by `updateSearch`;
-//   - opening = `pushState` (so Back/Forward work) with a marker in `history.state`;
-//   - "Back to list" = `history.back()` when this entry was pushed by the list (exact restoration, and
-//     Forward reopens the record), otherwise (deep link) a `replaceState` to the same URL without `record`;
-//   - the list restores its scroll by itself (`useListReportScrollRestoration`, keyed on the list's own
-//     parameters: `record` is not one of them); focus goes back to the opened row's link, or to the title.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+// RECIPE (documented in `showcase-router.ts`, no new library API): the "router" is ~60 lines on `history` +
+// `popstate`, shared with the CRUD showcase (#363). The list restores its scroll by itself
+// (`useListReportScrollRestoration`); focus goes back to the opened row's link, or to the title.
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { ListReport } from '../list-report/ListReport';
 import { useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
-import { updateSearch, useListReportUrlState } from '../list-report/use-list-report-url-state';
+import { useListReportUrlState } from '../list-report/use-list-report-url-state';
 import type { DemoInvoice } from '../internal/demo-invoices';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
 import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
+import { createInvoiceApi } from './invoice-api';
 import { createInvoiceStore, type InvoiceStore, type SaveOutcome, type StoredInvoice } from './invoice-store';
+import { isLeaving, leaveRoute, openRecord, readRecord, recordHref, subscribeRoute } from './showcase-router';
 
 export type NavigateEvent = { to: 'record'; id: string } | { to: 'list' };
 
@@ -46,53 +52,6 @@ declare global {
   }
 }
 
-/* ---------------------------------------------------------------- mini router */
-
-const FROM_LIST = 'ropFromList';
-let routeListeners: (() => void)[] = [];
-const notifyRoute = () => routeListeners.forEach((l) => l());
-const subscribeRoute = (listener: () => void) => {
-  routeListeners = [...routeListeners, listener];
-  window.addEventListener('popstate', listener);
-  return () => {
-    routeListeners = routeListeners.filter((l) => l !== listener);
-    window.removeEventListener('popstate', listener);
-  };
-};
-const readRecord = (): string | null => new URLSearchParams(window.location.search).get('record') || null;
-const stateObject = (): Record<string, unknown> => {
-  const s: unknown = window.history.state;
-  return typeof s === 'object' && s !== null ? (s as Record<string, unknown>) : {};
-};
-const urlWith = (record: string | null): string =>
-  `${window.location.pathname}${updateSearch(window.location.search, { record })}${window.location.hash}`;
-
-function openRecord(id: string): void {
-  if (readRecord() === id) return; // a double click leaves ONE history entry
-  window.history.pushState({ ...stateObject(), [FROM_LIST]: true }, '', urlWith(id));
-  notifyRoute();
-}
-
-// `history.back()` is asynchronous: until its `popstate` the record page is still on screen and still
-// carries the marker, so a second click would go back TWO entries (out of the app). One at a time.
-let leaving = false;
-
-function leaveRecord(): void {
-  if (stateObject()[FROM_LIST] === true) {
-    if (leaving) return;
-    leaving = true;
-    window.addEventListener('popstate', () => (leaving = false), { once: true });
-    window.history.back(); // `popstate` re-renders the list
-    return;
-  }
-  // Deep link: there is no list entry before this one.
-  window.history.replaceState(stateObject(), '', urlWith(null));
-  notifyRoute();
-}
-
-/** The href of a record: the current list parameters plus `record=<id>`. */
-const recordHref = (id: string): string => urlWith(id);
-
 /* ----------------------------------------------------------------------- list */
 
 // A negative offset on the focus indicator: the cell wraps its content in a clipping box that starts at the
@@ -111,16 +70,33 @@ function RecordLink({ row, onOpen }: { row: DemoInvoice; onOpen: (id: string) =>
   );
 }
 
-interface ListViewProps {
+export interface ListViewProps {
   store: InvoiceStore;
   history: 'replace' | 'push';
   /** The list is back from a record: focus goes to the opened row's link (or the title) once the data is in. */
   returning: boolean;
   returnedFrom: string | null;
   onOpen: (id: string) => void;
+  /** The List Report `actions` slot (the CRUD showcase's "New invoice"). */
+  actions?: ReactNode;
+  /**
+   * A record just created (#363). Once the data is in, `onCreatedReady` is called ONCE for it with whether it
+   * is among the rows the current filters show (the CRUD showcase raises its toast from there).
+   */
+  created?: { id: string } | null;
+  onCreatedReady?: (visible: boolean) => void;
 }
 
-function ListView({ store, history, returning, returnedFrom, onOpen }: ListViewProps) {
+export function ListView({
+  store,
+  history,
+  returning,
+  returnedFrom,
+  onOpen,
+  actions,
+  created,
+  onCreatedReady,
+}: ListViewProps) {
   const [load, setLoad] = useState<{ rows: DemoInvoice[] } | { error: true } | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -157,6 +133,19 @@ function ListView({ store, history, returning, returnedFrom, onOpen }: ListViewP
     filters: FILTERS,
     ...url,
   });
+
+  const reported = useRef<string | null>(null);
+  const readyCallback = useRef(onCreatedReady);
+  useEffect(() => {
+    readyCallback.current = onCreatedReady;
+  });
+  const createdId = created?.id ?? null;
+  const visibleRows = table.rows;
+  useEffect(() => {
+    if (!createdId || status !== 'ready' || reported.current === createdId) return;
+    reported.current = createdId;
+    readyCallback.current?.(visibleRows.some((r) => r.id === createdId));
+  }, [createdId, status, visibleRows]);
 
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -202,6 +191,7 @@ function ListView({ store, history, returning, returnedFrom, onOpen }: ListViewP
       <div ref={root} style={{ flex: 1, minHeight: 0 }}>
         <ListReport
           title="Invoices"
+          actions={actions}
           table={table}
           status={status}
           filtersLabel="Filters"
@@ -246,32 +236,7 @@ export function InvoiceListToRecord({
   // A save outlives the page that started it (leave with "Leave anyway" while it runs). Reads wait for the
   // saves in flight, so a list or a re-opened record never shows (and a later save never builds on) a value
   // older than the one the server is about to hold: no stale echo can overwrite a fresher save.
-  const api = useMemo<InvoiceStore>(() => {
-    const saving = new Set<Promise<unknown>>();
-    const settled = async () => {
-      while (saving.size > 0) await Promise.allSettled([...saving]);
-    };
-    return {
-      ...store,
-      save: (invoice) => {
-        const run = store.save(invoice);
-        saving.add(run);
-        const done = () => void saving.delete(run);
-        run.then(done, done);
-        return run;
-      },
-      list: async () => {
-        await settled();
-        store.configure({ loadDelayMs: delays.current.listLoadDelayMs });
-        return store.list();
-      },
-      get: async (id) => {
-        await settled();
-        store.configure({ loadDelayMs: delays.current.recordLoadDelayMs });
-        return store.get(id);
-      },
-    };
-  }, [store]);
+  const api = useMemo<InvoiceStore>(() => createInvoiceApi(store, delays), [store]);
   useEffect(() => {
     window.__ropShowcaseStore = store;
     return () => {
@@ -297,9 +262,9 @@ export function InvoiceListToRecord({
   }).current;
   const saved = useRef((invoice: StoredInvoice) => savedCallback.current?.(invoice)).current;
   const back = useRef(() => {
-    if (leaving) return; // already on its way back: no second navigation, no second report
+    if (isLeaving()) return; // already on its way back: no second navigation, no second report
     callbacks.current({ to: 'list' });
-    leaveRecord();
+    leaveRoute();
   }).current;
 
   if (record) return <InvoiceRecordPage store={api} recordId={record} onBack={back} onSaved={saved} />;
