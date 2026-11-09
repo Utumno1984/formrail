@@ -139,9 +139,9 @@ describe('ListReportTable rowActionsInline — default and invalid values', () =
     await waitFor(() => expect(third).toHaveFocus());
   });
 
-  it('a valid value reports nothing', () => {
+  it.each([0, 1, 3])('a valid value (%s) reports nothing', (value) => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    render(<Host rowActionsInline={1} />);
+    render(<Host rowActionsInline={value} />);
     expect(error).not.toHaveBeenCalled();
   });
 });
@@ -356,18 +356,21 @@ describe('ListReportTable rowActionsInline — width of the column', () => {
     expect(table.parentElement!.className.split(' ')).toContain('@container');
   });
 
+  // The same `rowActions` function across renders: only the prop under test can re-render the rows.
+  const stable = actionsFor();
+
   it('a change of rowActionsInline re-renders the memoized rows', () => {
-    const { rerender } = render(<Host rowActionsInline={1} />);
+    const { rerender } = render(<Host rowActions={stable} rowActionsInline={1} />);
     expect(within(form('FT-2026-0001', 'wide')).getAllByRole('button')).toHaveLength(2);
-    rerender(<Host rowActionsInline={0} />);
+    rerender(<Host rowActions={stable} rowActionsInline={0} />);
     expect(cellOf('FT-2026-0001').querySelector('[data-rop-row-actions-form]')).toBeNull();
-    rerender(<Host rowActionsInline={1} />);
+    rerender(<Host rowActions={stable} rowActionsInline={1} />);
     expect(form('FT-2026-0001', 'wide')).toBeInTheDocument();
   });
 
   it('a change of labels.rowAction re-renders the memoized rows', () => {
-    const { rerender } = render(<Host rowActionsInline={1} labels={{ rowAction: (a, r) => `${a} ${r}` }} />);
-    rerender(<Host rowActionsInline={1} labels={{ rowAction: (a, r) => `${a} invoice ${r}` }} />);
+    const { rerender } = render(<Host rowActions={stable} rowActionsInline={1} labels={{ rowAction: (a, r) => `${a} ${r}` }} />);
+    rerender(<Host rowActions={stable} rowActionsInline={1} labels={{ rowAction: (a, r) => `${a} invoice ${r}` }} />);
     expect(within(form('FT-2026-0001', 'wide')).getByRole('button', { name: 'Delete invoice FT-2026-0001' })).toBeInTheDocument();
   });
 
