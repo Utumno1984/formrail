@@ -18,8 +18,8 @@ export const countClass =
   'inline-block rounded-rop-sm border border-rop-border bg-rop-surface-subtle px-1.5 font-normal text-rop-text-muted transition-[background-color,border-color] duration-[var(--motion-rop-feedback-duration)] ease-[var(--motion-rop-feedback-easing)] motion-reduce:transition-none';
 // While the value just changed: a stronger tone, which the transition above eases in and out. With
 // reduced motion the pill keeps its resting tone (the new value simply appears).
-// (blue-50 keeps the muted text above 4.5:1 while the flash lasts.)
-export const countFlashClass = 'bg-rop-blue-50 border-rop-blue-300 motion-reduce:bg-rop-surface-subtle motion-reduce:border-rop-border';
+// (primary-subtle keeps the muted text above 4.5:1 while the flash lasts.)
+export const countFlashClass = 'bg-rop-primary-subtle border-rop-primary-muted motion-reduce:bg-rop-surface-subtle motion-reduce:border-rop-border';
 export const countHiddenClass = 'invisible';
 
 export const actionsClass = 'flex min-w-0 flex-wrap items-center gap-2';

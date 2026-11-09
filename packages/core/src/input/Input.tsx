@@ -1,6 +1,6 @@
 import { forwardRef, type InputHTMLAttributes } from 'react';
 import { useFieldControlProps } from '../field/useFieldControlProps';
-import { CONTROL_INVALID } from '../internal/field-control-styles';
+import { CONTROL_INVALID, TEXT_CONTROL_BOX } from '../internal/field-control-styles';
 import { cn } from '../utils/cn';
 
 export type InputSize = 'sm' | 'md';
@@ -10,16 +10,7 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   size?: InputSize;
 }
 
-// Full literals (Tailwind scan, which also reads comments: no bare names of the shadow-like
-// utilities here). The keyboard focus indicator is the same arbitrary declaration as in Button.
-// The library ships no preflight (boxes are content-box) and a guard forbids a box-sizing reset:
-// so no `w-full` / `h-*` here, which padding would push past the Field. The width is the one the
-// Field's column gives it (a stretched flex item), the height is line height + padding + border,
-// like Button (32px / 36px).
-const BASE =
-  'block max-w-full min-w-0 rounded-rop-md border border-rop-border bg-rop-surface px-3 font-rop-sans text-rop-body text-rop-text ' +
-  'placeholder:text-rop-text-muted focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
-  'read-only:bg-rop-readonly-surface read-only:not-disabled:border-dashed disabled:cursor-not-allowed disabled:opacity-50';
+// Full literals (Tailwind scan). Height = line height + padding + border, like Button (32px / 36px).
 const SIZE_CLASS: Record<InputSize, string> = {
   sm: 'py-[5px]',
   md: 'py-[7px]',
@@ -41,7 +32,7 @@ export const Input = /* @__PURE__ */ forwardRef<HTMLInputElement, InputProps>(fu
       {...rest}
       {...fieldProps}
       ref={ref}
-      className={cn(BASE, CONTROL_INVALID, SIZE_CLASS[size], className)}
+      className={cn(TEXT_CONTROL_BOX, CONTROL_INVALID, SIZE_CLASS[size], className)}
     />
   );
 });

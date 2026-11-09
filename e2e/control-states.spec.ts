@@ -21,6 +21,7 @@ const KINDS = [
   'switch-on',
   'radio',
   'input',
+  'textarea',
   'select',
   'combobox',
   'multi-select',
@@ -44,7 +45,7 @@ function box(page: Page, kind: Kind, state: State): Locator {
   if (kind.startsWith('switch')) return c.getByRole('switch');
   // The MultiSelect draws its box on the wrapper of the chips and the text input.
   if (kind === 'multi-select') return c.locator('[data-rop-multi-select]');
-  return c.getByRole(kind === 'input' ? 'textbox' : 'combobox');
+  return c.getByRole(kind === 'input' || kind === 'textarea' ? 'textbox' : 'combobox');
 }
 
 interface Look {
