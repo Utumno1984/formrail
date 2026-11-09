@@ -109,6 +109,33 @@ test.describe('semantics and initial focus', () => {
     await expect(opener(page)).toBeFocused();
   });
 
+  test('reopened while the exit animation is still running: the focus goes to Cancel, not to the panel', async ({ page }) => {
+    await expectPlayToPass(page, STORY('delete-with-server-round-trip'));
+    await opener(page).click();
+    const dialog = confirmDialog(page);
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await settleMotion(page);
+    // Reopen right after the commit that marks the panel closed (still mounted, exit animation running).
+    await dialog.evaluate((node) => {
+      const w = window as unknown as { __reused?: boolean };
+      const observer = new MutationObserver(() => {
+        if (node.getAttribute('data-state') !== 'closed') return;
+        observer.disconnect();
+        w.__reused = node.isConnected;
+        // As a mouse click does: the opener takes the focus, then the click reopens the dialog.
+        const reopen = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Delete…') as HTMLButtonElement;
+        reopen.focus();
+        reopen.click();
+      });
+      observer.observe(node, { attributes: true, attributeFilter: ['data-state'] });
+    });
+    await page.keyboard.press('Escape');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __reused?: boolean }).__reused)).toBe(true);
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await expect(dialog).not.toBeFocused();
+  });
+
   test('with reduced motion: no animation, same initial focus and return', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expectPlayToPass(page, STORY('delete-with-server-round-trip'));

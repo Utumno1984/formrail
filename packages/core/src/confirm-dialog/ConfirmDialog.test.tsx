@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef, useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DialogClose } from '../dialog/Dialog';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '../dialog/Dialog';
 import { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
 
 afterEach(() => {
@@ -313,6 +313,49 @@ describe('ConfirmDialog: pending (onConfirm returns a promise)', () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it('two clicks in the same batch (before any re-render) still run onConfirm once', async () => {
+    const job = deferred();
+    const onConfirm = vi.fn(() => job.promise);
+    await openHost({ onConfirm });
+    const confirm = screen.getByRole('button', { name: 'Delete invoice' });
+    act(() => {
+      confirm.click();
+      confirm.click();
+      confirm.click();
+    });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await act(async () => job.resolve());
+  });
+
+  it('pending above another Dialog: Escape closes neither, the lower one stays open too', async () => {
+    const user = userEvent.setup();
+    const job = deferred();
+    function Stacked() {
+      const [editor, setEditor] = useState(true);
+      const [ask, setAsk] = useState(false);
+      return (
+        <Dialog open={editor} onOpenChange={setEditor}>
+          <DialogContent>
+            <DialogTitle>Edit supplier</DialogTitle>
+            <button type="button" onClick={() => setAsk(true)}>
+              Close editor
+            </button>
+          </DialogContent>
+          <ConfirmDialog open={ask} onOpenChange={setAsk} title="Discard changes?" confirmLabel="Discard" onConfirm={() => job.promise} />
+        </Dialog>
+      );
+    }
+    render(<Stacked />);
+    await user.click(screen.getByRole('button', { name: 'Close editor' }));
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog', { name: 'Discard changes?' })).toBeInTheDocument();
+    expect(document.querySelector('[role="dialog"]')).toHaveAccessibleName('Edit supplier');
+    await act(async () => job.resolve());
+    expect(screen.queryByRole('dialog', { name: 'Discard changes?' })).toBeNull();
+    expect(document.querySelector('[role="dialog"]')).toHaveAccessibleName('Edit supplier');
+  });
+
   it('rejected: stays open and interactive, focus on confirm, error to onError; a retry is possible', async () => {
     let job = deferred();
     const onConfirm = vi.fn(() => job.promise);
@@ -388,7 +431,8 @@ describe('ConfirmDialog: pending (onConfirm returns a promise)', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const job = deferred();
     const onOpenChange = vi.fn();
-    const { user } = await openHost({ onConfirm: () => job.promise, onOpenChange });
+    const onConfirm = vi.fn(() => job.promise);
+    const { user } = await openHost({ onConfirm, onOpenChange });
     await user.click(screen.getByRole('button', { name: 'Delete invoice' }));
     // The page is aria-hidden while open: reach the outside button through the DOM.
     const outside = screen.getByText('Close from outside');
@@ -403,6 +447,9 @@ describe('ConfirmDialog: pending (onConfirm returns a promise)', () => {
     const confirm = screen.getByRole('button', { name: 'Delete invoice' });
     expect(confirm).not.toHaveAttribute('aria-disabled');
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    // Really idle, not only in its look: a confirmation runs again.
+    await user.click(confirm);
+    expect(onConfirm).toHaveBeenCalledTimes(2);
     expect(errors).not.toHaveBeenCalled();
   });
 
@@ -471,11 +518,13 @@ describe('ConfirmDialog: confirmLabel', () => {
   });
 
   it('is required by the types', () => {
+    const close = () => undefined;
     // @ts-expect-error confirmLabel is required
-    const missing = <ConfirmDialog open={false} title="Delete?" onConfirm={() => undefined} />;
+    const missing = <ConfirmDialog open={false} onOpenChange={close} title="Delete?" onConfirm={() => undefined} />;
     // @ts-expect-error null is not a label
-    const empty = <ConfirmDialog open={false} title="Delete?" confirmLabel={null} onConfirm={() => undefined} />;
-    expect(missing).toBeTruthy();
-    expect(empty).toBeTruthy();
+    const empty = <ConfirmDialog open={false} onOpenChange={close} title="Delete?" confirmLabel={null} onConfirm={() => undefined} />;
+    // @ts-expect-error onOpenChange is required: without it an async confirmation could never close
+    const uncontrolled = <ConfirmDialog open={false} title="Delete?" confirmLabel="Delete" onConfirm={() => undefined} />;
+    expect([missing, empty, uncontrolled].every(Boolean)).toBe(true);
   });
 });

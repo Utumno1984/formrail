@@ -24,8 +24,10 @@ export interface ConfirmDialogProps {
   /**
    * Called with `false` when the dialog asks to close: after a confirmation that succeeded, or on
    * Cancel / Escape / a click on the backdrop. Never called while a confirmation is pending.
+   * Required: the dialog is controlled, and only this callback lets it close after an async
+   * `onConfirm` has succeeded (set `open` to `false` here).
    */
-  onOpenChange?: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   /** The question, and the dialog's accessible name ("Delete invoice 2026/0142?"). */
   title: ReactNode;
   /** What happens if the user confirms; the dialog's accessible description. */
