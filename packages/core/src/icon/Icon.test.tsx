@@ -281,6 +281,7 @@ describe('internal icons', () => {
       'TabsList',
       'TabsTrigger',
       'Text',
+      'Textarea',
       'Title',
       'ToastProvider',
       'Tooltip',

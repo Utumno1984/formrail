@@ -318,6 +318,10 @@
       "baseline": 10856,
       "limit": 11942
     },
+    "Textarea": {
+      "baseline": 12222,
+      "limit": 13445
+    },
     "Title": {
       "baseline": 10809,
       "limit": 11890
