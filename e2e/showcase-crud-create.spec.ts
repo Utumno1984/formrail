@@ -139,6 +139,33 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
     await expect(page.getByRole('heading', { level: 2, name: /Invoices/ })).toContainText('of 201');
   });
 
+  test('a slow list after Create: loading first, the focus goes to the link only once the data is in', async ({ page }) => {
+    await openList(page, SHOWN_QUERY, 'listLoadDelayMs:1200;recordLoadDelayMs:0;saveDelayMs:0');
+    await newInvoice(page).click();
+    await fillValid(page, '99999.9');
+    await create(page).click();
+    // The return mounts a list that is still loading (skeleton rows: no link, no toast, nothing to focus yet)...
+    await expect(table(page)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'FT-2026-0201', exact: true })).toHaveCount(0);
+    await expect(page.getByText('Invoice FT-2026-0201 created')).toHaveCount(0);
+    // ...and the focus lands on the new link when the data is in, with the toast announced then too.
+    const link = page.getByRole('link', { name: 'FT-2026-0201', exact: true });
+    await expect(link).toBeFocused({ timeout: 10_000 });
+    await expect(page.getByText('Invoice FT-2026-0201 created')).toBeVisible();
+  });
+
+  test('Forward after the return reopens an EMPTY creation form, not the record that was created', async ({ page }) => {
+    await openList(page);
+    await newInvoice(page).click();
+    await fillValid(page, '50');
+    await create(page).click();
+    await expect(table(page)).toBeVisible();
+    await page.goForward();
+    await expect(heading(page)).toBeVisible();
+    await expect(amount(page)).toHaveValue('');
+    expect(await store(page)).toHaveLength(201); // still one created record
+  });
+
   test('Create with saveDelayMs 0: still no "Unsaved changes", also via history.back()', async ({ page }) => {
     for (let round = 0; round < 3; round += 1) {
       await openList(page);
