@@ -6,6 +6,7 @@ import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { Calendar } from './Calendar';
 import { dayOfWeek, type IsoDate, type IsoMonth, type Weekday } from './date-math';
+import { parseDisabledDates } from './disabled-dates';
 
 // Every story passes a fixed `today` and month: the baselines never change with the real date.
 const TODAY = '2026-03-10';
@@ -319,6 +320,69 @@ export const StableFootprint: Story = {
     </div>
   ),
 };
+
+// Single dates plus one closed range ("from|to", both ends included), across a month boundary.
+const BLACKOUT_DATES = ['2026-06-03', '2026-06-15', '2026-06-29|2026-07-03'];
+const isBlackout = parseDisabledDates(BLACKOUT_DATES);
+
+/**
+ * `isDateDisabled` from a list of single dates and ranges: `parseDisabledDates(['2026-06-03',
+ * '2026-06-15', '2026-06-29|2026-07-03'])` (helper in `disabled-dates.ts`; a range is `from|to`, both
+ * ends included). The play function checks that the day before and after the range stay selectable,
+ * that single dates and the range ends do not, and that the range continues in July.
+ */
+export const DisabledDates: Story = {
+  parameters: NO_CONTROLS,
+  render: (args) => <DisabledDatesDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cell = (name: string) => canvas.getByRole('gridcell', { name });
+    for (const name of ['Wednesday, June 3, 2026', 'Monday, June 15, 2026', 'Monday, June 29, 2026', 'Tuesday, June 30, 2026']) {
+      await expect(cell(name)).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(cell(name));
+    }
+    await expect(args.onValueChange).not.toHaveBeenCalled();
+    await userEvent.click(cell('Sunday, June 28, 2026')); // the day before the range
+    await expect(args.onValueChange).toHaveBeenLastCalledWith('2026-06-28');
+    await expect(canvas.getByTestId('value')).toHaveTextContent('2026-06-28');
+    await userEvent.click(canvas.getByRole('button', { name: 'Next month' }));
+    await expect(canvas.getByText('July 2026')).toBeInTheDocument();
+    await expect(cell('Friday, July 3, 2026')).toHaveAttribute('aria-disabled', 'true'); // last day of the range
+    await userEvent.click(cell('Friday, July 3, 2026'));
+    await userEvent.click(cell('Saturday, July 4, 2026')); // the day after
+    await expect(args.onValueChange).toHaveBeenLastCalledWith('2026-07-04');
+    await expect(args.onValueChange).toHaveBeenCalledTimes(2);
+  },
+};
+
+/** `DisabledDates` without a play function: for the e2e that drive the real keyboard. */
+export const DisabledDatesManual: Story = {
+  parameters: NO_CONTROLS,
+  render: (args) => <DisabledDatesDemo {...args} />,
+};
+
+function DisabledDatesDemo({ onValueChange, onMonthChange }: DemoArgs) {
+  const [value, setValue] = useState<IsoDate | null>(null);
+  return (
+    <div style={{ display: 'grid', gap: 12, justifyItems: 'start' }}>
+      <Field label="Pickup date" help="Closed on June 3 and 15, and from June 29 to July 3.">
+        <Calendar
+          locale="en-US"
+          today={TODAY}
+          defaultMonth="2026-06"
+          isDateDisabled={isBlackout}
+          value={value}
+          onMonthChange={onMonthChange}
+          onValueChange={(next) => {
+            setValue(next);
+            onValueChange(next);
+          }}
+        />
+      </Field>
+      <output data-testid="value">{value ?? 'none'}</output>
+    </div>
+  );
+}
 
 /**
  * `ar-EG` inside `dir="rtl"`: Arabic names and digits, Saturday first, and the left/right arrow keys

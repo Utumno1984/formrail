@@ -17,7 +17,7 @@ async function tabIntoGrid(page: Page) {
 }
 
 test.describe('Forms/Calendar: stories play', () => {
-  for (const name of ['playground', 'async-hydration']) {
+  for (const name of ['playground', 'async-hydration', 'disabled-dates']) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
     });
@@ -156,6 +156,28 @@ test.describe('limits', () => {
     expect(await focusedIso(page)).toBe('2026-03-14'); // Saturday
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('value')).toHaveText('none');
+  });
+});
+
+test.describe('isDateDisabled from a list of dates and ranges', () => {
+  test('keyboard: single dates and range ends are not selectable, the days around the range are', async ({ page }) => {
+    await gotoStory(page, STORY('disabled-dates-manual'));
+    await tabIntoGrid(page);
+    // The grid opens on June 1; two ArrowRight reach June 3, a disabled single date.
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    expect(await focusedIso(page)).toBe('2026-06-03');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('value')).toHaveText('none');
+    // June 28 (the day before the range) is selectable, June 29 (range start) is not.
+    for (let i = 0; i < 25; i++) await page.keyboard.press('ArrowRight');
+    expect(await focusedIso(page)).toBe('2026-06-28');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('value')).toHaveText('2026-06-28');
+    await page.keyboard.press('ArrowRight');
+    expect(await focusedIso(page)).toBe('2026-06-29');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('value')).toHaveText('2026-06-28');
   });
 });
 
