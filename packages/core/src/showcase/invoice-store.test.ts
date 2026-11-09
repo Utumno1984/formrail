@@ -98,6 +98,37 @@ describe('createInvoiceStore', () => {
     await expect(store.save({ ...record, id: 'nope' })).rejects.toBeInstanceOf(InvoiceNotFoundError);
   });
 
+  it('create assigns increasing ids and numbers, never reusing one, and rounds the amount to 2 decimals (#363)', async () => {
+    const store = createInvoiceStore();
+    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 1295.9, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+    const a = await store.create(draft);
+    const b = await store.create({ ...draft, amount: 12.3456 });
+    expect([a.id, a.number]).toEqual(['inv-201', 'FT-2026-0201']);
+    expect([b.id, b.number]).toEqual(['inv-202', 'FT-2026-0202']);
+    expect(b.amount).toBe(12.35);
+    expect(store.snapshot()).toHaveLength(202);
+    expect(await store.get('inv-201')).toEqual(a);
+    // A failed create consumes no identity and leaves the store unchanged.
+    store.configure({ saveOutcome: 'error' });
+    await expect(store.create(draft)).rejects.toBeInstanceOf(InvoiceNetworkError);
+    expect(store.snapshot()).toHaveLength(202);
+    store.configure({ saveOutcome: 'success' });
+    expect((await store.create(draft)).id).toBe('inv-203');
+  });
+
+  it('create honours saveDelayMs like save', async () => {
+    const store = createInvoiceStore(undefined, { saveDelayMs: 300 });
+    const spy = vi.fn();
+    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+    const pending = store.create(draft).then(spy);
+    await vi.advanceTimersByTimeAsync(299);
+    expect(spy).not.toHaveBeenCalled();
+    expect(store.snapshot()).toHaveLength(200);
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it('loadOutcome error rejects every read; error-once only the first', async () => {
     const always = createInvoiceStore(undefined, { loadOutcome: 'error' });
     await expect(always.get('inv-1')).rejects.toBeInstanceOf(InvoiceNetworkError);

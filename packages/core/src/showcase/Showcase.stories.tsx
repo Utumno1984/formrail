@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { InvoiceListToRecord, type InvoiceListToRecordProps } from './InvoiceListToRecord';
+import { InvoiceCrud, type InvoiceCrudProps } from './InvoiceCrud';
+import { InvoiceListToRecord,type InvoiceListToRecordProps } from './InvoiceListToRecord';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
 import { createInvoiceStore, type LoadOutcome, type SaveOutcome, type StoredInvoice } from './invoice-store';
 
@@ -219,7 +220,7 @@ function resetListToRecord(win: Window): void {
     if (key.startsWith('rop:list-report-scroll:')) win.sessionStorage.removeItem(key);
   }
   const params = new URLSearchParams(win.location.search);
-  for (const key of ['filter', 'q', 'sort', 'record']) params.delete(key);
+  for (const key of ['filter', 'q', 'sort', 'record', 'create']) params.delete(key);
   win.history.replaceState(null, '', `${win.location.pathname}?${params.toString()}`);
   win.dispatchEvent(new PopStateEvent('popstate', { state: null }));
 }
@@ -517,5 +518,175 @@ export const ListAfterSave: StoryObj<ListToRecordArgs> = {
     const row = canvas.getByRole('link', { name: number }).closest('tr') as HTMLElement;
     await expect(row).toHaveTextContent('4.321,50 €');
     await waitFor(() => expect(canvas.getByRole('link', { name: number })).toHaveFocus());
+  },
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* #363: CRUD showcase, Create: "New invoice" -> the same editor in creation mode -> back to the list. */
+/* ------------------------------------------------------------------------------------------ */
+
+type CrudArgs = InvoiceCrudProps;
+
+const CRUD_ARGTYPES = {
+  history: {
+    control: 'radio',
+    options: ['replace', 'push'],
+    description: 'How a list gesture (pill, search, sort) writes the URL. Opening a page is always a `push`.',
+  },
+  listLoadDelayMs: {
+    control: 'number',
+    description: 'How long the list takes to arrive, every time it mounts (also when coming back).',
+  },
+  recordLoadDelayMs: { control: 'number', description: 'How long an existing record takes to arrive.' },
+  saveDelayMs: {
+    control: 'number',
+    description:
+      'How long a save or a create takes (ms). Leaving while a Create is in flight ("Leave anyway") goes at once; the record is still created and the list shows it.',
+  },
+  saveOutcome: {
+    control: 'radio',
+    options: ['success', 'error'],
+    description: '`error`: the create (or save) fails, the form keeps its values with the message in the footer, nothing is created.',
+  },
+  today: {
+    control: 'text',
+    description: 'The default invoice date of a new invoice (yyyy-mm-dd). Empty: the local date.',
+  },
+  onNavigate: {
+    control: false,
+    description: 'Called on the navigations the user starts ("New invoice", a link, "Back to list", "Cancel"), never on browser Back/Forward.',
+  },
+  onSaved: { control: false, description: 'Called once per successful Update.' },
+  onCreated: {
+    control: false,
+    description: 'Called once per successful Create with the record as the server stored it, even if the page was left meanwhile.',
+  },
+} as const;
+const CRUD_ARGS = {
+  history: 'replace',
+  listLoadDelayMs: 300,
+  recordLoadDelayMs: 300,
+  saveDelayMs: 400,
+  saveOutcome: 'success',
+  onNavigate: fn(),
+  onSaved: fn(),
+  onCreated: fn(),
+} satisfies Partial<CrudArgs>;
+
+/** Picks a supplier in the Select of the editor (its options are in a portal on `document.body`). */
+async function chooseSupplierIn(canvas: ReturnType<typeof within>, name: string) {
+  await userEvent.click(await canvas.findByRole('combobox', { name: /Supplier/ }));
+  await userEvent.click(await within(document.body).findByRole('option', { name }));
+}
+
+/**
+ * Create, end to end: sort the list by amount, "New invoice" opens the editor in creation mode (focus on the
+ * title "New invoice"), pick a supplier, type an amount, "Create": back to the list (same sort, one more row,
+ * the count goes from 200 to 201), the new record at the top and focused, and a toast with its number. The
+ * form is never reported as "unsaved" after a successful Create. Controls: delays, `saveOutcome` (`error`
+ * keeps the form with the message in the footer), `history`, `today`.
+ */
+export const Crud: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('Crud: no window');
+    resetListToRecord(win);
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(200\)/ })).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
+
+    await userEvent.click(canvas.getByRole('button', { name: 'New invoice' }));
+    await expect(args.onNavigate).toHaveBeenLastCalledWith({ to: 'create' });
+    await expect(new URLSearchParams(win.location.search).get('create')).toBe('1');
+    const title = await canvas.findByRole('heading', { level: 1, name: 'New invoice' });
+    await waitFor(() => expect(title).toHaveFocus());
+    await expect(canvas.queryByRole('table')).toBeNull();
+
+    await chooseSupplierIn(canvas, 'Bianchi Supplies');
+    await userEvent.type(canvas.getByRole('textbox', { name: /Amount/ }), '999999.5');
+    await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+    await expect(args.onCreated).toHaveBeenCalledTimes(1);
+    await expect(new URLSearchParams(win.location.search).get('create')).toBeNull();
+    await expect(new URLSearchParams(win.location.search).get('sort')).toBe('amount.desc');
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(201\)/ })).toBeVisible();
+    await expect(canvas.getByRole('columnheader', { name: /Amount/ })).toHaveAttribute('aria-sort', 'descending');
+    await waitFor(() => expect(canvas.getByRole('link', { name: 'FT-2026-0201' })).toHaveFocus());
+    await expect(await within(document.body).findByText('Invoice FT-2026-0201 created')).toBeVisible();
+    await expect(within(document.body).queryByRole('dialog')).toBeNull();
+  },
+};
+
+/** `Crud` without a `play` function: what `e2e/showcase-crud-create.spec.ts` drives with real input. */
+export const CrudManual: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+};
+
+// Visual states of the creation page (3 viewports, via the `visual` tag): `today` is fixed so the dates do not
+// change with the calendar, no delays.
+const CRUD_VISUAL_ARGS = {
+  ...CRUD_ARGS,
+  listLoadDelayMs: 0,
+  recordLoadDelayMs: 0,
+  saveDelayMs: 0,
+  today: '2026-11-09',
+} satisfies Partial<CrudArgs>;
+
+async function openCreation(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  const win = canvasElement.ownerDocument.defaultView;
+  if (!win) throw new Error('visual story: no window');
+  resetListToRecord(win);
+  await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(5), { timeout: 5000 });
+  await userEvent.click(canvas.getByRole('button', { name: 'New invoice' }));
+  await expect(await canvas.findByRole('heading', { level: 1, name: 'New invoice' })).toBeVisible();
+  return canvas;
+}
+
+/** A new invoice, untouched: defaults, the locked number, no status badge, the footer already there. */
+export const CreateEmpty: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await openCreation(canvasElement);
+    await expect(canvas.getByRole('region', { name: 'Save actions' })).toBeVisible();
+  },
+};
+
+/** "Create" on the empty form: the field errors and the summary in the footer. */
+export const CreateInvalid: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await openCreation(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
+    await expect(await canvas.findByText('2 invalid fields')).toBeVisible();
+  },
+};
+
+/** A Create in flight (the delay is an hour, the picture is taken before it ends): "Create" disabled, "Saving…". */
+export const CreateSaving: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: { ...CRUD_VISUAL_ARGS, saveDelayMs: 3_600_000 },
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await openCreation(canvasElement);
+    await chooseSupplierIn(canvas, 'Bianchi Supplies');
+    await userEvent.type(canvas.getByRole('textbox', { name: /Amount/ }), '120.5');
+    await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
+    await expect(await canvas.findByText('Saving…')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-disabled', 'true');
   },
 };
