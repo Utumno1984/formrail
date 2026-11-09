@@ -64,6 +64,10 @@ export type {
   SheetTitleProps,
   SheetCloseProps,
 } from './sheet/Sheet';
+export { ConfirmDialog } from './confirm-dialog/ConfirmDialog';
+export type { ConfirmDialogProps, ConfirmDialogTone } from './confirm-dialog/ConfirmDialog';
+export { useConfirmDialog } from './confirm-dialog/use-confirm-dialog';
+export type { ConfirmOptions } from './confirm-dialog/use-confirm-dialog';
 export { Tooltip, TooltipProvider } from './tooltip/Tooltip';
 export type { TooltipProps, TooltipProviderProps, TooltipSide, TooltipAlign } from './tooltip/Tooltip';
 export { ToastProvider } from './toast/ToastProvider';
