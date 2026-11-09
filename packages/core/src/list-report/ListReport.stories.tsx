@@ -1330,6 +1330,8 @@ interface RowActionsArgs {
   disabledFor: DisabledFor;
   /** Tone of the "Delete" action. */
   deleteTone: 'danger' | 'default';
+  /** Label of the "Duplicate" action. */
+  duplicateLabel: string;
   selectable: boolean;
   containerWidth: number;
   onDuplicate: (id: string) => void;
@@ -1338,7 +1340,16 @@ interface RowActionsArgs {
   preselectedIds?: readonly string[];
 }
 
-function RowActionsReport({ disabledFor, deleteTone, selectable, containerWidth, onDuplicate, onDelete, preselectedIds }: RowActionsArgs) {
+function RowActionsReport({
+  disabledFor,
+  deleteTone,
+  duplicateLabel,
+  selectable,
+  containerWidth,
+  onDuplicate,
+  onDelete,
+  preselectedIds,
+}: RowActionsArgs) {
   const table = useListReport<DemoInvoice>({
     rows: ROW_ACTION_ROWS,
     columns: URL_COLUMNS,
@@ -1352,7 +1363,7 @@ function RowActionsReport({ disabledFor, deleteTone, selectable, containerWidth,
   // would leave them as they were.
   const rowActions = useCallback(
     (row: DemoInvoice): readonly ListReportRowAction[] => [
-      { id: 'duplicate', label: 'Duplicate', onSelect: () => onDuplicate(row.id) },
+      { id: 'duplicate', label: duplicateLabel, onSelect: () => onDuplicate(row.id) },
       {
         id: 'delete',
         label: 'Delete…',
@@ -1370,7 +1381,7 @@ function RowActionsReport({ disabledFor, deleteTone, selectable, containerWidth,
         },
       },
     ],
-    [confirm, deleteTone, disabledFor, onDelete, onDuplicate],
+    [confirm, deleteTone, disabledFor, duplicateLabel, onDelete, onDuplicate],
   );
   return (
     <div style={PAGE}>
@@ -1389,6 +1400,7 @@ const ROW_ACTIONS_ARG_TYPES = {
     description: 'Invoices whose "Delete" is `disabled` (by status): shown in the menu, skipped by the arrows, never selected',
   },
   deleteTone: { control: 'radio', options: ['danger', 'default'], description: '`tone` of the "Delete" action' },
+  duplicateLabel: { control: 'text', description: '`label` of the first action: a long one wraps inside the menu' },
   selectable: { control: 'boolean', description: '`selectable` of `useListReport`: a checkbox column before, the actions column after' },
   containerWidth: {
     control: { type: 'range', min: 320, max: 1280, step: 10 },
@@ -1404,6 +1416,7 @@ const ROW_ACTIONS_ARG_TYPES = {
 const ROW_ACTIONS_ARGS: RowActionsArgs = {
   disabledFor: 'approved',
   deleteTone: 'danger',
+  duplicateLabel: 'Duplicate',
   selectable: false,
   containerWidth: 1100,
   onDuplicate: fn(),
@@ -1426,8 +1439,8 @@ export const RowActions: StoryObj<RowActionsArgs> = {
   args: ROW_ACTIONS_ARGS,
   render: (args) => <RowActionsReport {...args} />,
   play: async ({ args, canvasElement }) => {
-    // Written for the default configuration ("Delete…" disabled for the approved invoices).
-    if (args.disabledFor !== 'approved') return;
+    // Written for the default configuration ("Delete…" disabled for the approved invoices, "Duplicate").
+    if (args.disabledFor !== 'approved' || args.duplicateLabel !== 'Duplicate') return;
     // The menu is in a portal: query the whole document.
     const page = within(canvasElement.ownerDocument.body);
     const trigger = (number: string) => page.getByRole('button', { name: `Actions for ${number}`, hidden: true });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Button } from '../button/Button';
 import { moreIcon } from '../internal/icons';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
@@ -22,26 +22,10 @@ export interface ListReportRowActionsCellProps {
   triggerLabel: string;
 }
 
-/**
- * @internal The trailing, sticky cell of a data row with `rowActions`: a "…" icon button that opens a
- * `Menu` with one item per action. Each item takes `onSelect`, `disabled` and `tone` from its
- * descriptor as they are; `onSelect` receives the trigger as `returnFocusRef`.
- *
- * - One `onSelect` per opening of the menu: a second activation that reaches an item while the menu
- *   is closing (a fast double click) is ignored.
- * - The menu is not modal (see below): the rest of the page keeps its accessibility tree and stays
- *   interactive; Escape, Tab and a click outside close it.
- * - The row going away while its menu is open (deleted elsewhere, filtered out) closes the menu
- *   (`Menu`'s own rule); the focus, which was in the menu, then goes to the table's scroll container
- *   instead of being lost to `body`.
- */
-export function ListReportRowActionsCell({ actions, triggerLabel }: ListReportRowActionsCellProps) {
+function RowActionsMenu({ actions, triggerLabel }: ListReportRowActionsCellProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const context = useMemo<ListReportRowActionContext>(() => ({ returnFocusRef: triggerRef }), []);
-  const open = useRef(false);
-  const selected = useRef(false);
-  // The table's scroll container, taken when the menu opens (the row may be gone when it is needed).
-  const container = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isDev()) return;
@@ -54,66 +38,76 @@ export function ListReportRowActionsCell({ actions, triggerLabel }: ListReportRo
     }
   }, [actions]);
 
-  // Unmounted with the menu open: the menu and its items go with the row, and the focus they had would
-  // fall on `body`. Checked after the frame (the menu's own focus return runs in one too).
-  useEffect(
+  // Going away with the focus (the row deleted or filtered out, also by one of its own actions, or its
+  // actions becoming empty): the focused trigger or menu item leaves the document and the focus would
+  // fall on `body`. A layout cleanup runs before the nodes are removed, so it can still see where the
+  // focus is and which table this is; the scroll container gets the focus once the frame is over (the
+  // menu's own return of the focus runs in one too), unless something else took it by then.
+  useLayoutEffect(
     () => () => {
-      if (!open.current) return;
-      const target = container.current;
+      const trigger = triggerRef.current;
+      const active = document.activeElement;
+      const hadFocus = !!active && (trigger?.contains(active) || contentRef.current?.contains(active));
+      const container = trigger?.closest('table')?.parentElement;
+      if (!hadFocus || !container) return;
       requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (target?.isConnected && (!active || active === document.body || !active.isConnected)) target.focus({ preventScroll: true });
+        const now = document.activeElement;
+        if (container.isConnected && (!now || now === document.body || !now.isConnected)) container.focus({ preventScroll: true });
       });
     },
     [],
   );
 
-  if (actions.length === 0) return <td className={rowActionsBodyCellClass} />;
   return (
-    <td className={rowActionsBodyCellClass}>
-      <div className={selectBoxClass}>
-        <Menu
-          // Not modal: a modal menu hides the rest of the page with `aria-hidden`, and a report is full
-          // of focusable controls (search, pills, links, the other rows' triggers) — an accessibility
-          // tree with hidden focusable content. Non-modal, the page stays as it is; a click outside
-          // closes the menu and reaches its target (e.g. another row's trigger opens that menu).
-          modal={false}
-          onOpenChange={(next) => {
-            open.current = next;
-            if (next) {
-              selected.current = false;
-              container.current = triggerRef.current?.closest('table')?.parentElement ?? null;
-            }
-          }}
-        >
-          <MenuTrigger asChild>
-            <Button ref={triggerRef} variant="ghost" size="icon-sm" aria-label={triggerLabel}>
-              {moreIcon}
-            </Button>
-          </MenuTrigger>
-          <MenuContent align="end">
-            {actions.map((action) => (
-              <MenuItem
-                key={action.id}
-                disabled={action.disabled}
-                tone={action.tone}
-                onSelect={() => {
-                  if (selected.current) return;
-                  selected.current = true;
-                  action.onSelect(context);
-                }}
-              >
-                {action.icon ? (
-                  <span aria-hidden="true" className={rowActionsItemIconClass}>
-                    {action.icon}
-                  </span>
-                ) : null}
-                <span className={rowActionsItemLabelClass}>{action.label}</span>
-              </MenuItem>
-            ))}
-          </MenuContent>
-        </Menu>
-      </div>
-    </td>
+    <div className={selectBoxClass}>
+      <Menu
+        // Not modal: a modal menu hides the rest of the page with `aria-hidden`, and a report is full of
+        // focusable controls (search, pills, links, the other rows' triggers): an accessibility tree with
+        // hidden focusable content. Non-modal, the page stays as it is; a click outside closes the menu
+        // and reaches its target (e.g. another row's trigger opens that menu).
+        modal={false}
+      >
+        <MenuTrigger asChild>
+          <Button ref={triggerRef} variant="ghost" size="icon-sm" aria-label={triggerLabel}>
+            {moreIcon}
+          </Button>
+        </MenuTrigger>
+        <MenuContent ref={contentRef} align="end">
+          {actions.map((action) => (
+            <MenuItem
+              key={action.id}
+              disabled={action.disabled}
+              tone={action.tone}
+              // Direct assignment from the descriptor; `MenuItem` never calls it while `disabled`.
+              onSelect={() => action.onSelect(context)}
+            >
+              {action.icon ? (
+                <span aria-hidden="true" className={rowActionsItemIconClass}>
+                  {action.icon}
+                </span>
+              ) : null}
+              <span className={rowActionsItemLabelClass}>{action.label}</span>
+            </MenuItem>
+          ))}
+        </MenuContent>
+      </Menu>
+    </div>
   );
+}
+
+/**
+ * @internal The trailing, sticky cell of a data row with `rowActions`: a "…" icon button that opens a
+ * `Menu` with one item per action. Each item takes `onSelect`, `disabled` and `tone` from its
+ * descriptor as they are; `onSelect` receives the trigger as `returnFocusRef`.
+ *
+ * - The menu is not modal: the rest of the page keeps its accessibility tree and stays interactive;
+ *   Escape, Tab and a click outside close it.
+ * - One `onSelect` per activation: the menu closes and its panel unmounts with the first one (it has
+ *   no exit animation), so the second click of a fast double click never reaches an item.
+ * - The trigger or the menu going away while it has the focus (the row deleted elsewhere or by one of
+ *   its own actions, filtered out, or its actions becoming empty) closes the menu (`Menu`'s own rule);
+ *   the focus then goes to the table's scroll container instead of being lost to `body`.
+ */
+export function ListReportRowActionsCell({ actions, triggerLabel }: ListReportRowActionsCellProps) {
+  return <td className={rowActionsBodyCellClass}>{actions.length > 0 ? <RowActionsMenu actions={actions} triggerLabel={triggerLabel} /> : null}</td>;
 }

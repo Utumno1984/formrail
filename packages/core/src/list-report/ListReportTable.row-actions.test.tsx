@@ -175,6 +175,28 @@ describe('ListReportTable rowActions — menu', () => {
     await waitFor(() => expect(trigger('FT-2026-0003')).toHaveFocus());
   });
 
+  it('a sort that changes with the menu open: the menu stays with the trigger of the same row', async () => {
+    const user = userEvent.setup();
+    const duplicate = vi.fn<(ctx: ListReportRowActionContext) => void>();
+    let sortDesc: () => void = () => {};
+    function Sorted() {
+      const table = useListReport<Invoice>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id });
+      sortDesc = () => table.setSort({ columnId: 'number', direction: 'desc' });
+      return <ListReportTable table={table} aria-label="Invoices" rowActions={actionsFor({ duplicate })} />;
+    }
+    render(<Sorted />);
+    await user.click(trigger('FT-2026-0001'));
+    await screen.findByRole('menu');
+    act(() => sortDesc());
+    // FT-2026-0001 is now the last row; its trigger is the one that owns the open menu.
+    const rows = screen.getAllByRole('row', { hidden: true });
+    expect(within(rows.at(-2)!).getByRole('button', { hidden: true })).toBe(trigger('FT-2026-0001'));
+    expect(trigger('FT-2026-0001')).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger('FT-2026-0003')).toHaveAttribute('aria-expanded', 'false');
+    await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
+    expect(duplicate.mock.calls[0]![0].returnFocusRef.current).toBe(trigger('FT-2026-0001'));
+  });
+
   it('a fast double click on an item calls onSelect once', async () => {
     const user = userEvent.setup();
     const duplicate = vi.fn();
@@ -258,6 +280,77 @@ describe('ListReportTable rowActions — menu', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
     const scroller = container.querySelector('table')!.parentElement!;
     await waitFor(() => expect(scroller).toHaveFocus());
+  });
+});
+
+describe('ListReportTable rowActions — focus when the trigger goes away', () => {
+  function Removable({ removeOnSelect, emptyOnSelect }: { removeOnSelect?: boolean; emptyOnSelect?: boolean }) {
+    const [rows, setRows] = useState(ROWS);
+    const [emptied, setEmptied] = useState(false);
+    const rowActions = useCallback(
+      (row: Invoice): readonly ListReportRowAction[] =>
+        emptied
+          ? []
+          : [
+              {
+                id: 'archive',
+                label: 'Archive',
+                onSelect: () => {
+                  if (removeOnSelect) setRows((current) => current.filter((r) => r.id !== row.id));
+                  if (emptyOnSelect) setEmptied(true);
+                },
+              },
+            ],
+      [emptied, removeOnSelect, emptyOnSelect],
+    );
+    return (
+      <>
+        <button type="button" onClick={() => setRows((current) => current.filter((r) => r.id !== 'a'))}>
+          Remove first
+        </button>
+        <Host rows={rows} rowActions={rowActions} />
+      </>
+    );
+  }
+  const scrollerOf = (container: HTMLElement) => container.querySelector('table')!.parentElement!;
+
+  it('an action that removes its own row at once: the focus goes to the table container, never body', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Removable removeOnSelect />);
+    await user.click(trigger('FT-2026-0002'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Archive' }));
+    expect(screen.queryByRole('cell', { name: 'FT-2026-0002' })).toBeNull();
+    await waitFor(() => expect(scrollerOf(container)).toHaveFocus());
+  });
+
+  it('an action after which the row has no actions ([]): the focus goes to the table container', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Removable emptyOnSelect />);
+    trigger('FT-2026-0002').focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('menuitem', { name: 'Archive' });
+    await user.keyboard('{Enter}');
+    expect(screen.queryAllByRole('button', { name: /^Actions for / })).toHaveLength(0);
+    await waitFor(() => expect(scrollerOf(container)).toHaveFocus());
+  });
+
+  it('a focused trigger whose row is removed from outside (menu closed): the focus goes to the table container', async () => {
+    const { container } = render(<Removable />);
+    trigger('FT-2026-0001').focus();
+    // A removal that does not move the focus (e.g. a poll that drops the row): `click()` without focusing.
+    act(() => screen.getByRole('button', { name: 'Remove first' }).click());
+    expect(screen.queryByRole('cell', { name: 'FT-2026-0001' })).toBeNull();
+    await waitFor(() => expect(scrollerOf(container)).toHaveFocus());
+  });
+
+  it('a removal of a row that does not hold the focus leaves the focus where it is', async () => {
+    const user = userEvent.setup();
+    render(<Removable />);
+    const remove = screen.getByRole('button', { name: 'Remove first' });
+    await user.click(remove);
+    expect(screen.queryByRole('cell', { name: 'FT-2026-0001' })).toBeNull();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(remove).toHaveFocus();
   });
 });
 

@@ -142,13 +142,25 @@ test.describe('List Report row actions', () => {
 
   test('a long action label wraps inside the menu, which stays within the viewport (mobile)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await gotoStory(page, STORY);
-    await trigger(page, THIRD.number).click();
-    const panel = menu(page);
-    await expect(panel).toBeVisible();
-    const box = (await panel.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(375);
+    // No comma: Storybook drops a URL arg with characters outside its safe set.
+    const long = 'Duplicate this invoice together with every attachment and note and approval step it currently has';
+    const longWord = 'Duplicate-with-attachments-notes-and-approval-steps-of-the-original-invoice';
+    for (const label of [long, longWord]) {
+      await gotoStory(page, STORY, `duplicateLabel:${label.replaceAll(' ', '+')}`);
+      await trigger(page, THIRD.number).click();
+      const panel = menu(page);
+      await expect(panel).toBeVisible();
+      const entry = item(page, label);
+      await expect(entry).toBeVisible();
+      const box = (await panel.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(375);
+      // It wraps (more than one line tall) and is not clipped sideways.
+      const itemBox = (await entry.boundingBox())!;
+      expect(itemBox.height).toBeGreaterThan(40);
+      expect(await entry.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await page.keyboard.press('Escape');
+    }
   });
 });
 
