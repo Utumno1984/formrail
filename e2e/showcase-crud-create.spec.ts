@@ -6,6 +6,8 @@ import { expectPlayToPass } from './helpers/story';
 const STORY = 'showcase-invoices--crud';
 const FIXTURE = 'showcase-invoices--crud-manual';
 const LIST_QUERY = 'filter=open&q=FT-2026-00&sort=amount.desc';
+// Same without the search: "FT-2026-0201" does not contain "FT-2026-00", so the new record would be filtered out.
+const SHOWN_QUERY = 'filter=open&sort=amount.desc';
 const FAST = 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:0';
 
 const table = (page: Page): Locator => page.getByRole('table', { name: /Invoices/ });
@@ -60,11 +62,15 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
     const entries = await page.evaluate(() => history.length);
     await newInvoice(page).dblclick();
     await expect(heading(page)).toBeVisible();
-    await expect(heading(page)).toBeFocused();
     expect(params(page).get('create')).toBe('1');
     expect(params(page).get('filter')).toBe('open');
     expect(await page.evaluate(() => history.length)).toBe(entries + 1);
     await expect(table(page)).toHaveCount(0);
+    // The focus: with a single click (the second click of a double one lands on the new page and moves it).
+    await page.goBack();
+    await expect(table(page)).toBeVisible();
+    await newInvoice(page).click();
+    await expect(heading(page)).toBeFocused();
   });
 
   test('defaults: locked number, supplier and amount empty, status Open, dates, no badge, clean (Back leaves without a dialog)', async ({ page }) => {
@@ -110,10 +116,10 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
   });
 
   test('a valid Create (double click, Enter held) creates ONE record, returns to the list, no dialog, toast, focus on the link', async ({ page }) => {
-    await openList(page, LIST_QUERY, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:200');
+    await openList(page, SHOWN_QUERY, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:200');
     const entries = await page.evaluate(() => history.length);
     await newInvoice(page).click();
-    await fillValid(page, '1295.9');
+    await fillValid(page, '99999.9');
     await create(page).dblclick();
     await create(page).press('Enter').catch(() => undefined);
     await expect(table(page)).toBeVisible();
@@ -122,13 +128,13 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
     expect(await page.evaluate(() => history.length)).toBe(entries + 1); // the pushed entry is still there for Forward
     const created = (await store(page)).filter((r) => r.number === 'FT-2026-0201');
     expect(created).toHaveLength(1);
-    expect(created[0]).toMatchObject({ supplier: 'Bianchi Supplies', amount: 1295.9 });
+    expect(created[0]).toMatchObject({ supplier: 'Bianchi Supplies', amount: 99999.9 });
     expect(await store(page)).toHaveLength(201);
     await expect(page.getByText('Invoice FT-2026-0201 created')).toBeVisible();
-    // Open + search "FT-2026-00" + amount.desc: 1295.90 is a row of the list, its link has the focus.
+    // Open + amount.desc: the new record is the first row, its link has the focus.
     const link = page.getByRole('link', { name: 'FT-2026-0201', exact: true });
     await expect(link).toBeVisible();
-    await expect(link.locator('xpath=ancestor::tr')).toContainText('1.295,90');
+    await expect(link.locator('xpath=ancestor::tr')).toContainText('99.999,90');
     await expect(link).toBeFocused();
     await expect(page.getByRole('heading', { level: 2, name: /Invoices/ })).toContainText('of 201');
   });
@@ -213,7 +219,8 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
   for (const [name, leave] of [
     ['Cancel', (p: Page) => cancel(p).click()],
     ['Back to list', (p: Page) => backToList(p).click()],
-    ['browser Back', (p: Page) => p.goBack()],
+    // `history.back()` itself: `page.goBack()` waits for a navigation the guard (rightly) cancels.
+    ['browser Back', (p: Page) => p.evaluate(() => history.back())],
   ] as const) {
     test(`${name} with edits asks; "Keep editing" keeps the values; "Discard changes" returns to the list, nothing created`, async ({ page }) => {
       await openList(page, LIST_QUERY);
@@ -233,7 +240,7 @@ test.describe('Showcase/Invoices: Crud (Create)', () => {
   }
 
   test('"Leave anyway" with a Create in flight: the list shows the new record once it lands', async ({ page }) => {
-    await openList(page, LIST_QUERY, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:1500');
+    await openList(page, SHOWN_QUERY, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:1500');
     await newInvoice(page).click();
     await fillValid(page, '99999');
     await create(page).click();
