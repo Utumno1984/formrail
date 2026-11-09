@@ -795,7 +795,8 @@ export const DeleteConfirmRecordPending: StoryObj<CrudArgs> = {
     await userEvent.type(canvas.getByRole('textbox', { name: 'Notes' }), ' (draft)');
     await userEvent.click(canvas.getByRole('button', { name: 'Delete' }));
     const dialog = await body.findByRole('dialog', { name: 'Delete invoice FT-2026-0001?' });
-    await expect(within(dialog).getByText(/Unsaved changes will be lost too\./)).toBeVisible();
+    // `waitFor`: the dialog enters with an animation (transparent at first).
+    await waitFor(() => expect(within(dialog).getByText(/Unsaved changes will be lost too\./)).toBeVisible());
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
     await expect(within(dialog).getByRole('button', { name: 'Delete invoice' })).toHaveAttribute('aria-disabled', 'true');
   },
