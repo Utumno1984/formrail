@@ -46,6 +46,27 @@ describe('Textarea outside a Field', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('maxRows'));
   });
 
+  it('the maxRows warning is emitted once per instance, not on every render (a controlled control re-renders per keystroke)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ui = (value: string) => <Textarea aria-label="Notes" autoResize rows={4} maxRows={2} value={value} onChange={() => {}} />;
+    const { rerender } = render(ui('a'));
+    rerender(ui('ab'));
+    rerender(ui('abc'));
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[react-object-page\] Textarea: maxRows/));
+  });
+
+  it('maxRows equal to rows, or maxRows without autoResize, does not warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(
+      <>
+        <Textarea aria-label="Equal" autoResize rows={3} maxRows={3} />
+        <Textarea aria-label="Manual" rows={4} maxRows={2} />
+      </>,
+    );
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('disabled: not typeable', async () => {
     const onChange = vi.fn();
     render(<Textarea aria-label="Notes" disabled onChange={onChange} />);
@@ -253,6 +274,46 @@ describe('Textarea autoResize (the arithmetic is in auto-height.test.ts; real ge
     expect(screen.getByRole('textbox').style.height).not.toBe('');
     rerender(<Textarea aria-label="Notes" defaultValue="long" />);
     expect(screen.getByRole('textbox').style.height).toBe('');
+  });
+
+  it('switching autoResize off while clamped at maxRows also drops the inline overflow (a fixed-rows control scrolls again)', () => {
+    mockLayout(9 * 20 + 14);
+    const { rerender } = render(<Textarea aria-label="Notes" autoResize maxRows={4} defaultValue="long" />);
+    const el = screen.getByRole('textbox');
+    expect(el.style.overflowY).toBe('auto');
+    rerender(<Textarea aria-label="Notes" maxRows={4} defaultValue="long" />);
+    expect(el.style.overflowY).toBe('');
+    expect(el.style.height).toBe('');
+  });
+
+  it('switching autoResize off under the limit drops the inline overflow: hidden too', () => {
+    mockLayout(2 * 20 + 14);
+    const { rerender } = render(<Textarea aria-label="Notes" autoResize defaultValue="short" />);
+    const el = screen.getByRole('textbox');
+    expect(el.style.overflowY).toBe('hidden');
+    rerender(<Textarea aria-label="Notes" defaultValue="short" />);
+    expect(el.style.overflowY).toBe('');
+  });
+
+  it('rows changed from outside on the mounted control moves the minimum height (same node, no remount)', () => {
+    mockLayout(1 * 20 + 14);
+    const { rerender } = render(<Textarea aria-label="Notes" autoResize rows={2} defaultValue="one line" />);
+    const el = screen.getByRole('textbox');
+    expect(el.style.height).toBe('40px');
+    rerender(<Textarea aria-label="Notes" autoResize rows={5} defaultValue="one line" />);
+    expect(screen.getByRole('textbox')).toBe(el);
+    expect(el.style.height).toBe('100px');
+  });
+
+  it('maxRows changed from outside on the mounted control moves the limit and the inner scroll', () => {
+    mockLayout(9 * 20 + 14);
+    const { rerender } = render(<Textarea aria-label="Notes" autoResize maxRows={4} defaultValue="long" />);
+    const el = screen.getByRole('textbox');
+    expect(el.style.height).toBe('80px');
+    expect(el.style.overflowY).toBe('auto');
+    rerender(<Textarea aria-label="Notes" autoResize maxRows={10} defaultValue="long" />);
+    expect(el.style.height).toBe('180px');
+    expect(el.style.overflowY).toBe('hidden');
   });
 
   it('does not measure a hidden control (no client rects): the height is left alone', () => {

@@ -55,9 +55,14 @@ export const Textarea = /* @__PURE__ */ forwardRef<HTMLTextAreaElement, Textarea
   const limits = useRef({ rows, maxRows });
   limits.current = { rows, maxRows };
 
-  if (isDev() && autoResize && maxRows !== undefined && maxRows < rows) {
-    console.warn(`Textarea: maxRows (${maxRows}) is below rows (${rows}); rows is used as the minimum and the maximum.`);
-  }
+  // Once per instance, not on every render (a controlled textarea re-renders on every keystroke).
+  const warned = useRef(false);
+  const rowsConflict = autoResize && maxRows !== undefined && maxRows < rows;
+  useEffect(() => {
+    if (!rowsConflict || warned.current || !isDev()) return;
+    warned.current = true;
+    console.warn(`[react-object-page] Textarea: maxRows (${maxRows}) is below rows (${rows}); rows is used as the minimum and the maximum.`);
+  }, [rowsConflict, maxRows, rows]);
 
   const resize = useCallback(() => {
     const el = node.current;
