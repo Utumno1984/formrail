@@ -5,6 +5,7 @@ import { Calendar } from '../calendar/Calendar';
 import { Checkbox, type CheckedState } from '../checkbox/Checkbox';
 import { Combobox } from '../combobox/Combobox';
 import { Input } from '../input/Input';
+import { MultiSelect } from '../multi-select/MultiSelect';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { Select } from '../select/Select';
 import { Switch } from '../switch/Switch';
@@ -63,6 +64,7 @@ const KINDS = [
   'textarea',
   'select',
   'combobox',
+  'multi-select',
 ] as const;
 type Kind = (typeof KINDS)[number];
 
@@ -77,6 +79,7 @@ const KIND_LABEL: Record<Kind, string> = {
   textarea: 'Textarea',
   select: 'Select',
   combobox: 'Combobox',
+  'multi-select': 'MultiSelect',
 };
 const STATE_LABEL: Record<State, string> = {
   default: 'default',
@@ -154,6 +157,8 @@ function Control({ kind, own, onChange }: { kind: Kind; own: object; onChange: (
       return <Select {...own} options={OPTIONS} defaultValue="it" onValueChange={onChange} />;
     case 'combobox':
       return <Combobox {...own} options={OPTIONS} defaultValue="fr" onValueChange={onChange} />;
+    case 'multi-select':
+      return <MultiSelect {...own} options={OPTIONS} defaultValue={['fr']} onValueChange={onChange} />;
   }
 }
 
@@ -175,12 +180,13 @@ function controlsOf(cell: HTMLElement, kind: Kind): { aria: HTMLElement; box: HT
   if (kind === 'radio') return { aria: c.getByRole('radiogroup'), box: c.getByRole('radio', { name: 'Yearly' }) };
   const role = kind.startsWith('checkbox') ? 'checkbox' : kind.startsWith('switch') ? 'switch' : kind === 'input' || kind === 'textarea' ? 'textbox' : 'combobox';
   const el = c.getByRole(role);
+  if (kind === 'multi-select') return { aria: el, box: cell.querySelector<HTMLElement>('[data-rop-multi-select]')! };
   return { aria: el, box: el };
 }
 
 /**
  * Every form control in every state, side by side (#223): rows Checkbox (unchecked / checked /
- * indeterminate), Switch (off / on), RadioGroup, Input, Select, Combobox; columns default, invalid,
+ * indeterminate), Switch (off / on), RadioGroup, Input, Select, Combobox, MultiSelect; columns default, invalid,
  * disabled, forced, locked, locked + invalid. Forced and locked share one look (dashed border,
  * read-only surface, neutral indicator, full opacity); invalid owns the colour (error border and
  * fill); disabled is the default look at 0.5 opacity. Photographed on mobile, tablet and desktop;
@@ -206,12 +212,16 @@ export const Matrix: Story = {
         else await expect(aria).not.toHaveAttribute('aria-invalid');
         if (blocked) await expect(aria).toHaveAttribute('aria-readonly', 'true');
         else await expect(aria).not.toHaveAttribute('aria-readonly');
-        if (state === 'disabled') await expect(box).toBeDisabled();
-        else await expect(box).toBeEnabled();
+        // The MultiSelect's box is a wrapper: `disabled` is on its text input (the ARIA element).
+        if (state === 'disabled') await expect(kind === 'multi-select' ? aria : box).toBeDisabled();
+        else await expect(kind === 'multi-select' ? aria : box).toBeEnabled();
         // The forced / locked look is a dashed border; every other state keeps the solid one.
         await expect(getComputedStyle(box).borderTopStyle).toBe(blocked ? 'dashed' : 'solid');
-        if (args.withMessages && state === 'forced') await expect(aria).toHaveAccessibleDescription(REASON.forced);
-        if (args.withMessages && state === 'locked-invalid') await expect(aria).toHaveAccessibleDescription(`${REASON.locked} ${ERROR}`);
+        // The MultiSelect's description ends with the hidden list of its selected labels.
+        const selected = kind === 'multi-select' ? ' France' : '';
+        if (args.withMessages && state === 'forced') await expect(aria).toHaveAccessibleDescription(`${REASON.forced}${selected}`);
+        if (args.withMessages && state === 'locked-invalid')
+          await expect(aria).toHaveAccessibleDescription(`${REASON.locked} ${ERROR}${selected}`);
       }
     }
     await expect(args.onChange).not.toHaveBeenCalled();

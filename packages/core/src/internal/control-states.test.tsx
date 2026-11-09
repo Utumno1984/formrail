@@ -5,6 +5,7 @@ import { Checkbox } from '../checkbox/Checkbox';
 import { Combobox } from '../combobox/Combobox';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { MultiSelect } from '../multi-select/MultiSelect';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { Select } from '../select/Select';
 import { Switch } from '../switch/Switch';
@@ -88,6 +89,43 @@ describe('className wins over the forced / locked and invalid classes (real merg
       expect(cls).toContain('read-only:not-disabled:border-solid');
       expect(cls).not.toContain('read-only:not-disabled:border-dashed');
     }
+  });
+
+  it('MultiSelect: a consumer border style and surface on the box replace the read-only and invalid ones', () => {
+    const { container } = render(
+      <MultiSelect
+        aria-label="multi"
+        options={OPTIONS}
+        className="data-[readonly]:not-data-[disabled]:border-solid data-[readonly]:bg-rop-surface data-[invalid]:border-rop-warning"
+      />,
+    );
+    const cls = classes(container.querySelector('[data-rop-multi-select]')!);
+    expect(cls).toContain('data-[readonly]:not-data-[disabled]:border-solid');
+    expect(cls).not.toContain('data-[readonly]:not-data-[disabled]:border-dashed');
+    expect(cls).not.toContain('data-[readonly]:bg-rop-readonly-surface');
+    expect(cls).not.toContain('data-[invalid]:border-rop-error');
+  });
+
+  it('MultiSelect: the box carries the Field state of its input (forced / locked, invalid, disabled)', () => {
+    const { container } = render(
+      <>
+        <Field label="locked" state="locked" stateReason="Locked." error="Required.">
+          <MultiSelect options={OPTIONS} />
+        </Field>
+        <Field label="disabled" state="disabled">
+          <MultiSelect options={OPTIONS} />
+        </Field>
+        <MultiSelect aria-label="plain" options={OPTIONS} />
+      </>,
+    );
+    const [locked, disabled, plain] = Array.from(container.querySelectorAll('[data-rop-multi-select]'));
+    expect(locked).toHaveAttribute('data-readonly');
+    expect(locked).toHaveAttribute('data-invalid');
+    expect(locked).not.toHaveAttribute('data-disabled');
+    expect(disabled).toHaveAttribute('data-disabled');
+    expect(disabled).toHaveAttribute('aria-disabled', 'true');
+    expect(locked).not.toHaveAttribute('aria-disabled');
+    for (const name of ['data-readonly', 'data-invalid', 'data-disabled']) expect(plain).not.toHaveAttribute(name);
   });
 
   it('Textarea: a consumer invalid border replaces the error one, and the read-only surface/padding are replaceable', () => {

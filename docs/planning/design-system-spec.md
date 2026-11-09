@@ -394,7 +394,8 @@ form dirty.
 RadioGroup #189, Switch #190, Calendar #194, DatePicker #195, ticket Zod):
 - Il TSDoc dichiara il **valore vuoto emesso quando l'utente svuota**. Esistenti: `Input` → `''`;
   `Select`/`Combobox` → `undefined` (`'value' in props` distingue "controllato e vuoto" da "non
-  controllato"). Controlli di selezione nuovi → `undefined`, coerente con Select/Combobox, salvo
+  controllato"); `MultiSelect`/`FileUpload` → `[]` (deroga list-valued, §1.13.1). Controlli di
+  selezione nuovi → `undefined`, coerente con Select/Combobox, salvo
   diversa decisione (§5 punto 7). Checkbox/Switch emettono sempre un booleano; "indeterminato" è una
   prop separata, mai `null` come valore. **Eccezione decisa da Daniele (2026-11-08, ticket
   FileUpload/MultiSelect):** un controllo il cui valore è intrinsecamente una lista (selezione

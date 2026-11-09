@@ -24,6 +24,7 @@ const KINDS = [
   'textarea',
   'select',
   'combobox',
+  'multi-select',
 ] as const;
 type Kind = (typeof KINDS)[number];
 /** The kinds that show an "on" indicator (tick / dash, thumb at the end, dot). */
@@ -42,6 +43,8 @@ function box(page: Page, kind: Kind, state: State): Locator {
   if (kind === 'radio') return c.getByRole('radio', { name: 'Yearly' });
   if (kind.startsWith('checkbox')) return c.getByRole('checkbox');
   if (kind.startsWith('switch')) return c.getByRole('switch');
+  // The MultiSelect draws its box on the wrapper of the chips and the text input.
+  if (kind === 'multi-select') return c.locator('[data-rop-multi-select]');
   return c.getByRole(kind === 'input' || kind === 'textarea' ? 'textbox' : 'combobox');
 }
 
@@ -315,7 +318,20 @@ test.describe('control states matrix: computed styles', () => {
       expect(reached.has(`cell-${kind}-disabled`), `${kind} disabled skipped`).toBe(false);
     }
     for (const kind of KINDS) {
+      if (kind === 'multi-select') continue;
       for (const state of BLOCKED) await expectFocusRingVisible(box(page, kind, state));
+    }
+    // The MultiSelect's ring is drawn by its box while the text input inside has the keyboard focus.
+    for (const state of BLOCKED) {
+      await page.keyboard.press('Shift');
+      await cell(page, 'multi-select', state).getByRole('combobox').focus();
+      const ring = await box(page, 'multi-select', state).evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { style: cs.outlineStyle, width: parseFloat(cs.outlineWidth), focusVisible: !!el.querySelector('input:focus-visible') };
+      });
+      expect(ring.focusVisible, `multi-select ${state} focus-visible`).toBe(true);
+      expect(ring.style, `multi-select ${state} ring`).toBe('solid');
+      expect(ring.width, `multi-select ${state} ring width`).toBeGreaterThan(0);
     }
   });
 });
