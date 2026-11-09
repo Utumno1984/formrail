@@ -262,6 +262,26 @@ test.describe('Showcase/Invoices: Crud (Delete from the record page)', () => {
     await expect(unsavedDialog(page)).toHaveCount(0);
   });
 
+  test('browser Back while the delete is pending, with unsaved changes: the guard asks; the delete landing takes over and goes to the list', async ({ page }) => {
+    await openRecordFromList(page, 'FT-2026-0004', 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:2500');
+    await page.getByRole('textbox', { name: /Amount/ }).fill('12345');
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const dialog = confirmDialog(page, 'FT-2026-0004');
+    await dialog.getByRole('button', { name: 'Delete invoice' }).click();
+    await expect(dialog.getByRole('button', { name: 'Delete invoice' })).toHaveAttribute('aria-disabled', 'true');
+    // Not awaited: the guard cancels this traversal, so it only "completes" with the navigation after the delete.
+    const back = page.goBack({ timeout: 15_000 }).catch(() => null);
+    await expect(unsavedDialog(page)).toBeVisible();
+    expect(params(page).get('record')).toBe('inv-4');
+    // The server deletes the record: the guard is disarmed and the page goes to the list (no choice left to make).
+    await expect(table(page)).toBeVisible({ timeout: 10_000 });
+    await back;
+    await expect(unsavedDialog(page)).toHaveCount(0);
+    expect(params(page).get('record')).toBeNull();
+    expect(await inStore(page, 'FT-2026-0004')).toBe(false);
+    await expect(page.getByText('Invoice FT-2026-0004 deleted')).toBeVisible();
+  });
+
   test('after the delete, Forward reopens the record URL: "Invoice not found" with "Back to list"', async ({ page }) => {
     await openRecordFromList(page, 'FT-2026-0007');
     await page.getByRole('button', { name: 'Delete', exact: true }).click();

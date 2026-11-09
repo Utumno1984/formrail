@@ -165,6 +165,24 @@ describe('InvoiceCrud: Delete from the list', () => {
     expect(shownNumbers()).not.toContain(target);
   }, 20_000);
 
+  it('reads wait for a delete in flight: the record opened meanwhile (Forward) is "not found", never a stale editor', async () => {
+    const { promise, release } = gate();
+    render(<InvoiceCrud {...base({ saveDelayMs: promise })} />);
+    const [target] = await listReady();
+    const id = store().snapshot().find((r) => r.number === target)!.id;
+    await confirmDelete(target!);
+    // The record's URL comes back (e.g. browser Forward) while the delete is still in flight.
+    act(() => {
+      window.history.pushState(null, '', `/?filter=open&record=${id}`);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    expect(await screen.findAllByText('Loading invoice…')).not.toHaveLength(0);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull(); // no editor of the record being deleted
+    await act(async () => release());
+    expect(await screen.findByText('Invoice not found')).toBeTruthy();
+  }, 20_000);
+
   it('unmounting with a delete in flight: no error or warning, the store still completes', async () => {
     const { promise, release } = gate();
     const errors = vi.spyOn(console, 'error');
