@@ -226,6 +226,9 @@ export const MultiSelect = /* @__PURE__ */ forwardRef<HTMLInputElement, MultiSel
 
   const activeOption = shown && state.activeIndex >= 0 ? state.filteredOptions[state.activeIndex] : undefined;
   const activeValue = activeOption?.value;
+  const { filteredOptions } = state;
+  // Also re-run when the list changes under the same active option: a pick empties the filter, the
+  // unfiltered list comes back from the top and the active option may now be far below the fold.
   useEffect(() => {
     const list = listEl;
     if (!list || activeValue === undefined) return;
@@ -235,7 +238,7 @@ export const MultiSelect = /* @__PURE__ */ forwardRef<HTMLInputElement, MultiSel
     const o = el.getBoundingClientRect();
     if (o.top < l.top) list.scrollTop -= l.top - o.top;
     else if (o.bottom > l.bottom) list.scrollTop += o.bottom - l.bottom;
-  }, [activeValue, listEl]);
+  }, [activeValue, filteredOptions, listEl]);
 
   // The native `name` belongs to the hidden inputs, never to the text input.
   const inputProps = state.getInputProps({

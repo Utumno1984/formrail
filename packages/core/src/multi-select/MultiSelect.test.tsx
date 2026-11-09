@@ -195,6 +195,10 @@ describe('MultiSelect: picking', () => {
     await user.click(optionNamed('Operations'));
     expect(onValueChange).not.toHaveBeenCalled();
     expect(optionNamed('Operations')).toHaveAttribute('aria-disabled', 'true');
+    // The pointer over a disabled option does not make it active either.
+    fireEvent.mouseMove(optionNamed('Operations'));
+    expect(document.getElementById(input().getAttribute('aria-activedescendant')!)).toHaveTextContent('Research');
+    expect(optionNamed('Operations')).toHaveAttribute('data-active', 'false');
   });
 
   it('a selected value on a disabled option stays a chip and can be removed', async () => {
@@ -333,6 +337,17 @@ describe('MultiSelect: no echo (§1.13.1)', () => {
     expect(onValueChange).not.toHaveBeenCalled();
   });
 
+  it.each(absent)('value=%s (the key present) stays controlled after a user pick: one callback, no chip', async (_, v) => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<MultiSelect aria-label="x" options={CENTERS} value={v as string[]} onValueChange={onValueChange} />);
+    await user.click(input());
+    await user.click(optionNamed('Sales'));
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith(['sal']);
+    expect(chips()).toEqual([]);
+    expect(optionNamed('Sales')).toHaveAttribute('aria-selected', 'false');
+  });
+
   it('missing value prop (uncontrolled) at mount and the defaultValue changing after: zero callbacks', () => {
     const onValueChange = vi.fn();
     const { rerender } = render(<MultiSelect aria-label="x" options={CENTERS} onValueChange={onValueChange} />);
@@ -427,6 +442,25 @@ describe('MultiSelect: IME composition (§1.13.5)', () => {
     fireEvent.keyDown(input(), { key: 'Backspace' });
     expect(onValueChange).toHaveBeenCalledExactlyOnceWith([]);
   });
+
+  it('keys between compositionstart and compositionend are ignored even without isComposing; so is the keyCode 229 keydown after compositionend', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<Controlled onValueChange={onValueChange} initial={['mkt']} />);
+    await user.click(input());
+    fireEvent.compositionStart(input());
+    fireEvent.change(input(), { target: { value: 'sa' } });
+    // Some engines report isComposing late: the composition flag of the component decides.
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    fireEvent.change(input(), { target: { value: '' } });
+    fireEvent.keyDown(input(), { key: 'Backspace' });
+    expect(onValueChange).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input());
+    // The final keydown some browsers fire after compositionend belongs to the composition.
+    fireEvent.keyDown(input(), { key: 'Backspace', keyCode: 229 });
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(chips()).toEqual(['Marketing']);
+  });
 });
 
 describe('MultiSelect: blocked states', () => {
@@ -494,6 +528,32 @@ describe('MultiSelect: blocked states', () => {
     expect(input()).toHaveValue('');
     expect(onValueChange).not.toHaveBeenCalled();
   });
+
+  it('a Field locked from outside (no press outside the list) with the list open: Enter and arrows change nothing; unlocking does not bring the list back', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    let setLocked: (locked: boolean) => void = () => undefined;
+    function Host() {
+      const [locked, set] = useState(false);
+      setLocked = set;
+      return (
+        <Field label="Centers" {...((locked ? { state: 'locked', stateReason: 'Locked.' } : {}) as FieldStateProps)}>
+          <Controlled onValueChange={onValueChange} />
+        </Field>
+      );
+    }
+    render(<Host />);
+    await user.type(input(), 'sa');
+    expect(input()).toHaveAttribute('aria-activedescendant');
+    // A business rule locks the field (e.g. a server response): nothing dismisses the popover itself.
+    act(() => setLocked(true));
+    expect(screen.queryByRole('listbox')).toBeNull();
+    await user.keyboard('{Enter}{ArrowDown}{Enter}');
+    expect(onValueChange).not.toHaveBeenCalled();
+    act(() => setLocked(false));
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(input()).toHaveFocus();
+  });
 });
 
 describe('MultiSelect: announcements', () => {
@@ -535,6 +595,17 @@ describe('MultiSelect: announcements', () => {
     await user.keyboard('{Backspace}{Backspace}{Backspace}');
     expect(status).toHaveTextContent(/^$/u);
     expect(screen.getByRole('status')).toBe(status);
+  });
+
+  it('with no options the region stays empty while the list is closed; "No results" only once it opens', async () => {
+    const user = userEvent.setup();
+    render(<MultiSelect aria-label="x" options={[]} defaultValue={['mkt']} />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent(/^$/u);
+    await user.click(input());
+    expect(status).toHaveTextContent('No results');
+    await user.keyboard('{Escape}');
+    expect(status).toHaveTextContent(/^$/u);
   });
 
   it('labels.selectedCount and emptyLabel are used', async () => {
@@ -579,6 +650,24 @@ describe('MultiSelect: native form', () => {
       </form>,
     );
     expect(new FormData(screen.getByTestId('form') as HTMLFormElement).getAll('centers')).toEqual(['mkt']);
+  });
+
+  it('disabled (own prop or Field state): the values are not submitted, like any disabled control', () => {
+    render(
+      <>
+        <form data-testid="own">
+          <MultiSelect aria-label="x" name="c" disabled options={CENTERS} defaultValue={['mkt', 'sal']} />
+        </form>
+        <form data-testid="field">
+          <Field label="Centers" name="c" state="disabled">
+            <MultiSelect options={CENTERS} defaultValue={['mkt']} />
+          </Field>
+        </form>
+      </>,
+    );
+    expect(new FormData(screen.getByTestId('own') as HTMLFormElement).getAll('c')).toEqual([]);
+    expect(new FormData(screen.getByTestId('field') as HTMLFormElement).getAll('c')).toEqual([]);
+    expect(document.querySelectorAll('input[type="hidden"][name="c"]')).toHaveLength(3);
   });
 
   it('uncontrolled form.reset() goes back to defaultValue with no callback and drops the typed text', async () => {

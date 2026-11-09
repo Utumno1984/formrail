@@ -129,6 +129,25 @@ test.describe('keyboard', () => {
     await page.keyboard.press('Backspace');
     expect(await chips(page)).toEqual([]);
   });
+
+  // A pick empties the filter: the unfiltered list comes back from the top, and the option that
+  // stays active (the one just picked, far down a long list) must be scrolled back into view.
+  for (const gesture of ['Enter', 'click'] as const) {
+    test(`after a filtered pick (${gesture}) the picked option is visible in the unfiltered list`, async ({ page }) => {
+      await gotoStory(page, STORY('many-values'));
+      await input(page).click();
+      await input(page).fill('CC-028');
+      if (gesture === 'Enter') await page.keyboard.press('Enter');
+      else await page.getByRole('option', { name: 'CC-028' }).click();
+      await expect(input(page)).toHaveValue('');
+      await expect(page.getByRole('option')).toHaveCount(30);
+      const option = page.getByRole('option', { name: 'CC-028' });
+      await expect(option).toHaveAttribute('data-active', 'true');
+      const [o, l] = await Promise.all([option.boundingBox(), listbox(page).boundingBox()]);
+      expect(o!.y).toBeGreaterThanOrEqual(l!.y - 1);
+      expect(o!.y + o!.height).toBeLessThanOrEqual(l!.y + l!.height + 1);
+    });
+  }
 });
 
 test.describe('touch @touch', () => {
