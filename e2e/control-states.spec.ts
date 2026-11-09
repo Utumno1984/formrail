@@ -21,6 +21,7 @@ const KINDS = [
   'switch-on',
   'radio',
   'input',
+  'textarea',
   'select',
   'combobox',
   'number',
@@ -42,7 +43,9 @@ function box(page: Page, kind: Kind, state: State): Locator {
   if (kind === 'radio') return c.getByRole('radio', { name: 'Yearly' });
   if (kind.startsWith('checkbox')) return c.getByRole('checkbox');
   if (kind.startsWith('switch')) return c.getByRole('switch');
-  return c.getByRole(kind === 'input' ? 'textbox' : kind === 'number' ? 'spinbutton' : 'combobox');
+  return c.getByRole(
+    kind === 'input' || kind === 'textarea' ? 'textbox' : kind === 'number' ? 'spinbutton' : 'combobox',
+  );
 }
 
 interface Look {

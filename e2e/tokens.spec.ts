@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
+import { colourOf } from './helpers/colour';
 import { gotoStory } from './helpers/story';
 
 const STORY = 'foundations-tokens--overview';
@@ -27,13 +28,7 @@ test.describe('Foundations/Tokens', () => {
   test('the swatch of a derived token paints its computed default, in the same place of the palette', async ({ page }) => {
     await gotoStory(page, STORY);
     // A derived token is an unset override slot: a bare var() of its name would paint nothing.
-    const colour = (name: string) =>
-      page.getByTestId(`swatch-${name}`).evaluate((el) => {
-        const ctx = document.createElement('canvas').getContext('2d')!;
-        ctx.fillStyle = getComputedStyle(el).backgroundColor;
-        ctx.fillRect(0, 0, 1, 1);
-        return Array.from(ctx.getImageData(0, 0, 1, 1).data);
-      });
+    const colour = (name: string) => colourOf(page.getByTestId(`swatch-${name}`), 'backgroundColor', { alpha: true });
     expect(await colour('rop-primary-hover')).toEqual(await colour('rop-blue-700'));
     expect(await colour('rop-primary-active')).toEqual(await colour('rop-blue-800'));
     expect(await colour('rop-error-hover')).toEqual([168, 8, 8, 255]); // 80% of #d20a0a + 20% black
@@ -47,6 +42,8 @@ test.describe('Foundations/Tokens', () => {
     expect(after('rop-primary-hover')).toBe('swatch-rop-primary-active');
     expect(after('rop-error')).toBe('swatch-rop-error-hover');
     expect(after('rop-error-hover')).toBe('swatch-rop-error-active');
+    expect(after('rop-surface-pressed')).toBe('swatch-rop-readonly-surface');
+    expect(after('rop-text-muted')).toBe('swatch-rop-readonly-indicator');
   });
 
   test('the z-index scale is listed in strictly increasing order: sticky, overlay, modal, popover, toast, tooltip', async ({

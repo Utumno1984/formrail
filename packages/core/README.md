@@ -117,7 +117,7 @@ can use `text-rop-body`, `font-rop-mono`, `z-rop-modal`, `bg-rop-primary`... in 
 | Group | Names |
 |---|---|
 | Colors | `text`, `text-muted`, `surface`, `surface-subtle`, `border`, `primary`, `primary-contrast`, `info`, `success`, `warning`, `error` |
-| Derived colors (see below) | `primary-hover`, `primary-active`, `error-hover`, `error-active`, `surface-pressed`, `readonly-surface`, `readonly-indicator` |
+| Derived colors (see below) | `primary-hover`, `primary-active`, `primary-subtle`, `primary-subtle-hover`, `primary-muted`, `error-hover`, `error-active`, `surface-pressed`, `readonly-surface`, `readonly-indicator` |
 | Type scale (size + line height) | `caption`, `body`, `label`, `title-sm`, `title-md`, `title-lg` |
 | Families | `font-rop-sans`, `font-rop-mono` (system stacks, no web font; the mono stack ends with `monospace`) |
 | z-index | `sticky` < `overlay` (backdrop) < `modal` < `popover` < `tooltip` |
@@ -132,11 +132,16 @@ top of the precompiled `styles.css` (mode a) has no effect. Or force the layout 
 prop.
 
 The derived colors are not fixed values: they are computed from a base color **on the element that
-uses them**.
+uses them**. `theme.css` declares them in a `@theme reference` block, so nothing is emitted on
+`:root` and each utility is compiled as `var(<token>, <formula>)`: the formula and its base are
+resolved on the element, and the token name, unset by default, wins over the formula when you set
+it. This section is the contract; the comment above that block in `theme.css` only describes the
+mechanism.
 
 | Derived | Default |
 |---|---|
 | `primary-hover` / `primary-active` | `color-mix(in srgb, var(--color-rop-primary) 80%, black)` / `62%` |
+| `primary-subtle` / `primary-subtle-hover` / `primary-muted` | `color-mix(in srgb, var(--color-rop-primary) 8%, white)` / `16%` / `50%` (row selection fill at rest and on hover / press; count-flash border) |
 | `error-hover` / `error-active` | `color-mix(in srgb, var(--color-rop-error) 80%, black)` / `62%` |
 | `surface-pressed` | `color-mix(in srgb, var(--color-rop-surface-subtle) 96%, black)` |
 | `readonly-surface` | `var(--color-rop-surface-subtle)` |
@@ -167,11 +172,11 @@ uses them**.
 - **An alias of a derived token needs a value**: with `primary-hover` unset,
   `--color-rop-primary-active: var(--color-rop-primary-hover)` is ignored in silence and the computed
   shade stays. Write the color, or the full recipe above.
+- **With an opacity modifier** (`bg-rop-primary-hover/50`), browsers without `color-mix(in oklab)`
+  get Tailwind's fallback, which keeps the alpha but ignores an override of the derived token.
 
-Two more limits at wrapper scope. `--color-rop-blue-600` does not move `--color-rop-primary`: the
-primary is resolved on `:root`, redeclare it directly. The row selection and the count flash of the
-List Report are drawn with the `blue` scale, so they stay blue with any theme, on `:root` as well
-([#293](https://github.com/Utumno1984/react-object-page/issues/293)).
+One more limit at wrapper scope. `--color-rop-blue-600` does not move `--color-rop-primary`: the
+primary is resolved on `:root`, redeclare it directly.
 
 ## `cn()`
 

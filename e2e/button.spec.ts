@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
+import { colourOf } from './helpers/colour';
 import { expectFocusRingVisible } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
@@ -110,13 +111,7 @@ test.describe('Primitives/Button', () => {
     const hovered = async (testId: string) => {
       const target = page.getByTestId(testId);
       await target.hover();
-      return target.evaluate((el) => {
-        // Resolve whatever serialization the browser uses (rgb() or color(srgb ...)) to 8-bit channels.
-        const ctx = document.createElement('canvas').getContext('2d')!;
-        ctx.fillStyle = getComputedStyle(el).backgroundColor;
-        ctx.fillRect(0, 0, 1, 1);
-        return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
-      });
+      return colourOf(target, 'backgroundColor');
     };
     expect(await hovered('matrix-primary-md')).toEqual([204, 0, 0]); // 80% of #ff0000 + 20% black
     expect(await hovered('matrix-danger-md')).toEqual([0, 0, 204]);
@@ -190,19 +185,8 @@ test.describe('Primitives/Button', () => {
 
   test('primary: hover is blue-700 and a pressed mouse is blue-800; a disabled one never changes', async ({ page }) => {
     await gotoStory(page, OVERVIEW);
-    // Resolve a token to 8-bit channels through a canvas (whatever serialization the browser uses).
-    const channels = (css: string) =>
-      page.evaluate((value) => {
-        const ctx = document.createElement('canvas').getContext('2d')!;
-        ctx.fillStyle = '#000';
-        ctx.fillStyle = value;
-        ctx.fillRect(0, 0, 1, 1);
-        return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
-      }, css);
-    const token = (name: string) =>
-      page.evaluate((n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(), name).then(channels);
-    const bg = (locator: ReturnType<typeof page.locator>) =>
-      locator.evaluate((el) => getComputedStyle(el).backgroundColor).then(channels);
+    const token = (name: `--${string}`) => colourOf(page, name);
+    const bg = (locator: ReturnType<typeof page.locator>) => colourOf(locator, 'backgroundColor');
 
     const target = page.getByTestId('matrix-primary-md');
     const rest = await bg(target);

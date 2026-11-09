@@ -396,7 +396,13 @@ RadioGroup #189, Switch #190, Calendar #194, DatePicker #195, ticket Zod):
   `Select`/`Combobox` → `undefined` (`'value' in props` distingue "controllato e vuoto" da "non
   controllato"). Controlli di selezione nuovi → `undefined`, coerente con Select/Combobox, salvo
   diversa decisione (§5 punto 7). Checkbox/Switch emettono sempre un booleano; "indeterminato" è una
-  prop separata, mai `null` come valore.
+  prop separata, mai `null` come valore. **Eccezione decisa da Daniele (2026-11-08, ticket
+  FileUpload/MultiSelect):** un controllo il cui valore è intrinsecamente una lista (selezione
+  multipla, allegati) emette `[]` quando è vuoto, non `undefined` — un array vuoto è la
+  rappresentazione più naturale per un consumer che itera sul valore, e resta comunque un singolo
+  stato "vuoto" distinto (nessuna ambiguità con `undefined`/`null`, che restano "non controllato"/
+  "nessun valore esterno" per quei controlli). Si applica solo ai controlli list-valued, non cambia
+  il default per i controlli a valore singolo sopra.
 - Un valore assente in ingresso (`null` compreso) viene mostrato come vuoto **senza** nessun
   `onChange`/`onValueChange` che lo converta in un'altra rappresentazione di assente (eco, §1.4).
 - Test obbligatori: matrice ingresso {`undefined`, `null`, `''` dove il tipo lo ammette, prop/chiave

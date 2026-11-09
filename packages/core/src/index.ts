@@ -27,6 +27,8 @@ export { Input } from './input/Input';
 export type { InputProps, InputSize } from './input/Input';
 export { NumberInput } from './number-input/NumberInput';
 export type { NumberInputProps, NumberInputLabels, NumberInputSize } from './number-input/NumberInput';
+export { Textarea } from './textarea/Textarea';
+export type { TextareaProps } from './textarea/Textarea';
 export {
   Dialog,
   DialogTrigger,
@@ -66,6 +68,10 @@ export type {
   SheetTitleProps,
   SheetCloseProps,
 } from './sheet/Sheet';
+export { ConfirmDialog } from './confirm-dialog/ConfirmDialog';
+export type { ConfirmDialogProps, ConfirmDialogTone } from './confirm-dialog/ConfirmDialog';
+export { useConfirmDialog } from './confirm-dialog/use-confirm-dialog';
+export type { ConfirmOptions } from './confirm-dialog/use-confirm-dialog';
 export { Tooltip, TooltipProvider } from './tooltip/Tooltip';
 export type { TooltipProps, TooltipProviderProps, TooltipSide, TooltipAlign } from './tooltip/Tooltip';
 export { ToastProvider } from './toast/ToastProvider';
@@ -82,6 +88,8 @@ export { RadioGroup, RadioGroupItem } from './radio-group/RadioGroup';
 export type { RadioGroupItemProps, RadioGroupOrientation, RadioGroupProps } from './radio-group/RadioGroup';
 export { Switch } from './switch/Switch';
 export type { SwitchProps } from './switch/Switch';
+export { FileUpload } from './file-upload/FileUpload';
+export type { FileUploadProps, FileUploadLabels, FileRejection } from './file-upload/FileUpload';
 export { Combobox } from './combobox/Combobox';
 export type { ComboboxProps, ComboboxOption, ComboboxSize } from './combobox/Combobox';
 export { useCombobox } from './combobox/use-combobox';

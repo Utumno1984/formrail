@@ -1140,6 +1140,84 @@ export const SelectionAll: StoryObj<SelectionArgs> = {
   },
 };
 
+/** `color-mix(in srgb, <base> <percent>%, white)` in 8-bit channels (what the primary tints are). */
+function tint(base: [number, number, number], percent: number): number[] {
+  return base.map((c) => Math.round((c * percent) / 100 + (255 * (100 - percent)) / 100));
+}
+
+/** A computed colour as 8-bit channels, whatever serialization the browser uses (rgb() or color(srgb ...)). */
+function channels(el: Element): number[] {
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  ctx.fillStyle = getComputedStyle(el).backgroundColor;
+  ctx.fillRect(0, 0, 1, 1);
+  return Array.from(ctx.getImageData(0, 0, 1, 1).data.slice(0, 3));
+}
+
+const near = (actual: number[], expected: number[]) => actual.every((c, i) => Math.abs(c - expected[i]!) <= 1);
+const SCOPED_VIOLET: [number, number, number] = [107, 63, 160]; // #6b3fa0
+const DEFAULT_BLUE: [number, number, number] = [10, 110, 209]; // #0a6ed1
+
+/**
+ * Only `--color-rop-primary` is redeclared on a wrapper (Violet, `#6b3fa0`) and the selection follows it:
+ * the selected rows are tinted with 8% of the violet (16% when hovered or pressed) and the count pill flashes
+ * with it, not with the default blue. The tint tokens are computed where they are used, so they stay unset on
+ * the wrapper. Same three preselected invoices as "Selection some".
+ * The play function checks that the tinted rows are violet (and not the default blue family), that an
+ * unselected row is not tinted, that a row follows its checkbox off and on, and that the count pill
+ * flashes when a filter changes the number. A script cannot trigger the CSS `:hover`/`:active` nor read the
+ * flash mid-transition: the hover, pressed and flash colours are proved with a real mouse in
+ * `e2e/list-report-scoped-primary.spec.ts`.
+ */
+export const SelectionScopedPrimary: StoryObj<SelectionArgs> = {
+  ...Selection,
+  parameters: NO_CONTROLS,
+  args: { ...SELECTION_ARGS, preselected: 'some' },
+  decorators: [
+    (Story) => (
+      <div data-testid="violet-scope" style={{ '--color-rop-primary': '#6b3fa0' } as CSSProperties}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scope = getComputedStyle(canvas.getByTestId('violet-scope'));
+    await expect(scope.getPropertyValue('--color-rop-primary')).toBe('#6b3fa0');
+    for (const token of ['primary-subtle', 'primary-subtle-hover', 'primary-muted']) {
+      await expect(scope.getPropertyValue(`--color-rop-${token}`)).toBe('');
+    }
+
+    const row = (number: string) => rowBox(canvas, number).closest('tr')!;
+    const selected = row(FIRST_OPEN.number);
+    await expect(selected).toHaveAttribute('data-selected');
+    await expect(near(channels(selected), tint(SCOPED_VIOLET, 8))).toBe(true);
+    await expect(near(channels(selected), tint(DEFAULT_BLUE, 8))).toBe(false);
+
+    const other = SELECTION_ROWS.find((r) => !SCENARIO.includes(r))!;
+    await expect(row(other.number)).not.toHaveAttribute('data-selected');
+    await expect(near(channels(row(other.number)), tint(SCOPED_VIOLET, 8))).toBe(false);
+
+    await userEvent.click(rowBox(canvas, FIRST_OPEN.number));
+    await expect(selected).not.toHaveAttribute('data-selected');
+    await expect(near(channels(selected), tint(SCOPED_VIOLET, 8))).toBe(false);
+    await userEvent.click(rowBox(canvas, FIRST_OPEN.number));
+    await expect(near(channels(selected), tint(SCOPED_VIOLET, 8))).toBe(true);
+
+    const pill = canvasElement.querySelector('[data-rop-count]');
+    if (!(pill instanceof HTMLElement)) throw new Error('count pill not found');
+    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await expect(pill).toHaveAttribute('data-changed');
+    await waitFor(() => expect(pill).not.toHaveAttribute('data-changed'));
+  },
+};
+
+/** Fixture of the e2e suite: `SelectionScopedPrimary` without the play function. */
+export const SelectionScopedPrimaryNoPlay: StoryObj<SelectionArgs> = {
+  ...SelectionScopedPrimary,
+  tags: ['internal'],
+  play: undefined,
+};
+
 /** The same three invoices on the "Open" pill: one visible, two hidden by the filter. */
 export const SelectionHiddenByFilter: StoryObj<SelectionArgs> = {
   ...Selection,

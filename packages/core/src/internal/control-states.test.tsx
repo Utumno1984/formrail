@@ -9,6 +9,7 @@ import { NumberInput } from '../number-input/NumberInput';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { Select } from '../select/Select';
 import { Switch } from '../switch/Switch';
+import { Textarea } from '../textarea/Textarea';
 
 // The forced / locked and invalid looks of the form controls (#223). jsdom computes no Tailwind CSS:
 // the computed styles are asserted by `e2e/control-states.spec.ts`; here the class contract (the
@@ -71,14 +72,19 @@ describe('className wins over the forced / locked and invalid classes (real merg
     expect(cls).not.toContain('group-aria-readonly/rg:border-dashed');
   });
 
-  it('Input and Combobox: a consumer border style replaces the read-only one', () => {
+  it('Input, Textarea and Combobox: a consumer border style replaces the read-only one', () => {
     render(
       <>
         <Input aria-label="input" className="read-only:not-disabled:border-solid" />
+        <Textarea aria-label="textarea" className="read-only:not-disabled:border-solid" />
         <Combobox aria-label="combobox" options={OPTIONS} className="read-only:not-disabled:border-solid" />
       </>,
     );
-    for (const el of [screen.getByRole('textbox', { name: 'input' }), screen.getByRole('combobox', { name: 'combobox' })]) {
+    for (const el of [
+      screen.getByRole('textbox', { name: 'input' }),
+      screen.getByRole('textbox', { name: 'textarea' }),
+      screen.getByRole('combobox', { name: 'combobox' }),
+    ]) {
       const cls = classes(el);
       expect(cls).toContain('read-only:not-disabled:border-solid');
       expect(cls).not.toContain('read-only:not-disabled:border-dashed');
@@ -104,6 +110,17 @@ describe('className wins over the forced / locked and invalid classes (real merg
     expect(classes(input)).toContain('read-only:not-disabled:border-dashed');
     expect(input).toHaveAttribute('readonly');
     for (const name of ['Increase', 'Decrease']) expect(screen.getByRole('button', { name })).toBeDisabled();
+  });
+
+  it('Textarea: a consumer invalid border replaces the error one, and the read-only surface/padding are replaceable', () => {
+    render(<Textarea aria-label="t" className="aria-invalid:border-rop-warning read-only:bg-rop-surface py-1" />);
+    const cls = classes(screen.getByRole('textbox', { name: 't' }));
+    expect(cls).toContain('aria-invalid:border-rop-warning');
+    expect(cls).not.toContain('aria-invalid:border-rop-error');
+    expect(cls).toContain('read-only:bg-rop-surface');
+    expect(cls).not.toContain('read-only:bg-rop-readonly-surface');
+    expect(cls).toContain('py-1');
+    expect(cls).not.toContain('py-[7px]');
   });
 
   it('Select: a consumer border style and surface replace the read-only ones', () => {
