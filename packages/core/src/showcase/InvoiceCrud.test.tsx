@@ -188,11 +188,37 @@ describe('InvoiceCrud: Create', () => {
     expect(window.__ropShowcaseStore?.snapshot()).toHaveLength(201);
   }, 20_000);
 
-  it.each(['', 'not-a-date', '2026-13-45'])('an unusable `today` (%j) falls back to the local date instead of throwing', async (today) => {
+  it('a URL with BOTH record and create (record wins): "Back to list" clears both and shows the list', async () => {
+    window.history.replaceState(null, '', '/?filter=open&record=inv-12&create=1');
+    render(<InvoiceCrud {...base()} />);
+    await screen.findByRole('heading', { level: 1, name: /FT-2026-0012/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(await screen.findByRole('table')).toBeTruthy();
+    expect(screen.queryByRole('heading', { level: 1, name: 'New invoice' })).toBeNull();
+    expect(window.location.search).toBe('?filter=open');
+  }, 20_000);
+
+  it('leaving for another page before the list after a Create has loaded: the confirmation is shown anyway', async () => {
+    render(<InvoiceCrud {...base({ listLoadDelayMs: 800 })} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'New invoice' }));
+    await chooseSupplier('Bianchi Supplies');
+    await userEvent.type(screen.getByRole('textbox', { name: /Amount/ }), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(window.location.search).not.toContain('create='));
+    expect(screen.queryByText('Invoice FT-2026-0201 created')).toBeNull(); // the list is still loading
+    // ...and the user starts another navigation right away: the list that was to announce is unmounted.
+    await userEvent.click(screen.getByRole('button', { name: 'New invoice' }));
+    expect(await screen.findByText('Invoice FT-2026-0201 created')).toBeTruthy();
+    expect(window.location.search).toContain('create=1');
+    expect(window.__ropShowcaseStore?.snapshot()).toHaveLength(201);
+  }, 20_000);
+
+  it.each(['', 'not-a-date', '2026-13-45', '2026-02-30'])('an unusable `today` (%j) falls back to the local date instead of throwing', async (today) => {
     render(<InvoiceCrud {...base({ today })} />);
     await userEvent.click(await screen.findByRole('button', { name: 'New invoice' }));
     const date = (await screen.findByLabelText('Invoice date')) as HTMLInputElement;
     expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(date.value).not.toBe(today); // never kept as typed (an impossible day would leave the field empty)
     expect((screen.getByLabelText('Due date') as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   }, 20_000);
 

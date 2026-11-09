@@ -1,15 +1,31 @@
-// Story-only: the mini-router of the Invoices showcases (#150, shared since #363). No new library API: ~60
+// Story-only: the mini-router of the Invoices showcases (#150, shared since #363). No new library API: ~80
 // lines on `history` + `popstate`.
-//   - the routes are two query parameters, `record=<id>` (an existing invoice) and `create=1` (the creation
-//     page); they are separate so that no record id can ever collide with a reserved word. With BOTH
-//     present, `record` wins (documented, not an error). Every other parameter (the list's own, the page's)
-//     is kept byte for byte by `updateSearch`;
+//   - the route is ONE tagged value, `Route` = list | record(id) | create. In the URL it is carried by the
+//     `record=<id>` and `create=1` query parameters, but they are only ever READ through `parseRoute` (one
+//     value: with both present `record` wins, documented) and only ever WRITTEN through `routeUrl`, which
+//     sets exactly one of them and removes the other. So "both present" can be parsed but never produced,
+//     and leaving a page clears both. A route added later (Delete, #365/#366) is one more member of the union;
+//     every other parameter (the list's own, the page's) is kept byte for byte by `updateSearch`;
 //   - opening = `pushState` (so Back/Forward work) with a marker in `history.state`;
 //   - leaving = `history.back()` when this entry was pushed by the list (exact restoration, and Forward
-//     reopens the page), otherwise (deep link) a `replaceState` to the same URL without the parameter;
+//     reopens the page), otherwise (deep link) a `replaceState` to the list URL;
 //   - the list restores its scroll by itself (`useListReportScrollRestoration`, keyed on the list's own
 //     parameters: neither route parameter is one of them).
 import { updateSearch } from '../list-report/use-list-report-url-state';
+
+export type Route = { kind: 'list' } | { kind: 'record'; id: string } | { kind: 'create' };
+
+/** One canonical string per route. */
+export const routeKey = (route: Route): string => (route.kind === 'record' ? `record:${route.id}` : route.kind);
+
+const LIST: Route = { kind: 'list' };
+
+export function parseRoute(search: string): Route {
+  const params = new URLSearchParams(search);
+  const record = params.get('record');
+  if (record) return { kind: 'record', id: record }; // `record` wins when both are present
+  return params.get('create') === '1' ? { kind: 'create' } : LIST;
+}
 
 const FROM_LIST = 'ropFromList';
 let routeListeners: (() => void)[] = [];
@@ -24,39 +40,44 @@ export const subscribeRoute = (listener: () => void) => {
   };
 };
 
-export const readRecord = (): string | null => new URLSearchParams(window.location.search).get('record') || null;
-export const readCreate = (): boolean => new URLSearchParams(window.location.search).get('create') === '1';
+export const readRoute = (): Route => parseRoute(window.location.search);
+/** Primitive snapshots for `useSyncExternalStore`, both derived from the ONE parsed route (never both set). */
+export const readRecord = (): string | null => {
+  const route = readRoute();
+  return route.kind === 'record' ? route.id : null;
+};
+export const readCreate = (): boolean => readRoute().kind === 'create';
 
 const stateObject = (): Record<string, unknown> => {
   const s: unknown = window.history.state;
   return typeof s === 'object' && s !== null ? (s as Record<string, unknown>) : {};
 };
 
-type RouteParam = 'record' | 'create';
-const urlWith = (patch: Partial<Record<RouteParam, string | null>>): string =>
-  `${window.location.pathname}${updateSearch(window.location.search, patch)}${window.location.hash}`;
+/** The current URL with the route parameters set for `route`: exactly one of them, or none for the list. */
+const routeUrl = (route: Route): string =>
+  `${window.location.pathname}${updateSearch(window.location.search, {
+    record: route.kind === 'record' ? route.id : null,
+    create: route.kind === 'create' ? '1' : null,
+  })}${window.location.hash}`;
 
 /** The href of a record: the current list parameters plus `record=<id>`. */
-export const recordHref = (id: string): string => urlWith({ record: id });
+export const recordHref = (id: string): string => routeUrl({ kind: 'record', id });
 
-export function openRecord(id: string): void {
-  if (readRecord() === id) return; // a double click leaves ONE history entry
-  window.history.pushState({ ...stateObject(), [FROM_LIST]: true }, '', urlWith({ record: id }));
+function open(route: Route): void {
+  if (routeKey(readRoute()) === routeKey(route)) return; // a double click leaves ONE history entry
+  window.history.pushState({ ...stateObject(), [FROM_LIST]: true }, '', routeUrl(route));
   notifyRoute();
 }
 
-export function openCreate(): void {
-  if (readCreate()) return; // a double click leaves ONE history entry
-  window.history.pushState({ ...stateObject(), [FROM_LIST]: true }, '', urlWith({ create: '1' }));
-  notifyRoute();
-}
+export const openRecord = (id: string): void => open({ kind: 'record', id });
+export const openCreate = (): void => open({ kind: 'create' });
 
 // `history.back()` is asynchronous: until its `popstate` the page is still on screen and still carries the
 // marker, so a second click would go back TWO entries (out of the app). One at a time.
 let leaving = false;
 export const isLeaving = (): boolean => leaving;
 
-/** Leaves the record page or the creation page, whichever is the current route. */
+/** Leaves the current page for the list, whichever page it is. */
 export function leaveRoute(): void {
   if (stateObject()[FROM_LIST] === true) {
     if (leaving) return;
@@ -65,7 +86,7 @@ export function leaveRoute(): void {
     window.history.back(); // `popstate` re-renders the list
     return;
   }
-  // Deep link: there is no list entry before this one. Only the parameter that is on screen goes away.
-  window.history.replaceState(stateObject(), '', urlWith(readRecord() ? { record: null } : { create: null }));
+  // Deep link: there is no list entry before this one. The list URL carries NO route parameter at all.
+  window.history.replaceState(stateObject(), '', routeUrl(LIST));
   notifyRoute();
 }

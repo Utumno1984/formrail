@@ -98,13 +98,11 @@ function CrudInner({
 
   const open = useRef((id: string) => {
     callbacks.current.onNavigate({ to: 'record', id });
-    setJustCreated(null);
     openRecord(id);
   }).current;
   const openNew = useRef(() => {
     if (readCreate()) return; // a double click: one entry, one report
     callbacks.current.onNavigate({ to: 'create' });
-    setJustCreated(null);
     lastRecord.current = null;
     openCreate();
   }).current;
@@ -134,6 +132,22 @@ function CrudInner({
     );
     setJustCreated(null);
   }).current;
+
+  // The user went elsewhere (a row, "New invoice", Back/Forward) after the list came back but BEFORE its data
+  // arrived: the list that was to announce the Create is gone, and the confirmation must not vanish with it.
+  // Announce it from here (this component outlives every page); the filters can no longer be judged, and the
+  // focus move no longer makes sense, so it is the plain message. `listReturned` tells this apart from the
+  // moment right after the store accepted the record, when the creation page is still on screen.
+  const listReturned = useRef(false);
+  useEffect(() => {
+    if (!justCreated) {
+      listReturned.current = false;
+    } else if (!record && !create) {
+      listReturned.current = true;
+    } else if (listReturned.current) {
+      announce(justCreated, true);
+    }
+  }, [justCreated, record, create, announce]);
 
   if (record) return <InvoiceRecordPage store={api} recordId={record} onBack={back} onSaved={saved} />;
   if (create) {

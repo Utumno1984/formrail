@@ -18,7 +18,8 @@ import { useObjectPageForm } from '../object-page/use-object-page-form';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
-import { addDays, InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
+import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
+import { InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from './showcase-data';
 
 export interface InvoiceRecordPageProps {
@@ -174,24 +175,22 @@ export interface InvoiceEditorProps {
   onCreateDone?: (invoice: StoredInvoice) => void;
 }
 
-const localToday = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/**
+ * The defaults of a new invoice: no supplier, open, no amount, dated today, due in 30 days. `today` comes from
+ * a free-text Storybook control: anything that is not a real calendar date (`''`, `2026-02-30`) falls back to
+ * the local date (the calendar helpers' `isIsoDate` checks the day against the month).
+ */
+const defaultValues = (today: string | undefined): InvoiceValues => {
+  const date = isIsoDate(today) ? today : localToday();
+  return {
+    supplier: '',
+    status: 'pending',
+    amount: '',
+    date,
+    dueDate: addCalendarDays(date, 30) ?? date,
+    notes: '',
+  };
 };
-
-/** A usable yyyy-mm-dd or `undefined`: the Storybook control is free text, and `''`/garbage must not throw in `addDays`. */
-const validDay = (value: string | undefined): string | undefined =>
-  value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) ? value : undefined;
-
-/** The defaults of a new invoice: no supplier, open, no amount, dated today, due in 30 days. */
-const defaultValues = (today: string): InvoiceValues => ({
-  supplier: '',
-  status: 'pending',
-  amount: '',
-  date: today,
-  dueDate: addDays(today, 30),
-  notes: '',
-});
 
 const toDraft = (v: InvoiceValues): InvoiceDraft => ({
   supplier: v.supplier,
@@ -228,7 +227,7 @@ export function InvoiceEditor({
 }: InvoiceEditorProps) {
   const creating = record === null;
   const form = useObjectPageForm<InvoiceValues>({
-    baseline: record ? toValues(record) : defaultValues(validDay(today) ?? localToday()),
+    baseline: record ? toValues(record) : defaultValues(today),
     isEqual: sameValues,
     validate: (v) => {
       const errors: Partial<Record<keyof InvoiceValues, string>> = {};

@@ -67,7 +67,7 @@ export interface InvoiceStore {
 }
 
 const DAY_MS = 86_400_000;
-export const addDays = (iso: string, days: number): string =>
+const addDays = (iso: string, days: number): string =>
   new Date(Date.parse(iso + 'T00:00:00Z') + days * DAY_MS).toISOString().slice(0, 10);
 
 const extend = (r: DemoInvoice, index: number): StoredInvoice => ({
