@@ -164,6 +164,30 @@ describe('InvoiceCrud: Create', () => {
     expect(await screen.findByRole('link', { name: 'FT-2026-0201' }, { timeout: 5000 })).toBeTruthy();
   }, 20_000);
 
+  it('typing during the save: the guard asks about the newer edits and a second Create never makes a second record', async () => {
+    const { promise, release } = gate();
+    const onCreated = vi.fn();
+    render(<InvoiceCrud {...base({ saveDelayMs: promise, onCreated })} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'New invoice' }));
+    await chooseSupplier('Bianchi Supplies');
+    await userEvent.type(screen.getByRole('textbox', { name: /Amount/ }), '10');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), 'after the click');
+    await act(async () => release());
+    // The record exists, the form is dirty again with edits that were not part of it: the guard asks.
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+    expect(window.location.search).toContain('create=1');
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(window.__ropShowcaseStore?.snapshot()).toHaveLength(201);
+    // "Discard changes" finally leaves (the record stays created).
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(window.location.search).not.toContain('create='));
+    expect(window.__ropShowcaseStore?.snapshot()).toHaveLength(201);
+  }, 20_000);
+
   it('deep link ?create=1: Cancel replaces the entry with the list (no history entry added or lost)', async () => {
     window.history.replaceState(null, '', '/?filter=open&create=1');
     const entries = window.history.length;
