@@ -100,9 +100,15 @@ describe('formatFileSize', () => {
   it('uses kilobytes below 1 MB and megabytes from 1 MB', () => {
     expect(formatFileSize(0, 'en')).toBe('0 kB');
     expect(formatFileSize(1500, 'en')).toBe('1.5 kB');
-    expect(formatFileSize(999_999, 'en')).toBe('1,000 kB');
+    expect(formatFileSize(999_999, 'en')).toBe('1 MB');
     expect(formatFileSize(1_000_000, 'en')).toBe('1 MB');
     expect(formatFileSize(2_340_000, 'en')).toBe('2.3 MB');
+  });
+
+  it('chooses the unit after rounding: never "1,000 kB" at the boundary', () => {
+    expect(formatFileSize(999_949, 'en')).toBe('999.9 kB');
+    expect(formatFileSize(999_950, 'en')).toBe('1 MB');
+    expect(formatFileSize(999_951, 'en')).toBe('1 MB');
   });
 
   it('formats in the given locale', () => {

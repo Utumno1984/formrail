@@ -250,6 +250,33 @@ test.describe('blocked and disabled', () => {
     await expect(dropZone(page)).not.toHaveAttribute('data-dragging');
   });
 
+  test('locked: read-only styling (dashed border, read-only surface) on the button and the area, kept on hover; no aria-readonly', async ({ page }) => {
+    await gotoStory(page, STORY('locked-with-file'));
+    const button = CHOOSE(page);
+    const readonlySurface = await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.className = 'not-forced-colors:bg-rop-readonly-surface';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
+    const style = (target: Locator) =>
+      target.evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { background: s.backgroundColor, borderStyle: s.borderTopStyle, cursor: s.cursor };
+      });
+    await expect(button).not.toHaveAttribute('aria-readonly');
+    expect(await style(button)).toEqual({ background: readonlySurface, borderStyle: 'dashed', cursor: 'not-allowed' });
+    expect((await style(dropZone(page))).background).toBe(readonlySurface);
+    await button.hover();
+    expect((await style(button)).background).toBe(readonlySurface);
+    // The default state keeps the normal surface.
+    await gotoStory(page, STORY('playground'));
+    expect((await style(CHOOSE(page))).background).not.toBe(readonlySurface);
+    expect((await style(CHOOSE(page))).borderStyle).toBe('solid');
+  });
+
   test('disabled: the button is out of the tab order and the drop is ignored', async ({ page }) => {
     await gotoStory(page, STORY('playground'), 'fieldState:disabled');
     await expect(CHOOSE(page)).toBeDisabled();

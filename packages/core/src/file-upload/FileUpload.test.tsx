@@ -132,6 +132,26 @@ describe('FileUpload: Field wiring', () => {
     }
   });
 
+  it('outside a Field, aria-required / aria-readonly never reach the button (axe aria-allowed-attr)', () => {
+    const { container } = render(<FileUpload aria-required="true" aria-readonly="true" />);
+    const button = screen.getByRole('button', { name: 'Choose files' });
+    expect(button).not.toHaveAttribute('aria-required');
+    expect(button).not.toHaveAttribute('aria-readonly');
+    // Their meaning is kept: required -> hidden description, read-only -> read-only styling.
+    expect(button).toHaveAccessibleDescription('Required');
+    expect(button).toHaveAttribute('data-readonly', 'true');
+    expect(zoneOf(container)).toHaveAttribute('data-readonly', 'true');
+  });
+
+  it("aria-required / aria-readonly 'false' are false, not truthy strings", () => {
+    const { container } = render(<FileUpload aria-required="false" aria-readonly="false" />);
+    const button = screen.getByRole('button', { name: 'Choose files' });
+    expect(button).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText('Required')).toBeNull();
+    expect(button).not.toHaveAttribute('data-readonly');
+    expect(zoneOf(container)).not.toHaveAttribute('data-readonly');
+  });
+
   it('the native input is hidden, out of the tab order and has no name', () => {
     const { container } = render(<FileUpload accept=".pdf" multiple />);
     const input = nativeInput(container);
@@ -291,6 +311,18 @@ describe('FileUpload: drop', () => {
     expect(zone).not.toHaveAttribute('data-dragging');
   });
 
+  it('a dragleave with empty dataTransfer.types (Safari/WebKit) still clears the drag state', () => {
+    const { container } = render(<FileUpload />);
+    const zone = zoneOf(container);
+    const child = screen.getByRole('button', { name: 'Choose files' });
+    fireEvent.dragEnter(zone, { dataTransfer: { types: ['Files'], files: [], items: [] } });
+    fireEvent.dragEnter(child, { dataTransfer: { types: ['Files'], files: [], items: [] } });
+    fireEvent.dragLeave(child, { dataTransfer: { types: [], files: [], items: [] } });
+    expect(zone).toHaveAttribute('data-dragging', 'true');
+    fireEvent.dragLeave(zone, { dataTransfer: { types: [], files: [], items: [] } });
+    expect(zone).not.toHaveAttribute('data-dragging');
+  });
+
   it('disabled: no drag state, the drop is ignored', () => {
     const onValueChange = vi.fn();
     const { container } = render(<FileUpload disabled onValueChange={onValueChange} />);
@@ -414,6 +446,32 @@ describe('FileUpload: forced / locked / disabled', () => {
     expect(button).not.toBeDisabled();
   });
 
+  it.each(['forced', 'locked'] as const)('%s: the button and the area carry data-readonly (read-only styling), never aria-readonly', (state) => {
+    const { container } = render(blockedField(state, <FileUpload />));
+    const button = screen.getByRole('button', { name: 'Docs' });
+    expect(button).toHaveAttribute('data-readonly', 'true');
+    expect(button).not.toHaveAttribute('aria-readonly');
+    expect(button).toHaveClass('border-dashed');
+    expect(zoneOf(container)).toHaveAttribute('data-readonly', 'true');
+  });
+
+  it('default and disabled Field states have no read-only styling', () => {
+    const { container, rerender } = render(
+      <Field label="Docs">
+        <FileUpload />
+      </Field>,
+    );
+    expect(screen.getByRole('button', { name: 'Docs' })).not.toHaveAttribute('data-readonly');
+    expect(zoneOf(container)).not.toHaveAttribute('data-readonly');
+    rerender(
+      <Field label="Docs" state="disabled">
+        <FileUpload />
+      </Field>,
+    );
+    expect(screen.getByRole('button', { name: 'Docs' })).not.toHaveAttribute('data-readonly');
+    expect(zoneOf(container)).not.toHaveAttribute('data-readonly');
+  });
+
   it('a change event while blocked (e.g. a stray input) changes nothing', () => {
     const onValueChange = vi.fn();
     const { container } = render(blockedField('locked', <FileUpload onValueChange={onValueChange} />));
@@ -520,6 +578,32 @@ describe('FileUpload: native form reset', () => {
     await user().click(screen.getByRole('button', { name: 'Reset' }));
     await settle();
     expect(screen.queryByRole('listitem')).toBeNull();
+  });
+
+  it('follows the form named by the `form` prop when it changes without a remount', async () => {
+    const initial = pdf('initial.pdf');
+    function Harness({ target }: { target: string }) {
+      return (
+        <>
+          <form id="form-a" />
+          <form id="form-b" />
+          <FileUpload multiple form={target} defaultValue={[initial]} />
+        </>
+      );
+    }
+    const { container, rerender } = render(<Harness target="form-a" />);
+    rerender(<Harness target="form-b" />);
+    await user().upload(nativeInput(container), pdf('extra.pdf'));
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    // The old form no longer resets it.
+    act(() => (container.querySelector('#form-a') as HTMLFormElement).reset());
+    await settle();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    // The new one does.
+    act(() => (container.querySelector('#form-b') as HTMLFormElement).reset());
+    await settle();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getByText('initial.pdf')).toBeInTheDocument();
   });
 
   it('a controlled list is not touched by a reset', async () => {

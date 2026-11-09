@@ -73,7 +73,9 @@ export function resolveSelection(
 
 /** `1.5 kB` / `2.3 MB` (decimal units, as `Intl`'s `kilobyte` / `megabyte`), in `locale`. */
 export function formatFileSize(bytes: number, locale?: string): string {
-  const mega = bytes >= 1_000_000;
+  // The unit is chosen on the value as displayed (kB rounded to one decimal, half up like `Intl`):
+  // 999 950 bytes would otherwise read "1,000 kB" instead of "1 MB".
+  const mega = Math.round(bytes / 100) >= 10_000;
   return new Intl.NumberFormat(locale, {
     style: 'unit',
     unit: mega ? 'megabyte' : 'kilobyte',

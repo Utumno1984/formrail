@@ -97,7 +97,15 @@ const DROP =
   'data-[dragging=true]:border-rop-primary data-[dragging=true]:bg-rop-surface-subtle ' +
   'motion-safe:[transition-property:background-color,border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] ' +
-  'forced-colors:data-[dragging=true]:border-[Highlight]';
+  'forced-colors:data-[dragging=true]:border-[Highlight] ' +
+  // forced / locked (`data-readonly`): read-only surface, as the box of Checkbox / Switch / Select.
+  'not-forced-colors:data-[readonly=true]:bg-rop-readonly-surface';
+// The "Choose files" button in forced / locked: dashed border, read-only surface, no hover / pressed
+// feedback (the same convention as the `aria-readonly` controls; a `button` cannot take
+// `aria-readonly`, axe `aria-allowed-attr`, so it is driven by `data-readonly`).
+const CHOOSE_READONLY =
+  'border-dashed cursor-not-allowed not-forced-colors:bg-rop-readonly-surface ' +
+  'not-forced-colors:rop-hover:bg-rop-readonly-surface not-forced-colors:active:bg-rop-readonly-surface';
 const HINT = 'text-rop-text-muted pointer-coarse:hidden';
 const LIST = 'm-0 flex min-w-0 list-none flex-col gap-1 p-0';
 const ITEM = 'flex min-w-0 items-center gap-2';
@@ -126,11 +134,13 @@ function droppedFiles(dataTransfer: DataTransfer): File[] {
  *
  * Inside a `Field` the button takes `id`, `aria-describedby` (merged with its own), `aria-invalid`,
  * `disabled` and `data-rop-name` from it, and is named by the Field's label followed by the button
- * text. `aria-required` is not set (not allowed on a `button` role, axe `aria-allowed-attr`): a
- * required Field adds a visually hidden "Required" (`labels.required`) to the button's description
- * instead. `forced` / `locked` (`interactionBlocked`) keep the button focusable but a click
- * (also on the Field's label), Enter, Space and a drop open nothing and change nothing, and the remove
- * buttons are not rendered.
+ * text. `aria-required` and `aria-readonly` are never set on the button, neither from the Field nor
+ * from its own props (not allowed on a `button` role, axe `aria-allowed-attr`): a required control
+ * adds a visually hidden "Required" (`labels.required`) to the button's description instead, and a
+ * read-only one gets `data-readonly` on the button and the area (dashed border, read-only surface).
+ * `forced` / `locked` (`interactionBlocked`) keep the button focusable but a click (also on the
+ * Field's label), Enter, Space and a drop open nothing and change nothing, and the remove buttons
+ * are not rendered; the Field's state reason is the button's description.
  *
  * The native `<input type="file">` is in the DOM but hidden and has no `name`: to send the files with
  * a form, build a `FormData` from `value`. After a remove the focus moves to the Remove button of
@@ -151,14 +161,20 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
     className,
     onClick,
     form,
+    // Not valid on a `button` (axe `aria-allowed-attr`): kept out of the spread, only read through
+    // `useFieldControlProps` (required -> hidden description, read-only -> `data-readonly` styling).
+    'aria-required': ariaRequired,
+    'aria-readonly': ariaReadOnly,
     ...rest
   } = props;
   const control = useContext(FieldContext);
   const requiredId = useId();
-  const fieldProps = useFieldControlProps(rest);
+  const fieldProps = useFieldControlProps({ ...rest, 'aria-required': ariaRequired, 'aria-readonly': ariaReadOnly });
   const blocked = (control?.interactionBlocked ?? false) || !!fieldProps.disabled;
   const labels = useMemo(() => ({ ...DEFAULT_LABELS, ...labelsProp }), [labelsProp]);
-  const required = !!fieldProps['aria-required'];
+  // `'false'` is a valid ARIA value: compare explicitly instead of coercing the string.
+  const required = isTrue(fieldProps['aria-required']);
+  const readOnly = isTrue(fieldProps['aria-readonly']) && !fieldProps.disabled;
   const describedBy = [fieldProps['aria-describedby'], required ? requiredId : undefined].filter(Boolean).join(' ') || undefined;
 
   const controlled = value !== undefined;
@@ -246,7 +262,8 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
       form.removeEventListener('reset', onReset);
       clearTimeout(timer);
     };
-  }, [controlled]);
+    // `form` changes which <form> owns the native input (the `form` attribute) without a remount.
+  }, [controlled, form]);
 
   const onDragEnter = (event: DragEvent) => {
     if (!hasFiles(event)) return;
@@ -259,8 +276,9 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
     if (event.dataTransfer) event.dataTransfer.dropEffect = blocked ? 'none' : 'copy';
     if (!blocked) setDragging(true);
   };
-  const onDragLeave = (event: DragEvent) => {
-    if (!hasFiles(event)) return;
+  // Not gated on `hasFiles`: Safari/WebKit reports empty `dataTransfer.types` on `dragleave`, so the
+  // area would stay lit. A leave without a matching enter is absorbed by the clamp at 0.
+  const onDragLeave = () => {
     enterDepth.current = Math.max(0, enterDepth.current - 1);
     if (enterDepth.current === 0) setDragging(false);
   };
@@ -281,6 +299,7 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
     <div className={cn(ROOT, className)}>
       <div
         data-dragging={dragging && !blocked ? 'true' : undefined}
+        data-readonly={readOnly ? 'true' : undefined}
         className={DROP}
         onDragEnter={onDragEnter}
         onDragOver={onDragOver}
@@ -309,6 +328,8 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
           aria-labelledby={labelledBy || rest['aria-labelledby']}
           aria-invalid={fieldProps['aria-invalid']}
           data-rop-name={fieldProps['data-rop-name']}
+          data-readonly={readOnly ? 'true' : undefined}
+          className={readOnly ? CHOOSE_READONLY : undefined}
           form={form}
           onClick={handleClick}
         >
@@ -353,6 +374,8 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
 });
 
 const EMPTY: readonly File[] = [];
+
+const isTrue = (value: boolean | 'true' | 'false' | undefined) => value === true || value === 'true';
 
 /** One stable key per list item: the file identity, numbered when the same identity appears twice. */
 function itemKeys(files: readonly File[]): string[] {
