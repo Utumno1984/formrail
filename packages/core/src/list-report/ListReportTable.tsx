@@ -21,6 +21,7 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
               selectable={ctx.selectable}
               labels={ctx.labels}
               rowActions={ctx.rowActions}
+              rowActionsInline={ctx.rowActionsInline}
             />
           ))}
           <Filler columnCount={ctx.columnCount} rows={ctx.minRows - ctx.table.rows.length} />
@@ -66,6 +67,9 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   button named `labels.rowActions(getRowLabel(row))` that opens a `Menu`. Each action's `onSelect`
  *   receives `{ returnFocusRef }` (the trigger) for a dialog it opens. With `rowActions` every row is
  *   given an opaque surface background. Without it the DOM is the same as before.
+ *   With `rowActionsInline={n}` the first `n` actions with an `icon` are inline icon buttons when the
+ *   scroll container is at least 40rem wide (a container query: both forms are in the DOM, one is
+ *   displayed), and the column widens by `n` icon slots; below 40rem they are back in the "…" menu.
  *
  * An accessible name is required: `aria-label`, `aria-labelledby` or a (visually hidden) `caption`.
  *

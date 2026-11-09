@@ -111,3 +111,32 @@ export const rowActionsRowClass = 'bg-rop-surface';
 // breaks) instead of widening the menu beyond the room the menu leaves it.
 export const rowActionsItemIconClass = 'me-2 inline-flex shrink-0 [&>svg]:size-4';
 export const rowActionsItemLabelClass = 'min-w-0 [overflow-wrap:anywhere]';
+
+// Inline row actions (`rowActionsInline` > 0). The scroll container becomes a size container
+// (inline-size containment: its width comes from its parent, never from the table) and the two forms
+// of the actions cell switch on its width alone, at 40rem: the wide form (inline icon buttons, then
+// the slot of the "…" trigger) from 40rem up, the narrow form (the trigger alone) below. The hidden
+// form is `display: none`: out of the accessibility tree and of the tab order. No measuring in JS.
+// The threshold is a literal: a custom property cannot appear in a container condition.
+export const rowActionsInlineContainerClass = '@container';
+// The width of the actions column, on the table (its `<col>` and its `min-width` read it): one row
+// height (the slot of the trigger, as in the narrow form) plus, in the wide form, 2.25rem per inline
+// slot (a 2rem button and a 0.25rem gap) and 0.25rem of start padding. It depends only on the count
+// (`--rop-list-report-row-actions-inline`, set on the table) and on the form, never on a row.
+export const ROW_ACTIONS_INLINE_COLUMN_WIDTH = 'var(--rop-list-report-row-actions-width)';
+export const rowActionsInlineTableClass =
+  '[--rop-list-report-row-actions-width:var(--rop-list-report-row-height)] ' +
+  '@min-[40rem]:[--rop-list-report-row-actions-width:calc(var(--rop-list-report-row-height)+var(--rop-list-report-row-actions-inline)*2.25rem+0.25rem)]';
+// Wide form: the inline buttons, aligned to the end of the cell next to the trigger's slot (a row with
+// fewer inline actions leaves the first slots empty; the trigger is always at the same place).
+export const rowActionsWideClass = 'hidden items-center justify-end gap-1 @min-[40rem]:flex';
+// Narrow form: the trigger alone, centred in a column as wide as a row is tall (as without inline actions).
+export const rowActionsNarrowClass = 'flex items-center justify-center @min-[40rem]:hidden';
+// The trigger's slot in the wide form: as wide as the narrow cell's content (row height minus the
+// start border), so the trigger does not move when the form changes. Empty when no action is left
+// for the menu.
+export const rowActionsTriggerSlotClass = 'flex w-[calc(var(--rop-list-report-row-height)-1px)] shrink-0 items-center justify-center';
+// The icon of an inline action, on the scale of an icon-sm button.
+export const rowActionsInlineIconClass = 'inline-flex [&>svg]:size-(--icon-rop-md)';
+// A danger action inline: the danger colour on the ghost button (and its pressed shade).
+export const rowActionsInlineDangerClass = 'text-rop-error not-disabled:not-aria-disabled:active:text-rop-error-active';

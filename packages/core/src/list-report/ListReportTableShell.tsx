@@ -33,6 +33,9 @@ import {
   captionClass,
   containerClass,
   ROW_ACTIONS_COLUMN_WIDTH,
+  ROW_ACTIONS_INLINE_COLUMN_WIDTH,
+  rowActionsInlineContainerClass,
+  rowActionsInlineTableClass,
   SELECT_COLUMN_WIDTH,
   tableClass,
 } from './list-report-table-styles';
@@ -89,6 +92,33 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    * the same as before. Never rendered to the DOM.
    */
   rowActions?: ListReportRowActions<Row>;
+  /**
+   * How many actions with an `icon` are inline buttons when the table's container is at least 40rem
+   * wide. Default 0.
+   *
+   * With `n` > 0 the first `n` actions with an `icon` of every row are icon buttons in the actions
+   * column (a `Tooltip` with the label on hover/keyboard focus, named `labels.rowAction(label,
+   * rowLabel)`: "Delete FT-2026-0001"), followed by the "…" menu with the other actions (no "…" when
+   * none is left). Below 40rem every action is in the "…" menu. The switch is CSS alone (a container
+   * query on the scroll container, not the viewport: a table in a narrow panel of a wide page uses the
+   * narrow form): both forms are rendered from the same descriptors, only one is displayed, and the
+   * other is out of the accessibility tree and of the tab order. The 40rem threshold is fixed.
+   *
+   * - The column is as wide as `n` icon slots plus the trigger's slot in the wide form, one slot in
+   *   the narrow one, whatever the actions of each row (a row with fewer inline actions leaves slots
+   *   empty), in every state (loading, empty, data).
+   * - A disabled action inline is `aria-disabled` (still focusable, its tooltip still shows) and a
+   *   click, Enter or Space does nothing; in the menu it is a disabled item.
+   * - `onSelect` gets the control that was used (the inline button, or the trigger of the menu) as
+   *   `returnFocusRef`.
+   * - A menu open when the form changes (a tablet rotated, a panel resized) closes without running
+   *   anything, and the focus goes to the visible control of the same row.
+   * - The scroll container gets inline-size containment: its width must come from its parent (a block
+   *   or a stretched flex/grid item), not from the table; in a shrink-to-fit parent it collapses.
+   *
+   * A negative or fractional value is floored to a whole number ≥ 0 (reported in development).
+   */
+  rowActionsInline?: number;
 } & TableName;
 
 type BodyKind = 'loading' | 'error' | 'empty' | 'noResults' | 'data';
@@ -113,6 +143,8 @@ export interface ListReportTableBodyContext<Row> {
   columnCount: number;
   /** The `rowActions` prop: pass it to every `ListReportTableRow`. */
   rowActions: ListReportRowActions<Row> | undefined;
+  /** The `rowActionsInline` prop as a whole number ≥ 0 (`0` without `rowActions`): pass it to every `ListReportTableRow`. */
+  rowActionsInline: number;
   labels: ListReportTableLabels;
   /** Minimum number of rows the body must span (`loadingRowCount`, floored at 0). */
   minRows: number;
@@ -147,11 +179,23 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     tableProps,
     headRowProps,
     rowActions,
+    rowActionsInline: rowActionsInlineProp,
     ...rest
   } = props;
   const { columns, selection } = table;
   const selectable = selection.enabled;
   const hasRowActions = rowActions !== undefined;
+  const inlineCount = hasRowActions ? wholeRows(rowActionsInlineProp ?? 0) : 0;
+  const invalidInline =
+    rowActionsInlineProp !== undefined && !(Number.isInteger(rowActionsInlineProp) && rowActionsInlineProp >= 0);
+  useEffect(() => {
+    if (invalidInline && isDev()) {
+      console.error(
+        `[react-object-page] <ListReportTable> rowActionsInline must be a whole number ≥ 0; got ${String(rowActionsInlineProp)}, used ${wholeRows(rowActionsInlineProp ?? 0)}.`,
+      );
+    }
+  }, [invalidInline, rowActionsInlineProp]);
+  const rowActionsWidth = inlineCount > 0 ? ROW_ACTIONS_INLINE_COLUMN_WIDTH : ROW_ACTIONS_COLUMN_WIDTH;
   // The selection and row actions columns are not among `columns`: every full-width row spans them too.
   const columnCount = columns.length + (selectable ? 1 : 0) + (hasRowActions ? 1 : 0);
   const labels = { ...DEFAULT_LABELS, ...labelOverrides };
@@ -254,7 +298,13 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     }
   }, [named]);
 
-  const size = tableSize(columns, selectable ? SELECT_COLUMN_WIDTH : undefined, hasRowActions ? ROW_ACTIONS_COLUMN_WIDTH : undefined);
+  const size = tableSize(columns, selectable ? SELECT_COLUMN_WIDTH : undefined, hasRowActions ? rowActionsWidth : undefined);
+  // With inline actions the width of their column is a custom property the container query sets on the
+  // table (see `rowActionsInlineTableClass`), from the count given here.
+  const tableStyle: CSSProperties =
+    inlineCount > 0
+      ? ({ width: size.width, minWidth: size.minWidth, '--rop-list-report-row-actions-inline': inlineCount } as CSSProperties)
+      : { width: size.width, minWidth: size.minWidth };
   const containerStyle: CSSProperties = { ...(maxHeight !== undefined ? { maxHeight } : null), ...style };
 
   return (
@@ -266,20 +316,20 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
       {...rest}
       ref={mergedRef}
       aria-busy={status === 'loading' ? true : undefined}
-      className={cn(containerClass, className)}
+      className={cn(containerClass, inlineCount > 0 && rowActionsInlineContainerClass, className)}
       style={containerStyle}
     >
       <table
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledby}
-        className={tableClass}
-        style={{ width: size.width, minWidth: size.minWidth }}
+        className={inlineCount > 0 ? cn(tableClass, rowActionsInlineTableClass) : tableClass}
+        style={tableStyle}
         {...tableProps}
       >
         {hasContent(caption) ? <caption className={captionClass}>{caption}</caption> : null}
-        <ListReportTableHead table={table} selectable={selectable} labels={labels} rowProps={headRowProps} rowActions={hasRowActions} />
+        <ListReportTableHead table={table} selectable={selectable} labels={labels} rowProps={headRowProps} rowActions={hasRowActions} rowActionsWidth={rowActionsWidth} />
         <tbody>
-          {view === 'rows' ? renderBody({ table, selectable, columnCount, labels, minRows, rowActions }) : null}
+          {view === 'rows' ? renderBody({ table, selectable, columnCount, labels, minRows, rowActions, rowActionsInline: inlineCount }) : null}
           {view === 'skeleton' ? (
             <>
               <SkeletonRows columns={columns} count={minRows} selectable={selectable} rowActions={hasRowActions} />
