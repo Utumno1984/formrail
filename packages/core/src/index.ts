@@ -95,6 +95,8 @@ export type { ComboboxProps, ComboboxOption, ComboboxSize } from './combobox/Com
 export { useCombobox } from './combobox/use-combobox';
 export type { UseComboboxOptions, UseComboboxReturn } from './combobox/use-combobox';
 export { defaultComboboxFilter } from './combobox/filter';
+export { MultiSelect } from './multi-select/MultiSelect';
+export type { MultiSelectProps, MultiSelectOption, MultiSelectLabels, MultiSelectSize } from './multi-select/MultiSelect';
 export { ListReportTable } from './list-report/ListReportTable';
 export type { ListReportTableProps, ListReportTableLabels, ListReportTableStatus } from './list-report/ListReportTable';
 export { ListReportFilterBar } from './list-report/ListReportFilterBar';

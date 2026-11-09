@@ -214,6 +214,10 @@
       "baseline": 14654,
       "limit": 16120
     },
+    "MultiSelect": {
+      "baseline": 43561,
+      "limit": 47918
+    },
     "NumberInput": {
       "baseline": 14130,
       "limit": 15543

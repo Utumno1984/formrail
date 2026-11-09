@@ -266,6 +266,7 @@ describe('internal icons', () => {
       'MenuSeparator',
       'MenuTrigger',
       'MessageStrip',
+      'MultiSelect',
       'NumberInput',
       'ObjectPage',
       'ObjectPageFooter',
