@@ -90,6 +90,10 @@
       "baseline": 39205,
       "limit": 43126
     },
+    "ConfirmDialog": {
+      "baseline": 29950,
+      "limit": 32945
+    },
     "DatePicker": {
       "baseline": 44468,
       "limit": 48915
@@ -357,6 +361,10 @@
     "useCombobox": {
       "baseline": 1994,
       "limit": 2194
+    },
+    "useConfirmDialog": {
+      "baseline": 30188,
+      "limit": 33207
     },
     "useDirtyGuard": {
       "baseline": 30225,

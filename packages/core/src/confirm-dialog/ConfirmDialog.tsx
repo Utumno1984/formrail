@@ -130,13 +130,28 @@ export function ConfirmDialogBase({
     callbacks.current = { onOpenChange, onError, onConfirmed };
   });
 
+  const safeTarget = useCallback(
+    () => (tone === 'danger' ? cancelRef.current : confirmRef.current),
+    [tone],
+  );
+  const safeTargetRef = useRef(safeTarget);
+  useLayoutEffect(() => {
+    safeTargetRef.current = safeTarget;
+  });
+
   // A new opening (or a new request of the hook) starts idle; a close invalidates the running promise.
   // The pending look is kept while the panel animates out, so the button does not flash back to idle.
+  // A new request shown in a dialog that was already open is a new question: the focus goes back to
+  // its safe button (it may sit on the previous request's confirm button).
+  const shown = useRef<{ open: boolean; session: number | undefined }>({ open: false, session });
   useLayoutEffect(() => {
     runRef.current += 1;
+    const previous = shown.current;
+    shown.current = { open, session };
     if (!open) return;
     pendingRef.current = false;
     setPending(false);
+    if (previous.open && previous.session !== session) safeTargetRef.current()?.focus();
   }, [open, session]);
   useEffect(
     () => () => {
@@ -155,11 +170,6 @@ export function ConfirmDialogBase({
     }
   }, [blankConfirm]);
 
-  const safeTarget = useCallback(
-    () => (tone === 'danger' ? cancelRef.current : confirmRef.current),
-    [tone],
-  );
-
   // Reopened while the previous closing was still animating: the Dialog brings the focus back to
   // the panel node itself (Radix does not run its opening focus again on nodes that never unmounted).
   // That is the "empty panel", never a target here: move it to the safe button. This runs after the
@@ -168,6 +178,20 @@ export function ConfirmDialogBase({
   useLayoutEffect(() => {
     if (open && contentRef.current && document.activeElement === contentRef.current) safeTarget()?.focus();
   }, [open, safeTarget]);
+
+  // While pending the backdrop does not close the dialog, so a press on it would only take the focus
+  // away from the button: the browser moves it to `body` (the backdrop is not focusable) and the
+  // focus trap does not bring it back from there. Its default is prevented, the focus stays put.
+  // (The Tailwind scan reads comments too: no utility names that emit global defaults here.)
+  useEffect(() => {
+    if (!pending || !open) return undefined;
+    const keepFocus = (event: MouseEvent) => {
+      const content = contentRef.current;
+      if (content && event.target instanceof Node && !content.contains(event.target)) event.preventDefault();
+    };
+    document.addEventListener('mousedown', keepFocus, true);
+    return () => document.removeEventListener('mousedown', keepFocus, true);
+  }, [pending, open]);
 
   const fail = useCallback((error: unknown) => {
     const handler = callbacks.current.onError;
