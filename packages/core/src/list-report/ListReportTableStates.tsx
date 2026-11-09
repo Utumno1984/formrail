@@ -7,6 +7,7 @@ import {
   bodyCellClass,
   fillerCellClass,
   ROW_PITCH_EXTRA_PX,
+  rowActionsSkeletonCellClass,
   selectBodyCellClass,
   skeletonBarClass,
   stateBoxClass,
@@ -35,6 +36,13 @@ export interface ListReportTableLabels {
   selectAllResults: string;
   /** Name of the checkbox of a row, from `selection.getRowLabel(row)` (with `selectable`). Keep it distinct per row. */
   selectRow: (label: string) => string;
+  /**
+   * Name of the trigger of a row's actions menu, from `selection.getRowLabel(row)` (with `rowActions`).
+   * Keep it distinct per row.
+   */
+  rowActions: (label: string) => string;
+  /** Name of the header of the row actions column (visually hidden; with `rowActions`). */
+  rowActionsColumn: string;
 }
 
 export const DEFAULT_LABELS: ListReportTableLabels = {
@@ -47,6 +55,8 @@ export const DEFAULT_LABELS: ListReportTableLabels = {
   resultCount: (count) => (count === 1 ? '1 result' : `${count} results`),
   selectAllResults: 'Select all results',
   selectRow: (label) => `Select ${label}`,
+  rowActions: (label) => `Actions for ${label}`,
+  rowActionsColumn: 'Actions',
 };
 
 export const DEFAULT_LOADING_ROW_COUNT = 5;
@@ -63,11 +73,14 @@ export function SkeletonRows<Row>({
   columns,
   count,
   selectable = false,
+  rowActions = false,
 }: {
   columns: readonly ListReportColumn<Row>[];
   count: number;
   /** A leading empty cell for the selection column (no fake, focusable checkbox). */
   selectable?: boolean;
+  /** A trailing empty cell for the row actions column (no fake trigger). */
+  rowActions?: boolean;
 }) {
   return Array.from({ length: count }, (_, index) => (
     <tr key={index} aria-hidden="true" data-rop-skeleton="">
@@ -77,6 +90,7 @@ export function SkeletonRows<Row>({
           <span className={skeletonBarClass} />
         </td>
       ))}
+      {rowActions ? <td className={rowActionsSkeletonCellClass} /> : null}
     </tr>
   ));
 }

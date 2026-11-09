@@ -31,7 +31,7 @@ import {
   tableClass,
   titleClass,
 } from './list-report-styles';
-import type { ListReportSelection, UseListReportReturn } from './types';
+import type { ListReportRowActions, ListReportSelection, UseListReportReturn } from './types';
 import { useChangeFlash } from './use-change-flash';
 
 /** Texts of `ListReportFrame`: those of the table plus the count in the header (the count default is English). */
@@ -72,6 +72,7 @@ export interface ListReportFrameTableProps<Row> {
   onClearFilters: () => void;
   loadingRowCount: number | undefined;
   labels: Partial<ListReportFrameLabels> | undefined;
+  rowActions: ListReportRowActions<Row> | undefined;
 }
 
 /** @internal Props of {@link ListReportFrame}. */
@@ -117,6 +118,11 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    * `selection.getSelectedRows()`: only the selected rows the user can see. Never reaches the DOM.
    */
   bulkActions?: (selection: ListReportSelection<Row>) => ReactNode;
+  /**
+   * Actions of each row, in a menu in a trailing sticky column of the table (see `ListReportTable`'s
+   * `rowActions`). Passed to `renderTable` as is; never reaches the DOM.
+   */
+  rowActions?: ListReportRowActions<Row>;
   /** Renders the table from the props the floorplan computed for it (ref, id, status, labels, …). */
   renderTable: (tableProps: ListReportFrameTableProps<Row>) => ReactNode;
 };
@@ -138,6 +144,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
     showSearch = true,
     scrollerRef,
     bulkActions,
+    rowActions,
     renderTable,
     className,
     ...rest
@@ -242,6 +249,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
         onClearFilters: onClearFilters ?? clearFilters,
         loadingRowCount,
         labels,
+        rowActions,
       })}
     </div>
   );

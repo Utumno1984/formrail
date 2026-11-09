@@ -14,7 +14,14 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
       renderBody={(ctx) => (
         <>
           {ctx.table.rows.map((row) => (
-            <ListReportTableRow key={ctx.table.getRowId(row)} table={ctx.table} row={row} selectable={ctx.selectable} labels={ctx.labels} />
+            <ListReportTableRow
+              key={ctx.table.getRowId(row)}
+              table={ctx.table}
+              row={row}
+              selectable={ctx.selectable}
+              labels={ctx.labels}
+              rowActions={ctx.rowActions}
+            />
           ))}
           <Filler columnCount={ctx.columnCount} rows={ctx.minRows - ctx.table.rows.length} />
         </>
@@ -53,6 +60,12 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   allowed in a native table): the checkbox carries the state. A click elsewhere in the row does nothing,
  *   so cells can hold their own links and buttons. Selecting announces nothing beyond the checkbox itself.
  *   Without `selectable` the DOM is the same as before.
+ * - Row actions (`rowActions`): a trailing column, not one of `columns`, as wide as a row is tall and
+ *   sticky at the inline end of the scroller (it stays in view while a narrow table scrolls sideways),
+ *   with a visually hidden header (`labels.rowActionsColumn`) and, in every row that has actions, a "…"
+ *   button named `labels.rowActions(getRowLabel(row))` that opens a `Menu`. Each action's `onSelect`
+ *   receives `{ returnFocusRef }` (the trigger) for a dialog it opens. With `rowActions` every row is
+ *   given an opaque surface background. Without it the DOM is the same as before.
  *
  * An accessible name is required: `aria-label`, `aria-labelledby` or a (visually hidden) `caption`.
  *

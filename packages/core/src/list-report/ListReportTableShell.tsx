@@ -29,8 +29,14 @@ import {
   type ListReportTableLabels,
 } from './ListReportTableStates';
 import { tableSize } from './list-report-table-layout';
-import { captionClass, containerClass, SELECT_COLUMN_WIDTH, tableClass } from './list-report-table-styles';
-import type { UseListReportReturn } from './types';
+import {
+  captionClass,
+  containerClass,
+  ROW_ACTIONS_COLUMN_WIDTH,
+  SELECT_COLUMN_WIDTH,
+  tableClass,
+} from './list-report-table-styles';
+import type { ListReportRowActions, UseListReportReturn } from './types';
 
 export type ListReportTableStatus = 'ready' | 'loading' | 'error';
 
@@ -73,6 +79,16 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   onClearFilters?: () => void;
   /** Overrides the texts (partial: the rest keeps the English defaults). */
   labels?: Partial<ListReportTableLabels>;
+  /**
+   * Actions of each row, in a menu: adds a trailing column (not one of `columns`, as wide as a row is
+   * tall, sticky at the inline end so it stays in view while a narrow table scrolls sideways) with,
+   * for every row that has actions, a "…" button named `labels.rowActions(getRowLabel(row))` that opens
+   * a menu with one item per action. Each action's `onSelect` gets the trigger as `returnFocusRef`
+   * (pass it to a dialog the action opens). A row with no actions (`[]`) has an empty cell. Called
+   * while a row renders: memoize it like `columns` (see `ListReportRowActions`). Without it the DOM is
+   * the same as before. Never rendered to the DOM.
+   */
+  rowActions?: ListReportRowActions<Row>;
 } & TableName;
 
 type BodyKind = 'loading' | 'error' | 'empty' | 'noResults' | 'data';
@@ -90,8 +106,13 @@ const isDev = (): boolean => {
 export interface ListReportTableBodyContext<Row> {
   table: UseListReportReturn<Row>;
   selectable: boolean;
-  /** `table.columns.length`, plus one for the leading selection column when `selectable`. */
+  /**
+   * `table.columns.length`, plus one for the leading selection column when `selectable` and one for
+   * the trailing row actions column with `rowActions`.
+   */
   columnCount: number;
+  /** The `rowActions` prop: pass it to every `ListReportTableRow`. */
+  rowActions: ListReportRowActions<Row> | undefined;
   labels: ListReportTableLabels;
   /** Minimum number of rows the body must span (`loadingRowCount`, floored at 0). */
   minRows: number;
@@ -125,12 +146,14 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     renderBody,
     tableProps,
     headRowProps,
+    rowActions,
     ...rest
   } = props;
   const { columns, selection } = table;
   const selectable = selection.enabled;
-  // The selection column is not one of `columns`: every full-width row spans one more cell.
-  const columnCount = columns.length + (selectable ? 1 : 0);
+  const hasRowActions = rowActions !== undefined;
+  // The selection and row actions columns are not among `columns`: every full-width row spans them too.
+  const columnCount = columns.length + (selectable ? 1 : 0) + (hasRowActions ? 1 : 0);
   const labels = { ...DEFAULT_LABELS, ...labelOverrides };
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mergedRef = useMemo(() => composeRefs(ref, containerRef), [ref]);
@@ -231,7 +254,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     }
   }, [named]);
 
-  const size = tableSize(columns, selectable ? SELECT_COLUMN_WIDTH : undefined);
+  const size = tableSize(columns, selectable ? SELECT_COLUMN_WIDTH : undefined, hasRowActions ? ROW_ACTIONS_COLUMN_WIDTH : undefined);
   const containerStyle: CSSProperties = { ...(maxHeight !== undefined ? { maxHeight } : null), ...style };
 
   return (
@@ -254,12 +277,12 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
         {...tableProps}
       >
         {hasContent(caption) ? <caption className={captionClass}>{caption}</caption> : null}
-        <ListReportTableHead table={table} selectable={selectable} labels={labels} rowProps={headRowProps} />
+        <ListReportTableHead table={table} selectable={selectable} labels={labels} rowProps={headRowProps} rowActions={hasRowActions} />
         <tbody>
-          {view === 'rows' ? renderBody({ table, selectable, columnCount, labels, minRows }) : null}
+          {view === 'rows' ? renderBody({ table, selectable, columnCount, labels, minRows, rowActions }) : null}
           {view === 'skeleton' ? (
             <>
-              <SkeletonRows columns={columns} count={minRows} selectable={selectable} />
+              <SkeletonRows columns={columns} count={minRows} selectable={selectable} rowActions={hasRowActions} />
               {/* loadingRowCount={0}: no skeleton, but the body keeps the height of one row */}
               <Filler columnCount={columnCount} rows={1 - minRows} />
             </>

@@ -11,6 +11,8 @@ import {
   ALIGN_JUSTIFY,
   ALIGN_TEXT,
   headerCellClass,
+  ROW_ACTIONS_COLUMN_WIDTH,
+  rowActionsHeaderCellClass,
   SELECT_COLUMN_WIDTH,
   selectBoxClass,
   selectHeaderCellClass,
@@ -29,15 +31,17 @@ export interface ListReportTableHeadProps<Row> {
   labels: ListReportTableLabels;
   /** Extra attributes merged onto the header `<tr>` (e.g. `aria-rowindex={1}` in a virtualized table). Without it the `<tr>` has none. */
   rowProps?: HTMLAttributes<HTMLTableRowElement>;
+  /** Whether to render the trailing row actions column (its header + its `<col>`). Default `false`. */
+  rowActions?: boolean;
 }
 
 /**
  * @internal `<colgroup>` + `<thead>` of the List Report table (`ListReportTableShell`'s head): column
- * widths, the optional leading selection column (tri-state "select all results" checkbox) and the
- * sortable column headers. Exported from `@react-object-page/core/internal` for
+ * widths, the optional leading selection column (tri-state "select all results" checkbox), the
+ * sortable column headers and the optional trailing row actions column (a visually hidden name). Exported from `@react-object-page/core/internal` for
  * `@react-object-page/pro`; not public API, no semver guarantee, not meant to be used standalone.
  */
-export function ListReportTableHead<Row>({ table, selectable, labels, rowProps }: ListReportTableHeadProps<Row>) {
+export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, rowActions = false }: ListReportTableHeadProps<Row>) {
   const { columns, selection } = table;
   return (
     <>
@@ -46,6 +50,7 @@ export function ListReportTableHead<Row>({ table, selectable, labels, rowProps }
         {columns.map((column) => (
           <col key={column.id} style={column.width !== undefined ? { width: toCss(column.width) } : undefined} />
         ))}
+        {rowActions ? <col style={{ width: ROW_ACTIONS_COLUMN_WIDTH }} /> : null}
       </colgroup>
       <thead>
         <tr {...rowProps}>
@@ -87,6 +92,11 @@ export function ListReportTableHead<Row>({ table, selectable, labels, rowProps }
               </th>
             );
           })}
+          {rowActions ? (
+            <th scope="col" className={rowActionsHeaderCellClass}>
+              <span className="sr-only">{labels.rowActionsColumn}</span>
+            </th>
+          ) : null}
         </tr>
       </thead>
     </>

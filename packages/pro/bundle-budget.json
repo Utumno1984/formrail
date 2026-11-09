@@ -3,32 +3,32 @@
   "version": 1,
   "exports": {
     "ChangeSummary": {
-      "baseline": 1968,
-      "limit": 2165
+      "baseline": 2034,
+      "limit": 2238
     },
     "VirtualListReport": {
-      "baseline": 3924,
-      "limit": 4317
+      "baseline": 4277,
+      "limit": 4705
     },
     "VirtualListReportTable": {
-      "baseline": 3561,
-      "limit": 3918
+      "baseline": 3921,
+      "limit": 4314
     },
     "computeChangeSummary": {
-      "baseline": 2187,
-      "limit": 2406
+      "baseline": 1999,
+      "limit": 2199
     },
     "formatChangeValue": {
-      "baseline": 1236,
-      "limit": 1360
+      "baseline": 1279,
+      "limit": 1407
     },
     "inferSegmentLabel": {
       "baseline": 246,
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2362,
-      "limit": 2599
+      "baseline": 2175,
+      "limit": 2393
     }
   }
 }

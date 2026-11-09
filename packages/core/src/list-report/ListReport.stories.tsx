@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
 import {
   DEMO_STATUS_LABEL,
   formatEuro,
@@ -9,7 +10,13 @@ import {
   type DemoInvoice,
 } from '../internal/demo-invoices';
 import { ListReport } from './ListReport';
-import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
+import type {
+  ListReportColumn,
+  ListReportFilter,
+  ListReportRowAction,
+  ListReportSort,
+  ListReportSortDirection,
+} from './types';
 import { useListReport } from './use-list-report';
 import { createMemoryUrlAdapter } from '../internal/memory-url-adapter';
 import { useListReportScrollRestoration } from './use-list-report-scroll-restoration';
@@ -1307,5 +1314,207 @@ export const SelectionDeleteRecipe: StoryObj<DeleteRecipeArgs> = {
     await expect(canvas.queryByRole('checkbox', { name: `Select ${first!.number}` })).toBeNull();
     await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
     await expect(canvas.getByRole('button', { name: 'Delete' })).toBeDisabled();
+  },
+};
+
+// --- Row actions ---
+
+const ROW_ACTION_ROWS = makeDemoInvoices(20);
+const THIRD_ROW = ROW_ACTION_ROWS[2]!;
+const FIRST_APPROVED = ROW_ACTION_ROWS.find((r) => r.status === 'approved')!;
+
+type DisabledFor = DemoInvoice['status'] | 'none';
+
+interface RowActionsArgs {
+  /** Status of the invoices whose "Delete" is disabled. */
+  disabledFor: DisabledFor;
+  /** Tone of the "Delete" action. */
+  deleteTone: 'danger' | 'default';
+  /** Label of the "Duplicate" action. */
+  duplicateLabel: string;
+  selectable: boolean;
+  containerWidth: number;
+  onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
+  /** Fixture: ids selected at mount. Not in Controls. */
+  preselectedIds?: readonly string[];
+}
+
+function RowActionsReport({
+  disabledFor,
+  deleteTone,
+  duplicateLabel,
+  selectable,
+  containerWidth,
+  onDuplicate,
+  onDelete,
+  preselectedIds,
+}: RowActionsArgs) {
+  const [rows, setRows] = useState<readonly DemoInvoice[]>(ROW_ACTION_ROWS);
+  const table = useListReport<DemoInvoice>({
+    rows,
+    columns: URL_COLUMNS,
+    getRowId: (r) => r.id,
+    filters: URL_FILTERS,
+    selectable,
+    defaultSelectedIds: preselectedIds ? new Set(preselectedIds) : undefined,
+  });
+  const [confirm, confirmDialog] = useConfirmDialog();
+  // Memoized with what it reads: the rows are memoized, a stable function that read other values
+  // would leave them as they were.
+  const rowActions = useCallback(
+    (row: DemoInvoice): readonly ListReportRowAction[] => [
+      { id: 'duplicate', label: duplicateLabel, onSelect: () => onDuplicate(row.id) },
+      {
+        id: 'delete',
+        label: 'Delete…',
+        tone: deleteTone,
+        disabled: row.status === disabledFor,
+        // The confirmation gives the focus back to this row's "…" button when it closes (Cancel), or to
+        // the table once the row is deleted (Delete invoice).
+        onSelect: async ({ returnFocusRef }) => {
+          const confirmed = await confirm({
+            title: `Delete invoice ${row.number}?`,
+            description: 'The invoice is removed from the queue. This cannot be undone.',
+            confirmLabel: 'Delete invoice',
+            returnFocusRef,
+          });
+          if (!confirmed) return;
+          setRows((current) => current.filter((r) => r.id !== row.id));
+          onDelete(row.id);
+        },
+      },
+    ],
+    [confirm, deleteTone, disabledFor, duplicateLabel, onDelete, onDuplicate],
+  );
+  return (
+    <div style={PAGE}>
+      <div style={{ width: containerWidth, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
+        <ListReport title="Invoices" table={table} filtersLabel="Filters" searchLabel="Search" rowActions={rowActions} />
+      </div>
+      {confirmDialog}
+    </div>
+  );
+}
+
+const ROW_ACTIONS_ARG_TYPES = {
+  disabledFor: {
+    control: 'select',
+    options: ['approved', 'pending', 'rejected', 'none'],
+    description: 'Invoices whose "Delete" is `disabled` (by status): shown in the menu, skipped by the arrows, never selected',
+  },
+  deleteTone: { control: 'radio', options: ['danger', 'default'], description: '`tone` of the "Delete" action' },
+  duplicateLabel: { control: 'text', description: '`label` of the first action: a long one wraps inside the menu' },
+  selectable: { control: 'boolean', description: '`selectable` of `useListReport`: a checkbox column before, the actions column after' },
+  containerWidth: {
+    control: { type: 'range', min: 320, max: 1280, step: 10 },
+    description: 'Container width (px): below the width of the columns the table scrolls sideways and the actions column stays in view',
+  },
+  onDuplicate: { control: false },
+  onDelete: { control: false },
+  preselectedIds: HIDDEN,
+  ...{ status: HIDDEN, dataset: HIDDEN, searchCommitDelay: HIDDEN, firstSortDirection: HIDDEN, onRetry: HIDDEN },
+  ...{ onSortChange: HIDDEN, onFilterChange: HIDDEN, onSearchQueryChange: HIDDEN },
+} as const;
+
+const ROW_ACTIONS_ARGS: RowActionsArgs = {
+  disabledFor: 'approved',
+  deleteTone: 'danger',
+  duplicateLabel: 'Duplicate',
+  selectable: false,
+  containerWidth: 1100,
+  onDuplicate: fn(),
+  onDelete: fn(),
+};
+
+/**
+ * Per-row actions (`rowActions`): a trailing column, sticky at the end of the table, with a "…" button per
+ * row named "Actions for <number>" that opens a menu: "Duplicate" and "Delete…" (danger, disabled for the
+ * approved invoices; it asks for a confirmation, then deletes the row: Cancel returns the focus to the
+ * row's button, a confirmed deletion to the table). Controls: the
+ * status whose "Delete" is disabled, its tone, `selectable` and the width of the container (narrow: the
+ * table scrolls sideways under the actions column). `onDuplicate`/`onDelete` show up in Actions with the
+ * id of the row. The play function opens the menu of an approved invoice ("Delete…" cannot be chosen),
+ * then the menu of the third row from the keyboard, chooses "Duplicate" with Enter and checks the call
+ * and the focus back on that row's button.
+ */
+export const RowActions: StoryObj<RowActionsArgs> = {
+  name: 'Row actions',
+  argTypes: ROW_ACTIONS_ARG_TYPES,
+  args: ROW_ACTIONS_ARGS,
+  render: (args) => <RowActionsReport {...args} />,
+  play: async ({ args, canvasElement }) => {
+    // Written for the default configuration ("Delete…" disabled for the approved invoices, "Duplicate").
+    if (args.disabledFor !== 'approved' || args.duplicateLabel !== 'Duplicate') return;
+    // The menu is in a portal: query the whole document.
+    const page = within(canvasElement.ownerDocument.body);
+    const trigger = (number: string) => page.getByRole('button', { name: `Actions for ${number}`, hidden: true });
+
+    // An approved invoice: "Delete…" is there, disabled, and the arrows skip it.
+    trigger(FIRST_APPROVED.number).focus();
+    await userEvent.keyboard('{Enter}');
+    const remove = await page.findByRole('menuitem', { name: 'Delete…' });
+    await expect(remove).toHaveAttribute('aria-disabled', 'true');
+    await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
+    await userEvent.keyboard('{ArrowDown}');
+    await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(trigger(FIRST_APPROVED.number)).toHaveFocus());
+    await expect(args.onDelete).not.toHaveBeenCalled();
+
+    // The third row, from the keyboard: Enter opens on "Duplicate", Enter chooses it.
+    trigger(THIRD_ROW.number).focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
+    await expect(args.onDuplicate).toHaveBeenCalledWith(THIRD_ROW.id);
+    await waitFor(() => expect(page.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger(THIRD_ROW.number)).toHaveFocus());
+  },
+};
+
+/** Fixture of the e2e suite: `RowActions` without the play function. */
+export const RowActionsNoPlay: StoryObj<RowActionsArgs> = {
+  ...RowActions,
+  name: 'Row actions (no play)',
+  tags: ['internal'],
+  play: undefined,
+};
+
+const SECOND_ROW = ROW_ACTION_ROWS[1]!;
+const rowActionsScroller = (canvasElement: HTMLElement) =>
+  within(canvasElement).getByRole('table', { name: /Invoices/, hidden: true }).parentElement as HTMLElement;
+
+/**
+ * Visual fixture: with `selectable`, the second invoice selected (its sticky actions cell has the tint
+ * of the row) and the table scrolled sideways by half of what it can scroll (on a narrow viewport the
+ * columns pass under the sticky actions column; on a wide one there is nothing to scroll).
+ */
+export const RowActionsSelectedScrolled: StoryObj<RowActionsArgs> = {
+  name: 'Row actions: selected row, scrolled',
+  tags: ['internal', 'visual'],
+  argTypes: ROW_ACTIONS_ARG_TYPES,
+  args: { ...ROW_ACTIONS_ARGS, selectable: true, preselectedIds: [SECOND_ROW.id] },
+  render: (args) => <RowActionsReport {...args} />,
+  play: async ({ canvasElement }) => {
+    const scroller = rowActionsScroller(canvasElement);
+    scroller.scrollLeft = Math.round((scroller.scrollWidth - scroller.clientWidth) / 2);
+    await waitFor(() => expect(scroller.scrollLeft).toBe(Math.round((scroller.scrollWidth - scroller.clientWidth) / 2)));
+  },
+};
+
+/** Visual fixture: the menu of the third invoice open (opened from the keyboard, "Duplicate" focused). */
+export const RowActionsMenuOpen: StoryObj<RowActionsArgs> = {
+  name: 'Row actions: menu open',
+  tags: ['internal', 'visual'],
+  argTypes: ROW_ACTIONS_ARG_TYPES,
+  args: ROW_ACTIONS_ARGS,
+  render: (args) => <RowActionsReport {...args} />,
+  play: async ({ canvasElement }) => {
+    const page = within(canvasElement.ownerDocument.body);
+    page.getByRole('button', { name: `Actions for ${THIRD_ROW.number}` }).focus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
   },
 };
