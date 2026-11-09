@@ -2,6 +2,7 @@
 import type { Preview } from '@storybook/react-vite';
 // The SAME entry the package compiles into dist/styles.css (not a copy).
 import '../packages/core/src/styles/index.css';
+import { transformSource } from './source-transform';
 import { ropTheme } from './theme';
 
 // Storybook's native developer tools (grid / background / outline / measure) are for people building
@@ -25,13 +26,11 @@ const preview: Preview = {
         // "Show code" defaults to `dynamic` (JSX synthesized from the rendered tree, with the live args):
         // right for `render: (args) => <X {...args} />` and for stories with no render of their own
         // (`export const Playground: Story = {}`, where `type: 'code'` would print just `{}`). But a `render`
-        // that declares a local stateful component (`function XyzDemo() {...}; return <XyzDemo />`, ~27
-        // stories) collapses into a minified placeholder such as `<t />` (ticket #333). For exactly those
-        // stories, print the story's original source text instead. Guarded by e2e/docs-source.spec.ts.
-        transform: (code: string, storyContext: { parameters?: { docs?: { source?: { originalSource?: unknown } } } }) => {
-          const original = storyContext.parameters?.docs?.source?.originalSource;
-          return typeof original === 'string' && /\bfunction\s+[A-Za-z_$][\w$]*\s*\(/.test(original) ? original : code;
-        },
+        // that declares a local stateful component and renders it (`function XyzDemo() {...}; return <XyzDemo />`,
+        // ~27 stories) collapses into a minified placeholder such as `<t />` (ticket #333). For exactly those
+        // stories, print the story's original source text instead (see ./source-transform.ts for the exact
+        // rule). Guarded by e2e/docs-source.spec.ts on every story of every Docs page.
+        transform: transformSource,
       },
     },
     backgrounds: { disable: devToolsDisabled },
