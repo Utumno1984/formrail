@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 
 export type ListReportSortDirection = 'asc' | 'desc';
 
@@ -121,12 +121,52 @@ export interface UseListReportOptions<Row> {
    */
   onSelectedIdsChange?: (ids: ReadonlySet<string>) => void;
   /**
-   * Name of a row, used for the accessible name of its checkbox ("Select INV-0001"). Default: the text
-   * of the first column with an `accessor` (`String(accessor(row))`), else `getRowId(row)`. Memoize it
-   * like `columns`.
+   * Name of a row, used for the accessible names of its controls: its checkbox with `selectable`
+   * ("Select INV-0001") and the trigger of its actions menu with `rowActions` ("Actions for
+   * INV-0001"). Resolved with or without `selectable`. Default: the text of the first column with an
+   * `accessor` (`String(accessor(row))`), else `getRowId(row)`. Memoize it like `columns`.
    */
   getRowLabel?: (row: Row) => string;
 }
+
+/** What `ListReportRowAction.onSelect` receives. */
+export interface ListReportRowActionContext {
+  /**
+   * The element that should get the focus back when an overlay opened by the action closes: the
+   * trigger of the row's actions menu. Pass it as the `returnFocusRef` of a `Dialog`, a
+   * `ConfirmDialog` or `useConfirmDialog`'s `confirm()`.
+   */
+  returnFocusRef: RefObject<HTMLElement | null>;
+}
+
+/** One action of a row, an item of its actions menu (`rowActions` of `ListReportTable`/`ListReport`). */
+export interface ListReportRowAction {
+  /** Unique within the row and stable (the React key of the item). A duplicate is reported with a development error. */
+  id: string;
+  /** Text of the menu item. Name the action ("Delete…"), it is the item's accessible name. */
+  label: string;
+  /** Decorative icon shown before the label (an `<svg>`, sized by the item). */
+  icon?: ReactNode;
+  /**
+   * Called once per click, Enter or Space on the enabled item, before the menu closes. Never called
+   * while `disabled`.
+   */
+  onSelect: (context: ListReportRowActionContext) => void;
+  /** Shown but not selectable, by pointer or keyboard (the arrow keys skip it); `aria-disabled` on the item. */
+  disabled?: boolean;
+  /** `danger`: a destructive action (the item's danger tone). Default `'default'`. */
+  tone?: 'default' | 'danger';
+}
+
+/**
+ * The actions of each row, for the actions column of `ListReportTable`/`ListReport`. An empty array
+ * leaves the row's cell empty (the column stays). Called while a row renders, and rows are memoized:
+ * the same rules as `ListReportColumn.cell` apply — compute the actions from `row` and from values
+ * the function was built with, and memoize the function (`useCallback`) with those values as
+ * dependencies: a new function re-renders every row (correct, only slower), a stable one reading
+ * other values leaves the rows on screen as they were.
+ */
+export type ListReportRowActions<Row> = (row: Row) => readonly ListReportRowAction[];
 
 /**
  * Selection state and gestures (`UseListReportReturn.selection`). The effective selection is
@@ -162,7 +202,7 @@ export interface ListReportSelection<Row> {
   hiddenSelectedCount: number;
   /** The selected rows among the current results, in the order of `rows`. */
   getSelectedRows: () => readonly Row[];
-  /** The `getRowLabel` option, resolved (with its default). */
+  /** The `getRowLabel` option, resolved (with its default), also when `enabled` is `false`. */
   getRowLabel: (row: Row) => string;
 }
 

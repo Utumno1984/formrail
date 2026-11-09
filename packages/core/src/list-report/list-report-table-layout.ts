@@ -19,10 +19,16 @@ function pixels(value: number | string | undefined): number | null {
  * and percentages as shares of the table): each column keeps the width it declared in a container
  * wider than the sum. Otherwise the table fills the container.
  */
-export function tableSize<Row>(columns: readonly ListReportColumn<Row>[], lead?: string): { width: string; minWidth: string } {
+export function tableSize<Row>(
+  columns: readonly ListReportColumn<Row>[],
+  lead?: string,
+  trail?: string,
+): { width: string; minWidth: string } {
   let px = 0;
-  // `lead`: the width of the selection column, a fixed CSS length counted like any declared width.
-  const other: string[] = lead ? [lead] : [];
+  // `lead`/`trail`: the widths of the selection column and of the row actions column, fixed CSS
+  // lengths counted like any declared width.
+  const structural = [lead, trail].filter((width): width is string => !!width);
+  const other: string[] = [...structural];
   for (const column of columns) {
     const base = column.width !== undefined && !isPercent(column.width) ? column.width : (column.minWidth ?? DEFAULT_MIN_WIDTH);
     const known = pixels(base);
@@ -37,14 +43,14 @@ export function tableSize<Row>(columns: readonly ListReportColumn<Row>[], lead?:
   // is exactly as wide as its columns (else `table-layout: fixed` would stretch all of them).
   // Percentages are shares of the table itself: the absolute widths are (1 - shares) of it.
   let fixedPx = 0;
-  const fixedOther: string[] = lead ? [lead] : [];
+  const fixedOther: string[] = [...structural];
   let share = 0;
   for (const column of columns) {
     if (isPercent(column.width)) share += Number.parseFloat(column.width as string) / 100;
     else if (pixels(column.width) !== null) fixedPx += pixels(column.width) as number;
     else fixedOther.push(toCss(column.width as string));
   }
-  if (share >= 1 || (fixedPx === 0 && fixedOther.length === (lead ? 1 : 0))) return { minWidth, width: '100%' };
+  if (share >= 1 || (fixedPx === 0 && fixedOther.length === structural.length)) return { minWidth, width: '100%' };
   const absolute = sum(fixedPx, fixedOther);
   const total = share === 0 ? absolute : `calc(${absolute} / ${1 - share})`;
   return { minWidth: total, width: total };

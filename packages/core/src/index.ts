@@ -123,6 +123,9 @@ export type {
   ListReportHeaderProps,
   ListReportSortButtonProps,
   ListReportSelection,
+  ListReportRowAction,
+  ListReportRowActionContext,
+  ListReportRowActions,
   UseListReportOptions,
   UseListReportReturn,
 } from './list-report/types';

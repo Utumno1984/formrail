@@ -3,8 +3,16 @@ import { Checkbox } from '../checkbox/Checkbox';
 import { cn } from '../utils/cn';
 import { renderCell, type RenderCellOptions } from './list-report-cell';
 import type { ListReportTableLabels } from './ListReportTableStates';
-import { ALIGN_TEXT, bodyCellClass, selectableRowClass, selectBodyCellClass, selectBoxClass } from './list-report-table-styles';
-import type { UseListReportReturn } from './types';
+import { ListReportRowActionsCell } from './ListReportRowActions';
+import {
+  ALIGN_TEXT,
+  bodyCellClass,
+  rowActionsRowClass,
+  selectableRowClass,
+  selectBodyCellClass,
+  selectBoxClass,
+} from './list-report-table-styles';
+import type { ListReportRowActions, UseListReportReturn } from './types';
 
 /** @internal Props of {@link ListReportTableRow}. */
 export interface ListReportTableRowProps<Row> {
@@ -29,6 +37,12 @@ export interface ListReportTableRowProps<Row> {
   onToggle?: (id: string, event: MouseEvent<HTMLInputElement>) => void;
   /** Passed to `renderCell` for every cell of the row (e.g. `forceTruncate`). Without it, `renderCell(column, row)`. */
   renderCellOptions?: RenderCellOptions;
+  /**
+   * The table's `rowActions` (`ListReportTableBodyContext.rowActions`): adds the trailing, sticky actions
+   * cell and gives the `<tr>` an opaque surface. Compared by identity. Without it the `<tr>` is exactly
+   * what it was before. Never rendered to the DOM.
+   */
+  rowActions?: ListReportRowActions<Row>;
 }
 
 function ListReportTableRowImpl<Row>({
@@ -39,6 +53,7 @@ function ListReportTableRowImpl<Row>({
   rowProps,
   onToggle,
   renderCellOptions,
+  rowActions,
 }: ListReportTableRowProps<Row>) {
   const { columns, selection } = table;
   // The checkbox calls `onClick` before `onCheckedChange` within the same click: keep the event for `onToggle`.
@@ -49,7 +64,12 @@ function ListReportTableRowImpl<Row>({
   // `cn()` always returns a string (possibly ''), which would render an empty `class=""` attribute
   // where the original markup had none at all: only merge through `cn` when there is a selection
   // class to merge with, so a plain, non-selectable row (no `rowProps`) keeps no `class` attribute.
-  const className = selectable ? cn(selectableRowClass, extraClassName) : extraClassName;
+  // With `rowActions` the row is opaque: the sticky actions cell inherits its background, and a content
+  // scrolled under that cell must not show through.
+  const className =
+    selectable || rowActions
+      ? cn(rowActions && rowActionsRowClass, selectable && selectableRowClass, extraClassName)
+      : extraClassName;
   return (
     <tr {...restRowProps} data-selected={selected ? '' : undefined} className={className}>
       {selectable ? (
@@ -80,6 +100,7 @@ function ListReportTableRowImpl<Row>({
           {renderCell(column, row, renderCellOptions)}
         </td>
       ))}
+      {rowActions ? <ListReportRowActionsCell actions={rowActions(row)} triggerLabel={labels.rowActions(selection.getRowLabel(row))} /> : null}
     </tr>
   );
 }
@@ -104,7 +125,9 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
     prev.selectable !== next.selectable ||
     prev.onToggle !== next.onToggle ||
     prev.renderCellOptions !== next.renderCellOptions ||
+    prev.rowActions !== next.rowActions ||
     prev.labels.selectRow !== next.labels.selectRow ||
+    (next.rowActions !== undefined && prev.labels.rowActions !== next.labels.rowActions) ||
     !sameRowProps(prev.rowProps, next.rowProps)
   ) {
     return false;
@@ -116,8 +139,10 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
   // render of the consumer, and with it `getRowLabel`, which would defeat the memo for every row.
   const id = b.getRowId(next.row);
   if (a.getRowId(prev.row) !== id) return false;
-  if (!next.selectable) return true;
-  return a.selection.isSelected(id) === b.selection.isSelected(id) && a.selection.getRowLabel(prev.row) === b.selection.getRowLabel(next.row);
+  if (!next.selectable && !next.rowActions) return true;
+  // The label names the checkbox and the actions trigger.
+  if (a.selection.getRowLabel(prev.row) !== b.selection.getRowLabel(next.row)) return false;
+  return !next.selectable || a.selection.isSelected(id) === b.selection.isSelected(id);
 }
 
 /**
@@ -125,9 +150,10 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
  * one `<td>` per column. The default `renderBody` of `ListReportTable` renders one of these per
  * row; a virtualized table (`@react-object-page/pro`) renders the same row for whatever subset it
  * mounts. Memoized: it re-renders only when its row, its selected state, `columns`, its id and
- * label, `labels.selectRow`, `rowProps` (shallow) or the extension props change; see
- * `ListReportColumn.cell` for what that means for a cell. `onToggle` and `renderCellOptions` are
- * compared by identity: keep them stable, or every render of the parent renders the row. Exported
+ * label, `labels.selectRow`, `labels.rowActions` (with `rowActions`), `rowActions`, `rowProps`
+ * (shallow) or the extension props change; see `ListReportColumn.cell` for what that means for a
+ * cell (and `ListReportRowActions` for the actions). `onToggle`, `renderCellOptions` and `rowActions`
+ * are compared by identity: keep them stable, or every render of the parent renders the row. Exported
  * from `@react-object-page/core/internal`; not public API, no semver guarantee.
  */
 export const ListReportTableRow = /* @__PURE__ */ memo(ListReportTableRowImpl, rowPropsAreEqual) as <Row>(

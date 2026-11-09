@@ -74,3 +74,13 @@ export const stepperIcons = /* @__PURE__ */ (() => ({
     </svg>
   ),
 }) satisfies Record<string, SvgElement>)();
+
+// Kept apart for the same reason: only the row actions trigger of the List Report table uses it.
+// Three dots in a row ("more actions"), drawn as filled circles on the same 24x24 grid.
+export const moreIcon = /* @__PURE__ */ (() => (
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <circle cx="5" cy="12" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="19" cy="12" r="2" />
+  </svg>
+))();

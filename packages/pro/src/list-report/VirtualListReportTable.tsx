@@ -300,6 +300,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         rowProps={virtual ? { ...handlers, 'aria-rowindex': index + 2, className: VIRTUAL_ROW_CLASS } : handlers}
         onToggle={ctx.selectable ? onToggle : undefined}
         renderCellOptions={virtual ? FORCE_TRUNCATE : undefined}
+        rowActions={ctx.rowActions}
       />
     );
   };

@@ -87,3 +87,30 @@ export const selectBoxClass = 'flex items-center justify-center';
 export const selectableRowClass =
   'rop-hover:bg-rop-surface-subtle active:bg-rop-surface-subtle ' +
   'data-selected:bg-rop-primary-subtle data-selected:rop-hover:bg-rop-primary-subtle-hover data-selected:active:bg-rop-primary-subtle-hover';
+
+// Row actions column (only with `rowActions`): a trailing square column as wide as a row is tall, sticky
+// at the inline end of the scroller, so that on a narrow container the menu trigger stays in view while
+// the rest of the row scrolls under it. A start border separates it from that content.
+// Stacking without a z-index of its own (the scale has no level for it and none is needed): a sticky
+// body cell is positioned and the last cell of its row, so it is painted above the rest of its row,
+// and below the header cells, which are on the sticky level (the header covers it on a vertical scroll).
+// Its background is the row's own (`bg-inherit`), so the row is given an opaque surface
+// (`rowActionsRowClass`): normal, selected and hovered rows keep one colour across the sticky cell.
+// The header cell is sticky on both axes, on the header's level, and is painted after the other
+// header cells (last in the row).
+export const ROW_ACTIONS_COLUMN_WIDTH = 'var(--rop-list-report-row-height)';
+export const rowActionsHeaderCellClass =
+  'sticky top-0 end-0 z-rop-sticky h-(--rop-list-report-row-height) border-b border-s border-rop-border bg-rop-surface-subtle px-0 align-middle';
+export const rowActionsBodyCellClass =
+  'sticky end-0 h-(--rop-list-report-row-height) border-b border-s border-rop-border bg-inherit px-0 py-px align-middle';
+// The skeleton row has no row background: the cell takes the surface itself.
+export const rowActionsSkeletonCellClass =
+  'sticky end-0 h-(--rop-list-report-row-height) border-b border-s border-rop-border bg-rop-surface px-0 py-px align-middle';
+export const rowActionsRowClass = 'bg-rop-surface';
+// Items of the actions menu: an optional decorative icon, then the label, which wraps (a long word
+// breaks) instead of widening the menu beyond the room the menu leaves it.
+export const rowActionsItemIconClass = 'me-2 inline-flex shrink-0 [&>svg]:size-4';
+export const rowActionsItemLabelClass = 'min-w-0 [overflow-wrap:anywhere]';
+// A control focused behind the sticky column is scrolled out from under it (the column + its border
+// + the 4px of a focus indicator), as the scroll padding of the container does for the header.
+export const rowActionsContainerClass = 'scroll-pe-[calc(var(--rop-list-report-row-height)+5px)]';
