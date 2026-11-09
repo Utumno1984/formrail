@@ -53,6 +53,7 @@ const EXPORTS = [
   'Divider',
   'Field',
   'FieldMessage',
+  'FileUpload',
   'Icon',
   'Input',
   'ListReport',
