@@ -29,6 +29,8 @@ export interface ListReportRowActionsCellProps {
  *
  * - One `onSelect` per opening of the menu: a second activation that reaches an item while the menu
  *   is closing (a fast double click) is ignored.
+ * - The menu is not modal (see below): the rest of the page keeps its accessibility tree and stays
+ *   interactive; Escape, Tab and a click outside close it.
  * - The row going away while its menu is open (deleted elsewhere, filtered out) closes the menu
  *   (`Menu`'s own rule); the focus, which was in the menu, then goes to the table's scroll container
  *   instead of being lost to `body`.
@@ -71,6 +73,11 @@ export function ListReportRowActionsCell({ actions, triggerLabel }: ListReportRo
     <td className={rowActionsBodyCellClass}>
       <div className={selectBoxClass}>
         <Menu
+          // Not modal: a modal menu hides the rest of the page with `aria-hidden`, and a report is full
+          // of focusable controls (search, pills, links, the other rows' triggers) — an accessibility
+          // tree with hidden focusable content. Non-modal, the page stays as it is; a click outside
+          // closes the menu and reaches its target (e.g. another row's trigger opens that menu).
+          modal={false}
           onOpenChange={(next) => {
             open.current = next;
             if (next) {

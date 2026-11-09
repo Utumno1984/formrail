@@ -111,6 +111,3 @@ export const rowActionsRowClass = 'bg-rop-surface';
 // breaks) instead of widening the menu beyond the room the menu leaves it.
 export const rowActionsItemIconClass = 'me-2 inline-flex shrink-0 [&>svg]:size-4';
 export const rowActionsItemLabelClass = 'min-w-0 [overflow-wrap:anywhere]';
-// A control focused behind the sticky column is scrolled out from under it (the column + its border
-// + the 4px of a focus indicator), as the scroll padding of the container does for the header.
-export const rowActionsContainerClass = 'scroll-pe-[calc(var(--rop-list-report-row-height)+5px)]';

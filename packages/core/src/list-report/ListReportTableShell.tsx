@@ -33,7 +33,6 @@ import {
   captionClass,
   containerClass,
   ROW_ACTIONS_COLUMN_WIDTH,
-  rowActionsContainerClass,
   SELECT_COLUMN_WIDTH,
   tableClass,
 } from './list-report-table-styles';
@@ -267,7 +266,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
       {...rest}
       ref={mergedRef}
       aria-busy={status === 'loading' ? true : undefined}
-      className={cn(containerClass, hasRowActions && rowActionsContainerClass, className)}
+      className={cn(containerClass, className)}
       style={containerStyle}
     >
       <table
