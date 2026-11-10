@@ -561,6 +561,16 @@ const CRUD_ARGTYPES = {
     control: false,
     description: 'Called once per successful Create with the record as the server stored it, even if the page was left meanwhile.',
   },
+  deleteOutcome: {
+    control: 'radio',
+    options: ['success', 'error'],
+    description:
+      '`error`: a delete fails after `saveDelayMs`. From the list the row comes back where it was, with an error toast; on the record page the confirmation stays open (retry or Cancel).',
+  },
+  onDeleted: {
+    control: false,
+    description: 'Called once per record the server deleted (`{ id, number }`), from the list or from the record page.',
+  },
 } as const;
 const CRUD_ARGS = {
   history: 'replace',
@@ -568,9 +578,11 @@ const CRUD_ARGS = {
   recordLoadDelayMs: 300,
   saveDelayMs: 400,
   saveOutcome: 'success',
+  deleteOutcome: 'success',
   onNavigate: fn(),
   onSaved: fn(),
   onCreated: fn(),
+  onDeleted: fn(),
 } satisfies Partial<CrudArgs>;
 
 /** Picks a supplier in the Select of the editor (its options are in a portal on `document.body`). */
@@ -619,6 +631,57 @@ export const Crud: StoryObj<CrudArgs> = {
     await waitFor(() => expect(canvas.getByRole('link', { name: 'FT-2026-0201' })).toHaveFocus());
     await expect(await within(document.body).findByText('Invoice FT-2026-0201 created')).toBeVisible();
     await expect(within(document.body).queryByRole('dialog')).toBeNull();
+  },
+};
+
+/**
+ * Delete from the list (#365), optimistic: "…" of the second row -> "Delete" -> the confirmation (focus on
+ * Cancel) -> "Delete invoice". The row goes AT ONCE, before the server answers (the store still holds it), the
+ * count goes from 200 to 199, the focus lands on the "…" of the row that took its place, and once the server
+ * answered a toast confirms it. Controls: `saveDelayMs` (how long the server takes), `deleteOutcome` (`error`:
+ * the row comes back where it was, with an error toast). On a record page "Delete" waits for the server.
+ */
+export const CrudDelete: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  args: { ...CRUD_ARGS, saveDelayMs: 800 },
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('CrudDelete: no window');
+    resetListToRecord(win);
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(200\)/ })).toBeVisible();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Actions for FT-2026-0002' }));
+    await userEvent.click(await body.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete invoice FT-2026-0002?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+
+    // Optimistic: gone from the list while the server still holds it. (`hidden`: until the dialog has finished
+    // closing, the page behind it is still `aria-hidden`.)
+    await waitFor(() => expect(canvas.queryByRole('link', { name: 'FT-2026-0002', hidden: true })).toBeNull());
+    if (args.deleteOutcome !== 'error' && Number(args.saveDelayMs) > 0) {
+      await expect(win.__ropShowcaseStore?.snapshot().some((r) => r.number === 'FT-2026-0002')).toBe(true);
+    }
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(199\)/, hidden: true })).toBeInTheDocument();
+    // After the dialog's exit animation.
+    await waitFor(() => expect(canvas.getByRole('button', { name: 'Actions for FT-2026-0003' })).toHaveFocus(), { timeout: 3000 });
+    await expect(body.queryByRole('dialog')).toBeNull();
+    // `waitFor`: a toast enters with an animation (transparent at first).
+    if (args.deleteOutcome === 'error') {
+      const error = await body.findByText('Could not delete FT-2026-0002', undefined, { timeout: 5000 });
+      await waitFor(() => expect(error).toBeVisible());
+      await expect(await canvas.findByRole('link', { name: 'FT-2026-0002' })).toBeVisible();
+      return;
+    }
+    const done = await body.findByText('Invoice FT-2026-0002 deleted', undefined, { timeout: 5000 });
+    await waitFor(() => expect(done).toBeVisible());
+    await expect(win.__ropShowcaseStore?.snapshot().some((r) => r.number === 'FT-2026-0002')).toBe(false);
+    await expect(args.onDeleted).toHaveBeenCalledTimes(1);
+    await expect(canvas.getByRole('button', { name: 'Actions for FT-2026-0003' })).toHaveFocus();
   },
 };
 
@@ -688,5 +751,53 @@ export const CreateSaving: StoryObj<CrudArgs> = {
     await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
     await expect(await canvas.findByText('Saving…')).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-disabled', 'true');
+  },
+};
+
+/** #365: the delete confirmation over the list ("…" of the second row -> "Delete"), not confirmed. */
+export const DeleteConfirmList: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('visual story: no window');
+    resetListToRecord(win);
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(5), { timeout: 5000 });
+    await userEvent.click(canvas.getByRole('button', { name: 'Actions for FT-2026-0002' }));
+    await userEvent.click(await body.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete invoice FT-2026-0002?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+  },
+};
+
+/**
+ * #365: the delete confirmation over a record page with unsaved changes, CONFIRMED and waiting for the server
+ * (the delay is an hour, the picture is taken before it ends): the warning about the unsaved changes, the
+ * spinner on "Delete invoice", both buttons `aria-disabled`.
+ */
+export const DeleteConfirmRecordPending: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: { ...CRUD_VISUAL_ARGS, saveDelayMs: 3_600_000 },
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('visual story: no window');
+    resetListToRecord(win);
+    await userEvent.click(await canvas.findByRole('link', { name: 'FT-2026-0001' }, { timeout: 5000 }));
+    await canvas.findByRole('heading', { level: 1, name: /FT-2026-0001/ });
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Notes' }), ' (draft)');
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete invoice FT-2026-0001?' });
+    // `waitFor`: the dialog enters with an animation (transparent at first).
+    await waitFor(() => expect(within(dialog).getByText(/Unsaved changes will be lost too\./)).toBeVisible());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+    await expect(within(dialog).getByRole('button', { name: 'Delete invoice' })).toHaveAttribute('aria-disabled', 'true');
   },
 };

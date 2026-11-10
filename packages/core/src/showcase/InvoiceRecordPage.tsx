@@ -3,6 +3,7 @@
 // mount); a fetch in flight is a loading state, never an editor that is hydrated afterwards.
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '../button/Button';
+import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
 import { Field } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
 import { Input } from '../input/Input';
@@ -29,6 +30,10 @@ export interface InvoiceRecordPageProps {
   onBack: () => void;
   /** Called once per successful save with the record as the server stored it. */
   onSaved?: (invoice: StoredInvoice) => void;
+  /** CRUD only (#365): see `InvoiceEditorProps.onDelete`. Without it the header has no "Delete". */
+  onDelete?: (invoice: StoredInvoice) => Promise<void>;
+  /** CRUD only (#365): see `InvoiceEditorProps.onDeleteDone`. */
+  onDeleteDone?: () => void;
 }
 
 interface InvoiceValues {
@@ -82,7 +87,7 @@ const errorText = (error: unknown): string | undefined =>
 type LoadState = { key: string; record: StoredInvoice } | { key: string; error: unknown };
 
 /** Loads the record, then mounts the editor. No editable field exists until the record has arrived. */
-export function InvoiceRecordPage({ store, recordId, onBack, onSaved }: InvoiceRecordPageProps) {
+export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, onDeleteDone }: InvoiceRecordPageProps) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<LoadState | null>(null);
   const key = `${recordId}#${attempt}`;
@@ -150,6 +155,8 @@ export function InvoiceRecordPage({ store, recordId, onBack, onSaved }: InvoiceR
         record={settled.record}
         onBack={onBack}
         onSaved={onSaved}
+        onDelete={onDelete}
+        onDeleteDone={onDeleteDone}
         focusTitleOnMount={attempt > 0}
       />
     </>
@@ -173,6 +180,17 @@ export interface InvoiceEditorProps {
    * longer intercepts): the consumer navigates away from here, never right after the `await`.
    */
   onCreateDone?: (invoice: StoredInvoice) => void;
+  /**
+   * Editing only, CRUD only (#365): adds "Delete" to the header. Deletes the record on the server: the
+   * confirmation stays pending until it settles; a rejection keeps it open and interactive (the consumer
+   * reports the error). Not called while a save is in flight ("Delete" is `aria-disabled` then).
+   */
+  onDelete?: (invoice: StoredInvoice) => Promise<void>;
+  /**
+   * Called once after a confirmed delete, from an effect once the dirty-guard is disarmed: the consumer
+   * navigates away from here (the guard would otherwise intercept the `popstate` of `history.back()`).
+   */
+  onDeleteDone?: () => void;
 }
 
 /**
@@ -224,8 +242,21 @@ export function InvoiceEditor({
   today,
   onCreated,
   onCreateDone,
+  onDelete,
+  onDeleteDone,
 }: InvoiceEditorProps) {
   const creating = record === null;
+  // #365: `deleting` while the confirmed delete waits for the server; `deleted` once the server deleted the
+  // record (set in the same callback, so no render ever has both false in between). `deleting` ARMS the guard
+  // like a save in flight does (browser Back asks "Delete in progress", also on a clean form); `deleted`
+  // disarms it (whatever was unsaved is gone with the record, and the dialog said so) BEFORE the navigation,
+  // which starts from an effect (below). Until that navigation lands (`history.back()` is asynchronous) the page
+  // is still mounted: from `deleting` on, Save/Discard/Delete do nothing, and from `deleted` on the footer is
+  // gone (code review of #372: a Save there reached the store for a record it had just deleted).
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const deleteBusy = deleting || deleted;
+  const [confirm, confirmDialog] = useConfirmDialog();
   const form = useObjectPageForm<InvoiceValues>({
     baseline: record ? toValues(record) : defaultValues(today),
     isEqual: sameValues,
@@ -252,9 +283,27 @@ export function InvoiceEditor({
   // The values the save in flight sends: an edit made after Save is NOT part of it and would be lost on leaving.
   const sentRef = useRef<InvoiceValues | null>(null);
   const editedSinceSave = form.isSaving && form.isDirty && !!sentRef.current && !sameValues(form.values, sentRef.current);
+  // The "delete" wording is sticky like the "save" one: a guard dialog opened during the delete keeps saying
+  // what it said if the delete then fails (a clean form disarms the guard, but an open dialog stays until the
+  // user chooses); real unsaved edits, once no delete runs, bring back the "unsaved changes" wording.
+  const [deleteWording, setDeleteWording] = useState(false);
+  useEffect(() => {
+    if (deleting) setDeleteWording(true);
+    else if (form.isDirty) setDeleteWording(false);
+  }, [deleting, form.isDirty]);
   const { guard, dialog } = useDirtyGuard({
-    when: form.isDirty || form.isSaving,
-    labels: editedSinceSave
+    when: !deleted && (form.isDirty || form.isSaving || deleting),
+    labels: deleting || deleteWording
+      ? {
+          title: 'Delete in progress',
+          description: form.isDirty
+            ? 'The invoice is being deleted. Leaving does not cancel it: it will complete in the background. Your unsaved changes will be lost.'
+            : 'The invoice is being deleted. Leaving does not cancel it: it will complete in the background.',
+          stay: 'Stay',
+          leave: 'Leave anyway',
+          close: 'Close',
+        }
+      : editedSinceSave
       ? {
           title: 'Unsaved changes',
           description:
@@ -289,6 +338,7 @@ export function InvoiceEditor({
   // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).
   const [created, setCreated] = useState<StoredInvoice | null>(null);
   const save = () => {
+    if (deleteBusy) return; // the record is being (or has been) deleted: nothing left to save
     // Already created (the user kept typing during the save and kept editing at the guard): never a second
     // record; the button only asks to leave again.
     if (created) return guard(() => onCreateDone?.(created));
@@ -319,6 +369,40 @@ export function InvoiceEditor({
     guard(() => onCreateDone?.(created));
   }, [created, form.isSaving, guard, onCreateDone]);
 
+  // #365: pessimistic. The confirmation stays pending (spinner, no second confirm, no Escape) until the server
+  // answers: on this page the record must not "go away" before it is known to be gone. A failure keeps the
+  // dialog open and interactive (the consumer shows the error toast): retry or Cancel, which gives the focus
+  // back to "Delete".
+  const remove = () => {
+    if (!record || !onDelete || form.isSaving || deleteBusy) return; // `aria-disabled` does not block a click
+    void confirm({
+      title: `Delete invoice ${record.number}?`,
+      description: form.isDirty
+        ? 'The invoice is deleted permanently. Unsaved changes will be lost too.'
+        : 'The invoice is deleted permanently.',
+      confirmLabel: 'Delete invoice',
+      onConfirm: async () => {
+        setDeleting(true);
+        try {
+          await onDelete(record);
+        } catch (error) {
+          setDeleting(false); // the dialog stays open: retry or Cancel
+          throw error;
+        }
+        setDeleted(true);
+      },
+      // Reported by the consumer (a toast); handled, so not an uncaught error.
+      onError: () => undefined,
+    });
+  };
+  // The navigation starts after the commit that disarmed the guard (the same reason as for the Create).
+  const deleteDoneRef = useRef(false);
+  useEffect(() => {
+    if (!deleted || deleteDoneRef.current) return;
+    deleteDoneRef.current = true;
+    onDeleteDone?.();
+  }, [deleted, onDeleteDone]);
+
   // The save error, when there is one, wins over the summary (`||`, not `??`).
   const problem =
     errorText(form.saveError) ||
@@ -345,19 +429,26 @@ export function InvoiceEditor({
               ) : undefined
             }
             actions={
-              <Button variant="secondary" onClick={() => guard(onBack)}>
-                Back to list
-              </Button>
+              <>
+                <Button variant="secondary" onClick={() => guard(onBack)}>
+                  Back to list
+                </Button>
+                {record && onDelete ? (
+                  <Button variant="secondary" onClick={remove} aria-disabled={form.isSaving || deleteBusy || undefined}>
+                    Delete
+                  </Button>
+                ) : null}
+              </>
             }
           />
           <ObjectPageFooter
-            visible={creating || form.isDirty}
+            visible={!deleted && (creating || form.isDirty)}
             label="Save actions"
             toneLabel={problem ? 'Error' : 'Information'}
             message={message}
             messageTone={problem ? 'error' : 'info'}
           >
-            <Button onClick={save} aria-disabled={form.isSaving || undefined}>
+            <Button onClick={save} aria-disabled={form.isSaving || deleteBusy || undefined}>
               {creating ? 'Create' : 'Save'}
             </Button>
             {creating ? (
@@ -366,7 +457,13 @@ export function InvoiceEditor({
                 Cancel
               </Button>
             ) : (
-              <Button variant="secondary" onClick={() => form.reset()}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (!deleteBusy) form.reset();
+                }}
+                aria-disabled={deleteBusy || undefined}
+              >
                 Discard
               </Button>
             )}
@@ -422,6 +519,7 @@ export function InvoiceEditor({
         </ObjectPage>
       </ValidationProvider>
       {dialog}
+      {confirmDialog}
     </div>
   );
 }

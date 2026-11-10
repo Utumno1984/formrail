@@ -18,10 +18,11 @@ import {
   type ReactNode,
 } from 'react';
 import { ListReport } from '../list-report/ListReport';
-import { useListReport } from '../list-report/use-list-report';
+import { EMPTY_IDS, useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
 import { useListReportUrlState } from '../list-report/use-list-report-url-state';
 import type { DemoInvoice } from '../internal/demo-invoices';
+import type { ListReportRowActions } from '../list-report/types';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
 import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
 import { createInvoiceApi } from './invoice-api';
@@ -85,7 +86,16 @@ export interface ListViewProps {
    */
   created?: { id: string } | null;
   onCreatedReady?: (visible: boolean) => void;
+  /**
+   * Ids left out of the rows given to `useListReport` (#365: the CRUD showcase's deletes, in flight or done).
+   * The rows stay DERIVED from the loaded data: an id that leaves the set brings its row back exactly where
+   * the current filters, search and sort put it.
+   */
+  hiddenIds?: ReadonlySet<string>;
+  /** The List Report `rowActions` (#365: the CRUD showcase's "Delete"). */
+  rowActions?: ListReportRowActions<DemoInvoice>;
 }
+
 
 export function ListView({
   store,
@@ -96,6 +106,8 @@ export function ListView({
   actions,
   created,
   onCreatedReady,
+  hiddenIds = EMPTY_IDS,
+  rowActions,
 }: ListViewProps) {
   const [load, setLoad] = useState<{ rows: DemoInvoice[] } | { error: true } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -113,7 +125,10 @@ export function ListView({
   }, [store, attempt]);
 
   const status = load === null ? 'loading' : 'error' in load ? 'error' : 'ready';
-  const rows = useMemo(() => (load && 'rows' in load ? load.rows : []), [load]);
+  const rows = useMemo(() => {
+    const loaded = load && 'rows' in load ? load.rows : [];
+    return hiddenIds.size === 0 ? loaded : loaded.filter((r) => !hiddenIds.has(r.id));
+  }, [load, hiddenIds]);
 
   const url = useListReportUrlState({ filters: FILTERS, sortableColumnIds: SORTABLE, history });
   const scroll = useListReportScrollRestoration({ ready: status === 'ready' });
@@ -198,6 +213,7 @@ export function ListView({
           searchLabel="Search"
           labels={LABELS}
           scrollerRef={scroll.ref}
+          rowActions={rowActions}
           onRetry={() => setAttempt((n) => n + 1)}
           style={{ height: '100%' }}
         />

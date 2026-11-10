@@ -436,7 +436,8 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
   };
 }
 
-const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
+/** @internal The shared empty id set (never mutated). Not re-exported by the package index. */
+export const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
 const NO_IDS: readonly string[] = [];
 
 interface SelectionInput<Row> {
