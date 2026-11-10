@@ -3,11 +3,21 @@
 import type { DemoInvoice } from '../internal/demo-invoices';
 import { makeShowcaseInvoices } from './showcase-data';
 
+/** One invoice line as the store keeps it: numeric quantity and unit price, an `id` unique within the invoice. */
+export interface StoredLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 /** A demo invoice plus the fields only the record page edits, derived deterministically. */
 export interface StoredInvoice extends DemoInvoice {
   /** ISO date (yyyy-mm-dd), 30 days after `date`. */
   dueDate: string;
   notes: string;
+  /** In display order. The ids are assigned by whoever creates the line (the client) and kept as they are. */
+  lineItems: StoredLineItem[];
 }
 
 /** What the client sends to create a record: everything but the identity the server assigns. */
@@ -85,14 +95,39 @@ const DAY_MS = 86_400_000;
 const addDays = (iso: string, days: number): string =>
   new Date(Date.parse(iso + 'T00:00:00Z') + days * DAY_MS).toISOString().slice(0, 10);
 
+const LINE_CATALOG: readonly { description: string; unitPrice: number }[] = [
+  { description: 'Consulting (hourly)', unitPrice: 120 },
+  { description: 'Site inspection', unitPrice: 85.5 },
+  { description: 'Materials', unitPrice: 42.9 },
+  { description: 'Transport', unitPrice: 60 },
+  { description: 'Installation', unitPrice: 210 },
+  { description: 'Maintenance contract', unitPrice: 300 },
+];
+
+// 1 to 4 lines per invoice, consecutive catalog entries from `index`: distinct within an invoice (up to the
+// catalog length); the same index always gives the same lines.
+const makeLineItems = (index: number): StoredLineItem[] =>
+  Array.from({ length: (index % 4) + 1 }, (_, n) => {
+    const entry = LINE_CATALOG[(index + n) % LINE_CATALOG.length]!;
+    return {
+      id: `li-${index + 1}-${n + 1}`,
+      description: entry.description,
+      quantity: ((index + n) % 5) + 1,
+      unitPrice: entry.unitPrice,
+    };
+  });
+
 const extend = (r: DemoInvoice, index: number): StoredInvoice => ({
   ...r,
   dueDate: addDays(r.date, 30),
   // Every third invoice has a note; the others have an empty string (never a missing field).
   notes: index % 3 === 0 ? 'Payment terms: 30 days from the invoice date.' : '',
+  lineItems: makeLineItems(index),
 });
 
 const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+const normalizeLines = (lines: readonly StoredLineItem[]): StoredLineItem[] =>
+  lines.map((l) => ({ ...l, unitPrice: round2(l.unitPrice) }));
 
 const delay = (ms: number | Promise<void>): Promise<void> => {
   if (typeof ms !== 'number') return ms;
@@ -116,7 +151,7 @@ export function createInvoiceStore(
   // Monotonic: the next identity is one past the highest ever issued (a record removed later never frees it).
   let sequence = seed.length;
   // Copies in and out: a caller mutating what it got can never change the store.
-  const copy = (r: StoredInvoice): StoredInvoice => ({ ...r });
+  const copy = (r: StoredInvoice): StoredInvoice => ({ ...r, lineItems: r.lineItems.map((l) => ({ ...l })) });
 
   async function read<T>(produce: () => T): Promise<T> {
     // The config is read when the call is made, not when the delay ends.
@@ -141,7 +176,11 @@ export function createInvoiceStore(
       await delay(saveDelayMs);
       if (saveOutcome === 'error') throw new InvoiceNetworkError('Could not save the invoice: network error');
       if (!records.has(invoice.id)) throw new InvoiceNotFoundError(invoice.id);
-      const stored: StoredInvoice = { ...invoice, amount: round2(invoice.amount) };
+      const stored: StoredInvoice = {
+        ...invoice,
+        amount: round2(invoice.amount),
+        lineItems: normalizeLines(invoice.lineItems),
+      };
       records.set(stored.id, stored);
       return copy(stored);
     },
@@ -155,6 +194,7 @@ export function createInvoiceStore(
         id: `inv-${sequence}`,
         number: `FT-2026-${String(sequence).padStart(4, '0')}`,
         amount: round2(draft.amount),
+        lineItems: normalizeLines(draft.lineItems),
       };
       records.set(stored.id, stored);
       return copy(stored);

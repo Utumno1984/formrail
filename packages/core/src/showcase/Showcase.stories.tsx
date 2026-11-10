@@ -50,7 +50,7 @@ const meta: Meta<RecordPageArgs> = {
   argTypes: {
     recordId: {
       control: 'select',
-      options: ['inv-1', 'inv-2', 'inv-3', 'inv-7', 'inv-does-not-exist'],
+      options: ['inv-1', 'inv-2', 'inv-3', 'inv-4', 'inv-7', 'inv-does-not-exist'],
       description: 'The invoice to open. `inv-does-not-exist` shows the not-found state. Changing it mounts a fresh editor.',
     },
     loadDelayMs: {
@@ -146,6 +146,28 @@ export const RecordPage: Story = {
     await expect(args.onSaved).toHaveBeenCalledTimes(1);
     await expect(args.onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: args.recordId, amount: 1234.57 }));
 
+    // Line items: add a line (the focus goes to its description), fill it, edit another line, Save.
+    const lineCount = canvas.getAllByRole('button', { name: /^Remove line / }).length;
+    await userEvent.click(canvas.getByRole('button', { name: 'Add line' }));
+    const next = lineCount + 1;
+    const description = canvas.getByRole('textbox', { name: `Line ${next} description` });
+    await expect(description).toHaveFocus();
+    await userEvent.type(description, 'Consulting');
+    await userEvent.type(canvas.getByRole('textbox', { name: `Line ${next} quantity` }), '2');
+    await userEvent.type(canvas.getByRole('textbox', { name: `Line ${next} unit price` }), '150');
+    await expect(canvas.getByText(`Line ${next} total`).nextElementSibling).toHaveTextContent('300.00');
+    const firstQuantity = canvas.getByRole('textbox', { name: 'Line 1 quantity' });
+    await userEvent.clear(firstQuantity);
+    await userEvent.type(firstQuantity, '9');
+    const lineSave = within(await canvas.findByRole('region', { name: 'Save actions' })).getByRole('button', { name: 'Save' });
+    await userEvent.click(lineSave);
+    await waitFor(() => expect(region(canvas)).toBeNull());
+    await expect(args.onSaved).toHaveBeenCalledTimes(2);
+    const savedLines = window.__ropShowcaseStore?.snapshot().find((r) => r.id === args.recordId)?.lineItems ?? [];
+    await expect(savedLines).toHaveLength(next);
+    await expect(savedLines[0]?.quantity).toBe(9);
+    await expect(savedLines[next - 1]).toEqual({ id: 'new-1', description: 'Consulting', quantity: 2, unitPrice: 150 });
+
     // Clean: "Back to list" leaves at once, with no confirmation dialog.
     await userEvent.click(canvas.getByRole('button', { name: 'Back to list' }));
     await expect(args.onBack).toHaveBeenCalledTimes(1);
@@ -155,6 +177,28 @@ export const RecordPage: Story = {
 
 /** `RecordPage` without a `play` function: what `e2e/showcase-record-page.spec.ts` drives with real input. */
 export const Manual: Story = {};
+
+/** The record with four lines (#378), no delays: the "Line items" section as photographed at 3 viewports. */
+export const RecordLineItems: Story = {
+  tags: ['visual'],
+  args: { recordId: 'inv-4', loadDelayMs: 0, saveDelayMs: 0 },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole('textbox', { name: 'Line 4 description' })).toBeVisible();
+    await expect(canvas.getAllByRole('button', { name: /^Remove line / })).toHaveLength(4);
+    await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();
+    // Scrolls the section into view through the Anchor Bar, then waits for the scroll to settle.
+    await userEvent.click(canvas.getByRole('link', { name: 'Line items' }));
+    const heading = canvas.getByRole('heading', { name: 'Line items' });
+    let last = Number.NaN;
+    await waitFor(() => {
+      const top = heading.getBoundingClientRect().top;
+      const settled = top === last;
+      last = top;
+      expect(settled).toBe(true);
+    });
+  },
+};
 
 /* ------------------------------------------------------------------------------------------ */
 /* #150: the list opens the record as a dedicated page and comes back.                          */

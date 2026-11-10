@@ -106,8 +106,9 @@ export const reviewDescription = (count: number): string =>
 
 /**
  * The `reviewSave` of the showcase: the "Review changes" dialog, or `null` when there is nothing to review
- * (the editor then saves directly; with the equality above it cannot happen on a dirty form, whose footer
- * is the only way to Save). Computed once, when Save is pressed: the form cannot change under a modal.
+ * (the editor then saves directly). It happens on a dirty form when only the line items changed: `reviewSave`
+ * receives the scalar values only, so a lines-only save skips this review (the review of the lines is #379).
+ * Computed once, when Save is pressed: the form cannot change under a modal.
  */
 export function invoiceSaveReview(context: InvoiceSaveReviewContext): InvoiceSaveReview | null {
   const entries = invoiceReviewEntries(context);

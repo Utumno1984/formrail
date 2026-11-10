@@ -1,7 +1,7 @@
 // Story-only: the invoice detail page, composed ONLY from the public Object Page pieces. Not exported
 // by the package. Spec §1.4: the editor is mounted already hydrated (`key` per record + `baseline` at
 // mount); a fetch in flight is a loading state, never an editor that is hydrated afterwards.
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '../button/Button';
 import { useConfirmDialog, type ConfirmOptions } from '../confirm-dialog/use-confirm-dialog';
 import { Field } from '../field/Field';
@@ -20,6 +20,16 @@ import { MessageStrip } from '../message-strip/MessageStrip';
 import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
+import { InvoiceLineItems } from './InvoiceLineItems';
+import { DECIMAL, sameNumberText } from './number-text';
+import {
+  sameLines,
+  toLineValues,
+  toStoredLine,
+  validateLines,
+  type LineErrorKey,
+  type LineValues,
+} from './invoice-lines';
 import { InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from './showcase-data';
 
@@ -49,16 +59,22 @@ export interface InvoiceValues {
   notes: string;
 }
 
-const toValues = (r: StoredInvoice): InvoiceValues => ({
+/** All the values of the editor: the scalar ones plus the line items (the Pro review sees only the scalar ones). */
+interface InvoiceFormValues extends InvoiceValues {
+  lineItems: LineValues[];
+}
+
+const toValues = (r: StoredInvoice): InvoiceFormValues => ({
   supplier: r.supplier,
   status: r.status,
   amount: r.amount.toFixed(2),
   date: r.date,
   dueDate: r.dueDate,
   notes: r.notes,
+  lineItems: r.lineItems.map(toLineValues),
 });
 
-const toInvoice = (record: StoredInvoice, v: InvoiceValues): StoredInvoice => ({
+const toInvoice = (record: StoredInvoice, v: InvoiceFormValues): StoredInvoice => ({
   ...record,
   supplier: v.supplier,
   status: v.status,
@@ -66,7 +82,15 @@ const toInvoice = (record: StoredInvoice, v: InvoiceValues): StoredInvoice => ({
   date: v.date,
   dueDate: v.dueDate,
   notes: v.notes,
+  lineItems: v.lineItems.map(toStoredLine),
 });
+
+/** The scalar part of the values: what `reviewSave` receives. */
+const scalarValues = (v: InvoiceFormValues): InvoiceValues => {
+  const { lineItems, ...scalar } = v;
+  void lineItems;
+  return scalar;
+};
 
 /** What `reviewSave` receives: the values about to be saved and the REAL saved baseline (never a default). */
 export interface InvoiceSaveReviewContext {
@@ -226,7 +250,7 @@ export interface InvoiceEditorProps {
  * a free-text Storybook control: anything that is not a real calendar date (`''`, `2026-02-30`) falls back to
  * the local date (the calendar helpers' `isIsoDate` checks the day against the month).
  */
-const defaultValues = (today: string | undefined): InvoiceValues => {
+const defaultValues = (today: string | undefined): InvoiceFormValues => {
   const date = isIsoDate(today) ? today : localToday();
   return {
     supplier: '',
@@ -235,37 +259,40 @@ const defaultValues = (today: string | undefined): InvoiceValues => {
     date,
     dueDate: addCalendarDays(date, 30) ?? date,
     notes: '',
+    lineItems: [],
   };
 };
 
-const toDraft = (v: InvoiceValues): InvoiceDraft => ({
+const toDraft = (v: InvoiceFormValues): InvoiceDraft => ({
   supplier: v.supplier,
   status: v.status,
   amount: Number(v.amount),
   date: v.date,
   dueDate: v.dueDate,
   notes: v.notes,
+  lineItems: v.lineItems.map(toStoredLine),
 });
 
 // The amount is text; "1295.9" and "1295.90" are the same number, so typing the shorter form of the
 // baseline is not a change. Exported for the Pro story of #377 (its change summary compares the same way).
-export const sameAmount = (a: string, b: string): boolean => a === b || (a.trim() !== '' && b.trim() !== '' && Number(a) === Number(b));
-const sameValues = (a: InvoiceValues, b: InvoiceValues): boolean =>
+export const sameAmount = sameNumberText;
+export const sameValues = (a: InvoiceFormValues, b: InvoiceFormValues): boolean =>
   sameAmount(a.amount, b.amount) &&
   a.supplier === b.supplier &&
   a.status === b.status &&
   a.date === b.date &&
   a.dueDate === b.dueDate &&
-  a.notes === b.notes;
+  a.notes === b.notes &&
+  sameLines(a.lineItems, b.lineItems);
 
-const DECIMAL = /^\d+(\.\d+)?$/;
-const validateInvoice = (v: InvoiceValues): Partial<Record<keyof InvoiceValues, string>> => {
-  const errors: Partial<Record<keyof InvoiceValues, string>> = {};
+type InvoiceErrors = Partial<Record<keyof InvoiceValues | LineErrorKey, string>>;
+const validateInvoice = (v: InvoiceFormValues): InvoiceErrors => {
+  const errors: InvoiceErrors = {};
   if (!v.supplier) errors.supplier = 'Supplier is required.';
   if (!DECIMAL.test(v.amount.trim()) || Number(v.amount) <= 0) {
     errors.amount = 'Amount must be greater than 0.';
   }
-  return errors;
+  return { ...errors, ...validateLines(v.lineItems) };
 };
 const hasErrors = (errors: Partial<Record<string, string>>): boolean => Object.values(errors).some((e) => e !== undefined);
 const SAVING_HINT = 'Saving… Discard only restores the form: the save still completes.';
@@ -295,7 +322,7 @@ export function InvoiceEditor({
   const [deleted, setDeleted] = useState(false);
   const deleteBusy = deleting || deleted;
   const [confirm, confirmDialog] = useConfirmDialog();
-  const form = useObjectPageForm<InvoiceValues>({
+  const form = useObjectPageForm<InvoiceFormValues>({
     baseline: record ? toValues(record) : defaultValues(today),
     isEqual: sameValues,
     validate: validateInvoice,
@@ -312,7 +339,7 @@ export function InvoiceEditor({
     else if (form.isDirty) setSavingWording(false);
   }, [form.isSaving, form.isDirty]);
   // The values the save in flight sends: an edit made after Save is NOT part of it and would be lost on leaving.
-  const sentRef = useRef<InvoiceValues | null>(null);
+  const sentRef = useRef<InvoiceFormValues | null>(null);
   const editedSinceSave = form.isSaving && form.isDirty && !!sentRef.current && !sameValues(form.values, sentRef.current);
   // The "delete" wording is sticky like the "save" one: a guard dialog opened during the delete keeps saying
   // what it said if the delete then fails (a clean form disarms the guard, but an open dialog stays until the
@@ -366,6 +393,7 @@ export function InvoiceEditor({
   }, [focusTitleOnMount]);
 
   const { values, setValue } = form;
+  const baselineLineIds = useMemo(() => new Set(form.baseline.lineItems.map((l) => l.id)), [form.baseline]);
   // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).
   const [created, setCreated] = useState<StoredInvoice | null>(null);
   const save = () => {
@@ -378,7 +406,7 @@ export function InvoiceEditor({
     // none of an invalid form: `commit` then fails the validation exactly as without a review.
     if (form.isSaving) return;
     if (hasErrors(validateInvoice(form.values))) return commit();
-    const review = reviewSave({ values: form.values, baseline: form.baseline });
+    const review = reviewSave({ values: scalarValues(form.values), baseline: scalarValues(form.baseline) });
     if (!review) return commit();
     // No `onConfirm`: the dialog closes at once and the save shows its progress in the footer, as without it.
     void confirm(review).then((ok) => {
@@ -552,6 +580,13 @@ export function InvoiceEditor({
                 <Input type="date" value={values.dueDate} onChange={(e) => setValue('dueDate', e.target.value)} />
               </Field>
             </div>
+          </ObjectPageSection>
+          <ObjectPageSection id="line-items" title="Line items">
+            <InvoiceLineItems
+              lines={values.lineItems}
+              baselineIds={baselineLineIds}
+              onChange={(next) => setValue('lineItems', next)}
+            />
           </ObjectPageSection>
           <ObjectPageSection id="notes" title="Notes">
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
