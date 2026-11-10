@@ -12,7 +12,10 @@ import { ropTheme } from './theme';
 const hideInternalValue = process.env.STORYBOOK_HIDE_INTERNAL;
 const hideInternal = hideInternalValue !== undefined && hideInternalValue !== '' && hideInternalValue !== '0' && hideInternalValue !== 'false';
 
+// STORYBOOK_EDITION=pro (Pro demo build) is inlined into the manager the same way.
+const proEdition = process.env.STORYBOOK_EDITION === 'pro';
+
 addons.setConfig({
-  theme: ropTheme,
+  theme: proEdition ? { ...ropTheme, brandTitle: 'react-object-page Pro (preview)' } : ropTheme,
   ...(hideInternal && { sidebar: { filters: { patterns: (item) => !item.tags?.includes('internal') } } }),
 });

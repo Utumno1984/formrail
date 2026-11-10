@@ -2,11 +2,12 @@ import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import type { StorybookConfig } from '@storybook/react-vite';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
-import { previewAnnotations, storyGlobs } from './story-globs.mjs';
+import { introductionPages, previewAnnotations, storyGlobs } from './story-globs.mjs';
 
 const config: StorybookConfig = {
-  // Core always; packages/pro unless STORYBOOK_EXCLUDE_PRO is set (public deploy: Free only).
-  stories: [...(storyGlobs() as string[]), './Introduction.mdx'],
+  // Core always; packages/pro unless STORYBOOK_EXCLUDE_PRO is set (Free deploy); only packages/pro with
+  // STORYBOOK_EDITION=pro (Pro demo deploy). See story-globs.mjs.
+  stories: [...(storyGlobs() as string[]), ...(introductionPages() as string[])],
   // Docs tab (autodocs, MDX pages): addon-docs is a separate package since Storybook 9.
   addons: ['@storybook/addon-docs'],
   // Favicon for the manager (see manager-head.html).

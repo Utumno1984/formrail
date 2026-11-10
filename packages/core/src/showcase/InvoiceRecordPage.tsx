@@ -458,7 +458,7 @@ export function InvoiceEditor({
   return (
     <div
       ref={frameRef}
-      style={{ height: '100dvh', boxSizing: 'border-box', display: 'grid', gridTemplateRows: 'minmax(0, 1fr)' }}
+      style={{ height: 'var(--rop-demo-viewport-height, 100dvh)', boxSizing: 'border-box', display: 'grid', gridTemplateRows: 'minmax(0, 1fr)' }}
     >
       <ValidationProvider fieldErrors={form.fieldErrors}>
         <ObjectPage labels={{ anchorBar: 'Sections' }}>

@@ -37,7 +37,7 @@ const PAGE: CSSProperties = {
   gap: 12,
   fontFamily: 'system-ui, sans-serif',
 };
-const BOX: CSSProperties = { width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' };
+const BOX: CSSProperties = { width: 1100, maxWidth: '100%', height: 'min(600px, calc(var(--rop-demo-viewport-height, 100dvh) - 104px))' };
 
 // `rowHeight: '3rem'`: overrides the row height variable on the table's scroll container, what a
 // consumer does with its own CSS (the container declares the default itself, so a parent cannot).
@@ -366,7 +366,7 @@ function RestorationDemo({ loadDelayMs, rowHeight, onOpenDetail }: ScrollRestora
           </Button>
         </div>
       ) : (
-        <div style={{ ...BOX, height: 'min(500px, calc(100dvh - 104px))' }}>
+        <div style={{ ...BOX, height: 'min(500px, calc(var(--rop-demo-viewport-height, 100dvh) - 104px))' }}>
           <RestorationList loadDelayMs={loadDelayMs} rowHeight={rowHeight} onOpen={open} />
         </div>
       )}

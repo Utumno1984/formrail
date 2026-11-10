@@ -195,8 +195,11 @@ jobs:
           STORYBOOK_EXCLUDE_PRO: '1'
           # Test fixtures (tag `internal`) out of the public sidebar, see .storybook/manager.ts (#296).
           STORYBOOK_HIDE_INTERNAL: '1'
+      # Pro demo: Pro stories + ProIntroduction.mdx only, with the "Pro preview" banner (#381). Script in
+      # package.json: STORYBOOK_EDITION=pro + STORYBOOK_HIDE_INTERNAL=1, output storybook-static-pro/.
+      - run: npm run build-storybook:pro
       # site/ = landing slot at the root (redirects old Storybook links for now) + storybook/ + pro/
-      # (ticket #380). The prefix comes from GITHUB_REPOSITORY, see scripts/site-config.mjs.
+      # (tickets #380, #381). The prefix comes from GITHUB_REPOSITORY, see scripts/site-config.mjs.
       - run: node scripts/assemble-site.mjs
       # Pre-deploy smoke on the assembled folder, served locally under the same prefix as the live
       # site (not against the live site). If it fails, nothing below runs: no deploy.

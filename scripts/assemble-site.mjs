@@ -6,9 +6,10 @@
 //     404.html                  static, no script (cannot loop)
 //     .nojekyll                 Pages must not run Jekyll over Storybook's underscore-prefixed files
 //     storybook/                the Free Storybook (storybook-static/)
-//     pro/                      empty, reserved for the Pro demo (next ticket)
+//     pro/                      the Pro demo Storybook (storybook-static-pro/, ticket #381)
 //
-// Usage: node scripts/assemble-site.mjs   (after `npm run build` and `npm run build-storybook`)
+// Usage: node scripts/assemble-site.mjs   (after `npm run build`, `npm run build-storybook` and
+// `npm run build-storybook:pro`)
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,8 @@ export function redirectScriptSource(siteRootDir) {
 /**
  * @param {object} [options]
  * @param {string} [options.storybookDir] the built Storybook (default `<repo>/storybook-static`)
+ * @param {string | null} [options.proStorybookDir] the built Pro demo Storybook; when given it must exist
+ *   (the CLI passes `<repo>/storybook-static-pro`). Omitted: `pro/` is created empty.
  * @param {string} [options.siteRootDir] the static root files (default `<repo>/site-root`)
  * @param {string} [options.outDir] where to write the site (default `<repo>/site`); emptied first
  * @param {string} [options.siteBase] path prefix, written into 404.html (default `SITE_BASE`)
@@ -33,6 +36,7 @@ export function redirectScriptSource(siteRootDir) {
  */
 export function assembleSite({
   storybookDir = path.join(REPO_ROOT, 'storybook-static'),
+  proStorybookDir = null,
   siteRootDir = path.join(REPO_ROOT, 'site-root'),
   outDir = path.join(REPO_ROOT, 'site'),
   siteBase = SITE_BASE,
@@ -40,11 +44,15 @@ export function assembleSite({
   if (!existsSync(path.join(storybookDir, 'index.html'))) {
     throw new Error(`No built Storybook at ${storybookDir}: run \`npm run build-storybook\` first.`);
   }
+  if (proStorybookDir !== null && !existsSync(path.join(proStorybookDir, 'index.html'))) {
+    throw new Error(`No built Pro Storybook at ${proStorybookDir}: run \`npm run build-storybook:pro\` first.`);
+  }
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
 
   cpSync(storybookDir, path.join(outDir, 'storybook'), { recursive: true });
-  mkdirSync(path.join(outDir, 'pro'));
+  if (proStorybookDir === null) mkdirSync(path.join(outDir, 'pro'));
+  else cpSync(proStorybookDir, path.join(outDir, 'pro'), { recursive: true });
   writeFileSync(path.join(outDir, '.nojekyll'), '');
 
   const redirect = redirectScriptSource(siteRootDir);
@@ -60,5 +68,5 @@ export function assembleSite({
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  console.log(`Assembled the site in ${assembleSite()}`);
+  console.log(`Assembled the site in ${assembleSite({ proStorybookDir: path.join(REPO_ROOT, 'storybook-static-pro') })}`);
 }

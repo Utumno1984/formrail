@@ -48,7 +48,7 @@ const preview: Preview = {
       },
     },
     // `Introduction` and `Showcase` first; the sections not listed keep their relative order.
-    options: { storySort: { order: ['Introduction', 'Showcase'] } },
+    options: { storySort: { order: ['Introduction', 'Pro introduction', 'Showcase'] } },
   },
 };
 

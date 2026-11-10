@@ -1,0 +1,18 @@
+.rop-pro-banner {
+  box-sizing: border-box;
+  padding: 8px 16px;
+  background: #fff4cc;
+  color: #1d2d3e;
+  border-bottom: 1px solid #c9a227;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+.rop-pro-banner a {
+  color: #0a4f9e;
+  text-decoration: underline;
+}
+
+/* Storybook pads the body in the `padded` layout: the banner spans the full width, then the usual gap. */
+body.sb-main-padded > .rop-pro-banner {
+  margin: -1rem -1rem 1rem;
+}
