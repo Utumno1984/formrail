@@ -334,3 +334,156 @@ test.describe('Pro/Showcase/Invoices with Change Summary', () => {
     expect(await saves(page)).toHaveLength(1);
   });
 });
+
+// #379: the line items in the review (per row, by id) and the "only the order changed" case.
+test.describe('Pro/Showcase/Invoices with Change Summary: line items (#379)', () => {
+  const WITH_LINES = 'FT-2026-0003'; // Materials 3 × 42.90, Transport 4 × 60.00, Installation 5 × 210.00
+  const lineIds = (page: Page): Promise<string[]> =>
+    page.evaluate(
+      (n) =>
+        (window as unknown as { __ropShowcaseStore?: { snapshot: () => { number: string; lineItems: { description: string }[] }[] } })
+          .__ropShowcaseStore!.snapshot()
+          .find((r) => r.number === n)!
+          .lineItems.map((l) => l.description),
+      WITH_LINES,
+    );
+
+  async function openLines(page: Page): Promise<void> {
+    await page.goto(url(FIXTURE, FAST));
+    await page.getByRole('link', { name: WITH_LINES }).click();
+    await expect(page.getByRole('heading', { level: 1, name: new RegExp(WITH_LINES) })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Line 3 quantity' })).toBeVisible();
+  }
+
+  const lineField = (page: Page, n: number, field: 'description' | 'quantity' | 'unit price'): Locator =>
+    page.getByRole('textbox', { name: `Line ${n} ${field}` });
+
+  test('the play functions pass (three entries; only the order)', async ({ page }) => {
+    await expectPlayToPass(page, 'pro-showcase-invoices-with-change-summary--review-line-items');
+    await expectPlayToPass(page, 'pro-showcase-invoices-with-change-summary--review-order-only');
+  });
+
+  test('a quantity changed: ONE entry for that field of that row, a number; a unit price as money', async ({ page }) => {
+    await openLines(page);
+    await lineField(page, 2, 'quantity').fill('7');
+    await saveButton(page).click();
+    await expect(reviewDialog(page)).toHaveAccessibleDescription('1 change will be saved.');
+    expect(await itemTexts(page)).toEqual(['Line items > Item 2 (Transport) > Quantity, changed, from 4 to 7']);
+    await reviewDialog(page).getByRole('button', { name: 'Keep editing' }).click();
+
+    await lineField(page, 2, 'quantity').fill('4');
+    await lineField(page, 1, 'unit price').fill('1234.5');
+    await saveButton(page).click();
+    expect(await itemTexts(page)).toEqual(['Line items > Item 1 (Materials) > Unit price, changed, from €42.90 to €1,234.50']);
+  });
+
+  test('a line added: "added" with its values; a line removed: "removed" with the values it had', async ({ page }) => {
+    await openLines(page);
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await lineField(page, 4, 'description').fill('Permit');
+    await lineField(page, 4, 'quantity').fill('1');
+    await lineField(page, 4, 'unit price').fill('99');
+    await saveButton(page).click();
+    expect(await itemTexts(page)).toEqual(['Line items > Item 4, added, Permit, 1 × €99.00']);
+    await reviewDialog(page).getByRole('button', { name: 'Keep editing' }).click();
+
+    await page.getByRole('button', { name: 'Remove line 4' }).click();
+    await page.getByRole('button', { name: 'Remove line 2' }).click();
+    await saveButton(page).click();
+    expect(await itemTexts(page)).toEqual(['Line items > Item 2, removed, Transport, 4 × €60.00']);
+  });
+
+  test('line 1 removed and line 3 changed: line 3 is the same row (by id), one entry for its quantity', async ({ page }) => {
+    await openLines(page);
+    await lineField(page, 3, 'quantity').fill('8');
+    await page.getByRole('button', { name: 'Remove line 1' }).click();
+    await saveButton(page).click();
+    await expect(reviewDialog(page)).toHaveAccessibleDescription('2 changes will be saved.');
+    expect(await itemTexts(page)).toEqual([
+      'Line items > Item 2 (Installation) > Quantity, changed, from 5 to 8',
+      'Line items > Item 1, removed, Materials, 3 × €42.90',
+    ]);
+  });
+
+  test('only the order: the review opens with its own text and no list; "Save changes" saves the new order', async ({ page }) => {
+    await openLines(page);
+    await page.getByRole('button', { name: 'Move line 3 up' }).click();
+    await saveButton(page).click();
+    const dialog = reviewDialog(page);
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAccessibleDescription('Only the order of the line items changed.');
+    await expect(dialog.getByRole('list')).toHaveCount(0);
+    await expect(dialog.getByRole('listitem')).toHaveCount(0);
+    expect(await lineIds(page)).toEqual(['Materials', 'Transport', 'Installation']);
+
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(footer(page)).toBeHidden({ timeout: 10_000 });
+    expect(await lineIds(page)).toEqual(['Materials', 'Installation', 'Transport']);
+    await expect(lineField(page, 2, 'description')).toHaveValue('Installation');
+  });
+
+  test('a reorder AND a change: "1 change will be saved." plus the note about the order', async ({ page }) => {
+    await openLines(page);
+    await page.getByRole('button', { name: 'Move line 3 up' }).click();
+    await lineField(page, 3, 'quantity').fill('6');
+    await saveButton(page).click();
+    const dialog = reviewDialog(page);
+    await expect(dialog).toHaveAccessibleDescription('1 change will be saved.');
+    expect(await itemTexts(page)).toEqual(['Line items > Item 3 (Transport) > Quantity, changed, from 4 to 6']);
+    await expect(dialog.getByText('The order of the line items also changed.')).toBeVisible();
+  });
+
+  test('a new line with an empty description is blocked by the validation: no dialog', async ({ page }) => {
+    await openLines(page);
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await saveButton(page).click();
+    await expect(reviewDialog(page)).toHaveCount(0);
+    await expect(page.getByText('Description is required.')).toBeVisible();
+  });
+
+  test('added then removed before saving: the form is clean again', async ({ page }) => {
+    await openLines(page);
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await page.getByRole('button', { name: 'Remove line 4' }).click();
+    await expect(footer(page)).toBeHidden();
+  });
+
+  test('no a11y violations with the review open: three entries, and only the order', async ({ page }) => {
+    await openLines(page);
+    await lineField(page, 3, 'quantity').fill('9');
+    await page.getByRole('button', { name: 'Remove line 1' }).click();
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await lineField(page, 3, 'description').fill('Permit');
+    await lineField(page, 3, 'quantity').fill('1');
+    await lineField(page, 3, 'unit price').fill('99');
+    await saveButton(page).click();
+    await expect(reviewDialog(page)).toHaveAccessibleDescription('3 changes will be saved.');
+    expect(await itemTexts(page)).toHaveLength(3);
+    await expectNoA11yViolations(page);
+
+    await openLines(page);
+    await page.getByRole('button', { name: 'Move line 3 up' }).click();
+    await saveButton(page).click();
+    await expect(reviewDialog(page)).toHaveAccessibleDescription('Only the order of the line items changed.');
+    await expectNoA11yViolations(page);
+  });
+
+  test('mixed review on mobile: no horizontal overflow', async ({ page }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await openLines(page);
+    await lineField(page, 3, 'quantity').fill('9');
+    await page.getByRole('button', { name: 'Remove line 1' }).click();
+    await page.getByRole('button', { name: 'Add line' }).click();
+    await lineField(page, 3, 'description').fill('A very long description of a service that was added to the invoice at the last minute');
+    await lineField(page, 3, 'quantity').fill('1');
+    await lineField(page, 3, 'unit price').fill('99');
+    await saveButton(page).click();
+    const dialog = reviewDialog(page);
+    await expect(dialog).toBeVisible();
+    const box = await dialog.boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(MOBILE_VIEWPORT.width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(MOBILE_VIEWPORT.width);
+    expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  });
+});

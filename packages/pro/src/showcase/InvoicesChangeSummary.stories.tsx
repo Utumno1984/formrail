@@ -23,7 +23,7 @@ const meta: Meta<Args> = {
     docs: {
       description: {
         component:
-          'The CRUD showcase of `Showcase/Invoices` with a review step before saving: open an invoice, edit it, press Save and the dialog lists every change (with the field labels and readable values) against the saved record. Confirm to save, or keep editing. Controls: `saveDelayMs` (how long the save takes once confirmed), `saveOutcome` (`error`: the save fails, the form stays edited and a new Save reviews the same changes).',
+          'The CRUD showcase of `Showcase/Invoices` with a review step before saving: open an invoice, edit it, press Save and the dialog lists every change (with the field labels and readable values) against the saved record. The line items are reported row by row, matched by `id` (a changed quantity is one entry for that row, a removed row is reported with the values it had); when only their order changed the dialog says so instead of listing nothing. Confirm to save, or keep editing. Controls: `saveDelayMs` (how long the save takes once confirmed), `saveOutcome` (`error`: the save fails, the form stays edited and a new Save reviews the same changes).',
       },
     },
   },
@@ -43,14 +43,34 @@ async function chooseOption(canvas: ReturnType<typeof within>, field: RegExp | s
 }
 
 /** Opens the record from a clean list; returns the canvas. */
-async function openRecord(canvasElement: HTMLElement) {
+async function openRecord(canvasElement: HTMLElement, record = RECORD) {
   const canvas = within(canvasElement);
   const win = canvasElement.ownerDocument.defaultView;
   if (!win) throw new Error('Invoices with Change Summary: no window');
   resetListToRecord(win);
-  await userEvent.click(await canvas.findByRole('link', { name: RECORD }, { timeout: 5000 }));
-  await canvas.findByRole('heading', { level: 1, name: new RegExp(RECORD) });
+  await userEvent.click(await canvas.findByRole('link', { name: record }, { timeout: 5000 }));
+  await canvas.findByRole('heading', { level: 1, name: new RegExp(record) });
   return canvas;
+}
+
+/** The invoice with three line items (Materials, Transport, Installation). */
+const RECORD_WITH_LINES = 'FT-2026-0003';
+
+/**
+ * Line 3's quantity changed, line 1 removed, a new line added: one entry of each kind. Line 3 is edited BEFORE
+ * line 1 goes away, and the review still reports it as the same row (identity by id, never by position).
+ */
+async function editLines(canvas: ReturnType<typeof within>) {
+  await expect(canvas.getByRole('textbox', { name: 'Line 3 quantity' })).toBeVisible();
+  const quantity = canvas.getByRole('textbox', { name: 'Line 3 quantity' });
+  await userEvent.clear(quantity);
+  await userEvent.type(quantity, '9');
+  await userEvent.click(canvas.getByRole('button', { name: 'Remove line 1' }));
+  await userEvent.click(canvas.getByRole('button', { name: 'Add line' }));
+  // The new row is the last one (line 3 now: two rows were left, plus this).
+  await userEvent.type(canvas.getByRole('textbox', { name: 'Line 3 description' }), 'Site inspection');
+  await userEvent.type(canvas.getByRole('textbox', { name: 'Line 3 quantity' }), '2');
+  await userEvent.type(canvas.getByRole('textbox', { name: 'Line 3 unit price' }), '85.5');
 }
 
 /** A status other than the record's current one ("Approved" unless it already is). */
@@ -140,6 +160,79 @@ export const ReviewDialog: Story = {
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
     // `waitFor`: the dialog enters with an animation. The focus opens on "Keep editing" (`initialFocus`).
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus());
+  },
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* Line items (#379): the review per row, identified by id.                                       */
+/* ------------------------------------------------------------------------------------------ */
+
+/**
+ * The line items in the review: an invoice with three lines, line 3's quantity changed, line 1 removed, a new
+ * line added. The dialog lists ONE entry per kind, the changed one for the quantity of that row alone (the row
+ * is the same one although it moved up when line 1 went away). "Save changes" saves the new rows.
+ * A line removed and added back with the same content is a new id: it reads as "removed" + "added".
+ */
+export const ReviewLineItems: Story = {
+  play: async ({ canvasElement, args }) => {
+    const canvas = await openRecord(canvasElement, RECORD_WITH_LINES);
+    const body = within(canvasElement.ownerDocument.body);
+    await editLines(canvas);
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+
+    const dialog = await body.findByRole('dialog', { name: 'Review changes' });
+    await expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
+    const items = within(within(dialog).getByRole('list', { name: 'Changes to save' })).getAllByRole('listitem');
+    await expect(items).toHaveLength(3);
+    await expect(items[0]).toHaveTextContent(/Line items > Item 2 \(Installation\) > Quantity.*changed.*5.*9/);
+    await expect(items[1]).toHaveTextContent(/Line items > Item 3.*added.*Site inspection, 2 × €85\.50/);
+    await expect(items[2]).toHaveTextContent(/Line items > Item 1.*removed.*Materials, 3 × €42\.90/);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    if (args.saveOutcome === 'error') return;
+    await waitFor(() => expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull(), { timeout: 5000 });
+    // The saved rows: the baseline is what the server returned, three rows again.
+    await expect(canvas.getByRole('textbox', { name: 'Line 2 quantity' })).toHaveValue('9');
+    await expect(canvas.getByRole('textbox', { name: 'Line 3 description' })).toHaveValue('Site inspection');
+  },
+};
+
+/**
+ * Only the order changed: the form is dirty but there is no entry to list. Save still opens the review, with
+ * its own text instead of an empty list. "Keep editing" goes back to the form (still dirty, nothing saved).
+ */
+export const ReviewOrderOnly: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = await openRecord(canvasElement, RECORD_WITH_LINES);
+    const body = within(canvasElement.ownerDocument.body);
+    const win = canvasElement.ownerDocument.defaultView;
+    const storedBefore = JSON.stringify(win?.__ropShowcaseStore?.snapshot());
+    await userEvent.click(canvas.getByRole('button', { name: 'Move line 3 up' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+
+    const dialog = await body.findByRole('dialog', { name: 'Review changes' });
+    await expect(dialog).toHaveAccessibleDescription('Only the order of the line items changed.');
+    await expect(within(dialog).queryByRole('list')).toBeNull();
+    await expect(JSON.stringify(win?.__ropShowcaseStore?.snapshot())).toBe(storedBefore);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(canvas.getByRole('region', { name: 'Save actions' })).toBeVisible();
+  },
+};
+
+/** The dialog over the record page with one entry of each kind (1 added, 1 removed, 1 changed), not confirmed. */
+export const ReviewLinesDialog: Story = {
+  tags: ['visual'],
+  args: { ...CRUD_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, today: '2026-11-09' },
+  play: async ({ canvasElement }) => {
+    const canvas = await openRecord(canvasElement, RECORD_WITH_LINES);
+    const body = within(canvasElement.ownerDocument.body);
+    await editLines(canvas);
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    const dialog = await body.findByRole('dialog', { name: 'Review changes' });
+    await expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus());
   },
 };
