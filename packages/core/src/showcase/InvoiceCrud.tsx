@@ -22,7 +22,10 @@
 //   - from the record page, PESSIMISTIC: `confirm({ onConfirm: store.delete })` keeps the dialog pending until
 //     the server answers (see `InvoiceEditor`); then back to the list, past the dirty-guard, which the editor
 //     disarms first. The list focuses its title (the deleted row's link is not there to go back to).
-// BULK DELETE (#366), the same optimistic recipe on the `bulkActions` slot: "Delete selected" acts on the
+// BULK DELETE (#366), the same optimistic recipe with rollback on the `bulkActions` slot, but NOT the same
+// handling of `InvoiceNotFoundError`: a single delete counts it as success (the row is gone either way), while
+// here every failure rolls back, because `store.deleteMany` is atomic (an unknown id rejects the WHOLE call and
+// nothing is removed, so no row of the group was really deleted). "Delete selected" acts on the
 // selected rows the user can SEE (`getSelectedRows`), one `store.deleteMany` (atomic: all or nothing), so a
 // failure brings every row back. The selection is controlled from here: success removes the deleted ids from it
 // (those hidden by the filters stay selected); failure selects again the rows that come back, on top of the
@@ -106,11 +109,9 @@ const withoutId = (set: ReadonlySet<string>, id: string): ReadonlySet<string> =>
   return next;
 };
 
-const withIds = (set: ReadonlySet<string>, ids: readonly string[]): ReadonlySet<string> => new Set([...set, ...ids]);
-const withoutIds = (set: ReadonlySet<string>, ids: readonly string[]): ReadonlySet<string> => {
-  const gone = new Set(ids);
-  return new Set([...set].filter((id) => !gone.has(id)));
-};
+const withIds = (set: ReadonlySet<string>, ids: readonly string[]): ReadonlySet<string> => ids.reduce(withId, set);
+const withoutIds = (set: ReadonlySet<string>, ids: readonly string[]): ReadonlySet<string> =>
+  ids.reduce(withoutId, set);
 /** "1 invoice", "3 invoices". */
 const plural = (n: number): string => `${n} ${n === 1 ? 'invoice' : 'invoices'}`;
 
