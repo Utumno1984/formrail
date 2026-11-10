@@ -271,15 +271,39 @@ test.describe('Showcase/Invoices: Crud (Delete from the record page)', () => {
     await expect(dialog.getByRole('button', { name: 'Delete invoice' })).toHaveAttribute('aria-disabled', 'true');
     // Not awaited: the guard cancels this traversal, so it only "completes" with the navigation after the delete.
     const back = page.goBack({ timeout: 15_000 }).catch(() => null);
-    await expect(unsavedDialog(page)).toBeVisible();
+    // The delete in flight wins the wording (#372 code review): it says the delete goes on AND the edits are lost.
+    const guardDialog = page.getByRole('dialog', { name: 'Delete in progress' });
+    await expect(guardDialog).toBeVisible();
+    await expect(guardDialog).toContainText('Your unsaved changes will be lost.');
     expect(params(page).get('record')).toBe('inv-4');
     // The server deletes the record: the guard is disarmed and the page goes to the list (no choice left to make).
     await expect(table(page)).toBeVisible({ timeout: 10_000 });
     await back;
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(unsavedDialog(page)).toHaveCount(0);
     expect(params(page).get('record')).toBeNull();
     expect(await inStore(page, 'FT-2026-0004')).toBe(false);
     await expect(page.getByText('Invoice FT-2026-0004 deleted')).toBeVisible();
+  });
+
+  test('code-review #372 bug 2: browser Back while the delete of a CLEAN record is pending: "Delete in progress" asks; the delete landing goes to the list', async ({ page }) => {
+    await openRecordFromList(page, 'FT-2026-0004', 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:2500');
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const dialog = confirmDialog(page, 'FT-2026-0004');
+    await expect(dialog).not.toContainText('Unsaved changes');
+    await dialog.getByRole('button', { name: 'Delete invoice' }).click();
+    await expect(dialog.getByRole('button', { name: 'Delete invoice' })).toHaveAttribute('aria-disabled', 'true');
+    // Not awaited: the guard cancels this traversal, so it only "completes" with the navigation after the delete.
+    const back = page.goBack({ timeout: 15_000 }).catch(() => null);
+    await expect(page.getByRole('dialog', { name: 'Delete in progress' })).toBeVisible();
+    expect(params(page).get('record')).toBe('inv-4');
+    // Still the record page (behind the two dialogs, hence `includeHidden`).
+    await expect(page.getByRole('heading', { level: 1, name: 'FT-2026-0004', includeHidden: true })).toBeAttached();
+    await expect(table(page)).toBeVisible({ timeout: 10_000 });
+    await back;
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(params(page).get('record')).toBeNull();
+    expect(await inStore(page, 'FT-2026-0004')).toBe(false);
   });
 
   test('after the delete, Forward reopens the record URL: "Invoice not found" with "Back to list"', async ({ page }) => {

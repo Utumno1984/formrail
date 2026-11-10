@@ -265,6 +265,68 @@ describe('InvoiceCrud: Delete from the record page', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Delete' }).getAttribute('aria-disabled')).toBeNull());
   }, 20_000);
 
+  /** Opens the first record of the list with its link: a PUSHED entry, so leaving is `history.back()` (asynchronous). */
+  async function openFirstFromList(): Promise<string> {
+    const [number] = await listReady();
+    await userEvent.click(screen.getByRole('link', { name: number }));
+    await screen.findByRole('heading', { level: 1, name: number });
+    return number!;
+  }
+
+  it('code-review #372 bug 1: between the confirmed delete and the navigation, the footer is gone and Save cannot reach the store', async () => {
+    const save = vi.fn();
+    // Holds the navigation that follows the delete: the editor stays mounted in the window the bug lives in.
+    const back = vi.spyOn(window.history, 'back').mockImplementation(() => undefined);
+    try {
+      render(<InvoiceCrud {...base()} />);
+      const number = await openFirstFromList();
+      await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), ' edited');
+      vi.spyOn(store(), 'save').mockImplementation(save);
+      await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      const dialog = await screen.findByRole('dialog', { name: `Delete invoice ${number}?` });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+      await waitFor(() => expect(back).toHaveBeenCalledTimes(1)); // the delete landed, the navigation started
+      expect(screen.getByRole('heading', { level: 1, name: number })).toBeTruthy(); // ...and has not happened yet
+      const saveButton = screen.queryByRole('button', { name: 'Save' });
+      if (saveButton) await userEvent.click(saveButton);
+      expect(save).not.toHaveBeenCalled();
+      const discard = screen.queryByRole('button', { name: 'Discard' });
+      if (discard) await userEvent.click(discard);
+      expect(screen.queryByText(/not found/i)).toBeNull();
+      // Hidden, the footer keeps its space (it never moves the page) but is `inert` and out of the a11y tree.
+      expect(screen.getByRole('region', { name: 'Save actions' }).hasAttribute('inert')).toBe(true);
+    } finally {
+      back.mockRestore();
+      // `leaveRoute` waits for the `popstate` of its `history.back()` before allowing another one.
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
+  }, 20_000);
+
+  it('code-review #372 bug 2: browser Back while the delete of a CLEAN record is pending is guarded ("Delete in progress")', async () => {
+    const { promise, release } = gate();
+    render(<InvoiceCrud {...base({ saveDelayMs: promise })} />);
+    const number = await openFirstFromList();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: `Delete invoice ${number}?` });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+    expect(within(dialog).getByRole('button', { name: 'Delete invoice' }).getAttribute('aria-disabled')).toBe('true');
+    // Browser Back.
+    act(() => window.history.back());
+    const guardDialog = await screen.findByRole('dialog', { name: 'Delete in progress' });
+    expect(guardDialog.textContent).toMatch(/will complete/);
+    expect(screen.getByRole('heading', { level: 1, name: number, hidden: true })).toBeTruthy();
+    // The delete lands: the guard is disarmed and the page goes to the list.
+    // The page did not go: the confirmation is still pending on top of it.
+    expect(within(dialog).getByRole('button', { name: 'Delete invoice', hidden: true }).getAttribute('aria-disabled')).toBe('true');
+    expect(store().snapshot().some((r) => r.number === number)).toBe(true);
+    // The rest (the delete landing disarms the guard and goes to the list) runs on jsdom's `popstate` fallback
+    // of the guard, whose undo traversal jsdom does not replay faithfully: it is covered in Chromium by
+    // e2e/showcase-crud-delete.spec.ts ("bug 2"). Here: the delete completes.
+    await act(async () => release());
+    await waitFor(() => expect(store().snapshot().some((r) => r.number === number)).toBe(false));
+    window.dispatchEvent(new PopStateEvent('popstate')); // lets `leaveRoute` navigate again in the next tests
+  }, 20_000);
+
   it('the Update-only record page (no onDelete) has no "Delete"', async () => {
     const { InvoiceListToRecord } = await import('./InvoiceListToRecord');
     window.history.replaceState(null, '', RECORD);

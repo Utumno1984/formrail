@@ -29,6 +29,7 @@ import { Button } from '../button/Button';
 import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
 import type { DemoInvoice } from '../internal/demo-invoices';
 import type { ListReportRowAction } from '../list-report/types';
+import { EMPTY_IDS } from '../list-report/use-list-report';
 import { ToastProvider } from '../toast/ToastProvider';
 import { useToast } from '../toast/use-toast';
 import { InvoiceEditor, InvoiceRecordPage } from './InvoiceRecordPage';
@@ -82,7 +83,6 @@ export interface DeletedInvoice {
   number: string;
 }
 
-const NONE: ReadonlySet<string> = new Set();
 const withId = (set: ReadonlySet<string>, id: string): ReadonlySet<string> => new Set(set).add(id);
 const withoutId = (set: ReadonlySet<string>, id: string): ReadonlySet<string> => {
   const next = new Set(set);
@@ -226,8 +226,8 @@ function CrudInner({
   /* ------------------------------------------------------------------------------- delete (#365) */
 
   // In flight (optimistic, list only) and done: both left out of the list's rows.
-  const [pendingDeletes, setPendingDeletes] = useState<ReadonlySet<string>>(NONE);
-  const [deletedIds, setDeletedIds] = useState<ReadonlySet<string>>(NONE);
+  const [pendingDeletes, setPendingDeletes] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const [deletedIds, setDeletedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const hiddenIds = useMemo(
     () => (pendingDeletes.size === 0 ? deletedIds : new Set([...deletedIds, ...pendingDeletes])),
     [pendingDeletes, deletedIds],

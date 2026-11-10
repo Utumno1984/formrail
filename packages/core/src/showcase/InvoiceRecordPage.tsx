@@ -246,9 +246,16 @@ export function InvoiceEditor({
   onDeleteDone,
 }: InvoiceEditorProps) {
   const creating = record === null;
-  // #365: set once the server deleted the record. It disarms the dirty-guard (whatever was unsaved is gone
-  // with the record, and the dialog said so) BEFORE the navigation, which starts from an effect (below).
+  // #365: `deleting` while the confirmed delete waits for the server; `deleted` once the server deleted the
+  // record (set in the same callback, so no render ever has both false in between). `deleting` ARMS the guard
+  // like a save in flight does (browser Back asks "Delete in progress", also on a clean form); `deleted`
+  // disarms it (whatever was unsaved is gone with the record, and the dialog said so) BEFORE the navigation,
+  // which starts from an effect (below). Until that navigation lands (`history.back()` is asynchronous) the page
+  // is still mounted: from `deleting` on, Save/Discard/Delete do nothing, and from `deleted` on the footer is
+  // gone (code review of #372: a Save there reached the store for a record it had just deleted).
+  const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const deleteBusy = deleting || deleted;
   const [confirm, confirmDialog] = useConfirmDialog();
   const form = useObjectPageForm<InvoiceValues>({
     baseline: record ? toValues(record) : defaultValues(today),
@@ -276,9 +283,27 @@ export function InvoiceEditor({
   // The values the save in flight sends: an edit made after Save is NOT part of it and would be lost on leaving.
   const sentRef = useRef<InvoiceValues | null>(null);
   const editedSinceSave = form.isSaving && form.isDirty && !!sentRef.current && !sameValues(form.values, sentRef.current);
+  // The "delete" wording is sticky like the "save" one: a guard dialog opened during the delete keeps saying
+  // what it said if the delete then fails (a clean form disarms the guard, but an open dialog stays until the
+  // user chooses); real unsaved edits, once no delete runs, bring back the "unsaved changes" wording.
+  const [deleteWording, setDeleteWording] = useState(false);
+  useEffect(() => {
+    if (deleting) setDeleteWording(true);
+    else if (form.isDirty) setDeleteWording(false);
+  }, [deleting, form.isDirty]);
   const { guard, dialog } = useDirtyGuard({
-    when: !deleted && (form.isDirty || form.isSaving),
-    labels: editedSinceSave
+    when: !deleted && (form.isDirty || form.isSaving || deleting),
+    labels: deleting || deleteWording
+      ? {
+          title: 'Delete in progress',
+          description: form.isDirty
+            ? 'The invoice is being deleted. Leaving does not cancel it: it will complete in the background. Your unsaved changes will be lost.'
+            : 'The invoice is being deleted. Leaving does not cancel it: it will complete in the background.',
+          stay: 'Stay',
+          leave: 'Leave anyway',
+          close: 'Close',
+        }
+      : editedSinceSave
       ? {
           title: 'Unsaved changes',
           description:
@@ -313,6 +338,7 @@ export function InvoiceEditor({
   // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).
   const [created, setCreated] = useState<StoredInvoice | null>(null);
   const save = () => {
+    if (deleteBusy) return; // the record is being (or has been) deleted: nothing left to save
     // Already created (the user kept typing during the save and kept editing at the guard): never a second
     // record; the button only asks to leave again.
     if (created) return guard(() => onCreateDone?.(created));
@@ -347,19 +373,27 @@ export function InvoiceEditor({
   // answers: on this page the record must not "go away" before it is known to be gone. A failure keeps the
   // dialog open and interactive (the consumer shows the error toast): retry or Cancel, which gives the focus
   // back to "Delete".
-  const remove = async () => {
-    if (!record || !onDelete || form.isSaving || deleted) return; // `aria-disabled` does not block a click
-    const confirmed = await confirm({
+  const remove = () => {
+    if (!record || !onDelete || form.isSaving || deleteBusy) return; // `aria-disabled` does not block a click
+    void confirm({
       title: `Delete invoice ${record.number}?`,
       description: form.isDirty
         ? 'The invoice is deleted permanently. Unsaved changes will be lost too.'
         : 'The invoice is deleted permanently.',
       confirmLabel: 'Delete invoice',
-      onConfirm: () => onDelete(record),
+      onConfirm: async () => {
+        setDeleting(true);
+        try {
+          await onDelete(record);
+        } catch (error) {
+          setDeleting(false); // the dialog stays open: retry or Cancel
+          throw error;
+        }
+        setDeleted(true);
+      },
       // Reported by the consumer (a toast); handled, so not an uncaught error.
       onError: () => undefined,
     });
-    if (confirmed) setDeleted(true);
   };
   // The navigation starts after the commit that disarmed the guard (the same reason as for the Create).
   const deleteDoneRef = useRef(false);
@@ -400,7 +434,7 @@ export function InvoiceEditor({
                   Back to list
                 </Button>
                 {record && onDelete ? (
-                  <Button variant="secondary" onClick={() => void remove()} aria-disabled={form.isSaving || undefined}>
+                  <Button variant="secondary" onClick={remove} aria-disabled={form.isSaving || deleteBusy || undefined}>
                     Delete
                   </Button>
                 ) : null}
@@ -408,13 +442,13 @@ export function InvoiceEditor({
             }
           />
           <ObjectPageFooter
-            visible={creating || form.isDirty}
+            visible={!deleted && (creating || form.isDirty)}
             label="Save actions"
             toneLabel={problem ? 'Error' : 'Information'}
             message={message}
             messageTone={problem ? 'error' : 'info'}
           >
-            <Button onClick={save} aria-disabled={form.isSaving || undefined}>
+            <Button onClick={save} aria-disabled={form.isSaving || deleteBusy || undefined}>
               {creating ? 'Create' : 'Save'}
             </Button>
             {creating ? (
@@ -423,7 +457,13 @@ export function InvoiceEditor({
                 Cancel
               </Button>
             ) : (
-              <Button variant="secondary" onClick={() => form.reset()}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (!deleteBusy) form.reset();
+                }}
+                aria-disabled={deleteBusy || undefined}
+              >
                 Discard
               </Button>
             )}

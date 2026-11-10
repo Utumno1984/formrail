@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from 'react';
 import { ListReport } from '../list-report/ListReport';
-import { useListReport } from '../list-report/use-list-report';
+import { EMPTY_IDS, useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
 import { useListReportUrlState } from '../list-report/use-list-report-url-state';
 import type { DemoInvoice } from '../internal/demo-invoices';
@@ -96,7 +96,6 @@ export interface ListViewProps {
   rowActions?: ListReportRowActions<DemoInvoice>;
 }
 
-const NONE: ReadonlySet<string> = new Set();
 
 export function ListView({
   store,
@@ -107,7 +106,7 @@ export function ListView({
   actions,
   created,
   onCreatedReady,
-  hiddenIds = NONE,
+  hiddenIds = EMPTY_IDS,
   rowActions,
 }: ListViewProps) {
   const [load, setLoad] = useState<{ rows: DemoInvoice[] } | { error: true } | null>(null);
