@@ -71,6 +71,24 @@ describe('built bundle (dist)', () => {
     expect(typeof cjs.useChangeSummary).toBe('function');
   });
 
+  it('ESM and CJS: computeRebase merges a server version into edited values', () => {
+    const incoming = {
+      ...baseline,
+      supplier: { name: 'Acme Ltd', vatNumber: 'IT333' },
+      lineItems: [...baseline.lineItems, { id: 'e', description: 'Mat', price: 15 }],
+    };
+    const edited = { ...baseline, supplier: { name: 'Acme', vatNumber: 'IT222' } };
+    for (const api of [esm, cjs]) {
+      const out = api.computeRebase({ baseline, values: edited, incoming, arrayIdKeys: { lineItems: 'id' } });
+      expect(out.baseline).toBe(incoming);
+      expect(out.values.supplier).toEqual({ name: 'Acme Ltd', vatNumber: 'IT222' });
+      expect(out.values.lineItems.map((l) => l.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+      expect(out.conflicts.map((c) => c.path)).toEqual(['supplier.vatNumber']);
+      expect(out.applied.map((e) => e.path)).toEqual(['supplier.name', 'lineItems.4']);
+      expect(typeof api.useFormRebase).toBe('function');
+    }
+  });
+
   it('contains no runtime licensing / network mechanism', () => {
     for (const file of [distEsm, distCjs]) {
       const code = readFileSync(file, 'utf8');

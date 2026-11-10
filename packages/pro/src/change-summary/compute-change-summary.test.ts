@@ -687,6 +687,15 @@ describe('arrays with arrayIdKeys', () => {
     expect(String(warn.mock.calls[0]?.[0])).toMatch(/not an array/);
   });
 
+  it('warns when only one side under an id key is not an array (either side)', () => {
+    expect(paths(diff({ lineItems: [item(1)] }, { lineItems: 'x' }, { arrayIdKeys: ids }))).toEqual(['changed lineItems']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toMatch(/is not an array; the id key is ignored/);
+    resetChangeSummaryWarnings();
+    expect(paths(diff({ lineItems: 'x' }, { lineItems: [item(1)] }, { arrayIdKeys: ids }))).toEqual(['changed lineItems']);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
   it('is silent with NODE_ENV=production', () => {
     vi.stubEnv('NODE_ENV', 'production');
     diff({ lineItems: [item(1), item(1)] }, { lineItems: [item(1)] }, { arrayIdKeys: ids });
