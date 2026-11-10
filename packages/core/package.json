@@ -4,7 +4,7 @@
   "description": "Headless React implementation of public List Report and Object Page interaction patterns (Free tier, MIT).",
   "license": "MIT",
   "author": "Daniele Ingusci",
-  "homepage": "https://utumno1984.github.io/react-object-page/",
+  "homepage": "https://utumno1984.github.io/react-object-page/storybook/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Utumno1984/react-object-page.git",

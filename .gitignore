@@ -1,6 +1,8 @@
 node_modules/
 dist/
 storybook-static/
+/site/
+playwright-report-site/
 playwright-report/
 test-results/
 .tickets-draft/

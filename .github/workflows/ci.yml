@@ -161,7 +161,7 @@ jobs:
             test-results/
           retention-days: 7
 
-  # Publishes the static Storybook to GitHub Pages. Runs only after every gate above is green, and
+  # Publishes the site (Storybook under /storybook/) to GitHub Pages. Runs only after every gate above is green, and
   # only on push to main (or a manual dispatch) - never on pull requests. The workflow-level token
   # stays read-only; this job alone gets the Pages permissions. Only the Free core stories are built
   # (STORYBOOK_EXCLUDE_PRO=1 in the build step drops the packages/pro stories and CSS, see
@@ -195,8 +195,15 @@ jobs:
           STORYBOOK_EXCLUDE_PRO: '1'
           # Test fixtures (tag `internal`) out of the public sidebar, see .storybook/manager.ts (#296).
           STORYBOOK_HIDE_INTERNAL: '1'
+      # site/ = landing slot at the root (redirects old Storybook links for now) + storybook/ + pro/
+      # (ticket #380). The prefix comes from GITHUB_REPOSITORY, see scripts/site-config.mjs.
+      - run: node scripts/assemble-site.mjs
+      # Pre-deploy smoke on the assembled folder, served locally under the same prefix as the live
+      # site (not against the live site). If it fails, nothing below runs: no deploy.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:site
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: storybook-static
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v5

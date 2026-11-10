@@ -41,7 +41,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testIgnore: /visual\//,
+      testIgnore: /(visual|site)\//,
       grepInvert: /@touch/,
       use: { ...devices['Desktop Chrome'] },
     },
@@ -49,7 +49,7 @@ export default defineConfig({
     // duplicate every test: tag tests with `@touch` to run them in this project.
     {
       name: 'chromium-touch',
-      testIgnore: /visual\//,
+      testIgnore: /(visual|site)\//,
       grep: /@touch/,
       use: { ...devices['Desktop Chrome'], hasTouch: true },
     },
@@ -58,13 +58,13 @@ export default defineConfig({
     // test `@engines` to run it here too (it also runs in `chromium`).
     {
       name: 'firefox',
-      testIgnore: /visual\//,
+      testIgnore: /(visual|site)\//,
       grep: /@engines/,
       use: { ...devices['Desktop Firefox'] },
     },
     {
       name: 'webkit',
-      testIgnore: /visual\//,
+      testIgnore: /(visual|site)\//,
       grep: /@engines/,
       use: { ...devices['Desktop Safari'] },
     },

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>react-object-page</title>
+    <script>
+      /*REDIRECT_FN*/
+      var target = resolveRedirect(location.href, 'index');
+      // replace(), not assign(): the intermediate page must not stay in the history, or Back from
+      // the Storybook would land here and redirect again.
+      if (target) location.replace(target);
+    </script>
+  </head>
+  <body>
+    <noscript>
+      <p>JavaScript is disabled. <a href="storybook/">Open the react-object-page Storybook</a>.</p>
+    </noscript>
+  </body>
+</html>
