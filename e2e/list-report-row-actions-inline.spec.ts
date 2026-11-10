@@ -293,6 +293,19 @@ test.describe('List Report inline row actions: the form changes under an open me
     expect(await read()).toEqual([]);
   });
 
+  test('wide → narrow with the focus on an inline button (no menu open): the focus goes to the "…" of the row, never body', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoStory(page, STORY);
+    await inline(page, PENDING.number).focus();
+    await expect(inline(page, PENDING.number)).toBeFocused();
+    await page.setViewportSize({ width: 560, height: 800 });
+    await expect(inline(page, PENDING.number)).toHaveCount(0);
+    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await page.waitForTimeout(300);
+    await expect(trigger(page, PENDING.number)).toBeFocused();
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+  });
+
   test('a resize that keeps the form leaves the menu open', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, STORY);

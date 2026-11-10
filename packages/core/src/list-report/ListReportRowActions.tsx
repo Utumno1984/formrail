@@ -167,12 +167,38 @@ function RowActionsMenu({
  * focusable (`aria-disabled`, so the tooltip still explains it) and a click, Enter or Space does nothing.
  */
 function InlineRowAction({ action, label }: { action: ListReportRowAction; label: string }) {
-  const { setNode, context } = useControlReturnFocus();
+  const { nodeRef, containerRef, setNode, context } = useControlReturnFocus();
+  // A change of form while this button has the focus (a panel resized across the threshold): the wide
+  // form goes under `display: none` and the browser drops the focus to `body`. As for a menu left open
+  // (`RowActionsMenu`), an observer, only while the button has the focus, hands the focus to the visible
+  // control of the row. Losing the focus together with being hidden keeps the observer: it is what
+  // reacts to that very change. (Prose here is read by the Tailwind scan: no utility names as bare words.)
+  const [focused, setFocused] = useState(false);
+  useResizeAndMutationEffect(() => {
+    const node = nodeRef.current;
+    if (!focused || !node) return undefined;
+    const wasLaidOut = isLaidOut(node);
+    return {
+      target: node,
+      update: () => {
+        if (!wasLaidOut || !node.isConnected || isLaidOut(node)) return;
+        setFocused(false);
+        // The focus moved elsewhere on purpose in the meantime: leave it.
+        const active = document.activeElement;
+        if (active && active !== document.body && active !== node) return;
+        (firstRenderedControl(node.closest('td')) ?? containerRef.current)?.focus({ preventScroll: true });
+      },
+    };
+  }, [focused, nodeRef, containerRef]);
   const { disabled, onSelect } = action;
   return (
     <Tooltip content={action.label}>
       <Button
         ref={setNode}
+        onFocus={() => setFocused(true)}
+        onBlur={(event) => {
+          if (isLaidOut(event.currentTarget)) setFocused(false);
+        }}
         variant="ghost"
         size="icon-sm"
         aria-label={label}

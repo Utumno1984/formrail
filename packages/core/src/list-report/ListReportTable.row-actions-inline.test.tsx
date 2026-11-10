@@ -431,6 +431,31 @@ describe('ListReportTable rowActionsInline — the form changes under an open me
     expect(narrowTrigger('FT-2026-0003')).toHaveFocus();
   });
 
+  it('wide → narrow with the focus on an inline button (no menu open): the focus goes to the "…" of the row, not body', async () => {
+    Element.prototype.checkVisibility ??= () => true;
+    render(<Host rowActionsInline={1} />);
+    const button = inlineButton('FT-2026-0002');
+    // No observer while nothing of the row has the focus.
+    expect(observerOf(button)).toBeUndefined();
+    act(() => button.focus());
+    expect(observerOf(button)).toBeDefined();
+    // The container becomes narrow: the wide form is hidden, the browser drops the focus.
+    setDisplayed((el) => !el.closest('[data-rop-row-actions-form="wide"]'));
+    act(() => button.blur());
+    fire(button);
+    expect(narrowTrigger('FT-2026-0002')).toHaveFocus();
+  });
+
+  it('an inline button that loses the focus normally stops being observed', async () => {
+    Element.prototype.checkVisibility ??= () => true;
+    render(<Host rowActionsInline={1} />);
+    const button = inlineButton('FT-2026-0002');
+    act(() => button.focus());
+    expect(observerOf(button)).toBeDefined();
+    act(() => button.blur());
+    expect(observerOf(button)).toBeUndefined();
+  });
+
   it('without layout (nothing is laid out when the menu opens) a resize never closes the menu', async () => {
     const user = userEvent.setup();
     render(<Host rowActionsInline={1} />);
