@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -101,6 +101,44 @@ describe('Dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Annulla' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('dismissible={false} keeps the focus inside: a mousedown on the backdrop is default-prevented; dismissible does not touch it', () => {
+    const { unmount } = render(
+      <Dialog defaultOpen>
+        <Panel dismissible={false} />
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    const backdrop = dialog.previousElementSibling as HTMLElement;
+    expect(backdrop).toBeTruthy();
+    // fireEvent returns false when the event was default-prevented (the browser would not move the focus).
+    expect(fireEvent.mouseDown(backdrop)).toBe(false);
+    // Inside the panel the press behaves normally.
+    expect(fireEvent.mouseDown(screen.getByText('Corpo'))).toBe(true);
+    // Outside the modal layer (e.g. a popover portaled above it) is not touched either.
+    expect(fireEvent.mouseDown(document.body)).toBe(true);
+    unmount();
+
+    render(
+      <Dialog defaultOpen>
+        <Panel dismissible />
+      </Dialog>,
+    );
+    const normalBackdrop = screen.getByRole('dialog').previousElementSibling as HTMLElement;
+    expect(fireEvent.mouseDown(normalBackdrop)).toBe(true);
+  });
+
+  it('dismissible={false} listener is removed when the dialog closes', async () => {
+    const user = userEvent.setup();
+    const remove = vi.spyOn(document, 'removeEventListener');
+    render(
+      <Dialog defaultOpen>
+        <Panel dismissible={false} />
+      </Dialog>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(remove.mock.calls.some(([type, , capture]) => type === 'mousedown' && capture === true)).toBe(true);
   });
 
   it('returns the focus to the trigger (and to the external opener) on close, through useReturnFocus', async () => {

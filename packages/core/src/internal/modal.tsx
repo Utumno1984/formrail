@@ -320,6 +320,24 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
       wasOpen.current = open;
       wasMounted.current = wrapperRef.current !== null;
     });
+    // `dismissible={false}` must mean "the focus stays inside" too, not only "it does not close": a
+    // press on the backdrop (not focusable) makes the browser move the focus to `body`, and the focus
+    // trap does not bring it back from there. Its default is prevented, the focus stays put. Limited to
+    // the panel's own wrapper (backdrop): a popover portaled above the modal is a different layer and
+    // keeps its normal focus behaviour. (The Tailwind scan reads comments too: no utility names here.)
+    useEffect(() => {
+      if (dismissible || !open) return undefined;
+      const keepFocus = (event: MouseEvent) => {
+        const wrapper = wrapperRef.current;
+        const content = contentNode.current;
+        const target = event.target;
+        if (wrapper && target instanceof Node && wrapper.contains(target) && !content?.contains(target)) {
+          event.preventDefault();
+        }
+      };
+      document.addEventListener('mousedown', keepFocus, true);
+      return () => document.removeEventListener('mousedown', keepFocus, true);
+    }, [dismissible, open]);
     // Safety net: Radix's Presence unmounts on `animationend` / `animationcancel` only. If the
     // animation never ends (paused by the host, a stylesheet that names the animation without
     // defining it) the page would stay locked behind a closed panel for good: after the animation's
