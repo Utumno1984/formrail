@@ -187,6 +187,16 @@ export const RecordLineItems: Story = {
     await expect(await canvas.findByRole('textbox', { name: 'Line 4 description' })).toBeVisible();
     await expect(canvas.getAllByRole('button', { name: /^Remove line / })).toHaveLength(4);
     await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();
+    // Scrolls the section into view through the Anchor Bar, then waits for the scroll to settle.
+    await userEvent.click(canvas.getByRole('link', { name: 'Line items' }));
+    const heading = canvas.getByRole('heading', { name: 'Line items' });
+    let last = Number.NaN;
+    await waitFor(() => {
+      const top = heading.getBoundingClientRect().top;
+      const settled = top === last;
+      last = top;
+      expect(settled).toBe(true);
+    });
   },
 };
 
