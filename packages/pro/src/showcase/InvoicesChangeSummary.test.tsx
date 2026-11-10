@@ -79,7 +79,7 @@ describe('Invoices with Change Summary (#377)', () => {
     expect(items.map((i) => i.textContent?.split(',')[0])).toEqual(['Supplier', 'Status', 'Notes']);
     expect(items[1]).toHaveTextContent(otherStatus(record.status));
     expect(save).not.toHaveBeenCalled();
-    expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Keep editing' })));
 
     // Confirm: the showcase's own save, once, with the edited values.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));

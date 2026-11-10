@@ -16,6 +16,8 @@ const TONES: ConfirmDialogTone[] = ['danger', 'default'];
 
 interface DemoArgs {
   tone: ConfirmDialogTone;
+  /** `auto`: the prop is not passed (the focus follows the tone). */
+  initialFocus: 'auto' | 'cancel' | 'confirm';
   title: string;
   description: string;
   confirmLabel: string;
@@ -34,6 +36,12 @@ const meta: Meta<DemoArgs> = {
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     tone: { control: 'radio', options: TONES },
+    initialFocus: {
+      control: 'radio',
+      options: ['auto', 'cancel', 'confirm'],
+      description:
+        'Which button takes the focus on open. `auto` (story only) leaves the prop out: Cancel for `danger`, the confirm button for `default`.',
+    },
     title: { control: 'text' },
     description: { control: 'text' },
     confirmLabel: { control: 'text' },
@@ -45,6 +53,7 @@ const meta: Meta<DemoArgs> = {
   },
   args: {
     tone: 'danger',
+    initialFocus: 'auto',
     title: 'Delete invoice 2026/0142?',
     description: 'The invoice and its 3 attachments are deleted for good. This cannot be undone.',
     confirmLabel: 'Delete invoice',
@@ -60,6 +69,13 @@ export default meta;
 type Story = StoryObj<DemoArgs>;
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** The `initialFocus` prop for the args (`auto` = not passed). */
+const initialFocusOf = (args: DemoArgs) => (args.initialFocus === 'auto' ? undefined : args.initialFocus);
+
+/** The label of the button that must have the focus on open, for these args. */
+const focusedLabel = (args: DemoArgs) =>
+  (args.initialFocus === 'auto' ? args.tone === 'danger' : args.initialFocus === 'cancel') ? args.cancelLabel : args.confirmLabel;
 
 function Page({ children }: { children?: ReactNode }) {
   return (
@@ -90,6 +106,7 @@ function Demo({ args, initialOpen = false, onConfirmOverride }: { args: DemoArgs
           setOpen(next);
         }}
         tone={args.tone}
+        initialFocus={initialFocusOf(args)}
         title={args.title}
         description={args.description}
         confirmLabel={args.confirmLabel}
@@ -124,9 +141,9 @@ export const DeleteWithServerRoundTrip: Story = {
     const body = within(document.body);
     const dialog = await body.findByRole('dialog', { name: args.title });
     await expect(dialog).toHaveAccessibleDescription(args.description);
-    // The safe choice has the focus: Cancel for a danger confirmation, the confirm button otherwise.
-    const safe = args.tone === 'danger' ? args.cancelLabel : args.confirmLabel;
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: safe })).toHaveFocus());
+    // The safe choice has the focus: Cancel for a danger confirmation, the confirm button otherwise
+    // (or the button `initialFocus` names).
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: focusedLabel(args) })).toHaveFocus());
 
     const confirm = within(dialog).getByRole('button', { name: args.confirmLabel });
     await userEvent.dblClick(confirm);
@@ -167,6 +184,7 @@ export const ServerError: Story = {
               if (!next) setError(null);
             }}
             tone={args.tone}
+            initialFocus={initialFocusOf(args)}
             title={args.title}
             description={args.description}
             confirmLabel={args.confirmLabel}
@@ -210,8 +228,7 @@ export const ServerError: Story = {
 const playOpen: Story['play'] = async ({ args }) => {
   const dialog = await within(document.body).findByRole('dialog', { name: args.title });
   await settleMotion();
-  const safe = args.tone === 'danger' ? args.cancelLabel : args.confirmLabel;
-  await waitFor(() => expect(within(dialog).getByRole('button', { name: safe })).toHaveFocus());
+  await waitFor(() => expect(within(dialog).getByRole('button', { name: focusedLabel(args) })).toHaveFocus());
   await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(window.innerWidth);
 };
 
@@ -233,6 +250,39 @@ export const DefaultTone: Story = {
   },
   render: (args) => <Demo args={args} initialOpen />,
   play: playOpen,
+};
+
+/**
+ * A review step (`tone="default"` + `initialFocus="cancel"`): the confirm button stays the primary one, but the
+ * focus opens on "Keep editing", so a key still held on the opener (Enter auto-repeat) cannot confirm what the
+ * user has not read. The play function opens it from the keyboard, checks the focus, and presses Enter: the
+ * dialog closes without confirming.
+ */
+export const ReviewStep: Story = {
+  args: {
+    tone: 'default',
+    initialFocus: 'cancel',
+    title: 'Review changes',
+    description: '2 changes will be saved.',
+    confirmLabel: 'Save changes',
+    cancelLabel: 'Keep editing',
+    pendingMs: 0,
+  },
+  render: (args) => <Demo args={args} />,
+  play: async ({ args, canvasElement }) => {
+    const opener = within(canvasElement).getByRole('button', { name: 'Delete…' });
+    opener.focus();
+    await userEvent.keyboard('{Enter}');
+    const body = within(document.body);
+    const dialog = await body.findByRole('dialog', { name: args.title });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: args.cancelLabel })).toHaveFocus());
+    await expect(within(dialog).getByRole('button', { name: args.confirmLabel })).not.toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(args.onConfirm).not.toHaveBeenCalled();
+    await expect(args.onCancel).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(opener).toHaveFocus());
+  },
 };
 
 /** While `onConfirm` is pending: both buttons `aria-disabled`, a spinner on the confirm button, same name. */
@@ -308,6 +358,7 @@ export const FromAMenuItem: Story = {
             }}
             returnFocusRef={triggerRef}
             tone={args.tone}
+            initialFocus={initialFocusOf(args)}
             title={args.title}
             description={args.description}
             confirmLabel={args.confirmLabel}
@@ -335,7 +386,7 @@ export const FromAMenuItem: Story = {
     await waitFor(() => expect(body.getByRole('menuitem', { name: 'Delete…' })).toHaveFocus());
     await userEvent.keyboard('{Enter}');
     const dialog = await body.findByRole('dialog', { name: args.title });
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: args.cancelLabel })).toHaveFocus());
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: focusedLabel(args) })).toHaveFocus());
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
     await expect(args.onCancel).toHaveBeenCalledTimes(1);
@@ -360,6 +411,7 @@ export const WithUseConfirmDialog: Story = {
             onClick={async () => {
               const ok = await confirm({
                 tone: args.tone,
+                initialFocus: initialFocusOf(args),
                 title: args.title,
                 description: args.description,
                 confirmLabel: args.confirmLabel,
@@ -444,6 +496,7 @@ export const InsideASheet: Story = {
               setAsk(next);
             }}
             tone={args.tone}
+            initialFocus={initialFocusOf(args)}
             title={args.title}
             description={args.description}
             confirmLabel={args.confirmLabel}
@@ -512,6 +565,7 @@ export const OverADialog: Story = {
               setAsk(next);
             }}
             tone={args.tone}
+            initialFocus={initialFocusOf(args)}
             title={args.title}
             description={args.description}
             confirmLabel={args.confirmLabel}

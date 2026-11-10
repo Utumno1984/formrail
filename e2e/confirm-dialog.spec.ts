@@ -374,3 +374,41 @@ test.describe('no leak', () => {
     expect(logged).toEqual([]);
   });
 });
+
+test.describe('initialFocus: the focus on open chosen independently of the tone', () => {
+  test('review-step: the play function passes', async ({ page }) => {
+    await expectPlayToPass(page, STORY('review-step'));
+  });
+
+  test('initialFocus="cancel" with tone="default": focus on Cancel; Enter HELD on the opener never confirms', async ({ page }) => {
+    await expectPlayToPass(page, STORY('delete-with-server-round-trip'), 'tone:default;initialFocus:cancel;pendingMs:0');
+    await opener(page).focus();
+    // Enter pressed and held: the first keydown opens the dialog, the auto-repeated ones land on its focus.
+    await page.keyboard.down('Enter');
+    const dialog = confirmDialog(page);
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await page.keyboard.down('Enter');
+    await page.keyboard.down('Enter');
+    await page.keyboard.up('Enter');
+    // Still the one deletion of the play: the held key landed on Cancel, it never confirmed.
+    await expect(dialog).toHaveCount(0);
+    await expect(deletedText(page)).toHaveText('Deleted (1)');
+  });
+
+  test('initialFocus="confirm" with tone="danger": focus on the danger confirm button', async ({ page }) => {
+    await expectPlayToPass(page, STORY('delete-with-server-round-trip'), 'initialFocus:confirm;pendingMs:0');
+    await opener(page).click();
+    await expect(confirmDialog(page).getByRole('button', { name: 'Delete invoice' })).toBeFocused();
+  });
+
+  test('initialFocus is never an attribute in the DOM', async ({ page }) => {
+    await expectPlayToPass(page, STORY('delete-with-server-round-trip'), 'tone:default;initialFocus:cancel;pendingMs:0');
+    await opener(page).click();
+    const dialog = confirmDialog(page);
+    await expect(dialog).toBeVisible();
+    const names = await dialog.evaluate((el) =>
+      [el, ...el.querySelectorAll('*')].flatMap((n) => n.getAttributeNames().map((a) => a.toLowerCase())),
+    );
+    expect(names).not.toContain('initialfocus');
+  });
+});

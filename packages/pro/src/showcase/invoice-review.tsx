@@ -118,6 +118,9 @@ export function invoiceSaveReview(context: InvoiceSaveReviewContext): InvoiceSav
     confirmLabel: 'Save changes',
     cancelLabel: 'Keep editing',
     tone: 'default',
+    // A review the user must SEE: the focus opens on "Keep editing", so Enter held on Save (auto-repeat)
+    // cannot confirm it unread. The confirm button stays the primary one (`tone: 'default'`).
+    initialFocus: 'cancel',
     children: (
       <ChangeSummary
         entries={entries}

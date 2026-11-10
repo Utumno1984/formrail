@@ -222,8 +222,10 @@ test.describe('Pro/Showcase/Invoices with Change Summary', () => {
     const describedBy = await dialog.getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
     await expect(page.locator(`[id="${describedBy}"]`)).toHaveText('1 change will be saved.');
-    // Tone `default` (#344): the confirm button is the primary one and takes the initial focus.
-    await expect(dialog.getByRole('button', { name: 'Save changes' })).toBeFocused();
+    // Tone `default` (#344): the confirm button is the primary one, but `initialFocus: 'cancel'` opens the
+    // focus on "Keep editing".
+    await expect(dialog.getByRole('button', { name: 'Keep editing' })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Save changes' })).not.toBeFocused();
     await expectNoA11yViolations(page);
   });
 
@@ -260,6 +262,23 @@ test.describe('Pro/Showcase/Invoices with Change Summary', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(await saves(page)).toHaveLength(0);
     expect(await stored(page)).toEqual(record);
+  });
+
+  test('Enter HELD on Save: the review opens with the focus on "Keep editing", nothing is ever saved unread', async ({ page }) => {
+    const record = await openRecord(page);
+    await notes(page).fill('Held');
+    await saveButton(page).focus();
+    // The first keydown opens the review; the auto-repeated ones land on its initial focus.
+    await page.keyboard.down('Enter');
+    await expect(reviewDialog(page).getByRole('button', { name: 'Keep editing' })).toBeFocused();
+    await page.keyboard.down('Enter');
+    await page.keyboard.down('Enter');
+    await page.keyboard.up('Enter');
+    await expect(reviewDialog(page)).toHaveCount(0);
+    expect(await saves(page)).toHaveLength(0);
+    expect(await stored(page)).toEqual(record);
+    await expect(notes(page)).toHaveValue('Held');
+    await expect(footer(page)).toBeVisible();
   });
 
   test('a double click on Save opens ONE review, which stays open', async ({ page }) => {

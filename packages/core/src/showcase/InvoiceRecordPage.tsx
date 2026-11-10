@@ -75,7 +75,10 @@ export interface InvoiceSaveReviewContext {
 }
 
 /** The review dialog: the options of the editor's `confirm()` (#344) that the reviewer chooses. */
-export type InvoiceSaveReview = Pick<ConfirmOptions, 'title' | 'description' | 'confirmLabel' | 'cancelLabel' | 'tone' | 'children'>;
+export type InvoiceSaveReview = Pick<
+  ConfirmOptions,
+  'title' | 'description' | 'confirmLabel' | 'cancelLabel' | 'tone' | 'initialFocus' | 'children'
+>;
 
 /** Builds the review of a save, or `null` to save without one (nothing to review). */
 export type InvoiceSaveReviewer = (context: InvoiceSaveReviewContext) => InvoiceSaveReview | null;

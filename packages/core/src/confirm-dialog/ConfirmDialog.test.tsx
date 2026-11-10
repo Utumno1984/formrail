@@ -149,6 +149,50 @@ describe('ConfirmDialog: initial focus', () => {
   });
 });
 
+describe('ConfirmDialog: initialFocus overrides the focus derived from the tone', () => {
+  it('initialFocus="cancel" with tone="default": on Cancel, the confirm button stays primary; Enter cancels', async () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { user } = await openHost({ tone: 'default', initialFocus: 'cancel', confirmLabel: 'Save changes', onConfirm, onCancel });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toHaveClass('bg-rop-primary');
+    await user.keyboard('{Enter}');
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('initialFocus="confirm" with tone="danger": on the (danger) confirm button', async () => {
+    await openHost({ tone: 'danger', initialFocus: 'confirm' });
+    const confirm = screen.getByRole('button', { name: 'Delete invoice' });
+    expect(confirm).toHaveFocus();
+    expect(confirm).toHaveClass('bg-rop-error');
+  });
+
+  it('explicit values equal to the defaults change nothing', async () => {
+    await openHost({ tone: 'default', initialFocus: 'confirm', confirmLabel: 'Archive invoice' });
+    expect(screen.getByRole('button', { name: 'Archive invoice' })).toHaveFocus();
+    cleanup();
+    await openHost({ tone: 'danger', initialFocus: 'cancel' });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+  });
+
+  it('mounted open with initialFocus="cancel" and tone="default": on Cancel, never on the panel', () => {
+    render(<Host initialOpen tone="default" initialFocus="cancel" />);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    expect(document.activeElement).not.toBe(screen.getByRole('dialog'));
+  });
+
+  it('is not leaked to the DOM', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { dialog } = await openHost({ tone: 'default', initialFocus: 'cancel' });
+    await nextFrame();
+    for (const node of [dialog, ...Array.from(dialog.querySelectorAll('*'))]) {
+      for (const name of node.getAttributeNames()) expect(name.toLowerCase()).not.toBe('initialfocus');
+    }
+    expect(errors).not.toHaveBeenCalled();
+  });
+});
+
 describe('ConfirmDialog: synchronous confirm and cancel', () => {
   it('click on confirm: onConfirm once, closes, the focus returns to the opener', async () => {
     const onConfirm = vi.fn();

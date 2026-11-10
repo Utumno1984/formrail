@@ -45,6 +45,17 @@ export interface ConfirmDialogProps {
    */
   tone?: ConfirmDialogTone;
   /**
+   * Which button takes the focus when the dialog opens (and when a new request of `useConfirmDialog`
+   * replaces an open one), whatever the `tone`. Default: derived from `tone` (Cancel for `danger`, the
+   * confirm button for `default`).
+   *
+   * Use `'cancel'` with `tone="default"` when the confirmation is a review step the user must see
+   * before confirming (e.g. "Review changes"): a key held on the button that opened the dialog
+   * (Enter auto-repeat) would otherwise confirm it at once. `aria-disabled` buttons stay focusable,
+   * so the choice holds while a confirmation is pending too.
+   */
+  initialFocus?: 'cancel' | 'confirm';
+  /**
    * Runs the action. If it returns a promise the dialog stays open while it is pending: the confirm
    * button is `aria-disabled` with a spinner, further clicks / Enter are ignored (no double
    * submission), and Cancel, Escape and the backdrop do nothing. Resolved: the dialog asks to close.
@@ -107,6 +118,7 @@ export function ConfirmDialogBase({
   confirmLabel,
   cancelLabel = 'Cancel',
   tone = 'danger',
+  initialFocus,
   onConfirm,
   onCancel,
   onError,
@@ -132,9 +144,11 @@ export function ConfirmDialogBase({
     callbacks.current = { onOpenChange, onError, onConfirmed };
   });
 
+  // The button that takes the focus on open: `initialFocus` when given, else derived from `tone`.
+  const focusCancel = initialFocus ? initialFocus === 'cancel' : tone === 'danger';
   const safeTarget = useCallback(
-    () => (tone === 'danger' ? cancelRef.current : confirmRef.current),
-    [tone],
+    () => (focusCancel ? cancelRef.current : confirmRef.current),
+    [focusCancel],
   );
   const safeTargetRef = useRef(safeTarget);
   useLayoutEffect(() => {
@@ -291,7 +305,8 @@ export function ConfirmDialogBase({
  * `Dialog`: opened from state, `role="dialog"` named by `title` and described by `description`,
  * focus trapped, focus returned to the opener (or to `returnFocusRef`) on close.
  *
- * - Initial focus: on Cancel with `tone="danger"` (default), on the confirm button with `"default"`.
+ * - Initial focus: on Cancel with `tone="danger"` (default), on the confirm button with `"default"`;
+ *   `initialFocus` overrides it (e.g. Cancel on a non-destructive review step).
  * - `onConfirm` may return a promise: until it settles nothing can submit it again or close the
  *   dialog, and the focus is never lost (the buttons become `aria-disabled`, not `disabled`).
  *   Resolved: `onOpenChange(false)`. Rejected: stays open; the error goes to `onError`, or is
@@ -302,7 +317,7 @@ export function ConfirmDialogBase({
  */
 export function ConfirmDialog(props: ConfirmDialogProps) {
   // Only the public props reach the implementation (`session` / `onConfirmed` are the hook's).
-  const { open, onOpenChange, title, description, confirmLabel, cancelLabel, tone, onConfirm, onCancel, onError, returnFocusRef, children } =
+  const { open, onOpenChange, title, description, confirmLabel, cancelLabel, tone, initialFocus, onConfirm, onCancel, onError, returnFocusRef, children } =
     props;
   return (
     <ConfirmDialogBase
@@ -313,6 +328,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       confirmLabel={confirmLabel}
       cancelLabel={cancelLabel}
       tone={tone}
+      initialFocus={initialFocus}
       onConfirm={onConfirm}
       onCancel={onCancel}
       onError={onError}

@@ -118,6 +118,23 @@ describe('useConfirmDialog', () => {
     expect(answers).toEqual([false]);
   });
 
+  it('initialFocus="cancel" with tone="default" reaches the dialog: on Cancel, Enter resolves false', async () => {
+    const { user, answers } = await openPage({ ...DELETE, tone: 'default', initialFocus: 'cancel' });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(answers).toEqual([false]);
+  });
+
+  it('a new request replacing an open one: the focus goes to ITS initialFocus target', async () => {
+    const { confirm } = await openPage({ ...DELETE, tone: 'default' });
+    expect(screen.getByRole('button', { name: 'Delete invoice' })).toHaveFocus();
+    act(() => {
+      void confirm()({ title: 'Review changes', confirmLabel: 'Save changes', tone: 'default', initialFocus: 'cancel' });
+    });
+    await act(() => Promise.resolve());
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+  });
+
   it('with an async onConfirm: pending until it settles, then true; a rejection keeps it open and goes to onError', async () => {
     let finish!: () => void;
     let fail!: (e: unknown) => void;

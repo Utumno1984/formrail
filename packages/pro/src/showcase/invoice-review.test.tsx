@@ -122,13 +122,14 @@ describe('invoice review (#377): configuration of the change summary', () => {
     expect(invoiceSaveReview({ values: edit({ notes: 'x' }), baseline: BASELINE })?.description).toBe('1 change will be saved.');
   });
 
-  it('the dialog options: title, labels, default tone', () => {
+  it('the dialog options: title, labels, default tone, initial focus on "Keep editing"', () => {
     const review = invoiceSaveReview({ values: edit({ notes: 'x' }), baseline: BASELINE });
     expect(review).toMatchObject({
       title: 'Review changes',
       confirmLabel: 'Save changes',
       cancelLabel: 'Keep editing',
       tone: 'default',
+      initialFocus: 'cancel',
     });
   });
 });

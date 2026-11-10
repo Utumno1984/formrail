@@ -76,6 +76,8 @@ export const ReviewChanges: Story = {
 
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription('2 changes will be saved.');
+    // The focus opens on "Keep editing": confirming is a deliberate gesture, never a key still held on Save.
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus());
     const items = within(within(dialog).getByRole('list', { name: 'Changes to save' })).getAllByRole('listitem');
     await expect(items).toHaveLength(2);
     await expect(items[0]).toHaveTextContent(/^Status.*changed.*/);
@@ -137,7 +139,7 @@ export const ReviewDialog: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
-    // `waitFor`: the dialog enters with an animation.
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Save changes' })).toHaveFocus());
+    // `waitFor`: the dialog enters with an animation. The focus opens on "Keep editing" (`initialFocus`).
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus());
   },
 };
