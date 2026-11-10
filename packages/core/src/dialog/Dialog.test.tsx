@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -101,6 +101,67 @@ describe('Dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Annulla' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('dismissible={false} keeps the focus inside: a pointerdown on the backdrop is default-prevented; dismissible does not touch it', () => {
+    const { unmount } = render(
+      <Dialog defaultOpen>
+        <Panel dismissible={false} />
+      </Dialog>,
+    );
+    const dialog = screen.getByRole('dialog');
+    const backdrop = dialog.previousElementSibling as HTMLElement;
+    expect(backdrop).toBeTruthy();
+    // fireEvent returns false when the event was default-prevented (the browser would not move the focus).
+    expect(fireEvent.pointerDown(backdrop)).toBe(false);
+    // Inside the panel the press behaves normally.
+    expect(fireEvent.pointerDown(screen.getByText('Corpo'))).toBe(true);
+    // Outside the modal layer (e.g. a popover portaled above it) is not touched either.
+    expect(fireEvent.pointerDown(document.body)).toBe(true);
+    unmount();
+
+    render(
+      <Dialog defaultOpen>
+        <Panel dismissible />
+      </Dialog>,
+    );
+    const normalBackdrop = screen.getByRole('dialog').previousElementSibling as HTMLElement;
+    expect(fireEvent.pointerDown(normalBackdrop)).toBe(true);
+  });
+
+  it('dismissible={false} guard is removed when the dialog closes', async () => {
+    const user = userEvent.setup();
+    const add = vi.spyOn(document, 'addEventListener');
+    const remove = vi.spyOn(document, 'removeEventListener');
+    render(
+      <Dialog defaultOpen>
+        <Panel dismissible={false} />
+      </Dialog>,
+    );
+    const added = add.mock.calls.filter(([type, , capture]) => type === 'pointerdown' && capture === true);
+    expect(added.length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Annulla' }));
+    // The very same function that was added is removed.
+    for (const [, handler] of added) {
+      expect(remove.mock.calls.some(([type, fn, capture]) => type === 'pointerdown' && fn === handler && capture === true)).toBe(
+        true,
+      );
+    }
+  });
+
+  it('switching dismissible from false to true while open stops guarding the backdrop', () => {
+    function Host({ dismissible }: { dismissible: boolean }) {
+      return (
+        <Dialog defaultOpen>
+          <Panel dismissible={dismissible} />
+        </Dialog>
+      );
+    }
+    const { rerender } = render(<Host dismissible={false} />);
+    const backdrop = () => screen.getByRole('dialog').previousElementSibling as HTMLElement;
+    expect(fireEvent.pointerDown(backdrop())).toBe(false);
+    rerender(<Host dismissible />);
+    expect(fireEvent.pointerDown(backdrop())).toBe(true);
   });
 
   it('returns the focus to the trigger (and to the external opener) on close, through useReturnFocus', async () => {

@@ -181,19 +181,8 @@ export function ConfirmDialogBase({
     if (open && contentRef.current && document.activeElement === contentRef.current) safeTarget()?.focus();
   }, [open, safeTarget]);
 
-  // While pending the backdrop does not close the dialog, so a press on it would only take the focus
-  // away from the button: the browser moves it to `body` (the backdrop is not focusable) and the
-  // focus trap does not bring it back from there. Its default is prevented, the focus stays put.
-  // (The Tailwind scan reads comments too: no utility names that emit global defaults here.)
-  useEffect(() => {
-    if (!pending || !open) return undefined;
-    const keepFocus = (event: MouseEvent) => {
-      const content = contentRef.current;
-      if (content && event.target instanceof Node && !content.contains(event.target)) event.preventDefault();
-    };
-    document.addEventListener('mousedown', keepFocus, true);
-    return () => document.removeEventListener('mousedown', keepFocus, true);
-  }, [pending, open]);
+  // While pending the dialog is not dismissible, and `ModalPanel` itself keeps the focus from escaping
+  // to `body` on a press on the backdrop (the guarantee of `dismissible={false}`).
 
   const fail = useCallback((error: unknown) => {
     const handler = callbacks.current.onError;
