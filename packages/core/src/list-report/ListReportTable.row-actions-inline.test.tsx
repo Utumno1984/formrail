@@ -431,6 +431,17 @@ describe('ListReportTable rowActionsInline — the form changes under an open me
     expect(narrowTrigger('FT-2026-0003')).toHaveFocus();
   });
 
+  it('without layout (nothing is laid out when the menu opens) a resize never closes the menu', async () => {
+    const user = userEvent.setup();
+    render(<Host rowActionsInline={1} />);
+    const narrow = narrowTrigger('FT-2026-0001');
+    await user.click(narrow);
+    await screen.findByRole('menu');
+    // Still nothing laid out (as at the opening): the observer has nothing to act on.
+    fire(narrow);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
   it('a resize that keeps the form changes nothing', async () => {
     const user = userEvent.setup();
     Element.prototype.checkVisibility ??= () => true;

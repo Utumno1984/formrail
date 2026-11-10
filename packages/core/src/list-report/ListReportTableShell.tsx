@@ -185,16 +185,17 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   const { columns, selection } = table;
   const selectable = selection.enabled;
   const hasRowActions = rowActions !== undefined;
-  const inlineCount = hasRowActions ? wholeRows(rowActionsInlineProp ?? 0) : 0;
+  const inlineUsed = wholeRows(rowActionsInlineProp ?? 0);
+  const inlineCount = hasRowActions ? inlineUsed : 0;
   const invalidInline =
     rowActionsInlineProp !== undefined && !(Number.isInteger(rowActionsInlineProp) && rowActionsInlineProp >= 0);
   useEffect(() => {
     if (invalidInline && isDev()) {
       console.error(
-        `[react-object-page] <ListReportTable> rowActionsInline must be a whole number ≥ 0; got ${String(rowActionsInlineProp)}, used ${wholeRows(rowActionsInlineProp ?? 0)}.`,
+        `[react-object-page] <ListReportTable> rowActionsInline must be a whole number ≥ 0; got ${String(rowActionsInlineProp)}, used ${inlineUsed}.`,
       );
     }
-  }, [invalidInline, rowActionsInlineProp]);
+  }, [invalidInline, rowActionsInlineProp, inlineUsed]);
   const rowActionsWidth = inlineCount > 0 ? ROW_ACTIONS_INLINE_COLUMN_WIDTH : ROW_ACTIONS_COLUMN_WIDTH;
   // The selection and row actions columns are not among `columns`: every full-width row spans them too.
   const columnCount = columns.length + (selectable ? 1 : 0) + (hasRowActions ? 1 : 0);

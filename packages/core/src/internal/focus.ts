@@ -4,6 +4,17 @@ const TABBABLE =
   'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable="true"]';
 
 /**
+ * Whether the element has a box in the layout: not under `display: none` (a closed tab, the hidden
+ * form of a responsive cell), nor detached. Where `checkVisibility` exists it is used (it also sees
+ * `content-visibility: hidden` ancestors); elsewhere the rendered boxes say it. An environment without
+ * layout (jsdom) has no boxes at all, so everything is "not laid out" there unless a test stubs
+ * `checkVisibility`. Shared by `adjacentTabbable`, `Textarea` and the List Report row actions.
+ */
+export function isLaidOut(el: Element): boolean {
+  return typeof el.checkVisibility === 'function' ? el.checkVisibility() : el.getClientRects().length > 0;
+}
+
+/**
  * Document order comparator (`Array.prototype.sort`): -1 when `a` comes before `b`. Never the order
  * in which the elements were collected.
  */
@@ -41,7 +52,7 @@ export function adjacentTabbable(
       !el.closest('[inert]') &&
       !el.matches(':disabled') &&
       el.tabIndex >= 0 &&
-      el.getClientRects().length > 0,
+      isLaidOut(el),
   );
   const after = (el: HTMLElement) => !!(from.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
   const next = backwards ? candidates.filter((el) => !after(el)).pop() : candidates.find(after);

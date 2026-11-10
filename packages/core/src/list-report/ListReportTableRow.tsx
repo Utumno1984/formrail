@@ -1,9 +1,9 @@
-import { memo, useLayoutEffect, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
+import { memo, useCallback, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
 import { Checkbox } from '../checkbox/Checkbox';
 import { cn } from '../utils/cn';
 import { renderCell, type RenderCellOptions } from './list-report-cell';
 import type { ListReportTableLabels } from './ListReportTableStates';
-import { keepFocusInTable, tableContainerOf } from './keep-focus-in-table';
+import { useKeepFocusInTable } from './keep-focus-in-table';
 import { ListReportRowActionsCell } from './ListReportRowActions';
 import {
   ALIGN_TEXT,
@@ -68,14 +68,16 @@ function ListReportTableRowImpl<Row>({
   const lastClick = useRef<MouseEvent<HTMLInputElement> | null>(null);
   // A row removed while one of its controls has the focus (its checkbox, a link in a cell, its actions
   // trigger; deleted, filtered out): the focus goes to the table's scroll container, never `body`.
-  // Taken in a layout cleanup, while the row is still in the document.
+  // Taken in a layout cleanup, while the row is still in the document (`useKeepFocusInTable`, shared
+  // with the row actions controls).
   const trRef = useRef<HTMLTableRowElement | null>(null);
-  useLayoutEffect(
-    () => () => {
-      const tr = trRef.current;
-      keepFocusInTable(tableContainerOf(tr), [tr]);
+  const { capture } = useKeepFocusInTable(() => [trRef.current]);
+  const setTr = useCallback(
+    (node: HTMLTableRowElement | null) => {
+      trRef.current = node;
+      capture(node);
     },
-    [],
+    [capture],
   );
   const id = table.getRowId(row);
   const selected = selectable && selection.isSelected(id);
@@ -90,7 +92,7 @@ function ListReportTableRowImpl<Row>({
       ? cn(rowActions && rowActionsRowClass, selectable && selectableRowClass, extraClassName)
       : extraClassName;
   return (
-    <tr {...restRowProps} ref={trRef} data-selected={selected ? '' : undefined} className={className}>
+    <tr {...restRowProps} ref={setTr} data-selected={selected ? '' : undefined} className={className}>
       {selectable ? (
         <td className={selectBodyCellClass}>
           <div className={selectBoxClass}>
@@ -124,7 +126,8 @@ function ListReportTableRowImpl<Row>({
           actions={rowActions(row)}
           triggerLabel={labels.rowActions(selection.getRowLabel(row))}
           inline={rowActionsInline}
-          inlineLabel={rowActionsInline > 0 ? (actionLabel) => labels.rowAction(actionLabel, selection.getRowLabel(row)) : undefined}
+          rowActionLabel={labels.rowAction}
+          rowLabel={selection.getRowLabel(row)}
         />
       ) : null}
     </tr>

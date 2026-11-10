@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Button } from '../button/Button';
+import { isLaidOut } from '../internal/focus';
 import { moreIcon } from '../internal/icons';
 import { isDev } from '../internal/is-dev';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
 import { Tooltip } from '../tooltip/Tooltip';
 import { cn } from '../utils/cn';
-import { keepFocusInTable, tableContainerOf } from './keep-focus-in-table';
+import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
+import { useKeepFocusInTable } from './keep-focus-in-table';
 import {
   rowActionsBodyCellClass,
   rowActionsInlineDangerClass,
@@ -30,21 +32,15 @@ export interface ListReportRowActionsCellProps {
    * whole number ≥ 0). `0` (default): the menu alone, the cell of #362 exactly.
    */
   inline?: number;
-  /** Accessible name of the inline button of an action, from its label (`labels.rowAction(label, rowLabel)`). */
-  inlineLabel?: (actionLabel: string) => string;
+  /** `labels.rowAction`: names the inline button of an action from its label and `rowLabel`. */
+  rowActionLabel?: (actionLabel: string, rowLabel: string) => string;
+  /** The row's name (`selection.getRowLabel(row)`), for `rowActionLabel`. */
+  rowLabel?: string;
 }
 
-/**
- * Whether the element is laid out (not under `display: none`, the hidden form of the cell). Where
- * `checkVisibility` is missing the rendered boxes say it; an environment without layout (no boxes at
- * all) gives `false` for everything, which the callers below treat as "keep what was used".
- */
-const isRendered = (el: Element): boolean =>
-  typeof el.checkVisibility === 'function' ? el.checkVisibility() : el.getClientRects().length > 0;
-
-/** The first control of the cell that is laid out: the first inline button, or the trigger, of the visible form. */
+/** The first control of the cell in the form that is laid out: the first inline button, or the trigger. */
 const firstRenderedControl = (cell: Element | null | undefined): HTMLElement | null =>
-  cell ? ([...cell.querySelectorAll<HTMLElement>('button')].find(isRendered) ?? null) : null;
+  [...(cell?.querySelectorAll('[data-rop-row-actions-form]') ?? [])].find(isLaidOut)?.querySelector('button') ?? null;
 
 /**
  * The `returnFocusRef` given to `onSelect` by one control of the cell (an inline button or a trigger):
@@ -52,27 +48,30 @@ const firstRenderedControl = (cell: Element | null | undefined): HTMLElement | n
  * when the form changed in the meantime (the control is now under `display: none` and cannot take the
  * focus); the table's scroll container once the control is gone (the action deleted its row, e.g.
  * after `await confirm(…)`). Read when the focus is returned, not when the action runs: dialogs read
- * `returnFocusRef.current` after their exit, which can be well after the row went away.
+ * `returnFocusRef.current` after their exit, which can be well after the row went away. Also keeps the
+ * focus in the table when the control, or `extraOwners` (the portalled menu), go away with the focus.
  */
-function useControlReturnFocus() {
+function useControlReturnFocus(extraOwners?: () => readonly (Element | null | undefined)[]) {
   const nodeRef = useRef<HTMLElement | null>(null);
-  // The table's scroll container, taken while the control is in the document.
-  const containerRef = useRef<HTMLElement | null>(null);
-  const setNode = useCallback((node: HTMLElement | null) => {
-    nodeRef.current = node;
-    if (node) containerRef.current = tableContainerOf(node);
-  }, []);
+  const { containerRef, capture } = useKeepFocusInTable(() => [nodeRef.current, ...(extraOwners?.() ?? [])]);
+  const setNode = useCallback(
+    (node: HTMLElement | null) => {
+      nodeRef.current = node;
+      capture(node);
+    },
+    [capture],
+  );
   const context = useMemo<ListReportRowActionContext>(() => {
     const returnFocusRef: RefObject<HTMLElement | null> = {
       get current() {
         const node = nodeRef.current;
         if (!node || !node.isConnected) return containerRef.current;
-        if (isRendered(node)) return node;
+        if (isLaidOut(node)) return node;
         return firstRenderedControl(node.closest('td')) ?? node;
       },
     };
     return { returnFocusRef };
-  }, []);
+  }, [containerRef]);
   return { nodeRef, containerRef, setNode, context };
 }
 
@@ -86,14 +85,12 @@ function RowActionsMenu({
   /** One of the two forms of an inline cell: close the menu when its trigger is hidden by a change of form. */
   watchForm?: boolean;
 }) {
-  const { nodeRef: triggerRef, containerRef, setNode: setTrigger, context } = useControlReturnFocus();
   const contentRef = useRef<HTMLDivElement | null>(null);
+  // The trigger or the (portalled, so outside the row) menu going away with the focus (the row deleted
+  // or filtered out, also synchronously by one of its own actions, or its actions becoming empty): the
+  // focus goes to the table's scroll container instead of `body` (`useKeepFocusInTable`).
+  const { nodeRef: triggerRef, containerRef, setNode: setTrigger, context } = useControlReturnFocus(() => [contentRef.current]);
   const [open, setOpen] = useState(false);
-
-  // Going away while the trigger or the (portalled, so outside the row) menu has the focus: the row
-  // deleted or filtered out, also synchronously by one of its own actions, or its actions becoming
-  // empty. The focus would fall on `body`; it goes to the table's scroll container instead.
-  useLayoutEffect(() => () => keepFocusInTable(containerRef.current, [triggerRef.current, contentRef.current]), [containerRef, triggerRef]);
 
   // A change of form while the menu is open (a tablet rotated, a panel resized across the threshold):
   // the trigger goes under `display: none`, and the menu would stay anchored to nothing, with the focus
@@ -101,18 +98,20 @@ function RowActionsMenu({
   // open: an observer on the trigger, whose box collapses when it is hidden. The focus goes first to
   // the visible control of the same row (the first inline button or the other trigger), then the menu
   // closes without running anything; its own return of the focus sees the focus already outside the
-  // panel and leaves it there.
-  useEffect(() => {
+  // panel and leaves it there. It acts only on a trigger that was laid out when the menu opened (an
+  // environment without layout never closes it).
+  useResizeAndMutationEffect(() => {
     const trigger = triggerRef.current;
-    if (!watchForm || !open || !trigger || typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(() => {
-      if (!trigger.isConnected || isRendered(trigger)) return;
-      const target = firstRenderedControl(trigger.closest('td')) ?? containerRef.current;
-      target?.focus({ preventScroll: true });
-      setOpen(false);
-    });
-    observer.observe(trigger);
-    return () => observer.disconnect();
+    if (!watchForm || !open || !trigger) return undefined;
+    const wasLaidOut = isLaidOut(trigger);
+    return {
+      target: trigger,
+      update: () => {
+        if (!wasLaidOut || !trigger.isConnected || isLaidOut(trigger)) return;
+        (firstRenderedControl(trigger.closest('td')) ?? containerRef.current)?.focus({ preventScroll: true });
+        setOpen(false);
+      },
+    };
   }, [watchForm, open, triggerRef, containerRef]);
 
   return (
@@ -168,9 +167,7 @@ function RowActionsMenu({
  * focusable (`aria-disabled`, so the tooltip still explains it) and a click, Enter or Space does nothing.
  */
 function InlineRowAction({ action, label }: { action: ListReportRowAction; label: string }) {
-  const { nodeRef, containerRef, setNode, context } = useControlReturnFocus();
-  // Going away while focused (the action no longer inline, or gone): as for the trigger.
-  useLayoutEffect(() => () => keepFocusInTable(containerRef.current, [nodeRef.current]), [containerRef, nodeRef]);
+  const { setNode, context } = useControlReturnFocus();
   const { disabled, onSelect } = action;
   return (
     <Tooltip content={action.label}>
@@ -212,13 +209,13 @@ function InlineRowAction({ action, label }: { action: ListReportRowAction; label
  * With `inline` > 0 the cell holds two forms of the same descriptors, only one of them displayed (a
  * container query on the table's scroll container, see `rowActionsWideClass`):
  * - wide: the first `inline` actions with an `icon` as icon buttons (`Tooltip` = label, name =
- *   `inlineLabel(label)`, `aria-disabled` when disabled), then the trigger of a menu with the other
+ *   `rowActionLabel(label, rowLabel)`, `aria-disabled` when disabled), then the trigger of a menu with the other
  *   actions (no trigger when none is left; its slot stays);
  * - narrow: the trigger of a menu with every action.
  * `returnFocusRef` is the control that was used. A menu open when its form is hidden closes without
  * running anything, and the focus goes to the visible control of the row.
  */
-export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, inlineLabel }: ListReportRowActionsCellProps) {
+export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, rowActionLabel, rowLabel = '' }: ListReportRowActionsCellProps) {
   useEffect(() => {
     if (!isDev()) return;
     const seen = new Set<string>();
@@ -244,7 +241,7 @@ export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, in
     <td className={rowActionsBodyCellClass}>
       <div data-rop-row-actions-form="wide" className={rowActionsWideClass}>
         {inlineActions.map((action) => (
-          <InlineRowAction key={action.id} action={action} label={inlineLabel ? inlineLabel(action.label) : action.label} />
+          <InlineRowAction key={action.id} action={action} label={rowActionLabel ? rowActionLabel(action.label, rowLabel) : action.label} />
         ))}
         <div className={rowActionsTriggerSlotClass}>
           {menuActions.length > 0 ? <RowActionsMenu actions={menuActions} triggerLabel={triggerLabel} watchForm /> : null}

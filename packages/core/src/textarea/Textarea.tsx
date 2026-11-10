@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CONTROL_INVALID, TEXT_CONTROL_BOX } from '../internal/field-control-styles';
+import { isLaidOut } from '../internal/focus';
 import { isDev } from '../internal/is-dev';
 import { composeRefs } from '../utils/compose-refs';
 import { cn } from '../utils/cn';
@@ -68,7 +69,7 @@ export const Textarea = /* @__PURE__ */ forwardRef<HTMLTextAreaElement, Textarea
     const el = node.current;
     if (!el) return;
     // Hidden (display: none, a closed tab): nothing to measure; the ResizeObserver calls back when shown.
-    if (el.getClientRects().length === 0) return;
+    if (!isLaidOut(el)) return;
     const before = el.offsetHeight;
     const cs = getComputedStyle(el);
     // Measured with `overflow: hidden` so no scrollbar narrows the text or lingers by a rounding pixel.
