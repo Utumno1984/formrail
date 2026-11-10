@@ -23,12 +23,19 @@ const TYPES = {
 
 async function resolveFile(pathname) {
   if (!pathname.startsWith(SITE_BASE)) return null;
-  const relative = decodeURIComponent(pathname.slice(SITE_BASE.length));
+  let relative;
+  try {
+    relative = decodeURIComponent(pathname.slice(SITE_BASE.length));
+  } catch {
+    return null; // malformed percent-encoding: a 404 for that request, never a crash of the server
+  }
   let file = path.join(SITE_DIR, relative);
   if (file !== SITE_DIR && !file.startsWith(SITE_DIR + path.sep)) return null;
   try {
     if ((await stat(file)).isDirectory()) {
-      if (!pathname.endsWith('/')) return null;
+      // Like Pages: a directory without the trailing slash gets a 301 to the slashed URL (the
+      // relative links of the Storybook only resolve correctly from there).
+      if (!pathname.endsWith('/')) return { redirect: `${pathname}/` };
       file = path.join(file, 'index.html');
     }
     return { file, status: 200 };
@@ -38,8 +45,13 @@ async function resolveFile(pathname) {
 }
 
 createServer(async (req, res) => {
-  const { pathname } = new URL(req.url ?? '/', 'http://localhost');
-  const hit = (await resolveFile(pathname)) ?? { file: path.join(SITE_DIR, '404.html'), status: 404 };
+  const { pathname, search } = new URL(req.url ?? '/', 'http://localhost');
+  const found = await resolveFile(pathname);
+  if (found?.redirect) {
+    res.writeHead(301, { location: found.redirect + search, 'cache-control': 'no-store' }).end();
+    return;
+  }
+  const hit = found ?? { file: path.join(SITE_DIR, '404.html'), status: 404 };
   try {
     const body = await readFile(hit.file);
     res.writeHead(hit.status, {

@@ -130,6 +130,21 @@ test.describe('404 and static files', () => {
     });
   }
 
+  // Pages answers a directory URL without the trailing slash with a 301 to the slashed one.
+  test('storybook (no trailing slash) redirects to storybook/ and keeps the query', async ({ page, request }) => {
+    const raw = await request.get(`${base}storybook?path=${DOCS_PATH}`, { maxRedirects: 0 });
+    expect(raw.status()).toBe(301);
+    expect(raw.headers()['location']).toBe(`${base}storybook/?path=${DOCS_PATH}`);
+    await page.goto(`${base}storybook?path=${DOCS_PATH}`);
+    expect(new URL(page.url()).pathname).toBe(`${base}storybook/`);
+    await expect(page.frameLocator('#storybook-preview-iframe').locator('.sbdocs-content')).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('a malformed percent-encoding is a 404 and does not stop the server', async ({ request }) => {
+    expect((await request.get(`${base}%E0%A4%A`)).status()).toBe(404);
+    expect((await request.get(base)).status()).toBe(200);
+  });
+
   test('.nojekyll is published', async ({ request }) => {
     expect((await request.get('.nojekyll')).status()).toBe(200);
   });
