@@ -56,8 +56,8 @@ const meta: Meta<PlaygroundArgs> = {
     onChange: { control: false },
   },
   args: {
-    label: 'Ragione sociale',
-    name: 'ragioneSociale',
+    label: 'Company name',
+    name: 'companyName',
     help: '',
     error: '',
     required: false,
@@ -65,7 +65,7 @@ const meta: Meta<PlaygroundArgs> = {
     reserveMessageSpace: true,
     state: 'default',
     stateReason: '',
-    placeholder: 'Es. Rossi S.r.l.',
+    placeholder: 'e.g. Acme Corp',
     onChange: fn(),
   },
 };
@@ -103,7 +103,7 @@ export const Playground: Story = {
   ),
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = canvas.getByRole('textbox', { name: 'Company name' });
     await userEvent.type(input, 'Acme');
     await expect(input).toHaveValue('Acme');
     await expect(args.onChange).toHaveBeenCalledTimes(4);
@@ -132,7 +132,7 @@ export const Forced: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.tab();
-    const input = canvas.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = canvas.getByRole('textbox', { name: 'Company name' });
     await expect(input).toHaveFocus();
     await userEvent.keyboard('abc{Backspace}');
     await expect(input).toHaveValue('Price list A');
@@ -165,7 +165,7 @@ function LoadData({ onChange }: { onChange: PlaygroundArgs['onChange'] }) {
   const [value, setValue] = useState('');
   return (
     <div style={column}>
-      <Field label="Ragione sociale">
+      <Field label="Company name">
         <Input
           value={value}
           onChange={(event) => {
@@ -189,7 +189,7 @@ export const ExternalValue: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole('button', { name: 'Load data' }));
-    const input = canvas.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = canvas.getByRole('textbox', { name: 'Company name' });
     await expect(input).toHaveValue('Acme S.p.A.');
     await expect(args.onChange).not.toHaveBeenCalled();
     await userEvent.type(input, '!');

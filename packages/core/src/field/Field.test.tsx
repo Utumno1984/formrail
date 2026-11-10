@@ -29,21 +29,21 @@ function Toggle({ control, ...rest }: { control: FieldControlProps } & ButtonHTM
 describe('Field', () => {
   it('names the input after the label, through a generated id or the id prop', () => {
     const { rerender } = render(
-      <Field label="Ragione sociale">
+      <Field label="Company name">
         <Input />
       </Field>,
     );
-    const input = screen.getByRole('textbox', { name: 'Ragione sociale' });
-    expect(screen.getByLabelText('Ragione sociale')).toBe(input);
+    const input = screen.getByRole('textbox', { name: 'Company name' });
+    expect(screen.getByLabelText('Company name')).toBe(input);
     expect(input.id).not.toBe('');
-    expect(screen.getByText('Ragione sociale').closest('label')).toHaveAttribute('for', input.id);
+    expect(screen.getByText('Company name').closest('label')).toHaveAttribute('for', input.id);
 
     rerender(
-      <Field label="Ragione sociale" id="rs">
+      <Field label="Company name" id="rs">
         <Input />
       </Field>,
     );
-    expect(screen.getByLabelText('Ragione sociale').id).toBe('rs');
+    expect(screen.getByLabelText('Company name').id).toBe('rs');
   });
 
   it('keeps htmlFor and aria-describedby coherent when the id prop changes after mount', () => {
@@ -151,25 +151,25 @@ describe('Field', () => {
 
   it('required: aria-required, a hidden marker, and the accessible name stays the label', () => {
     const { rerender } = render(
-      <Field label="Ragione sociale" required>
+      <Field label="Company name" required>
         <Input />
       </Field>,
     );
-    expect(screen.getByRole('textbox', { name: 'Ragione sociale' })).toHaveAttribute('aria-required', 'true');
+    expect(screen.getByRole('textbox', { name: 'Company name' })).toHaveAttribute('aria-required', 'true');
     const marker = screen.getByText('*');
     expect(marker).toHaveAttribute('aria-hidden', 'true');
     rerender(
-      <Field label="Ragione sociale">
+      <Field label="Company name">
         <Input />
       </Field>,
     );
-    expect(screen.getByRole('textbox', { name: 'Ragione sociale' })).not.toHaveAttribute('aria-required');
+    expect(screen.getByRole('textbox', { name: 'Company name' })).not.toHaveAttribute('aria-required');
     rerender(
-      <Field label="Ragione sociale" required state="forced" stateReason="Regola aziendale">
+      <Field label="Company name" required state="forced" stateReason="Regola aziendale">
         <Input />
       </Field>,
     );
-    expect(screen.getByRole('textbox', { name: 'Ragione sociale' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Company name' })).toBeInTheDocument();
   });
 
   it('disabled -> native disabled; forced and locked -> focusable readOnly with aria-readonly', () => {

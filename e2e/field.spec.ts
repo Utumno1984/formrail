@@ -63,7 +63,7 @@ test.describe('Forms/Field', () => {
   test('forced: real typing, Ctrl+V and Backspace change nothing and fire no input event', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await gotoStory(page, 'forms-field--forced');
-    const input = page.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = page.getByRole('textbox', { name: 'Company name' });
     await page.evaluate(() => navigator.clipboard.writeText('incollato'));
     await input.focus();
     await countInputEvents(page);
@@ -110,7 +110,7 @@ test.describe('Forms/Field', () => {
 
   test('a value set from outside after mount fires no input event; typing does', async ({ page }) => {
     await gotoStory(page, 'forms-field--external-value');
-    const input = page.getByRole('textbox', { name: 'Ragione sociale' });
+    const input = page.getByRole('textbox', { name: 'Company name' });
     await countInputEvents(page);
     await page.getByRole('button', { name: 'Load data' }).click();
     await expect(input).toHaveValue('Acme S.p.A.');

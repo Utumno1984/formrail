@@ -334,13 +334,13 @@ export const LongLabels: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <div style={column}>
-      <Field label="Ragione sociale">
+      <Field label="Company name">
         <Controlled {...args} options={LONG} initial="a" />
       </Field>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const control = input(canvasElement, 'Ragione sociale');
+    const control = input(canvasElement, 'Company name');
     await expect(control.getBoundingClientRect().width).toBeLessThanOrEqual(320);
     await userEvent.click(control);
     await listbox();

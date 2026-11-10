@@ -442,8 +442,8 @@ export const WithForm: Story = {
   ),
   play: async () => {
     const field = await within(document.body).findByRole('textbox', { name: 'Company name' });
-    await userEvent.type(field, 'Rossi S.r.l.');
-    await expect(field).toHaveValue('Rossi S.r.l.');
+    await userEvent.type(field, 'Acme Corp');
+    await expect(field).toHaveValue('Acme Corp');
   },
 };
 
