@@ -3,6 +3,8 @@
   "compilerOptions": {
     "types": []
   },
-  "include": ["src"],
+  // `../core/src/types`: the ambient declarations (`*.css?raw`) of the core sources reached by the story-only
+  // `src/showcase/`, which reuses the Free CRUD showcase (ticket #377).
+  "include": ["src", "../core/src/types/*.d.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

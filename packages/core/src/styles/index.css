@@ -33,6 +33,8 @@
 @source not '../list-report/use-list-report-url-state.ts';
 @source not '../list-report/param-keys.ts';
 @source not '../list-report/types.ts';
+/* Story-only Storybook args of the CRUD showcase (#377): no class names, a `filter` URL parameter. */
+@source not '../showcase/crud-story-args.ts';
 @source not '../list-report/search.ts';
 @source not '../list-report/use-change-flash.ts';
 @source not '../internal/normalize-text.ts';
