@@ -5,6 +5,7 @@ enterprise UI patterns — the **List Report** (a list with filters, selection a
 **Object Page** (a sectioned editor with an anchor bar, a sticky save bar and dirty-tracking) — for
 teams that want that UX without a proprietary stack.
 
+- **Home page**: https://utumno1984.github.io/react-object-page/
 - **Live demo and documentation (Free)**: https://utumno1984.github.io/react-object-page/storybook/
 - **Pro demo**: https://utumno1984.github.io/react-object-page/pro/
 

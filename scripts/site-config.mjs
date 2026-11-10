@@ -7,3 +7,12 @@ export const SITE_BASE = `/${repo}/`;
 
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
+
+/**
+ * Target of the landing's "Request early access" call-to-action (ticket #382): an external form
+ * (Tally or Google Forms) that Daniele creates with his own account.
+ *
+ * EMPTY ON PURPOSE until that URL exists: while it is empty the assembler leaves the whole CTA out of
+ * the page (never a link to `#` or a broken one). When set it must be an absolute `https://` URL.
+ */
+export const EARLY_ACCESS_URL = '';

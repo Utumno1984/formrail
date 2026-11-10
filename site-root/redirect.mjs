@@ -10,7 +10,8 @@
 export const STORYBOOK_PARAMS = ['path', 'id', 'viewMode', 'args', 'globals'];
 
 /**
- * Where an old root URL must go, or `null` when the page must stay where it is.
+ * Where an old root URL must go, or `null` when the page must stay where it is (ticket #382: always
+ * the case for the bare root of `index`, which is the landing page).
  *
  * @param {string} href the full URL of the page that is running the redirect
  * @param {'index' | 'iframe'} page which root file is running it: `index.html` (the site root, which
@@ -33,7 +34,8 @@ export function resolveRedirect(href, page) {
   var isStorybookLink = STORYBOOK_PARAMS.some(function (name) {
     return url.searchParams.has(name);
   });
-  // Bare root (or only foreign parameters such as `?utm_source=x`): the Storybook entry point,
-  // without the foreign parameters, which the Storybook would only echo back in its own URL.
-  return isStorybookLink ? target + url.search + url.hash : target;
+  // Ticket #382: the root is now the landing page. Only a link that carries Storybook parameters is
+  // an old Storybook link; the bare root, a hash (`#pro`) or foreign parameters (`?utm_source=x`)
+  // stay on the landing.
+  return isStorybookLink ? target + url.search + url.hash : null;
 }
