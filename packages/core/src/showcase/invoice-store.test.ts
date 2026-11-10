@@ -17,9 +17,11 @@ describe('createInvoiceStore', () => {
     const all = await store.list();
     expect(all).toHaveLength(200);
     all.forEach((r, i) => {
-      const { dueDate, notes, ...base } = r;
+      const { dueDate, notes, lineItems, ...base } = r;
       expect(dueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(typeof notes).toBe('string');
+      expect(lineItems.length).toBeGreaterThanOrEqual(1);
+      expect(lineItems.length).toBeLessThanOrEqual(4);
       expect(base).toEqual(demo[i]);
     });
     expect(JSON.stringify(makeDemoInvoices(200))).toBe(before);
@@ -100,7 +102,7 @@ describe('createInvoiceStore', () => {
 
   it('create assigns increasing ids and numbers, never reusing one, and rounds the amount to 2 decimals (#363)', async () => {
     const store = createInvoiceStore();
-    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 1295.9, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 1295.9, date: '2026-11-09', dueDate: '2026-12-09', notes: '', lineItems: [] };
     const a = await store.create(draft);
     const b = await store.create({ ...draft, amount: 12.3456 });
     expect([a.id, a.number]).toEqual(['inv-201', 'FT-2026-0201']);
@@ -119,7 +121,7 @@ describe('createInvoiceStore', () => {
   it('create honours saveDelayMs like save', async () => {
     const store = createInvoiceStore(undefined, { saveDelayMs: 300 });
     const spy = vi.fn();
-    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '', lineItems: [] };
     const pending = store.create(draft).then(spy);
     await vi.advanceTimersByTimeAsync(299);
     expect(spy).not.toHaveBeenCalled();
@@ -163,7 +165,7 @@ describe('createInvoiceStore', () => {
 });
 
 describe('createInvoiceStore: delete (#365)', () => {
-  const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+  const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '', lineItems: [] };
 
   it('removes the record after saveDelayMs; a second delete of the same id is InvoiceNotFoundError', async () => {
     const store = createInvoiceStore(undefined, { saveDelayMs: 300 });
