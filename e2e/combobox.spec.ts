@@ -321,7 +321,7 @@ test.describe('layout and a11y', () => {
     await page.setViewportSize({ width: 360, height: 800 });
     await gotoStory(page, STORY('long-labels'));
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
-    const box = (await input(page, 'Ragione sociale').boundingBox())!;
+    const box = (await input(page, 'Company name').boundingBox())!;
     expect(box.width).toBeLessThanOrEqual(320);
   });
 
