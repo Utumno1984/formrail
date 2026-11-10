@@ -9,6 +9,7 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
   return <ListReportFrame {...props} ref={ref} renderTable={(tableProps) => <ListReportTable {...tableProps} />} />;
 }
 
+// Implementation: `ListReportFrame` with `renderTable` = `ListReportTable`.
 /**
  * The List Report floorplan (simple version): title with the result count, an actions slot, the bar of
  * pills and search and the table in one flex column that fills its parent, with a **single scroller**
@@ -35,9 +36,6 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  *   already says its new state.
  *
  * The parts stay exported (`ListReportFilterBar`, `ListReportTable`) for other layouts.
- *
- * Built on `ListReportFrame` of `@react-object-page/core/internal` (not public API): `ListReport` is the
- * Frame with `renderTable` = `ListReportTable`.
  */
 export const ListReport = /* @__PURE__ */ forwardRef(ListReportImpl) as <Row>(
   props: ListReportProps<Row> & { ref?: Ref<HTMLDivElement> },

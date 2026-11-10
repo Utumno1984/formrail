@@ -31,6 +31,8 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
   );
 }
 
+// Implementation: `ListReportTableShell` (with the Head/Row/`renderCell`/`tableSize` building blocks) and a
+// `renderBody` that renders every result row (`ListReportTableRow`) plus a `Filler`.
 /**
  * The List Report table: a native `<table>` that renders the state of `useListReport`.
  *
@@ -72,10 +74,6 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   displayed), and the column widens by `n` icon slots; below 40rem they are back in the "…" menu.
  *
  * An accessible name is required: `aria-label`, `aria-labelledby` or a (visually hidden) `caption`.
- *
- * Built on the Shell/Head/Row/`renderCell`/`tableSize` building blocks of `@react-object-page/core/internal`
- * (not public API): `ListReportTable` is `ListReportTableShell` with a `renderBody` that renders every
- * result row (`ListReportTableRow`) plus a `Filler`.
  */
 export const ListReportTable = /* @__PURE__ */ forwardRef(ListReportTableImpl) as <Row>(
   props: ListReportTableProps<Row> & { ref?: Ref<HTMLDivElement> },
