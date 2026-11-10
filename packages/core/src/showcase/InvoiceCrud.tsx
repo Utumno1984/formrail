@@ -51,7 +51,7 @@ import type { ListReportRowAction, ListReportSelection } from '../list-report/ty
 import { EMPTY_IDS } from '../list-report/use-list-report';
 import { ToastProvider } from '../toast/ToastProvider';
 import { useToast } from '../toast/use-toast';
-import { InvoiceEditor, InvoiceRecordPage } from './InvoiceRecordPage';
+import { InvoiceEditor, InvoiceRecordPage, type InvoiceSaveReviewer } from './InvoiceRecordPage';
 import { ListView, type ListViewProps } from './InvoiceListToRecord';
 import { createInvoiceApi } from './invoice-api';
 import {
@@ -95,6 +95,11 @@ export interface InvoiceCrudProps {
   deleteOutcome?: DeleteOutcome;
   /** Called once per record the server deleted (also when it was already gone), even if the page was left meanwhile. */
   onDeleted?: (invoice: DeletedInvoice) => void;
+  /**
+   * Story-only extension point (#377): a review dialog before saving an EXISTING invoice (never a creation).
+   * Absent, the showcase is unchanged. See `InvoiceEditorProps.reviewSave`.
+   */
+  reviewSave?: InvoiceSaveReviewer;
 }
 
 export interface DeletedInvoice {
@@ -147,6 +152,7 @@ function CrudInner({
   today,
   deleteOutcome = 'success',
   onDeleted,
+  reviewSave,
 }: InvoiceCrudProps) {
   const toast = useToast();
   // One store per mount of the story: nothing shared between stories.
@@ -334,6 +340,7 @@ function CrudInner({
         onSaved={saved}
         onDelete={deleteFromPage}
         onDeleteDone={deleteDone}
+        reviewSave={reviewSave}
       />
     );
   }

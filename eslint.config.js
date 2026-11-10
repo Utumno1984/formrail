@@ -61,6 +61,30 @@ export default tseslint.config(
     },
   },
   {
+    // The Pro story of #377 reuses the Free CRUD showcase from the core SOURCES (`packages/core/src/showcase`,
+    // story-only, never in core's `exports`) instead of a copy that would drift. That import is allowed only
+    // inside `packages/pro/src/showcase/` (the story and its story-only helpers and tests); everywhere else in
+    // packages/pro (the published `src/index.ts` and everything it reaches, the package tests and scripts) any
+    // `showcase` import is an error, so neither the Free showcase nor pro's own story-only folder can leak into
+    // the package. The e2e specs (`e2e/`) drive the built Storybook and import no sources.
+    files: ['packages/pro/**/*.{js,mjs,cjs,ts,tsx}'],
+    ignores: ['packages/pro/src/showcase/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '(^|/)showcase(/|$)',
+              message:
+                'The invoice showcase (packages/core/src/showcase, packages/pro/src/showcase) is story-only: import it only from packages/pro/src/showcase/ (ticket #377).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.cjs'],
     languageOptions: { sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },

@@ -182,3 +182,14 @@ export function createInvoiceStore(
     snapshot: () => [...records.values()].map(copy),
   };
 }
+
+declare global {
+  interface Window {
+    /**
+     * The store of the mounted story, for e2e assertions ("the store did not change"). Declared next to the
+     * store (not in a stories file) so every module that sets it typechecks on its own, also when the Pro
+     * story of #377 imports the showcase.
+     */
+    __ropShowcaseStore?: ReturnType<typeof createInvoiceStore>;
+  }
+}

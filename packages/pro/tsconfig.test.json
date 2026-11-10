@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src", "test", "tsup.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", "tsup.config.ts", "vitest.config.ts", "../core/src/types/*.d.ts"]
 }

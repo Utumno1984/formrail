@@ -3,7 +3,7 @@
 // mount); a fetch in flight is a loading state, never an editor that is hydrated afterwards.
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Button } from '../button/Button';
-import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
+import { useConfirmDialog, type ConfirmOptions } from '../confirm-dialog/use-confirm-dialog';
 import { Field } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
 import { Input } from '../input/Input';
@@ -34,9 +34,12 @@ export interface InvoiceRecordPageProps {
   onDelete?: (invoice: StoredInvoice) => Promise<void>;
   /** CRUD only (#365): see `InvoiceEditorProps.onDeleteDone`. */
   onDeleteDone?: () => void;
+  /** Story-only extension (#377): see `InvoiceEditorProps.reviewSave`. */
+  reviewSave?: InvoiceSaveReviewer;
 }
 
-interface InvoiceValues {
+/** The values of the editor, as typed (exported for the Pro story of #377 only; not part of the package). */
+export interface InvoiceValues {
   supplier: string;
   status: DemoInvoiceStatus;
   /** Text, as typed; the server normalizes it to 2 decimals. */
@@ -65,6 +68,18 @@ const toInvoice = (record: StoredInvoice, v: InvoiceValues): StoredInvoice => ({
   notes: v.notes,
 });
 
+/** What `reviewSave` receives: the values about to be saved and the REAL saved baseline (never a default). */
+export interface InvoiceSaveReviewContext {
+  values: InvoiceValues;
+  baseline: InvoiceValues;
+}
+
+/** The review dialog: the options of the editor's `confirm()` (#344) that the reviewer chooses. */
+export type InvoiceSaveReview = Pick<ConfirmOptions, 'title' | 'description' | 'confirmLabel' | 'cancelLabel' | 'tone' | 'children'>;
+
+/** Builds the review of a save, or `null` to save without one (nothing to review). */
+export type InvoiceSaveReviewer = (context: InvoiceSaveReviewContext) => InvoiceSaveReview | null;
+
 const SUPPLIER_OPTIONS = SUPPLIERS_EN.map((s) => ({ value: s, label: s }));
 const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as DemoInvoiceStatus[]).map((s) => ({
   value: s,
@@ -87,7 +102,7 @@ const errorText = (error: unknown): string | undefined =>
 type LoadState = { key: string; record: StoredInvoice } | { key: string; error: unknown };
 
 /** Loads the record, then mounts the editor. No editable field exists until the record has arrived. */
-export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, onDeleteDone }: InvoiceRecordPageProps) {
+export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, onDeleteDone, reviewSave }: InvoiceRecordPageProps) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<LoadState | null>(null);
   const key = `${recordId}#${attempt}`;
@@ -157,6 +172,7 @@ export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, 
         onSaved={onSaved}
         onDelete={onDelete}
         onDeleteDone={onDeleteDone}
+        reviewSave={reviewSave}
         focusTitleOnMount={attempt > 0}
       />
     </>
@@ -191,6 +207,15 @@ export interface InvoiceEditorProps {
    * navigates away from here (the guard would otherwise intercept the `popstate` of `history.back()`).
    */
   onDeleteDone?: () => void;
+  /**
+   * Story-only extension point (#377, used by the Pro story "Invoices with Change Summary"); absent, nothing
+   * changes. Editing only (a creation saves directly: a diff against defaults reviews nothing). On Save, once
+   * the form is VALID (with errors Save behaves as without it: the errors, the summary, the focus on the first
+   * invalid field) and no save is in flight, it is called with the values and the saved baseline: what it
+   * returns is shown in the editor's confirmation dialog; confirming runs the SAME save as without it (there
+   * is no second save path), cancelling saves nothing and leaves the form as it was. `null`: saves directly.
+   */
+  reviewSave?: InvoiceSaveReviewer | undefined;
 }
 
 /**
@@ -220,8 +245,8 @@ const toDraft = (v: InvoiceValues): InvoiceDraft => ({
 });
 
 // The amount is text; "1295.9" and "1295.90" are the same number, so typing the shorter form of the
-// baseline is not a change.
-const sameAmount = (a: string, b: string): boolean => a === b || (a.trim() !== '' && b.trim() !== '' && Number(a) === Number(b));
+// baseline is not a change. Exported for the Pro story of #377 (its change summary compares the same way).
+export const sameAmount = (a: string, b: string): boolean => a === b || (a.trim() !== '' && b.trim() !== '' && Number(a) === Number(b));
 const sameValues = (a: InvoiceValues, b: InvoiceValues): boolean =>
   sameAmount(a.amount, b.amount) &&
   a.supplier === b.supplier &&
@@ -231,6 +256,15 @@ const sameValues = (a: InvoiceValues, b: InvoiceValues): boolean =>
   a.notes === b.notes;
 
 const DECIMAL = /^\d+(\.\d+)?$/;
+const validateInvoice = (v: InvoiceValues): Partial<Record<keyof InvoiceValues, string>> => {
+  const errors: Partial<Record<keyof InvoiceValues, string>> = {};
+  if (!v.supplier) errors.supplier = 'Supplier is required.';
+  if (!DECIMAL.test(v.amount.trim()) || Number(v.amount) <= 0) {
+    errors.amount = 'Amount must be greater than 0.';
+  }
+  return errors;
+};
+const hasErrors = (errors: Partial<Record<string, string>>): boolean => Object.values(errors).some((e) => e !== undefined);
 const SAVING_HINT = 'Saving… Discard only restores the form: the save still completes.';
 
 export function InvoiceEditor({
@@ -244,6 +278,7 @@ export function InvoiceEditor({
   onCreateDone,
   onDelete,
   onDeleteDone,
+  reviewSave,
 }: InvoiceEditorProps) {
   const creating = record === null;
   // #365: `deleting` while the confirmed delete waits for the server; `deleted` once the server deleted the
@@ -260,14 +295,7 @@ export function InvoiceEditor({
   const form = useObjectPageForm<InvoiceValues>({
     baseline: record ? toValues(record) : defaultValues(today),
     isEqual: sameValues,
-    validate: (v) => {
-      const errors: Partial<Record<keyof InvoiceValues, string>> = {};
-      if (!v.supplier) errors.supplier = 'Supplier is required.';
-      if (!DECIMAL.test(v.amount.trim()) || Number(v.amount) <= 0) {
-        errors.amount = 'Amount must be greater than 0.';
-      }
-      return errors;
-    },
+    validate: validateInvoice,
   });
   // #166: while a save is in flight, leaving cannot discard anything (the save still lands in the store), so
   // the guard stays armed (even after a footer "Discard" made the form clean) and the dialog says what really
@@ -342,6 +370,19 @@ export function InvoiceEditor({
     // Already created (the user kept typing during the save and kept editing at the guard): never a second
     // record; the button only asks to leave again.
     if (created) return guard(() => onCreateDone?.(created));
+    if (!record || !reviewSave) return commit();
+    // #377: no review while a save is in flight (Save is `aria-disabled`, which does not block a click), and
+    // none of an invalid form: `commit` then fails the validation exactly as without a review.
+    if (form.isSaving) return;
+    if (hasErrors(validateInvoice(form.values))) return commit();
+    const review = reviewSave({ values: form.values, baseline: form.baseline });
+    if (!review) return commit();
+    // No `onConfirm`: the dialog closes at once and the save shows its progress in the footer, as without it.
+    void confirm(review).then((ok) => {
+      if (ok) commit();
+    });
+  };
+  const commit = () => {
     void form.save(async (v) => {
       sentRef.current = v;
       if (!record) {
