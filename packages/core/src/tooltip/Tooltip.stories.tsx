@@ -415,10 +415,12 @@ export const AutoFocus: Story = {
 };
 
 /**
- * A toolbar of adjacent icon buttons sharing one provider: moving the pointer from one to the next
- * opens the second at once (`skipDelayDuration`) and closes the first.
+ * `TooltipProvider`: a toolbar of adjacent icon buttons sharing one provider, which sets the
+ * `delayDuration` and `skipDelayDuration` of the tooltips below it. Moving the pointer from one
+ * button to the next opens the second at once (`skipDelayDuration`) and closes the first.
  */
 export const Toolbar: Story = {
+  name: 'TooltipProvider: shared delays',
   parameters: NO_CONTROLS,
   render: () => (
     <Page>

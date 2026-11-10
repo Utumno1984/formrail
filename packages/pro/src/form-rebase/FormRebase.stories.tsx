@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useObjectPageForm } from '@react-object-page/core';
+import { computeRebase } from './compute-rebase';
 import { useFormRebase } from './use-form-rebase';
 
 interface DemoArgs {
@@ -174,5 +175,41 @@ export const Playground: Story = {
     await waitFor(() => expect(conflictItems()).toHaveLength(0));
     await expect(field('Notes')).toHaveValue('Checked by me');
     await expect(field('Supplier')).toHaveValue('Acme Corp (updated)');
+  },
+};
+
+/**
+ * `computeRebase({ baseline, values, incoming })`: the pure three-way merge behind `useFormRebase`.
+ * Paths the user did not touch take the server value (`applied`), touched paths keep the user's value,
+ * paths changed by both sides differently keep the user's value and are listed in `conflicts`. The play
+ * function checks the three lists for a draft where the user edited `supplier` and `notes` while the
+ * server changed `amount` and `notes`.
+ */
+export const PureMerge: Story = {
+  parameters: { controls: { disable: true } },
+  render: () => {
+    const result = computeRebase<Invoice>({
+      baseline: BASELINE,
+      values: { ...BASELINE, supplier: 'Acme Ltd', notes: 'Checked by me' },
+      incoming: { ...BASELINE, amount: '120', notes: 'Checked by the server' },
+    });
+    return (
+      <dl style={{ display: 'grid', gap: 8 }}>
+        <dt>values</dt>
+        <dd data-testid="values">{JSON.stringify(result.values)}</dd>
+        <dt>applied</dt>
+        <dd data-testid="applied">{result.applied.map((entry) => entry.label).join(', ')}</dd>
+        <dt>conflicts</dt>
+        <dd data-testid="conflicts">{result.conflicts.map((conflict) => conflict.label).join(', ')}</dd>
+      </dl>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('applied')).toHaveTextContent('Amount');
+    await expect(canvas.getByTestId('conflicts')).toHaveTextContent('Notes');
+    await expect(canvas.getByTestId('values')).toHaveTextContent('"supplier":"Acme Ltd"');
+    await expect(canvas.getByTestId('values')).toHaveTextContent('"amount":"120"');
+    await expect(canvas.getByTestId('values')).toHaveTextContent('"notes":"Checked by me"');
   },
 };

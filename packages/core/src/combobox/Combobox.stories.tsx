@@ -17,6 +17,8 @@ import type { FieldState } from '../field/FieldContext';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { repositionAfterMotion } from '../internal/settle-motion';
 import { Combobox, type ComboboxOption, type ComboboxSize } from './Combobox';
+import { defaultComboboxFilter } from './filter';
+import { useCombobox } from './use-combobox';
 
 const SIZES: ComboboxSize[] = ['sm', 'md'];
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -515,5 +517,71 @@ export const InsideSheet: Story = {
     await userEvent.click(within(list).getByRole('option', { name: 'Torino' }));
     await expect(body.getByRole('dialog', { name: 'Edit supplier' })).toBeInTheDocument();
     await waitFor(() => expect(within(sheet).getByRole('combobox', { name: 'City' })).toHaveValue('Torino'));
+  },
+};
+
+function HeadlessDemo({ onValueChange }: { onValueChange: (value: string | undefined) => void }) {
+  const [selected, setSelected] = useState<ComboboxOption | null>(null);
+  const combobox = useCombobox<ComboboxOption>({
+    items: CITIES,
+    itemToString: (city) => city.label,
+    itemToKey: (city) => city.value,
+    isItemDisabled: (city) => !!city.disabled,
+    selectedItem: selected,
+    // The default filter (case- and diacritics-insensitive substring), capped to three results.
+    filter: (items, inputValue) => defaultComboboxFilter(items, inputValue, (city) => city.label).slice(0, 3),
+    onSelectedItemChange: (city) => {
+      setSelected(city);
+      onValueChange(city?.value);
+    },
+  });
+  return (
+    <div style={{ ...column, fontFamily: 'var(--font-rop-sans, sans-serif)' }}>
+      <label>
+        City{' '}
+        <input {...combobox.getInputProps()} style={{ border: '1px solid var(--color-rop-border)', padding: '4px 8px' }} />
+      </label>
+      <ul {...combobox.getListboxProps({ 'aria-label': 'Cities' })} hidden={!combobox.isOpen} style={{ margin: 0, paddingLeft: 16 }}>
+        {combobox.filteredItems.map((city, index) => (
+          <li
+            key={city.value}
+            {...combobox.getOptionProps(city, index)}
+            style={{ fontWeight: index === combobox.activeIndex ? 700 : 400 }}
+          >
+            {city.label}
+          </li>
+        ))}
+        {combobox.filteredItems.length === 0 && (
+          <li role="option" aria-disabled="true" aria-selected="false">
+            No results
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Headless hook: `useCombobox` gives the input, listbox and option props (ARIA combobox with listbox,
+ * focus stays on the input) and no markup or style; `defaultComboboxFilter(items, inputValue,
+ * itemToString)` is the filter `Combobox` uses and can be wrapped in a custom `filter`. Here the
+ * filter caps the results to three. The play function types "m" and checks that only three of the
+ * four matching cities are listed, then narrows to "mod" and picks it with the keyboard.
+ */
+export const HeadlessHook: Story = {
+  name: 'Headless hook: useCombobox',
+  parameters: { controls: { include: ['onValueChange'] } },
+  render: ({ onValueChange }) => <HeadlessDemo onValueChange={onValueChange} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const field = canvas.getByRole('combobox', { name: 'City' });
+    await userEvent.click(field);
+    await userEvent.keyboard('m');
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(3));
+    await userEvent.keyboard('od');
+    await waitFor(() => expect(canvas.getAllByRole('option')).toHaveLength(1));
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(field).toHaveValue('Modena'));
+    await expect(args.onValueChange).toHaveBeenLastCalledWith('mo');
   },
 };

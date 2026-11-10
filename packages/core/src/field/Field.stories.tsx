@@ -226,11 +226,13 @@ function HookToggle() {
 }
 
 /**
- * Render-prop to wire a control that is not an `Input`. Locked: Space, Enter and click leave it
- * off; the reason is its accessible description. `control.interactionBlocked` and `control.state`
- * are readable but do not travel through `{...control}`.
+ * Render-prop: `<Field>{(control) => ...}</Field>` hands a `FieldControlProps` object to a control that
+ * is not an `Input`; spread it on the element. Locked: Space, Enter and click leave it off; the
+ * reason is its accessible description. `control.interactionBlocked` and `control.state` are
+ * readable but do not travel through `{...control}`.
  */
 export const RenderPropLocked: Story = {
+  name: 'Render-prop: FieldControlProps',
   parameters: { controls: { disable: true } },
   render: () => (
     <div style={column}>
@@ -250,8 +252,12 @@ export const RenderPropLocked: Story = {
   },
 };
 
-/** The same wiring through `useFieldControl()` called in a child of the Field; here it is not blocked. */
+/**
+ * Hook: `useFieldControl()` returns the same `FieldControlProps` from any component rendered inside
+ * a `Field`, so a custom control does not need the render-prop. Here the Field is not blocked.
+ */
 export const HookToggleEnabled: Story = {
+  name: 'Hook: useFieldControl',
   parameters: { controls: { disable: true } },
   render: () => (
     <div style={column}>

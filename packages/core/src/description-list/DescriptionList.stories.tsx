@@ -414,6 +414,7 @@ function StatusDemo({ entity: initial, tone, width, showSummary, layout, onSelec
 }
 
 /**
+ * `DescriptionListStatus`: a row with a status badge and a detail line, inside a `DescriptionList`.
  * Controls: `entity` (which kind of record is shown), badge `tone`, container width, `showSummary`,
  * `layout`; `onSelect` shows in Actions. The play function selects each of the four entities in
  * turn through the demo buttons and checks after every switch that the `<dl>` did not move and that
