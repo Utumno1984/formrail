@@ -460,7 +460,15 @@ export const AsyncHydration: Story = {
  * React state (like RadioGroup), reports nothing, and the next click still reports.
  */
 export const ControlledInForm: Story = {
-  parameters: NO_CONTROLS,
+  parameters: {
+    ...NO_CONTROLS,
+    docs: {
+      description: {
+        story:
+          "Controlled components don't respond to native form reset: React owns `checked`, not the DOM, so Reset leaves this checkbox showing the React state (just like a controlled `<input value={...}>`). To make Reset affect this value, reset the owning state yourself in the form's `onReset`. See 'In Form' for the uncontrolled pattern, which does follow native reset.",
+      },
+    },
+  },
   render: ({ onCheckedChange }) => {
     function Demo() {
       const [checked, setChecked] = useState(false);
