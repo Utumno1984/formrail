@@ -530,9 +530,12 @@ describe('computeRebase: purity and determinism', () => {
       o.self = o;
       return o;
     };
-    const out = rebase({ baseline: cyclic(1), values: cyclic(2), incoming: cyclic(3) });
-    expect(out.conflicts.length).toBeGreaterThan(0);
+    const values = cyclic(2);
+    const out = rebase({ baseline: cyclic(1), values, incoming: cyclic(3) });
+    // The pair (values, incoming) met again under `self` is not merged twice: one conflict there.
+    expect(out.conflicts.map((c) => c.path)).toEqual(['v', 'self']);
     expect(out.values.v).toBe(2);
+    expect(out.values.self).toBe(values);
   });
 
   it('change-summary consistency: applied equals the change summary baseline → incoming when values are clean', () => {
