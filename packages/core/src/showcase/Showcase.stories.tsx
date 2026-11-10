@@ -685,6 +685,62 @@ export const CrudDelete: StoryObj<CrudArgs> = {
   },
 };
 
+/**
+ * Bulk delete from the list (#366), optimistic and atomic: tick three rows (the bar says "3 selected"),
+ * "Delete selected" -> "Delete 3 invoices?" (focus on Cancel) -> "Delete 3 invoices". The three rows go AT ONCE,
+ * before the server answers (the store still holds them), the count goes from 200 to 197, the focus lands on
+ * "Select all results", and once the server answered a toast confirms it. Controls: `saveDelayMs`,
+ * `deleteOutcome` (`error`: all three rows come back where they were, still selected, with an error toast).
+ */
+export const CrudBulkDelete: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  // 2.5 s: the assertions made "while the server has not answered" (count, focus, store still holding the rows)
+  // need a window that a loaded machine does not close under them.
+  args: { ...CRUD_ARGS, saveDelayMs: 2500 },
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('CrudBulkDelete: no window');
+    resetListToRecord(win);
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(200\)/ })).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Delete selected' })).toHaveAttribute('aria-disabled', 'true');
+
+    const numbers = ['FT-2026-0002', 'FT-2026-0004', 'FT-2026-0005'];
+    for (const n of numbers) await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${n}` }));
+    await expect(canvas.getByText('3 selected')).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete selected' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete 3 invoices?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete 3 invoices' }));
+
+    // Optimistic: gone from the list while the server still holds them.
+    for (const n of numbers) await waitFor(() => expect(canvas.queryByRole('link', { name: n, hidden: true })).toBeNull());
+    if (args.deleteOutcome !== 'error' && Number(args.saveDelayMs) > 0) {
+      await expect(win.__ropShowcaseStore?.snapshot().some((r) => r.number === numbers[0])).toBe(true);
+    }
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(197\)/, hidden: true })).toBeInTheDocument();
+    // After the dialog's exit animation.
+    await waitFor(() => expect(canvas.getByRole('checkbox', { name: 'Select all results' })).toHaveFocus(), { timeout: 3000 });
+    await expect(body.queryByRole('dialog')).toBeNull();
+    if (args.deleteOutcome === 'error') {
+      const error = await body.findByText('Could not delete 3 invoices', undefined, { timeout: 5000 });
+      await waitFor(() => expect(error).toBeVisible());
+      for (const n of numbers) await expect(await canvas.findByRole('link', { name: n })).toBeVisible();
+      await expect(canvas.getByText('3 selected')).toBeVisible();
+      return;
+    }
+    const done = await body.findByText('3 invoices deleted', undefined, { timeout: 5000 });
+    await waitFor(() => expect(done).toBeVisible());
+    await expect(win.__ropShowcaseStore?.snapshot()).toHaveLength(197);
+    await expect(args.onDeleted).toHaveBeenCalledTimes(3);
+    await expect(canvas.getByText('No items selected')).toBeVisible();
+    await expect(canvas.getByRole('checkbox', { name: 'Select all results' })).toHaveFocus();
+  },
+};
+
 /** `Crud` without a `play` function: what `e2e/showcase-crud-create.spec.ts` drives with real input. */
 export const CrudManual: StoryObj<CrudArgs> = {
   argTypes: CRUD_ARGTYPES,
@@ -770,6 +826,61 @@ export const DeleteConfirmList: StoryObj<CrudArgs> = {
     await userEvent.click(canvas.getByRole('button', { name: 'Actions for FT-2026-0002' }));
     await userEvent.click(await body.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await body.findByRole('dialog', { name: 'Delete invoice FT-2026-0002?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+  },
+};
+
+async function openBulkList(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  const win = canvasElement.ownerDocument.defaultView;
+  if (!win) throw new Error('visual story: no window');
+  resetListToRecord(win);
+  await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(5), { timeout: 5000 });
+  return canvas;
+}
+
+/** #366: the selection bar with "Delete selected" disabled (nothing selected). */
+export const BulkDeleteIdle: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await openBulkList(canvasElement);
+    await expect(canvas.getByRole('button', { name: 'Delete selected' })).toHaveAttribute('aria-disabled', 'true');
+  },
+};
+
+/** #366: three rows selected, "Delete selected" enabled. */
+export const BulkDeleteSelected: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await openBulkList(canvasElement);
+    for (const n of ['FT-2026-0002', 'FT-2026-0004', 'FT-2026-0005']) {
+      await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${n}` }));
+    }
+    await expect(canvas.getByText('3 selected')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Delete selected' })).not.toHaveAttribute('aria-disabled');
+  },
+};
+
+/** #366: the bulk delete confirmation over the list (three rows selected), not confirmed. */
+export const BulkDeleteConfirm: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: (args) => <InvoiceCrud {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = await openBulkList(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    for (const n of ['FT-2026-0002', 'FT-2026-0004', 'FT-2026-0005']) {
+      await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${n}` }));
+    }
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete selected' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete 3 invoices?' });
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
   },
 };

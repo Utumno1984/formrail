@@ -26,6 +26,7 @@ export function createInvoiceApi(store: InvoiceStore, delays: { readonly current
     save: (invoice) => track(store.save(invoice)),
     create: (draft) => track(store.create(draft)),
     delete: (id) => track(store.delete(id)),
+    deleteMany: (ids) => track(store.deleteMany(ids)),
     list: async () => {
       await settled();
       store.configure({ loadDelayMs: delays.current.listLoadDelayMs });

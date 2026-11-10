@@ -69,6 +69,12 @@ export interface InvoiceStore {
    * more). The identity of a deleted record is never issued again (see `create`).
    */
   delete: (id: string) => Promise<void>;
+  /**
+   * Deletes several records in ONE operation (#366), all or nothing: after `saveDelayMs`, an error
+   * (`deleteOutcome: 'error'` -> `InvoiceNetworkError`, or an id that does not exist -> `InvoiceNotFoundError`
+   * for the first missing one) leaves the store unchanged. Repeated ids count once; no ids resolve at once.
+   */
+  deleteMany: (ids: readonly string[]) => Promise<void>;
   /** Changes delays/outcomes; applies to the calls made from now on. */
   configure: (patch: Partial<InvoiceStoreConfig>) => void;
   /** Synchronous read of the current state (for tests and debugging). */
@@ -158,6 +164,17 @@ export function createInvoiceStore(
       await delay(saveDelayMs);
       if (deleteOutcome === 'error') throw new InvoiceNetworkError('Could not delete the invoice: network error');
       if (!records.delete(id)) throw new InvoiceNotFoundError(id);
+    },
+    async deleteMany(ids) {
+      const unique = [...new Set(ids)];
+      if (unique.length === 0) return;
+      const { saveDelayMs, deleteOutcome } = config;
+      await delay(saveDelayMs);
+      if (deleteOutcome === 'error') throw new InvoiceNetworkError('Could not delete the invoices: network error');
+      // Checked as a whole BEFORE removing anything: all or nothing.
+      const missing = unique.find((id) => !records.has(id));
+      if (missing !== undefined) throw new InvoiceNotFoundError(missing);
+      for (const id of unique) records.delete(id);
     },
     configure: (patch) => {
       Object.assign(config, patch);

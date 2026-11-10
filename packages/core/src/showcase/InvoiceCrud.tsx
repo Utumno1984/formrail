@@ -22,13 +22,32 @@
 //   - from the record page, PESSIMISTIC: `confirm({ onConfirm: store.delete })` keeps the dialog pending until
 //     the server answers (see `InvoiceEditor`); then back to the list, past the dirty-guard, which the editor
 //     disarms first. The list focuses its title (the deleted row's link is not there to go back to).
+// BULK DELETE (#366), the same optimistic recipe with rollback on the `bulkActions` slot, but NOT the same
+// handling of `InvoiceNotFoundError`: a single delete counts it as success (the row is gone either way), while
+// here every failure rolls back, because `store.deleteMany` is atomic (an unknown id rejects the WHOLE call and
+// nothing is removed, so no row of the group was really deleted). "Delete selected" acts on the
+// selected rows the user can SEE (`getSelectedRows`), one `store.deleteMany` (atomic: all or nothing), so a
+// failure brings every row back. The selection is controlled from here: success removes the deleted ids from it
+// (those hidden by the filters stay selected); failure selects again the rows that come back, on top of the
+// current selection (changes the user made meanwhile, additions and deselections, are respected). The focus
+// goes to "select all results" (the table when no results are left).
 // Deletes outlive the page that started them: the sets live here, and a list mounted meanwhile (or loading
 // again) still leaves the ids out until each delete settles.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
 import { Button } from '../button/Button';
 import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
 import type { DemoInvoice } from '../internal/demo-invoices';
-import type { ListReportRowAction } from '../list-report/types';
+import type { ListReportRowAction, ListReportSelection } from '../list-report/types';
 import { EMPTY_IDS } from '../list-report/use-list-report';
 import { ToastProvider } from '../toast/ToastProvider';
 import { useToast } from '../toast/use-toast';
@@ -89,6 +108,12 @@ const withoutId = (set: ReadonlySet<string>, id: string): ReadonlySet<string> =>
   next.delete(id);
   return next;
 };
+
+const withIds = (set: ReadonlySet<string>, ids: readonly string[]): ReadonlySet<string> => ids.reduce(withId, set);
+const withoutIds = (set: ReadonlySet<string>, ids: readonly string[]): ReadonlySet<string> =>
+  ids.reduce(withoutId, set);
+/** "1 invoice", "3 invoices". */
+const plural = (n: number): string => `${n} ${n === 1 ? 'invoice' : 'invoices'}`;
 
 const ROW_TRIGGER = 'button[aria-label^="Actions for "]';
 
@@ -263,6 +288,37 @@ function CrudInner({
     }
   }).current;
 
+  // Bulk delete (#366). The selection lives here so it outlives the list (a page opened and closed meanwhile).
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
+  const selection = useMemo(() => ({ selectedIds, onChange: setSelectedIds }), [selectedIds]);
+
+  // Confirmed in the list (`CrudList`): the same recipe as a single row, for the whole group at once. The store
+  // call is atomic, so a failure brings EVERY row back. Success takes the deleted ids out of the selection (the
+  // hook never prunes it) and leaves the ones hidden by the filters selected. Failure selects again exactly the
+  // rows that come back (this group's ids), on top of the CURRENT selection: with no change meanwhile that is the
+  // selection of the confirmation; what the user added meanwhile stays, what the user deselected meanwhile (other
+  // rows, hidden ones, "Clear selection") stays deselected, and ids another bulk already deleted are never revived.
+  const deleteManyFromList = useRef(async (rows: readonly DemoInvoice[]) => {
+    const ids = rows.map((r) => r.id);
+    const count = ids.length;
+    setPendingDeletes((current) => withIds(current, ids));
+    try {
+      await api.deleteMany(ids);
+      for (const row of rows) callbacks.current.onDeleted?.({ id: row.id, number: row.number });
+      if (!mounted.current) return;
+      // Added to `deletedIds` BEFORE leaving `pendingDeletes` (the `finally`): never shown in between.
+      setDeletedIds((current) => withIds(current, ids));
+      setSelectedIds((current) => withoutIds(current, ids));
+      toast.show({ tone: 'success', description: `${plural(count)} deleted` });
+    } catch {
+      if (!mounted.current) return;
+      toast.show({ tone: 'error', description: `Could not delete ${plural(count)}` });
+      setSelectedIds((current) => withIds(current, ids));
+    } finally {
+      if (mounted.current) setPendingDeletes((current) => withoutIds(current, ids));
+    }
+  }).current;
+
   const deleteFromPage = useRef((invoice: StoredInvoice) => deleteOnServer(invoice)).current;
   const deleteDone = useRef(() => {
     if (isLeaving()) return;
@@ -298,6 +354,8 @@ function CrudInner({
   return (
     <CrudList
       onDelete={deleteFromList}
+      onDeleteMany={deleteManyFromList}
+      selection={selection}
       store={api}
       history={history}
       returning={cameFromPage.current}
@@ -320,8 +378,77 @@ function CrudInner({
  * and `useConfirmDialog` resolves an open confirmation with `false`, so nothing is deleted from a list that is
  * no longer on screen.
  */
-function CrudList({ onDelete, ...props }: Omit<ListViewProps, 'rowActions'> & { onDelete: (row: DemoInvoice) => void }) {
+function CrudList({
+  onDelete,
+  onDeleteMany,
+  ...props
+}: Omit<ListViewProps, 'rowActions' | 'bulkActions'> & {
+  onDelete: (row: DemoInvoice) => void;
+  onDeleteMany: (rows: readonly DemoInvoice[]) => void;
+}) {
   const [confirm, confirmDialog] = useConfirmDialog();
+  const [buttonKey, setButtonKey] = useState(0);
+  // "Delete selected" (#366) in the selection bar. `aria-disabled`, not `disabled`: with nothing selected it
+  // stays focusable, so the focus the dialog gives back to it is not lost. It acts on the selected rows the user
+  // can see (`getSelectedRows`); the ones hidden by the filters are said in the dialog and left alone.
+  const bulkActions = useCallback(
+    (selection: ListReportSelection<DemoInvoice>) => {
+      const visible = selection.selectedResultCount;
+      const ask = (event: MouseEvent<HTMLElement>) => {
+        const rows = selection.getSelectedRows();
+        if (rows.length === 0) return;
+        const button = event.currentTarget;
+        const bar = button.closest<HTMLElement>('[data-rop-selection-bar]');
+        const hidden = selection.hiddenSelectedCount;
+        // Read when the dialog has closed. Cancel/Escape: the button itself (the dialog's own return). After the
+        // confirmation the selection is empty, so the "select all results" checkbox of the table (or its
+        // container when there are no results left): the same rule as "Clear selection".
+        let confirmed = false;
+        const returnFocusRef: RefObject<HTMLElement | null> = {
+          get current() {
+            if (!confirmed) return button;
+            const root = bar?.parentElement;
+            const header = root?.querySelector<HTMLInputElement>('th[data-rop-select] input');
+            if (header && !header.disabled) return header;
+            return root?.querySelector<HTMLElement>(`[id="${bar?.getAttribute('aria-controls') ?? ''}"]`) ?? null;
+          },
+          set current(_value) {
+            /* read-only view */
+          },
+        };
+        void confirm({
+          title: `Delete ${plural(rows.length)}?`,
+          description:
+            `${rows.length === 1 ? 'The invoice is' : 'The invoices are'} deleted permanently.` +
+            (hidden > 0
+              ? ` ${hidden} selected ${hidden === 1 ? 'invoice' : 'invoices'} hidden by the filters will not be deleted.`
+              : ''),
+          confirmLabel: `Delete ${plural(rows.length)}`,
+          tone: 'danger',
+          returnFocusRef,
+        }).then((ok) => {
+          if (!ok) return;
+          confirmed = true;
+          // A new button: the dialog gives the focus back to the element that opened it if it is still there,
+          // and only then to `returnFocusRef` (see `useReturnFocus`). The old one goes, like a deleted row's "…".
+          setButtonKey((k) => k + 1);
+          onDeleteMany(rows);
+        });
+      };
+      return (
+        <Button
+          key={buttonKey}
+          size="sm"
+          variant="danger"
+          aria-disabled={visible === 0 ? true : undefined}
+          onClick={ask}
+        >
+          Delete selected
+        </Button>
+      );
+    },
+    [confirm, onDeleteMany, buttonKey],
+  );
   const rowActions = useCallback(
     (row: DemoInvoice): readonly ListReportRowAction[] => [
       {
@@ -357,7 +484,7 @@ function CrudList({ onDelete, ...props }: Omit<ListViewProps, 'rowActions'> & { 
   );
   return (
     <>
-      <ListView {...props} rowActions={rowActions} />
+      <ListView {...props} rowActions={rowActions} bulkActions={bulkActions} />
       {confirmDialog}
     </>
   );

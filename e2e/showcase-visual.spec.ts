@@ -58,6 +58,35 @@ test.describe('Showcase/Invoices: visual states (geometry)', () => {
         expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
         expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
       });
+
+      test('#366 CRUD list: the selection bar keeps its height with "Delete selected" enabled or disabled; the bulk dialog fits', async ({ page }) => {
+        await gotoStory(page, 'showcase-invoices--crud-manual', 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:0');
+        const bar = page.locator('[data-rop-selection-bar]');
+        await expect(page.getByRole('checkbox', { name: /^Select FT-/ }).first()).toBeVisible();
+        const button = page.getByRole('button', { name: 'Delete selected' });
+        await expect(button).toHaveAttribute('aria-disabled', 'true');
+        const idle = (await bar.boundingBox())!;
+        for (const n of ['FT-2026-0002', 'FT-2026-0003', 'FT-2026-0004']) {
+          await page.getByRole('checkbox', { name: `Select ${n}`, exact: true }).check();
+        }
+        await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+        const selected = (await bar.boundingBox())!;
+        expect(selected.height).toBeCloseTo(idle.height, 0);
+        expect(selected.y).toBeCloseTo(idle.y, 0);
+        // The bar's controls stay inside the viewport (no wrap that pushes "Delete selected" out of view).
+        const buttonBox = (await button.boundingBox())!;
+        expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(viewport.width);
+        // The table scrolls sideways inside its own scroller on narrow screens (by design); the page must not.
+        expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+        await button.click();
+        const dialog = page.getByRole('dialog', { name: 'Delete 3 invoices?' });
+        await expect(dialog).toBeVisible();
+        const box = (await dialog.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+        expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+      });
     });
   }
 
