@@ -4,7 +4,8 @@
 > variabile di una codebase altrui è riportato qui: ogni idea è riformulata in termini generici di
 > progettazione UI enterprise diffusi nel settore. Obiettivo:
 > ripartire con un design system React indipendente, usato per primo da Daniele nei suoi progetti
-> (vistato, agent-scout, sniper-trading-bot, react-virtual-tree-view, react-virtual-dnd-table) e
+> (un SaaS di approvazione fatture fornitori, agent-scout, sniper-trading-bot, react-virtual-tree-view,
+> react-virtual-dnd-table) e
 > messo a reddito con un modello **open-core** (core MIT gratuito + pacchetto Pro a pagamento).
 
 ## 0. Posizionamento: pattern UI enterprise generici
@@ -646,11 +647,11 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
 
 ## 4. Riuso con i progetti esistenti di Daniele
 
-- **vistato**: oggi usa tabelle/form "custom" per l'approvazione fatture; la UI di approvazione è
+- **SaaS di approvazione fatture fornitori (altro progetto di Daniele)**: oggi usa tabelle/form "custom" per l'approvazione fatture; la UI di approvazione è
   concettualmente un **Object Page** (fattura = oggetto, sezioni = dati fattura/fornitore/storico
   approvazioni, azioni = approva/rifiuta) con una **List Report** per la coda fatture da approvare.
   Migrarlo sul nuovo DS non è solo riuso interno: è il **primo banco di prova reale** per il DS (se
-  non regge vistato, non regge niente).
+  non regge questo progetto, non regge niente).
 - **react-virtual-tree-view / react-virtual-dnd-table**: candidati naturali come **fondamenta del
   livello Pro "tabelle avanzate"** (virtualizzazione + drag&drop già maturi, testati, con
   community/traction iniziale) invece di restare pacchetti satellite separati. Da **discutere, non
@@ -693,9 +694,9 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    fascia Free (probabile: Free attira adozione/community ampia, Pro converte chi ha davvero un
    backoffice complesso da costruire in produzione).
 6. **Rischio di diluizione dell'attenzione**: Daniele ha già 2 pacchetti pubblici attivi
-   (react-virtual-tree-view, react-virtual-dnd-table) più 3 prodotti in corso (vistato, agent-scout,
+   (react-virtual-tree-view, react-virtual-dnd-table) più 3 prodotti in corso (il SaaS di approvazione fatture, agent-scout,
    sniper-trading-bot) più il filone Fatture in Cloud. Questo è un **quinto/sesto fronte**. Va
-   deciso consapevolmente se ha priorità più alta del completamento di vistato/FiC o se procede in
+   deciso consapevolmente se ha priorità più alta del completamento del SaaS di approvazione fatture/FiC o se procede in
    parallelo a ritmo più lento (sezione MVP sotto assume ritmo "lento ma con moat", non uno sprint).
 7. **Valori assenti tra form e Change Summary** (aperta il 2026-11-03, vedi §1.13.1).
    (a) **Decisa il 2026-11-03, risolta da #202.** `isDirty` (core) resta rigoroso e invariato
@@ -712,7 +713,7 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
 
 ## 6. Proposta di primo MVP
 
-Obiettivo: arrivare rapidamente a qualcosa che (a) Daniele può già usare lui stesso su vistato, (b)
+Obiettivo: arrivare rapidamente a qualcosa che (a) Daniele può già usare lui stesso nel suo SaaS di approvazione fatture, (b)
 è presentabile pubblicamente come design system React headless, indipendente e open-source, (c) ha
 già un primo componente Pro vendibile per validare la domanda, senza costruire tutto il resto prima.
 
@@ -725,7 +726,7 @@ già un primo componente Pro vendibile per validare la domanda, senza costruire 
    empty/loading stabili) + **Object Page semplice** (sezioni ancorate + save-bar base). Questo è
    il primo momento in cui il posizionamento del progetto diventa visibile e dimostrabile in
    Storybook — vale la pena investire qui su qualità visiva e demo, è il "biglietto da visita".
-3. **Validazione su vistato**: migrare la coda fatture di vistato su List Report + Object Page
+3. **Validazione sul SaaS di approvazione fatture**: migrare la sua coda fatture su List Report + Object Page
    Free. Se emergono limiti reali (non estetici) qui, è il segnale più onesto di cosa manca prima
    di vendere qualcosa.
 4. **Primo componente Pro**: **dirty-tracking robusto + Change Summary** sull'Object Page (§1.4,
