@@ -90,17 +90,23 @@ describe('InvoiceCrud: bulk delete', () => {
     expect(button.getAttribute('aria-disabled')).toBe('true');
     expect((button as HTMLButtonElement).disabled).toBe(false);
     const spy = vi.spyOn(store(), 'deleteMany');
+    // A dialog would open asynchronously (the confirmation is a promise + a state update): give it the time to
+    // appear before asserting that it did not. Asserted after EACH gesture: a dialog opened by the click would
+    // otherwise be closed by the Enter (Cancel has the focus) and the final check would see nothing.
+    const assertNothingOpened = async () => {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByText(/Delete 0 invoices/)).toBeNull();
+      expect(spy).not.toHaveBeenCalled();
+    };
     await userEvent.click(button);
+    await assertNothingOpened();
     button.focus();
     await userEvent.keyboard('{Enter}');
-    // A dialog would open asynchronously (the confirmation is a promise + a state update): give it the time to
-    // appear before asserting that it did not.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-    });
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByText(/Delete 0 invoices/)).toBeNull();
-    expect(spy).not.toHaveBeenCalled();
+    await assertNothingOpened();
+    expect(document.activeElement).toBe(button);
   }, 20_000);
 
   it('rollback respects what the user deselected meanwhile: "Clear selection" during the flight, then an error -> only the rows that come back are selected again (a hidden one stays deselected)', async () => {

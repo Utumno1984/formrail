@@ -100,10 +100,16 @@ test.describe('Showcase/Invoices: Crud (bulk delete)', () => {
     await expect(button).toHaveAttribute('aria-disabled', 'true');
     // Playwright's `toBeDisabled` counts `aria-disabled`: read the native property instead.
     expect(await button.evaluate((el) => (el as HTMLButtonElement).disabled)).toBe(false);
+    // Checked after EACH gesture: a dialog opened by the click would be closed by the Enter (Cancel has the
+    // focus), and a single final check would not see it. The short wait gives an async dialog time to appear.
     await button.click({ force: true }); // actionability treats aria-disabled as disabled
+    await page.waitForTimeout(300);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await button.focus();
     await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(button).toBeFocused();
     expect(await bulkCalls(page)).toEqual([]);
   });
 
