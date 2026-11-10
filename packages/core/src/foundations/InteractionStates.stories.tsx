@@ -164,7 +164,7 @@ function Surfaces({ disabled, state, onClick, onValueChange, onFilterChange }: S
       <Group id="list-report" title="Filter pills and sortable header">
         <ListReportFilterBar table={table} showSearch={false} />
         <div style={{ marginTop: 12 }}>
-          <ListReportTable table={table} aria-label="Invoices" />
+          <ListReportTable table={table} aria-label="Invoices" loadingRowCount={1} />
         </div>
       </Group>
 
