@@ -78,7 +78,7 @@ ma sono priorità non regole rigide:
 
 **Priorità e ritmo (decisione di Daniele del 2026-11-04, sostituisce "ritmo lento/non
 prioritario")**: react-object-page è ora **prioritario**, non più un progetto a ritmo lento in
-parallelo su vistato/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
+parallelo sul SaaS di approvazione fatture/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
 step salvo una vera decisione da chiedere a Daniele (vedi anche la nota sulla pipeline ad
 oltranza in memoria dell'orchestratore).
 
