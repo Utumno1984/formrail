@@ -186,7 +186,12 @@ test.describe('Showcase/Invoices: Crud (bulk delete)', () => {
     await openList(page, 'filter=all');
     // The first pending (Open) invoice and two non-pending ones, all in the first rows.
     const statuses = await page.evaluate(() =>
-      Object.fromEntries((window.__ropShowcaseStore?.snapshot() ?? []).map((r) => [r.number, r.status])),
+      Object.fromEntries(
+        ((window.__ropShowcaseStore?.snapshot() ?? []) as unknown as { number: string; status: string }[]).map((r) => [
+          r.number,
+          r.status,
+        ]),
+      ),
     );
     const shown = await shownNumbers(page);
     const open = shown.find((n) => statuses[n] === 'pending')!;
