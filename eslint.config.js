@@ -10,6 +10,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       '**/storybook-static/**',
+      'site/**',
+      '**/playwright-report-site/**',
       '**/playwright-report/**',
       '**/test-results/**',
       '.tickets-draft/**',

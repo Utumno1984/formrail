@@ -38,9 +38,16 @@ critico-avversariale) e le regole di dominio.
 
 ### Storybook ed e2e
 
-- **Demo pubblica**: https://utumno1984.github.io/react-object-page/ — Storybook del solo core
-  (Free), ripubblicato su GitHub Pages a ogni push su `main` con CI verde (job `deploy-pages` in
-  `.github/workflows/ci.yml`; esiste anche l'avvio manuale con `workflow_dispatch`).
+- **Demo pubblica**: https://utumno1984.github.io/react-object-page/storybook/ — Storybook del solo
+  core (Free), ripubblicato su GitHub Pages a ogni push su `main` con CI verde (job `deploy-pages`
+  in `.github/workflows/ci.yml`; esiste anche l'avvio manuale con `workflow_dispatch`). La radice
+  del sito è riservata alla landing; finché non esiste reindirizza allo Storybook e i vecchi link
+  profondi (`/?path=/docs/...`, `/iframe.html?id=...`) continuano a funzionare.
+- Il sito pubblicato si assembla in locale con
+  `npm run build && STORYBOOK_EXCLUDE_PRO=1 npm run build-storybook && npm run assemble-site`
+  (cartella `site/`: radice + `storybook/` + `pro/`); poi `npm run serve-site` lo serve su
+  `http://localhost:6008/react-object-page/` e `npm run test:site` esegue lo smoke pre-deploy
+  (`e2e/site/`, fuori dalla suite e2e delle PR).
 
 - `npm run storybook` avvia Storybook; `npm run test:e2e` ricostruisce Storybook e lancia
   Playwright contro la build statica sulla porta 6007.

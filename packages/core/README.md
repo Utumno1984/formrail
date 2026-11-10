@@ -12,7 +12,7 @@ This package is the free, MIT-licensed tier of the
 tier today versus the commercially-licensed `@react-object-page/pro`. It is an independent
 implementation of generic, publicly known UI patterns.
 
-**[Live demo and documentation (Storybook)](https://utumno1984.github.io/react-object-page/)**
+**[Live demo and documentation (Storybook)](https://utumno1984.github.io/react-object-page/storybook/)**
 
 ## Install
 
