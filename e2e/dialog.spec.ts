@@ -139,7 +139,7 @@ test.describe('dismissible={false}', () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test('a mousedown on the backdrop does not move the focus out of the panel', async ({ page }) => {
+  test('@engines a mousedown on the backdrop does not move the focus out of the panel', async ({ page }) => {
     await gotoStory(page, STORY('not-dismissible'));
     const dialog = page.getByRole('dialog', { name: 'Delete the supplier?' });
     await expect(dialog).toBeVisible();
@@ -151,6 +151,21 @@ test.describe('dismissible={false}', () => {
     await page.mouse.down();
     await expect(cancel).toBeFocused();
     await page.mouse.up();
+    await expect(dialog).toBeVisible();
+    await expect(cancel).toBeFocused();
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+  });
+});
+
+test.describe('dismissible={false} on touch @touch', () => {
+  test('a tap on the backdrop does not move the focus out of the panel', async ({ page }) => {
+    await gotoStory(page, STORY('not-dismissible'));
+    const dialog = page.getByRole('dialog', { name: 'Delete the supplier?' });
+    await expect(dialog).toBeVisible();
+    const cancel = page.getByRole('button', { name: 'Cancel' });
+    await cancel.focus();
+    await expect(cancel).toBeFocused();
+    await page.touchscreen.tap(4, 4);
     await expect(dialog).toBeVisible();
     await expect(cancel).toBeFocused();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
