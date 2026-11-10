@@ -37,16 +37,22 @@ export function previewAnnotations(env = process.env) {
  * Pro stories that exist in the repo (and in the complete build, where they are developed) but are not
  * public yet: left out of the Pro demo build ONLY, at the glob level, so they are absent from index.json
  * too (the `internal` tag only hides the sidebar, see manager.ts). Remove an entry when its showcase
- * ticket ships. Folder names directly under packages/pro/src. Done with an extglob `!(a|b)` because
- * Storybook does not resolve a leading `!` negated glob relative to `.storybook/` (it treats it as a path).
+ * ticket ships (removing the last one is fine: storyGlobs() then emits the plain glob). Folder names
+ * directly under packages/pro/src. Done with an extglob `!(a|b)` because Storybook does not resolve a
+ * leading `!` negated glob relative to `.storybook/` (it treats it as a path). An EMPTY extglob `!()`
+ * matches NOTHING (not "everything"), which would silently drop every Pro story: hence the empty case below.
  *   - form-rebase: waiting for the showcase integration (#384); leaked in by #395 (incident #421).
  */
 export const PRO_DEMO_NOT_PUBLIC = ['form-rebase'];
 
 /** Story globs (and the Pro intro page), relative to `.storybook/`. */
-export function storyGlobs(env = process.env) {
+export function storyGlobs(env = process.env, notPublic = PRO_DEMO_NOT_PUBLIC) {
   if (proEdition(env)) {
-    return [`../packages/pro/src/!(${PRO_DEMO_NOT_PUBLIC.join('|')})/**/*.stories.tsx`, './ProIntroduction.mdx'];
+    const proStories =
+      notPublic.length === 0
+        ? '../packages/pro/src/**/*.stories.tsx'
+        : `../packages/pro/src/!(${notPublic.join('|')})/**/*.stories.tsx`;
+    return [proStories, './ProIntroduction.mdx'];
   }
   const globs = ['../packages/core/src/**/*.stories.tsx'];
   if (!excludePro(env)) globs.push('../packages/pro/src/**/*.stories.tsx');
