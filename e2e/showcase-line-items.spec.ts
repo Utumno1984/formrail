@@ -81,8 +81,9 @@ test.describe('Showcase/Invoices: line items', () => {
     const before = await descriptions(page);
     await expect(btn(page, 'Move line 1 up')).toHaveAttribute('aria-disabled', 'true');
     await expect(btn(page, 'Move line 3 down')).toHaveAttribute('aria-disabled', 'true');
-    await btn(page, 'Move line 1 up').click();
-    await btn(page, 'Move line 3 down').click();
+    // Playwright treats `aria-disabled` as not actionable: the click is forced to reach the handler.
+    await btn(page, 'Move line 1 up').click({ force: true });
+    await btn(page, 'Move line 3 down').click({ force: true });
     expect(await descriptions(page)).toEqual(before);
     await expect(bar(page)).toBeHidden();
   });
@@ -94,12 +95,15 @@ test.describe('Showcase/Invoices: line items', () => {
     await btn(page, 'Move line 2 down').focus();
     await page.keyboard.press('Enter');
     await expect(bar(page)).toBeHidden();
-    await expect(btn(page, 'Move line 2 down')).toBeFocused();
+    // The line moved back to position 3: its "down" button is now the (aria-disabled) last one.
+    await expect(btn(page, 'Move line 3 down')).toBeFocused();
   });
 
   test('every repeated button has its own accessible name', async ({ page }) => {
     await open(page, 'inv-4');
-    const names = await page.getByRole('button', { name: /^(Remove|Move) line \d/ }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+    const names = await page
+      .getByRole('button', { name: /^(Remove|Move) line \d/ })
+      .evaluateAll((els) => els.map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim()));
     expect(names).toHaveLength(12);
     expect(new Set(names).size).toBe(12);
     const labels = await page.getByRole('textbox', { name: /^Line \d/ }).evaluateAll((els) => els.map((el) => el.getAttribute('aria-labelledby')));

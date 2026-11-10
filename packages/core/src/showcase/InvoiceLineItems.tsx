@@ -91,7 +91,8 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
   };
 
   return (
-    <div ref={rootRef} style={{ display: 'grid', gap: 16, maxWidth: 640, minWidth: 0 }}>
+    // `position: relative`: the visually hidden spans are absolutely positioned and must stay inside the scroller.
+    <div ref={rootRef} style={{ position: 'relative', display: 'grid', gap: 16, maxWidth: 640, minWidth: 0 }}>
       {lines.length === 0 ? (
         <p style={{ margin: 0 }}>No line items</p>
       ) : (
@@ -107,31 +108,34 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-label={`Move line ${n} up`}
                       aria-disabled={i === 0 || undefined}
                       onClick={() => move(i, -1)}
                       {...{ [FOCUS_ATTR]: `up:${line.id}` }}
                     >
-                      Move up
+                      <span>
+                        Move <span style={VISUALLY_HIDDEN}>{`line ${n}`}</span> up
+                      </span>
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-label={`Move line ${n} down`}
                       aria-disabled={i === lines.length - 1 || undefined}
                       onClick={() => move(i, 1)}
                       {...{ [FOCUS_ATTR]: `down:${line.id}` }}
                     >
-                      Move down
+                      <span>
+                        Move <span style={VISUALLY_HIDDEN}>{`line ${n}`}</span> down
+                      </span>
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-label={`Remove line ${n}`}
                       onClick={() => remove(i)}
                       {...{ [FOCUS_ATTR]: `remove:${line.id}` }}
                     >
-                      Remove
+                      <span>
+                        Remove <span style={VISUALLY_HIDDEN}>{`line ${n}`}</span>
+                      </span>
                     </Button>
                   </div>
                 </div>

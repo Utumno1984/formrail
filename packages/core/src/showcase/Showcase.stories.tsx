@@ -50,7 +50,7 @@ const meta: Meta<RecordPageArgs> = {
   argTypes: {
     recordId: {
       control: 'select',
-      options: ['inv-1', 'inv-2', 'inv-3', 'inv-7', 'inv-does-not-exist'],
+      options: ['inv-1', 'inv-2', 'inv-3', 'inv-4', 'inv-7', 'inv-does-not-exist'],
       description: 'The invoice to open. `inv-does-not-exist` shows the not-found state. Changing it mounts a fresh editor.',
     },
     loadDelayMs: {

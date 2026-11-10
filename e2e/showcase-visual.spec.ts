@@ -94,7 +94,8 @@ test.describe('Showcase/Invoices: visual states (geometry)', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await openFirstRecord(page);
     const bar = page.getByRole('navigation', { name: 'Sections' });
-    await expect(bar.getByRole('link')).toHaveCount(3);
+    // Sections: General, Amount, Line items, Notes.
+    await expect(bar.getByRole('link')).toHaveCount(4);
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
   });
 });
