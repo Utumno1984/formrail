@@ -34,6 +34,9 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Menu',
+  // The props tables come from `subcomponents` (docgen only, no inferred argTypes): the stories drive the
+  // menu through a demo wrapper, so its props must not become Controls.
+  subcomponents: { Menu, MenuTrigger, MenuContent, MenuItem, MenuGroup, MenuLabel, MenuSeparator },
   // Overlays opened at mount (`defaultOpen`) would take over the Docs page if the stories were rendered
   // inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '420px' } } },

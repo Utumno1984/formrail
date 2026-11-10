@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useFieldControl, useObjectPageForm } from '@react-object-page/core';
 import { ChangeSummary } from './ChangeSummary';
 import { formatChangeValue } from './format-change-value';
+import { inferSegmentLabel } from './infer-label';
 import { computeChangeSummary } from './compute-change-summary';
 import { useChangeSummary } from './use-change-summary';
 import type { ChangeEntry } from './types';
@@ -489,5 +490,39 @@ export const EditedInvoice: Story = {
   ),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getAllByRole('listitem').length).toBeGreaterThanOrEqual(4);
+  },
+};
+
+const SEGMENTS = ['lineItems', 'LINE_ITEMS', 'vatID', 'address2', 'XMLParser', ''];
+
+/**
+ * `inferSegmentLabel(segment)`: the label `computeChangeSummary` gives to an object key when `labels`
+ * has no entry for it. Splits camelCase, `_`, `-` and letter/digit boundaries, keeps acronyms and
+ * returns `(unnamed)` for an empty segment. The play function checks the table below.
+ */
+export const InferredLabels: Story = {
+  parameters: { controls: { disable: true } },
+  render: () => (
+    <table>
+      <tbody>
+        {SEGMENTS.map((segment) => (
+          <tr key={segment}>
+            <td>
+              <code>inferSegmentLabel({JSON.stringify(segment)})</code>
+            </td>
+            <td data-testid={`label-${segment}`}>{inferSegmentLabel(segment)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('label-lineItems')).toHaveTextContent('Line Items');
+    await expect(canvas.getByTestId('label-LINE_ITEMS')).toHaveTextContent('LINE ITEMS');
+    await expect(canvas.getByTestId('label-vatID')).toHaveTextContent('Vat ID');
+    await expect(canvas.getByTestId('label-address2')).toHaveTextContent('Address 2');
+    await expect(canvas.getByTestId('label-XMLParser')).toHaveTextContent('XML Parser');
+    await expect(canvas.getByTestId('label-')).toHaveTextContent('(unnamed)');
   },
 };

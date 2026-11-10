@@ -217,6 +217,20 @@ test.describe('Introduction page', () => {
     expect(themedBg).not.toBe(defaultBg);
   });
 
+  // Ticket #407, on the real `index.json`: the static guard (`scripts/docs-coverage.test.mjs`) reads the
+  // sources; this one reads what the build publishes.
+  test('every Docs link of the index opens an existing page, and every public Docs page is linked', async ({ page, request }) => {
+    const index = (await (await request.get('/index.json')).json()) as { entries: Record<string, { id: string; type?: string; title: string }> };
+    const docs = Object.values(index.entries).filter((e) => e.type === 'docs');
+    const ids = new Set(docs.map((e) => e.id));
+    const hrefs = await page.locator('a[href*="?path=/docs/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href') ?? ''));
+    const linked = new Set(hrefs.map((href) => /\?path=\/docs\/([^&#]+)/.exec(href)?.[1] ?? ''));
+    expect([...linked].filter((id) => !ids.has(id))).toEqual([]);
+    const pro = docs.filter((e) => e.title.startsWith('Pro/') || e.title === 'Pro introduction');
+    const free = docs.filter((e) => !pro.includes(e) && e.id !== 'introduction--docs');
+    expect(free.filter((e) => !linked.has(e.id)).map((e) => e.id)).toEqual([]);
+  });
+
   test('links to the Tokens page and the floorplans are present', async ({ page }) => {
     await expect(page.locator('a[href*="foundations-tokens--docs"]').first()).toBeVisible();
     await expect(page.locator('a[href*="floorplans-list-report--docs"]').first()).toBeVisible();
