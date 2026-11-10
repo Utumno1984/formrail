@@ -402,6 +402,68 @@ describe('computeRebase: arrays with an id key', () => {
     expect(out.conflicts).toEqual([]);
   });
 
+  it('user removes an item, server reorders: the removal is not a user reorder (server order, no conflict)', () => {
+    const out = rebase({
+      baseline: { lines: [{ id: 1 }, { id: 2 }, { id: 3 }] },
+      values: { lines: [{ id: 1 }, { id: 3 }] },
+      incoming: { lines: [{ id: 3 }, { id: 2 }, { id: 1 }] },
+      arrayIdKeys,
+    });
+    expect(out.values.lines.map((l) => l.id)).toEqual([3, 1]);
+    expect(out.conflicts).toEqual([]);
+  });
+
+  it('server removes an item, user reorders: the removal is not a server reorder (user order, no conflict)', () => {
+    const out = rebase({
+      baseline: { lines: [{ id: 1 }, { id: 2 }, { id: 3 }] },
+      values: { lines: [{ id: 3 }, { id: 2 }, { id: 1 }] },
+      incoming: { lines: [{ id: 1 }, { id: 3 }] },
+      arrayIdKeys,
+    });
+    expect(out.values.lines.map((l) => l.id)).toEqual([3, 1]);
+    expect(out.conflicts).toEqual([]);
+    expect(out.applied.map((e) => [e.path, e.kind])).toEqual([['lines.1', 'removed']]);
+  });
+
+  it('applied on an id-keyed array with an item without id is one block entry', () => {
+    const baseline = { lines: [{ id: 1, a: 1 }, { a: 2 }] };
+    const out = rebase({ baseline, values: baseline, incoming: { lines: [{ id: 1, a: 9 }, { a: 2 }] }, arrayIdKeys });
+    expect(out.applied.map((e) => [e.path, e.kind])).toEqual([['lines', 'changed']]);
+  });
+
+  it('a cycle through an id-keyed array: conflict on the cyclic node, no key lost', () => {
+    type L = { id: number; v: number; lines: L[] };
+    const mk = (v: number) => {
+      const arr: L[] = [];
+      arr.push({ id: 1, v, lines: arr });
+      return arr;
+    };
+    const values = { lines: mk(1) };
+    const out = computeRebase({
+      baseline: { lines: mk(0) },
+      values,
+      incoming: { lines: mk(2) },
+      arrayIdKeys: { lines: 'id', 'lines.lines': 'id' },
+    });
+    const item = out.values.lines[0] as L;
+    expect(Object.hasOwn(item, 'lines')).toBe(true);
+    expect(item.lines).toBe(values.lines);
+    expect(item.v).toBe(1);
+    expect(out.conflicts.map((c) => c.path)).toEqual(['lines.0.v', 'lines.0.lines']);
+  });
+
+  it('warns when one of the three sides under an id key is not an array', () => {
+    const out = rebase({
+      baseline: { lines: [line(1)] } as Obj,
+      values: { lines: 'x' } as Obj,
+      incoming: { lines: [line(1, 2)] } as Obj,
+      arrayIdKeys,
+    });
+    expect(out.conflicts.map((c) => c.path)).toEqual(['lines']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toMatch(/computeRebase: .*is not an array; the id key is ignored/);
+  });
+
   it('removals and additions are not reorders', () => {
     const out = run(base, [line(1), line(3)], [line(0), line(1), line(2), line(3)]);
     expect(ids(out.values.lines)).toEqual([1, 3, 0]);

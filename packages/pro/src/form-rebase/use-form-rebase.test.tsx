@@ -279,6 +279,16 @@ describe('useFormRebase: resolving conflicts', () => {
     expect(h().rebase.applied).toEqual([]);
   });
 
+  it('reset(newBaseline) by the consumer after a rebase on a clean form clears applied', () => {
+    const { h } = setup();
+    act(() => h().rebase.rebase({ ...BASE, amount: 20 }));
+    expect(h().form.isDirty).toBe(false);
+    expect(h().rebase.applied.map((e) => e.path)).toEqual(['amount']);
+    act(() => h().form.reset({ ...BASE, amount: 50, notes: 'reloaded' }));
+    expect(h().rebase.applied).toEqual([]);
+    expect(h().rebase.conflicts).toEqual([]);
+  });
+
   it('a conflict on a top-level key removed by the server: acceptTheirs removes the key', () => {
     const { h } = setup(undefined, { ...BASE, extra: 'base' });
     act(() => h().form.setValue('extra', 'mine'));
