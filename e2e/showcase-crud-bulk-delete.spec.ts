@@ -182,6 +182,36 @@ test.describe('Showcase/Invoices: Crud (bulk delete)', () => {
     await expect(bulkButton(page)).not.toHaveAttribute('aria-disabled', 'true');
   });
 
+  test('deleteOutcome error after "Clear selection" during the flight: the rows that come back are selected again, a hidden row the user deselected is not', async ({ page }) => {
+    await openList(page, 'filter=all', `${SLOW};deleteOutcome:error`);
+    const statuses = await page.evaluate(() =>
+      Object.fromEntries(
+        ((window.__ropShowcaseStore?.snapshot() ?? []) as unknown as { number: string; status: string }[]).map((r) => [
+          r.number,
+          r.status,
+        ]),
+      ),
+    );
+    const shown = await shownNumbers(page);
+    const open = shown.find((n) => statuses[n] === 'pending')!;
+    const hiddenOne = shown.find((n) => statuses[n] !== 'pending')!;
+    await selectRows(page, open, hiddenOne);
+    await page.getByRole('radio', { name: 'Open' }).click();
+    await expect(counter(page)).toHaveText('1 selected (1 hidden by filters)');
+    const dialog = await askBulk(page, 'Delete 1 invoice?');
+    await dialog.getByRole('button', { name: 'Delete 1 invoice', exact: true }).click();
+    await expect(link(page, open)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Clear selection' }).click();
+    await expect(counter(page)).toHaveText('No items selected');
+    await expect(page.getByText('Could not delete 1 invoice')).toBeVisible({ timeout: 10_000 });
+    await expect(link(page, open)).toBeVisible();
+    await expect(counter(page)).toHaveText('1 selected');
+    await expect(rowBox(page, open)).toBeChecked();
+    await page.getByRole('radio', { name: 'All' }).click();
+    await expect(rowBox(page, hiddenOne)).not.toBeChecked();
+    await expect(counter(page)).toHaveText('1 selected');
+  });
+
   test('2 selected rows hidden by the filters: the dialog says so; after the delete they are still stored and still selected', async ({ page }) => {
     await openList(page, 'filter=all');
     // The first pending (Open) invoice and two non-pending ones, all in the first rows.

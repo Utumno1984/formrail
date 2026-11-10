@@ -694,7 +694,9 @@ export const CrudDelete: StoryObj<CrudArgs> = {
  */
 export const CrudBulkDelete: StoryObj<CrudArgs> = {
   argTypes: CRUD_ARGTYPES,
-  args: { ...CRUD_ARGS, saveDelayMs: 800 },
+  // 2.5 s: the assertions made "while the server has not answered" (count, focus, store still holding the rows)
+  // need a window that a loaded machine does not close under them.
+  args: { ...CRUD_ARGS, saveDelayMs: 2500 },
   render: (args) => <InvoiceCrud {...args} />,
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);

@@ -25,8 +25,9 @@
 // BULK DELETE (#366), the same optimistic recipe on the `bulkActions` slot: "Delete selected" acts on the
 // selected rows the user can SEE (`getSelectedRows`), one `store.deleteMany` (atomic: all or nothing), so a
 // failure brings every row back. The selection is controlled from here: success removes the deleted ids from it
-// (those hidden by the filters stay selected); failure restores it as it was at the confirmation, plus what the
-// user selected meanwhile. The focus goes to "select all results" (the table when no results are left).
+// (those hidden by the filters stay selected); failure selects again the rows that come back, on top of the
+// current selection (changes the user made meanwhile, additions and deselections, are respected). The focus
+// goes to "select all results" (the table when no results are left).
 // Deletes outlive the page that started them: the sets live here, and a list mounted meanwhile (or loading
 // again) still leaves the ids out until each delete settles.
 import {
@@ -292,9 +293,11 @@ function CrudInner({
 
   // Confirmed in the list (`CrudList`): the same recipe as a single row, for the whole group at once. The store
   // call is atomic, so a failure brings EVERY row back. Success takes the deleted ids out of the selection (the
-  // hook never prunes it) and leaves the ones hidden by the filters selected. Failure puts the selection back as
-  // it was at the confirmation, together with whatever the user selected meanwhile.
-  const deleteManyFromList = useRef(async (rows: readonly DemoInvoice[], selectionBefore: ReadonlySet<string>) => {
+  // hook never prunes it) and leaves the ones hidden by the filters selected. Failure selects again exactly the
+  // rows that come back (this group's ids), on top of the CURRENT selection: with no change meanwhile that is the
+  // selection of the confirmation; what the user added meanwhile stays, what the user deselected meanwhile (other
+  // rows, hidden ones, "Clear selection") stays deselected, and ids another bulk already deleted are never revived.
+  const deleteManyFromList = useRef(async (rows: readonly DemoInvoice[]) => {
     const ids = rows.map((r) => r.id);
     const count = ids.length;
     setPendingDeletes((current) => withIds(current, ids));
@@ -309,7 +312,7 @@ function CrudInner({
     } catch {
       if (!mounted.current) return;
       toast.show({ tone: 'error', description: `Could not delete ${plural(count)}` });
-      setSelectedIds((current) => new Set([...selectionBefore, ...current]));
+      setSelectedIds((current) => withIds(current, ids));
     } finally {
       if (mounted.current) setPendingDeletes((current) => withoutIds(current, ids));
     }
@@ -380,7 +383,7 @@ function CrudList({
   ...props
 }: Omit<ListViewProps, 'rowActions' | 'bulkActions'> & {
   onDelete: (row: DemoInvoice) => void;
-  onDeleteMany: (rows: readonly DemoInvoice[], selectionBefore: ReadonlySet<string>) => void;
+  onDeleteMany: (rows: readonly DemoInvoice[]) => void;
 }) {
   const [confirm, confirmDialog] = useConfirmDialog();
   const [buttonKey, setButtonKey] = useState(0);
@@ -395,7 +398,6 @@ function CrudList({
         if (rows.length === 0) return;
         const button = event.currentTarget;
         const bar = button.closest<HTMLElement>('[data-rop-selection-bar]');
-        const selectionBefore = selection.selectedIds;
         const hidden = selection.hiddenSelectedCount;
         // Read when the dialog has closed. Cancel/Escape: the button itself (the dialog's own return). After the
         // confirmation the selection is empty, so the "select all results" checkbox of the table (or its
@@ -429,7 +431,7 @@ function CrudList({
           // A new button: the dialog gives the focus back to the element that opened it if it is still there,
           // and only then to `returnFocusRef` (see `useReturnFocus`). The old one goes, like a deleted row's "…".
           setButtonKey((k) => k + 1);
-          onDeleteMany(rows, selectionBefore);
+          onDeleteMany(rows);
         });
       };
       return (

@@ -93,9 +93,64 @@ describe('InvoiceCrud: bulk delete', () => {
     await userEvent.click(button);
     button.focus();
     await userEvent.keyboard('{Enter}');
+    // A dialog would open asynchronously (the confirmation is a promise + a state update): give it the time to
+    // appear before asserting that it did not.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText(/Delete 0 invoices/)).toBeNull();
     expect(spy).not.toHaveBeenCalled();
   }, 20_000);
+
+  it('rollback respects what the user deselected meanwhile: "Clear selection" during the flight, then an error -> only the rows that come back are selected again (a hidden one stays deselected)', async () => {
+    const { promise, release } = gate();
+    render(<InvoiceCrud {...base({ saveDelayMs: promise, deleteOutcome: 'error' })} />);
+    await listReady();
+    const snapshot = store().snapshot();
+    const open = snapshot.find((r) => r.status === 'pending')!.number;
+    const hiddenOne = snapshot.find((r) => r.status !== 'pending')!.number;
+    await select(open, hiddenOne);
+    await userEvent.click(screen.getByRole('radio', { name: 'Open' }));
+    await waitFor(() => expect(counter()).toBe('1 selected (1 hidden by filters)'));
+    await confirmBulk('Delete 1 invoice?', 'Delete 1 invoice');
+    await userEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    await waitFor(() => expect(counter()).toBe('No items selected'));
+    await act(async () => release());
+    expect(await screen.findByText('Could not delete 1 invoice')).toBeTruthy();
+    // The row that came back is selected again; the hidden one, deselected by the user, is not.
+    await waitFor(() => expect(counter()).toBe('1 selected'));
+    expect((checkbox(open) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(screen.getByRole('radio', { name: 'All' }));
+    await waitFor(() => expect(shownNumbers()).toContain(hiddenOne));
+    expect((checkbox(hiddenOne) as HTMLInputElement).checked).toBe(false);
+    expect(counter()).toBe('1 selected');
+  }, 30_000);
+
+  it('two bulk deletes in flight, the first succeeds and the second fails: only the second group is selected again', async () => {
+    const first = gate();
+    const second = gate();
+    render(<InvoiceCrud {...base()} />);
+    const before = await listReady();
+    const [a, b, c, d] = [before[0]!, before[1]!, before[2]!, before[3]!];
+    store().configure({ saveDelayMs: first.promise, deleteOutcome: 'success' });
+    await select(a, b);
+    await confirmBulk('Delete 2 invoices?', 'Delete 2 invoices');
+    store().configure({ saveDelayMs: second.promise, deleteOutcome: 'error' });
+    await select(c, d);
+    await confirmBulk('Delete 2 invoices?', 'Delete 2 invoices');
+    expect(shownNumbers()).toEqual(before.filter((n) => ![a, b, c, d].includes(n)));
+    await act(async () => first.release());
+    expect(await screen.findByText('2 invoices deleted')).toBeTruthy();
+    await act(async () => second.release());
+    expect(await screen.findByText('Could not delete 2 invoices')).toBeTruthy();
+    await waitFor(() => expect(shownNumbers()).toEqual(before.filter((n) => ![a, b].includes(n))));
+    expect(counter()).toBe('2 selected');
+    expect((checkbox(c) as HTMLInputElement).checked).toBe(true);
+    expect((checkbox(d) as HTMLInputElement).checked).toBe(true);
+    // Nothing of the first group is selected again: they stay out and the count is only the second group's.
+    expect(store().snapshot().some((r) => r.number === a || r.number === b)).toBe(false);
+  }, 30_000);
 
   it('3 selected: the dialog is "Delete 3 invoices?" with the matching action, focus on Cancel; Cancel changes nothing', async () => {
     render(<InvoiceCrud {...base()} />);
