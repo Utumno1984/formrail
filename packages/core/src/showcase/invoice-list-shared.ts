@@ -47,7 +47,7 @@ export const PAGE: CSSProperties = {
   boxSizing: 'border-box',
   padding: 16,
   fontFamily: 'system-ui, sans-serif',
-  height: '100dvh',
+  height: 'var(--rop-demo-viewport-height, 100dvh)',
   display: 'flex',
   flexDirection: 'column',
 };

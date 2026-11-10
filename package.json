@@ -21,6 +21,7 @@
     "check": "npm run lint && npm run typecheck && npm run build && npm run test:unit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
+    "build-storybook:pro": "STORYBOOK_EDITION=pro STORYBOOK_HIDE_INTERNAL=1 storybook build -o storybook-static-pro",
     "test:e2e": "E2E_EXCLUDE_VISUAL=1 playwright test",
     "assemble-site": "node scripts/assemble-site.mjs",
     "serve-site": "node scripts/serve-site.mjs",

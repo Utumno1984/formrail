@@ -1,0 +1,36 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Pro introduction" />
+
+# react-object-page Pro (preview)
+
+`@react-object-page/pro` extends the free `@react-object-page/core` with components for heavier
+enterprise screens. This site shows the Pro components that exist today, running against the same
+design tokens and primitives as the free library. Nothing here is a mock-up: each story renders the
+actual component.
+
+## Components available today
+
+### Change Summary
+
+A review of what is about to be saved: every changed field with its label and a readable before/after
+value, computed against the value saved on the server rather than the value the page opened with.
+
+- [Change Summary](?path=/docs/pro-changesummary--docs): the component, its states and value types.
+- [Invoices with Change Summary](?path=/docs/pro-showcase-invoices-with-change-summary--docs): the
+  invoice CRUD showcase with a "Review changes" step before saving.
+
+### Virtual List Report
+
+The List Report with virtualized rows, for datasets far beyond what a plain table can render. It keeps
+the same props and `useListReport` state as the free List Report, and behaves as the free table below
+a configurable row threshold.
+
+- [Virtual List Report](?path=/docs/pro-floorplans-virtual-list-report--docs): up to 200,000 rows,
+  range selection and scroll restoration.
+
+## License status
+
+The Pro components are under a commercial license that is not available yet. They are free to explore
+on this site and not for production use. For more information, see the
+[Pro section of the project page](/react-object-page/#pro).

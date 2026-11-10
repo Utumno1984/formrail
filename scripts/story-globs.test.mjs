@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { excludePro, previewAnnotations, storyGlobs } from '../.storybook/story-globs.mjs';
+import { excludePro, introductionPages, previewAnnotations, proEdition, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -41,6 +41,59 @@ describe('storyGlobs (#175)', () => {
       if (previous === undefined) delete process.env.STORYBOOK_EXCLUDE_PRO;
       else process.env.STORYBOOK_EXCLUDE_PRO = previous;
     }
+  });
+
+  it('Free mode and complete mode are unchanged by the Pro edition support', () => {
+    expect(storyGlobs({})).toEqual(['../packages/core/src/**/*.stories.tsx', '../packages/pro/src/**/*.stories.tsx']);
+    expect(storyGlobs({ STORYBOOK_EXCLUDE_PRO: '1' })).toEqual(['../packages/core/src/**/*.stories.tsx']);
+    expect(previewAnnotations({})).toEqual(['./preview-pro.ts']);
+    expect(previewAnnotations({ STORYBOOK_EXCLUDE_PRO: '1' })).toEqual([]);
+    expect(introductionPages({})).toEqual(['./Introduction.mdx']);
+    expect(introductionPages({ STORYBOOK_EXCLUDE_PRO: '1' })).toEqual(['./Introduction.mdx']);
+  });
+
+  describe('Pro edition (STORYBOOK_EDITION=pro, #381)', () => {
+    const env = { STORYBOOK_EDITION: 'pro' };
+
+    it('has only Pro story globs and the Pro introduction page', () => {
+      expect(storyGlobs(env)).toEqual(['../packages/pro/src/**/*.stories.tsx', './ProIntroduction.mdx']);
+      expect(introductionPages(env)).toEqual([]);
+    });
+
+    it('loads the Pro CSS entry and the banner annotation, in this order', () => {
+      expect(previewAnnotations(env)).toEqual(['./preview-pro.ts', './preview-pro-demo.ts']);
+    });
+
+    it('only the value "pro" selects it', () => {
+      for (const value of ['', 'free', 'PRO', '1']) expect(proEdition({ STORYBOOK_EDITION: value })).toBe(false);
+      expect(proEdition({})).toBe(false);
+      expect(proEdition(env)).toBe(true);
+    });
+
+    it('contradicting STORYBOOK_EXCLUDE_PRO fails loudly', () => {
+      expect(() => storyGlobs({ ...env, STORYBOOK_EXCLUDE_PRO: '1' })).toThrow(/mutually exclusive/);
+    });
+
+    it('every referenced file exists next to the config', () => {
+      for (const file of [...previewAnnotations(env), './ProIntroduction.mdx']) {
+        expect(() => readFileSync(resolve(ROOT, '.storybook', file))).not.toThrow();
+      }
+    });
+
+    it('the banner annotation is not part of any other mode', () => {
+      expect(previewAnnotations({})).not.toContain('./preview-pro-demo.ts');
+      expect(previewAnnotations({ STORYBOOK_EXCLUDE_PRO: '1' })).not.toContain('./preview-pro-demo.ts');
+    });
+
+    it('the Pro build is made by the package.json script, run by deploy-pages only', () => {
+      const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+      expect(pkg.scripts['build-storybook:pro']).toMatch(/^STORYBOOK_EDITION=pro .*storybook build -o storybook-static-pro$/);
+      const ci = readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8');
+      const deployJob = ci.slice(ci.indexOf('deploy-pages:'));
+      expect(deployJob).toContain('npm run build-storybook:pro');
+      expect(ci.slice(0, ci.indexOf('deploy-pages:'))).not.toContain('build-storybook:pro');
+      expect(ci).not.toMatch(/STORYBOOK_EDITION:/);
+    });
   });
 
   it('only the deploy-pages step of the workflow sets the variable', () => {

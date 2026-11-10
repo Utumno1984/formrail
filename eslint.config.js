@@ -10,6 +10,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       '**/storybook-static/**',
+      '**/storybook-static-pro/**',
       'site/**',
       '**/playwright-report-site/**',
       '**/playwright-report/**',

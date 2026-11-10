@@ -120,6 +120,25 @@ describe('assembleSite', () => {
     expect(existsSync(path.join(outDir, 'stale.txt'))).toBe(false);
   });
 
+  it('copies the Pro demo build into pro/ and leaves the Free one untouched', () => {
+    const { tmp, storybookDir, outDir } = setup();
+    const proDir = path.join(tmp, 'storybook-static-pro');
+    mkdirSync(path.join(proDir, 'assets'), { recursive: true });
+    writeFileSync(path.join(proDir, 'index.html'), '<!-- pro manager -->');
+    writeFileSync(path.join(proDir, 'assets', '_p.js'), 'p');
+    assembleSite({ storybookDir, proStorybookDir: proDir, outDir });
+    expect(readFileSync(path.join(outDir, 'pro', 'index.html'), 'utf8')).toBe('<!-- pro manager -->');
+    expect(existsSync(path.join(outDir, 'pro', 'assets', '_p.js'))).toBe(true);
+    expect(readFileSync(path.join(outDir, 'storybook', 'index.html'), 'utf8')).toBe('<!-- manager -->');
+    expect(existsSync(path.join(outDir, 'storybook', 'assets', '_p.js'))).toBe(false);
+  });
+
+  it('fails loudly when the Pro demo build was requested but not built', () => {
+    const { tmp, storybookDir, outDir } = setup();
+    expect(() => assembleSite({ storybookDir, proStorybookDir: path.join(tmp, 'missing'), outDir })).toThrow(/build-storybook:pro/);
+    expect(existsSync(outDir)).toBe(false);
+  });
+
   it('fails loudly when the Storybook was not built', () => {
     const { tmp, outDir } = setup();
     expect(() => assembleSite({ storybookDir: path.join(tmp, 'missing'), outDir })).toThrow(/build-storybook/);
