@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { excludePro, introductionPages, previewAnnotations, proEdition, storyGlobs } from '../.storybook/story-globs.mjs';
+import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -56,8 +56,16 @@ describe('storyGlobs (#175)', () => {
     const env = { STORYBOOK_EDITION: 'pro' };
 
     it('has only Pro story globs and the Pro introduction page', () => {
-      expect(storyGlobs(env)).toEqual(['../packages/pro/src/**/*.stories.tsx', './ProIntroduction.mdx']);
+      expect(storyGlobs(env)).toEqual(['../packages/pro/src/!(form-rebase)/**/*.stories.tsx', './ProIntroduction.mdx']);
       expect(introductionPages(env)).toEqual([]);
+    });
+
+    it('leaves the not-yet-public Form rebase story out of the Pro demo only (#421)', () => {
+      for (const mode of [{}, { STORYBOOK_EXCLUDE_PRO: '1' }]) {
+        expect(storyGlobs(mode).some((g) => g.includes('form-rebase') || g.includes('!('))).toBe(false);
+      }
+      // Each exclusion must point at a real folder, or it would silently exclude nothing.
+      for (const dir of PRO_DEMO_NOT_PUBLIC) expect(existsSync(resolve(ROOT, 'packages/pro/src', dir))).toBe(true);
     });
 
     it('loads the Pro CSS entry and the banner annotation, in this order', () => {

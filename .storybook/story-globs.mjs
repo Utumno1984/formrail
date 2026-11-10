@@ -33,9 +33,21 @@ export function previewAnnotations(env = process.env) {
   return excludePro(env) ? [] : ['./preview-pro.ts'];
 }
 
+/**
+ * Pro stories that exist in the repo (and in the complete build, where they are developed) but are not
+ * public yet: left out of the Pro demo build ONLY, at the glob level, so they are absent from index.json
+ * too (the `internal` tag only hides the sidebar, see manager.ts). Remove an entry when its showcase
+ * ticket ships. Folder names directly under packages/pro/src. Done with an extglob `!(a|b)` because
+ * Storybook does not resolve a leading `!` negated glob relative to `.storybook/` (it treats it as a path).
+ *   - form-rebase: waiting for the showcase integration (#384); leaked in by #395 (incident #421).
+ */
+export const PRO_DEMO_NOT_PUBLIC = ['form-rebase'];
+
 /** Story globs (and the Pro intro page), relative to `.storybook/`. */
 export function storyGlobs(env = process.env) {
-  if (proEdition(env)) return ['../packages/pro/src/**/*.stories.tsx', './ProIntroduction.mdx'];
+  if (proEdition(env)) {
+    return [`../packages/pro/src/!(${PRO_DEMO_NOT_PUBLIC.join('|')})/**/*.stories.tsx`, './ProIntroduction.mdx'];
+  }
   const globs = ['../packages/core/src/**/*.stories.tsx'];
   if (!excludePro(env)) globs.push('../packages/pro/src/**/*.stories.tsx');
   return globs;
