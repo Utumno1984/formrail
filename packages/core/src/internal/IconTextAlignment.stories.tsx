@@ -58,7 +58,7 @@ function SortHeader() {
     getRowId: (r) => r.id,
     defaultSort: { columnId: 'customer', direction: 'desc' },
   });
-  return <ListReportTable table={table} aria-label="Invoices" />;
+  return <ListReportTable table={table} aria-label="Invoices" loadingRowCount={1} />;
 }
 
 const BADGES: Array<[StatusBadgeTone, keyof typeof internalIcons, string]> = [
