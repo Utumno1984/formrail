@@ -31,6 +31,8 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
   );
 }
 
+// Implementation: `ListReportTableShell` (with the Head/Row/`renderCell`/`tableSize` building blocks) and a
+// `renderBody` that renders every result row (`ListReportTableRow`) plus a `Filler`.
 /**
  * The List Report table: a native `<table>` that renders the state of `useListReport`.
  *
@@ -73,8 +75,6 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *
  * An accessible name is required: `aria-label`, `aria-labelledby` or a (visually hidden) `caption`.
  */
-// Implementation: `ListReportTableShell` (with the Head/Row/`renderCell`/`tableSize` building blocks) and a
-// `renderBody` that renders every result row (`ListReportTableRow`) plus a `Filler`.
 export const ListReportTable = /* @__PURE__ */ forwardRef(ListReportTableImpl) as <Row>(
   props: ListReportTableProps<Row> & { ref?: Ref<HTMLDivElement> },
 ) => ReactElement | null;
