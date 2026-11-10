@@ -33,6 +33,8 @@ export interface ListReportTableHeadProps<Row> {
   rowProps?: HTMLAttributes<HTMLTableRowElement>;
   /** Whether to render the trailing row actions column (its header + its `<col>`). Default `false`. */
   rowActions?: boolean;
+  /** Width of the row actions `<col>` (a CSS length). Default: one row height (the "…" trigger alone). */
+  rowActionsWidth?: string;
 }
 
 /**
@@ -41,7 +43,7 @@ export interface ListReportTableHeadProps<Row> {
  * sortable column headers and the optional trailing row actions column (a visually hidden name). Exported from `@react-object-page/core/internal` for
  * `@react-object-page/pro`; not public API, no semver guarantee, not meant to be used standalone.
  */
-export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, rowActions = false }: ListReportTableHeadProps<Row>) {
+export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, rowActions = false, rowActionsWidth = ROW_ACTIONS_COLUMN_WIDTH }: ListReportTableHeadProps<Row>) {
   const { columns, selection } = table;
   return (
     <>
@@ -50,7 +52,7 @@ export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, 
         {columns.map((column) => (
           <col key={column.id} style={column.width !== undefined ? { width: toCss(column.width) } : undefined} />
         ))}
-        {rowActions ? <col style={{ width: ROW_ACTIONS_COLUMN_WIDTH }} /> : null}
+        {rowActions ? <col style={{ width: rowActionsWidth }} /> : null}
       </colgroup>
       <thead>
         <tr {...rowProps}>

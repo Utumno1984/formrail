@@ -1,9 +1,9 @@
-import { memo, useLayoutEffect, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
+import { memo, useCallback, useRef, type HTMLAttributes, type MouseEvent, type ReactElement } from 'react';
 import { Checkbox } from '../checkbox/Checkbox';
 import { cn } from '../utils/cn';
 import { renderCell, type RenderCellOptions } from './list-report-cell';
 import type { ListReportTableLabels } from './ListReportTableStates';
-import { keepFocusInTable, tableContainerOf } from './keep-focus-in-table';
+import { useKeepFocusInTable } from './keep-focus-in-table';
 import { ListReportRowActionsCell } from './ListReportRowActions';
 import {
   ALIGN_TEXT,
@@ -44,6 +44,12 @@ export interface ListReportTableRowProps<Row> {
    * what it was before. Never rendered to the DOM.
    */
   rowActions?: ListReportRowActions<Row>;
+  /**
+   * `ListReportTableBodyContext.rowActionsInline` (a whole number ≥ 0): how many actions with an `icon`
+   * are inline buttons when the table's container is wide. Default `0` (the menu alone, as before).
+   * Never rendered to the DOM.
+   */
+  rowActionsInline?: number;
 }
 
 function ListReportTableRowImpl<Row>({
@@ -55,20 +61,23 @@ function ListReportTableRowImpl<Row>({
   onToggle,
   renderCellOptions,
   rowActions,
+  rowActionsInline = 0,
 }: ListReportTableRowProps<Row>) {
   const { columns, selection } = table;
   // The checkbox calls `onClick` before `onCheckedChange` within the same click: keep the event for `onToggle`.
   const lastClick = useRef<MouseEvent<HTMLInputElement> | null>(null);
   // A row removed while one of its controls has the focus (its checkbox, a link in a cell, its actions
   // trigger; deleted, filtered out): the focus goes to the table's scroll container, never `body`.
-  // Taken in a layout cleanup, while the row is still in the document.
+  // Taken in a layout cleanup, while the row is still in the document (`useKeepFocusInTable`, shared
+  // with the row actions controls).
   const trRef = useRef<HTMLTableRowElement | null>(null);
-  useLayoutEffect(
-    () => () => {
-      const tr = trRef.current;
-      keepFocusInTable(tableContainerOf(tr), [tr]);
+  const { capture } = useKeepFocusInTable(() => [trRef.current]);
+  const setTr = useCallback(
+    (node: HTMLTableRowElement | null) => {
+      trRef.current = node;
+      capture(node);
     },
-    [],
+    [capture],
   );
   const id = table.getRowId(row);
   const selected = selectable && selection.isSelected(id);
@@ -83,7 +92,7 @@ function ListReportTableRowImpl<Row>({
       ? cn(rowActions && rowActionsRowClass, selectable && selectableRowClass, extraClassName)
       : extraClassName;
   return (
-    <tr {...restRowProps} ref={trRef} data-selected={selected ? '' : undefined} className={className}>
+    <tr {...restRowProps} ref={setTr} data-selected={selected ? '' : undefined} className={className}>
       {selectable ? (
         <td className={selectBodyCellClass}>
           <div className={selectBoxClass}>
@@ -112,7 +121,15 @@ function ListReportTableRowImpl<Row>({
           {renderCell(column, row, renderCellOptions)}
         </td>
       ))}
-      {rowActions ? <ListReportRowActionsCell actions={rowActions(row)} triggerLabel={labels.rowActions(selection.getRowLabel(row))} /> : null}
+      {rowActions ? (
+        <ListReportRowActionsCell
+          actions={rowActions(row)}
+          triggerLabel={labels.rowActions(selection.getRowLabel(row))}
+          inline={rowActionsInline}
+          rowActionLabel={labels.rowAction}
+          rowLabel={selection.getRowLabel(row)}
+        />
+      ) : null}
     </tr>
   );
 }
@@ -140,6 +157,8 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
     prev.rowActions !== next.rowActions ||
     prev.labels.selectRow !== next.labels.selectRow ||
     (next.rowActions !== undefined && prev.labels.rowActions !== next.labels.rowActions) ||
+    (prev.rowActionsInline ?? 0) !== (next.rowActionsInline ?? 0) ||
+    (next.rowActions !== undefined && (next.rowActionsInline ?? 0) > 0 && prev.labels.rowAction !== next.labels.rowAction) ||
     !sameRowProps(prev.rowProps, next.rowProps)
   ) {
     return false;
@@ -162,7 +181,8 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
  * one `<td>` per column. The default `renderBody` of `ListReportTable` renders one of these per
  * row; a virtualized table (`@react-object-page/pro`) renders the same row for whatever subset it
  * mounts. Memoized: it re-renders only when its row, its selected state, `columns`, its id and
- * label, `labels.selectRow`, `labels.rowActions` (with `rowActions`), `rowActions`, `rowProps`
+ * label, `labels.selectRow`, `labels.rowActions` (with `rowActions`), `labels.rowAction` (with
+ * `rowActions` and `rowActionsInline` > 0), `rowActions`, `rowActionsInline`, `rowProps`
  * (shallow) or the extension props change; see `ListReportColumn.cell` for what that means for a
  * cell (and `ListReportRowActions` for the actions). `onToggle`, `renderCellOptions` and `rowActions`
  * are compared by identity: keep them stable, or every render of the parent renders the row. Exported

@@ -301,6 +301,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
         onToggle={ctx.selectable ? onToggle : undefined}
         renderCellOptions={virtual ? FORCE_TRUNCATE : undefined}
         rowActions={ctx.rowActions}
+        rowActionsInline={ctx.rowActionsInline}
       />
     );
   };

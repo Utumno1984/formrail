@@ -73,6 +73,7 @@ export interface ListReportFrameTableProps<Row> {
   loadingRowCount: number | undefined;
   labels: Partial<ListReportFrameLabels> | undefined;
   rowActions: ListReportRowActions<Row> | undefined;
+  rowActionsInline: number | undefined;
 }
 
 /** @internal Props of {@link ListReportFrame}. */
@@ -123,6 +124,12 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    * `rowActions`). Passed to `renderTable` as is; never reaches the DOM.
    */
   rowActions?: ListReportRowActions<Row>;
+  /**
+   * How many actions with an `icon` are inline buttons when the table's container is at least 40rem
+   * wide (see `ListReportTable`'s `rowActionsInline`). Default 0. Passed to `renderTable` as is; never
+   * reaches the DOM.
+   */
+  rowActionsInline?: number;
   /** Renders the table from the props the floorplan computed for it (ref, id, status, labels, …). */
   renderTable: (tableProps: ListReportFrameTableProps<Row>) => ReactNode;
 };
@@ -145,6 +152,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
     scrollerRef,
     bulkActions,
     rowActions,
+    rowActionsInline,
     renderTable,
     className,
     ...rest
@@ -250,6 +258,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
         loadingRowCount,
         labels,
         rowActions,
+        rowActionsInline,
       })}
     </div>
   );

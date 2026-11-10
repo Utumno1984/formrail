@@ -41,6 +41,12 @@ export interface ListReportTableLabels {
    * Keep it distinct per row.
    */
   rowActions: (label: string) => string;
+  /**
+   * Name of an inline action button (with `rowActionsInline`), from the action's `label` and
+   * `selection.getRowLabel(row)`: "Delete FT-2026-0001". Keep it distinct per row (200 buttons all
+   * named "Delete" cannot be told apart).
+   */
+  rowAction: (actionLabel: string, rowLabel: string) => string;
   /** Name of the header of the row actions column (visually hidden; with `rowActions`). */
   rowActionsColumn: string;
 }
@@ -56,6 +62,7 @@ export const DEFAULT_LABELS: ListReportTableLabels = {
   selectAllResults: 'Select all results',
   selectRow: (label) => `Select ${label}`,
   rowActions: (label) => `Actions for ${label}`,
+  rowAction: (actionLabel, rowLabel) => `${actionLabel} ${rowLabel}`,
   rowActionsColumn: 'Actions',
 };
 
