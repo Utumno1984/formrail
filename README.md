@@ -1,63 +1,52 @@
 # react-object-page
 
-Design system React **open-core**: implementazione headless e indipendente di due pattern UI
-enterprise diffusi — **List Report** (lista con filtri, selezione, azioni bulk) e **Object Page**
-(editor a sezioni ancorate, save-bar sticky, dirty-tracking) — per chi vuole quella UX senza
-uno stack proprietario.
+An **open-core** React design system: an independent, headless implementation of two widespread
+enterprise UI patterns — the **List Report** (a list with filters, selection and bulk actions) and the
+**Object Page** (a sectioned editor with an anchor bar, a sticky save bar and dirty-tracking) — for
+teams that want that UX without a proprietary stack.
 
-## Stato
+- **Live demo and documentation (Free)**: https://utumno1984.github.io/react-object-page/storybook/
+- **Pro demo**: https://utumno1984.github.io/react-object-page/pro/
 
-- **Free (`@react-object-page/core`, MIT)**: i primitivi del lotto Free sono completi — tipografia e
-  icone, `Button`, `Field` e controlli di form (`Input`, `Checkbox`, `Switch`, `RadioGroup`, `Select`,
-  `Combobox`, `Calendar`, `DatePicker`), overlay (`Dialog`, `Sheet`, `Menu`, `Tooltip`, `Toast`),
-  `Tabs`/`Accordion`/`Breadcrumb`/`Pagination`, feedback (`MessageStrip`, `Spinner`, `Skeleton`...) e
-  le versioni semplici dei floorplan **List Report** e **Object Page** (con `useObjectPageForm` e
-  `useDirtyGuard`). Storybook documentato e pubblico (vedi sotto). Il pacchetto è in preparazione alla
-  prima pubblicazione su npm come `0.x`: l'API può ancora assestarsi con i primi riscontri reali.
-- **Pro (`@react-object-page/pro`)**: in sviluppo e non pubblicato. Oggi contiene il motore e il
-  componente del Change Summary e la List Report virtualizzata; il resto del lotto Pro non è ancora
-  iniziato né ha una data.
+## Install
 
-Il piano completo (inventario componenti, segmentazione Free/Pro, architettura, roadmap) è in
+```bash
+npm install @react-object-page/core
+```
+
+Peer dependencies: `react` and `react-dom` (18 or 19). See
+[`packages/core/README.md`](packages/core/README.md) for the quick start and the styling options.
+
+## Free and Pro
+
+- **Free** (`@react-object-page/core`, [MIT](LICENSE)): typography and icons, `Button`, `Field` and the
+  form controls (`Input`, `Checkbox`, `Switch`, `RadioGroup`, `Select`, `Combobox`, `Calendar`,
+  `DatePicker`), overlays (`Dialog`, `Sheet`, `Menu`, `Tooltip`, `Toast`),
+  `Tabs`/`Accordion`/`Breadcrumb`/`Pagination`, feedback (`MessageStrip`, `Spinner`, `Skeleton`...) and
+  the simple versions of the **List Report** and **Object Page** floorplans (with `useObjectPageForm`
+  and `useDirtyGuard`).
+- **Pro** (`@react-object-page/pro`): components with a real technical moat (virtualization, advanced
+  dirty-tracking, Change Summary, a dialog with an embedded grid). The package is private
+  (`"private": true`, not published on npm) and has a **separate commercial license**
+  ([`packages/pro/LICENSE`](packages/pro/LICENSE)); the source is readable in this repository, but the
+  MIT license of the root covers `packages/core` only. See [`packages/pro/README.md`](packages/pro/README.md).
+
+## Status
+
+- The Free package is complete for the Free batch and is being prepared for its first npm release as
+  `0.x`: the API may still settle after the first real-world feedback.
+- Pro is in development and not published. Today it contains the Change Summary engine and component
+  and the virtualized List Report; the rest of the Pro batch has not started and has no date.
+
+The full plan (component inventory, Free/Pro split, architecture, roadmap) is in
 [`docs/planning/design-system-spec.md`](docs/planning/design-system-spec.md).
 
-## Modello
+## License
 
-- **Free** (`packages/core`, MIT): primitivi di base e versioni semplici dei floorplan.
-- **Pro** (`packages/pro`, `@react-object-page/pro`, in sviluppo): componenti con moat tecnico reale
-  (virtualizzazione, dirty-tracking avanzato, Change Summary, dialog con griglia incorporata). Il
-  pacchetto è privato (`"private": true`, non pubblicato su npm) e ha una **licenza commerciale
-  separata** ([`packages/pro/LICENSE`](packages/pro/LICENSE)); il sorgente è leggibile in questo
-  repo, ma la licenza MIT della radice copre solo `packages/core`. Primo modulo: il motore del
-  Change Summary (`useChangeSummary`), vedi [`packages/pro/README.md`](packages/pro/README.md).
+`packages/core` is [MIT](LICENSE) © Daniele Ingusci. `packages/pro` is under a separate commercial
+license.
 
-## Sviluppo
+## Contributing
 
-Vedi `CLAUDE.md` per la pipeline di sviluppo (pianificatore → sviluppatore → tester →
-critico-avversariale) e le regole di dominio.
-
-### Storybook ed e2e
-
-- **Demo pubblica**: https://utumno1984.github.io/react-object-page/storybook/ — Storybook del solo
-  core (Free), ripubblicato su GitHub Pages a ogni push su `main` con CI verde (job `deploy-pages`
-  in `.github/workflows/ci.yml`; esiste anche l'avvio manuale con `workflow_dispatch`). La radice
-  del sito è riservata alla landing; finché non esiste reindirizza allo Storybook e i vecchi link
-  profondi (`/?path=/docs/...`, `/iframe.html?id=...`) continuano a funzionare.
-- Il sito pubblicato si assembla in locale con
-  `npm run build && STORYBOOK_EXCLUDE_PRO=1 npm run build-storybook && npm run assemble-site`
-  (cartella `site/`: radice + `storybook/` + `pro/`); poi `npm run serve-site` lo serve su
-  `http://localhost:6008/react-object-page/` e `npm run test:site` esegue lo smoke pre-deploy
-  (`e2e/site/`, fuori dalla suite e2e delle PR).
-
-- `npm run storybook` avvia Storybook; `npm run test:e2e` ricostruisce Storybook e lancia
-  Playwright contro la build statica sulla porta 6007.
-- In locale `reuseExistingServer` è attivo: se qualcosa ascolta già sulla porta 6007, Playwright
-  lo riusa senza ricostruire, quindi si può testare una build **vecchia**. Se i risultati sembrano
-  incoerenti, ferma il processo sulla 6007 e rilancia.
-- **Più git worktree in parallelo**: la porta è configurabile con `PLAYWRIGHT_PORT` (default 6007).
-  Senza, due worktree condividono la 6007 e una può testare la build dell'altra (per via di
-  `reuseExistingServer`). Dai a ogni worktree la sua porta, es.
-  `PLAYWRIGHT_PORT=6107 npm run test:e2e`.
-- In CI `retries: 1`: un test instabile che passa al secondo tentativo risulta **flaky ma verde**.
-  Controlla il report per i test marcati flaky, non fidarti solo del colore.
-- I test marcati `@touch` girano solo nel progetto `chromium-touch`.
+Development notes (workflow, running Storybook and the end-to-end tests locally) are in
+[`CONTRIBUTING.md`](CONTRIBUTING.md).

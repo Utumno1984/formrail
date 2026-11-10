@@ -8,7 +8,7 @@ layout stability (no jumps between loading, empty and loaded states) are tested,
 
 This package is the free, MIT-licensed tier of the
 [react-object-page](https://github.com/Utumno1984/react-object-page) project — see its
-[**Stato**](https://github.com/Utumno1984/react-object-page#stato) section for what is in this
+[**Free and Pro**](https://github.com/Utumno1984/react-object-page#free-and-pro) section for what is in this
 tier today versus the commercially-licensed `@react-object-page/pro`. It is an independent
 implementation of generic, publicly known UI patterns.
 
@@ -46,8 +46,11 @@ export function SupplierForm() {
 ```
 
 `Field` wires the label, help text, error and required state to the control (real `aria-describedby`,
-`aria-invalid`, `aria-required`). For whole pages see `ListReport`, `useListReport`, `ObjectPage`,
-`useObjectPageForm` and `useDirtyGuard` in the Storybook above.
+`aria-invalid`, `aria-required`). For whole pages see the
+[List Report](https://utumno1984.github.io/react-object-page/storybook/?path=/docs/floorplans-list-report--docs)
+(`ListReport`, `useListReport`) and
+[Object Page](https://utumno1984.github.io/react-object-page/storybook/?path=/docs/floorplans-object-page-layout--docs)
+(`ObjectPage`, `useObjectPageForm`, `useDirtyGuard`) documentation pages.
 
 ## License
 

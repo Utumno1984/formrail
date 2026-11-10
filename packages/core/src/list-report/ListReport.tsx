@@ -35,10 +35,8 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  *   already says its new state.
  *
  * The parts stay exported (`ListReportFilterBar`, `ListReportTable`) for other layouts.
- *
- * Built on `ListReportFrame` of `@react-object-page/core/internal` (not public API): `ListReport` is the
- * Frame with `renderTable` = `ListReportTable`.
  */
+// Implementation: `ListReportFrame` with `renderTable` = `ListReportTable`.
 export const ListReport = /* @__PURE__ */ forwardRef(ListReportImpl) as <Row>(
   props: ListReportProps<Row> & { ref?: Ref<HTMLDivElement> },
 ) => ReactElement | null;
