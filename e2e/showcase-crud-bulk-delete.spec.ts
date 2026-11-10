@@ -264,4 +264,27 @@ test.describe('Showcase/Invoices: Crud (bulk delete)', () => {
     await expect(page.getByText('1 invoice deleted')).toBeVisible();
     expect(await bulkCalls(page)).toEqual([['inv-2']]);
   });
+
+  test('rows selected while the delete is in flight: success removes only the deleted ids; rollback unions the old selection with the new one', async ({ page }) => {
+    await openList(page, '', SLOW);
+    await selectRows(page, 'FT-2026-0002', 'FT-2026-0003');
+    let dialog = await askBulk(page, 'Delete 2 invoices?');
+    await dialog.getByRole('button', { name: 'Delete 2 invoices', exact: true }).click();
+    await expect(link(page, 'FT-2026-0002')).toHaveCount(0);
+    await rowBox(page, 'FT-2026-0006').check();
+    await expect(page.getByText('2 invoices deleted')).toBeVisible({ timeout: 10_000 });
+    await expect(counter(page)).toHaveText('1 selected');
+    await expect(rowBox(page, 'FT-2026-0006')).toBeChecked();
+
+    await openList(page, '', `${SLOW};deleteOutcome:error`);
+    await selectRows(page, 'FT-2026-0002', 'FT-2026-0003');
+    dialog = await askBulk(page, 'Delete 2 invoices?');
+    await dialog.getByRole('button', { name: 'Delete 2 invoices', exact: true }).click();
+    await expect(link(page, 'FT-2026-0002')).toHaveCount(0);
+    await rowBox(page, 'FT-2026-0006').check();
+    await expect(page.getByText('Could not delete 2 invoices')).toBeVisible({ timeout: 10_000 });
+    await expect(counter(page)).toHaveText('3 selected');
+    for (const n of ['FT-2026-0002', 'FT-2026-0003', 'FT-2026-0006']) await expect(rowBox(page, n)).toBeChecked();
+    expect(await storeSize(page)).toBe(200);
+  });
 });
