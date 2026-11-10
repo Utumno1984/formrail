@@ -104,10 +104,11 @@ const LINE_CATALOG: readonly { description: string; unitPrice: number }[] = [
   { description: 'Maintenance contract', unitPrice: 300 },
 ];
 
-// 1 to 4 lines per invoice, picked from the catalog by position: the same index always gives the same lines.
+// 1 to 4 lines per invoice, consecutive catalog entries from `index`: distinct within an invoice (up to the
+// catalog length); the same index always gives the same lines.
 const makeLineItems = (index: number): StoredLineItem[] =>
   Array.from({ length: (index % 4) + 1 }, (_, n) => {
-    const entry = LINE_CATALOG[(index + n * 2) % LINE_CATALOG.length]!;
+    const entry = LINE_CATALOG[(index + n) % LINE_CATALOG.length]!;
     return {
       id: `li-${index + 1}-${n + 1}`,
       description: entry.description,

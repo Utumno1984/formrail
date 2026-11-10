@@ -77,6 +77,12 @@ describe('lineTotal', () => {
     expect(lineTotal(line('a', { quantity: '' }))).toBeNull();
     expect(lineTotal(line('a', { unitPrice: 'abc' }))).toBeNull();
   });
+
+  it('is null for a decimal quantity, the same text validateLines rejects', () => {
+    const decimal = line('a', { quantity: '2.5', unitPrice: '150' });
+    expect(lineTotal(decimal)).toBeNull();
+    expect(validateLines([decimal])['lineItems.0.quantity']).toBeDefined();
+  });
 });
 
 describe('nextLineId', () => {

@@ -1,6 +1,7 @@
 // Story-only: the invoice line items as the form sees them (text as typed) and the rules on them. Not exported
 // by the package.
 import type { StoredLineItem } from './invoice-store';
+import { DECIMAL, INTEGER, sameNumberText } from './number-text';
 
 /** A line in the form: quantity and unit price are text as typed, like the invoice `amount`. */
 export interface LineValues {
@@ -24,10 +25,6 @@ export const toStoredLine = (line: LineValues): StoredLineItem => ({
   unitPrice: Number(line.unitPrice),
 });
 
-// "150" and "150.00" are the same number; two empty texts are equal, an empty and a filled one are not.
-const sameNumberText = (a: string, b: string): boolean =>
-  a === b || (a.trim() !== '' && b.trim() !== '' && Number(a) === Number(b));
-
 /** Same lines, in the same order, with the same ids and values (quantity and price compared numerically). */
 export const sameLines = (a: readonly LineValues[], b: readonly LineValues[]): boolean =>
   a.length === b.length &&
@@ -40,9 +37,6 @@ export const sameLines = (a: readonly LineValues[], b: readonly LineValues[]): b
       sameNumberText(line.unitPrice, other.unitPrice)
     );
   });
-
-const INTEGER = /^\d+$/;
-const DECIMAL = /^\d+(\.\d+)?$/;
 
 /** Errors keyed by dotted path (`lineItems.2.quantity`). */
 export function validateLines(lines: readonly LineValues[]): Record<string, string> {
@@ -61,11 +55,11 @@ export function validateLines(lines: readonly LineValues[]): Record<string, stri
   return errors;
 }
 
-/** Quantity × unit price with 2 decimals, or `null` while either text is not a number. */
+/** Quantity × unit price with 2 decimals, or `null` while the quantity is not a whole number or the price is not a number. */
 export function lineTotal(line: LineValues): string | null {
   const quantity = line.quantity.trim();
   const price = line.unitPrice.trim();
-  if (!DECIMAL.test(quantity) || !DECIMAL.test(price)) return null;
+  if (!INTEGER.test(quantity) || !DECIMAL.test(price)) return null;
   return (Number(quantity) * Number(price)).toFixed(2);
 }
 

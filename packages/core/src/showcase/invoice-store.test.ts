@@ -27,6 +27,14 @@ describe('createInvoiceStore', () => {
     expect(JSON.stringify(makeDemoInvoices(200))).toBe(before);
   });
 
+  it('gives every invoice distinct catalog entries on its lines (description and unit price)', async () => {
+    const all = await createInvoiceStore().list();
+    all.forEach((r) => {
+      const descriptions = r.lineItems.map((l) => l.description);
+      expect(new Set(descriptions).size, r.id).toBe(descriptions.length);
+    });
+  });
+
   it('derives dueDate (30 days later) and notes deterministically; notes are never missing', async () => {
     const a = await createInvoiceStore().get('inv-1');
     const b = await createInvoiceStore().get('inv-1');

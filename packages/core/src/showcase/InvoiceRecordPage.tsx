@@ -21,6 +21,7 @@ import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
 import { InvoiceLineItems } from './InvoiceLineItems';
+import { DECIMAL, sameNumberText } from './number-text';
 import { sameLines, toLineValues, toStoredLine, validateLines, type LineValues } from './invoice-lines';
 import { InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from './showcase-data';
@@ -78,14 +79,11 @@ const toInvoice = (record: StoredInvoice, v: InvoiceFormValues): StoredInvoice =
 });
 
 /** The scalar part of the values: what `reviewSave` receives. */
-const scalarValues = (v: InvoiceFormValues): InvoiceValues => ({
-  supplier: v.supplier,
-  status: v.status,
-  amount: v.amount,
-  date: v.date,
-  dueDate: v.dueDate,
-  notes: v.notes,
-});
+const scalarValues = (v: InvoiceFormValues): InvoiceValues => {
+  const { lineItems, ...scalar } = v;
+  void lineItems;
+  return scalar;
+};
 
 /** What `reviewSave` receives: the values about to be saved and the REAL saved baseline (never a default). */
 export interface InvoiceSaveReviewContext {
@@ -270,7 +268,7 @@ const toDraft = (v: InvoiceFormValues): InvoiceDraft => ({
 
 // The amount is text; "1295.9" and "1295.90" are the same number, so typing the shorter form of the
 // baseline is not a change. Exported for the Pro story of #377 (its change summary compares the same way).
-export const sameAmount = (a: string, b: string): boolean => a === b || (a.trim() !== '' && b.trim() !== '' && Number(a) === Number(b));
+export const sameAmount = sameNumberText;
 export const sameValues = (a: InvoiceFormValues, b: InvoiceFormValues): boolean =>
   sameAmount(a.amount, b.amount) &&
   a.supplier === b.supplier &&
@@ -280,9 +278,11 @@ export const sameValues = (a: InvoiceFormValues, b: InvoiceFormValues): boolean 
   a.notes === b.notes &&
   sameLines(a.lineItems, b.lineItems);
 
-const DECIMAL = /^\d+(\.\d+)?$/;
-const validateInvoice = (v: InvoiceFormValues): Record<string, string> => {
-  const errors: Record<string, string> = {};
+type InvoiceErrors = Partial<
+  Record<keyof InvoiceValues | `lineItems.${number}.${keyof Omit<LineValues, 'id'>}`, string>
+>;
+const validateInvoice = (v: InvoiceFormValues): InvoiceErrors => {
+  const errors: InvoiceErrors = {};
   if (!v.supplier) errors.supplier = 'Supplier is required.';
   if (!DECIMAL.test(v.amount.trim()) || Number(v.amount) <= 0) {
     errors.amount = 'Amount must be greater than 0.';
