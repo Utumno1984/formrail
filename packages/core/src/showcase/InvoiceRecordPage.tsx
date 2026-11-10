@@ -22,7 +22,14 @@ import { StatusBadge } from '../status-badge/StatusBadge';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
 import { InvoiceLineItems } from './InvoiceLineItems';
 import { DECIMAL, sameNumberText } from './number-text';
-import { sameLines, toLineValues, toStoredLine, validateLines, type LineValues } from './invoice-lines';
+import {
+  sameLines,
+  toLineValues,
+  toStoredLine,
+  validateLines,
+  type LineErrorKey,
+  type LineValues,
+} from './invoice-lines';
 import { InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from './showcase-data';
 
@@ -278,9 +285,7 @@ export const sameValues = (a: InvoiceFormValues, b: InvoiceFormValues): boolean 
   a.notes === b.notes &&
   sameLines(a.lineItems, b.lineItems);
 
-type InvoiceErrors = Partial<
-  Record<keyof InvoiceValues | `lineItems.${number}.${keyof Omit<LineValues, 'id'>}`, string>
->;
+type InvoiceErrors = Partial<Record<keyof InvoiceValues | LineErrorKey, string>>;
 const validateInvoice = (v: InvoiceFormValues): InvoiceErrors => {
   const errors: InvoiceErrors = {};
   if (!v.supplier) errors.supplier = 'Supplier is required.';

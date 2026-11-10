@@ -14,16 +14,8 @@ export interface InvoiceLineItemsProps {
   onChange: (next: LineValues[]) => void;
 }
 
+// Same name as the literal `data-line-focus` attributes in the JSX below (a JSX attribute name cannot be a constant).
 const FOCUS_ATTR = 'data-line-focus';
-
-const VISUALLY_HIDDEN: CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-};
 
 const LIST: CSSProperties = { display: 'grid', gap: 12, listStyle: 'none', margin: 0, padding: 0 };
 const ROW: CSSProperties = {
@@ -52,21 +44,15 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
     const wanted = pendingRef.current;
     if (wanted === null) return;
     pendingRef.current = null;
-    for (const el of rootRef.current?.querySelectorAll<HTMLElement>(`[${FOCUS_ATTR}]`) ?? []) {
-      if (el.getAttribute(FOCUS_ATTR) === wanted) {
-        el.focus();
-        return;
-      }
-    }
+    rootRef.current?.querySelector<HTMLElement>(`[${FOCUS_ATTR}="${wanted.replace(/["\\]/g, '\\$&')}"]`)?.focus();
   });
 
   const update = (index: number, patch: Partial<LineValues>) =>
     onChange(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
 
   const add = () => {
-    const taken = new Set(baselineIds);
-    for (const line of lines) taken.add(line.id);
-    const { id, counter } = nextLineId(taken, counterRef.current);
+    // `counterRef` only grows, so an id made here never repeats one made here before: only the saved ids can clash.
+    const { id, counter } = nextLineId(baselineIds, counterRef.current);
     counterRef.current = counter;
     pendingRef.current = `description:${id}`;
     onChange([...lines, { id, description: '', quantity: '', unitPrice: '' }]);
@@ -110,10 +96,10 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                       size="sm"
                       aria-disabled={i === 0 || undefined}
                       onClick={() => move(i, -1)}
-                      {...{ [FOCUS_ATTR]: `up:${line.id}` }}
+                      data-line-focus={`up:${line.id}`}
                     >
                       <span>
-                        Move <span style={VISUALLY_HIDDEN}>{`line ${n}`}</span> up
+                        Move <span className="sr-only">{`line ${n}`}</span> up
                       </span>
                     </Button>
                     <Button
@@ -121,20 +107,20 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                       size="sm"
                       aria-disabled={i === lines.length - 1 || undefined}
                       onClick={() => move(i, 1)}
-                      {...{ [FOCUS_ATTR]: `down:${line.id}` }}
+                      data-line-focus={`down:${line.id}`}
                     >
                       <span>
-                        Move <span style={VISUALLY_HIDDEN}>{`line ${n}`}</span> down
+                        Move <span className="sr-only">{`line ${n}`}</span> down
                       </span>
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => remove(i)}
-                      {...{ [FOCUS_ATTR]: `remove:${line.id}` }}
+                      data-line-focus={`remove:${line.id}`}
                     >
                       <span>
-                        Remove <span style={VISUALLY_HIDDEN}>{`line ${n}`}</span>
+                        Remove <span className="sr-only">{`line ${n}`}</span>
                       </span>
                     </Button>
                   </div>
@@ -143,7 +129,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                   <Input
                     value={line.description}
                     onChange={(e) => update(i, { description: e.target.value })}
-                    {...{ [FOCUS_ATTR]: `description:${line.id}` }}
+                    data-line-focus={`description:${line.id}`}
                   />
                 </Field>
                 <div style={ROW_FIELDS}>
@@ -155,7 +141,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                   </Field>
                   <div style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
                     <span aria-hidden="true">Total</span>
-                    <span style={VISUALLY_HIDDEN}>{`Line ${n} total`}</span>
+                    <span className="sr-only">{`Line ${n} total`}</span>
                     <span data-line-total={line.id}>{total ?? '—'}</span>
                   </div>
                 </div>
@@ -165,7 +151,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
         </ol>
       )}
       <div>
-        <Button variant="secondary" onClick={add} {...{ [FOCUS_ATTR]: 'add' }}>
+        <Button variant="secondary" onClick={add} data-line-focus="add">
           Add line
         </Button>
       </div>

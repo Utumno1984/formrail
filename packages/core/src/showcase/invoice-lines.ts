@@ -38,29 +38,42 @@ export const sameLines = (a: readonly LineValues[], b: readonly LineValues[]): b
     );
   });
 
+/** A field of a line that has a validation error. */
+export type LineErrorField = 'description' | 'quantity' | 'unitPrice';
+/** Dotted path of a line error (`lineItems.2.quantity`). */
+export type LineErrorKey = `lineItems.${number}.${LineErrorField}`;
+
+const lineErrorKey = (index: number, field: LineErrorField): LineErrorKey => `lineItems.${index}.${field}`;
+
+// A valid quantity is a whole number > 0; a valid unit price is a decimal > 0. `Number.isFinite` rejects the
+// digit strings long enough to coerce to Infinity.
+const isValidQuantity = (text: string): boolean => {
+  const quantity = text.trim();
+  return INTEGER.test(quantity) && Number.isFinite(Number(quantity)) && Number(quantity) > 0;
+};
+const isValidPrice = (text: string): boolean => {
+  const price = text.trim();
+  return DECIMAL.test(price) && Number.isFinite(Number(price)) && Number(price) > 0;
+};
+
 /** Errors keyed by dotted path (`lineItems.2.quantity`). */
-export function validateLines(lines: readonly LineValues[]): Record<string, string> {
-  const errors: Record<string, string> = {};
+export function validateLines(lines: readonly LineValues[]): Partial<Record<LineErrorKey, string>> {
+  const errors: Partial<Record<LineErrorKey, string>> = {};
   lines.forEach((line, i) => {
-    if (line.description.trim() === '') errors[`lineItems.${i}.description`] = 'Description is required.';
-    const quantity = line.quantity.trim();
-    if (!INTEGER.test(quantity) || Number(quantity) <= 0) {
-      errors[`lineItems.${i}.quantity`] = 'Quantity must be a whole number greater than 0.';
+    if (line.description.trim() === '') errors[lineErrorKey(i, 'description')] = 'Description is required.';
+    if (!isValidQuantity(line.quantity)) {
+      errors[lineErrorKey(i, 'quantity')] = 'Quantity must be a whole number greater than 0.';
     }
-    const price = line.unitPrice.trim();
-    if (!DECIMAL.test(price) || Number(price) <= 0) {
-      errors[`lineItems.${i}.unitPrice`] = 'Unit price must be greater than 0.';
-    }
+    if (!isValidPrice(line.unitPrice)) errors[lineErrorKey(i, 'unitPrice')] = 'Unit price must be greater than 0.';
   });
   return errors;
 }
 
-/** Quantity × unit price with 2 decimals, or `null` while the quantity is not a whole number or the price is not a number. */
+/** Quantity × unit price with 2 decimals, or `null` while the quantity or the unit price is not valid (see `validateLines`). */
 export function lineTotal(line: LineValues): string | null {
-  const quantity = line.quantity.trim();
-  const price = line.unitPrice.trim();
-  if (!INTEGER.test(quantity) || !DECIMAL.test(price)) return null;
-  return (Number(quantity) * Number(price)).toFixed(2);
+  if (!isValidQuantity(line.quantity) || !isValidPrice(line.unitPrice)) return null;
+  const total = Number(line.quantity.trim()) * Number(line.unitPrice.trim());
+  return Number.isFinite(total) ? total.toFixed(2) : null;
 }
 
 /**

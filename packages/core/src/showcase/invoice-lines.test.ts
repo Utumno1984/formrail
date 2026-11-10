@@ -67,6 +67,25 @@ describe('validateLines', () => {
   });
 });
 
+describe('validateLines: finite values', () => {
+  it('rejects a unit price or a quantity whose digits coerce to Infinity', () => {
+    const huge = '9'.repeat(400);
+    const errors = validateLines([line('a', { quantity: huge, unitPrice: huge })]);
+    expect(errors['lineItems.0.quantity']).toBeDefined();
+    expect(errors['lineItems.0.unitPrice']).toBeDefined();
+  });
+});
+
+describe('sameLines: invalid numeric forms', () => {
+  it('counts "2e0" and "0x2" as a change from "2", "2.0" is still the same', () => {
+    const base = [line('a', { quantity: '2', unitPrice: '150' })];
+    expect(sameLines(base, [line('a', { quantity: '2e0', unitPrice: '150' })])).toBe(false);
+    expect(sameLines(base, [line('a', { quantity: '2', unitPrice: '1.5e2' })])).toBe(false);
+    expect(sameLines(base, [line('a', { quantity: '0x2', unitPrice: '150' })])).toBe(false);
+    expect(sameLines(base, [line('a', { quantity: '2', unitPrice: '150.00' })])).toBe(true);
+  });
+});
+
 describe('lineTotal', () => {
   it('multiplies quantity by unit price with 2 decimals', () => {
     expect(lineTotal(line('a', { quantity: '2', unitPrice: '150' }))).toBe('300.00');
@@ -76,6 +95,16 @@ describe('lineTotal', () => {
   it('is null while either text is not a number', () => {
     expect(lineTotal(line('a', { quantity: '' }))).toBeNull();
     expect(lineTotal(line('a', { unitPrice: 'abc' }))).toBeNull();
+  });
+
+  it('is null for every quantity or price validateLines rejects (zero, non-finite)', () => {
+    expect(lineTotal(line('a', { quantity: '0', unitPrice: '150' }))).toBeNull();
+    expect(lineTotal(line('a', { quantity: '2', unitPrice: '0' }))).toBeNull();
+    const huge = '9'.repeat(400);
+    expect(lineTotal(line('a', { quantity: '2', unitPrice: huge }))).toBeNull();
+    expect(lineTotal(line('a', { quantity: huge, unitPrice: '2' }))).toBeNull();
+    // Both finite, the product is not
+    expect(lineTotal(line('a', { quantity: '9'.repeat(200), unitPrice: '9'.repeat(200) }))).toBeNull();
   });
 
   it('is null for a decimal quantity, the same text validateLines rejects', () => {
