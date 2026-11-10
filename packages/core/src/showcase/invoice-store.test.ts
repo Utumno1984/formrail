@@ -258,3 +258,50 @@ describe('createInvoiceStore: deleteMany (#366)', () => {
     expect(store.snapshot()).toHaveLength(200);
   });
 });
+
+describe('createInvoiceStore: line items (#378)', () => {
+  it('gives every invoice 1 to 4 deterministic lines with unique ids and numeric quantity and price', async () => {
+    const all = await createInvoiceStore().list();
+    const again = await createInvoiceStore().list();
+    expect(all.map((r) => r.lineItems)).toEqual(again.map((r) => r.lineItems));
+    for (const r of all) {
+      expect(r.lineItems.length).toBeGreaterThanOrEqual(1);
+      expect(r.lineItems.length).toBeLessThanOrEqual(4);
+      expect(new Set(r.lineItems.map((l) => l.id)).size).toBe(r.lineItems.length);
+      for (const l of r.lineItems) {
+        expect(Number.isInteger(l.quantity) && l.quantity > 0).toBe(true);
+        expect(l.unitPrice).toBeGreaterThan(0);
+        expect(l.description).not.toBe('');
+      }
+    }
+  });
+
+  it('save keeps the lines in the order sent, keeps client ids as they are and rounds the unit price to 2 decimals', async () => {
+    const store = createInvoiceStore();
+    const record = await store.get('inv-3');
+    const [a, b] = record.lineItems as [(typeof record.lineItems)[number], (typeof record.lineItems)[number]];
+    const extra = { id: 'new-7', description: 'Extra', quantity: 2, unitPrice: 150.456 };
+    const saved = await store.save({ ...record, lineItems: [b, extra, a] });
+    expect(saved.lineItems).toEqual([b, { ...extra, unitPrice: 150.46 }, a]);
+    expect((await store.get('inv-3')).lineItems).toEqual(saved.lineItems);
+  });
+
+  it('what a caller does to the lines it got never changes the store', async () => {
+    const store = createInvoiceStore();
+    const first = await store.get('inv-3');
+    first.lineItems[0]!.description = 'tampered';
+    first.lineItems.pop();
+    const second = await store.get('inv-3');
+    expect(second.lineItems).toHaveLength(3);
+    expect(second.lineItems[0]!.description).not.toBe('tampered');
+  });
+
+  it('create stores the lines of the draft, normalized; a draft without lines creates a record without lines', async () => {
+    const store = createInvoiceStore();
+    const draft = { supplier: 'Acme', status: 'pending' as const, amount: 5, date: '2026-11-09', dueDate: '2026-12-09', notes: '' };
+    expect((await store.create({ ...draft, lineItems: [] })).lineItems).toEqual([]);
+    const row = { id: 'new-1', description: 'Row', quantity: 1, unitPrice: 9.999 };
+    const withLines = await store.create({ ...draft, lineItems: [row] });
+    expect(withLines.lineItems).toEqual([{ ...row, unitPrice: 10 }]);
+  });
+});
