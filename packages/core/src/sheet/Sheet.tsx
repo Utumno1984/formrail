@@ -64,7 +64,10 @@ export interface SheetContentProps
   side?: SheetSide;
   /** Width step. Default `md`. A conflicting width in `className` wins. */
   size?: SheetSize;
-  /** Whether Escape and a click on the backdrop close the sheet. Default `true`. */
+  /**
+   * Whether Escape and a click on the backdrop close the sheet. Default `true`. While `false`, a press
+   * on the backdrop also keeps the focus on the element that has it (it does not fall back to `body`).
+   */
   dismissible?: boolean;
   /** Receives the focus on close when the opener is gone or disabled (or there never was one). */
   returnFocusRef?: RefObject<HTMLElement | null>;
