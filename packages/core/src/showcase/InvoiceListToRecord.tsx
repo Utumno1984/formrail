@@ -22,7 +22,7 @@ import { EMPTY_IDS, useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
 import { useListReportUrlState } from '../list-report/use-list-report-url-state';
 import type { DemoInvoice } from '../internal/demo-invoices';
-import type { ListReportRowActions } from '../list-report/types';
+import type { ListReportRowActions, ListReportSelection } from '../list-report/types';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
 import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
 import { createInvoiceApi } from './invoice-api';
@@ -94,8 +94,14 @@ export interface ListViewProps {
   hiddenIds?: ReadonlySet<string>;
   /** The List Report `rowActions` (#365: the CRUD showcase's "Delete"). */
   rowActions?: ListReportRowActions<DemoInvoice>;
+  /**
+   * Makes the list selectable (#366: the CRUD showcase's bulk delete), the selection controlled by the caller so
+   * it outlives the list (a page opened and closed meanwhile). Without it the list is not selectable.
+   */
+  selection?: { selectedIds: ReadonlySet<string>; onChange: (ids: ReadonlySet<string>) => void };
+  /** The List Report `bulkActions` slot (with `selection`). */
+  bulkActions?: (selection: ListReportSelection<DemoInvoice>) => ReactNode;
 }
-
 
 export function ListView({
   store,
@@ -108,6 +114,8 @@ export function ListView({
   onCreatedReady,
   hiddenIds = EMPTY_IDS,
   rowActions,
+  selection,
+  bulkActions,
 }: ListViewProps) {
   const [load, setLoad] = useState<{ rows: DemoInvoice[] } | { error: true } | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -147,6 +155,9 @@ export function ListView({
     getRowId: (r) => r.id,
     filters: FILTERS,
     ...url,
+    ...(selection
+      ? { selectable: true, selectedIds: selection.selectedIds, onSelectedIdsChange: selection.onChange }
+      : {}),
   });
 
   const reported = useRef<string | null>(null);
@@ -214,6 +225,7 @@ export function ListView({
           labels={LABELS}
           scrollerRef={scroll.ref}
           rowActions={rowActions}
+          bulkActions={bulkActions}
           onRetry={() => setAttempt((n) => n + 1)}
           style={{ height: '100%' }}
         />

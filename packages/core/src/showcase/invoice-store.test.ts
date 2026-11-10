@@ -212,3 +212,47 @@ describe('createInvoiceStore: delete (#365)', () => {
     expect(ids).not.toContain(first.id);
   });
 });
+
+describe('createInvoiceStore: deleteMany (#366)', () => {
+  it('removes every id in one operation after saveDelayMs (nothing before); repeated ids count once', async () => {
+    const store = createInvoiceStore(undefined, { saveDelayMs: 300 });
+    const pending = store.deleteMany(['inv-2', 'inv-5', 'inv-2', 'inv-9']);
+    await vi.advanceTimersByTimeAsync(299);
+    expect(store.snapshot()).toHaveLength(200);
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    const ids = store.snapshot().map((r) => r.id);
+    expect(ids).toHaveLength(197);
+    for (const gone of ['inv-2', 'inv-5', 'inv-9']) expect(ids).not.toContain(gone);
+  });
+
+  it('deleteOutcome error rejects with InvoiceNetworkError and leaves the store unchanged', async () => {
+    const store = createInvoiceStore(undefined, { deleteOutcome: 'error' });
+    const before = JSON.stringify(store.snapshot());
+    await expect(store.deleteMany(['inv-1', 'inv-2'])).rejects.toBeInstanceOf(InvoiceNetworkError);
+    expect(JSON.stringify(store.snapshot())).toBe(before);
+  });
+
+  it('an unknown id makes the whole call fail with InvoiceNotFoundError and removes nothing (all or nothing)', async () => {
+    const store = createInvoiceStore();
+    const before = JSON.stringify(store.snapshot());
+    await expect(store.deleteMany(['inv-1', 'inv-999', 'inv-2'])).rejects.toMatchObject({
+      name: 'InvoiceNotFoundError',
+      id: 'inv-999',
+    });
+    expect(JSON.stringify(store.snapshot())).toBe(before);
+  });
+
+  it('an id already deleted by a single delete is "not found" for the group', async () => {
+    const store = createInvoiceStore();
+    await store.delete('inv-3');
+    await expect(store.deleteMany(['inv-3', 'inv-4'])).rejects.toBeInstanceOf(InvoiceNotFoundError);
+    expect(store.snapshot().some((r) => r.id === 'inv-4')).toBe(true);
+  });
+
+  it('no ids: resolves at once and changes nothing', async () => {
+    const store = createInvoiceStore(undefined, { saveDelayMs: 10_000, deleteOutcome: 'error' });
+    await expect(store.deleteMany([])).resolves.toBeUndefined();
+    expect(store.snapshot()).toHaveLength(200);
+  });
+});
