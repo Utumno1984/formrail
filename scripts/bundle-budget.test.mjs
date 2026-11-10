@@ -312,9 +312,11 @@ describe('multi-package check (#174)', () => {
       'VirtualListReport',
       'VirtualListReportTable',
       'computeChangeSummary',
+      'computeRebase',
       'formatChangeValue',
       'inferSegmentLabel',
       'useChangeSummary',
+      'useFormRebase',
     ]);
     const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
     expect(compareBudget(measured, budget).ok).toBe(true);

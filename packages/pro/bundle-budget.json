@@ -3,32 +3,40 @@
   "version": 1,
   "exports": {
     "ChangeSummary": {
-      "baseline": 2034,
-      "limit": 2238
+      "baseline": 2031,
+      "limit": 2235
     },
     "VirtualListReport": {
-      "baseline": 4277,
-      "limit": 4705
+      "baseline": 4285,
+      "limit": 4714
     },
     "VirtualListReportTable": {
-      "baseline": 3921,
-      "limit": 4314
+      "baseline": 3928,
+      "limit": 4321
     },
     "computeChangeSummary": {
-      "baseline": 1999,
-      "limit": 2199
+      "baseline": 2179,
+      "limit": 2397
+    },
+    "computeRebase": {
+      "baseline": 3443,
+      "limit": 3788
     },
     "formatChangeValue": {
-      "baseline": 1279,
-      "limit": 1407
+      "baseline": 1278,
+      "limit": 1406
     },
     "inferSegmentLabel": {
       "baseline": 246,
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2175,
-      "limit": 2393
+      "baseline": 2360,
+      "limit": 2596
+    },
+    "useFormRebase": {
+      "baseline": 4955,
+      "limit": 5451
     }
   }
 }

@@ -12,6 +12,15 @@ export type {
   ChangeSummaryOptions,
   UseChangeSummaryReturn,
 } from './change-summary/types';
+export { computeRebase } from './form-rebase/compute-rebase';
+export { useFormRebase } from './form-rebase/use-form-rebase';
+export type {
+  RebaseConflict,
+  RebaseOptions,
+  RebaseResult,
+  UseFormRebaseOptions,
+  UseFormRebaseReturn,
+} from './form-rebase/types';
 export { VirtualListReportTable } from './list-report/VirtualListReportTable';
 export type { VirtualListReportTableHandle, VirtualListReportTableProps } from './list-report/VirtualListReportTable';
 export { VirtualListReport } from './list-report/VirtualListReport';
