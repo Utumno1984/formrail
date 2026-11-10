@@ -191,7 +191,7 @@ const heading = (canvas: ReturnType<typeof within>) => canvas.getByRole('heading
 const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row').slice(1);
 
 /**
- * The vistato invoice queue: title with count, actions, filters and search, and a table that
+ * An invoice queue example: title with count, actions, filters and search, and a table that
  * fills the space with a single scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
  * `firstSortDirection` of the "Date" column and container width; the callbacks show up in Actions.
  * The play function picks "To approve", searches for a supplier, sorts by amount descending, checks
