@@ -18,7 +18,7 @@ test.describe('the root is the landing page', () => {
       await page.goto(link);
       await page.waitForTimeout(300);
       expect(new URL(page.url()).pathname, link).toBe(base);
-      await expect(page.getByRole('heading', { level: 1, name: 'react-object-page' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: 'Formrail' })).toBeVisible();
     }
   });
 
@@ -83,7 +83,9 @@ test.describe('links', () => {
   test('external links (GitHub) point to the repository', async ({ page }) => {
     await page.goto('');
     const hrefs = await page.locator('a[href^="http"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-    expect(new Set(hrefs)).toEqual(new Set(['https://github.com/Utumno1984/react-object-page']));
+    expect(new Set(hrefs)).toEqual(
+      new Set(['https://github.com/Utumno1984/react-object-page', ...(earlyAccessUrl ? [earlyAccessUrl] : [])]),
+    );
   });
 });
 
@@ -127,7 +129,9 @@ test.describe('network and weight', () => {
     await page.goto('');
     const scripts = await page.locator('script').evaluateAll((els) => els.map((s) => s.getAttribute('src') ?? 'inline'));
     expect(scripts.sort()).toEqual(['copy.js', 'inline']);
-    expect(readFileSync(`${SITE_DIR}index.html`, 'utf8')).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/react-object-page)/);
+    // The only absolute URLs are GitHub and, when set, the early-access form (the CTA).
+    const html = readFileSync(`${SITE_DIR}index.html`, 'utf8').replace(earlyAccessUrl || '\0', '');
+    expect(html).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/react-object-page)/);
   });
 });
 

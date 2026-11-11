@@ -121,6 +121,10 @@ section {
 #pro {
   scroll-margin-top: 1rem;
 }
+.aka {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+}
 .lead {
   max-width: 40rem;
   font-size: var(--text-rop-title-md);

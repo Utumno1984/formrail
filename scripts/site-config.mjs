@@ -10,9 +10,10 @@ export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
 /**
  * Target of the landing's "Request early access" call-to-action (ticket #382): an external form
- * (Tally or Google Forms) that Daniele creates with his own account.
+ * (Google Forms) created by Daniele; its privacy notice lives in the form.
  *
- * EMPTY ON PURPOSE until that URL exists: while it is empty the assembler leaves the whole CTA out of
- * the page (never a link to `#` or a broken one). When set it must be an absolute `https://` URL.
+ * Must be an absolute `https://` URL. Setting it to '' makes the assembler leave the whole CTA out of
+ * the page (never a link to `#` or a broken one).
  */
-export const EARLY_ACCESS_URL = '';
+export const EARLY_ACCESS_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSd0zpYCxBiaD2UFS-FHZril8Od8eOsh62z6aEKubdavE-lodQ/viewform';

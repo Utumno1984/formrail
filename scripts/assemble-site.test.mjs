@@ -190,12 +190,16 @@ describe('landing: early access call-to-action (ticket #382)', () => {
     return readFileSync(path.join(outDir, 'index.html'), 'utf8');
   }
 
-  it('the committed constant is empty until the real form exists', () => {
-    expect(EARLY_ACCESS_URL).toBe('');
+  it('the default build carries the CTA pointing at the committed form URL', () => {
+    const html = build();
+    expect(html).toContain(`href="${EARLY_ACCESS_URL}"`);
+    expect(html).toContain('rel="noopener"');
+    expect(html).toContain('Request early access');
+    expect(html).toContain('see the privacy note in the form.');
   });
 
-  it('with an empty URL (the default) the CTA is not in the page at all', () => {
-    for (const html of [build(), build({ earlyAccessUrl: '' })]) {
+  it('with an empty URL the CTA is not in the page at all', () => {
+    for (const html of [build({ earlyAccessUrl: '' })]) {
       expect(html).not.toContain('Request early access');
       expect(html).not.toContain('EARLY_ACCESS');
       expect(html).not.toContain('{{');

@@ -8,7 +8,7 @@ import { assembleSite } from '../../scripts/assemble-site.mjs';
 
 // Visual baseline of the public landing page (ticket #382) at the three viewports of the visual
 // projects. The landing is not a story: it is assembled into a temp folder (same assembler as the
-// real site, early-access CTA left out, as long as EARLY_ACCESS_URL is empty) and served through
+// real site, early-access CTA included, with the committed EARLY_ACCESS_URL) and served through
 // `page.route` under the Storybook origin, so no extra server or port is needed. The assembler
 // needs the built Storybook only to validate its presence; it is already there for this project.
 
@@ -26,8 +26,6 @@ test.beforeAll(() => {
   siteDir = assembleSite({
     storybookDir: path.join(ROOT, 'storybook-static'),
     outDir: path.join(mkdtempSync(path.join(tmpdir(), 'rop-landing-')), 'site'),
-    // Pinned: the baseline must not change when the real URL is filled in later.
-    earlyAccessUrl: '',
   }) as string;
 });
 
