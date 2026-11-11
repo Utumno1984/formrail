@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 // @ts-expect-error plain .mjs helper shared with the assembler and the server, no type declarations
 import { SITE_BASE } from '../../scripts/site-config.mjs';
+import { gotoAndStay } from '../helpers/no-redirect';
 
 // Pre-deploy smoke of the assembled Pages site (ticket #380), see playwright.site.config.ts.
 // The URLs below are the ones already distributed (README on npm, links sent around): they must
@@ -65,8 +66,7 @@ test.describe('old deep links reach the same page under storybook/', () => {
 // redirects, so the former "bare root reaches the Storybook" cases are replaced by these.
 test.describe('bare root', () => {
   test('stays on the landing: no Storybook manager', async ({ page }) => {
-    await page.goto('');
-    await page.waitForTimeout(300);
+    await gotoAndStay(page, '');
     expect(new URL(page.url()).pathname).toBe(base);
     await expect(page.locator('#storybook-preview-iframe')).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();

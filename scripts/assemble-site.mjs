@@ -92,6 +92,7 @@ export function redirectScriptSource(siteRootDir) {
  * @param {string} [options.siteBase] path prefix, written into 404.html (default `SITE_BASE`)
  * @param {string} [options.earlyAccessUrl] target of the landing's CTA; empty = no CTA (default `EARLY_ACCESS_URL`)
  * @param {string} [options.themeCssPath] the theme source whose tokens become `tokens.css`
+ * @param {string} [options.faviconPath] the favicon copied to `favicon.svg`
  * @returns {string} outDir
  */
 export function assembleSite({
@@ -102,6 +103,7 @@ export function assembleSite({
   siteBase = SITE_BASE,
   earlyAccessUrl = EARLY_ACCESS_URL,
   themeCssPath = THEME_CSS,
+  faviconPath = FAVICON,
 } = {}) {
   if (!existsSync(path.join(storybookDir, 'index.html'))) {
     throw new Error(`No built Storybook at ${storybookDir}: run \`npm run build-storybook\` first.`);
@@ -109,9 +111,25 @@ export function assembleSite({
   if (proStorybookDir !== null && !existsSync(path.join(proStorybookDir, 'index.html'))) {
     throw new Error(`No built Pro Storybook at ${proStorybookDir}: run \`npm run build-storybook:pro\` first.`);
   }
-  // Everything that can fail is read before the output folder is touched.
+  // Everything that can fail is read or validated before the output folder is touched: after the
+  // rmSync below nothing may throw for a missing/malformed source, or a failed run would leave
+  // neither the previous (working) site nor a new one.
   const tokens = themeTokensToRoot(readFileSync(themeCssPath, 'utf8'));
   const landing = renderEarlyAccess(readFileSync(path.join(siteRootDir, 'index.html'), 'utf8'), earlyAccessUrl);
+  const redirect = redirectScriptSource(siteRootDir);
+  const pages = {};
+  for (const file of ['index.html', 'iframe.html']) {
+    const html = file === 'index.html' ? landing : readFileSync(path.join(siteRootDir, file), 'utf8');
+    if (!html.includes(PLACEHOLDER)) throw new Error(`${file} has no ${PLACEHOLDER} placeholder.`);
+    // A function replacer: `$` sequences in the code must not be read as replacement patterns.
+    pages[file] = html.replace(PLACEHOLDER, () => redirect);
+  }
+  const notFound = readFileSync(path.join(siteRootDir, '404.html'), 'utf8').replaceAll('{{SITE_BASE}}', siteBase);
+  const assets = ['landing.css', 'copy.js'].map((file) => path.join(siteRootDir, file));
+  for (const asset of [...assets, faviconPath]) {
+    if (!existsSync(asset)) throw new Error(`Missing site asset (favicon/landing file): ${asset}`);
+  }
+
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
 
@@ -119,19 +137,11 @@ export function assembleSite({
   if (proStorybookDir === null) mkdirSync(path.join(outDir, 'pro'));
   else cpSync(proStorybookDir, path.join(outDir, 'pro'), { recursive: true });
   writeFileSync(path.join(outDir, '.nojekyll'), '');
-
-  const redirect = redirectScriptSource(siteRootDir);
   writeFileSync(path.join(outDir, 'tokens.css'), tokens);
-  for (const file of ['landing.css', 'copy.js']) cpSync(path.join(siteRootDir, file), path.join(outDir, file));
-  cpSync(FAVICON, path.join(outDir, 'favicon.svg'));
-  for (const file of ['index.html', 'iframe.html']) {
-    const html = file === 'index.html' ? landing : readFileSync(path.join(siteRootDir, file), 'utf8');
-    if (!html.includes(PLACEHOLDER)) throw new Error(`${file} has no ${PLACEHOLDER} placeholder.`);
-    // A function replacer: `$` sequences in the code must not be read as replacement patterns.
-    writeFileSync(path.join(outDir, file), html.replace(PLACEHOLDER, () => redirect));
-  }
-  const notFound = readFileSync(path.join(siteRootDir, '404.html'), 'utf8');
-  writeFileSync(path.join(outDir, '404.html'), notFound.replaceAll('{{SITE_BASE}}', siteBase));
+  for (const asset of assets) cpSync(asset, path.join(outDir, path.basename(asset)));
+  cpSync(faviconPath, path.join(outDir, 'favicon.svg'));
+  for (const [file, html] of Object.entries(pages)) writeFileSync(path.join(outDir, file), html);
+  writeFileSync(path.join(outDir, '404.html'), notFound);
   return outDir;
 }
 

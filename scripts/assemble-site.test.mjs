@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, writeFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, existsSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -128,6 +128,28 @@ describe('assembleSite', () => {
     expect(run('index.html', B)).toEqual([]);
     expect(run('index.html', `${B}#pro`)).toEqual([]);
     expect(run('iframe.html', `${B}iframe.html?id=x&viewMode=story`)).toEqual([`${B}storybook/iframe.html?id=x&viewMode=story`]);
+  });
+
+  // The invariant: everything that can fail is read/validated before the previous output is touched.
+  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html']])('missing site-root/%s', (missing) => {
+    it('fails before outDir is touched (the previous site stays intact)', () => {
+      const { tmp, storybookDir, outDir } = setup();
+      const siteRootDir = path.join(tmp, 'site-root');
+      cpSync(path.join(import.meta.dirname, '..', 'site-root'), siteRootDir, { recursive: true });
+      rmSync(path.join(siteRootDir, missing));
+      mkdirSync(outDir);
+      writeFileSync(path.join(outDir, 'previous.txt'), 'published');
+      expect(() => assembleSite({ storybookDir, siteRootDir, outDir })).toThrow();
+      expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
+    });
+  });
+
+  it('a missing favicon fails before outDir is touched', () => {
+    const { tmp, storybookDir, outDir } = setup();
+    mkdirSync(outDir);
+    writeFileSync(path.join(outDir, 'previous.txt'), 'published');
+    expect(() => assembleSite({ storybookDir, outDir, faviconPath: path.join(tmp, 'nope.svg') })).toThrow(/favicon/i);
+    expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
   });
 
   it('404.html has no script and links to the Storybook with the prefix', () => {

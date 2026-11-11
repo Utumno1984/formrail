@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 // @ts-expect-error plain .mjs helper shared with the assembler and the server, no type declarations
 import { EARLY_ACCESS_URL, SITE_BASE } from '../../scripts/site-config.mjs';
 import { expectNoA11yViolations } from '../helpers/a11y';
+import { gotoAndStay } from '../helpers/no-redirect';
 import { VIEWPORTS } from '../helpers/viewports';
 
 // Pre-deploy smoke of the landing page at the site root (ticket #382), see playwright.site.config.ts.
@@ -15,8 +16,7 @@ const SITE_DIR = fileURLToPath(new URL('../../site/', import.meta.url));
 test.describe('the root is the landing page', () => {
   test('bare root, #pro and foreign parameters stay on the landing (no redirect)', async ({ page }) => {
     for (const link of ['', '#pro', '?utm_source=newsletter']) {
-      await page.goto(link);
-      await page.waitForTimeout(300);
+      await gotoAndStay(page, link);
       expect(new URL(page.url()).pathname, link).toBe(base);
       await expect(page.getByRole('heading', { level: 1, name: 'Formrail' })).toBeVisible();
     }
