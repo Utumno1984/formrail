@@ -50,6 +50,10 @@ const lineErrorKey = (index: number, field: LineErrorField): LineErrorKey => `li
 const isValidQuantity = (text: string): boolean => isPlainPositive(text, INTEGER);
 const isValidPrice = (text: string): boolean => isPlainPositive(text, DECIMAL);
 
+/** Raw product of two already valid factors. */
+const rawProduct = (line: LineValues): number => Number(line.quantity.trim()) * Number(line.unitPrice.trim());
+const productTooLarge = (line: LineValues): boolean => !(rawProduct(line) < MAX_PLAIN_NUMBER);
+
 /** Errors keyed by dotted path (`lineItems.2.quantity`). */
 export function validateLines(lines: readonly LineValues[]): Partial<Record<LineErrorKey, string>> {
   const errors: Partial<Record<LineErrorKey, string>> = {};
@@ -65,6 +69,10 @@ export function validateLines(lines: readonly LineValues[]): Partial<Record<Line
         ? 'Unit price must be less than 1e21.'
         : 'Unit price must be greater than 0.';
     }
+    // Both factors valid on their own, but the product reaches the bound: `lineTotal` would be blank with no reason.
+    if (isValidQuantity(line.quantity) && isValidPrice(line.unitPrice) && productTooLarge(line)) {
+      errors[lineErrorKey(i, 'unitPrice')] = 'Quantity × unit price is too large (must be less than 1e21).';
+    }
   });
   return errors;
 }
@@ -72,9 +80,8 @@ export function validateLines(lines: readonly LineValues[]): Partial<Record<Line
 /** Quantity × unit price with 2 decimals, or `null` while the quantity or the unit price is not valid (see `validateLines`) or the product reaches 1e21. */
 export function lineTotal(line: LineValues): string | null {
   if (!isValidQuantity(line.quantity) || !isValidPrice(line.unitPrice)) return null;
-  const total = Number(line.quantity.trim()) * Number(line.unitPrice.trim());
-  // Two valid factors can still multiply past the bound: no total is better than a "1e+21" one.
-  return total < MAX_PLAIN_NUMBER ? total.toFixed(2) : null;
+  // Two valid factors can still multiply past the bound (`validateLines` reports it): no total is better than a "1e+21" one.
+  return productTooLarge(line) ? null : rawProduct(line).toFixed(2);
 }
 
 /**
