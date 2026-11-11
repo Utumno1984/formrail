@@ -59,8 +59,8 @@ export interface InvoiceValues {
   notes: string;
 }
 
-/** All the values of the editor: the scalar ones plus the line items (the Pro review sees only the scalar ones). */
-interface InvoiceFormValues extends InvoiceValues {
+/** All the values of the editor: the scalar ones plus the line items (the Pro review sees them too since #379). */
+export interface InvoiceFormValues extends InvoiceValues {
   lineItems: LineValues[];
 }
 
@@ -85,17 +85,13 @@ const toInvoice = (record: StoredInvoice, v: InvoiceFormValues): StoredInvoice =
   lineItems: v.lineItems.map(toStoredLine),
 });
 
-/** The scalar part of the values: what `reviewSave` receives. */
-const scalarValues = (v: InvoiceFormValues): InvoiceValues => {
-  const { lineItems, ...scalar } = v;
-  void lineItems;
-  return scalar;
-};
+/** What `reviewSave` receives per side: the scalar values plus the line items (#379). */
+export type InvoiceReviewValues = InvoiceFormValues;
 
 /** What `reviewSave` receives: the values about to be saved and the REAL saved baseline (never a default). */
 export interface InvoiceSaveReviewContext {
-  values: InvoiceValues;
-  baseline: InvoiceValues;
+  values: InvoiceReviewValues;
+  baseline: InvoiceReviewValues;
 }
 
 /** The review dialog: the options of the editor's `confirm()` (#344) that the reviewer chooses. */
@@ -406,7 +402,7 @@ export function InvoiceEditor({
     // none of an invalid form: `commit` then fails the validation exactly as without a review.
     if (form.isSaving) return;
     if (hasErrors(validateInvoice(form.values))) return commit();
-    const review = reviewSave({ values: scalarValues(form.values), baseline: scalarValues(form.baseline) });
+    const review = reviewSave({ values: form.values, baseline: form.baseline });
     if (!review) return commit();
     // No `onConfirm`: the dialog closes at once and the save shows its progress in the footer, as without it.
     void confirm(review).then((ok) => {
