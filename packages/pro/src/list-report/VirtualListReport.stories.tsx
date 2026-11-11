@@ -11,7 +11,7 @@ import {
   type ListReportFilter,
 } from '@formrail/core';
 import { VirtualListReport } from './VirtualListReport';
-import type { VirtualListReportTableHandle } from './VirtualListReportTable';
+import { VirtualListReportTable, type VirtualListReportTableHandle } from './VirtualListReportTable';
 import { DEMO_STATUS_LABEL, formatAmount, makeDemoRows, type DemoRow } from './demo-rows';
 
 const FILTERS: ListReportFilter<DemoRow>[] = [
@@ -125,6 +125,8 @@ async function scrollTable(canvasElement: HTMLElement, top: number) {
 
 const meta: Meta<DemoArgs> = {
   title: 'Pro/Floorplans/Virtual List Report',
+  component: VirtualListReport as never,
+  subcomponents: { VirtualListReportTable: VirtualListReportTable as never },
   parameters: {
     layout: 'fullscreen',
     docs: {
