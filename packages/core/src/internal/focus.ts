@@ -1,5 +1,7 @@
 // Internal: focus / tab-order helpers shared by the overlays and the form helpers. Not exported from the package.
 
+import { isDev } from './is-dev';
+
 const TABBABLE =
   'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable="true"]';
 
@@ -38,6 +40,14 @@ export function focusFirst(candidates: Iterable<HTMLElement>, options?: FocusOpt
     if (root.activeElement === el) return el;
   }
   return null;
+}
+
+/**
+ * Development-only diagnostic for a `focusFirst` that found nothing: one `console.error`
+ * `[react-object-page] <what>, nothing was focused.` (silent in production).
+ */
+export function warnNoFocusTarget(what: string): void {
+  if (isDev()) console.error(`[react-object-page] ${what}, nothing was focused.`);
 }
 
 /**

@@ -54,6 +54,8 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
   const remove = (index: number) => {
     const next = lines.filter((_, i) => i !== index);
     // The row that takes the place of the removed one, else the previous one, else "Add line".
+    // `heir` is a row object here (truthy whenever present): a plain truthiness check is right. In
+    // `FileUpload` it is a key string where '' is a valid heir, hence `=== undefined` there: do not unify.
     const heir = next[index] ?? next[index - 1];
     focus.requestFocus({ next: ids(next), targets: heir ? [`remove:${heir.id}`, 'add'] : ['add'] });
     onChange(next);

@@ -216,6 +216,8 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
     // else "Choose files". Keys of `next`, not of `files`: with two identical files the numbering
     // (`#0`, `#1`) shifts after the removal.
     const nextKeys = itemKeys(next);
+    // `heir` is a key string: '' would be falsy yet present, so the guard is `=== undefined`. In
+    // `InvoiceLineItems` it is a row object (truthiness is right there): do not unify the two guards.
     const heir = nextKeys[index] ?? nextKeys[index - 1];
     focus.requestFocus({ next: nextKeys, targets: heir === undefined ? ['choose'] : [`remove:${heir}`, 'choose'] });
     commit(next);

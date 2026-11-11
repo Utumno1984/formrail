@@ -1,8 +1,7 @@
 // Internal: where the focus goes after the user adds, removes or moves an item of a list. Not exported
 // from the package (see the PR of #417 for why it stays private for now).
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { focusFirst } from './focus';
-import { isDev } from './is-dev';
+import { focusFirst, warnNoFocusTarget } from './focus';
 
 export interface ListMutationFocusRequest {
   /**
@@ -34,6 +33,12 @@ interface Pending extends ListMutationFocusRequest {
   from: readonly string[];
 }
 
+/** One entry per key: the mounted element (if any) and the stable callback ref that tracks it. */
+interface TargetEntry {
+  element: HTMLElement | null;
+  ref: (element: HTMLElement | null) => void;
+}
+
 const sameItems = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((key, i) => Object.is(key, b[i]));
 
 /**
@@ -54,8 +59,7 @@ const sameItems = (a: readonly string[], b: readonly string[]) => a.length === b
  * line) cannot answer to the outer list's keys.
  */
 export function useListMutationFocus(items: readonly string[]): ListMutationFocus {
-  const elements = useRef(new Map<string, HTMLElement>());
-  const refs = useRef(new Map<string, (element: HTMLElement | null) => void>());
+  const targets = useRef(new Map<string, TargetEntry>());
   const itemsRef = useRef(items);
   const pending = useRef<Pending | null>(null);
 
@@ -68,29 +72,32 @@ export function useListMutationFocus(items: readonly string[]): ListMutationFocu
       return;
     }
     pending.current = null;
-    const candidates = request.targets.flatMap((key) => elements.current.get(key) ?? []);
-    if (focusFirst(candidates) === null && isDev()) {
-      console.error(
-        `[react-object-page] list focus: none of the targets ${JSON.stringify(request.targets)} is mounted and focusable after the change, nothing was focused.`,
+    const candidates = request.targets.flatMap((key) => targets.current.get(key)?.element ?? []);
+    if (focusFirst(candidates) === null) {
+      warnNoFocusTarget(
+        `list focus: none of the targets ${JSON.stringify(request.targets)} is mounted and focusable after the change`,
       );
     }
   });
 
   const targetRef = useCallback((key: string) => {
-    let ref = refs.current.get(key);
-    if (!ref) {
-      ref = (element: HTMLElement | null) => {
+    const known = targets.current.get(key);
+    if (known) return known.ref;
+    const entry: TargetEntry = {
+      element: null,
+      ref: (element: HTMLElement | null) => {
         if (element) {
-          elements.current.set(key, element);
+          entry.element = element;
+          targets.current.set(key, entry);
         } else {
           // The element is gone (a removed row): forget its key, the cache does not grow with every key ever seen.
-          elements.current.delete(key);
-          refs.current.delete(key);
+          entry.element = null;
+          targets.current.delete(key);
         }
-      };
-      refs.current.set(key, ref);
-    }
-    return ref;
+      },
+    };
+    targets.current.set(key, entry);
+    return entry.ref;
   }, []);
 
   const requestFocus = useCallback((request: ListMutationFocusRequest) => {

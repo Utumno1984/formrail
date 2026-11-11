@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
-import { compareDocumentOrder, focusFirst } from '../internal/focus';
-import { isDev } from '../internal/is-dev';
+import { compareDocumentOrder, focusFirst, warnNoFocusTarget } from '../internal/focus';
 
 import { invalidPaths, isClearing } from './field-errors';
 import type { FieldErrors } from './field-errors';
@@ -89,17 +88,12 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors, trigger }
     // Document order, never the order of the keys of `fieldErrors`.
     candidates.sort(compareDocumentOrder);
 
-    // A candidate that cannot take focus (`type="hidden"`, disabled, `display: none`, inert, a
-    // `fieldset`) is skipped: the first one that really receives focus wins.
+    // See `focusFirst`: unfocusable candidates are skipped. No scroll on focus, centered below.
     const focused = focusFirst(candidates, { preventScroll: true });
-    if (focused) {
-      focused.scrollIntoView({ block: 'center' });
-      return;
-    }
-
-    if (isDev()) {
-      console.error(
-        '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]`/`[name]` element inside the container, nothing was focused.',
+    if (focused) focused.scrollIntoView({ block: 'center' });
+    else {
+      warnNoFocusTarget(
+        'useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]`/`[name]` element inside the container',
       );
     }
     // With `trigger`, a new `fieldErrors` alone must not re-run the effect: it is read, not watched.
