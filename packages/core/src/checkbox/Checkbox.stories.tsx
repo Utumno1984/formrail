@@ -5,7 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
-import { storyControl } from '../internal/story-docs';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Checkbox, type CheckedState } from './Checkbox';
 
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -23,14 +23,16 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Checkbox',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
-  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
-  subcomponents: { Checkbox },
+  // The stories drive the component through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: Checkbox as never,
   parameters: { layout: 'padded', docs: { description: { component: "Checkbox: a styled native `<input type=\"checkbox\">` with an optional inline label, a mixed (`indeterminate`) state, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
-  // No `component`, so these rows are not merged with the docgen (the `Checkbox` tab has the props).
+  // The props' rows take their description from the TSDoc; only the controls are set here.
   argTypes: {
-    checked: { control: 'radio', options: CHECKED_OPTIONS, description: '`checked`: `true`, `false` or `indeterminate` (mixed). The demo keeps it in local state.' },
-    onCheckedChange: { control: false, description: '`onCheckedChange(checked)`: a user toggle (not an external change of `checked`).' },
+    checked: { control: 'radio', options: CHECKED_OPTIONS },
+    onCheckedChange: { control: false },
+    // Set by the demo itself (`children`: from `inlineLabel`).
+    ...withoutControls('defaultChecked', 'children'),
     // forced = value decided by a business rule; locked = not editable. Neither changes on click or Space.
     fieldState: storyControl({
       control: 'radio',

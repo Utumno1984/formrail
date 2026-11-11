@@ -16,7 +16,7 @@ import {
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
-import { storyControl } from '../internal/story-docs';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { DatePicker, type DatePickerInvalidReason, type DatePickerSize } from './DatePicker';
 
@@ -41,19 +41,21 @@ const meta: Meta<DemoArgs> = {
   title: 'Forms/DatePicker',
   // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
   // were rendered inline: each story gets its own iframe there.
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
-  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
-  subcomponents: { DatePicker },
+  // The stories drive the component through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: DatePicker as never,
   parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' }, description: { component: "DatePicker: a text input in the locale's numeric format plus a Calendar popover. Typing and picking give the same ISO date through `onValueChange`; text that is not a valid date is reported through `onInvalidInput`." } } },
-  // No `component`, so these rows are not merged with the docgen (the `DatePicker` tab has the props).
+  // The props' rows take their description from the TSDoc; only the controls are set here.
   argTypes: {
-    locale: { control: 'select', options: LOCALES, description: '`locale`: order and separator of the typed text, calendar names.' },
-    size: { control: 'radio', options: SIZES, description: '`size`: height of the input (`sm` or `md`).' },
-    today: { control: 'text', description: '`today`: the date marked as today, YYYY-MM-DD.' },
-    min: { control: 'text', description: '`min`: first selectable date, YYYY-MM-DD (empty = none).' },
-    max: { control: 'text', description: '`max`: last selectable date, YYYY-MM-DD (empty = none).' },
-    onValueChange: { control: false, description: '`onValueChange(date | null)`: a typed or picked date (ISO), or `null` when cleared.' },
-    onInvalidInput: { control: false, description: '`onInvalidInput(text, reason)`: typed text that is not a valid date.' },
+    locale: { control: 'select', options: LOCALES },
+    size: { control: 'radio', options: SIZES },
+    today: { control: 'text' },
+    min: { control: 'text' },
+    max: { control: 'text' },
+    onValueChange: { control: false },
+    onInvalidInput: { control: false },
+    // Not taken from the story args: the demo keeps `value` in local state and sets the rest itself.
+    ...withoutControls('value', 'defaultValue', 'isDateDisabled', 'weekStartsOn', 'labels'),
     // forced = value decided by a business rule; locked = not editable. Neither ever opens the calendar.
     fieldState: storyControl({ control: 'radio', options: STATES, description: '`state` of the surrounding `Field` (`forced` / `locked`: the calendar never opens).' }),
   },

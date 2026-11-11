@@ -4,7 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
-import { storyControl } from '../internal/story-docs';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Calendar } from './Calendar';
 import { dayOfWeek, type IsoDate, type IsoMonth, type Weekday } from './date-math';
 import { parseDisabledDates } from './disabled-dates';
@@ -31,29 +31,29 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Calendar',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
-  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
-  subcomponents: { Calendar },
+  // The stories drive the component through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: Calendar as never,
   parameters: { layout: 'padded', docs: { description: { component: "Calendar: an inline month grid to pick one date, with keyboard navigation (arrows, Home/End, PageUp/PageDown), `min` / `max` limits and `disabled` / `readOnly` states. Controlled with `value` / `onValueChange`." } } },
-  // No `component`, so these rows are not merged with the docgen: each one says what it drives (the
-  // `Calendar` tab has the full props with their TSDoc).
+  // The props' rows take their description from the TSDoc; only the controls are set here.
   argTypes: {
-    locale: { control: 'select', options: LOCALES, description: '`locale`: BCP 47 tag for month/day names, digits and the first day of the week.' },
-    // 'auto' = derived from the locale (Intl week info, else the CLDR region table, else Monday).
+    locale: { control: 'select', options: LOCALES },
+    // 'auto' = not passed: derived from the locale (Intl week info, else the CLDR region table, else Monday).
     weekStartsOn: {
       control: 'select',
       options: WEEK_STARTS,
       labels: { auto: 'auto (from locale)', 0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' },
-      description: '`weekStartsOn`: first column of the grid, 0 = Sunday. `auto` (not passed): derived from the locale.',
     },
-    defaultMonth: { control: 'text', description: '`defaultMonth`: initial month, YYYY-MM (applied on remount).' },
-    today: { control: 'text', description: '`today`: the date marked as today, YYYY-MM-DD.' },
-    min: { control: 'text', description: '`min`: first selectable date, YYYY-MM-DD (empty = none).' },
-    max: { control: 'text', description: '`max`: last selectable date, YYYY-MM-DD (empty = none).' },
-    disabled: { control: 'boolean', description: '`disabled`: no focus, no selection.' },
-    readOnly: { control: 'boolean', description: '`readOnly`: navigable, the selection cannot change.' },
-    onValueChange: { control: false, description: '`onValueChange(date)`: a day was picked.' },
-    onMonthChange: { control: false, description: '`onMonthChange(month)`: the visible month changed.' },
+    defaultMonth: { control: 'text' },
+    today: { control: 'text' },
+    min: { control: 'text' },
+    max: { control: 'text' },
+    disabled: { control: 'boolean' },
+    readOnly: { control: 'boolean' },
+    onValueChange: { control: false },
+    onMonthChange: { control: false },
+    // Set by the demo itself (`value`: local state; `isDateDisabled`: from `disableWeekends`).
+    ...withoutControls('value', 'defaultValue', 'month', 'isDateDisabled', 'labels'),
     disableWeekends: storyControl({ control: 'boolean', description: 'Passes an `isDateDisabled` that disables Saturdays and Sundays.' }),
   },
   args: {
