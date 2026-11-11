@@ -47,12 +47,18 @@ export const DOCUMENTED_IN = {
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };
 
-/** Storybook's id sanitizer for titles. */
+/**
+ * Storybook's id sanitizer (`sanitize` of `storybook/internal/csf`, applied by `toId` to the whole title):
+ * only the listed punctuation/space characters become a hyphen, so letters outside a-z (`é`, `ü`) are kept.
+ * Underscore is in the list, so `My_Field` becomes `my-field`. A test compares it with the real `toId`.
+ */
 export function sanitize(text) {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[ ’–—―′¿'`~!@#$%^&*()_|+\-=?;:'",.<>{}[\]\\/]/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 }
 
 /** Docs page id Storybook generates for a title. */
@@ -163,10 +169,36 @@ export function collectPages(root, packageDir, mdxFiles = []) {
 
 /** Ids of the `?path=/docs/<id>` links of an MDX source. */
 export function docsLinks(mdxSource) {
-  return [...mdxSource.matchAll(/\?path=\/docs\/([a-z0-9-]+)/g)].map((m) => m[1]);
+  return [...mdxSource.matchAll(/\?path=\/docs\/([\p{L}\p{N}-]+)/gu)].map((m) => m[1]);
 }
 
-const mentions = (source, name) => new RegExp(`(^|[^\\w$])${name.replace(/\$/g, '\\$')}([^\\w$]|$)`).test(source);
+/** Source with every comment blanked out (same length), so a name in a comment is not a mention. */
+export function stripComments(source) {
+  const file = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const starts = new Set();
+  const ranges = [];
+  const visit = (node) => {
+    // At a token's start: the comments before it on its own lines (leading) and those on the previous token's line (trailing).
+    for (const r of [...(ts.getTrailingCommentRanges(source, node.pos) ?? []), ...(ts.getLeadingCommentRanges(source, node.pos) ?? [])]) {
+      if (!starts.has(r.pos)) {
+        starts.add(r.pos);
+        ranges.push(r);
+      }
+    }
+    for (const child of node.getChildren(file)) visit(child);
+  };
+  visit(file);
+  let out = source;
+  for (const { pos, end } of ranges) out = out.slice(0, pos) + out.slice(pos, end).replace(/[^\n]/g, ' ') + out.slice(end);
+  return out;
+}
+
+const mentionsRaw = (source, name) => new RegExp(`(^|[^\\w$])${name.replace(/\$/g, '\\$')}([^\\w$]|$)`).test(source);
+const strippedCache = new Map();
+const mentions = (source, name) => {
+  if (!strippedCache.has(source)) strippedCache.set(source, stripComments(source));
+  return mentionsRaw(strippedCache.get(source), name);
+};
 
 /**
  * (a) Runtime exports with no Docs page: not a `component`/`subcomponents` of a page and not listed
@@ -178,8 +210,10 @@ export function undocumentedExports(exportNames, pages, documentedIn = DOCUMENTE
   const byTitle = new Map(pages.map((p) => [p.title, p]));
   for (const name of exportNames) {
     if (covered.has(name)) continue;
-    // A part of a documented compound component (`DialogTitle` of `Dialog`): its page shows it by name.
-    if (pages.some((p) => p.components.some((c) => name.startsWith(c) && mentions(p.source, name)))) continue;
+    // A part of a documented compound component (`DialogTitle` of `Dialog`): the name continues the
+    // component's at a word boundary (not `Fieldset` for `Field`) and the page uses it in code, not in a comment.
+    const isPart = (c) => name.length > c.length && name.startsWith(c) && /^[A-Z0-9]/.test(name.slice(c.length));
+    if (pages.some((p) => p.components.some(isPart) && mentions(p.source, name))) continue;
     const titles = documentedIn[name];
     if (!titles) {
       problems.push(`${name}: exported but not documented (no Docs page with it as component/subcomponent, no entry in DOCUMENTED_IN)`);

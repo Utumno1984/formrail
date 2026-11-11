@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { toId } from 'storybook/internal/csf';
 import {
   DOCUMENTED_IN,
   brokenLinks,
@@ -10,6 +11,7 @@ import {
   docsLinks,
   parseStoriesFile,
   runtimeExports,
+  stripComments,
   undocumentedExports,
   unlinkedPages,
 } from './docs-coverage.mjs';
@@ -102,5 +104,80 @@ describe('docs coverage: the guard itself', () => {
     expect(parseStoriesFile("export default { title: 'I/J', tags: ['!autodocs', 'internal'] };")?.autodocs).toBe(false);
     expect(docsId('Floorplans/Object Page/Layout')).toBe('floorplans-object-page-layout--docs');
     expect(docsLinks('(?path=/docs/a-b--docs) (?path=/story/a-b--c)')).toEqual(['a-b--docs']);
+  });
+});
+
+describe('docs coverage: id sanitization (#416)', () => {
+  const titles = [
+    'Forms/My_Field',
+    'Forms/Input',
+    'Pro/Patterns/Form rebase',
+    'Forms/Café',
+    'Überblick/Ünïcode_Åpp',
+    'A//B',
+    'A/_x_/B',
+    'Foo.Bar/Baz-Qux (beta)',
+    'Forms/It’s — here',
+    '_A/b_',
+  ];
+
+  it.each(titles)('docsId(%j) matches the id Storybook itself generates', (title) => {
+    expect(docsId(title)).toBe(toId(title, 'Docs'));
+  });
+
+  it('keeps letters outside a-z, as Storybook does, and links to them resolve', () => {
+    expect(docsId('Forms/Café')).toBe('forms-café--docs');
+    const page = { title: 'Forms/Café', id: docsId('Forms/Café'), components: [], source: '' };
+    expect(brokenLinks([page], '(?path=/docs/forms-café--docs)', 'Introduction')).toEqual([]);
+    expect(unlinkedPages([page], '(?path=/docs/forms-café--docs)', 'Introduction')).toEqual([]);
+  });
+
+  it('turns an underscore into a hyphen (Forms/My_Field -> forms-my-field--docs)', () => {
+    expect(docsId('Forms/My_Field')).toBe('forms-my-field--docs');
+  });
+});
+
+describe('docs coverage: compound-component heuristic (#416)', () => {
+  const page = (source) => ({ title: 'Forms/Field', id: 'forms-field--docs', components: ['Field'], source });
+
+  it('does not accept FieldGroup because a comment of the Field page mentions it', () => {
+    const pages = [page('// TODO: document FieldGroup\n/* FieldGroup */\nexport const S = () => <Field />;')];
+    expect(undocumentedExports(['Field', 'FieldGroup'], pages, {})).toEqual([
+      expect.stringContaining('FieldGroup: exported but not documented'),
+    ]);
+  });
+
+  it('does not accept a comment inside JSX either', () => {
+    const pages = [page('export const S = () => <Field>{/* FieldGroup later */}</Field>;')];
+    expect(undocumentedExports(['FieldGroup'], pages, {})).toHaveLength(1);
+  });
+
+  it('does not accept a name that merely starts with a component name (Fieldset, Fields)', () => {
+    const pages = [page('export const S = () => (<><Field /><Fieldset /><Fields /></>);')];
+    expect(undocumentedExports(['Fieldset', 'Fields'], pages, {})).toHaveLength(2);
+  });
+
+  it('still accepts a real part of a compound component used in code', () => {
+    const pages = [{ ...page('export const S = () => <Dialog><DialogTitle>x</DialogTitle></Dialog>;'), components: ['Dialog'] }];
+    expect(undocumentedExports(['DialogTitle'], pages, {})).toEqual([]);
+  });
+
+  it('a DOCUMENTED_IN claim is not satisfied by a comment mention', () => {
+    const pages = [
+      { title: 'Foundations/Utilities', id: 'u--docs', components: [], source: '// composeRefs is documented elsewhere\ncn(a)' },
+    ];
+    expect(undocumentedExports(['composeRefs'], pages, { composeRefs: ['Foundations/Utilities'] })).toEqual([
+      expect.stringContaining('never mentions it'),
+    ]);
+  });
+
+  it('stripComments keeps code, strings and line numbers', () => {
+    const src = "const a = 'http://x'; // gone\n/* gone\ntoo */ const b = `// kept`;";
+    const out = stripComments(src);
+    expect(out).toContain("'http://x'");
+    expect(out).toContain('`// kept`');
+    expect(out).not.toContain('gone');
+    expect(out.split('\n')).toHaveLength(3);
+    expect(out).toHaveLength(src.length);
   });
 });
