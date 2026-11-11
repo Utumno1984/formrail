@@ -3,6 +3,7 @@
 // compiler options the docgen used: the two cannot drift apart.
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import type { Plugin } from 'vite';
 
 const fromRoot = (path: string) => fileURLToPath(new URL(`../${path}`, import.meta.url));
 
@@ -30,6 +31,28 @@ export const docgenCompilerOptions: ts.CompilerOptions = {
     '@formrail/core/internal': [fromRoot('packages/core/src/internal.ts')],
   },
 };
+
+const REPO_ROOT = fromRoot('');
+
+/**
+ * react-docgen-typescript writes absolute paths into the bundle (`__docgenInfo.filePath`, and each prop's
+ * `parent` / `declarations`): the build machine's directory would ship in the public Storybook. This Vite
+ * plugin, run after the docgen's transform, makes them repo-relative (`packages/core/src/...`). The guard
+ * (e2e/docs-props.spec.ts) fails on an absolute `filePath`, and resolves the relative one from the repo root.
+ */
+export function docgenRelativePaths(): Plugin {
+  // As it appears inside the JSON the docgen emits (a JSON string escapes nothing in a POSIX path, but
+  // a Windows one would have its backslashes doubled).
+  const needle = JSON.stringify(REPO_ROOT).slice(1, -1);
+  return {
+    name: 'formrail:docgen-relative-paths',
+    enforce: 'post',
+    transform(code, id) {
+      if (!id.endsWith('.tsx') || !code.includes('__docgenInfo') || !code.includes(needle)) return null;
+      return { code: code.replaceAll(needle, ''), map: null };
+    },
+  };
+}
 
 /** The part of a react-docgen-typescript prop the filter reads. */
 export interface DocgenPropSource {

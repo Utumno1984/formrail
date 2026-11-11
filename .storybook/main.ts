@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import type { StorybookConfig } from '@storybook/react-vite';
-import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter } from './docgen.ts';
+import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter, docgenRelativePaths } from './docgen.ts';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
 import { introductionPages, previewAnnotations, storyGlobs } from './story-globs.mjs';
 
@@ -62,7 +62,7 @@ const config: StorybookConfig = {
   // the e2e/visual jobs): resolve it to the sources instead, like the Free stories do.
   viteFinal: (viteConfig) => ({
     ...viteConfig,
-    plugins: [...(viteConfig.plugins ?? []), tailwindcss()],
+    plugins: [...(viteConfig.plugins ?? []), tailwindcss(), docgenRelativePaths()],
     resolve: {
       ...viteConfig.resolve,
       alias: [
