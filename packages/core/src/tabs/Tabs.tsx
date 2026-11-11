@@ -153,9 +153,9 @@ const EDGE_EPSILON = 1;
 const CONTENT =
   'min-w-0 flex-1 data-[state=inactive]:hidden focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:-outline-offset-2';
 
-const NO_NAME_WARNING = '[react-object-page] <TabsList> has no accessible name: pass `aria-label` or `aria-labelledby`.';
+const NO_NAME_WARNING = '[formrail] <TabsList> has no accessible name: pass `aria-label` or `aria-labelledby`.';
 const noMatchWarning = (value: string) =>
-  `[react-object-page] <Tabs value="${value}"> matches no tab: no panel is shown.`;
+  `[formrail] <Tabs value="${value}"> matches no tab: no panel is shown.`;
 
 /**
  * Tabs: tablist / tab / tabpanel pattern with roving tabindex and arrow keys (Home/End, wrap,

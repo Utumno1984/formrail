@@ -9,7 +9,7 @@ import {
   useListReportUrlState,
   type ListReportColumn,
   type ListReportFilter,
-} from '@react-object-page/core';
+} from '@formrail/core';
 import { VirtualListReport } from './VirtualListReport';
 import type { VirtualListReportTableHandle } from './VirtualListReportTable';
 import { DEMO_STATUS_LABEL, formatAmount, makeDemoRows, type DemoRow } from './demo-rows';
@@ -130,7 +130,7 @@ const meta: Meta<DemoArgs> = {
     docs: {
       description: {
         component:
-          '`VirtualListReport` / `VirtualListReportTable` (`@react-object-page/pro`): the core List Report with virtualized rows. ' +
+          '`VirtualListReport` / `VirtualListReportTable` (`@formrail/pro`): the core List Report with virtualized rows. ' +
           'Same props and `useListReport` state as the Free `ListReport`; below `virtualizeThreshold` it is the Free table (same DOM, no virtualizer). ' +
           'Rows are mounted only around the viewport, between spacer rows of a native `<table>`; the focused row stays mounted; ' +
           'shift-click / Shift+Space select a range over the current results; "Select all N results" and Escape act on the data.',

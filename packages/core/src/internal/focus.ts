@@ -44,10 +44,10 @@ export function focusFirst(candidates: Iterable<HTMLElement>, options?: FocusOpt
 
 /**
  * Development-only diagnostic for a `focusFirst` that found nothing: one `console.error`
- * `[react-object-page] <what>, nothing was focused.` (silent in production).
+ * `[formrail] <what>, nothing was focused.` (silent in production).
  */
 export function warnNoFocusTarget(what: string): void {
-  if (isDev()) console.error(`[react-object-page] ${what}, nothing was focused.`);
+  if (isDev()) console.error(`[formrail] ${what}, nothing was focused.`);
 }
 
 /**

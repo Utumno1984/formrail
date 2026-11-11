@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button, useListReport, useListReportScrollRestoration, type ListReportColumn } from '@react-object-page/core';
+import { Button, useListReport, useListReportScrollRestoration, type ListReportColumn } from '@formrail/core';
 import { VirtualListReport } from './VirtualListReport';
 import { PITCH, mockTableLayout } from '../../test/virtual-table-utils';
 

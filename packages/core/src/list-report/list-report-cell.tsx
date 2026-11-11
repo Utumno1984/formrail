@@ -19,7 +19,7 @@ export function cellValue<Row>(column: ListReportColumn<Row>, row: Row): CellVal
 
 export interface RenderCellOptions {
   /**
-   * Truncates the cell regardless of `column.truncate`. A virtualized table (`@react-object-page/pro`)
+   * Truncates the cell regardless of `column.truncate`. A virtualized table (`@formrail/pro`)
    * forces this when its fixed row height cannot grow with a wrapped `truncate: false` column; it
    * warns once per column in development instead of silently changing the layout contract. Default
    * behaviour (no options, or `forceTruncate: false`) is exactly `column.truncate !== false`.

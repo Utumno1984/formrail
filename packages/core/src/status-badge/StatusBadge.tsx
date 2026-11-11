@@ -53,7 +53,7 @@ function warnEmpty(): void {
   const self = warnEmpty as typeof warnEmpty & { done?: boolean };
   if (self.done) return;
   self.done = true;
-  console.warn('[react-object-page] <StatusBadge> needs text children (colour alone does not carry the status); rendering nothing.');
+  console.warn('[formrail] <StatusBadge> needs text children (colour alone does not carry the status); rendering nothing.');
 }
 
 export interface StatusBadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'role' | 'children'> {

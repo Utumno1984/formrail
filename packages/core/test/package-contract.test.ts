@@ -21,12 +21,12 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
   it('the CSS entries resolve through the exports map, like a consumer would', () => {
     const require = createRequire(import.meta.url);
     for (const entry of ['styles.css', 'theme.css']) {
-      const resolved = require.resolve(`@react-object-page/core/${entry}`);
+      const resolved = require.resolve(`@formrail/core/${entry}`);
       expect(existsSync(resolved)).toBe(true);
       expect(resolved).toBe(join(distDir, entry));
     }
     // Subpaths that are not exported stay private.
-    expect(() => require.resolve('@react-object-page/core/src/styles/tokens.css')).toThrow();
+    expect(() => require.resolve('@formrail/core/src/styles/tokens.css')).toThrow();
   });
 
   it('dist has an ESM entry, a CJS entry and type declarations', () => {

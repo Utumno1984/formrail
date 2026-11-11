@@ -1,5 +1,5 @@
 /*
- * Entry of the compiled `styles.css` of @react-object-page/pro (also loaded by Storybook, so the
+ * Entry of the compiled `styles.css` of @formrail/pro (also loaded by Storybook, so the
  * docs render the same CSS the package ships).
  *
  * Why component classes and not Tailwind utilities (as core does): two stylesheets that both emit
@@ -22,7 +22,7 @@
 @import 'tailwindcss/theme.css' layer(rop.theme) theme(reference);
 /* `@reference` (not `theme(reference)`): core's theme.css also holds the `rop-hover` variant, and a
    `theme(reference)` import accepts `@theme` blocks only. Nothing is emitted either way. */
-@reference '@react-object-page/core/theme.css';
+@reference '@formrail/core/theme.css';
 
 @layer rop.utilities.pro {
   /* ChangeSummary (packages/pro/src/change-summary/ChangeSummary.tsx). Nothing is animated. */

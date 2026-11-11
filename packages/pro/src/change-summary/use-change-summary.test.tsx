@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { act, render, renderHook } from '@testing-library/react';
-import { useObjectPageForm } from '@react-object-page/core';
+import { useObjectPageForm } from '@formrail/core';
 import { resetChangeSummaryWarnings } from './compute-change-summary';
 import { useChangeSummary } from './use-change-summary';
 import type { ChangeSummaryOptions, UseChangeSummaryReturn } from './types';

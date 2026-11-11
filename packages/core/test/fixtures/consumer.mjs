@@ -1,6 +1,6 @@
 // ESM consumer fixture: resolves the *built* package through its `exports` map.
-import { composeRefs } from '@react-object-page/core';
-import * as ns from '@react-object-page/core';
+import { composeRefs } from '@formrail/core';
+import * as ns from '@formrail/core';
 
 const ref = { current: null };
 const node = { id: 'node' };

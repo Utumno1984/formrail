@@ -8,7 +8,7 @@ import { assembleSite, themeTokensToRoot } from './assemble-site.mjs';
 import { EARLY_ACCESS_URL } from './site-config.mjs';
 
 const O = 'https://utumno1984.github.io';
-const B = `${O}/react-object-page/`;
+const B = `${O}/formrail/`;
 
 describe('resolveRedirect', () => {
   const cases = [

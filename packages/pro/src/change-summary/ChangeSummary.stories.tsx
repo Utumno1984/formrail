@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { Button, Field, Input, Text, useFieldControl, useObjectPageForm } from '@react-object-page/core';
+import { Button, Field, Input, Text, useFieldControl, useObjectPageForm } from '@formrail/core';
 import { ChangeSummary } from './ChangeSummary';
 import { formatChangeValue } from './format-change-value';
 import { inferSegmentLabel } from './infer-label';

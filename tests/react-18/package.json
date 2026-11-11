@@ -1,8 +1,8 @@
 {
-  "name": "@react-object-page/test-react-18",
+  "name": "@formrail/test-react-18",
   "private": true,
   "type": "module",
-  "description": "Runs React-version-sensitive tests of @react-object-page/core against React 18 (the core package itself is developed against React 19).",
+  "description": "Runs React-version-sensitive tests of @formrail/core against React 18 (the core package itself is developed against React 19).",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

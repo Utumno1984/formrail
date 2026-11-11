@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Serves the assembled `site/` under the Pages prefix (`/react-object-page/`), like the live site:
+// Serves the assembled `site/` under the Pages prefix (`/formrail/`), like the live site:
 // the same prefix matters because the redirects and the Storybook's relative links must work under it.
 // Used by the pre-deploy smoke (playwright.site.config.ts) and for the manual check of the ticket.
 // Like Pages: a missing path gets `404.html` with status 404; a directory gets its `index.html`.

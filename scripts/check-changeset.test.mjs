@@ -95,7 +95,7 @@ describe('evaluateChangesetGate', () => {
     const files = ['packages/core/a.ts', '.changeset/x.md'];
     const gate = (content) => evaluateChangesetGate(files, () => content).ok;
     expect(gate('---\n---\n\nEmpty changeset\n')).toBe(true);
-    expect(gate("---\n'@react-object-page/core': patch\n---\n\nFix\n")).toBe(true);
+    expect(gate("---\n'@formrail/core': patch\n---\n\nFix\n")).toBe(true);
     expect(gate('')).toBe(false);
     expect(gate('Just text, no frontmatter\n')).toBe(false);
     expect(gate('---\nunterminated\n')).toBe(false);

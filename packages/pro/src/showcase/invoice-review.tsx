@@ -1,4 +1,4 @@
-// Story-only (#377), not part of @react-object-page/pro (`src/index.ts` never reaches `src/showcase/`, and the
+// Story-only (#377), not part of @formrail/pro (`src/index.ts` never reaches `src/showcase/`, and the
 // lint forbids it): the "Review changes" step of the Pro story `Pro/Showcase/Invoices with Change Summary`,
 // plugged into the Free CRUD showcase through its `reviewSave` extension point. The showcase is imported from
 // the core SOURCES (one copy, never duplicated here); see the `no-restricted-imports` rules in eslint.config.js.

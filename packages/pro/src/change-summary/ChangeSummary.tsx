@@ -1,5 +1,5 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
-import { cn, Text } from '@react-object-page/core';
+import { cn, Text } from '@formrail/core';
 import {
   DEFAULT_VALUE_LABELS,
   formatChangeValueAt,

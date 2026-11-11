@@ -62,7 +62,7 @@ export const Textarea = /* @__PURE__ */ forwardRef<HTMLTextAreaElement, Textarea
   useEffect(() => {
     if (!rowsConflict || warned.current || !isDev()) return;
     warned.current = true;
-    console.warn(`[react-object-page] Textarea: maxRows (${maxRows}) is below rows (${rows}); rows is used as the minimum and the maximum.`);
+    console.warn(`[formrail] Textarea: maxRows (${maxRows}) is below rows (${rows}); rows is used as the minimum and the maximum.`);
   }, [rowsConflict, maxRows, rows]);
 
   const resize = useCallback(() => {

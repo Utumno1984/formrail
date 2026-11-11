@@ -280,7 +280,7 @@ export function useObjectPageForm<Values extends object>(
     if (isEqual(baselineOption, initialBaselineRef.current)) return;
     warnedRef.current = true;
     console.warn(
-      '[react-object-page] useObjectPageForm: the `baseline` option is only read at mount, a different value was ignored. Call `reset(newBaseline)` to hydrate data that arrives later.',
+      '[formrail] useObjectPageForm: the `baseline` option is only read at mount, a different value was ignored. Call `reset(newBaseline)` to hydrate data that arrives later.',
     );
   });
 
@@ -359,7 +359,7 @@ export function useObjectPageForm<Values extends object>(
             // Never awaited (v1 is synchronous); a later rejection must not surface as unhandled.
             (result as PromiseLike<unknown>).then(undefined, () => undefined);
             const error = new Error(ASYNC_SCHEMA_MESSAGE);
-            if (isDev()) console.error('[react-object-page] useObjectPageForm:', error);
+            if (isDev()) console.error('[formrail] useObjectPageForm:', error);
             throw error;
           }
           const issues = (result as StandardSchemaResult).issues;
@@ -425,7 +425,7 @@ export function useObjectPageForm<Values extends object>(
       if (result !== undefined) {
         if (typeof result === 'object' && result !== null && !Array.isArray(result)) baseline = result;
         else if (isDev()) {
-          console.warn('[react-object-page] useObjectPageForm: the save handler returned a non-object, the sent values are the new baseline.');
+          console.warn('[formrail] useObjectPageForm: the save handler returned a non-object, the sent values are the new baseline.');
         }
       }
       const current = stateRef.current;

@@ -1,5 +1,5 @@
 /* Unsupported on purpose (documented in the README): styles.css AND theme.css together. */
 @import 'tailwindcss';
-@import '@react-object-page/core/theme.css';
-@import '@react-object-page/core/styles.css';
+@import '@formrail/core/theme.css';
+@import '@formrail/core/styles.css';
 @source './src';

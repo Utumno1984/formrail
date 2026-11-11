@@ -79,7 +79,7 @@ const THUMB =
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 
 const BOTH_WARNING =
-  '[react-object-page] <Switch> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.';
+  '[formrail] <Switch> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.';
 
 /**
  * Switch: a styled native `<input type="checkbox" role="switch">` with an optional inline label.

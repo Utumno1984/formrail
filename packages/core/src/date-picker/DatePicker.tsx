@@ -124,7 +124,7 @@ const CALENDAR_ICON = (
   </svg>
 );
 
-const PREFIX = '[react-object-page] <DatePicker>';
+const PREFIX = '[formrail] <DatePicker>';
 const invalidDate = (v: unknown) => v !== undefined && v !== null && !isIsoDate(v);
 
 function longDateFormatter(locale: string | undefined): (date: IsoDate) => string {

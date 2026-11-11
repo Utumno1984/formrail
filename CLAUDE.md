@@ -1,6 +1,7 @@
-# react-object-page — istruzioni per Claude Code
+# Formrail — istruzioni per Claude Code
 
-react-object-page è un design system React **open-core**: implementazione headless e
+Formrail (fino all'11/11/2026 `react-object-page`: repo GitHub, npm `@react-object-page/core`,
+Storybook; rebrand nel ticket #428) è un design system React **open-core**: implementazione headless e
 indipendente di due pattern UI enterprise diffusi — **List Report** (lista con filtri/azioni
 bulk) e **Object Page** (editor a sezioni ancorate, save-bar sticky, dirty-guard). Nessun
 codice/asset/CSS di terzi viene toccato: solo pattern di interazione e composizione generici e
@@ -77,7 +78,7 @@ ma sono priorità non regole rigide:
   reale dell'hardware (CPU/Chromium in parallelo), non più la quota: vedi `~/projects/CLAUDE.md`.
 
 **Priorità e ritmo (decisione di Daniele del 2026-11-04, sostituisce "ritmo lento/non
-prioritario")**: react-object-page è ora **prioritario**, non più un progetto a ritmo lento in
+prioritario")**: Formrail è ora **prioritario**, non più un progetto a ritmo lento in
 parallelo sul SaaS di approvazione fatture/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
 step salvo una vera decisione da chiedere a Daniele (vedi anche la nota sulla pipeline ad
 oltranza in memoria dell'orchestratore).

@@ -1,5 +1,5 @@
 import * as pro from '../src/index';
-import type { UseObjectPageFormReturn } from '@react-object-page/core';
+import type { UseObjectPageFormReturn } from '@formrail/core';
 import type {
   ChangeEntry,
   ChangeKind,
@@ -12,7 +12,7 @@ import type {
   UseFormRebaseReturn,
 } from '../src/index';
 
-describe('@react-object-page/pro scaffold', () => {
+describe('@formrail/pro scaffold', () => {
   it('loads the public entry', () => {
     expect(pro).toBeTypeOf('object');
   });

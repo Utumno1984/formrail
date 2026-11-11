@@ -65,9 +65,9 @@ test.describe('Pro demo: manager and index', () => {
   test('pro/ opens the Pro introduction with the banner and a Pro-only sidebar', async ({ page }) => {
     await page.goto('pro/');
     const preview = page.frameLocator('#storybook-preview-iframe');
-    await expect(preview.getByRole('heading', { level: 1, name: 'react-object-page Pro (preview)' })).toBeVisible({ timeout: 30_000 });
+    await expect(preview.getByRole('heading', { level: 1, name: 'Formrail Pro (preview)' })).toBeVisible({ timeout: 30_000 });
     await expect(preview.getByRole('note')).toHaveText(BANNER_TEXT);
-    await expect(page.getByRole('link', { name: 'react-object-page Pro (preview)' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Formrail Pro (preview)' }).first()).toBeVisible();
     const sidebar = page.locator('#storybook-explorer-tree');
     await expect(sidebar.getByText('Pro introduction', { exact: true })).toBeVisible();
     for (const free of ['Forms', 'Overlays', 'Primitives', 'Patterns', 'Introduction']) {
@@ -112,7 +112,7 @@ test.describe('Pro demo: banner', () => {
     await expect(banner).toHaveCount(1);
     await expect(banner).toHaveText(BANNER_TEXT);
     const link = banner.getByRole('link', { name: 'Learn more' });
-    await expect(link).toHaveAttribute('href', '/react-object-page/#pro');
+    await expect(link).toHaveAttribute('href', '/formrail/#pro');
     await expect(banner.getByRole('link')).toHaveCount(1);
     await expect(banner.getByRole('button')).toHaveCount(0);
     const geometry = await page.evaluate(() => {

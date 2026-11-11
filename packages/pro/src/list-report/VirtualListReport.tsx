@@ -1,6 +1,6 @@
 import { forwardRef, useMemo, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
-import { Button, composeRefs, type ListReportSelection } from '@react-object-page/core';
-import { ListReportFrame, type ListReportFrameLabels, type ListReportFrameProps } from '@react-object-page/core/internal';
+import { Button, composeRefs, type ListReportSelection } from '@formrail/core';
+import { ListReportFrame, type ListReportFrameLabels, type ListReportFrameProps } from '@formrail/core/internal';
 import { VirtualListReportTable, type VirtualListReportTableProps } from './VirtualListReportTable';
 
 /** Texts of `VirtualListReport`: those of the core floorplan plus the Pro selection action. */
@@ -68,7 +68,7 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
 }
 
 /**
- * The List Report floorplan of `@react-object-page/core` (`ListReport`) with the virtualized table
+ * The List Report floorplan of `@formrail/core` (`ListReport`) with the virtualized table
  * (`VirtualListReportTable`): the same title/count, actions, filter bar and selection bar (the core's
  * `ListReportFrame`, not a copy), the same props, plus `virtualizeThreshold`, `overscan` and `handleRef`.
  *

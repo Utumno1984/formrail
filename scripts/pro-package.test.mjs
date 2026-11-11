@@ -12,8 +12,8 @@ const readJson = (path) => JSON.parse(readFileSync(resolve(ROOT, path), 'utf8'))
 describe('packages/pro publication guard', () => {
   const pkg = readJson('packages/pro/package.json');
 
-  it('is the @react-object-page/pro package', () => {
-    expect(pkg.name).toBe('@react-object-page/pro');
+  it('is the @formrail/pro package', () => {
+    expect(pkg.name).toBe('@formrail/pro');
   });
 
   it('stays private (strictly true, not a truthy string)', () => {

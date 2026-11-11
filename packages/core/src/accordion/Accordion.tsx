@@ -169,7 +169,7 @@ export const AccordionItem = /* @__PURE__ */ forwardRef<HTMLDivElement, Accordio
   const open = Array.isArray(current) ? current.includes(value) : type === 'single' && current !== '' && current === value;
   useEffect(() => {
     if (value === '' && type === 'single' && isDev()) {
-      console.error('[react-object-page] <AccordionItem value=""> in a `type="single"` Accordion can never open: `""` means "none open". Use a non-empty value.');
+      console.error('[formrail] <AccordionItem value=""> in a `type="single"` Accordion can never open: `""` means "none open". Use a non-empty value.');
     }
   }, [value, type]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);

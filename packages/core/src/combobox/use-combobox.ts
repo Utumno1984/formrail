@@ -157,7 +157,7 @@ export function useCombobox<T>(options: UseComboboxOptions<T>): UseComboboxRetur
     const keys = items.map(itemToKey);
     if (new Set(keys).size !== keys.length) {
       duplicatesWarned.current = true;
-      console.warn('[react-object-page] useCombobox: `itemToKey` returned duplicate keys; option ids must be unique.');
+      console.warn('[formrail] useCombobox: `itemToKey` returned duplicate keys; option ids must be unique.');
     }
   }, [items, itemToKey]);
 

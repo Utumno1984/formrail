@@ -5,7 +5,7 @@ import { FieldContext, type FieldControlProps } from './FieldContext';
 export function useFieldControl(): FieldControlProps {
   const control = useContext(FieldContext);
   if (control === null) {
-    throw new Error('[react-object-page] useFieldControl() must be called inside a <Field>.');
+    throw new Error('[formrail] useFieldControl() must be called inside a <Field>.');
   }
   return control;
 }

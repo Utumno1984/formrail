@@ -249,23 +249,23 @@ describe('react externals measurement (#34)', () => {
     expect(measured.dev).toBeLessThan(1024);
   });
 
-  it('keeps @react-object-page/core (peer dependency of pro) external: never charged to a pro export (#175)', async () => {
+  it('keeps @formrail/core (peer dependency of pro) external: never charged to a pro export (#175)', async () => {
     const big = Array.from({ length: 200 }, (_, i) => `"core-code-${i}-${'x'.repeat(40)}"`).join(',');
-    mkdirSync(join(dir, 'node_modules/@react-object-page/core'), { recursive: true });
+    mkdirSync(join(dir, 'node_modules/@formrail/core'), { recursive: true });
     writeFileSync(
-      join(dir, 'node_modules/@react-object-page/core/package.json'),
-      JSON.stringify({ name: '@react-object-page/core', type: 'module', exports: './index.js' }),
+      join(dir, 'node_modules/@formrail/core/package.json'),
+      JSON.stringify({ name: '@formrail/core', type: 'module', exports: './index.js' }),
     );
     writeFileSync(
-      join(dir, 'node_modules/@react-object-page/core/index.js'),
+      join(dir, 'node_modules/@formrail/core/index.js'),
       `export const cn = (...a) => [${big}].concat(a).join(' ');\n`,
     );
     writeFileSync(
       join(dir, 'dist/index.js'),
-      'import { cn } from "@react-object-page/core";\nexport const Uses = (c) => cn(c);\n',
+      'import { cn } from "@formrail/core";\nexport const Uses = (c) => cn(c);\n',
     );
     const out = await bundleExport(join(dir, 'dist/index.js'), 'Uses');
-    expect(out).toContain('from"@react-object-page/core"');
+    expect(out).toContain('from"@formrail/core"');
     expect(out).not.toContain('core-code-');
     expect((await runUpdate({ packageDir: dir })).Uses).toBeLessThan(200);
   });

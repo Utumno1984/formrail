@@ -3,7 +3,7 @@
 // (most of the List Report: `internal.ts` exports the exact building blocks `index.ts`'s
 // `ListReportTable`/`ListReport` are made of) are hoisted into one shared chunk, not duplicated.
 // A duplicated module would silently split module-level state (e.g. a React Context instance)
-// between the two entries: a consumer importing both (a `@react-object-page/pro` component next to
+// between the two entries: a consumer importing both (a `@formrail/pro` component next to
 // a Free one) would see two different contexts that never see each other's values.
 // `Checkbox` is exported from both `src/index.ts` (public) and `src/internal.ts` (re-exported only
 // for this check) specifically so this test has something to compare: if the build ever duplicates
@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 const indexCjs = require(fileURLToPath(new URL('../dist/index.cjs', import.meta.url))) as IndexApi;
 const internalCjs = require(fileURLToPath(new URL('../dist/internal.cjs', import.meta.url))) as InternalApi;
 
-describe('`@react-object-page/core/internal` shares its modules with the public entry (no duplicated instance)', () => {
+describe('`@formrail/core/internal` shares its modules with the public entry (no duplicated instance)', () => {
   it('ESM: Checkbox is the exact same export from both entries', () => {
     expect(internalEsm.Checkbox).toBeDefined();
     expect(internalEsm.Checkbox).toBe((indexEsm as IndexApi).Checkbox);

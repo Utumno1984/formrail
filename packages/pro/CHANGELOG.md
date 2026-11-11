@@ -1,4 +1,4 @@
-# @react-object-page/pro
+# @formrail/pro
 
 ## 0.1.0
 

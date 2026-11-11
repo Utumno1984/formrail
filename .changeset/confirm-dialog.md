@@ -1,5 +1,5 @@
 ---
-'@react-object-page/core': minor
+'@formrail/core': minor
 ---
 
 New `ConfirmDialog` and `useConfirmDialog`: a confirmation for destructive actions built on `Dialog`, with a safe

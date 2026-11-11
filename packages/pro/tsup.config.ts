@@ -7,5 +7,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   target: 'es2022',
-  external: ['react', 'react-dom', 'react/jsx-runtime', '@react-object-page/core', '@react-object-page/core/internal'],
+  external: ['react', 'react-dom', 'react/jsx-runtime', '@formrail/core', '@formrail/core/internal'],
 });

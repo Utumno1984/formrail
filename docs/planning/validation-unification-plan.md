@@ -19,7 +19,7 @@ Punti ricognizione: `Field`, `useFieldControl`/`FieldContext`, `FieldMessage`, `
 `Combobox`, `useObjectPageForm`, `useFocusFirstInvalidField`, `useDirtyGuard`, più `ObjectPageFooter`
 e le story che oggi fanno da "documentazione" del flusso.
 
-Stato del pacchetto: `@react-object-page/core` è `0.0.0`, mai pubblicato: un cambio di API pubblica
+Stato del pacchetto: `@formrail/core` è `0.0.0`, mai pubblicato: un cambio di API pubblica
 oggi non è un breaking change verso utenti reali, ma resta una scelta di API che spetta a Daniele.
 
 ---

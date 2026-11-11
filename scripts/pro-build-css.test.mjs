@@ -77,11 +77,11 @@ describe('pro styles.css build', () => {
     expect([...pro].filter((name) => core.has(name))).toEqual([]);
   });
 
-  it('is exported as @react-object-page/pro/styles.css and flagged as a side effect', () => {
+  it('is exported as @formrail/pro/styles.css and flagged as a side effect', () => {
     const pkg = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/package.json'), 'utf8'));
     expect(pkg.exports['./styles.css']).toBe('./dist/styles.css');
     expect(pkg.sideEffects).toEqual(['**/*.css']);
-    expect(pkg.peerDependencies['@react-object-page/core']).toBeDefined();
-    expect(pkg.devDependencies['@react-object-page/core']).toBeDefined();
+    expect(pkg.peerDependencies['@formrail/core']).toBeDefined();
+    expect(pkg.devDependencies['@formrail/core']).toBeDefined();
   });
 });

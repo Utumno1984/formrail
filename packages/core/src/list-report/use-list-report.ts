@@ -264,7 +264,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
       if (id === current.filter) return;
       if (!current.filters.some((f) => f.id === id)) {
         if (isDev()) {
-          console.warn(`[react-object-page] useListReport: setFilter("${id}") ignored, no such filter.`);
+          console.warn(`[formrail] useListReport: setFilter("${id}") ignored, no such filter.`);
         }
         return;
       }
@@ -370,7 +370,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
     const warnOnce = (key: string, message: string) => {
       if (warned.current.has(key)) return;
       warned.current.add(key);
-      console.warn(`[react-object-page] useListReport: ${message}`);
+      console.warn(`[formrail] useListReport: ${message}`);
     };
     // No columns yet (asynchronous loading): a pending sort is expected, not a mistake.
     if (invalidId !== null && columns.length > 0) {
