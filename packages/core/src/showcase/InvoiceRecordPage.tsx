@@ -21,7 +21,7 @@ import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
 import { InvoiceLineItems } from './InvoiceLineItems';
-import { DECIMAL, sameNumberText } from './number-text';
+import { DECIMAL, isPlainPositive, isTooLarge, sameNumberText } from './number-text';
 import {
   sameLines,
   toLineValues,
@@ -285,8 +285,8 @@ type InvoiceErrors = Partial<Record<keyof InvoiceValues | LineErrorKey, string>>
 const validateInvoice = (v: InvoiceFormValues): InvoiceErrors => {
   const errors: InvoiceErrors = {};
   if (!v.supplier) errors.supplier = 'Supplier is required.';
-  if (!DECIMAL.test(v.amount.trim()) || Number(v.amount) <= 0) {
-    errors.amount = 'Amount must be greater than 0.';
+  if (!isPlainPositive(v.amount, DECIMAL)) {
+    errors.amount = isTooLarge(v.amount, DECIMAL) ? 'Amount must be less than 1e21.' : 'Amount must be greater than 0.';
   }
   return { ...errors, ...validateLines(v.lineItems) };
 };

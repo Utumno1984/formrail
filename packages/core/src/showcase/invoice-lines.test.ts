@@ -88,6 +88,14 @@ describe('validateLines: upper bound at the toFixed exponential threshold (#418)
     }
   });
 
+  it('says the value is too large, not that it is not greater than 0', () => {
+    const big = '1' + '0'.repeat(21);
+    expect(errorsFor({ quantity: big })['lineItems.0.quantity']).toBe('Quantity must be less than 1e21.');
+    expect(errorsFor({ unitPrice: big })['lineItems.0.unitPrice']).toBe('Unit price must be less than 1e21.');
+    expect(errorsFor({ quantity: '0' })['lineItems.0.quantity']).toBe('Quantity must be a whole number greater than 0.');
+    expect(errorsFor({ unitPrice: '0' })['lineItems.0.unitPrice']).toBe('Unit price must be greater than 0.');
+  });
+
   it('still accepts the largest values below the bound', () => {
     // 999999999999999868928 is the largest double below 1e21 (1e21 - 131072); the digit string `9`×21 rounds up to 1e21.
     expect(errorsFor({ quantity: '999999999999999868928' })['lineItems.0.quantity']).toBeUndefined();

@@ -1,7 +1,7 @@
 // Story-only: the invoice line items as the form sees them (text as typed) and the rules on them. Not exported
 // by the package.
 import type { StoredLineItem } from './invoice-store';
-import { DECIMAL, INTEGER, sameNumberText } from './number-text';
+import { DECIMAL, INTEGER, MAX_PLAIN_NUMBER, isPlainPositive, isTooLarge, sameNumberText } from './number-text';
 
 /** A line in the form: quantity and unit price are text as typed, like the invoice `amount`. */
 export interface LineValues {
@@ -45,22 +45,10 @@ export type LineErrorKey = `lineItems.${number}.${LineErrorField}`;
 
 const lineErrorKey = (index: number, field: LineErrorField): LineErrorKey => `lineItems.${index}.${field}`;
 
-// `Number#toFixed` and `String(number)` switch to exponential notation ("1e+21") from 1e21 up, and a saved line
-// is reloaded through them (`toLineValues`): a value at or past this bound would reload as text that no longer
-// passes `INTEGER`/`DECIMAL`. So it is rejected up front. It also bounds `lineTotal`, see below.
-const MAX_PLAIN_NUMBER = 1e21;
-
-// A valid quantity is a whole number in (0, 1e21); a valid unit price is a decimal in (0, 1e21).
-// (`Number.isFinite` is implied by the bound, kept explicit for the digit strings that coerce to Infinity.)
-const isInRange = (n: number): boolean => Number.isFinite(n) && n > 0 && n < MAX_PLAIN_NUMBER;
-const isValidQuantity = (text: string): boolean => {
-  const quantity = text.trim();
-  return INTEGER.test(quantity) && isInRange(Number(quantity));
-};
-const isValidPrice = (text: string): boolean => {
-  const price = text.trim();
-  return DECIMAL.test(price) && isInRange(Number(price));
-};
+// A valid quantity is a whole number in (0, 1e21); a valid unit price is a decimal in (0, 1e21). The bound
+// (`MAX_PLAIN_NUMBER`, see number-text.ts) also bounds `lineTotal`, see below.
+const isValidQuantity = (text: string): boolean => isPlainPositive(text, INTEGER);
+const isValidPrice = (text: string): boolean => isPlainPositive(text, DECIMAL);
 
 /** Errors keyed by dotted path (`lineItems.2.quantity`). */
 export function validateLines(lines: readonly LineValues[]): Partial<Record<LineErrorKey, string>> {
@@ -68,9 +56,15 @@ export function validateLines(lines: readonly LineValues[]): Partial<Record<Line
   lines.forEach((line, i) => {
     if (line.description.trim() === '') errors[lineErrorKey(i, 'description')] = 'Description is required.';
     if (!isValidQuantity(line.quantity)) {
-      errors[lineErrorKey(i, 'quantity')] = 'Quantity must be a whole number greater than 0.';
+      errors[lineErrorKey(i, 'quantity')] = isTooLarge(line.quantity, INTEGER)
+        ? 'Quantity must be less than 1e21.'
+        : 'Quantity must be a whole number greater than 0.';
     }
-    if (!isValidPrice(line.unitPrice)) errors[lineErrorKey(i, 'unitPrice')] = 'Unit price must be greater than 0.';
+    if (!isValidPrice(line.unitPrice)) {
+      errors[lineErrorKey(i, 'unitPrice')] = isTooLarge(line.unitPrice, DECIMAL)
+        ? 'Unit price must be less than 1e21.'
+        : 'Unit price must be greater than 0.';
+    }
   });
   return errors;
 }
