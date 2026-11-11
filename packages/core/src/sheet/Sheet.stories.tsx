@@ -6,7 +6,7 @@ import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '..
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { settleMotion } from '../internal/settle-motion';
-import { withoutControls } from '../internal/story-docs';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import {
   Sheet,
   SheetBody,
@@ -43,9 +43,9 @@ const meta: Meta<DemoArgs> = {
     // Set by the stories (a trigger opens the sheet; the content is the demo).
     ...withoutControls('open', 'defaultOpen', 'children'),
     // Props of `SheetContent` (see its tab), driven from the main table.
-    side: { control: 'radio', options: SIDES, description: "`SheetContent`'s `side`: the edge the panel is attached to." },
-    size: { control: 'radio', options: SIZES, description: "`SheetContent`'s `size`: width step." },
-    dismissible: { control: 'boolean', description: "`SheetContent`'s `dismissible`: whether Escape and a click on the backdrop close the sheet." },
+    side: storyControl({ control: 'radio', options: SIDES, description: 'Prop of `SheetContent` (see its tab): the edge the panel is attached to.' }),
+    size: storyControl({ control: 'radio', options: SIZES, description: 'Prop of `SheetContent` (see its tab): width step.' }),
+    dismissible: storyControl({ control: 'boolean', description: 'Prop of `SheetContent` (see its tab): whether Escape and a click on the backdrop close the sheet.' }),
   },
   args: { side: 'right', size: 'md', dismissible: true, onOpenChange: fn() },
 };

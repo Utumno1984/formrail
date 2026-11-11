@@ -27,7 +27,7 @@ const meta = {
   parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     as: { control: 'radio', options: ['div', 'section', 'article'] },
-    level: { control: 'select', options: LEVELS, description: "`CardTitle`'s `level`: the heading level of the title (see the CardTitle tab)." },
+    level: storyControl({ control: 'select', options: LEVELS, description: 'Prop of `CardTitle` (see its tab): the heading level of the title.' }),
     className: CLASS_NAME_ARG,
     showDescription: storyControl({ control: 'boolean', description: 'Renders a `CardDescription` under the title.' }),
     showFooter: storyControl({ control: 'boolean', description: 'Renders a `CardFooter` with two buttons.' }),

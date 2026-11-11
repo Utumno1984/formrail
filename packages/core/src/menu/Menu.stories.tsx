@@ -47,17 +47,17 @@ const meta: Meta<DemoArgs> = {
     onOpenChange: { control: false },
     ...withoutControls('open', 'defaultOpen', 'dir', 'children'),
     // Props of `MenuContent` (see its tab), driven from the main table.
-    side: {
+    side: storyControl({
       control: 'radio',
       options: ['top', 'right', 'bottom', 'left'] satisfies Side[],
-      description: "`MenuContent`'s `side`: the side of the trigger the menu opens on.",
-    },
-    align: {
+      description: 'Prop of `MenuContent` (see its tab): the side of the trigger the menu opens on.',
+    }),
+    align: storyControl({
       control: 'radio',
       options: ['start', 'center', 'end'] satisfies Align[],
-      description: "`MenuContent`'s `align`: alignment against the trigger.",
-    },
-    loop: { control: 'boolean', description: "`MenuContent`'s `loop`: the arrow keys wrap from the last item to the first." },
+      description: 'Prop of `MenuContent` (see its tab): alignment against the trigger.',
+    }),
+    loop: storyControl({ control: 'boolean', description: 'Prop of `MenuContent` (see its tab): the arrow keys wrap from the last item to the first.' }),
     disabledItem: storyControl({
       control: 'select',
       options: ['none', 'rename', 'duplicate', 'archive'] satisfies DisabledItem[],

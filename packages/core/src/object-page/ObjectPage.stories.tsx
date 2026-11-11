@@ -30,8 +30,8 @@ const meta: Meta<PlaygroundArgs> = {
     headingLevel: { control: 'select', options: [1, 2, 3, 4] },
     // Set by the demo (default navigation and texts, the sections).
     ...withoutControls('sectionNavigation', 'labels', 'children'),
-    title: { control: 'text', description: "`ObjectPageHeader`'s `title` (see its tab)." },
-    subtitle: { control: 'text', description: "`ObjectPageHeader`'s `subtitle` (see its tab)." },
+    title: storyControl({ control: 'text', description: 'Prop of `ObjectPageHeader` (see its tab): the record title.' }),
+    subtitle: storyControl({ control: 'text', description: 'Prop of `ObjectPageHeader` (see its tab): the line under the title.' }),
     sectionCount: storyControl({ control: { type: 'range', min: 1, max: 8, step: 1 }, description: 'How many `ObjectPageSection`s the demo renders.' }),
     showActions: storyControl({ control: 'boolean', description: 'Gives the header `actions` (Approve / Reject buttons).' }),
     showStatus: storyControl({ control: 'boolean', description: 'Gives the header a status badge.' }),
