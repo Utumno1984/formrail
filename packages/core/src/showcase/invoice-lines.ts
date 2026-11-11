@@ -1,7 +1,7 @@
 // Story-only: the invoice line items as the form sees them (text as typed) and the rules on them. Not exported
 // by the package.
 import type { StoredLineItem } from './invoice-store';
-import { DECIMAL, INTEGER, sameNumberText } from './number-text';
+import { DECIMAL, INTEGER, MAX_PLAIN_NUMBER, isPlainPositive, isTooLarge, sameNumberText } from './number-text';
 
 /** A line in the form: quantity and unit price are text as typed, like the invoice `amount`. */
 export interface LineValues {
@@ -45,16 +45,14 @@ export type LineErrorKey = `lineItems.${number}.${LineErrorField}`;
 
 const lineErrorKey = (index: number, field: LineErrorField): LineErrorKey => `lineItems.${index}.${field}`;
 
-// A valid quantity is a whole number > 0; a valid unit price is a decimal > 0. `Number.isFinite` rejects the
-// digit strings long enough to coerce to Infinity.
-const isValidQuantity = (text: string): boolean => {
-  const quantity = text.trim();
-  return INTEGER.test(quantity) && Number.isFinite(Number(quantity)) && Number(quantity) > 0;
-};
-const isValidPrice = (text: string): boolean => {
-  const price = text.trim();
-  return DECIMAL.test(price) && Number.isFinite(Number(price)) && Number(price) > 0;
-};
+// A valid quantity is a whole number in (0, 1e21); a valid unit price is a decimal in (0, 1e21). The bound
+// (`MAX_PLAIN_NUMBER`, see number-text.ts) also bounds `lineTotal`, see below.
+const isValidQuantity = (text: string): boolean => isPlainPositive(text, INTEGER);
+const isValidPrice = (text: string): boolean => isPlainPositive(text, DECIMAL);
+
+/** Raw product of two already valid factors. */
+const rawProduct = (line: LineValues): number => Number(line.quantity.trim()) * Number(line.unitPrice.trim());
+const productTooLarge = (line: LineValues): boolean => !(rawProduct(line) < MAX_PLAIN_NUMBER);
 
 /** Errors keyed by dotted path (`lineItems.2.quantity`). */
 export function validateLines(lines: readonly LineValues[]): Partial<Record<LineErrorKey, string>> {
@@ -62,18 +60,28 @@ export function validateLines(lines: readonly LineValues[]): Partial<Record<Line
   lines.forEach((line, i) => {
     if (line.description.trim() === '') errors[lineErrorKey(i, 'description')] = 'Description is required.';
     if (!isValidQuantity(line.quantity)) {
-      errors[lineErrorKey(i, 'quantity')] = 'Quantity must be a whole number greater than 0.';
+      errors[lineErrorKey(i, 'quantity')] = isTooLarge(line.quantity, INTEGER)
+        ? 'Quantity must be less than 1e21.'
+        : 'Quantity must be a whole number greater than 0.';
     }
-    if (!isValidPrice(line.unitPrice)) errors[lineErrorKey(i, 'unitPrice')] = 'Unit price must be greater than 0.';
+    if (!isValidPrice(line.unitPrice)) {
+      errors[lineErrorKey(i, 'unitPrice')] = isTooLarge(line.unitPrice, DECIMAL)
+        ? 'Unit price must be less than 1e21.'
+        : 'Unit price must be greater than 0.';
+    }
+    // Both factors valid on their own, but the product reaches the bound: `lineTotal` would be blank with no reason.
+    if (isValidQuantity(line.quantity) && isValidPrice(line.unitPrice) && productTooLarge(line)) {
+      errors[lineErrorKey(i, 'unitPrice')] = 'Quantity × unit price is too large (must be less than 1e21).';
+    }
   });
   return errors;
 }
 
-/** Quantity × unit price with 2 decimals, or `null` while the quantity or the unit price is not valid (see `validateLines`). */
+/** Quantity × unit price with 2 decimals, or `null` while the quantity or the unit price is not valid (see `validateLines`) or the product reaches 1e21. */
 export function lineTotal(line: LineValues): string | null {
   if (!isValidQuantity(line.quantity) || !isValidPrice(line.unitPrice)) return null;
-  const total = Number(line.quantity.trim()) * Number(line.unitPrice.trim());
-  return Number.isFinite(total) ? total.toFixed(2) : null;
+  // Two valid factors can still multiply past the bound (`validateLines` reports it): no total is better than a "1e+21" one.
+  return productTooLarge(line) ? null : rawProduct(line).toFixed(2);
 }
 
 /**

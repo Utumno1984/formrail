@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lineTotal, nextLineId, sameLines, validateLines, type LineValues } from './invoice-lines';
+import { lineTotal, nextLineId, sameLines, toLineValues, toStoredLine, validateLines, type LineValues } from './invoice-lines';
 
 const line = (id: string, patch: Partial<LineValues> = {}): LineValues => ({
   id,
@@ -73,6 +73,78 @@ describe('validateLines: finite values', () => {
     const errors = validateLines([line('a', { quantity: huge, unitPrice: huge })]);
     expect(errors['lineItems.0.quantity']).toBeDefined();
     expect(errors['lineItems.0.unitPrice']).toBeDefined();
+  });
+});
+
+describe('validateLines: upper bound at the toFixed exponential threshold (#418)', () => {
+  const errorsFor = (patch: Partial<LineValues>) => validateLines([line('a', patch)]);
+
+  it('rejects a quantity or a unit price of 1e21 and above', () => {
+    for (const text of ['1' + '0'.repeat(21), '9'.repeat(22), '1' + '0'.repeat(21) + '.00']) {
+      expect(errorsFor({ unitPrice: text })['lineItems.0.unitPrice'], text).toBeDefined();
+    }
+    for (const text of ['1' + '0'.repeat(21), '9'.repeat(22)]) {
+      expect(errorsFor({ quantity: text })['lineItems.0.quantity'], text).toBeDefined();
+    }
+  });
+
+  it('says the value is too large, not that it is not greater than 0', () => {
+    const big = '1' + '0'.repeat(21);
+    expect(errorsFor({ quantity: big })['lineItems.0.quantity']).toBe('Quantity must be less than 1e21.');
+    expect(errorsFor({ unitPrice: big })['lineItems.0.unitPrice']).toBe('Unit price must be less than 1e21.');
+    expect(errorsFor({ quantity: '0' })['lineItems.0.quantity']).toBe('Quantity must be a whole number greater than 0.');
+    expect(errorsFor({ unitPrice: '0' })['lineItems.0.unitPrice']).toBe('Unit price must be greater than 0.');
+  });
+
+  it('still accepts the largest values below the bound', () => {
+    // 999999999999999868928 is the largest double below 1e21 (1e21 - 131072); the digit string `9`×21 rounds up to 1e21.
+    expect(errorsFor({ quantity: '999999999999999868928' })['lineItems.0.quantity']).toBeUndefined();
+    expect(errorsFor({ quantity: '1', unitPrice: '999999999999999868928.00' })['lineItems.0.unitPrice']).toBeUndefined();
+    expect(errorsFor({ quantity: '9'.repeat(21) })['lineItems.0.quantity']).toBeDefined();
+    expect(errorsFor({ quantity: '1' + '0'.repeat(20), unitPrice: '1' })).toEqual({});
+  });
+
+  it('never reloads a valid saved line as exponential text', () => {
+    // One huge factor per line: together they would trip the product rule.
+    const saved = [
+      toStoredLine(line('a', { quantity: '1' + '0'.repeat(20), unitPrice: '1' })),
+      toStoredLine(line('b', { quantity: '1', unitPrice: '99999999999999900000.5' })),
+    ];
+    const reloaded = saved.map(toLineValues);
+    for (const r of reloaded) {
+      expect(r.quantity).not.toMatch(/e/i);
+      expect(r.unitPrice).not.toMatch(/e/i);
+    }
+    expect(validateLines(reloaded)).toEqual({});
+  });
+
+  it('lineTotal is null when two valid factors multiply past the bound, never exponential', () => {
+    expect(lineTotal(line('a', { quantity: '1' + '0'.repeat(11), unitPrice: '1' + '0'.repeat(10) }))).toBeNull();
+    expect(lineTotal(line('a', { quantity: '1' + '0'.repeat(10), unitPrice: '1' + '0'.repeat(9) }))).toBe(
+      '1' + '0'.repeat(19) + '.00',
+    );
+  });
+});
+
+describe('validateLines: product of two valid factors (#418)', () => {
+  const big = line('a', { quantity: '100000000000', unitPrice: '10000000000' }); // 1e11 × 1e10 = 1e21
+
+  it('flags a line whose quantity × unit price reaches 1e21, the case where lineTotal is blank', () => {
+    expect(lineTotal(big)).toBeNull();
+    const errors = validateLines([big]);
+    expect(errors['lineItems.0.unitPrice']).toBe('Quantity × unit price is too large (must be less than 1e21).');
+    expect(errors['lineItems.0.quantity']).toBeUndefined();
+  });
+
+  it('accepts a product just below the bound, with a total', () => {
+    const ok = line('a', { quantity: '10000000000', unitPrice: '10000000000' });
+    expect(validateLines([ok])).toEqual({});
+    expect(lineTotal(ok)).not.toBeNull();
+  });
+
+  it('keeps the factor error, not the product one, when a factor is already invalid', () => {
+    const errors = validateLines([line('a', { quantity: '100000000000', unitPrice: '1' + '0'.repeat(21) })]);
+    expect(errors['lineItems.0.unitPrice']).toBe('Unit price must be less than 1e21.');
   });
 });
 

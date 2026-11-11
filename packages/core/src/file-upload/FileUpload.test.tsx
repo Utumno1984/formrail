@@ -539,6 +539,31 @@ describe('FileUpload: no echo, controlled and uncontrolled', () => {
     expect(screen.queryByRole('listitem')).toBeNull();
   });
 
+  it('two identical files (same name, size, date): removing either keeps the focus on a Remove button, then on the next file', async () => {
+    const u = user();
+    // Controlled: the consumer can pass duplicates (the picker would not add them twice).
+    render(<Controlled initial={[pdf('a.pdf'), pdf('a.pdf'), pdf('b.pdf')]} multiple />);
+    await u.click(screen.getAllByRole('button', { name: 'Remove a.pdf' })[0]!);
+    expect(screen.getAllByRole('button', { name: 'Remove a.pdf' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Remove a.pdf' })).toHaveFocus();
+    await u.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Remove b.pdf' })).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
+  });
+
+  it('a refused removal followed by another change of the list is forgotten: a later list equal to the expected one does not steal the focus', async () => {
+    const a = pdf('a.pdf');
+    const b = pdf('b.pdf');
+    const { rerender } = render(<FileUpload value={[a, b]} multiple />);
+    await user().click(screen.getByRole('button', { name: 'Remove a.pdf' }));
+    // The consumer ignored the removal, then changed the list for its own reasons.
+    rerender(<FileUpload value={[a, b, pdf('c.pdf')]} multiple />);
+    screen.getByRole('button', { name: 'Remove c.pdf' }).focus();
+    // Much later the list happens to be what the old request expected: the focus stays where the user is.
+    rerender(<FileUpload value={[b]} multiple />);
+    expect(screen.queryByRole('button', { name: 'Remove b.pdf' })).not.toHaveFocus();
+  });
+
   it('a stale focus request does not steal the focus when the consumer ignores a removal', async () => {
     render(<FileUpload value={[pdf('a.pdf'), pdf('b.pdf')]} multiple />);
     await user().click(screen.getByRole('button', { name: 'Remove a.pdf' }));

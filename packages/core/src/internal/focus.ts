@@ -1,5 +1,7 @@
 // Internal: focus / tab-order helpers shared by the overlays and the form helpers. Not exported from the package.
 
+import { isDev } from './is-dev';
+
 const TABBABLE =
   'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable="true"]';
 
@@ -21,6 +23,31 @@ export function isLaidOut(el: Element): boolean {
 export function compareDocumentOrder(a: Node, b: Node): number {
   if (a === b) return 0;
   return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+}
+
+/**
+ * Focuses the first of `candidates` (in the given order) that really takes the focus, and returns it;
+ * `null` if none does. "Really" is checked after the call, so a candidate that cannot be focused
+ * (`type="hidden"`, disabled, `display: none`, inert, a `fieldset`) is skipped without having to
+ * predict focusability. Compared against the element's own root: `document.activeElement` is the
+ * host when the element lives in a ShadowRoot. Shared by `useFocusFirstInvalidField` and
+ * `useListMutationFocus`, which differ in everything else (trigger, lookup, order, scrolling).
+ */
+export function focusFirst(candidates: Iterable<HTMLElement>, options?: FocusOptions): HTMLElement | null {
+  for (const el of candidates) {
+    el.focus(options);
+    const root = el.getRootNode() as Document | ShadowRoot;
+    if (root.activeElement === el) return el;
+  }
+  return null;
+}
+
+/**
+ * Development-only diagnostic for a `focusFirst` that found nothing: one `console.error`
+ * `[formrail] <what>, nothing was focused.` (silent in production).
+ */
+export function warnNoFocusTarget(what: string): void {
+  if (isDev()) console.error(`[formrail] ${what}, nothing was focused.`);
 }
 
 /**

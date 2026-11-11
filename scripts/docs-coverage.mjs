@@ -4,6 +4,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
+import { sanitize, toId } from 'storybook/internal/csf';
 
 /**
  * Runtime exports with no `component`/`subcomponents` entry in a stories file: export name -> titles of
@@ -47,16 +48,8 @@ export const DOCUMENTED_IN = {
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };
 
-/** Storybook's id sanitizer for titles. */
-export function sanitize(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-/** Docs page id Storybook generates for a title. */
-export const docsId = (title) => `${sanitize(title)}--docs`;
+/** Docs page id Storybook generates for a title (Storybook's own `toId`, so the two cannot diverge). */
+export const docsId = (title) => toId(title, 'docs');
 
 function walk(dir, accept, out = []) {
   for (const name of readdirSync(dir)) {
@@ -161,9 +154,21 @@ export function collectPages(root, packageDir, mdxFiles = []) {
   return pages;
 }
 
-/** Ids of the `?path=/docs/<id>` links of an MDX source. */
+/** A character that can be part of a Storybook id: one `sanitize` leaves alone (it lowercases and turns separators into `-`). */
+const isIdChar = (ch) => ch === '-' || sanitize(ch) === ch.toLowerCase();
+
+/** Ids of the `?path=/docs/<id>` links of an MDX source: a link ends at the first character `sanitize` never leaves in an id. */
 export function docsLinks(mdxSource) {
-  return [...mdxSource.matchAll(/\?path=\/docs\/([a-z0-9-]+)/g)].map((m) => m[1]);
+  const ids = [];
+  for (const m of mdxSource.matchAll(/\?path=\/docs\/(\S+)/g)) {
+    let id = '';
+    for (const ch of m[1]) {
+      if (!isIdChar(ch)) break;
+      id += ch;
+    }
+    if (id) ids.push(id);
+  }
+  return ids;
 }
 
 const mentions = (source, name) => new RegExp(`(^|[^\\w$])${name.replace(/\$/g, '\\$')}([^\\w$]|$)`).test(source);
@@ -178,8 +183,8 @@ export function undocumentedExports(exportNames, pages, documentedIn = DOCUMENTE
   const byTitle = new Map(pages.map((p) => [p.title, p]));
   for (const name of exportNames) {
     if (covered.has(name)) continue;
-    // A part of a documented compound component (`DialogTitle` of `Dialog`): its page shows it by name.
-    if (pages.some((p) => p.components.some((c) => name.startsWith(c) && mentions(p.source, name)))) continue;
+    // No inference from usage: a part of a compound component (`DialogTitle`) needs its own `subcomponents` entry
+    // (or a `documentedIn` entry), otherwise it is reported.
     const titles = documentedIn[name];
     if (!titles) {
       problems.push(`${name}: exported but not documented (no Docs page with it as component/subcomponent, no entry in DOCUMENTED_IN)`);

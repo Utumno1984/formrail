@@ -22,6 +22,7 @@ interface PlaygroundArgs {
 const meta: Meta<PlaygroundArgs> = {
   title: 'Floorplans/Object Page/Layout',
   component: ObjectPage,
+  subcomponents: { ObjectPageHeader, ObjectPageSection },
   parameters: { layout: 'fullscreen' },
   argTypes: {
     headingLevel: { control: 'select', options: [1, 2, 3, 4], description: 'Heading level of the header title; the sections use the next one' },
