@@ -8,4 +8,6 @@ playwright-report/
 test-results/
 .tickets-draft/
 *.local
+pipeline*.jsonl
+pipeline*.err
 .DS_Store
