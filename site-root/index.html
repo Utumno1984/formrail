@@ -3,9 +3,24 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>react-object-page</title>
+    <title>Formrail: List Report and Object Page for React</title>
+    <meta
+      name="description"
+      content="An open-core React design system for List Report and Object Page screens: lists with filters and bulk actions, sectioned editors with a sticky save bar and dirty-guard. Core is MIT and on npm."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Formrail" />
+    <meta
+      property="og:description"
+      content="An open-core React design system for List Report and Object Page screens. Core is MIT and on npm."
+    />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="landing.css" />
     <script>
       /*REDIRECT_FN*/
+      // Old Storybook links (…/?path=…) used to land on the Storybook at the root: forward them. The
+      // bare root, `#pro` and foreign parameters stay here: this page is the landing.
       var target = resolveRedirect(location.href, 'index');
       // replace(), not assign(): the intermediate page must not stay in the history, or Back from
       // the Storybook would land here and redirect again.
@@ -13,8 +28,129 @@
     </script>
   </head>
   <body>
-    <noscript>
-      <p>JavaScript is disabled. <a href="storybook/">Open the react-object-page Storybook</a>.</p>
-    </noscript>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="./">Formrail</a>
+        <nav aria-label="Main">
+          <ul class="nav-list">
+            <li><a href="storybook/">Components</a></li>
+            <li><a href="#pro">Pro</a></li>
+            <li><a href="https://github.com/Utumno1984/react-object-page">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="wrap">
+          <h1 id="hero-title">Formrail</h1>
+          <p class="aka">The project you know as <strong>react-object-page</strong> on GitHub, npm and Storybook.</p>
+          <p class="lead">
+            An open-core React design system for List Report and Object Page screens: lists with filters and bulk
+            actions, sectioned editors with a sticky save bar and dirty-guard.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="storybook/">Browse the components (free, MIT)</a>
+            <a class="btn btn-secondary" href="pro/">See the Pro preview</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" aria-labelledby="install-title">
+        <div class="wrap">
+          <h2 id="install-title">Install</h2>
+          <div class="install">
+            <pre class="code" tabindex="0"><code id="install-cmd">npm install @react-object-page/core</code></pre>
+            <button type="button" class="btn btn-secondary copy-btn" id="copy-btn" data-target="install-cmd" hidden>
+              Copy command
+            </button>
+          </div>
+          <!-- Mounted from the start (a live region only announces changes made after it exists). -->
+          <p class="copy-status" id="copy-status" role="status"></p>
+          <p class="muted">React 18 or 19 is a peer dependency.</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="why-title">
+        <div class="wrap">
+          <h2 id="why-title">What makes it different</h2>
+          <ul class="cards">
+            <li class="card">
+              <h3>Two complete floorplans</h3>
+              <p>
+                A List Report with filter pills, search and sortable columns that keeps the same footprint while loading,
+                empty or full, and an Object Page with an anchor bar and a sticky save bar.
+              </p>
+              <p class="card-links">
+                <a href="storybook/?path=/docs/floorplans-list-report--docs">List Report</a>
+                <a href="storybook/?path=/docs/floorplans-object-page-layout--docs">Object Page</a>
+              </p>
+            </li>
+            <li class="card">
+              <h3>Dirty-tracking against the saved baseline</h3>
+              <p>
+                Editing a field marks the form dirty, typing the original value back makes it clean again, and a value
+                hydrated from outside is never mistaken for a user gesture.
+              </p>
+              <p class="card-links">
+                <a href="storybook/?path=/docs/patterns-dirtyguard--docs">DirtyGuard</a>
+                <a href="storybook/?path=/docs/floorplans-object-page-with-validation--docs">Validation recipe</a>
+              </p>
+            </li>
+            <li class="card">
+              <h3>Accessibility checked in CI</h3>
+              <p>
+                Keyboard handling, focus management and ARIA are built into the components. Fields in a locked, forced
+                or disabled state cannot be edited, from the keyboard either, and explain why through a real
+                <code>aria-describedby</code>. The stories are covered by Playwright end-to-end tests and screenshot
+                comparison at desktop, tablet and mobile sizes.
+              </p>
+              <p class="card-links">
+                <a href="storybook/?path=/docs/forms-field--docs">Field</a>
+              </p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="band" id="pro" aria-labelledby="pro-title">
+        <div class="wrap">
+          <h2 id="pro-title">Pro</h2>
+          <p class="status">Preview: the commercial license is not available yet.</p>
+          <ul class="pro-list">
+            <li>
+              <a href="pro/?path=/docs/pro-changesummary--docs">Change Summary</a>: every changed field with its label
+              and a readable before/after value, computed against the saved value.
+            </li>
+            <li>
+              <a href="pro/?path=/docs/pro-floorplans-virtual-list-report--docs">Virtual List Report</a>: the List
+              Report with virtualized rows, for datasets far beyond what a plain table can render.
+            </li>
+          </ul>
+          <!--EARLY_ACCESS_START-->
+          <div class="cta">
+            <a class="btn btn-primary" href="{{EARLY_ACCESS_URL}}" target="_blank" rel="noopener">Request early access</a>
+            <p class="muted">
+              Opens an external form (Tally or Google Forms). We only use your answers to contact you about Pro early
+              access; see the privacy note in the form.
+            </p>
+          </div>
+          <!--EARLY_ACCESS_END-->
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <ul class="footer-list">
+          <li><a href="https://github.com/Utumno1984/react-object-page">Source on GitHub</a></li>
+          <li>Formrail Core: MIT license, free on npm.</li>
+          <li>Formrail Pro: commercial license, terms to be defined.</li>
+        </ul>
+      </div>
+    </footer>
+    <script src="copy.js" defer></script>
   </body>
 </html>

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 // @ts-expect-error plain .mjs helper shared with the assembler and the server, no type declarations
 import { SITE_BASE } from '../../scripts/site-config.mjs';
+import { gotoAndStay } from '../helpers/no-redirect';
 
 // Pre-deploy smoke of the assembled Pages site (ticket #380), see playwright.site.config.ts.
 // The URLs below are the ones already distributed (README on npm, links sent around): they must
@@ -61,18 +62,20 @@ test.describe('old deep links reach the same page under storybook/', () => {
   });
 });
 
+// Ticket #382: the bare root is the landing page now (details in landing.spec.ts); it no longer
+// redirects, so the former "bare root reaches the Storybook" cases are replaced by these.
 test.describe('bare root', () => {
-  test('reaches the Storybook', async ({ page }) => {
-    await page.goto('');
-    await page.waitForURL(`**${base}storybook/`);
-    await expect(page.locator('#storybook-preview-iframe')).toBeAttached();
+  test('stays on the landing: no Storybook manager', async ({ page }) => {
+    await gotoAndStay(page, '');
+    expect(new URL(page.url()).pathname).toBe(base);
+    await expect(page.locator('#storybook-preview-iframe')).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   });
 
-  test('foreign parameters (?utm_source=x) end up on a clean storybook/ URL', async ({ page }) => {
-    await page.goto('?utm_source=newsletter');
-    await page.waitForURL(`**${base}storybook/`);
-    expect(new URL(page.url()).pathname).toBe(`${base}storybook/`);
-    expect(new URL(page.url()).searchParams.has('utm_source')).toBe(false);
+  test('a Storybook parameter next to a foreign one is still forwarded, both kept', async ({ page }) => {
+    await page.goto(`?utm_source=newsletter&path=${DOCS_PATH}`);
+    await page.waitForURL(`**${base}storybook/**`);
+    expect(new URL(page.url()).searchParams.get('path')).toBe(DOCS_PATH);
     await expect(page.locator('#storybook-preview-iframe')).toBeAttached();
   });
 });
@@ -80,7 +83,6 @@ test.describe('bare root', () => {
 test.describe('history', () => {
   for (const [name, link] of [
     ['deep link', `?path=${DOCS_PATH}`],
-    ['bare root', ''],
     ['iframe.html link', `iframe.html?id=${DOCS}&viewMode=docs`],
   ] as const) {
     test(`Back from the redirected ${name} returns to the page it came from, not to the redirector`, async ({ page }) => {
@@ -153,10 +155,8 @@ test.describe('404 and static files', () => {
 test.describe('JavaScript disabled', () => {
   test.use({ javaScriptEnabled: false });
 
-  for (const [name, link, target] of [
-    ['index.html', '', 'storybook/'],
-    ['iframe.html', 'iframe.html', 'storybook/iframe.html'],
-  ] as const) {
+  // index.html is the landing now: it needs no redirect and works without JavaScript (landing.spec.ts).
+  for (const [name, link, target] of [['iframe.html', 'iframe.html', 'storybook/iframe.html']] as const) {
     test(`${name} stays put and offers a manual link to ${target}`, async ({ page }) => {
       await page.goto(link);
       const url = page.url();
