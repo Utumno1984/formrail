@@ -233,8 +233,59 @@ function hasAccessibleName(node: HTMLElement): boolean {
     .some((id) => !!id && !!document.getElementById(id)?.textContent?.trim());
 }
 
-export interface ModalPanelProps
-  extends Omit<ComponentPropsWithoutRef<typeof RadixDialog.Content>, 'children' | 'forceMount'> {
+type RadixContentProps = ComponentPropsWithoutRef<typeof RadixDialog.Content>;
+
+/**
+ * The Radix props `DialogContent` and `SheetContent` pass through. The ones `ModalPanel` intercepts, or
+ * whose Radix description does not hold for a modal panel, are redeclared (same types) with the TSDoc
+ * the props table shows: Radix's text would promise what the wrapper does not do (ticket #401).
+ * `deferPointerDownOutside` keeps Radix's own text: the wrapper does not change it.
+ */
+export interface ModalContentBaseProps extends Omit<RadixContentProps, 'children' | 'forceMount'> {
+  /**
+   * Called when the panel opens, just before the focus moves into it (to its first focusable
+   * element, or to the panel itself when it has none). Call `event.preventDefault()` and focus an
+   * element of the panel yourself to choose where the focus starts. Not called when an element of
+   * the panel already took the focus (`autoFocus`), nor when the panel is reopened while its exit
+   * animation is still running: its nodes never left the DOM, and the panel itself takes the focus.
+   */
+  onOpenAutoFocus?: RadixContentProps['onOpenAutoFocus'];
+  /**
+   * Called once the panel has closed and left the DOM (after its exit animation). It does not
+   * control the focus: the component returns it itself, to the element that had it before opening
+   * (else `returnFocusRef`, else the trigger). So `event.preventDefault()` has no effect, and a focus
+   * moved from here can be overridden by that return, which may run right after this call. Not
+   * called when the panel is reopened before its exit animation ends.
+   */
+  onCloseAutoFocus?: RadixContentProps['onCloseAutoFocus'];
+  /**
+   * Called on Escape while the panel is the topmost layer (a menu, popover or tooltip open above it
+   * gets the Escape instead), before the panel closes. Call `event.preventDefault()` to keep it open. With
+   * `dismissible={false}` it is still called, and the panel stays open whatever it does.
+   */
+  onEscapeKeyDown?: RadixContentProps['onEscapeKeyDown'];
+  /**
+   * Called on a pointer press outside the panel (in practice on the backdrop), before it closes.
+   * Call `event.preventDefault()` to keep it open. Still called, with the panel staying open
+   * whatever it does, for a press that is not a dismissal: with `dismissible={false}`, a right or
+   * Ctrl+click, and the late press of the tap that reopened the panel during its exit animation.
+   */
+  onPointerDownOutside?: RadixContentProps['onPointerDownOutside'];
+  /**
+   * Called when the focus moves outside the panel. The panel never closes for it (it is modal: the
+   * focus is kept inside), so there is nothing to prevent.
+   */
+  onFocusOutside?: RadixContentProps['onFocusOutside'];
+  /**
+   * Called on any interaction outside the panel, right after `onPointerDownOutside` or
+   * `onFocusOutside`, with the same event. Call `event.preventDefault()` to keep the panel open
+   * after a pointer press; the same presses as there, and a focus moving out, never close it
+   * whatever it does.
+   */
+  onInteractOutside?: RadixContentProps['onInteractOutside'];
+}
+
+export interface ModalPanelProps extends ModalContentBaseProps {
   /**
    * Names of the public components, for the error / console messages. One object with a name that
    * is not an HTML attribute: `part` and `title` are valid attributes the consumer may pass to the

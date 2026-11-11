@@ -215,7 +215,8 @@ export const MenuTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, MenuTri
 type RadixMenuContentProps = ComponentPropsWithoutRef<typeof RadixMenu.Content>;
 
 // The Radix props below are redeclared (same types) only to document them: Radix's own declarations
-// carry no description, and the props table shows the TSDoc of the declaration (ticket #401).
+// carry no description, or one this component does not honour (`onCloseAutoFocus`: the focus return
+// is `useReturnFocus`'s), and the props table shows the TSDoc of the declaration (ticket #401).
 export interface MenuContentProps extends Omit<RadixMenuContentProps, 'asChild' | 'forceMount'> {
   /**
    * Arrow-key navigation wraps from the last item to the first and back (default `true`). With
@@ -247,12 +248,31 @@ export interface MenuContentProps extends Omit<RadixMenuContentProps, 'asChild' 
   updatePositionStrategy?: RadixMenuContentProps['updatePositionStrategy'];
   /** Called on Escape, before the menu closes. Call `event.preventDefault()` to keep it open. */
   onEscapeKeyDown?: RadixMenuContentProps['onEscapeKeyDown'];
-  /** Called on a pointer press outside the menu, before it closes. Call `event.preventDefault()` to keep it open. */
+  /**
+   * Called on a pointer press outside the menu, before it closes. Call `event.preventDefault()` to
+   * keep it open. Except for a touch tap outside a modal menu (the default): that one closes the menu
+   * at the press whatever the handler does, so the tap cannot reach the page underneath.
+   */
   onPointerDownOutside?: RadixMenuContentProps['onPointerDownOutside'];
-  /** Called when the focus moves outside the menu, before it closes. Call `event.preventDefault()` to keep it open. */
+  /**
+   * Called when the focus moves outside the menu. A modal menu (the default) never closes for it (the
+   * focus is kept inside); with `modal={false}` it closes, unless you call `event.preventDefault()`.
+   */
   onFocusOutside?: RadixMenuContentProps['onFocusOutside'];
-  /** Called on any interaction outside the menu (pointer press or focus), before it closes. Call `event.preventDefault()` to keep it open. */
+  /**
+   * Called on any interaction outside the menu, right after `onPointerDownOutside` or
+   * `onFocusOutside`, with the same event. Call `event.preventDefault()` to keep it open, with the
+   * same exceptions: a touch tap outside a modal menu closes it whatever the handler does, and a
+   * focus moving out never closes a modal menu.
+   */
   onInteractOutside?: RadixMenuContentProps['onInteractOutside'];
+  /**
+   * Called once the menu has closed and left the DOM. It does not control the focus: the menu
+   * returns it itself, to the element that had it before opening (normally the trigger; when Tab
+   * closed the menu, the focus moves on to the next element instead). So `event.preventDefault()` has no effect, and a focus moved from
+   * here can race with that return, which may run right after this call.
+   */
+  onCloseAutoFocus?: RadixMenuContentProps['onCloseAutoFocus'];
 }
 
 // Full literals (Tailwind scan). The stacking level is `overlayLayer.popover`, set on the element.

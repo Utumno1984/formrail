@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode, type RefObject } from 'react';
+import { forwardRef, type ElementRef, type ReactNode, type RefObject } from 'react';
 import type * as RadixDialog from '@radix-ui/react-dialog';
 import {
   ModalBody,
@@ -12,6 +12,7 @@ import {
   createModalTrigger,
   modalPanelClass,
   type ModalCloseProps,
+  type ModalContentBaseProps,
   type ModalRootProps,
   type ModalTitleProps,
   type ModalTriggerProps,
@@ -58,8 +59,7 @@ export type DialogTriggerProps = ModalTriggerProps;
 /** Opens the dialog on click. `asChild` renders your own element (e.g. a `Button`) instead. */
 export const DialogTrigger = /* @__PURE__ */ createModalTrigger('DialogTrigger', 'Dialog');
 
-export interface DialogContentProps
-  extends Omit<ComponentPropsWithoutRef<typeof RadixDialog.Content>, 'children' | 'forceMount'> {
+export interface DialogContentProps extends ModalContentBaseProps {
   /** Maximum width step. Default `md`. A conflicting width in `className` wins. */
   size?: DialogSize;
   /**
