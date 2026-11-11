@@ -94,6 +94,25 @@ const DEPENDENCY_TSDOC_PROPS: AuditOptions['dependencyTsdocProps'] = {
   SheetContent: { deferPointerDownOutside: DEFER_POINTER_DOWN },
 };
 
+const FIELD_REQUIRED = '`required` of the surrounding `Field` (the demo wraps the control in one), not the native attribute';
+
+/**
+ * Story controls named like an inherited HTML attribute of the page's component, with what they really
+ * drive: their row stays under "Story controls" with that description. Any other such name fails (rule b').
+ */
+const STORY_CONTROL_ATTRIBUTE_NAMES: AuditOptions['storyControlAttributeNames'] = {
+  Checkbox: { required: FIELD_REQUIRED },
+  MultiSelect: { required: FIELD_REQUIRED },
+  NumberInput: { required: FIELD_REQUIRED },
+  Switch: { required: FIELD_REQUIRED },
+  Textarea: { required: FIELD_REQUIRED },
+  Field: { onChange: "`onChange` of the demo's `Input` (the Field's child), wired to the Actions panel" },
+  ListReportFilterBar: { dir: '`dir` of the demo wrapper around the bar (the RTL layout), not an attribute of the bar' },
+  ObjectPage: { title: 'the `title` prop of `ObjectPageHeader` (see its tab), not the native tooltip of the page' },
+  Skeleton: { onLoad: 'called when the simulated load of the demo card ends, not the native `load` event' },
+  ToastProvider: { title: 'the `title` option of `useToast().show()`, not the native tooltip of the region' },
+};
+
 interface IndexEntry {
   id: string;
   type?: string;
@@ -167,6 +186,7 @@ const optionsFor = (components: DocgenComponent[]): AuditOptions => ({
   inheritedAttributeRows: INHERITED_ATTRIBUTE_ROWS,
   requiredProps: REQUIRED_PROPS,
   dependencyTsdocProps: DEPENDENCY_TSDOC_PROPS,
+  storyControlAttributeNames: STORY_CONTROL_ATTRIBUTE_NAMES,
 });
 
 /** A real page by title, with the audit options of its components. */
@@ -204,6 +224,12 @@ test.describe('Docs props tables', () => {
       for (const attribute of Object.keys(attributes)) {
         const used = facts.some((f) => f.component?.displayName === name && f.rows.some((r) => r.name === attribute && !r.disabled && r.category === null));
         if (!used) problems.push(`INHERITED_ATTRIBUTE_ROWS: ${name}.${attribute} is shown by no page: drop it`);
+      }
+    }
+    for (const [name, controls] of Object.entries(STORY_CONTROL_ATTRIBUTE_NAMES)) {
+      for (const control of Object.keys(controls)) {
+        const used = facts.some((f) => f.component?.displayName === name && f.rows.some((r) => r.name === control && !r.disabled && r.category === STORY_CONTROLS));
+        if (!used) problems.push(`STORY_CONTROL_ATTRIBUTE_NAMES: ${name}.${control} is a story control of no page: drop it`);
       }
     }
 
@@ -352,5 +378,19 @@ test.describe('Docs props tables', () => {
       expect.stringContaining('DialogContent.onCloseAutoFocus is listed as keeping its dependency\'s TSDoc, but the project redeclares it'),
       expect.stringContaining('DialogContent.notAProp is listed as keeping its dependency\'s TSDoc, but it is not in the docgen'),
     ]);
+  });
+
+  test('negative: an HTML attribute of the component filed under "Story controls" fails the guard', async ({ page }) => {
+    // Rule (b'): `title` is not in ListReportTable's docgen (an inherited HTML attribute), but it is a key
+    // of its props type: a demo knob with that name may hide the attribute among the story controls.
+    const { facts: real, options } = await realPage(page, 'Data/ListReportTable');
+    const withControl = (name: string): DocsPageFacts => ({ ...real, rows: [...real.rows, { name, category: STORY_CONTROLS, disabled: false, description: 'A demo knob.' }] });
+    expect(auditDocsPage(withControl('title'), options)).toEqual([
+      expect.stringContaining('"title" is an attribute of ListReportTable\'s props type but is filed under "Story controls"'),
+    ]);
+    expect(auditDocsPage(withControl('fakeDemoArg'), options)).toEqual([]);
+    // Reviewed: a control that only shares the attribute's name (it drives something else) passes.
+    const reviewed: AuditOptions = { ...options, storyControlAttributeNames: { ListReportTable: { title: 'the title of the demo card' } } };
+    expect(auditDocsPage(withControl('title'), reviewed)).toEqual([]);
   });
 });

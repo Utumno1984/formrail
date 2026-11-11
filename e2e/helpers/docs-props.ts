@@ -119,6 +119,12 @@ export interface AuditOptions {
    * dependency's text promises.
    */
   dependencyTsdocProps: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /**
+   * Story controls whose name is also an inherited HTML attribute of the page's component, per
+   * component, with what the control really drives (e.g. `required` of the surrounding `Field`): any
+   * other such name filed under "Story controls" fails, as it may be the attribute itself hidden there.
+   */
+  storyControlAttributeNames: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** The problems of one Docs page's props table; empty when the table tells the truth. */
@@ -171,6 +177,10 @@ export function auditDocsPage(page: DocsPageFacts, options: AuditOptions): strin
       // (b') A real prop of the component filed as a demo knob would hide it from the props.
       if (main && (docgenProps.has(row.name) || Object.hasOwn(inherited, row.name))) {
         at(`"${row.name}" is a prop of ${main.displayName} but is filed under "${STORY_CONTROLS}"`);
+      } else if (main && typeKeys.get(main)?.has(row.name) && !Object.hasOwn(options.storyControlAttributeNames[main.displayName] ?? {}, row.name)) {
+        // An inherited HTML attribute the component accepts (left out of the docgen): a demo knob with
+        // its name may be that attribute filed away from the props. Only a reviewed name passes.
+        at(`"${row.name}" is an attribute of ${main.displayName}'s props type but is filed under "${STORY_CONTROLS}": rename the demo control, list it as an inherited attribute, or list it as a story control that only shares the name, with the reason`);
       }
       if (!row.description.trim()) at(`story control "${row.name}" has no description (what it does, or which hook option it is)`);
       continue;
