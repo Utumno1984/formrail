@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import micromatch from 'micromatch';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { excludePro, introductionPages, previewAnnotations, proEdition, storyGlobs } from '../.storybook/story-globs.mjs';
+import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -56,8 +57,32 @@ describe('storyGlobs (#175)', () => {
     const env = { STORYBOOK_EDITION: 'pro' };
 
     it('has only Pro story globs and the Pro introduction page', () => {
-      expect(storyGlobs(env)).toEqual(['../packages/pro/src/**/*.stories.tsx', './ProIntroduction.mdx']);
+      expect(storyGlobs(env)).toEqual(['../packages/pro/src/!(form-rebase)/**/*.stories.tsx', './ProIntroduction.mdx']);
       expect(introductionPages(env)).toEqual([]);
+    });
+
+    it('leaves the not-yet-public Form rebase story out of the Pro demo only (#421)', () => {
+      for (const mode of [{}, { STORYBOOK_EXCLUDE_PRO: '1' }]) {
+        expect(storyGlobs(mode).some((g) => g.includes('form-rebase') || g.includes('!('))).toBe(false);
+      }
+      // Each exclusion must point at a real folder, or it would silently exclude nothing.
+      for (const dir of PRO_DEMO_NOT_PUBLIC) expect(existsSync(resolve(ROOT, 'packages/pro/src', dir))).toBe(true);
+    });
+
+    it('an empty PRO_DEMO_NOT_PUBLIC still matches the real Pro stories (empty extglob `!()` matches nothing)', () => {
+      const story = 'packages/pro/src/change-summary/ChangeSummary.stories.tsx';
+      expect(existsSync(resolve(ROOT, story))).toBe(true);
+      // Before the fix: the old formula applied to an empty list matched no story at all (same matcher as Storybook).
+      const degenerate = `packages/pro/src/!(${[].join('|')})/**/*.stories.tsx`;
+      expect(micromatch.isMatch(story, degenerate)).toBe(false);
+      // After the fix: the plain glob, no extglob wrapper, matches it.
+      const [proGlob] = storyGlobs(env, []);
+      expect(proGlob).toBe('../packages/pro/src/**/*.stories.tsx');
+      expect(micromatch.isMatch(story, proGlob.replace('../', ''))).toBe(true);
+      // A non-empty list still excludes exactly its folders.
+      const [filtered] = storyGlobs(env, ['form-rebase']);
+      expect(micromatch.isMatch(story, filtered.replace('../', ''))).toBe(true);
+      expect(micromatch.isMatch('packages/pro/src/form-rebase/FormRebase.stories.tsx', filtered.replace('../', ''))).toBe(false);
     });
 
     it('loads the Pro CSS entry and the banner annotation, in this order', () => {
