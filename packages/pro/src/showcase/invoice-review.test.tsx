@@ -165,8 +165,17 @@ describe('invoice review (#379): line items, by id', () => {
 
   it('a unit price changed: rendered as money, labelled "Unit price"', () => {
     expect(texts(withLines([{ ...L1, unitPrice: '1234.5' }, L2, L3]))).toEqual([
-      'Line items > Item 1 (Consulting (hourly)) > Unit price, changed, from €120.00 to €1,234.50',
+      'Line items > Item 1 (Consulting [hourly]) > Unit price, changed, from €120.00 to €1,234.50',
     ]);
+  });
+
+  it('a description with parentheses never nests them in the label: "(urgent)" becomes "[urgent]" inside the disambiguation', () => {
+    const repair = line('li-9', 'Repair (urgent)', '1', '50');
+    const baseline = { ...BASELINE, lineItems: [repair] };
+    const values = { ...BASELINE, lineItems: [{ ...repair, quantity: '2' }] };
+    const entries = invoiceReviewEntries({ values, baseline });
+    expect(entries.map((e) => e.label)).toEqual(['Line items > Item 1 (Repair [urgent]) > Quantity']);
+    expect(entries[0]!.labelPath[1]).toBe('Item 1 (Repair [urgent])');
   });
 
   it('quantities are rendered as numbers: 1000 -> "1,000", 007 -> "7", for a changed field and for a whole row', () => {

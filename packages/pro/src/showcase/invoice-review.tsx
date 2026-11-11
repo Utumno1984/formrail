@@ -93,13 +93,18 @@ export function formatIsoDate(value: string): string | null {
   return day.format(date);
 }
 
+/** The one formatting of a line's number: a unit price as money, a quantity as a plain number. Validity is the caller's. */
+function formatLineNumber(field: 'quantity' | 'unitPrice', text: string): string {
+  return (field === 'unitPrice' ? money : count).format(Number(text));
+}
+
 /** A whole line (an added or removed row): `Consulting (hourly), 2 × €120.00`; `null` if it is not a line. */
 function lineText(value: unknown): string | null {
   if (typeof value !== 'object' || value === null) return null;
   const { description, quantity, unitPrice } = value as Record<string, unknown>;
   if (typeof description !== 'string' || typeof quantity !== 'string' || typeof unitPrice !== 'string') return null;
   if (!Number.isFinite(Number(quantity)) || !Number.isFinite(Number(unitPrice))) return null;
-  return `${description.trim() === '' ? 'No description' : description}, ${count.format(Number(quantity))} × ${money.format(Number(unitPrice))}`;
+  return `${description.trim() === '' ? 'No description' : description}, ${formatLineNumber('quantity', quantity)} × ${formatLineNumber('unitPrice', unitPrice)}`;
 }
 
 /**
@@ -114,7 +119,7 @@ export function invoiceReviewText(value: unknown, entry: ChangeEntry): string {
   }
   if (typeof value === 'string') {
     if (LINE_NUMBER_PATH.test(entry.path) && value.trim() !== '' && Number.isFinite(Number(value))) {
-      return entry.path.endsWith('.unitPrice') ? money.format(Number(value)) : count.format(Number(value));
+      return formatLineNumber(entry.path.endsWith('.unitPrice') ? 'unitPrice' : 'quantity', value);
     }
     if (entry.path === 'status' && Object.hasOwn(STATUS_LABEL, value)) {
       return STATUS_LABEL[value as keyof typeof STATUS_LABEL];
@@ -152,7 +157,7 @@ export function invoiceReviewEntries({ values, baseline }: InvoiceSaveReviewCont
     labels: INVOICE_REVIEW_PATH_LABELS,
     isEqual: invoiceReviewIsEqual,
   });
-  return entries.map((entry) => nameLine(entry, values, baseline));
+  return entries.map((entry) => nameLine(entry, values));
 }
 
 // Only the entries of one field of a row: an added/removed row already shows its description as its value.
@@ -161,17 +166,20 @@ const LINE_INDEX = /^lineItems\.(\d+)\./;
 /**
  * `Item N` alone is ambiguous: the index is the row's position in the new list, except for a removed row (its
  * position in the saved one), so "Item 1" can be two different rows in the same review. The description of the
- * row (from the baseline for a removed one, else from the new values) makes it unmistakable:
+ * row (from the new values) makes it unmistakable:
  * `Line items > Item 1 (Transport) > Quantity`.
  */
-function nameLine(entry: ChangeEntry, values: InvoiceReviewValues, baseline: InvoiceReviewValues): ChangeEntry {
+function nameLine(entry: ChangeEntry, values: InvoiceReviewValues): ChangeEntry {
   const match = LINE_INDEX.exec(entry.path);
   if (!match) return entry;
   const index = Number(match[1]);
-  const row = (entry.kind === 'removed' ? baseline : values).lineItems[index];
+  // `values`, not the baseline: diffById reports a removed row only as a whole row, which LINE_INDEX never matches.
+  const row = values.lineItems[index];
   const description = row?.description.trim();
   if (!description || entry.labelPath[1] === undefined) return entry;
-  const labelPath = entry.labelPath.map((segment, i) => (i === 1 ? `${segment} (${description})` : segment));
+  // Brackets for the description's own parentheses: `Repair (urgent)` must not nest inside `Item 2 (...)`.
+  const named = description.replaceAll('(', '[').replaceAll(')', ']');
+  const labelPath = entry.labelPath.map((segment, i) => (i === 1 ? `${segment} (${named})` : segment));
   return { ...entry, labelPath, label: labelPath.join(' > ') };
 }
 
