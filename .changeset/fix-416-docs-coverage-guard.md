@@ -2,4 +2,4 @@
 '@react-object-page/core': patch
 ---
 
-Internal docs-coverage guard (#416): Docs page ids now follow Storybook's own sanitizer (non-ASCII letters kept), and a "part of a compound component" export counts as documented only when the page uses it in code at a word boundary, not when a comment or a longer-named sibling mentions it.
+Internal docs-coverage guard (#416): Docs page ids now come from Storybook's own `toId` (non-ASCII letters kept), and the automatic "part of a compound component" inference from code usage is removed: a compound component's parts count as documented only when declared explicitly in `subcomponents` of its stories file.

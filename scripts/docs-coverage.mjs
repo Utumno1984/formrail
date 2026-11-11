@@ -4,7 +4,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
-import { sanitize } from 'storybook/internal/csf';
+import { sanitize, toId } from 'storybook/internal/csf';
 
 /**
  * Runtime exports with no `component`/`subcomponents` entry in a stories file: export name -> titles of
@@ -48,8 +48,8 @@ export const DOCUMENTED_IN = {
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };
 
-/** Docs page id Storybook generates for a title (its own `sanitize`, so the two cannot diverge). */
-export const docsId = (title) => `${sanitize(title)}--docs`;
+/** Docs page id Storybook generates for a title (Storybook's own `toId`, so the two cannot diverge). */
+export const docsId = (title) => toId(title, 'docs');
 
 function walk(dir, accept, out = []) {
   for (const name of readdirSync(dir)) {
