@@ -69,6 +69,8 @@ export interface AuditOptions {
   propsTypeKeys: (component: DocgenComponent) => Set<string> | string;
   /** Pages that document no component (a showcase, a hook, the foundations), with the reason. */
   pagesWithoutComponent: Readonly<Record<string, string>>;
+  /** Pages whose meta has no `component` but documents it in `subcomponents`, with the reason. */
+  pagesDocumentedBySubcomponents: Readonly<Record<string, string>>;
   /** Props each listed component must show (the ones react-docgen used to lose). */
   requiredProps: Readonly<Record<string, readonly string[]>>;
 }
@@ -91,7 +93,16 @@ export function auditDocsPage(page: DocsPageFacts, options: AuditOptions): strin
   if (withoutComponent !== undefined) {
     if (page.component) at(`listed as a page without component, but documents ${page.component.displayName}: drop it from the list`);
   } else if (!page.component) {
-    at('no `component` with docgen: set the real component on the meta (or list the page as without component, with the reason)');
+    // A listed page documents its component through `subcomponents` only (its tab must then have props).
+    // Otherwise the meta needs its real component.
+    const viaSubcomponents = Object.values(page.subcomponents).some((s) => s && Object.keys(s.props).length > 0);
+    if (options.pagesDocumentedBySubcomponents[page.title] === undefined) {
+      at('no `component` with docgen: set the real component on the meta (or list the page as without component, with the reason)');
+    } else if (!viaSubcomponents) {
+      at('documented by its `subcomponents`, but none of them has props');
+    }
+  } else if (options.pagesDocumentedBySubcomponents[page.title] !== undefined) {
+    at(`listed as documented by its subcomponents, but documents ${page.component.displayName}: drop it from the list`);
   } else if (Object.keys(page.component.props).length === 0) {
     at(`the props table of ${page.component.displayName} is empty`);
   }
@@ -103,10 +114,10 @@ export function auditDocsPage(page: DocsPageFacts, options: AuditOptions): strin
     if (typeof keys === 'string') at(keys);
     else keys.forEach((key) => typeKeys.add(key));
   }
-  const docgenProps = new Map<string, string>();
-  for (const component of documented) {
-    for (const [key, prop] of Object.entries(component.props)) if (!docgenProps.has(key)) docgenProps.set(key, prop.description);
-  }
+  // Storybook merges the docgen into the rows of the page's `component` only (a subcomponent has its own
+  // tab): those rows must keep the TSDoc; any other row (a subcomponent's prop shown in the main tab, an
+  // inherited HTML attribute) carries the story's own description.
+  const docgenProps = new Map<string, string>(Object.entries(page.component?.props ?? {}).map(([key, prop]) => [key, prop.description]));
 
   for (const row of page.rows) {
     if (row.disabled) continue;
@@ -120,18 +131,18 @@ export function auditDocsPage(page: DocsPageFacts, options: AuditOptions): strin
     }
     // (b) A row among the props is a key of the documented props types.
     if (!typeKeys.has(row.name)) {
-      at(`"${row.name}" is shown as a prop but is not a key of the props type of ${documented.map((c) => c.displayName).join(' / ') || '(no component)'}: file it under "${STORY_CONTROLS}" (storyControl()) or hide it (table: { disable: true })`);
+      at(`"${row.name}" is not a prop of ${documented.map((c) => c.displayName).join(' / ') || '(no component)'}: file it under "${STORY_CONTROLS}" or hide it`);
       continue;
     }
     if (row.category !== null) at(`prop "${row.name}" is in category "${row.category}": props stay uncategorized`);
     const tsdoc = docgenProps.get(row.name);
     if (tsdoc === undefined) {
-      // A key of the type the docgen filters out (an inherited HTML attribute the story exposes): the
-      // story describes it. A docgen prop without TSDoc is reported once, by (c) below.
-      if (!row.description.trim()) at(`prop "${row.name}" (inherited, not in the docgen) has no description in the story's argTypes`);
+      // Not merged with a docgen row: the story describes it. (A docgen prop without TSDoc is reported
+      // once, by (c) below.)
+      if (!row.description.trim()) at(`prop "${row.name}" (inherited, or of a subcomponent) has no description in the story's argTypes`);
     } else if (tsdoc.trim() && row.description !== tsdoc) {
       // The TSDoc is the single source: an argTypes description that replaces it drifts.
-      at(`prop "${row.name}": the story's argTypes description replaces the TSDoc of the source (drop it, or fix the TSDoc)`);
+      at(`prop "${row.name}": an argTypes description overrides its TSDoc`);
     }
   }
 

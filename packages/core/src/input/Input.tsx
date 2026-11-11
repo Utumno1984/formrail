@@ -6,7 +6,7 @@ import { cn } from '../utils/cn';
 export type InputSize = 'sm' | 'md';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
-  /** Height scale. Default `md` (the native `size` attribute is not exposed). */
+  /** Height scale: `sm` 32px, `md` 36px. Default `md` (the native `size` attribute is not exposed). */
   size?: InputSize;
 }
 

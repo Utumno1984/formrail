@@ -20,6 +20,23 @@ export function storyControl<T extends InputType & { description: string }>(argT
 }
 
 /**
+ * The row of `className` where a story exposes it: an attribute every component inherits from its root
+ * element's HTML attributes (the docgen leaves those out), so the story describes it.
+ */
+export const CLASS_NAME_ARG = {
+  control: false,
+  description: "Extra classes for the root element, merged with the component's own (tailwind-merge: yours win on a conflict).",
+} as const satisfies InputType;
+
+/**
+ * {@link storyControl} on every entry: the argTypes of a page that documents no component (a showcase, a
+ * hook), where every arg is a demo knob or a hook option.
+ */
+export function storyControls<T extends Record<string, InputType & { description: string }>>(argTypes: T): T {
+  return Object.fromEntries(Object.entries(argTypes).map(([name, argType]) => [name, storyControl(argType)])) as T;
+}
+
+/**
  * Props of the documented component that the demo does not take from the story args (it sets them itself,
  * or they need a value no control can build, e.g. `table`): their row stays in the props table, with its
  * TSDoc, but without a Control that would change nothing in the canvas. Spread into `argTypes` (a spread

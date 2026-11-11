@@ -16,6 +16,7 @@ import { Field, type FieldStateProps } from '../field/Field';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Select, type SelectOption, type SelectSize } from './Select';
 
 const SIZES: SelectSize[] = ['sm', 'md'];
@@ -61,9 +62,15 @@ const meta: Meta<DemoArgs> = {
   argTypes: {
     size: { control: 'radio', options: SIZES },
     placeholder: { control: 'text' },
-    // forced = value decided by a business rule; locked = not editable. Neither ever opens the list.
-    state: { control: 'radio', options: STATES },
     onValueChange: { control: false },
+    // Set by the demo (the option lists, a local controlled value); `Empty` gives `emptyLabel` a control.
+    ...withoutControls('options', 'value', 'defaultValue', 'unknownValueLabel', 'emptyLabel'),
+    // forced = value decided by a business rule; locked = not editable. Neither ever opens the list.
+    state: storyControl({
+      control: 'radio',
+      options: STATES,
+      description: '`state` of the surrounding `Field` (`forced`: value decided by a rule, `locked`: not editable; neither opens the list).',
+    }),
   },
   args: { size: 'md', placeholder: 'Select', state: 'default', onValueChange: fn() },
 };

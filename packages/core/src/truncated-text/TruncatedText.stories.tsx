@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Tooltip, TooltipProvider } from '../tooltip/Tooltip';
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { TruncatedText } from './TruncatedText';
 
 const LONG =
@@ -32,13 +33,15 @@ const meta: Meta<DemoArgs> = {
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     children: { control: 'text' },
-    width: { control: { type: 'range', min: 80, max: 600, step: 10 }, description: 'Width of the demo container (px)' },
     tabIndex: {
       control: 'select',
       options: ['none', '0'],
-      description: 'Without tabIndex the text is not a tab stop; with 0, keyboard focus opens the tooltip.',
+      description: 'Native `tabIndex`. Without it the text is not a tab stop; with 0, keyboard focus opens the tooltip.',
     },
-    onFocus: { control: false },
+    onFocus: { control: false, description: 'Native `onFocus` (the demo logs it in Actions).' },
+    // Set by the demo or not used by it.
+    ...withoutControls('tooltipContent', 'as'),
+    width: storyControl({ control: { type: 'range', min: 80, max: 600, step: 10 }, description: 'Width of the demo container (px): the text truncates to it.' }),
   },
   args: { children: LONG, width: 200, tabIndex: 'none', onFocus: fn() },
 };

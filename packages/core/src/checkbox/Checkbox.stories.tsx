@@ -5,6 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl } from '../internal/story-docs';
 import { Checkbox, type CheckedState } from './Checkbox';
 
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -26,15 +27,20 @@ const meta: Meta<DemoArgs> = {
   // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
   subcomponents: { Checkbox },
   parameters: { layout: 'padded', docs: { description: { component: "Checkbox: a styled native `<input type=\"checkbox\">` with an optional inline label, a mixed (`indeterminate`) state, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
+  // No `component`, so these rows are not merged with the docgen (the `Checkbox` tab has the props).
   argTypes: {
-    checked: { control: 'radio', options: CHECKED_OPTIONS },
+    checked: { control: 'radio', options: CHECKED_OPTIONS, description: '`checked`: `true`, `false` or `indeterminate` (mixed). The demo keeps it in local state.' },
+    onCheckedChange: { control: false, description: '`onCheckedChange(checked)`: a user toggle (not an external change of `checked`).' },
     // forced = value decided by a business rule; locked = not editable. Neither changes on click or Space.
-    fieldState: { control: 'radio', options: STATES },
-    invalid: { control: 'boolean' },
-    required: { control: 'boolean' },
-    fieldLabel: { control: 'text' },
-    inlineLabel: { control: 'text' },
-    onCheckedChange: { control: false },
+    fieldState: storyControl({
+      control: 'radio',
+      options: STATES,
+      description: '`state` of the surrounding `Field` (`forced`: value decided by a rule, `locked`: not editable; neither changes on click or Space).',
+    }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
+    fieldLabel: storyControl({ control: 'text', description: '`label` of the surrounding `Field`.' }),
+    inlineLabel: storyControl({ control: 'text', description: "The Checkbox's `children`: its inline label." }),
   },
   args: {
     checked: false,

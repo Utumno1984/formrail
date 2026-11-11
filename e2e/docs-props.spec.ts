@@ -31,6 +31,18 @@ const PAGES_WITHOUT_COMPONENT: Record<string, string> = {
   'Pro/Patterns/Form rebase': 'documents the useFormRebase hook: its options are the story controls',
 };
 
+/**
+ * Pages whose meta keeps `component` unset and documents it in `subcomponents` (its own tab, with the
+ * TSDoc): their e2e drive the stories with URL args (`?args=weekStartsOn:1`, ...) that the argTypes
+ * inferred from the docgen would reject (decision of the stories, kept by #401).
+ */
+const PAGES_DOCUMENTED_BY_SUBCOMPONENTS: Record<string, string> = {
+  'Forms/Calendar': 'URL args of the e2e; Calendar in subcomponents',
+  'Forms/DatePicker': 'URL args of the e2e; DatePicker in subcomponents',
+  'Forms/Checkbox': 'URL args of the e2e; Checkbox in subcomponents',
+  'Forms/RadioGroup': 'URL args of the e2e; RadioGroup and RadioGroupItem in subcomponents',
+};
+
 /** The props react-docgen lost (the table of the ticket): they must stay in the docgen. */
 const REQUIRED_PROPS: AuditOptions['requiredProps'] = {
   ListReport: ['title', 'table', 'actions', 'bulkActions', 'status', 'labels', 'rowActions'],
@@ -111,13 +123,16 @@ test.describe('Docs props tables', () => {
     const options: AuditOptions = {
       propsTypeKeys: createPropsTypeReader(REPO_ROOT, components),
       pagesWithoutComponent: PAGES_WITHOUT_COMPONENT,
+      pagesDocumentedBySubcomponents: PAGES_DOCUMENTED_BY_SUBCOMPONENTS,
       requiredProps: REQUIRED_PROPS,
     };
     const problems = facts.flatMap((f) => auditDocsPage(f, options));
 
-    // The list of pages without component, and the components of REQUIRED_PROPS, must exist (no stale entry).
+    // The page lists, and the components of REQUIRED_PROPS, must exist (no stale entry).
     const titles = new Set(facts.map((f) => f.title));
-    for (const title of Object.keys(PAGES_WITHOUT_COMPONENT)) if (!titles.has(title)) problems.push(`PAGES_WITHOUT_COMPONENT lists "${title}", which is not a public Docs page`);
+    for (const title of [...Object.keys(PAGES_WITHOUT_COMPONENT), ...Object.keys(PAGES_DOCUMENTED_BY_SUBCOMPONENTS)]) {
+      if (!titles.has(title)) problems.push(`"${title}" is listed above but is not a public Docs page`);
+    }
     const names = new Set(components.map((c) => c.displayName));
     for (const name of Object.keys(REQUIRED_PROPS)) if (!names.has(name)) problems.push(`REQUIRED_PROPS: ${name} is documented on no public Docs page`);
 
@@ -132,6 +147,7 @@ test.describe('Docs props tables', () => {
     const options: AuditOptions = {
       propsTypeKeys: createPropsTypeReader(REPO_ROOT, [real.component]),
       pagesWithoutComponent: PAGES_WITHOUT_COMPONENT,
+      pagesDocumentedBySubcomponents: PAGES_DOCUMENTED_BY_SUBCOMPONENTS,
       requiredProps: REQUIRED_PROPS,
     };
     expect(auditDocsPage(real, options)).toEqual([]);
@@ -142,7 +158,7 @@ test.describe('Docs props tables', () => {
       rows: [...real.rows, { name: 'fakeDemoArg', category: null, disabled: false, description: 'A demo knob.' }],
     };
     expect(auditDocsPage(uncategorized, options)).toEqual([
-      expect.stringContaining('"fakeDemoArg" is shown as a prop but is not a key of the props type of ListReportTable'),
+      expect.stringContaining('"fakeDemoArg" is not a prop of ListReportTable'),
     ]);
 
     // The same arg filed under "Story controls" passes; a real prop filed there does not.
@@ -168,9 +184,9 @@ test.describe('Docs props tables', () => {
 
     // An argTypes description that replaces the TSDoc of a prop (the manual compensation that drifts).
     const overridden: DocsPageFacts = { ...real, rows: real.rows.map((r) => (r.name === 'maxHeight' ? { ...r, description: 'Stale text.' } : r)) };
-    expect(auditDocsPage(overridden, options)).toEqual([expect.stringContaining('prop "maxHeight": the story\'s argTypes description replaces the TSDoc')]);
+    expect(auditDocsPage(overridden, options)).toEqual([expect.stringContaining('prop "maxHeight": an argTypes description overrides its TSDoc')]);
 
     const noComponent: DocsPageFacts = { ...real, component: null, subcomponents: {} };
-    expect(auditDocsPage(noComponent, options)[0]).toContain('no `component` with docgen');
+    expect(auditDocsPage(noComponent, options).join('\n')).toContain('no `component` with docgen');
   });
 });

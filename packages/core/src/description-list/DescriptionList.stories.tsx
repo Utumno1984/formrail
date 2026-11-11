@@ -14,6 +14,7 @@ import {
 import { Text } from '../typography/Text';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { internalIcons } from '../internal/icons';
+import { storyControl } from '../internal/story-docs';
 import { StatusBadge,type StatusBadgeTone } from '../status-badge/StatusBadge';
 import { DescriptionList, DescriptionListItem, type DescriptionListLayout } from './DescriptionList';
 import { DescriptionListStatus } from './DescriptionListStatus';
@@ -98,19 +99,27 @@ function Demo({ layout, width, valueKind, emptyLabel, onOpen }: DemoProps) {
 
 const meta = {
   title: 'Data/DescriptionList',
-  component: Demo,
+  // The stories drive the list through a small demo wrapper (`render`); the cast keeps the props table of
+  // the real component while the stories stay typed by the wrapper's args.
+  component: DescriptionList as unknown as typeof Demo,
+  subcomponents: { DescriptionListItem, DescriptionListStatus },
   parameters: {
     layout: 'padded',
-    docs: { story: { inline: false, height: '360px' }, description: { component: "`DescriptionList` / `DescriptionListItem`: a read-only list of term/value pairs that lays itself out from the width of its own container (inline terms when wide, stacked when narrow), with a placeholder for empty values. The stories below drive it through a small demo wrapper; the table lists the wrapper's controls." } },
+    docs: { story: { inline: false, height: '360px' }, description: { component: "`DescriptionList` / `DescriptionListItem`: a read-only list of term/value pairs that lays itself out from the width of its own container (inline terms when wide, stacked when narrow), with a placeholder for empty values. `DescriptionListStatus` puts a status badge in a value." } },
   },
   argTypes: {
     layout: { control: 'radio', options: ['auto', 'inline', 'stacked'] satisfies DescriptionListLayout[] },
-    width: { control: { type: 'range', min: 200, max: 800, step: 10 } },
-    valueKind: { control: 'select', options: ['strings', 'mixed', 'with-empties'] satisfies ValueKind[] },
     emptyLabel: { control: 'text' },
-    onOpen: { control: false },
+    width: storyControl({ control: { type: 'range', min: 200, max: 800, step: 10 }, description: 'Width of the demo container (px): the list reacts to it, not to the window.' }),
+    valueKind: storyControl({
+      control: 'select',
+      options: ['strings', 'mixed', 'with-empties'] satisfies ValueKind[],
+      description: 'Which items the demo renders: plain strings, mixed content (link, code, button, address), or empty values (`emptyLabel`).',
+    }),
+    onOpen: storyControl({ control: false, description: 'The "Open invoice" button inside a value (mixed content).' }),
   },
   args: { layout: 'auto', width: 600, valueKind: 'mixed', emptyLabel: 'Not specified', onOpen: fn() },
+  render: (args) => <Demo {...args} />,
 } satisfies Meta<typeof Demo>;
 
 export default meta;

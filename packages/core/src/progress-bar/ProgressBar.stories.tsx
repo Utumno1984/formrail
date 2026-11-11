@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { ProgressBar, type ProgressBarProps } from './ProgressBar';
 
 interface DemoArgs extends ProgressBarProps {
@@ -46,15 +47,15 @@ const meta = {
   component: ProgressBar,
   parameters: { layout: 'padded' },
   argTypes: {
-    value: { control: { type: 'range', min: 0, max: 100, step: 1 }, description: 'Current value (min..max)' },
-    indeterminate: { control: 'boolean', description: 'Story-only: render the indeterminate state' },
+    value: { control: { type: 'range', min: 0, max: 100, step: 1 } },
     tone: { control: 'radio', options: ['primary', 'success', 'error'] },
     label: { control: 'text' },
     min: { control: false },
     max: { control: false },
     getValueLabel: { control: false },
-    className: { control: false },
-    onComplete: { control: false },
+    className: CLASS_NAME_ARG,
+    indeterminate: storyControl({ control: 'boolean', description: 'Renders the indeterminate state (`value={null}`), whatever the `value` control says.' }),
+    onComplete: storyControl({ control: false, description: 'Called once when the simulated upload of the demo reaches 100.' }),
   },
   args: {
     value: 45,

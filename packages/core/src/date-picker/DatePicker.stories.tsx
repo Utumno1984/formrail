@@ -16,6 +16,7 @@ import {
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
+import { storyControl } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { DatePicker, type DatePickerInvalidReason, type DatePickerSize } from './DatePicker';
 
@@ -44,16 +45,17 @@ const meta: Meta<DemoArgs> = {
   // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
   subcomponents: { DatePicker },
   parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' }, description: { component: "DatePicker: a text input in the locale's numeric format plus a Calendar popover. Typing and picking give the same ISO date through `onValueChange`; text that is not a valid date is reported through `onInvalidInput`." } } },
+  // No `component`, so these rows are not merged with the docgen (the `DatePicker` tab has the props).
   argTypes: {
-    locale: { control: 'select', options: LOCALES, description: 'Order and separator of the typed text, calendar names.' },
+    locale: { control: 'select', options: LOCALES, description: '`locale`: order and separator of the typed text, calendar names.' },
+    size: { control: 'radio', options: SIZES, description: '`size`: height of the input (`sm` or `md`).' },
+    today: { control: 'text', description: '`today`: the date marked as today, YYYY-MM-DD.' },
+    min: { control: 'text', description: '`min`: first selectable date, YYYY-MM-DD (empty = none).' },
+    max: { control: 'text', description: '`max`: last selectable date, YYYY-MM-DD (empty = none).' },
+    onValueChange: { control: false, description: '`onValueChange(date | null)`: a typed or picked date (ISO), or `null` when cleared.' },
+    onInvalidInput: { control: false, description: '`onInvalidInput(text, reason)`: typed text that is not a valid date.' },
     // forced = value decided by a business rule; locked = not editable. Neither ever opens the calendar.
-    fieldState: { control: 'radio', options: STATES, description: 'The state of the enclosing Field.' },
-    size: { control: 'radio', options: SIZES },
-    today: { control: 'text', description: 'The date marked as today, YYYY-MM-DD.' },
-    min: { control: 'text', description: 'First selectable date, YYYY-MM-DD (empty = none).' },
-    max: { control: 'text', description: 'Last selectable date, YYYY-MM-DD (empty = none).' },
-    onValueChange: { control: false },
-    onInvalidInput: { control: false },
+    fieldState: storyControl({ control: 'radio', options: STATES, description: '`state` of the surrounding `Field` (`forced` / `locked`: the calendar never opens).' }),
   },
   args: {
     locale: 'en-US',

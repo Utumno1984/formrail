@@ -5,6 +5,7 @@ import { InvoiceCrud, type InvoiceCrudProps } from './InvoiceCrud';
 import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from './crud-story-args';
 import { InvoiceListToRecord,type InvoiceListToRecordProps } from './InvoiceListToRecord';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
+import { storyControls } from '../internal/story-docs';
 import { createInvoiceStore, type LoadOutcome, type SaveOutcome, type StoredInvoice } from './invoice-store';
 
 /*
@@ -47,7 +48,8 @@ const meta: Meta<RecordPageArgs> = {
     layout: 'fullscreen',
     docs: { description: { component: "A complete worked example: an invoice record page (Object Page with sections, validation, a sticky save-bar and a dirty-guard) opened from a List Report, built only from the library's components. Use the controls to open another invoice, slow down the load or open one that does not exist; edit a field and try to leave to see the guard." } },
   },
-  argTypes: {
+  // A showcase documents no component: every control is a knob of the demo.
+  argTypes: storyControls({
     recordId: {
       control: 'select',
       options: ['inv-1', 'inv-2', 'inv-3', 'inv-4', 'inv-7', 'inv-does-not-exist'],
@@ -73,7 +75,7 @@ const meta: Meta<RecordPageArgs> = {
     },
     onBack: { control: false, description: '"Back to list": called at once if clean, after confirmation if dirty.' },
     onSaved: { control: false, description: 'Called once per successful save with the record as the server stored it.' },
-  },
+  }),
   args: {
     recordId: 'inv-2',
     loadDelayMs: 300,

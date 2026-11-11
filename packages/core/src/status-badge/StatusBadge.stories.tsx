@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, within } from 'storybook/test';
 import { DescriptionList, DescriptionListItem } from '../description-list/DescriptionList';
 import { internalIcons } from '../internal/icons';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Text } from '../typography/Text';
 import { StatusBadge, type StatusBadgeProps, type StatusBadgeTone } from './StatusBadge';
 
@@ -29,8 +30,8 @@ const meta = {
     tone: { control: 'radio', options: TONES },
     children: { control: 'text' },
     icon: { control: 'select', options: ICON_NAMES, mapping: ICONS },
-    width: { control: { type: 'range', min: 80, max: 400, step: 10 }, description: 'Demo container width (px)' },
-    className: { control: false },
+    className: CLASS_NAME_ARG,
+    width: storyControl({ control: { type: 'range', min: 80, max: 400, step: 10 }, description: 'Width of the demo container (px).' }),
   },
   args: { tone: 'neutral', children: 'Archived', icon: undefined, width: 300 },
   render: ({ width, ...args }) => (

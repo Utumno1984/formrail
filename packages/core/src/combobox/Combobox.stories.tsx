@@ -16,6 +16,7 @@ import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { repositionAfterMotion } from '../internal/settle-motion';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Combobox, type ComboboxOption, type ComboboxSize } from './Combobox';
 import { defaultComboboxFilter } from './filter';
 import { useCombobox } from './use-combobox';
@@ -69,12 +70,18 @@ const meta: Meta<DemoArgs> = {
   parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     size: { control: 'radio', options: SIZES },
-    placeholder: { control: 'text' },
+    placeholder: { control: 'text', description: 'Native `placeholder` of the input, shown while nothing is typed or selected.' },
     emptyLabel: { control: 'text' },
     clearOnEmpty: { control: 'boolean' },
-    // forced = value decided by a business rule; locked = not editable. Neither ever opens the list.
-    state: { control: 'radio', options: STATES },
     onValueChange: { control: false },
+    // Set by the demo (the city list, a local controlled value).
+    ...withoutControls('options', 'value', 'defaultValue', 'unknownValueLabel', 'filter'),
+    // forced = value decided by a business rule; locked = not editable. Neither ever opens the list.
+    state: storyControl({
+      control: 'radio',
+      options: STATES,
+      description: '`state` of the surrounding `Field` (`forced`: value decided by a rule, `locked`: not editable; neither opens the list).',
+    }),
   },
   args: {
     size: 'md',

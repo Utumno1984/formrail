@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from '../dialog/Dialog';
 import { internalIcons } from '../internal/icons';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Tooltip, TooltipProvider, type TooltipAlign, type TooltipSide } from './Tooltip';
 
@@ -42,6 +43,7 @@ const meta: Meta<DemoArgs> = {
   // The stories drive the component through a demo wrapper (`Meta<...Args>`): `never` keeps the docs
   // props table of the real component without forcing the wrapper's args to match its props.
   component: Tooltip as never,
+  subcomponents: { TooltipProvider },
   // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
   // were rendered inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
@@ -51,6 +53,8 @@ const meta: Meta<DemoArgs> = {
     align: { control: 'radio', options: ALIGNS },
     delayDuration: { control: { type: 'number', min: 0, step: 100 } },
     onOpenChange: { control: false },
+    // Set by the stories themselves (the trigger, hover/focus opening).
+    ...withoutControls('open', 'children'),
   },
   args: { content: 'Delete row', side: 'top', align: 'center', delayDuration: 500, onOpenChange: fn() },
   // Optional in the library (a `Tooltip` supplies its own); here it is shared like in an app.
@@ -103,7 +107,7 @@ export const Playground: Story = {
   args: { sideOffset: 6, disabled: false, disabledTriggerFocusable: false },
   argTypes: {
     sideOffset: { control: { type: 'number', min: 0, max: 24, step: 2 } },
-    disabled: { control: 'boolean' },
+    disabled: storyControl({ control: 'boolean', description: 'Makes the trigger button `disabled` (see `disabledTriggerFocusable`).' }),
     disabledTriggerFocusable: { control: 'boolean' },
   },
   render: ({ content, side, align, sideOffset, delayDuration, disabled, disabledTriggerFocusable, onOpenChange }) => (
