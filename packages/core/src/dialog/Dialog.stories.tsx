@@ -5,6 +5,7 @@ import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { settleMotion } from '../internal/settle-motion';
+import { withoutControls } from '../internal/story-docs';
 import {
   Dialog,
   DialogBody,
@@ -34,9 +35,15 @@ const meta: Meta<DemoArgs> = {
   // were rendered inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
-    size: { control: 'radio', options: SIZES },
-    dismissible: { control: 'boolean' },
     onOpenChange: { control: false },
+    // Set by the stories (a trigger opens the dialog; the content is the demo).
+    ...withoutControls('open', 'defaultOpen', 'children'),
+    // Props of `DialogContent` (see its tab), driven from the main table.
+    size: { control: 'radio', options: SIZES, description: "`DialogContent`'s `size`: maximum width step." },
+    dismissible: {
+      control: 'boolean',
+      description: "`DialogContent`'s `dismissible`: whether Escape and a click on the backdrop close the dialog.",
+    },
   },
   args: { size: 'md', dismissible: true, onOpenChange: fn() },
 };
