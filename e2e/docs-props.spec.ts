@@ -80,6 +80,20 @@ const REQUIRED_PROPS: AuditOptions['requiredProps'] = {
   Button: ['variant', 'size', 'aria-label', 'aria-labelledby'],
 };
 
+const DEFER_POINTER_DOWN =
+  "Radix's text is true of the panel: ModalPanel does not touch it (the press it defers is still the one `onPointerDownOutside` receives, and the backdrop press of `dismissible={false}` keeps the panel open either way)";
+
+/**
+ * Pass-through props of a dependency (Radix) whose TSDoc the table shows as the dependency wrote it, with
+ * why that text holds for the component. Every other one is redeclared with the project's TSDoc: Radix's
+ * text on a prop the wrapper intercepts (`onCloseAutoFocus`, whose `preventDefault()` the overlays make
+ * moot) promises what the component does not do.
+ */
+const DEPENDENCY_TSDOC_PROPS: AuditOptions['dependencyTsdocProps'] = {
+  DialogContent: { deferPointerDownOutside: DEFER_POINTER_DOWN },
+  SheetContent: { deferPointerDownOutside: DEFER_POINTER_DOWN },
+};
+
 interface IndexEntry {
   id: string;
   type?: string;
@@ -152,6 +166,7 @@ const optionsFor = (components: DocgenComponent[]): AuditOptions => ({
   pagesWithoutComponent: PAGES_WITHOUT_COMPONENT,
   inheritedAttributeRows: INHERITED_ATTRIBUTE_ROWS,
   requiredProps: REQUIRED_PROPS,
+  dependencyTsdocProps: DEPENDENCY_TSDOC_PROPS,
 });
 
 /** A real page by title, with the audit options of its components. */
@@ -182,6 +197,7 @@ test.describe('Docs props tables', () => {
     }
     const names = new Set(components.map((c) => c.displayName));
     for (const name of Object.keys(REQUIRED_PROPS)) if (!names.has(name)) problems.push(`REQUIRED_PROPS: ${name} is documented on no public Docs page`);
+    for (const name of Object.keys(DEPENDENCY_TSDOC_PROPS)) if (!names.has(name)) problems.push(`DEPENDENCY_TSDOC_PROPS: ${name} is documented on no public Docs page`);
     const mains = new Set(facts.map((f) => f.component?.displayName));
     for (const [name, attributes] of Object.entries(INHERITED_ATTRIBUTE_ROWS)) {
       if (!mains.has(name)) problems.push(`INHERITED_ATTRIBUTE_ROWS: ${name} is the component of no public Docs page`);
@@ -289,6 +305,44 @@ test.describe('Docs props tables', () => {
     ]);
     expect(auditDocsPage(tabs, tweak({ reactTypesTsdoc: true }))).toEqual([
       'Navigation/Tabs: TabsList.aria-labelledby: its TSDoc is joined to the generic @types/react text (leave the attribute out of the base type)',
+    ]);
+  });
+
+  test('negative: a Radix prop the wrapper intercepts, shown with the Radix text, fails the guard', async ({ page }) => {
+    // The critic's case (round 2): Radix says "Can be prevented." of `onCloseAutoFocus`, but the overlays
+    // call `preventDefault()` themselves and return the focus through `useReturnFocus`.
+    const { facts: dialog, options } = await realPage(page, 'Overlays/Dialog');
+    const { facts: menu } = await realPage(page, 'Overlays/Menu');
+    const { facts: sheet } = await realPage(page, 'Overlays/Sheet');
+    for (const component of [dialog.subcomponents.DialogContent, sheet.subcomponents.SheetContent, menu.subcomponents.MenuContent]) {
+      const text = component?.props.onCloseAutoFocus?.description ?? '';
+      expect(text, `${component?.displayName}.onCloseAutoFocus`).toContain('`event.preventDefault()` has no effect');
+      expect(text).not.toContain('Can be prevented');
+    }
+
+    // The redeclaration gone (the prop declared by Radix only): the Radix text is refused.
+    const radixOnly: AuditOptions = {
+      ...options,
+      propsTypeKeys: (c) => {
+        const keys = options.propsTypeKeys(c);
+        if (typeof keys === 'string' || c.displayName !== 'DialogContent') return keys;
+        return new Map([...keys].map(([k, v]) => [k, k === 'onCloseAutoFocus' ? { ...v, declaredByProject: false, projectTsdoc: false } : v]));
+      },
+    };
+    expect(auditDocsPage(dialog, radixOnly)).toEqual([
+      expect.stringContaining('DialogContent.onCloseAutoFocus shows the TSDoc of its dependency: redeclare it'),
+    ]);
+    // A Radix text kept as it is, without being listed as faithful.
+    const unlisted: AuditOptions = { ...options, dependencyTsdocProps: { ...options.dependencyTsdocProps, DialogContent: {} } };
+    expect(auditDocsPage(dialog, unlisted)).toEqual([expect.stringContaining('DialogContent.deferPointerDownOutside shows the TSDoc of its dependency')]);
+    // Listed as faithful, but redeclared by the project (stale), or not a prop at all.
+    const stale: AuditOptions = {
+      ...options,
+      dependencyTsdocProps: { ...options.dependencyTsdocProps, DialogContent: { deferPointerDownOutside: 'faithful', onCloseAutoFocus: 'stale', notAProp: 'stale' } },
+    };
+    expect(auditDocsPage(dialog, stale)).toEqual([
+      expect.stringContaining('DialogContent.onCloseAutoFocus is listed as keeping its dependency\'s TSDoc, but the project redeclares it'),
+      expect.stringContaining('DialogContent.notAProp is listed as keeping its dependency\'s TSDoc, but it is not in the docgen'),
     ]);
   });
 });

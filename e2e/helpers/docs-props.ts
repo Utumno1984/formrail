@@ -111,6 +111,14 @@ export interface AuditOptions {
   inheritedAttributeRows: Readonly<Record<string, Readonly<Record<string, string>>>>;
   /** Props each listed component must show (the ones react-docgen used to lose). */
   requiredProps: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Props a component passes through from a dependency (Radix) that the table shows with the
+   * dependency's own TSDoc, per component, with why that text is true of the component. Any other
+   * pass-through prop must be redeclared with the project's TSDoc: a wrapper that intercepts a
+   * dependency's prop (calls `preventDefault()` itself, does the work another way) changes what the
+   * dependency's text promises.
+   */
+  dependencyTsdocProps: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** The problems of one Docs page's props table; empty when the table tells the truth. */
@@ -196,7 +204,16 @@ export function auditDocsPage(page: DocsPageFacts, options: AuditOptions): strin
         }
       } else if (!prop.description.trim()) {
         at(`${component.displayName}.${key} has no TSDoc`);
+      } else if (info && !Object.hasOwn(options.dependencyTsdocProps[component.displayName] ?? {}, key)) {
+        // (c') A dependency's prop shown with the dependency's text: only where that text is known to
+        // hold for the wrapper.
+        at(`${component.displayName}.${key} shows the TSDoc of its dependency: redeclare it with the project's own TSDoc (same type), or list it as faithful to the dependency, with the reason`);
       }
+    }
+    // (c'') No stale entry in the list of the dependency texts kept as they are.
+    for (const key of Object.keys(options.dependencyTsdocProps[component.displayName] ?? {})) {
+      if (!Object.hasOwn(component.props, key)) at(`${component.displayName}.${key} is listed as keeping its dependency's TSDoc, but it is not in the docgen`);
+      else if (keys?.get(key)?.declaredByProject) at(`${component.displayName}.${key} is listed as keeping its dependency's TSDoc, but the project redeclares it: drop it from the list`);
     }
     // (e) The docgen lists every key it should keep: everything not declared by @types/react (the
     // project's props and the dependencies' public ones, e.g. Radix's `asChild`), for every component.
