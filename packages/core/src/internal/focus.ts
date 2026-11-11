@@ -24,6 +24,23 @@ export function compareDocumentOrder(a: Node, b: Node): number {
 }
 
 /**
+ * Focuses the first of `candidates` (in the given order) that really takes the focus, and returns it;
+ * `null` if none does. "Really" is checked after the call, so a candidate that cannot be focused
+ * (`type="hidden"`, disabled, `display: none`, inert, a `fieldset`) is skipped without having to
+ * predict focusability. Compared against the element's own root: `document.activeElement` is the
+ * host when the element lives in a ShadowRoot. Shared by `useFocusFirstInvalidField` and
+ * `useListMutationFocus`, which differ in everything else (trigger, lookup, order, scrolling).
+ */
+export function focusFirst(candidates: Iterable<HTMLElement>, options?: FocusOptions): HTMLElement | null {
+  for (const el of candidates) {
+    el.focus(options);
+    const root = el.getRootNode() as Document | ShadowRoot;
+    if (root.activeElement === el) return el;
+  }
+  return null;
+}
+
+/**
  * The next (or previous) tabbable element after `from`, outside `exclude`. Inside a modal panel
  * (`aria-modal`) the search stays in it and wraps around, like the panel's own focus trap; on a
  * page it stops at the end (`null`).
