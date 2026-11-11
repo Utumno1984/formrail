@@ -105,6 +105,30 @@ describe('InvoiceRecordPage', () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 
+  it.each(['1' + '0'.repeat(21), '9'.repeat(22), '1' + '0'.repeat(21) + '.00'])(
+    'rejects the amount %j as too large, not as "not greater than 0" (#418)',
+    async (typed) => {
+      const { onSaved } = setup();
+      const amount = await amountField();
+      await userEvent.clear(amount);
+      await userEvent.type(amount, typed);
+      await userEvent.click(within(await visibleBar()).getByRole('button', { name: 'Save' }));
+      expect(await screen.findByText('Amount must be less than 1e21.')).toBeInTheDocument();
+      expect(onSaved).not.toHaveBeenCalled();
+    },
+  );
+
+  it('accepts the largest amount below 1e21 and reloads it as plain digits', async () => {
+    const { onSaved, store } = setup();
+    const amount = await amountField();
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '999999999999999868928');
+    await userEvent.click(within(await visibleBar()).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(screen.queryByText(/Amount must be/)).toBeNull();
+    expect((await store.get('inv-2')).amount.toFixed(2)).not.toMatch(/e/i);
+  });
+
   it('announces the loading and the arrival in one live region that is always mounted', async () => {
     setup({ loadDelayMs: 30 });
     const region = screen.getByRole('status');
