@@ -201,7 +201,9 @@ export const TooltipOverBar: Story = {
           <Tooltip content="Hint that overlaps the bar" delayDuration={0}>
             <Button variant="secondary">Details</Button>
           </Tooltip>
-          <Filler height={900}>Long content</Filler>
+          <div style={{ marginTop: 12 }}>
+            <Filler height={900}>Long content</Filler>
+          </div>
         </ObjectPageSection>
         <ObjectPageSection id="other" title="Other">
           <Filler height={700}>More content</Filler>
