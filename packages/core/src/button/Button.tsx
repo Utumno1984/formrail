@@ -91,7 +91,10 @@ const ICON_SIZE: Record<ButtonSize, IconSize> = {
 
 type IconElement = ReactElement<SVGProps<SVGSVGElement>>;
 
-interface ButtonBaseProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+// `aria-label` / `aria-labelledby` are left out here and declared by every size branch below, with
+// the same TSDoc: an HTML declaration would add its generic text to theirs in the props table.
+interface ButtonBaseProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'aria-label' | 'aria-labelledby'> {
   /** Visual emphasis. Default `secondary`. */
   variant?: ButtonVariant;
   /**
@@ -138,6 +141,10 @@ export type ButtonProps = ButtonBaseProps &
          * requires `aria-label` or `aria-labelledby`: there is no visible text. Default `md`.
          */
         size?: ButtonTextSize;
+        /** Accessible name. Required with the `icon-*` sizes (this or `aria-labelledby`): they have no visible text. */
+        'aria-label'?: string | undefined;
+        /** Id of the element that names the button. Required with the `icon-*` sizes (this or `aria-label`). */
+        'aria-labelledby'?: string | undefined;
       }
     | ({
         /**
