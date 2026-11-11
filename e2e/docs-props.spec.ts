@@ -210,6 +210,14 @@ test.describe('Docs props tables', () => {
     expect(problems, `\n${problems.join('\n')}\n`).toEqual([]);
   });
 
+  test('the published Storybook names no path of the build machine (project.json, index.json)', async ({ page }) => {
+    // `project.json` would copy main.ts's docgen options (absolute include / paths) into the site: it is
+    // not generated (core.disableProjectJson).
+    expect((await page.request.get('/project.json')).status()).toBe(404);
+    const root = REPO_ROOT.replace(/[\\/]+$/, '');
+    expect(await (await page.request.get('/index.json')).text()).not.toContain(root);
+  });
+
   test('negative: rows that are not props of the component fail the guard', async ({ page }) => {
     const { facts: real, options } = await realPage(page, 'Data/ListReportTable');
     expect(real.component?.displayName).toBe('ListReportTable');

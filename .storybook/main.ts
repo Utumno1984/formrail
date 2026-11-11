@@ -54,7 +54,10 @@ const config: StorybookConfig = {
     ...(previewAnnotations() as string[]).map((file) => fileURLToPath(new URL(file, import.meta.url))),
   ],
   framework: { name: '@storybook/react-vite', options: {} },
-  core: { disableTelemetry: true },
+  // `disableProjectJson`: `project.json` (build metadata for Storybook's telemetry and hosted services,
+  // read by nothing here) copies the options above into the published site, absolute docgen paths of the
+  // build machine included (ticket #401).
+  core: { disableTelemetry: true, disableProjectJson: true },
   // Unused here, and not free: on every DOM change under the story it re-runs `getComputedStyle` on
   // every element of the page, a cost the performance e2e would charge to the component.
   features: { highlight: false },
