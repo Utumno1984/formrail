@@ -269,8 +269,8 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
  * slot, the bar of pills and search and the selection bar, ending with whatever `renderTable` returns
  * for the table props the floorplan computed (ref, id, `aria-labelledby`, status, labels, …).
  * `ListReport` is `ListReportFrame` with `renderTable` = `ListReportTable`; a virtualized floorplan
- * (`@react-object-page/pro`) renders a different table from the same props. Exported from
- * `@react-object-page/core/internal`; not public API, no semver guarantee.
+ * (`@formrail/pro`) renders a different table from the same props. Exported from
+ * `@formrail/core/internal`; not public API, no semver guarantee.
  */
 export const ListReportFrame = /* @__PURE__ */ forwardRef(ListReportFrameImpl) as <Row>(
   props: ListReportFrameProps<Row> & { ref?: Ref<HTMLDivElement> },

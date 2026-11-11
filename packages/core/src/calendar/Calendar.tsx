@@ -176,7 +176,7 @@ function Arrow({ direction, rtl }: { direction: 'previous' | 'next'; rtl: boolea
   );
 }
 
-const PREFIX = '[react-object-page] <Calendar>';
+const PREFIX = '[formrail] <Calendar>';
 const isWeekday = (n: unknown): n is Weekday => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 6;
 /** `undefined`/`null` are "absent", never an error; any other non-ISO value is. */
 const invalidDate = (v: unknown) => v !== undefined && v !== null && !isIsoDate(v);

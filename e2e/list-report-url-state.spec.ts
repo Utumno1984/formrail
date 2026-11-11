@@ -106,7 +106,7 @@ test.describe('Floorplans/List Report: UrlState', () => {
     const search = new URL(page.url()).searchParams;
     expect(search.get('filter')).toBe('xyz');
     expect(search.get('sort')).toBe('amount.sideways');
-    expect(errors.filter((e) => /react-object-page|useListReport|Warning|Error/i.test(e))).toEqual([]);
+    expect(errors.filter((e) => /formrail|useListReport|Warning|Error/i.test(e))).toEqual([]);
   });
 
   test('push: two pill changes, then Back selects the previous pill again with no onFilterChange', async ({ page }) => {

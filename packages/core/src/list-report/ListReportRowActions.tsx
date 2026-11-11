@@ -247,7 +247,7 @@ export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, ro
     const seen = new Set<string>();
     for (const action of actions) {
       if (seen.has(action.id)) {
-        console.error(`[react-object-page] rowActions: duplicate action id "${action.id}" in the same row; ids must be unique within a row.`);
+        console.error(`[formrail] rowActions: duplicate action id "${action.id}" in the same row; ids must be unique within a row.`);
       }
       seen.add(action.id);
     }

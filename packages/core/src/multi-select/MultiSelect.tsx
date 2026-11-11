@@ -172,7 +172,7 @@ export const MultiSelect = /* @__PURE__ */ forwardRef<HTMLInputElement, MultiSel
     }
     if (problems.length === 0) return;
     duplicatesWarned.current = true;
-    console.warn(`[react-object-page] MultiSelect: ${problems.join('; ')}.`);
+    console.warn(`[formrail] MultiSelect: ${problems.join('; ')}.`);
   }, [rawValues, values, options]);
 
   const byValue = useMemo(() => {

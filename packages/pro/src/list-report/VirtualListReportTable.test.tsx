@@ -10,7 +10,7 @@ import {
   type ListReportColumn,
   type ListReportFilter,
   type ListReportTableStatus,
-} from '@react-object-page/core';
+} from '@formrail/core';
 import { VirtualListReportTable, type VirtualListReportTableHandle } from './VirtualListReportTable';
 import {
   CLIENT,

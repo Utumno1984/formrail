@@ -1,5 +1,5 @@
 // CommonJS consumer fixture: resolves the *built* package through its `exports` map.
-const pkg = require('@react-object-page/core');
+const pkg = require('@formrail/core');
 
 const ref = { current: null };
 const node = { id: 'node' };

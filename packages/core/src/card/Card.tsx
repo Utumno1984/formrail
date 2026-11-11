@@ -62,7 +62,7 @@ export const Card = /* @__PURE__ */ forwardRef<HTMLElement, CardProps>(function 
   useEffect(() => {
     if (named && !hasOwnName && !titleSeen.current && isDev()) {
       console.warn(
-        `[react-object-page] <Card as="${as}"> has no <CardTitle>, aria-labelledby or aria-label: it has no accessible name, so it is not a landmark.`,
+        `[formrail] <Card as="${as}"> has no <CardTitle>, aria-labelledby or aria-label: it has no accessible name, so it is not a landmark.`,
       );
     }
   }, [named, hasOwnName, as]);

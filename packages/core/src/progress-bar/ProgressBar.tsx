@@ -70,17 +70,17 @@ export const ProgressBar = /* @__PURE__ */ forwardRef<HTMLDivElement, ProgressBa
 
   useEffect(() => {
     if (isDev() && !hasName) {
-      console.error('[react-object-page] <ProgressBar> has no accessible name: pass aria-label, aria-labelledby or label.');
+      console.error('[formrail] <ProgressBar> has no accessible name: pass aria-label, aria-labelledby or label.');
     }
   }, [hasName]);
   useEffect(() => {
     if (isDev() && !validRange) {
-      console.error(`[react-object-page] <ProgressBar> needs max > min (got min=${min}, max=${max}): rendered indeterminate.`);
+      console.error(`[formrail] <ProgressBar> needs max > min (got min=${min}, max=${max}): rendered indeterminate.`);
     }
   }, [validRange, min, max]);
   useEffect(() => {
     if (isDev() && determinate && clamped !== value) {
-      console.warn(`[react-object-page] <ProgressBar> value ${value} is outside [${min}, ${max}]: clamped to ${clamped}.`);
+      console.warn(`[formrail] <ProgressBar> value ${value} is outside [${min}, ${max}]: clamped to ${clamped}.`);
     }
   }, [determinate, clamped, value, min, max]);
 

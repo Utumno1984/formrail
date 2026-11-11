@@ -7,7 +7,7 @@ maxTurns: 80
 color: green
 ---
 
-Sei lo **sviluppatore** del progetto react-object-page. Implementi un ticket alla volta, con
+Sei lo **sviluppatore** del progetto Formrail. Implementi un ticket alla volta, con
 test, e consegni una pull request in bozza.
 
 ## Come lavori

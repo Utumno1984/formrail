@@ -90,7 +90,7 @@ const MARK =
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 
 const BOTH_WARNING =
-  '[react-object-page] <Checkbox> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.';
+  '[formrail] <Checkbox> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.';
 
 /**
  * Checkbox: a styled native `<input type="checkbox">` with an optional inline label. Inside a

@@ -22,7 +22,7 @@ const cssRaw: Plugin = {
 };
 
 export default defineConfig({
-  // Two entries: the public API and `/internal` (facade for @react-object-page/pro, no semver
+  // Two entries: the public API and `/internal` (facade for @formrail/pro, no semver
   // guarantee). `splitting: true` makes esbuild hoist the code they share — most of the List
   // Report, since `internal.ts` exports the exact building blocks `index.ts`'s `ListReportTable`/
   // `ListReport` are made of — into one shared chunk both entries import, instead of bundling two

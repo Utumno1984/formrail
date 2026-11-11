@@ -5,8 +5,8 @@ import { create } from 'storybook/theming';
 // Keep in sync with tokens.css when the values there change.
 export const ropTheme = create({
   base: 'light',
-  brandTitle: 'react-object-page',
-  brandUrl: 'https://github.com/Utumno1984/react-object-page',
+  brandTitle: 'Formrail',
+  brandUrl: 'https://github.com/Utumno1984/formrail',
   brandTarget: '_blank',
 
   colorPrimary: '#0a6ed1', // --color-rop-blue-600 / --color-rop-primary

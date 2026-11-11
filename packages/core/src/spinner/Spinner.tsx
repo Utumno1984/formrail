@@ -52,7 +52,7 @@ export const Spinner = /* @__PURE__ */ forwardRef<HTMLSpanElement, SpinnerProps>
     // Same rule as Icon: empty, whitespace-only or non-string (a JS consumer's `null`) is "no label".
     const text = typeof label === 'string' && label.trim() !== '' ? label : '';
     if (text === '' && isDev()) {
-      console.error('[react-object-page] <Spinner> has an empty label: nothing is announced. Pass a label or use `decorative`.');
+      console.error('[formrail] <Spinner> has an empty label: nothing is announced. Pass a label or use `decorative`.');
     }
     const frame = requestAnimationFrame(() => {
       // The text span is written imperatively and only here: React never owns its content, so a

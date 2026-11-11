@@ -120,9 +120,9 @@ const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 const NO_NAME_WARNING =
-  '[react-object-page] <RadioGroup> has no accessible name: put it in a <Field label>, or pass `aria-label` or `aria-labelledby`.';
+  '[formrail] <RadioGroup> has no accessible name: put it in a <Field label>, or pass `aria-label` or `aria-labelledby`.';
 const BOTH_WARNING =
-  '[react-object-page] <RadioGroup> received both `value` and `defaultValue`: `value` wins and `defaultValue` is ignored.';
+  '[formrail] <RadioGroup> received both `value` and `defaultValue`: `value` wins and `defaultValue` is ignored.';
 
 /**
  * RadioGroup: native `<input type="radio">` items (`RadioGroupItem`) sharing one `name` inside a
@@ -242,12 +242,12 @@ export const RadioGroupItem = /* @__PURE__ */ forwardRef<HTMLInputElement, Radio
   const unnamed = !hasContent(children) && !rest['aria-label'] && !rest['aria-labelledby'];
   useEffect(() => {
     if (unnamed && isDev()) {
-      console.error(`[react-object-page] <RadioGroupItem value="${value}"> has no accessible name: give it children, \`aria-label\` or \`aria-labelledby\`.`);
+      console.error(`[formrail] <RadioGroupItem value="${value}"> has no accessible name: give it children, \`aria-label\` or \`aria-labelledby\`.`);
     }
   }, [unnamed, value]);
 
   if (!group) {
-    if (isDev()) console.error('[react-object-page] <RadioGroupItem> must be rendered inside a <RadioGroup>.');
+    if (isDev()) console.error('[formrail] <RadioGroupItem> must be rendered inside a <RadioGroup>.');
     return null;
   }
   const { blocked } = group;

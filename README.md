@@ -1,18 +1,20 @@
-# react-object-page
+# Formrail
+
+_Formerly `react-object-page` (npm: `@react-object-page/core`)._
 
 An **open-core** React design system: an independent, headless implementation of two widespread
 enterprise UI patterns — the **List Report** (a list with filters, selection and bulk actions) and the
 **Object Page** (a sectioned editor with an anchor bar, a sticky save bar and dirty-tracking) — for
 teams that want that UX without a proprietary stack.
 
-- **Home page**: https://utumno1984.github.io/react-object-page/
-- **Live demo and documentation (Free)**: https://utumno1984.github.io/react-object-page/storybook/
-- **Pro demo**: https://utumno1984.github.io/react-object-page/pro/
+- **Home page**: https://utumno1984.github.io/formrail/
+- **Live demo and documentation (Free)**: https://utumno1984.github.io/formrail/storybook/
+- **Pro demo**: https://utumno1984.github.io/formrail/pro/
 
 ## Install
 
 ```bash
-npm install @react-object-page/core
+npm install @formrail/core
 ```
 
 Peer dependencies: `react` and `react-dom` (18 or 19). See
@@ -20,13 +22,13 @@ Peer dependencies: `react` and `react-dom` (18 or 19). See
 
 ## Free and Pro
 
-- **Free** (`@react-object-page/core`, [MIT](LICENSE)): typography and icons, `Button`, `Field` and the
+- **Free** (`@formrail/core`, [MIT](LICENSE)): typography and icons, `Button`, `Field` and the
   form controls (`Input`, `Checkbox`, `Switch`, `RadioGroup`, `Select`, `Combobox`, `Calendar`,
   `DatePicker`), overlays (`Dialog`, `Sheet`, `Menu`, `Tooltip`, `Toast`),
   `Tabs`/`Accordion`/`Breadcrumb`/`Pagination`, feedback (`MessageStrip`, `Spinner`, `Skeleton`...) and
   the simple versions of the **List Report** and **Object Page** floorplans (with `useObjectPageForm`
   and `useDirtyGuard`).
-- **Pro** (`@react-object-page/pro`): components with a real technical moat (virtualization, advanced
+- **Pro** (`@formrail/pro`): components with a real technical moat (virtualization, advanced
   dirty-tracking, Change Summary, a dialog with an embedded grid). The package is private
   (`"private": true`, not published on npm) and has a **separate commercial license**
   ([`packages/pro/LICENSE`](packages/pro/LICENSE)); the source is readable in this repository, but the

@@ -174,7 +174,7 @@ export function Field(props: FieldProps) {
   useEffect(() => {
     if (emptyProviderError && isDev()) {
       console.error(
-        `[react-object-page] Field "${name}": the ValidationProvider error for this path is empty or blank. The control is marked aria-invalid (the form treats the path as invalid), but no message is shown: give it a text.`,
+        `[formrail] Field "${name}": the ValidationProvider error for this path is empty or blank. The control is marked aria-invalid (the form treats the path as invalid), but no message is shown: give it a text.`,
       );
     }
   }, [emptyProviderError, name]);

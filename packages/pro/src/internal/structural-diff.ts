@@ -231,21 +231,21 @@ export class Differ {
     if (!sides.every((side) => isAbsent(side) || Array.isArray(side))) {
       warnOnce(
         `not-array:${this.source}:${node.schemaPath}`,
-        `[react-object-page/pro] ${this.source}: arrayIdKeys['${node.schemaPath}'] is declared but the value at '${node.path}' is not an array; the id key is ignored.`,
+        `[formrail/pro] ${this.source}: arrayIdKeys['${node.schemaPath}'] is declared but the value at '${node.path}' is not an array; the id key is ignored.`,
       );
       return undefined;
     }
     if (sides.some((side) => Array.isArray(side) && indexById(side, idKey) === null)) {
       warnOnce(
         `duplicate-id:${this.source}:${node.schemaPath}`,
-        `[react-object-page/pro] ${this.source}: duplicate '${idKey}' values in the array at '${node.path}'; it is diffed as a whole block instead of item by item.`,
+        `[formrail/pro] ${this.source}: duplicate '${idKey}' values in the array at '${node.path}'; it is diffed as a whole block instead of item by item.`,
       );
       return undefined;
     }
     if (this.blockWithoutIds && sides.some((side) => Array.isArray(side) && side.some((item) => itemId(item, idKey) === NO_ID))) {
       warnOnce(
         `missing-id:${this.source}:${node.schemaPath}`,
-        `[react-object-page/pro] ${this.source}: an item without '${idKey}' in the array at '${node.path}'; it is merged as a whole block instead of item by item.`,
+        `[formrail/pro] ${this.source}: an item without '${idKey}' in the array at '${node.path}'; it is merged as a whole block instead of item by item.`,
       );
       return undefined;
     }

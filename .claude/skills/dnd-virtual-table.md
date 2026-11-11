@@ -1,6 +1,6 @@
 ---
 name: dnd-virtual-table
-description: Sincronizzazione indici dataset/DOM per liste virtualizzate con drag-and-drop — usala quando progetti o implementi un componente che combina virtualizzazione e riordino (nessuno ancora in react-object-page; prerequisito prima del primo ticket che li introduce, vedi design-system-spec.md §6 Pro "tabelle avanzate").
+description: Sincronizzazione indici dataset/DOM per liste virtualizzate con drag-and-drop — usala quando progetti o implementi un componente che combina virtualizzazione e riordino (nessuno ancora in Formrail; prerequisito prima del primo ticket che li introduce, vedi design-system-spec.md §6 Pro "tabelle avanzate").
 ---
 
 # Drag-and-drop su liste virtualizzate

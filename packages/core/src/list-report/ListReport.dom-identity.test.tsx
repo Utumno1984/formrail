@@ -1,5 +1,5 @@
 // Dedicated regression guard for #230 (splitting ListReport into ListReportFrame, so
-// @react-object-page/pro can reuse it with a different table): the snapshot below was written
+// @formrail/pro can reuse it with a different table): the snapshot below was written
 // against the code BEFORE that refactor and must stay byte-for-byte identical after it.
 import { cleanup, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

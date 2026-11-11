@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, type ReactNode } from 'react';
 import { act, render, renderHook } from '@testing-library/react';
-import { useObjectPageForm, type UseObjectPageFormReturn } from '@react-object-page/core';
+import { useObjectPageForm, type UseObjectPageFormReturn } from '@formrail/core';
 import { useFormRebase } from './use-form-rebase';
 import type { UseFormRebaseOptions, UseFormRebaseReturn } from './types';
 

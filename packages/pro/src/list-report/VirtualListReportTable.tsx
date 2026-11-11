@@ -16,7 +16,7 @@ import {
   type Ref,
 } from 'react';
 import { flushSync } from 'react-dom';
-import { composeRefs } from '@react-object-page/core';
+import { composeRefs } from '@formrail/core';
 import {
   Filler,
   ListReportTableRow,
@@ -24,7 +24,7 @@ import {
   useListReportResultIndex,
   type ListReportTableBodyContext,
   type ListReportTableProps,
-} from '@react-object-page/core/internal';
+} from '@formrail/core/internal';
 import { isDev } from '../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
 import { scrollTopForIndex } from '../internal/virtual-rows';
@@ -236,7 +236,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
       if (column.truncate === false && !warned.current.has(column.id)) {
         warned.current.add(column.id);
         console.warn(
-          `[react-object-page] <VirtualListReportTable>: column "${column.id}" sets \`truncate: false\`, which a virtualized table does not support (fixed row height): its cells are truncated.`,
+          `[formrail] <VirtualListReportTable>: column "${column.id}" sets \`truncate: false\`, which a virtualized table does not support (fixed row height): its cells are truncated.`,
         );
       }
     }
@@ -346,7 +346,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
 }
 
 /**
- * The List Report table of `@react-object-page/core` (`ListReportTable`) with **virtualized rows**:
+ * The List Report table of `@formrail/core` (`ListReportTable`) with **virtualized rows**:
  * same props, same `table` (`useListReport`), same DOM per row, same states and same selection, but
  * only the rows in the viewport (+ `overscan`) are mounted, for client-side datasets of 10⁴–10⁵ rows.
  *

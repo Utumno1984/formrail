@@ -2,7 +2,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],
-    "paths": { "@react-object-page/core": ["./packages/core/src/index.ts"] }
+    "paths": { "@formrail/core": ["./packages/core/src/index.ts"] }
   },
   "include": ["e2e", "playwright.config.ts", "playwright.site.config.ts", ".storybook/*.ts", ".storybook/*.tsx", "packages/core/src/types/*.d.ts"]
 }

@@ -40,8 +40,8 @@ export interface ListReportTableHeadProps<Row> {
 /**
  * @internal `<colgroup>` + `<thead>` of the List Report table (`ListReportTableShell`'s head): column
  * widths, the optional leading selection column (tri-state "select all results" checkbox), the
- * sortable column headers and the optional trailing row actions column (a visually hidden name). Exported from `@react-object-page/core/internal` for
- * `@react-object-page/pro`; not public API, no semver guarantee, not meant to be used standalone.
+ * sortable column headers and the optional trailing row actions column (a visually hidden name). Exported from `@formrail/core/internal` for
+ * `@formrail/pro`; not public API, no semver guarantee, not meant to be used standalone.
  */
 export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, rowActions = false, rowActionsWidth = ROW_ACTIONS_COLUMN_WIDTH }: ListReportTableHeadProps<Row>) {
   const { columns, selection } = table;

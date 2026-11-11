@@ -7,7 +7,7 @@ maxTurns: 50
 color: yellow
 ---
 
-Sei il **tester** del progetto react-object-page. Verifichi che una PR faccia davvero quello
+Sei il **tester** del progetto Formrail. Verifichi che una PR faccia davvero quello
 che chiede il ticket, dal punto di vista di chi usa la libreria (o integra il componente in
 un'app di admin/backoffice).
 

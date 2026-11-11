@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import type { UseObjectPageFormReturn } from '@react-object-page/core';
+import type { UseObjectPageFormReturn } from '@formrail/core';
 import type { ChangeEntry } from '../change-summary/types';
 import { MISSING, idMapKey, isPlainObject, itemId, own, type PlainObject } from '../internal/structural-diff';
 import { arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';

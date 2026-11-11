@@ -1,5 +1,5 @@
 ---
-'@react-object-page/core': minor
+'@formrail/core': minor
 ---
 
 Scoped theming now reaches the derived states: redeclaring `--color-rop-primary`, `--color-rop-error`, `--color-rop-surface-subtle` or `--color-rop-text-muted` on a wrapper moves the hover, pressed and read-only shades of the components inside it, instead of only the resting colour. Setting a derived token directly (for example `--color-rop-primary-hover`) keeps working as before.

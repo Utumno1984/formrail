@@ -1,5 +1,5 @@
 ---
-'@react-object-page/core': patch
+'@formrail/core': patch
 ---
 
 Tabs: the overflow indicators of a horizontal tab list read the layout at most once per frame while

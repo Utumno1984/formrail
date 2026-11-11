@@ -1,4 +1,4 @@
-// Public entry of @react-object-page/pro.
+// Public entry of @formrail/pro.
 export { computeChangeSummary } from './change-summary/compute-change-summary';
 export { useChangeSummary } from './change-summary/use-change-summary';
 export { inferSegmentLabel } from './change-summary/infer-label';

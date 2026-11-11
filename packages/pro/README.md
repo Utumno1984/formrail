@@ -1,6 +1,6 @@
-# @react-object-page/pro
+# @formrail/pro
 
-Pro tier of react-object-page (commercial license, **to be defined**; see [LICENSE](./LICENSE)).
+Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LICENSE)).
 
 - `"private": true` on purpose: nothing is published until the private npm org exists (a guard test,
   `scripts/pro-package.test.mjs`, fails if `private` is removed or the license becomes MIT). There is
@@ -14,7 +14,7 @@ Pro tier of react-object-page (commercial license, **to be defined**; see [LICEN
   visual builds; the public GitHub Pages deploy sets `STORYBOOK_EXCLUDE_PRO=1` and publishes Free only).
 - The engine (`computeChangeSummary`, `useChangeSummary`) works with any form state that exposes the
   current values and the saved baseline (e.g. core's `useObjectPageForm`). The components
-  (`<ChangeSummary />`) use `@react-object-page/core` (`cn`, design tokens), declared as a
+  (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as a
   **peer dependency** and treated as external by the build. The peer range must be revisited when pro
   is published.
 
@@ -24,8 +24,8 @@ A field-by-field diff of the current `values` against the **real saved baseline*
 deterministic list of human-readable entries.
 
 ```ts
-import { computeChangeSummary, useChangeSummary, inferSegmentLabel } from '@react-object-page/pro';
-import type { ChangeEntry, ChangeKind, ChangeSummaryOptions, UseChangeSummaryReturn } from '@react-object-page/pro';
+import { computeChangeSummary, useChangeSummary, inferSegmentLabel } from '@formrail/pro';
+import type { ChangeEntry, ChangeKind, ChangeSummaryOptions, UseChangeSummaryReturn } from '@formrail/pro';
 ```
 
 - `computeChangeSummary(options): ChangeEntry[]` — the pure function where all the logic lives.
@@ -38,8 +38,8 @@ import type { ChangeEntry, ChangeKind, ChangeSummaryOptions, UseChangeSummaryRet
 ### Example
 
 ```tsx
-import { useObjectPageForm } from '@react-object-page/core';
-import { useChangeSummary } from '@react-object-page/pro';
+import { useObjectPageForm } from '@formrail/core';
+import { useChangeSummary } from '@formrail/pro';
 
 function InvoiceChanges({ invoice }: { invoice: Invoice }) {
   const form = useObjectPageForm<Invoice>({ baseline: invoice });
@@ -121,9 +121,9 @@ An accessible, responsive list of the entries of the engine, to show in an Objec
 ### Styles and import order
 
 ```ts
-import '@react-object-page/core/theme.css'; // 1. tokens (--rop-*)
-import '@react-object-page/core/styles.css'; // 2. core utilities
-import '@react-object-page/pro/styles.css'; //  3. pro component styles (consume the tokens, never redefine them)
+import '@formrail/core/theme.css'; // 1. tokens (--rop-*)
+import '@formrail/core/styles.css'; // 2. core utilities
+import '@formrail/pro/styles.css'; //  3. pro component styles (consume the tokens, never redefine them)
 ```
 
 Pro's `styles.css` holds only its own `.rop-pro-*` component classes, never a Tailwind utility also
@@ -135,7 +135,7 @@ your un-layered CSS overrides both.
 ### Usage
 
 ```tsx
-import { ChangeSummary, useChangeSummary } from '@react-object-page/pro';
+import { ChangeSummary, useChangeSummary } from '@formrail/pro';
 
 const { entries } = useChangeSummary({ values: form.values, baseline: form.baseline });
 <ChangeSummary entries={entries} locale="en-US" />;

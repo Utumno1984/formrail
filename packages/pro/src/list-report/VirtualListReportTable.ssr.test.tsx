@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { renderToString } from 'react-dom/server';
-import { useListReport, type ListReportColumn } from '@react-object-page/core';
+import { useListReport, type ListReportColumn } from '@formrail/core';
 import { VirtualListReportTable } from './VirtualListReportTable';
 import { VirtualListReport } from './VirtualListReport';
 

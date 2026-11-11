@@ -16,6 +16,6 @@ const hideInternal = hideInternalValue !== undefined && hideInternalValue !== ''
 const proEdition = process.env.STORYBOOK_EDITION === 'pro';
 
 addons.setConfig({
-  theme: proEdition ? { ...ropTheme, brandTitle: 'react-object-page Pro (preview)' } : ropTheme,
+  theme: proEdition ? { ...ropTheme, brandTitle: 'Formrail Pro (preview)' } : ropTheme,
   ...(hideInternal && { sidebar: { filters: { patterns: (item) => !item.tags?.includes('internal') } } }),
 });

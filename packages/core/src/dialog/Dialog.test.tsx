@@ -248,7 +248,7 @@ describe('Dialog', () => {
       </Dialog>,
     );
     await nextFrame();
-    expect(errors.mock.calls.some((c) => String(c[0]).includes('[react-object-page] <DialogContent> has no accessible name'))).toBe(true);
+    expect(errors.mock.calls.some((c) => String(c[0]).includes('[formrail] <DialogContent> has no accessible name'))).toBe(true);
     unmount();
     errors.mockClear();
     render(

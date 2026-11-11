@@ -1,5 +1,5 @@
 ---
-'@react-object-page/core': patch
+'@formrail/core': patch
 ---
 
 Showcase invoice line items: a quantity or unit price of 1e21 or more is now rejected (it used to pass validation and

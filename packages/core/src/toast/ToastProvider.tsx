@@ -312,13 +312,13 @@ export const ToastProvider = /* @__PURE__ */ forwardRef<HTMLDivElement, ToastPro
       const id = options.id ?? nextId();
       if (!hasContent(options.description)) {
         if (isDev()) {
-          console.error('[react-object-page] useToast().show() needs a non-empty `description`; no toast is shown.');
+          console.error('[formrail] useToast().show() needs a non-empty `description`; no toast is shown.');
         }
         return id;
       }
       if (isDev() && options.action && typeof options.duration === 'number') {
         console.warn(
-          '[react-object-page] A toast with an `action` and a numeric `duration` disappears on a timer: the action may become unreachable (WCAG 2.2.1). Omit `duration` to keep it until it is closed.',
+          '[formrail] A toast with an `action` and a numeric `duration` disappears on a timer: the action may become unreachable (WCAG 2.2.1). Omit `duration` to keep it until it is closed.',
         );
       }
       const previous = currentRef.current;

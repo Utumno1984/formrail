@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '@react-object-page/core/theme.css';
+@import '@formrail/core/theme.css';
 /* The consumer redefines a derived token in its own build. */
 @theme {
   --color-rop-primary-hover: #123456;

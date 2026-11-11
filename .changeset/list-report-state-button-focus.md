@@ -1,5 +1,5 @@
 ---
-'@react-object-page/core': patch
+'@formrail/core': patch
 ---
 
 ListReportTable / ListReport: "Retry" (error state) and "Clear filters" (no-results state) keep the focus
