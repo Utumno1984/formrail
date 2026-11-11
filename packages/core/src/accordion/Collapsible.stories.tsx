@@ -13,6 +13,7 @@ interface DemoArgs {
 const meta = {
   title: 'Navigation/Collapsible',
   component: Collapsible,
+  subcomponents: { CollapsibleTrigger, CollapsibleContent },
   parameters: { layout: 'padded' },
   argTypes: {
     defaultOpen: { control: 'boolean' },

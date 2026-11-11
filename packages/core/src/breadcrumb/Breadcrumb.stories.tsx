@@ -24,6 +24,7 @@ interface DemoArgs extends BreadcrumbProps {
 const meta = {
   title: 'Navigation/Breadcrumb',
   component: Breadcrumb,
+  subcomponents: { BreadcrumbItem, BreadcrumbLink, BreadcrumbPage },
   parameters: { layout: 'padded' },
   argTypes: {
     items: { control: { type: 'range', min: 1, max: 6, step: 1 }, description: 'Number of items (the last is the current page)' },

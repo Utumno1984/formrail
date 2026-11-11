@@ -11,7 +11,6 @@ import {
   docsLinks,
   parseStoriesFile,
   runtimeExports,
-  stripComments,
   undocumentedExports,
   unlinkedPages,
 } from './docs-coverage.mjs';
@@ -127,65 +126,26 @@ describe('docs coverage: id sanitization (#416)', () => {
   });
 });
 
-describe('docs coverage: compound-component heuristic (#416)', () => {
-  const page = (source) => ({ title: 'Forms/Field', id: 'forms-field--docs', components: ['Field'], source });
+describe('docs coverage: no usage-based inference (#416)', () => {
+  const page = (source) => ({ title: 'Forms/Dialog', id: 'forms-dialog--docs', components: ['Dialog'], source });
 
-  it('does not accept FieldGroup because a comment of the Field page mentions it', () => {
-    const pages = [page('// TODO: document FieldGroup\n/* FieldGroup */\nexport const S = () => <Field />;')];
-    expect(undocumentedExports(['Field', 'FieldGroup'], pages, {})).toEqual([
-      expect.stringContaining('FieldGroup: exported but not documented'),
+  it('always reports a compound part that is not in subcomponents, even if the page renders or mentions it', () => {
+    const pages = [page('// DialogTitle\nexport const S = () => <Dialog><DialogTitle>x</DialogTitle></Dialog>;')];
+    expect(undocumentedExports(['Dialog', 'DialogTitle'], pages, {})).toEqual([
+      expect.stringContaining('DialogTitle: exported but not documented'),
     ]);
   });
 
-  it('does not accept a comment inside JSX either', () => {
-    const pages = [page('export const S = () => <Field>{/* FieldGroup later */}</Field>;')];
-    expect(undocumentedExports(['FieldGroup'], pages, {})).toHaveLength(1);
+  it('accepts the same part once it is an explicit subcomponent', () => {
+    const pages = [{ ...page('<DialogTitle />'), components: ['Dialog', 'DialogTitle'] }];
+    expect(undocumentedExports(['Dialog', 'DialogTitle'], pages, {})).toEqual([]);
   });
 
-  it('does not accept a name that merely starts with a component name (Fieldset, Fields)', () => {
-    const pages = [page('export const S = () => (<><Field /><Fieldset /><Fields /></>);')];
-    expect(undocumentedExports(['Fieldset', 'Fields'], pages, {})).toHaveLength(2);
-  });
-
-  it('still accepts a real part of a compound component rendered as a tag in code', () => {
-    const pages = [{ ...page('export const S = () => <Dialog><DialogTitle>x</DialogTitle></Dialog>;'), components: ['Dialog'] }];
-    expect(undocumentedExports(['DialogTitle'], pages, {})).toEqual([]);
-    const inComment = [{ ...page('// <DialogTitle> later\nexport const S = () => <Dialog />;'), components: ['Dialog'] }];
-    expect(undocumentedExports(['DialogTitle'], inComment, {})).toHaveLength(1);
-  });
-
-  it('does not treat an unrelated export as part of a component because it continues its name (SelectAll, Step2Icon)', () => {
-    const select = { title: 'Forms/Select', id: 'forms-select--docs', components: ['Select'], source: '<Select /><button onClick={SelectAll}>x</button>' };
-    expect(undocumentedExports(['SelectAll'], [select], {})).toEqual([expect.stringContaining('SelectAll: exported but not documented')]);
-    const step = { title: 'Nav/Step', id: 'nav-step--docs', components: ['Step'], source: '<Step />{Step2Icon}' };
-    expect(undocumentedExports(['Step2Icon'], [step], {})).toEqual([expect.stringContaining('Step2Icon: exported but not documented')]);
-  });
-
-  it('on the real core pages: a new export mentioned only in a comment or in JSX text is still reported', () => {
-    const synthetic = {
-      title: 'Forms/Select',
-      id: 'forms-select--docs',
-      components: ['Select'],
-      source: '// SelectAll is coming\nexport const S = () => <Select>// SelectMany literal text</Select>;',
-    };
-    const problems = undocumentedExports([...coreExports, 'SelectAll', 'SelectMany'], [...corePages, synthetic]);
-    expect(problems).toEqual([
+  it('on the real core pages: a new export only mentioned by a page is still reported', () => {
+    const synthetic = { title: 'Forms/Select', id: 'forms-select--docs', components: ['Select'], source: '<Select /> SelectAll' };
+    expect(undocumentedExports([...coreExports, 'SelectAll'], [...corePages, synthetic])).toEqual([
       expect.stringContaining('SelectAll: exported but not documented'),
-      expect.stringContaining('SelectMany: exported but not documented'),
     ]);
-  });
-
-  it('a DOCUMENTED_IN claim counts a mention in code that follows JSX text containing //', () => {
-    const pages = [{ title: 'Foundations/Utilities', id: 'u--docs', components: [], source: 'const S = () => <p>// note</p>; composeRefs(a);' }];
-    expect(undocumentedExports(['composeRefs'], pages, { composeRefs: ['Foundations/Utilities'] })).toEqual([]);
-  });
-
-  it('stripComments does not treat // or /* inside JSX text as a comment', () => {
-    const src = 'const S = () => <Field>// FieldGroup literal text</Field>;';
-    expect(stripComments(src)).toBe(src);
-    const block = 'const S = () => <Field>/* FieldGroup */</Field>; const t = 1;';
-    expect(stripComments(block)).toBe(block);
-    expect(stripComments('const S = () => <Field>{/* gone */}</Field>; // gone')).not.toContain('gone');
   });
 
   it('docsLinks stops where docsId can never produce a character, on both sides (Forms/Rate•Limit)', () => {
@@ -196,22 +156,4 @@ describe('docs coverage: compound-component heuristic (#416)', () => {
     expect(brokenLinks([page], `(?path=/docs/${id})`, 'Introduction')).toEqual([]);
   });
 
-  it('a DOCUMENTED_IN claim is not satisfied by a comment mention', () => {
-    const pages = [
-      { title: 'Foundations/Utilities', id: 'u--docs', components: [], source: '// composeRefs is documented elsewhere\ncn(a)' },
-    ];
-    expect(undocumentedExports(['composeRefs'], pages, { composeRefs: ['Foundations/Utilities'] })).toEqual([
-      expect.stringContaining('never mentions it'),
-    ]);
-  });
-
-  it('stripComments keeps code, strings and line numbers', () => {
-    const src = "const a = 'http://x'; // gone\n/* gone\ntoo */ const b = `// kept`;";
-    const out = stripComments(src);
-    expect(out).toContain("'http://x'");
-    expect(out).toContain('`// kept`');
-    expect(out).not.toContain('gone');
-    expect(out.split('\n')).toHaveLength(3);
-    expect(out).toHaveLength(src.length);
-  });
 });

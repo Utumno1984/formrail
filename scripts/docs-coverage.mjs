@@ -171,48 +171,7 @@ export function docsLinks(mdxSource) {
   return ids;
 }
 
-/** Source with every comment blanked out (same length), so a name in a comment is not a mention. */
-export function stripComments(source) {
-  const file = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-  const starts = new Set();
-  const ranges = [];
-  // JSX text is content, not trivia: a `//` or `/*` in it is literal text. Positions where one starts are never scanned
-  // (the node holding the text, e.g. the children list of an element, starts at the same position).
-  const jsxTextStarts = new Set();
-  const collect = (node) => {
-    if (ts.isJsxText(node)) jsxTextStarts.add(node.pos);
-    ts.forEachChild(node, collect);
-  };
-  collect(file);
-  const visit = (node) => {
-    // At a token's start: the comments before it on its own lines (leading) and those on the previous token's line (trailing).
-    if (!jsxTextStarts.has(node.pos)) {
-      for (const r of [...(ts.getTrailingCommentRanges(source, node.pos) ?? []), ...(ts.getLeadingCommentRanges(source, node.pos) ?? [])]) {
-        if (!starts.has(r.pos)) {
-          starts.add(r.pos);
-          ranges.push(r);
-        }
-      }
-    }
-    for (const child of node.getChildren(file)) visit(child);
-  };
-  visit(file);
-  let out = source;
-  for (const { pos, end } of ranges) out = out.slice(0, pos) + out.slice(pos, end).replace(/[^\n]/g, ' ') + out.slice(end);
-  return out;
-}
-
-const mentionsRaw = (source, name) => new RegExp(`(^|[^\\w$])${name.replace(/\$/g, '\\$')}([^\\w$]|$)`).test(source);
-const strippedCache = new Map();
-const mentions = (source, name) => {
-  if (!strippedCache.has(source)) strippedCache.set(source, stripComments(source));
-  return mentionsRaw(strippedCache.get(source), name);
-};
-
-const rendersTag = (source, name) => {
-  if (!strippedCache.has(source)) strippedCache.set(source, stripComments(source));
-  return new RegExp(`</?${name.replace(/\$/g, '\\$')}(?![\\w$])`).test(strippedCache.get(source));
-};
+const mentions = (source, name) => new RegExp(`(^|[^\\w$])${name.replace(/\$/g, '\\$')}([^\\w$]|$)`).test(source);
 
 /**
  * (a) Runtime exports with no Docs page: not a `component`/`subcomponents` of a page and not listed
@@ -224,12 +183,8 @@ export function undocumentedExports(exportNames, pages, documentedIn = DOCUMENTE
   const byTitle = new Map(pages.map((p) => [p.title, p]));
   for (const name of exportNames) {
     if (covered.has(name)) continue;
-    // A part of a documented compound component (`DialogTitle` of `Dialog`) without an explicit `subcomponents` entry:
-    // the name continues the component's at a PascalCase/digit boundary (not `Fieldset` for `Field`) AND the page renders it
-    // as a JSX tag in code, not in a comment. A name that merely starts like a component (`SelectAll`, `Step2Icon`) and is
-    // only referenced as a value is a separate export and needs its own page or `documentedIn` entry.
-    const isPart = (c) => name.length > c.length && name.startsWith(c) && /^[A-Z0-9]/.test(name.slice(c.length));
-    if (pages.some((p) => p.components.some(isPart) && rendersTag(p.source, name))) continue;
+    // No inference from usage: a part of a compound component (`DialogTitle`) needs its own `subcomponents` entry
+    // (or a `documentedIn` entry), otherwise it is reported.
     const titles = documentedIn[name];
     if (!titles) {
       problems.push(`${name}: exported but not documented (no Docs page with it as component/subcomponent, no entry in DOCUMENTED_IN)`);

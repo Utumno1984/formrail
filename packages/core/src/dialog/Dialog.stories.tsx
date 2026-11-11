@@ -29,6 +29,7 @@ interface DemoArgs {
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Dialog',
   component: Dialog,
+  subcomponents: { DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogClose },
   // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
   // were rendered inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },

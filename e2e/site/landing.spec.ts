@@ -63,7 +63,7 @@ test.describe('links', () => {
     const hrefs = await page.locator('.cards a, .pro-list a').evaluateAll((as) => as.map((a) => a.getAttribute('href')!));
     expect(hrefs.length).toBeGreaterThanOrEqual(7);
     for (const href of hrefs) {
-      expect(href, 'a story link').toMatch(/^(storybook|pro)\/\?path=\/docs\/[a-z0-9-]+--docs$/);
+      expect(href, 'a story link').toMatch(/^(storybook|pro)\/\?path=\/docs\/[\p{L}\p{N}-]+--docs$/u);
       await page.goto(href);
       const id = new URL(page.url()).searchParams.get('path')!.replace('/docs/', '');
       const frame = page.frameLocator('#storybook-preview-iframe');
