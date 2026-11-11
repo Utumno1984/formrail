@@ -45,15 +45,21 @@ export type LineErrorKey = `lineItems.${number}.${LineErrorField}`;
 
 const lineErrorKey = (index: number, field: LineErrorField): LineErrorKey => `lineItems.${index}.${field}`;
 
-// A valid quantity is a whole number > 0; a valid unit price is a decimal > 0. `Number.isFinite` rejects the
-// digit strings long enough to coerce to Infinity.
+// `Number#toFixed` and `String(number)` switch to exponential notation ("1e+21") from 1e21 up, and a saved line
+// is reloaded through them (`toLineValues`): a value at or past this bound would reload as text that no longer
+// passes `INTEGER`/`DECIMAL`. So it is rejected up front. It also bounds `lineTotal`, see below.
+const MAX_PLAIN_NUMBER = 1e21;
+
+// A valid quantity is a whole number in (0, 1e21); a valid unit price is a decimal in (0, 1e21).
+// (`Number.isFinite` is implied by the bound, kept explicit for the digit strings that coerce to Infinity.)
+const isInRange = (n: number): boolean => Number.isFinite(n) && n > 0 && n < MAX_PLAIN_NUMBER;
 const isValidQuantity = (text: string): boolean => {
   const quantity = text.trim();
-  return INTEGER.test(quantity) && Number.isFinite(Number(quantity)) && Number(quantity) > 0;
+  return INTEGER.test(quantity) && isInRange(Number(quantity));
 };
 const isValidPrice = (text: string): boolean => {
   const price = text.trim();
-  return DECIMAL.test(price) && Number.isFinite(Number(price)) && Number(price) > 0;
+  return DECIMAL.test(price) && isInRange(Number(price));
 };
 
 /** Errors keyed by dotted path (`lineItems.2.quantity`). */
@@ -69,11 +75,12 @@ export function validateLines(lines: readonly LineValues[]): Partial<Record<Line
   return errors;
 }
 
-/** Quantity × unit price with 2 decimals, or `null` while the quantity or the unit price is not valid (see `validateLines`). */
+/** Quantity × unit price with 2 decimals, or `null` while the quantity or the unit price is not valid (see `validateLines`) or the product reaches 1e21. */
 export function lineTotal(line: LineValues): string | null {
   if (!isValidQuantity(line.quantity) || !isValidPrice(line.unitPrice)) return null;
   const total = Number(line.quantity.trim()) * Number(line.unitPrice.trim());
-  return Number.isFinite(total) ? total.toFixed(2) : null;
+  // Two valid factors can still multiply past the bound: no total is better than a "1e+21" one.
+  return total < MAX_PLAIN_NUMBER ? total.toFixed(2) : null;
 }
 
 /**

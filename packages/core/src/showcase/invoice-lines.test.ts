@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lineTotal, nextLineId, sameLines, validateLines, type LineValues } from './invoice-lines';
+import { lineTotal, nextLineId, sameLines, toLineValues, toStoredLine, validateLines, type LineValues } from './invoice-lines';
 
 const line = (id: string, patch: Partial<LineValues> = {}): LineValues => ({
   id,
@@ -73,6 +73,40 @@ describe('validateLines: finite values', () => {
     const errors = validateLines([line('a', { quantity: huge, unitPrice: huge })]);
     expect(errors['lineItems.0.quantity']).toBeDefined();
     expect(errors['lineItems.0.unitPrice']).toBeDefined();
+  });
+});
+
+describe('validateLines: upper bound at the toFixed exponential threshold (#418)', () => {
+  const errorsFor = (patch: Partial<LineValues>) => validateLines([line('a', patch)]);
+
+  it('rejects a quantity or a unit price of 1e21 and above', () => {
+    for (const text of ['1' + '0'.repeat(21), '9'.repeat(22), '1' + '0'.repeat(21) + '.00']) {
+      expect(errorsFor({ unitPrice: text })['lineItems.0.unitPrice'], text).toBeDefined();
+    }
+    for (const text of ['1' + '0'.repeat(21), '9'.repeat(22)]) {
+      expect(errorsFor({ quantity: text })['lineItems.0.quantity'], text).toBeDefined();
+    }
+  });
+
+  it('still accepts the largest values below the bound', () => {
+    expect(errorsFor({ quantity: '9'.repeat(20) + '0' })['lineItems.0.quantity']).toBeUndefined();
+    expect(errorsFor({ unitPrice: '999999999999999900000' })['lineItems.0.unitPrice']).toBeUndefined();
+    expect(errorsFor({ quantity: '1' + '0'.repeat(20) })).toEqual({});
+  });
+
+  it('never reloads a valid saved line as exponential text', () => {
+    const saved = toStoredLine(line('a', { quantity: '1' + '0'.repeat(20), unitPrice: '99999999999999900000.5' }));
+    const reloaded = toLineValues(saved);
+    expect(reloaded.quantity).not.toMatch(/e/i);
+    expect(reloaded.unitPrice).not.toMatch(/e/i);
+    expect(validateLines([reloaded])).toEqual({});
+  });
+
+  it('lineTotal is null when two valid factors multiply past the bound, never exponential', () => {
+    expect(lineTotal(line('a', { quantity: '1' + '0'.repeat(11), unitPrice: '1' + '0'.repeat(10) }))).toBeNull();
+    expect(lineTotal(line('a', { quantity: '1' + '0'.repeat(10), unitPrice: '1' + '0'.repeat(9) }))).toBe(
+      '1' + '0'.repeat(19) + '.00',
+    );
   });
 });
 
