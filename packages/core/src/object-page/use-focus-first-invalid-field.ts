@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { RefObject } from 'react';
-import { compareDocumentOrder } from '../internal/focus';
+import { compareDocumentOrder, focusFirst } from '../internal/focus';
 import { isDev } from '../internal/is-dev';
 
 import { invalidPaths, isClearing } from './field-errors';
@@ -91,13 +91,9 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors, trigger }
 
     // A candidate that cannot take focus (`type="hidden"`, disabled, `display: none`, inert, a
     // `fieldset`) is skipped: the first one that really receives focus wins.
-    for (const el of candidates) {
-      el.focus({ preventScroll: true });
-      // Compare against the element's own root: `document.activeElement` is the host when
-      // the element lives in a ShadowRoot (and the `<iframe>` across a frame boundary).
-      const root = el.getRootNode() as Document | ShadowRoot;
-      if (root.activeElement !== el) continue;
-      el.scrollIntoView({ block: 'center' });
+    const focused = focusFirst(candidates, { preventScroll: true });
+    if (focused) {
+      focused.scrollIntoView({ block: 'center' });
       return;
     }
 

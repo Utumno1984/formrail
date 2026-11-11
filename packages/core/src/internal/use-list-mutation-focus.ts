@@ -1,6 +1,6 @@
 // Internal: where the focus goes after the user adds, removes or moves an item of a list. Not exported
 // from the package (see the PR of #417 for why it stays private for now).
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { focusFirst } from './focus';
 import { isDev } from './is-dev';
 
@@ -97,5 +97,6 @@ export function useListMutationFocus(items: readonly string[]): ListMutationFocu
     pending.current = { next: [...request.next], targets: [...request.targets], from: itemsRef.current };
   }, []);
 
-  return { targetRef, requestFocus };
+  // Same object at every render: safe in the dependencies of a `useMemo` (e.g. `composeRefs`).
+  return useMemo(() => ({ targetRef, requestFocus }), [targetRef, requestFocus]);
 }

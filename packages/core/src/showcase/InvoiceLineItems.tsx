@@ -1,10 +1,11 @@
 // Story-only: the "Line items" section of the invoice page (add, remove, move up/down, per-line total). Not
 // exported by the package. The lines are controlled by the form of the page; this component only decides which
 // control takes the focus after an action (the control that had it may be gone or moved in the DOM).
-import { useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { useRef, type CSSProperties } from 'react';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { useListMutationFocus } from '../internal/use-list-mutation-focus';
 import { lineTotal, nextLineId, type LineValues } from './invoice-lines';
 
 export interface InvoiceLineItemsProps {
@@ -13,9 +14,6 @@ export interface InvoiceLineItemsProps {
   baselineIds: ReadonlySet<string>;
   onChange: (next: LineValues[]) => void;
 }
-
-// Same name as the literal `data-line-focus` attributes in the JSX below (a JSX attribute name cannot be a constant).
-const FOCUS_ATTR = 'data-line-focus';
 
 const LIST: CSSProperties = { display: 'grid', gap: 12, listStyle: 'none', margin: 0, padding: 0 };
 const ROW: CSSProperties = {
@@ -35,17 +33,11 @@ const ROW_FIELDS: CSSProperties = {
 };
 
 export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineItemsProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
   const counterRef = useRef(0);
-  // Which control takes the focus once the next render has committed (see `FOCUS_ATTR`).
-  const pendingRef = useRef<string | null>(null);
-
-  useLayoutEffect(() => {
-    const wanted = pendingRef.current;
-    if (wanted === null) return;
-    pendingRef.current = null;
-    rootRef.current?.querySelector<HTMLElement>(`[${FOCUS_ATTR}="${wanted.replace(/["\\]/g, '\\$&')}"]`)?.focus();
-  });
+  // Which control takes the focus once the form shows the lines of the action. Target keys:
+  // `<action>:<line id>` for the controls of a line, `add` for the button after the list.
+  const focus = useListMutationFocus(lines.map((line) => line.id));
+  const ids = (next: readonly LineValues[]) => next.map((line) => line.id);
 
   const update = (index: number, patch: Partial<LineValues>) =>
     onChange(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
@@ -54,15 +46,16 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
     // `counterRef` only grows, so an id made here never repeats one made here before: only the saved ids can clash.
     const { id, counter } = nextLineId(baselineIds, counterRef.current);
     counterRef.current = counter;
-    pendingRef.current = `description:${id}`;
-    onChange([...lines, { id, description: '', quantity: '', unitPrice: '' }]);
+    const next = [...lines, { id, description: '', quantity: '', unitPrice: '' }];
+    focus.requestFocus({ next: ids(next), targets: [`description:${id}`] });
+    onChange(next);
   };
 
   const remove = (index: number) => {
     const next = lines.filter((_, i) => i !== index);
     // The row that takes the place of the removed one, else the previous one, else "Add line".
     const heir = next[index] ?? next[index - 1];
-    pendingRef.current = heir ? `remove:${heir.id}` : 'add';
+    focus.requestFocus({ next: ids(next), targets: heir ? [`remove:${heir.id}`, 'add'] : ['add'] });
     onChange(next);
   };
 
@@ -72,13 +65,13 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
     if (target < 0 || target >= lines.length) return;
     const next = [...lines];
     [next[index], next[target]] = [next[target]!, next[index]!];
-    pendingRef.current = `${direction < 0 ? 'up' : 'down'}:${lines[index]!.id}`;
+    focus.requestFocus({ next: ids(next), targets: [`${direction < 0 ? 'up' : 'down'}:${lines[index]!.id}`] });
     onChange(next);
   };
 
   return (
     // `position: relative`: the visually hidden spans are absolutely positioned and must stay inside the scroller.
-    <div ref={rootRef} style={{ position: 'relative', display: 'grid', gap: 16, maxWidth: 640, minWidth: 0 }}>
+    <div style={{ position: 'relative', display: 'grid', gap: 16, maxWidth: 640, minWidth: 0 }}>
       {lines.length === 0 ? (
         <p style={{ margin: 0 }}>No line items</p>
       ) : (
@@ -96,7 +89,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                       size="sm"
                       aria-disabled={i === 0 || undefined}
                       onClick={() => move(i, -1)}
-                      data-line-focus={`up:${line.id}`}
+                      ref={focus.targetRef(`up:${line.id}`)}
                     >
                       <span>
                         Move <span className="sr-only">{`line ${n}`}</span> up
@@ -107,7 +100,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                       size="sm"
                       aria-disabled={i === lines.length - 1 || undefined}
                       onClick={() => move(i, 1)}
-                      data-line-focus={`down:${line.id}`}
+                      ref={focus.targetRef(`down:${line.id}`)}
                     >
                       <span>
                         Move <span className="sr-only">{`line ${n}`}</span> down
@@ -117,7 +110,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                       variant="secondary"
                       size="sm"
                       onClick={() => remove(i)}
-                      data-line-focus={`remove:${line.id}`}
+                      ref={focus.targetRef(`remove:${line.id}`)}
                     >
                       <span>
                         Remove <span className="sr-only">{`line ${n}`}</span>
@@ -129,7 +122,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                   <Input
                     value={line.description}
                     onChange={(e) => update(i, { description: e.target.value })}
-                    data-line-focus={`description:${line.id}`}
+                    ref={focus.targetRef(`description:${line.id}`)}
                   />
                 </Field>
                 <div style={ROW_FIELDS}>
@@ -151,7 +144,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
         </ol>
       )}
       <div>
-        <Button variant="secondary" onClick={add} data-line-focus="add">
+        <Button variant="secondary" onClick={add} ref={focus.targetRef('add')}>
           Add line
         </Button>
       </div>

@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -17,6 +16,7 @@ import { Button } from '../button/Button';
 import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { internalIcons } from '../internal/icons';
+import { useListMutationFocus } from '../internal/use-list-mutation-focus';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
@@ -182,27 +182,16 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
   const files = (controlled ? value : internal) ?? EMPTY;
 
   const input = useRef<HTMLInputElement>(null);
-  const chooseButton = useRef<HTMLButtonElement>(null);
-  const list = useRef<HTMLUListElement>(null);
-  const mergedRef = useMemo(() => composeRefs<HTMLButtonElement>(ref, chooseButton), [ref]);
 
   const [announcement, setAnnouncement] = useState({ text: '', tick: 0 });
   const [dragging, setDragging] = useState(false);
   const enterDepth = useRef(0);
 
   // Focus after a removal, applied once the list shows the expected files (a controlled consumer may
-  // apply the change later, or not at all).
-  const pendingFocus = useRef<{ expected: string; focusKey: string | null } | null>(null);
+  // apply the change later, or not at all). Target keys: `remove:<item key>` and `choose`.
   const keys = useMemo(() => itemKeys(files), [files]);
-  useLayoutEffect(() => {
-    const pending = pendingFocus.current;
-    if (!pending || pending.expected !== keys.join('\n')) return;
-    pendingFocus.current = null;
-    const item = Array.from(list.current?.children ?? []).find(
-      (li) => (li as HTMLElement).dataset.fileKey === pending.focusKey,
-    );
-    (item?.querySelector('button') ?? chooseButton.current)?.focus();
-  }, [keys]);
+  const focus = useListMutationFocus(keys);
+  const mergedRef = useMemo(() => composeRefs<HTMLButtonElement>(ref, focus.targetRef('choose')), [ref, focus]);
 
   const commit = useCallback(
     (next: File[]) => {
@@ -223,11 +212,12 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
   const remove = (index: number) => {
     if (blocked) return;
     const next = files.filter((_, i) => i !== index);
-    const neighbour = keys[index + 1] ?? keys[index - 1] ?? null;
-    pendingFocus.current = {
-      expected: keys.filter((_, i) => i !== index).join('\n'),
-      focusKey: neighbour,
-    };
+    // The Remove button of the file that takes the place of the removed one, else of the previous one,
+    // else "Choose files". Keys of `next`, not of `files`: with two identical files the numbering
+    // (`#0`, `#1`) shifts after the removal.
+    const nextKeys = itemKeys(next);
+    const heir = nextKeys[index] ?? nextKeys[index - 1];
+    focus.requestFocus({ next: nextKeys, targets: heir === undefined ? ['choose'] : [`remove:${heir}`, 'choose'] });
     commit(next);
   };
 
@@ -345,9 +335,9 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
         </span>
       </div>
       {files.length > 0 ? (
-        <ul ref={list} aria-label={labels.listLabel} className={LIST}>
+        <ul aria-label={labels.listLabel} className={LIST}>
           {files.map((file, index) => (
-            <li key={keys[index]} data-file-key={keys[index]} className={ITEM}>
+            <li key={keys[index]} className={ITEM}>
               <TruncatedText className={NAME} tooltipContent={file.name}>
                 <bdi>{file.name}</bdi>
               </TruncatedText>
@@ -358,6 +348,7 @@ export const FileUpload = /* @__PURE__ */ forwardRef<HTMLButtonElement, FileUplo
                   variant="ghost"
                   aria-label={labels.remove(file.name)}
                   leadingIcon={internalIcons.close}
+                  ref={focus.targetRef(`remove:${keys[index]}`)}
                   onClick={() => remove(index)}
                 />
               )}
