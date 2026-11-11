@@ -4,7 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test';
 import { Avatar } from '../avatar/Avatar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage } from '../breadcrumb/Breadcrumb';
 import { Button } from '../button/Button';
-import { Card } from '../card/Card';
+import { Card, CardBody } from '../card/Card';
 import { Checkbox } from '../checkbox/Checkbox';
 import { Field, type FieldStateProps } from '../field/Field';
 import { Input } from '../input/Input';
@@ -205,7 +205,9 @@ function Surfaces({ disabled, state, onClick, onValueChange, onFilterChange }: S
           <div style={{ width: 200 }}>
             <Input aria-label="Text input" defaultValue="Text cursor" />
           </div>
-          <Card>Card</Card>
+          <Card>
+            <CardBody className="px-3 py-2">Card</CardBody>
+          </Card>
           <StatusBadge tone="success">Approved</StatusBadge>
           <Avatar name="Rossi Construction" />
           <div style={{ width: 120 }}>
