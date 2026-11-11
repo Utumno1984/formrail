@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { toId } from 'storybook/internal/csf';
 import {
   DOCUMENTED_IN,
   brokenLinks,
@@ -103,4 +104,56 @@ describe('docs coverage: the guard itself', () => {
     expect(docsId('Floorplans/Object Page/Layout')).toBe('floorplans-object-page-layout--docs');
     expect(docsLinks('(?path=/docs/a-b--docs) (?path=/story/a-b--c)')).toEqual(['a-b--docs']);
   });
+});
+
+describe('docs coverage: id sanitization (#416)', () => {
+  // docsId uses Storybook's own `sanitize`, so a divergence is structurally impossible: a short sanity check suffices.
+  const titles = ['Forms/My_Field', 'Pro/Patterns/Form rebase', 'Überblick/Ünïcode_Åpp', 'Forms/It’s — here'];
+
+  it.each(titles)('docsId(%j) matches the id Storybook itself generates', (title) => {
+    expect(docsId(title)).toBe(toId(title, 'Docs'));
+  });
+
+  it('keeps letters outside a-z, as Storybook does, and links to them resolve', () => {
+    expect(docsId('Forms/Café')).toBe('forms-café--docs');
+    const page = { title: 'Forms/Café', id: docsId('Forms/Café'), components: [], source: '' };
+    expect(brokenLinks([page], '(?path=/docs/forms-café--docs)', 'Introduction')).toEqual([]);
+    expect(unlinkedPages([page], '(?path=/docs/forms-café--docs)', 'Introduction')).toEqual([]);
+  });
+
+  it('turns an underscore into a hyphen (Forms/My_Field -> forms-my-field--docs)', () => {
+    expect(docsId('Forms/My_Field')).toBe('forms-my-field--docs');
+  });
+});
+
+describe('docs coverage: no usage-based inference (#416)', () => {
+  const page = (source) => ({ title: 'Forms/Dialog', id: 'forms-dialog--docs', components: ['Dialog'], source });
+
+  it('always reports a compound part that is not in subcomponents, even if the page renders or mentions it', () => {
+    const pages = [page('// DialogTitle\nexport const S = () => <Dialog><DialogTitle>x</DialogTitle></Dialog>;')];
+    expect(undocumentedExports(['Dialog', 'DialogTitle'], pages, {})).toEqual([
+      expect.stringContaining('DialogTitle: exported but not documented'),
+    ]);
+  });
+
+  it('accepts the same part once it is an explicit subcomponent', () => {
+    const pages = [{ ...page('<DialogTitle />'), components: ['Dialog', 'DialogTitle'] }];
+    expect(undocumentedExports(['Dialog', 'DialogTitle'], pages, {})).toEqual([]);
+  });
+
+  it('on the real core pages: a new export only mentioned by a page is still reported', () => {
+    const synthetic = { title: 'Forms/Select', id: 'forms-select--docs', components: ['Select'], source: '<Select /> SelectAll' };
+    expect(undocumentedExports([...coreExports, 'SelectAll'], [...corePages, synthetic])).toEqual([
+      expect.stringContaining('SelectAll: exported but not documented'),
+    ]);
+  });
+
+  it('docsLinks stops where docsId can never produce a character, on both sides (Forms/Rate•Limit)', () => {
+    const id = docsId('Forms/Rate•Limit');
+    expect(id).toContain('•');
+    expect(docsLinks(`[x](?path=/docs/${id}) and ?path=/docs/${id}, more`)).toEqual([id, id]);
+    const page = { title: 'Forms/Rate•Limit', id, components: [], source: '' };
+    expect(brokenLinks([page], `(?path=/docs/${id})`, 'Introduction')).toEqual([]);
+  });
+
 });

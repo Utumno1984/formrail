@@ -29,7 +29,7 @@ const meta: Meta<DemoArgs> = {
   title: 'Forms/RadioGroup',
   // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
   // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
-  subcomponents: { RadioGroup },
+  subcomponents: { RadioGroup, RadioGroupItem },
   parameters: { layout: 'padded', docs: { description: { component: "RadioGroup: native `<input type=\"radio\">` items (`RadioGroupItem`) with roving focus, arrow-key selection, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
   argTypes: {
     orientation: { control: 'radio', options: ['vertical', 'horizontal'] satisfies RadioGroupOrientation[] },

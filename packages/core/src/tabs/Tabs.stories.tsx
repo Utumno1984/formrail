@@ -57,6 +57,7 @@ function Demo({ tabCount, disabledTab, ...rest }: DemoArgs) {
 const meta = {
   title: 'Navigation/Tabs',
   component: Tabs,
+  subcomponents: { TabsList, TabsTrigger, TabsContent },
   parameters: { layout: 'padded' },
   argTypes: {
     activationMode: { control: 'radio', options: ['automatic', 'manual'] },
