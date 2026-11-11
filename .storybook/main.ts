@@ -13,8 +13,9 @@ const config: StorybookConfig = {
   // `VirtualListReport` / `VirtualListReportTable` (types imported from @formrail/core, 1 and 3 props),
   // and the union members of `ListReportTable` (`aria-label` / `aria-labelledby` / `caption`: the
   // required accessible name), `Field` (`state` / `stateReason`), `Button` (`size`, the icon sizes'
-  // required name). react-docgen-typescript asks the TypeScript checker, so all of them are there
-  // (21, 9, 17, 14, 11 and 8 props, with their TSDoc).
+  // required name). react-docgen-typescript asks the TypeScript checker, so all of them are there, with
+  // their TSDoc: props before -> after, `ListReport` 0 -> 18, `Accordion` 0 -> 9, `VirtualListReport`
+  // 1 -> 21, `VirtualListReportTable` 3 -> 17, `ListReportTable` 10 -> 14, `Field` 9 -> 11, `Button` 4 -> 8.
   //
   // Cost, measured on the same machine one build at a time (`npm run build-storybook`, 3 runs each,
   // load average below 1 before each run, nothing else running): 14.0-14.4 s with react-docgen,
