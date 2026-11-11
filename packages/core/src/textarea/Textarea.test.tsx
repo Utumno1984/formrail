@@ -56,7 +56,7 @@ describe('Textarea outside a Field', () => {
     // Still in conflict with another maxRows: still the one warning.
     rerender(<Textarea aria-label="Notes" autoResize rows={4} maxRows={1} value="abc" onChange={() => {}} />);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[react-object-page\] Textarea: maxRows/));
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/^\[formrail\] Textarea: maxRows/));
   });
 
   it('maxRows equal to rows, or maxRows without autoResize, does not warn', () => {

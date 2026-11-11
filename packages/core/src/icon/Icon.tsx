@@ -47,7 +47,7 @@ let warned = false;
 function warnInvalidChild(): void {
   if (warned) return;
   warned = true;
-  console.warn('[react-object-page] <Icon> expects exactly one <svg> element as its child; rendering nothing.');
+  console.warn('[formrail] <Icon> expects exactly one <svg> element as its child; rendering nothing.');
 }
 
 /**

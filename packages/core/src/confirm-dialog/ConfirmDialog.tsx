@@ -181,7 +181,7 @@ export function ConfirmDialogBase({
   useEffect(() => {
     if (blankConfirm && isDev()) {
       console.error(
-        '[react-object-page] <ConfirmDialog> needs a confirmLabel that names the action (e.g. "Delete invoice"), not an empty one.',
+        '[formrail] <ConfirmDialog> needs a confirmLabel that names the action (e.g. "Delete invoice"), not an empty one.',
       );
     }
   }, [blankConfirm]);

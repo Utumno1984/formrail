@@ -111,7 +111,7 @@ export const DescriptionListItem = /* @__PURE__ */ forwardRef<HTMLDivElement, De
   function DescriptionListItem({ label, children, emptyLabel, variant, className, ...rest }, ref) {
     const context = useContext(DescriptionListContext);
     if (!context && isDev()) {
-      throw new Error('[react-object-page] <DescriptionListItem> must be rendered inside a <DescriptionList>.');
+      throw new Error('[formrail] <DescriptionListItem> must be rendered inside a <DescriptionList>.');
     }
     const filled = hasContent(children);
     const summary = variant === 'summary';

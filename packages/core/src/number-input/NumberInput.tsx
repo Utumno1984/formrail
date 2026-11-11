@@ -101,7 +101,7 @@ const STEPPER =
   'not-disabled:rop-hover:text-rop-text disabled:pointer-events-none disabled:opacity-50';
 
 const warn = (message: string) => {
-  if (isDev()) console.warn(`[react-object-page] <NumberInput> ${message}`);
+  if (isDev()) console.warn(`[formrail] <NumberInput> ${message}`);
 };
 
 /**

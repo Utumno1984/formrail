@@ -103,7 +103,7 @@ export function useFocusFirstInvalidField({ containerRef, fieldErrors, trigger }
 
     if (isDev()) {
       console.error(
-        '[react-object-page] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]`/`[name]` element inside the container, nothing was focused.',
+        '[formrail] useFocusFirstInvalidField: none of the keys of `fieldErrors` matches a mounted, focusable `[data-rop-name]`/`[name]` element inside the container, nothing was focused.',
       );
     }
     // With `trigger`, a new `fieldErrors` alone must not re-run the effect: it is read, not watched.

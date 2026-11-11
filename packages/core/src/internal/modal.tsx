@@ -57,7 +57,7 @@ const ModalContext =/* @__PURE__ */ createContext<ModalContextValue | null>(null
 
 function useModalContext(part: string, root: string): ModalContextValue {
   const ctx = useContext(ModalContext);
-  if (!ctx) throw new Error(`[react-object-page] <${part}> must be rendered inside <${root}>.`);
+  if (!ctx) throw new Error(`[formrail] <${part}> must be rendered inside <${root}>.`);
   return ctx;
 }
 
@@ -290,7 +290,7 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
           ? requestAnimationFrame(() => {
               if (node.isConnected && !hasAccessibleName(node)) {
                 console.error(
-                  `[react-object-page] <${part}> has no accessible name: render a <${title}> (use visuallyHidden to hide it) or pass aria-label / aria-labelledby.`,
+                  `[formrail] <${part}> has no accessible name: render a <${title}> (use visuallyHidden to hide it) or pass aria-label / aria-labelledby.`,
                 );
               }
             })

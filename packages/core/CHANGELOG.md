@@ -1,4 +1,4 @@
-# @react-object-page/core
+# @formrail/core
 
 ## 0.1.0
 

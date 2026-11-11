@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { useListReport, type ListReportColumn } from '@react-object-page/core';
+import { useListReport, type ListReportColumn } from '@formrail/core';
 import { VirtualListReportTable } from './VirtualListReportTable';
 import { mockTableLayout } from '../../test/virtual-table-utils';
 

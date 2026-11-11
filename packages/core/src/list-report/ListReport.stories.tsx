@@ -624,7 +624,7 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
  * ```tsx
  * import { useMemo } from 'react';
  * import { useLocation, useNavigate, useSearchParams } from 'react-router';
- * import type { ListReportUrlAdapter } from '@react-object-page/core';
+ * import type { ListReportUrlAdapter } from '@formrail/core';
  *
  * function useReactRouterAdapter(): ListReportUrlAdapter {
  *   const [searchParams] = useSearchParams();
@@ -653,7 +653,7 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
  * ```tsx
  * import { useMemo } from 'react';
  * import { useRouter } from '@tanstack/react-router';
- * import type { ListReportUrlAdapter } from '@react-object-page/core';
+ * import type { ListReportUrlAdapter } from '@formrail/core';
  *
  * function useTanStackAdapter(): ListReportUrlAdapter {
  *   const router = useRouter();

@@ -124,7 +124,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   useEffect(() => {
     if (isDev() && page !== pageProp) {
       console.error(
-        `[react-object-page] <Pagination page={${String(pageProp)}}> is outside 1..${pageCount}: showing page ${page}. onPageChange is not called to correct it.`,
+        `[formrail] <Pagination page={${String(pageProp)}}> is outside 1..${pageCount}: showing page ${page}. onPageChange is not called to correct it.`,
       );
     }
   }, [page, pageProp, pageCount]);

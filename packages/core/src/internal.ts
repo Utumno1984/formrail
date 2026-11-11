@@ -1,11 +1,11 @@
 /**
- * `@react-object-page/core/internal`: building blocks of the List Report, for
- * `@react-object-page/pro` only (e.g. a virtualized table that mounts a subset of the rows but
+ * `@formrail/core/internal`: building blocks of the List Report, for
+ * `@formrail/pro` only (e.g. a virtualized table that mounts a subset of the rows but
  * must render **the same** table as the Free `ListReportTable`/`ListReport`).
  *
  * **Not public API**: no semver guarantee, nothing here is documented in a public story/MDX, and
- * it can change (or disappear) in a patch release of `@react-object-page/core`. `@react-object-page/pro`
- * pins its peer dependency on `@react-object-page/core` to an exact version for this reason (see
+ * it can change (or disappear) in a patch release of `@formrail/core`. `@formrail/pro`
+ * pins its peer dependency on `@formrail/core` to an exact version for this reason (see
  * `.changeset/config.json`'s `fixed` pairing of the two packages). Do not import this module from
  * an application, from a core story/MDX, or from anywhere inside `packages/core/src` itself: a
  * `no-restricted-imports` ESLint rule (`eslint.config.js`) enforces that.

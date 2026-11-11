@@ -1,6 +1,6 @@
 import { Suspense, lazy, startTransition, useMemo, useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { useListReport, type ListReportColumn } from '@react-object-page/core';
+import { useListReport, type ListReportColumn } from '@formrail/core';
 import { VirtualListReportTable } from './VirtualListReportTable';
 import { PITCH, mockTableLayout } from '../../test/virtual-table-utils';
 

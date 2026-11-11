@@ -11,7 +11,7 @@ Every PR that touches `packages/*` needs a changeset (`npx changeset`, see
 
 ## Storybook and end-to-end tests
 
-- **Public demo**: https://utumno1984.github.io/react-object-page/storybook/ is the Storybook of the
+- **Public demo**: https://utumno1984.github.io/formrail/storybook/ is the Storybook of the
   core package only (Free). It is republished to GitHub Pages on every push to `main` with a green CI
   (job `deploy-pages` in `.github/workflows/ci.yml`; `workflow_dispatch` starts it manually). The site
   root is reserved for the landing page; until it exists it redirects to Storybook, and the old deep
@@ -19,7 +19,7 @@ Every PR that touches `packages/*` needs a changeset (`npx changeset`, see
 - The published site is assembled locally with
   `npm run build && STORYBOOK_EXCLUDE_PRO=1 npm run build-storybook && npm run assemble-site`
   (folder `site/`: root + `storybook/` + `pro/`); then `npm run serve-site` serves it at
-  `http://localhost:6008/react-object-page/` and `npm run test:site` runs the pre-deploy smoke test
+  `http://localhost:6008/formrail/` and `npm run test:site` runs the pre-deploy smoke test
   (`e2e/site/`, outside the PR e2e suite).
 - `npm run storybook` starts Storybook; `npm run test:e2e` rebuilds Storybook and runs Playwright
   against the static build on port 6007.

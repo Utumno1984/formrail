@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { Field, Input, useObjectPageForm } from '@react-object-page/core';
+import { Field, Input, useObjectPageForm } from '@formrail/core';
 import { ChangeSummary } from './ChangeSummary';
 import { computeChangeSummary, resetChangeSummaryWarnings } from './compute-change-summary';
 import { useChangeSummary } from './use-change-summary';

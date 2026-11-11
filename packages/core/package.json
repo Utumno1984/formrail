@@ -1,17 +1,17 @@
 {
-  "name": "@react-object-page/core",
+  "name": "@formrail/core",
   "version": "0.1.0",
   "description": "Headless React implementation of public List Report and Object Page interaction patterns (Free tier, MIT).",
   "license": "MIT",
   "author": "Daniele Ingusci",
-  "homepage": "https://utumno1984.github.io/react-object-page/storybook/",
+  "homepage": "https://utumno1984.github.io/formrail/storybook/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Utumno1984/react-object-page.git",
+    "url": "git+https://github.com/Utumno1984/formrail.git",
     "directory": "packages/core"
   },
   "bugs": {
-    "url": "https://github.com/Utumno1984/react-object-page/issues"
+    "url": "https://github.com/Utumno1984/formrail/issues"
   },
   "keywords": [
     "react",

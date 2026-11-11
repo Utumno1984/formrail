@@ -174,7 +174,7 @@ export const Button = /* @__PURE__ */ forwardRef<HTMLElement, ButtonProps>(funct
   useEffect(() => {
     if (iconOnly && !named && isDev()) {
       console.error(
-        `[react-object-page] <Button size="${size}"> has no visible text: it needs an accessible name (aria-label or aria-labelledby).`,
+        `[formrail] <Button size="${size}"> has no visible text: it needs an accessible name (aria-label or aria-labelledby).`,
       );
     }
   }, [iconOnly, named, size]);
@@ -188,7 +188,7 @@ export const Button = /* @__PURE__ */ forwardRef<HTMLElement, ButtonProps>(funct
 
   if (asChild) {
     if (!isValidElement(children) || children.type === Fragment) {
-      throw new Error('[react-object-page] <Button asChild> expects exactly one React element as its child.');
+      throw new Error('[formrail] <Button asChild> expects exactly one React element as its child.');
     }
     if (
       isDev() &&
@@ -197,7 +197,7 @@ export const Button = /* @__PURE__ */ forwardRef<HTMLElement, ButtonProps>(funct
       !(children.type.prototype as { isReactComponent?: unknown } | undefined)?.isReactComponent
     ) {
       console.error(
-        '[react-object-page] <Button asChild>: the child is a function component, which cannot receive the ref on React 18. Wrap it in forwardRef.',
+        '[formrail] <Button asChild>: the child is a function component, which cannot receive the ref on React 18. Wrap it in forwardRef.',
       );
     }
     // Applied to the child itself, not through Slot: Slot only concatenates `className` (no merge

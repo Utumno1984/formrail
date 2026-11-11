@@ -14,7 +14,7 @@ export interface ListReportResultIndex {
 
 /**
  * @internal The position of each current result's id, memoized so a gesture built on top of
- * `table.selection` (e.g. shift-click range selection in `@react-object-page/pro`) finds "the index
+ * `table.selection` (e.g. shift-click range selection in `@formrail/pro`) finds "the index
  * of this id among the current results" in O(1) without redoing its own O(n) pass of `getRowId`
  * over `table.rows` on every call — only `useMemo` recomputes it, and only when the results change.
  *

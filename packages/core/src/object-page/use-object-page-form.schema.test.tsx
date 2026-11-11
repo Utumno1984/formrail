@@ -376,7 +376,7 @@ describe('useObjectPageForm: schema (Standard Schema)', () => {
       expect(result.current.formErrors).toEqual([]);
       expect(error).toHaveBeenCalledTimes(1);
       expect((error.mock.calls[0] ?? []).map(String).join(' ')).toMatch(
-        /\[react-object-page\] useObjectPageForm:.*asynchronous schema not supported/,
+        /\[formrail\] useObjectPageForm:.*asynchronous schema not supported/,
       );
     });
 

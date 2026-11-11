@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { Button, Field, Input, Text, useObjectPageForm } from '@react-object-page/core';
+import { Button, Field, Input, Text, useObjectPageForm } from '@formrail/core';
 import { computeRebase } from './compute-rebase';
 import { useFormRebase } from './use-form-rebase';
 

@@ -41,7 +41,7 @@ const MenuContext = /* @__PURE__ */ createContext<MenuContextValue | null>(null)
 
 function useMenuContext(part: string): MenuContextValue {
   const context = useContext(MenuContext);
-  if (!context) throw new Error(`[react-object-page] <${part}> must be rendered inside <Menu>.`);
+  if (!context) throw new Error(`[formrail] <${part}> must be rendered inside <Menu>.`);
   return context;
 }
 

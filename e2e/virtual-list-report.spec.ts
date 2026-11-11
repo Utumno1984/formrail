@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
-// @react-object-page/pro VirtualListReport (#231), on Storybook ("Pro/Floorplans/Virtual List Report").
+// @formrail/pro VirtualListReport (#231), on Storybook ("Pro/Floorplans/Virtual List Report").
 const BASE = 'pro-floorplans-virtual-list-report';
 const DEFAULT = `${BASE}--default-no-play`;
 const CEILING = `${BASE}--ceiling-200-k`;

@@ -37,7 +37,7 @@ function warnNoName(): void {
   const self = warnNoName as typeof warnNoName & { done?: boolean };
   if (self.done) return;
   self.done = true;
-  console.error('[react-object-page] <Avatar> needs a non-blank `name` (its accessible name) or `decorative`; rendering it as decorative.');
+  console.error('[formrail] <Avatar> needs a non-blank `name` (its accessible name) or `decorative`; rendering it as decorative.');
 }
 
 export interface AvatarProps

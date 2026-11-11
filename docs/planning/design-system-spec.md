@@ -669,8 +669,10 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
 
 ## 5. Rischi e domande aperte per Daniele
 
-1. **Nome del progetto/pacchetto**: deciso, `react-object-page` (coerente col naming `react-virtual-*`
-   già usato da Daniele).
+1. **Nome del progetto/pacchetto**: deciso, **Formrail** (pacchetti `@formrail/core` e
+   `@formrail/pro`, repo `Utumno1984/formrail`; decisione di Daniele dell'11/11/2026, ticket #428).
+   Nome precedente, storico: `react-object-page` (coerente col naming `react-virtual-*` già usato
+   da Daniele), sostituito dal rebrand.
 2. **Mecanismo di licensing Pro**: npm org privata (minimo sforzo, meno standard) vs license-key
    (più standard di mercato, più sforzo iniziale) vs source-available a pagamento. Raccomandazione
    preliminare in §2.4: iniziare semplice (npm org privata), evolvere se c'è trazione.

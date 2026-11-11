@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { useObjectPageForm } from '@react-object-page/core';
+import { useObjectPageForm } from '@formrail/core';
 import { useFormRebase } from './use-form-rebase';
 
 type Form = { name: string; amount: number };

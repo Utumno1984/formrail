@@ -1,4 +1,4 @@
-# @react-object-page/core
+# @formrail/core
 
 React components and hooks for the **List Report** (filterable, sortable, selectable lists) and
 **Object Page** (sectioned editor with anchor bar, sticky save bar and unsaved-changes guard)
@@ -7,17 +7,17 @@ interaction patterns, plus the primitives they are built from (`Button`, `Field`
 layout stability (no jumps between loading, empty and loaded states) are tested, not assumed.
 
 This package is the free, MIT-licensed tier of the
-[react-object-page](https://github.com/Utumno1984/react-object-page) project — see its
-[**Free and Pro**](https://github.com/Utumno1984/react-object-page#free-and-pro) section for what is in this
-tier today versus the commercially-licensed `@react-object-page/pro`. It is an independent
+[Formrail](https://github.com/Utumno1984/formrail) project — see its
+[**Free and Pro**](https://github.com/Utumno1984/formrail#free-and-pro) section for what is in this
+tier today versus the commercially-licensed `@formrail/pro`. It is an independent
 implementation of generic, publicly known UI patterns.
 
-**[Live demo and documentation (Storybook)](https://utumno1984.github.io/react-object-page/storybook/)**
+**[Live demo and documentation (Storybook)](https://utumno1984.github.io/formrail/storybook/)**
 
 ## Install
 
 ```bash
-npm install @react-object-page/core
+npm install @formrail/core
 ```
 
 Peer dependencies: `react` and `react-dom` (18 or 19). `tailwindcss` is an optional peer dependency:
@@ -27,9 +27,9 @@ it is only used by mode (b) of [Styles](#styles), which requires 4.0.9 or later.
 
 ```tsx
 // once, at the root of your app (see "Styles" below for the Tailwind v4 alternative)
-import '@react-object-page/core/styles.css';
+import '@formrail/core/styles.css';
 
-import { Button, Field, Input } from '@react-object-page/core';
+import { Button, Field, Input } from '@formrail/core';
 
 export function SupplierForm() {
   return (
@@ -47,9 +47,9 @@ export function SupplierForm() {
 
 `Field` wires the label, help text, error and required state to the control (real `aria-describedby`,
 `aria-invalid`, `aria-required`). For whole pages see the
-[List Report](https://utumno1984.github.io/react-object-page/storybook/?path=/docs/floorplans-list-report--docs)
+[List Report](https://utumno1984.github.io/formrail/storybook/?path=/docs/floorplans-list-report--docs)
 (`ListReport`, `useListReport`) and
-[Object Page](https://utumno1984.github.io/react-object-page/storybook/?path=/docs/floorplans-object-page-layout--docs)
+[Object Page](https://utumno1984.github.io/formrail/storybook/?path=/docs/floorplans-object-page-layout--docs)
 (`ObjectPage`, `useObjectPageForm`, `useDirtyGuard`) documentation pages.
 
 ## License
@@ -65,7 +65,7 @@ components use. There are **two alternative ways** to get them. Pick one.
 
 ```ts
 // once, at the root of your app
-import '@react-object-page/core/styles.css';
+import '@formrail/core/styles.css';
 ```
 
 `styles.css` contains no reset (no preflight, no rule on `html`, `body`, `*`, `button`...) and
@@ -89,9 +89,9 @@ and never the long list that `shadow-*`, `ring-*`, `translate-*` etc. would add.
 
 ```css
 @import 'tailwindcss';
-@import '@react-object-page/core/theme.css';
+@import '@formrail/core/theme.css';
 /* path of the package's dist, relative to this CSS file */
-@source '../node_modules/@react-object-page/core/dist';
+@source '../node_modules/@formrail/core/dist';
 ```
 
 **Requires `tailwindcss` 4.0.9 or later.** Tailwind 4.0.0 to 4.0.8 compile `theme.css` without any
@@ -184,7 +184,7 @@ primary is resolved on `:root`, redeclare it directly.
 ## `cn()`
 
 ```ts
-import { cn } from '@react-object-page/core';
+import { cn } from '@formrail/core';
 
 cn('px-2', 'px-4'); // 'px-4'
 cn('z-rop-modal', 'z-rop-popover'); // 'z-rop-popover'

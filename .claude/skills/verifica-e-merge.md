@@ -1,6 +1,6 @@
 ---
 name: verifica-e-merge
-description: Procedura che l'orchestratore di ~/projects segue per verificare dal vivo e mergiare una PR di react-object-page — usala prima di ogni gh pr ready/merge, mai dentro una sessione del progetto (il merge lo fa solo l'orchestratore).
+description: Procedura che l'orchestratore di ~/projects segue per verificare dal vivo e mergiare una PR di Formrail — usala prima di ogni gh pr ready/merge, mai dentro una sessione del progetto (il merge lo fa solo l'orchestratore).
 ---
 
 # Verifica e merge di una PR (solo orchestratore)

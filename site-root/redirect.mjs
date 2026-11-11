@@ -20,7 +20,7 @@ export const STORYBOOK_PARAMS = ['path', 'id', 'viewMode', 'args', 'globals'];
  */
 export function resolveRedirect(href, page) {
   var url = new URL(href);
-  // The directory the root files live in, whatever the prefix is (`/react-object-page/` on Pages,
+  // The directory the root files live in, whatever the prefix is (`/formrail/` on Pages,
   // `/` on a custom domain): strip the file name, keep the trailing slash.
   var base = url.pathname.replace(/[^/]*$/, '');
   // Already under `storybook/`: never prefix twice, never loop.

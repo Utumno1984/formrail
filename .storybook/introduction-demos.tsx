@@ -1,5 +1,5 @@
 // Live demos embedded in Introduction.mdx. They import from the public entry point
-// (`@react-object-page/core`, aliased to the sources in main.ts): the page uses the library
+// (`@formrail/core`, aliased to the sources in main.ts): the page uses the library
 // the way a consumer would, instead of showing code as text.
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import {
@@ -12,7 +12,7 @@ import {
   useObjectPageForm,
   type ListReportColumn,
   type ListReportFilter,
-} from '@react-object-page/core';
+} from '@formrail/core';
 
 interface Invoice {
   id: string;

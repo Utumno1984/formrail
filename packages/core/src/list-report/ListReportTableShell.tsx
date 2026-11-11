@@ -192,7 +192,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   useEffect(() => {
     if (invalidInline && isDev()) {
       console.error(
-        `[react-object-page] <ListReportTable> rowActionsInline must be a whole number ≥ 0; got ${String(rowActionsInlineProp)}, used ${inlineUsed}.`,
+        `[formrail] <ListReportTable> rowActionsInline must be a whole number ≥ 0; got ${String(rowActionsInlineProp)}, used ${inlineUsed}.`,
       );
     }
   }, [invalidInline, rowActionsInlineProp, inlineUsed]);
@@ -295,7 +295,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   const named = !!ariaLabel?.trim() || !!ariaLabelledby?.trim() || hasContent(caption);
   useEffect(() => {
     if (!named && isDev()) {
-      console.warn('[react-object-page] <ListReportTable> needs an accessible name: pass `aria-label`, `aria-labelledby` or `caption`.');
+      console.warn('[formrail] <ListReportTable> needs an accessible name: pass `aria-label`, `aria-labelledby` or `caption`.');
     }
   }, [named]);
 
@@ -378,8 +378,8 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
  * head (`ListReportTableHead`), the stable-footprint states (skeleton/empty/noResults/error) and the
  * always-mounted announcement. `renderBody(ctx)` is called only for `view === 'rows'`; `ListReportTable`
  * uses it to render every row (`ListReportTableRow`) plus a `Filler`, and a virtualized table
- * (`@react-object-page/pro`) uses it to mount only a range of rows with spacer `<tr>`s around them.
- * Exported from `@react-object-page/core/internal`; not public API, no semver guarantee.
+ * (`@formrail/pro`) uses it to mount only a range of rows with spacer `<tr>`s around them.
+ * Exported from `@formrail/core/internal`; not public API, no semver guarantee.
  */
 export const ListReportTableShell = /* @__PURE__ */ forwardRef(ListReportTableShellImpl) as <Row>(
   props: ListReportTableShellProps<Row> & { ref?: Ref<HTMLDivElement> },

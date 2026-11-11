@@ -23,7 +23,7 @@ const config: StorybookConfig = {
   // every element of the page, a cost the performance e2e would charge to the component.
   features: { highlight: false },
   // Same Tailwind pipeline as the published `styles.css` (packages/core/src/styles/index.css).
-  // Pro stories import `@react-object-page/core`, whose package entry points at `dist/` (not built in
+  // Pro stories import `@formrail/core`, whose package entry points at `dist/` (not built in
   // the e2e/visual jobs): resolve it to the sources instead, like the Free stories do.
   viteFinal: (viteConfig) => ({
     ...viteConfig,
@@ -31,11 +31,11 @@ const config: StorybookConfig = {
     resolve: {
       ...viteConfig.resolve,
       alias: [
-        { find: /^@react-object-page\/core\/theme\.css$/, replacement: fileURLToPath(new URL('../packages/core/src/styles/tokens.css', import.meta.url)) },
+        { find: /^@formrail\/core\/theme\.css$/, replacement: fileURLToPath(new URL('../packages/core/src/styles/tokens.css', import.meta.url)) },
         // `/internal` (ticket #230): Pro stories build their own table from these building blocks;
         // resolved to the source facade for the same reason as the bare specifier above.
-        { find: /^@react-object-page\/core\/internal$/, replacement: fileURLToPath(new URL('../packages/core/src/internal.ts', import.meta.url)) },
-        { find: /^@react-object-page\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
+        { find: /^@formrail\/core\/internal$/, replacement: fileURLToPath(new URL('../packages/core/src/internal.ts', import.meta.url)) },
+        { find: /^@formrail\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
         ...(Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : Object.entries(viteConfig.resolve?.alias ?? {}).map(([find, replacement]) => ({ find, replacement }))),
       ],
     },

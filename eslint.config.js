@@ -38,8 +38,8 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    // `packages/core/src/internal.ts` (the facade published at the `@react-object-page/core/internal`
-    // subpath) is for @react-object-page/pro only (ticket #230: no semver guarantee, can change in a
+    // `packages/core/src/internal.ts` (the facade published at the `@formrail/core/internal`
+    // subpath) is for @formrail/pro only (ticket #230: no semver guarantee, can change in a
     // patch release). Nothing inside the core package itself — including its own public story/MDX
     // files, which ship in the public Storybook deploy — may import it, by either path.
     files: ['packages/core/src/**/*.{ts,tsx}'],
@@ -56,7 +56,7 @@ export default tseslint.config(
             {
               regex: '(^|/)internal$',
               message:
-                'src/internal.ts is the facade published as the Pro-only @react-object-page/core/internal subpath (ticket #230): do not import it from inside the core package itself, nor from a public story/MDX.',
+                'src/internal.ts is the facade published as the Pro-only @formrail/core/internal subpath (ticket #230): do not import it from inside the core package itself, nor from a public story/MDX.',
             },
           ],
         },

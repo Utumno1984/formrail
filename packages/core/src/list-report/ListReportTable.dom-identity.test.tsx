@@ -1,5 +1,5 @@
 // Dedicated regression guard for #230 (splitting ListReportTable into ListReportTableShell /
-// ListReportTableHead / ListReportTableRow, so @react-object-page/pro can reuse them): the
+// ListReportTableHead / ListReportTableRow, so @formrail/pro can reuse them): the
 // snapshot below was written against the code BEFORE that refactor and must stay byte-for-byte
 // identical after it. A diff here means the DOM changed, which the ticket forbids.
 import { cleanup, render } from '@testing-library/react';

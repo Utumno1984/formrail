@@ -179,14 +179,14 @@ function rowPropsAreEqual<Row>(prev: ListReportTableRowProps<Row>, next: ListRep
 /**
  * @internal One data `<tr>` of the List Report table body: the optional leading checkbox cell and
  * one `<td>` per column. The default `renderBody` of `ListReportTable` renders one of these per
- * row; a virtualized table (`@react-object-page/pro`) renders the same row for whatever subset it
+ * row; a virtualized table (`@formrail/pro`) renders the same row for whatever subset it
  * mounts. Memoized: it re-renders only when its row, its selected state, `columns`, its id and
  * label, `labels.selectRow`, `labels.rowActions` (with `rowActions`), `labels.rowAction` (with
  * `rowActions` and `rowActionsInline` > 0), `rowActions`, `rowActionsInline`, `rowProps`
  * (shallow) or the extension props change; see `ListReportColumn.cell` for what that means for a
  * cell (and `ListReportRowActions` for the actions). `onToggle`, `renderCellOptions` and `rowActions`
  * are compared by identity: keep them stable, or every render of the parent renders the row. Exported
- * from `@react-object-page/core/internal`; not public API, no semver guarantee.
+ * from `@formrail/core/internal`; not public API, no semver guarantee.
  */
 export const ListReportTableRow = /* @__PURE__ */ memo(ListReportTableRowImpl, rowPropsAreEqual) as <Row>(
   props: ListReportTableRowProps<Row>,

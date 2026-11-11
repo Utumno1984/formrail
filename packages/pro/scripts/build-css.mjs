@@ -1,6 +1,6 @@
 // Builds styles.css (compiled Tailwind v4, no preflight, no token declarations) into `dist/` or
 // into the directory given as first argument (used by the determinism test).
-// Deterministic: same inputs -> same bytes. Needs @react-object-page/core built (theme.css).
+// Deterministic: same inputs -> same bytes. Needs @formrail/core built (theme.css).
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

@@ -84,7 +84,7 @@ test.describe('links', () => {
     await page.goto('');
     const hrefs = await page.locator('a[href^="http"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
     expect(new Set(hrefs)).toEqual(
-      new Set(['https://github.com/Utumno1984/react-object-page', ...(earlyAccessUrl ? [earlyAccessUrl] : [])]),
+      new Set(['https://github.com/Utumno1984/formrail', ...(earlyAccessUrl ? [earlyAccessUrl] : [])]),
     );
   });
 });
@@ -131,7 +131,7 @@ test.describe('network and weight', () => {
     expect(scripts.sort()).toEqual(['copy.js', 'inline']);
     // The only absolute URLs are GitHub and, when set, the early-access form (the CTA).
     const html = readFileSync(`${SITE_DIR}index.html`, 'utf8').replace(earlyAccessUrl || '\0', '');
-    expect(html).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/react-object-page)/);
+    expect(html).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/formrail)/);
   });
 });
 
@@ -301,7 +301,7 @@ test.describe('install command', () => {
     await expect(status).toHaveText('');
     await page.getByRole('button', { name: 'Copy command' }).click();
     await expect(status).toHaveText('Copied');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npm install @react-object-page/core');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npm install @formrail/core');
   });
 
   test('keyboard: the button copies with Enter', async ({ page }) => {
@@ -318,7 +318,7 @@ test.describe('JavaScript disabled', () => {
   test('the landing renders, the command stays selectable text, there is no dead button', async ({ page }) => {
     await page.goto('');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.locator('#install-cmd')).toHaveText('npm install @react-object-page/core');
+    await expect(page.locator('#install-cmd')).toHaveText('npm install @formrail/core');
     expect(await page.locator('#install-cmd').evaluate((el) => getComputedStyle(el).userSelect)).not.toBe('none');
     await expect(page.getByRole('button', { name: 'Copy command' })).toBeHidden();
     await page.getByRole('link', { name: 'See the Pro preview' }).click();

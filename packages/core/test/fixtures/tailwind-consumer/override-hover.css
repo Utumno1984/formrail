@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '@react-object-page/core/theme.css';
+@import '@formrail/core/theme.css';
 /* The consumer redefines `hover` as a plain :hover (no media guard). */
 @custom-variant hover (&:hover);
 @source '../../../dist';

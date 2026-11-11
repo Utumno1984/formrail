@@ -88,7 +88,7 @@ const SIZE_CLASS: Record<SelectSize, string> = {
 const VALUE = 'block min-w-0 flex-1 truncate';
 
 const DUPLICATES_WARNING =
-  '[react-object-page] <Select> options must have unique values; the first of each duplicate wins.';
+  '[formrail] <Select> options must have unique values; the first of each duplicate wins.';
 
 // Keys Radix's trigger reacts to while closed: the opening keys and the typeahead characters.
 function opensOrSearches(event: KeyboardEvent<HTMLElement>): boolean {
