@@ -73,6 +73,8 @@ export interface SheetContentProps
   returnFocusRef?: RefObject<HTMLElement | null>;
   /** Header, body and footer of the panel. */
   children?: ReactNode;
+  /** Renders your single child element as the panel instead of the default `<div>`, with the panel's props and behavior merged onto it. */
+  asChild?: boolean;
 }
 
 /**

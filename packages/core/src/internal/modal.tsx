@@ -134,7 +134,10 @@ export function ModalRoot({ open, defaultOpen = false, onOpenChange, children }:
   );
 }
 
-export type ModalTriggerProps = ComponentPropsWithoutRef<typeof RadixDialog.Trigger>;
+export interface ModalTriggerProps extends ComponentPropsWithoutRef<typeof RadixDialog.Trigger> {
+  /** Renders your single child element (e.g. a `Button`) instead of the default `<button>`, with the trigger's props and behavior merged onto it. */
+  asChild?: boolean;
+}
 
 /** Factory of the trigger: only the name used in the error message differs per component. */
 export function createModalTrigger(part: string, root: string) {
@@ -415,6 +418,8 @@ export const ModalHeader = /* @__PURE__ */ forwardRef<HTMLDivElement, HTMLAttrib
 export interface ModalTitleProps extends ComponentPropsWithoutRef<typeof RadixDialog.Title> {
   /** Hides the title visually; it stays in the accessible name of the panel. */
   visuallyHidden?: boolean;
+  /** Renders your single child element instead of the default `<h2>`, with the title's props merged onto it. */
+  asChild?: boolean;
 }
 
 /** The panel's accessible name. */
@@ -435,11 +440,13 @@ export const ModalTitle = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
   );
 });
 
+export interface ModalDescriptionProps extends ComponentPropsWithoutRef<typeof RadixDialog.Description> {
+  /** Renders your single child element instead of the default `<p>`, with the description's props merged onto it. */
+  asChild?: boolean;
+}
+
 /** The panel's accessible description. */
-export const ModalDescription = /* @__PURE__ */ forwardRef<
-  ElementRef<typeof RadixDialog.Description>,
-  ComponentPropsWithoutRef<typeof RadixDialog.Description>
->(function ModalDescription({ className, ...rest }, ref) {
+export const ModalDescription = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDialog.Description>, ModalDescriptionProps>(function ModalDescription({ className, ...rest }, ref) {
   return (
     <RadixDialog.Description
       {...rest}
@@ -505,7 +512,10 @@ export const ModalFooter = /* @__PURE__ */ forwardRef<HTMLDivElement, HTMLAttrib
   );
 });
 
-export type ModalCloseProps = ComponentPropsWithoutRef<typeof RadixDialog.Close>;
+export interface ModalCloseProps extends ComponentPropsWithoutRef<typeof RadixDialog.Close> {
+  /** Renders your single child element (e.g. a `Button`) instead of the default close button, with the close behavior merged onto it. */
+  asChild?: boolean;
+}
 
 /**
  * Closes the panel. With no children and no `asChild` it renders the default close button: a ghost
