@@ -89,8 +89,10 @@ describe('validateLines: upper bound at the toFixed exponential threshold (#418)
   });
 
   it('still accepts the largest values below the bound', () => {
-    expect(errorsFor({ quantity: '9'.repeat(20) + '0' })['lineItems.0.quantity']).toBeUndefined();
-    expect(errorsFor({ unitPrice: '999999999999999900000' })['lineItems.0.unitPrice']).toBeUndefined();
+    // 999999999999999868928 is the largest double below 1e21 (1e21 - 131072); the digit string `9`×21 rounds up to 1e21.
+    expect(errorsFor({ quantity: '999999999999999868928' })['lineItems.0.quantity']).toBeUndefined();
+    expect(errorsFor({ unitPrice: '999999999999999868928.00' })['lineItems.0.unitPrice']).toBeUndefined();
+    expect(errorsFor({ quantity: '9'.repeat(21) })['lineItems.0.quantity']).toBeDefined();
     expect(errorsFor({ quantity: '1' + '0'.repeat(20) })).toEqual({});
   });
 
