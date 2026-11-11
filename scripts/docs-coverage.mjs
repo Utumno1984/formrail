@@ -4,6 +4,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
+import { sanitize } from 'storybook/internal/csf';
 
 /**
  * Runtime exports with no `component`/`subcomponents` entry in a stories file: export name -> titles of
@@ -47,21 +48,7 @@ export const DOCUMENTED_IN = {
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };
 
-/**
- * Storybook's id sanitizer (`sanitize` of `storybook/internal/csf`, applied by `toId` to the whole title):
- * only the listed punctuation/space characters become a hyphen, so letters outside a-z (`é`, `ü`) are kept.
- * Underscore is in the list, so `My_Field` becomes `my-field`. A test compares it with the real `toId`.
- */
-export function sanitize(text) {
-  return text
-    .toLowerCase()
-    .replace(/[ ’–—―′¿'`~!@#$%^&*()_|+\-=?;:'",.<>{}[\]\\/]/gi, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+/, '')
-    .replace(/-+$/, '');
-}
-
-/** Docs page id Storybook generates for a title. */
+/** Docs page id Storybook generates for a title (its own `sanitize`, so the two cannot diverge). */
 export const docsId = (title) => `${sanitize(title)}--docs`;
 
 function walk(dir, accept, out = []) {
@@ -167,9 +154,21 @@ export function collectPages(root, packageDir, mdxFiles = []) {
   return pages;
 }
 
-/** Ids of the `?path=/docs/<id>` links of an MDX source. */
+/** A character that can be part of a Storybook id: one `sanitize` leaves alone (it lowercases and turns separators into `-`). */
+const isIdChar = (ch) => ch === '-' || sanitize(ch) === ch.toLowerCase();
+
+/** Ids of the `?path=/docs/<id>` links of an MDX source: a link ends at the first character `sanitize` never leaves in an id. */
 export function docsLinks(mdxSource) {
-  return [...mdxSource.matchAll(/\?path=\/docs\/([\p{L}\p{N}-]+)/gu)].map((m) => m[1]);
+  const ids = [];
+  for (const m of mdxSource.matchAll(/\?path=\/docs\/(\S+)/g)) {
+    let id = '';
+    for (const ch of m[1]) {
+      if (!isIdChar(ch)) break;
+      id += ch;
+    }
+    if (id) ids.push(id);
+  }
+  return ids;
 }
 
 /** Source with every comment blanked out (same length), so a name in a comment is not a mention. */
@@ -177,12 +176,22 @@ export function stripComments(source) {
   const file = ts.createSourceFile('x.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const starts = new Set();
   const ranges = [];
+  // JSX text is content, not trivia: a `//` or `/*` in it is literal text. Positions where one starts are never scanned
+  // (the node holding the text, e.g. the children list of an element, starts at the same position).
+  const jsxTextStarts = new Set();
+  const collect = (node) => {
+    if (ts.isJsxText(node)) jsxTextStarts.add(node.pos);
+    ts.forEachChild(node, collect);
+  };
+  collect(file);
   const visit = (node) => {
     // At a token's start: the comments before it on its own lines (leading) and those on the previous token's line (trailing).
-    for (const r of [...(ts.getTrailingCommentRanges(source, node.pos) ?? []), ...(ts.getLeadingCommentRanges(source, node.pos) ?? [])]) {
-      if (!starts.has(r.pos)) {
-        starts.add(r.pos);
-        ranges.push(r);
+    if (!jsxTextStarts.has(node.pos)) {
+      for (const r of [...(ts.getTrailingCommentRanges(source, node.pos) ?? []), ...(ts.getLeadingCommentRanges(source, node.pos) ?? [])]) {
+        if (!starts.has(r.pos)) {
+          starts.add(r.pos);
+          ranges.push(r);
+        }
       }
     }
     for (const child of node.getChildren(file)) visit(child);
@@ -200,6 +209,11 @@ const mentions = (source, name) => {
   return mentionsRaw(strippedCache.get(source), name);
 };
 
+const rendersTag = (source, name) => {
+  if (!strippedCache.has(source)) strippedCache.set(source, stripComments(source));
+  return new RegExp(`</?${name.replace(/\$/g, '\\$')}(?![\\w$])`).test(strippedCache.get(source));
+};
+
 /**
  * (a) Runtime exports with no Docs page: not a `component`/`subcomponents` of a page and not listed
  * in `documentedIn` (or listed with a page that does not exist or never mentions the export).
@@ -210,10 +224,12 @@ export function undocumentedExports(exportNames, pages, documentedIn = DOCUMENTE
   const byTitle = new Map(pages.map((p) => [p.title, p]));
   for (const name of exportNames) {
     if (covered.has(name)) continue;
-    // A part of a documented compound component (`DialogTitle` of `Dialog`): the name continues the
-    // component's at a word boundary (not `Fieldset` for `Field`) and the page uses it in code, not in a comment.
+    // A part of a documented compound component (`DialogTitle` of `Dialog`) without an explicit `subcomponents` entry:
+    // the name continues the component's at a PascalCase/digit boundary (not `Fieldset` for `Field`) AND the page renders it
+    // as a JSX tag in code, not in a comment. A name that merely starts like a component (`SelectAll`, `Step2Icon`) and is
+    // only referenced as a value is a separate export and needs its own page or `documentedIn` entry.
     const isPart = (c) => name.length > c.length && name.startsWith(c) && /^[A-Z0-9]/.test(name.slice(c.length));
-    if (pages.some((p) => p.components.some(isPart) && mentions(p.source, name))) continue;
+    if (pages.some((p) => p.components.some(isPart) && rendersTag(p.source, name))) continue;
     const titles = documentedIn[name];
     if (!titles) {
       problems.push(`${name}: exported but not documented (no Docs page with it as component/subcomponent, no entry in DOCUMENTED_IN)`);

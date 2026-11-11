@@ -108,18 +108,8 @@ describe('docs coverage: the guard itself', () => {
 });
 
 describe('docs coverage: id sanitization (#416)', () => {
-  const titles = [
-    'Forms/My_Field',
-    'Forms/Input',
-    'Pro/Patterns/Form rebase',
-    'Forms/Café',
-    'Überblick/Ünïcode_Åpp',
-    'A//B',
-    'A/_x_/B',
-    'Foo.Bar/Baz-Qux (beta)',
-    'Forms/It’s — here',
-    '_A/b_',
-  ];
+  // docsId uses Storybook's own `sanitize`, so a divergence is structurally impossible: a short sanity check suffices.
+  const titles = ['Forms/My_Field', 'Pro/Patterns/Form rebase', 'Überblick/Ünïcode_Åpp', 'Forms/It’s — here'];
 
   it.each(titles)('docsId(%j) matches the id Storybook itself generates', (title) => {
     expect(docsId(title)).toBe(toId(title, 'Docs'));
@@ -157,9 +147,53 @@ describe('docs coverage: compound-component heuristic (#416)', () => {
     expect(undocumentedExports(['Fieldset', 'Fields'], pages, {})).toHaveLength(2);
   });
 
-  it('still accepts a real part of a compound component used in code', () => {
+  it('still accepts a real part of a compound component rendered as a tag in code', () => {
     const pages = [{ ...page('export const S = () => <Dialog><DialogTitle>x</DialogTitle></Dialog>;'), components: ['Dialog'] }];
     expect(undocumentedExports(['DialogTitle'], pages, {})).toEqual([]);
+    const inComment = [{ ...page('// <DialogTitle> later\nexport const S = () => <Dialog />;'), components: ['Dialog'] }];
+    expect(undocumentedExports(['DialogTitle'], inComment, {})).toHaveLength(1);
+  });
+
+  it('does not treat an unrelated export as part of a component because it continues its name (SelectAll, Step2Icon)', () => {
+    const select = { title: 'Forms/Select', id: 'forms-select--docs', components: ['Select'], source: '<Select /><button onClick={SelectAll}>x</button>' };
+    expect(undocumentedExports(['SelectAll'], [select], {})).toEqual([expect.stringContaining('SelectAll: exported but not documented')]);
+    const step = { title: 'Nav/Step', id: 'nav-step--docs', components: ['Step'], source: '<Step />{Step2Icon}' };
+    expect(undocumentedExports(['Step2Icon'], [step], {})).toEqual([expect.stringContaining('Step2Icon: exported but not documented')]);
+  });
+
+  it('on the real core pages: a new export mentioned only in a comment or in JSX text is still reported', () => {
+    const synthetic = {
+      title: 'Forms/Select',
+      id: 'forms-select--docs',
+      components: ['Select'],
+      source: '// SelectAll is coming\nexport const S = () => <Select>// SelectMany literal text</Select>;',
+    };
+    const problems = undocumentedExports([...coreExports, 'SelectAll', 'SelectMany'], [...corePages, synthetic]);
+    expect(problems).toEqual([
+      expect.stringContaining('SelectAll: exported but not documented'),
+      expect.stringContaining('SelectMany: exported but not documented'),
+    ]);
+  });
+
+  it('a DOCUMENTED_IN claim counts a mention in code that follows JSX text containing //', () => {
+    const pages = [{ title: 'Foundations/Utilities', id: 'u--docs', components: [], source: 'const S = () => <p>// note</p>; composeRefs(a);' }];
+    expect(undocumentedExports(['composeRefs'], pages, { composeRefs: ['Foundations/Utilities'] })).toEqual([]);
+  });
+
+  it('stripComments does not treat // or /* inside JSX text as a comment', () => {
+    const src = 'const S = () => <Field>// FieldGroup literal text</Field>;';
+    expect(stripComments(src)).toBe(src);
+    const block = 'const S = () => <Field>/* FieldGroup */</Field>; const t = 1;';
+    expect(stripComments(block)).toBe(block);
+    expect(stripComments('const S = () => <Field>{/* gone */}</Field>; // gone')).not.toContain('gone');
+  });
+
+  it('docsLinks stops where docsId can never produce a character, on both sides (Forms/Rate•Limit)', () => {
+    const id = docsId('Forms/Rate•Limit');
+    expect(id).toContain('•');
+    expect(docsLinks(`[x](?path=/docs/${id}) and ?path=/docs/${id}, more`)).toEqual([id, id]);
+    const page = { title: 'Forms/Rate•Limit', id, components: [], source: '' };
+    expect(brokenLinks([page], `(?path=/docs/${id})`, 'Introduction')).toEqual([]);
   });
 
   it('a DOCUMENTED_IN claim is not satisfied by a comment mention', () => {
