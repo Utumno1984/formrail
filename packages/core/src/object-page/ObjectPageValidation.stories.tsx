@@ -2,6 +2,7 @@ import { useRef, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { storyControls } from '../internal/story-docs';
 import { Combobox } from '../combobox/Combobox';
 import { Field } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
@@ -45,7 +46,8 @@ const meta: Meta<ValidationArgs> = {
     layout: 'fullscreen',
     docs: { description: { component: "Validation on an Object Page: `useObjectPageForm` collects the errors, a `ValidationProvider` hands each one to the `Field` with the matching `name`, and the footer's error summary moves the focus to the first invalid field on save. Press Save with nothing filled in to see it." } },
   },
-  argTypes: {
+  // A pattern page (hook + provider + footer), no single component: every control is a knob of the demo.
+  argTypes: storyControls({
     withProvider: {
       control: 'boolean',
       description:
@@ -55,8 +57,8 @@ const meta: Meta<ValidationArgs> = {
       control: 'text',
       description: 'An explicit `error` on Country. With content it wins over the provider; empty, the provider error is used.',
     },
-    onSave: { control: false },
-  },
+    onSave: { control: false, description: 'Called with the values when a save passes validation.' },
+  }),
   args: { withProvider: true, countryError: '', onSave: fn() },
 };
 

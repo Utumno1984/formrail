@@ -46,6 +46,7 @@ function useMenuContext(part: string): MenuContextValue {
 }
 
 export interface MenuProps {
+  /** The `MenuTrigger` and the `MenuContent`. */
   children?: ReactNode;
   /**
    * Controlled open state. Whatever opens the menu (the trigger, or the application setting `open`),
@@ -53,7 +54,9 @@ export interface MenuProps {
    * `onOpenChange` reports the user's opening and closing, not the application's own changes.
    */
   open?: boolean;
+  /** Open state at mount, when `open` is not controlled. Default `false`. */
   defaultOpen?: boolean;
+  /** Called when the user opens or closes the menu (trigger, Escape, outside click, an item's selection). */
   onOpenChange?: (open: boolean) => void;
   /**
    * Modal (default `true`): the page behind is inert while the menu is open, and an outside click or
@@ -219,9 +222,9 @@ export interface MenuContentProps extends Omit<
    * has always wrapped, so `true` is kept.)
    */
   loop?: boolean;
-  /** Default `bottom`. */
+  /** The side of the trigger the menu opens on. Default `bottom`. */
   side?: 'top' | 'right' | 'bottom' | 'left';
-  /** Default `start`. */
+  /** Alignment of the menu against the trigger. Default `start`. */
   align?: 'start' | 'center' | 'end';
 }
 

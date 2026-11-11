@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../dialog/Dialog';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from './Menu';
 
@@ -34,32 +35,38 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Overlays/Menu',
-  // The props tables come from `subcomponents` (docgen only, no inferred argTypes): the stories drive the
-  // menu through a demo wrapper, so its props must not become Controls.
-  subcomponents: { Menu, MenuTrigger, MenuContent, MenuItem, MenuGroup, MenuLabel, MenuSeparator },
+  // The stories drive the menu through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the props table of
+  // the real component; the Menu props the demo does not take from the args have no Control.
+  component: Menu as never,
+  subcomponents: { MenuTrigger, MenuContent, MenuItem, MenuGroup, MenuLabel, MenuSeparator },
   // Overlays opened at mount (`defaultOpen`) would take over the Docs page if the stories were rendered
   // inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '420px' } } },
   argTypes: {
+    modal: { control: 'boolean' },
+    onOpenChange: { control: false },
+    ...withoutControls('open', 'defaultOpen', 'dir', 'children'),
+    // Props of `MenuContent` (see its tab), driven from the main table.
     side: {
       control: 'radio',
       options: ['top', 'right', 'bottom', 'left'] satisfies Side[],
+      description: "`MenuContent`'s `side`: the side of the trigger the menu opens on.",
     },
     align: {
       control: 'radio',
       options: ['start', 'center', 'end'] satisfies Align[],
+      description: "`MenuContent`'s `align`: alignment against the trigger.",
     },
-    disabledItem: {
+    loop: { control: 'boolean', description: "`MenuContent`'s `loop`: the arrow keys wrap from the last item to the first." },
+    disabledItem: storyControl({
       control: 'select',
       options: ['none', 'rename', 'duplicate', 'archive'] satisfies DisabledItem[],
-    },
-    modal: { control: 'boolean' },
-    loop: { control: 'boolean' },
-    onOpenChange: { control: false },
-    onRename: { control: false },
-    onDuplicate: { control: false },
-    onArchive: { control: false },
-    onDelete: { control: false },
+      description: 'Which `MenuItem` gets `disabled` (`none`: no one).',
+    }),
+    onRename: storyControl({ control: false, description: 'The `onSelect` of the "Rename" `MenuItem`.' }),
+    onDuplicate: storyControl({ control: false, description: 'The `onSelect` of the "Duplicate" `MenuItem`.' }),
+    onArchive: storyControl({ control: false, description: 'The `onSelect` of the "Archive" `MenuItem`.' }),
+    onDelete: storyControl({ control: false, description: 'The `onSelect` of the "Delete" `MenuItem`.' }),
   },
   args: {
     side: 'bottom',

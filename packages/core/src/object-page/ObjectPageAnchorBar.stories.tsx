@@ -5,6 +5,7 @@ import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { Tooltip } from '../tooltip/Tooltip';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { ObjectPage } from './ObjectPage';
 import { ObjectPageHeader } from './ObjectPageHeader';
 import { ObjectPageSection } from './ObjectPageSection';
@@ -19,19 +20,18 @@ interface PlaygroundArgs {
 const meta: Meta<PlaygroundArgs> = {
   title: 'Floorplans/Object Page/Anchor Bar',
   component: ObjectPage,
+  subcomponents: { ObjectPageSection },
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    sectionNavigation: {
-      control: 'radio',
-      options: ['anchors', 'none'],
-      description: 'Sticky anchor bar (with scroll-spy) or no navigation',
-    },
-    sectionCount: { control: { type: 'range', min: 1, max: 10, step: 1 }, description: 'Number of sections (the bar appears from 2)' },
-    lastSectionHeight: {
+    sectionNavigation: { control: 'radio', options: ['anchors', 'none'] },
+    // Set by the demo (the header, the sections; `labels` gets `anchorBar` from the control below).
+    ...withoutControls('headingLevel', 'labels', 'children'),
+    sectionCount: storyControl({ control: { type: 'range', min: 1, max: 10, step: 1 }, description: 'How many `ObjectPageSection`s the demo renders (the bar appears from 2).' }),
+    lastSectionHeight: storyControl({
       control: { type: 'range', min: 40, max: 900, step: 10 },
-      description: 'Height of the last section: if it is too short to reach the top, the active entry at the bottom is still the last one',
-    },
-    anchorBarLabel: { control: 'text', description: 'labels.anchorBar: accessible name of the <nav>' },
+      description: 'Height of the last section: if it is too short to reach the top, the active entry at the bottom is still the last one.',
+    }),
+    anchorBarLabel: storyControl({ control: 'text', description: 'Passed as `labels.anchorBar`: the accessible name of the anchor bar `<nav>`.' }),
   },
   args: { sectionNavigation: 'anchors', sectionCount: 6, lastSectionHeight: 120, anchorBarLabel: 'Sections' },
 };
