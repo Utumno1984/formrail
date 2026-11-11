@@ -76,5 +76,8 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  * An accessible name is required: `aria-label`, `aria-labelledby` or a (visually hidden) `caption`.
  */
 export const ListReportTable = /* @__PURE__ */ forwardRef(ListReportTableImpl) as <Row>(
-  props: ListReportTableProps<Row> & { ref?: Ref<HTMLDivElement> },
+  props: ListReportTableProps<Row> & {
+    /** The table's scroll container (the focusable `<div>` around the `<table>`). */
+    ref?: Ref<HTMLDivElement>;
+  },
 ) => ReactElement | null;
