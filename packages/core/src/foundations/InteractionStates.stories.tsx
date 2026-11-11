@@ -206,7 +206,7 @@ function Surfaces({ disabled, state, onClick, onValueChange, onFilterChange }: S
             <Input aria-label="Text input" defaultValue="Text cursor" />
           </div>
           <Card>
-            <CardBody>Card</CardBody>
+            <CardBody className="px-3 py-2">Card</CardBody>
           </Card>
           <StatusBadge tone="success">Approved</StatusBadge>
           <Avatar name="Rossi Construction" />
