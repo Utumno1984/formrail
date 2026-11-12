@@ -1,5 +1,8 @@
 import { useRef, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/story-example';
+import { NewSupplier } from './ObjectPageValidation.example';
+import newSupplierCode from './ObjectPageValidation.example.tsx?raw';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { storyControls } from '../internal/story-docs';
@@ -126,10 +129,22 @@ function ValidationDemo({ withProvider, countryError, onSave }: ValidationArgs) 
 const render = (args: ValidationArgs) => <ValidationDemo {...args} />;
 
 /**
+ * Copy-paste example: `useObjectPageForm({ validate })`, a `ValidationProvider` that hands each error to its `Field`, and the focus on the first invalid field after Save.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory(NewSupplier, newSupplierCode),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Save with nothing filled in: every Field shows its own message and `aria-invalid`, the focus goes to
  * the first one. Filling in the supplier and saving again moves the focus to the next invalid one.
  */
 export const WithValidation: Story = {
+  tags: ['playground'],
   name: 'Object Page with validation',
   render,
   play: async ({ canvasElement, args }) => {

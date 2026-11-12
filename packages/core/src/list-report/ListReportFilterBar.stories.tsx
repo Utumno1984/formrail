@@ -1,5 +1,8 @@
 import { useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/story-example';
+import { FilteredInvoices } from './ListReportFilterBar.example';
+import filteredInvoicesCode from './ListReportFilterBar.example.tsx?raw';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
@@ -128,6 +131,17 @@ const customers = (canvas: ReturnType<typeof within>): string[] =>
     .map((li) => li.textContent ?? '');
 
 /**
+ * Copy-paste example: one `table` from `useListReport({ filters })` drives both the filter bar (filter pills and search) and the `ListReportTable` that shows the result.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory(FilteredInvoices, filteredInvoicesCode),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: `searchCommitDelay` (0 / 300 / 800 ms, or "Enter only" = only Enter commits), `showSearch`,
  * the two accessible names and `dir`. `onFilterChange` and `onSearchQueryChange` show up in Actions.
  * The play function moves from "All" to "To approve" with the arrow key, types "rossi" and presses
@@ -135,6 +149,7 @@ const customers = (canvas: ReturnType<typeof within>): string[] =>
  * clears the search and the whole filter comes back.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ searchCommitDelay, ...rest }) => (
     <div style={PAGE}>
       <Demo searchCommitDelay={searchCommitDelay as number | null} {...rest} />

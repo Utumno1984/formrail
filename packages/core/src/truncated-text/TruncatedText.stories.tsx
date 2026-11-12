@@ -1,5 +1,8 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/story-example';
+import { SupplierRow } from './TruncatedText.example';
+import supplierRowCode from './TruncatedText.example.tsx?raw';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Tooltip, TooltipProvider } from '../tooltip/Tooltip';
@@ -68,12 +71,24 @@ async function settle(trigger: HTMLElement) {
 }
 
 /**
+ * Copy-paste example: a long name in a flex row next to a button: it shrinks, ends with an ellipsis and shows the full text in a tooltip on hover or focus.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory(SupplierRow, supplierRowCode),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: `children` (the text), `width` (the demo container), `tabIndex` (`0` makes the text
  * reachable by keyboard); `onFocus` appears in Actions. The play function hovers the text: if it is
  * truncated at the current width the tooltip shows the full text, otherwise nothing opens. Then it
  * widens the container to 900px and hovers again: the same element must now open nothing.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ children, width, tabIndex, onFocus }) => (
     <Page>
       <div data-testid="container" style={{ width, ...FRAME }}>

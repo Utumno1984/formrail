@@ -6,6 +6,17 @@ import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from '../../../core/src/s
 import { InvoiceCrud, type InvoiceCrudProps } from '../../../core/src/showcase/InvoiceCrud';
 import { storyControls } from '../../../core/src/internal/story-docs';
 import { invoiceSaveReview } from './invoice-review';
+import invoiceReviewCode from './invoice-review.tsx?raw';
+// Story-only helper of the core sources (same exception as the showcase imports above).
+import { githubSource, showcaseSource } from '../../../core/src/internal/story-example';
+
+const SOURCE_FILES = [
+  {
+    path: 'packages/pro/src/showcase/invoice-review.tsx',
+    code: invoiceReviewCode,
+    note: 'The review step plugged into the Free showcase through its `reviewSave` extension point: `ChangeSummary` against the saved record. In your app, import `ChangeSummary` from `@formrail/pro`. Not public: the relative imports of the Pro sources (`../change-summary/compute-change-summary`, `../change-summary/format-change-value`) and of the Free showcase (`../../../core/src/showcase/...`, fixtures and the record page).',
+  },
+];
 
 /*
  * The Pro Change Summary in a real flow: the SAME CRUD showcase as `Showcase/Invoices` (List Report -> Object
@@ -24,7 +35,7 @@ const meta: Meta<Args> = {
     docs: {
       description: {
         component:
-          'The CRUD showcase of `Showcase/Invoices` with a review step before saving: open an invoice, edit it, press Save and the dialog lists every change (with the field labels and readable values) against the saved record. The line items are reported row by row, matched by `id` (a changed quantity is one entry for that row, a removed row is reported with the values it had); when only their order changed the dialog says so instead of listing nothing. Confirm to save, or keep editing. Controls: `saveDelayMs` (how long the save takes once confirmed), `saveOutcome` (`error`: the save fails, the form stays edited and a new Save reviews the same changes).',
+          'The CRUD showcase of `Showcase/Invoices` with a review step before saving: open an invoice, edit it, press Save and the dialog lists every change (with the field labels and readable values) against the saved record. The line items are reported row by row, matched by `id` (a changed quantity is one entry for that row, a removed row is reported with the values it had); when only their order changed the dialog says so instead of listing nothing. Confirm to save, or keep editing. Controls: `saveDelayMs` (how long the save takes once confirmed), `saveOutcome` (`error`: the save fails, the form stays edited and a new Save reviews the same changes). The source is on [GitHub](' + githubSource('packages/pro/src/showcase') + '), built on the [Free showcase](' + githubSource('packages/core/src/showcase') + '); the review step is at the bottom of this page.',
       },
     },
   },
@@ -85,6 +96,8 @@ const otherStatus = (canvas: ReturnType<typeof within>): string =>
  * showcase's own save ("Saving…" in the footer), then "Back to list": the row shows the new status.
  */
 export const ReviewChanges: Story = {
+  tags: ['showcase-source'],
+  parameters: showcaseSource('packages/pro/src/showcase', SOURCE_FILES),
   play: async ({ canvasElement, args }) => {
     const canvas = await openRecord(canvasElement);
     const body = within(canvasElement.ownerDocument.body);

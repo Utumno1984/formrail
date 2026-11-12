@@ -1,5 +1,8 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/story-example';
+import { NewOrder } from './ObjectPageSchema.example';
+import newOrderCode from './ObjectPageSchema.example.tsx?raw';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { z } from 'zod';
 import { Button } from '../button/Button';
@@ -155,8 +158,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Copy-paste example: `useObjectPageForm({ schema })` with a Zod schema (any Standard Schema works); press Save with nothing filled in.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory(NewOrder, newOrderCode),
+};
+
 /** Object Page with schema: Save with nothing filled in, then fill everything and save again. */
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ */
 export const WithSchema: Story = {
+  tags: ['playground'],
   name: 'Object Page with schema',
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);

@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/story-example';
+import { InvoiceSummary } from './DescriptionList.example';
+import invoiceSummaryCode from './DescriptionList.example.tsx?raw';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import {
@@ -128,12 +131,24 @@ type Story = StoryObj<typeof meta>;
 const rect = (el: Element) => el.getBoundingClientRect();
 
 /**
+ * Copy-paste example: a status above a description list whose layout follows the width of its own container; an empty value shows `emptyLabel`.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory(InvoiceSummary, invoiceSummaryCode),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: layout, container width (a range), kind of values, empty label. `onOpen` shows in
  * Actions. The play function narrows the container under the threshold, checks the value drops
  * under its label, widens it again and checks the values are back beside the labels in a single
  * column (a string row and a custom-node row start at the same x).
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { layout: 'auto', width: 600, valueKind: 'mixed' },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

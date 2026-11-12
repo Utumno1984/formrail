@@ -1,5 +1,11 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { githubSource, showcaseSource } from '../internal/story-example';
+import invoiceCrudCode from './InvoiceCrud.tsx?raw';
+import invoiceLineItemsCode from './InvoiceLineItems.tsx?raw';
+import invoiceListToRecordCode from './InvoiceListToRecord.tsx?raw';
+import invoiceRecordPageCode from './InvoiceRecordPage.tsx?raw';
+import invoiceStoreCode from './invoice-store.ts?raw';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { InvoiceCrud, type InvoiceCrudProps } from './InvoiceCrud';
 import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from './crud-story-args';
@@ -42,11 +48,23 @@ function RecordPageDemo({ recordId, loadDelayMs, saveDelayMs, saveOutcome, loadO
   return <InvoiceRecordPage store={store} recordId={recordId} onBack={onBack} onSaved={onSaved} />;
 }
 
+const SHOWCASE_FOLDER = 'packages/core/src/showcase';
+// Every file of the showcase lives inside the core package, so it imports the components by relative path:
+// in an app, those are imports from `@formrail/core`. What is NOT public API is said file by file.
+const IN_APP = 'Imports the components by relative path because it lives inside the core package: in your app, import them from `@formrail/core`.';
+const SOURCE_FILES = [
+  { path: `${SHOWCASE_FOLDER}/InvoiceCrud.tsx`, code: invoiceCrudCode, note: `The whole application: list, record page, create, delete and bulk delete, with toasts and confirmations. ${IN_APP} Not public: \`../internal/demo-invoices\` (fixture data), \`./invoice-api\`, \`./invoice-store\` (an in-memory server) and \`./showcase-router\` (a minimal router for the story).` },
+  { path: `${SHOWCASE_FOLDER}/InvoiceListToRecord.tsx`, code: invoiceListToRecordCode, note: `The List Report with URL state and scroll restoration, opening the record page. ${IN_APP} Not public: \`../internal/demo-invoices\`, \`./invoice-api\`, \`./invoice-store\`, \`./invoice-list-shared\`, \`./showcase-router\`.` },
+  { path: `${SHOWCASE_FOLDER}/InvoiceRecordPage.tsx`, code: invoiceRecordPageCode, note: `The Object Page: loading, form with a baseline, validation, error summary, save bar and dirty-guard. ${IN_APP} Not public: \`../calendar/date-math\` (an internal date helper), \`../internal/demo-invoices\`, \`./invoice-store\`, \`./showcase-data\`, \`./number-text\`, \`./invoice-lines\`.` },
+  { path: `${SHOWCASE_FOLDER}/InvoiceLineItems.tsx`, code: invoiceLineItemsCode, note: `The editable line items of an invoice. ${IN_APP} Not public: \`../internal/use-list-mutation-focus\` (where the focus goes after adding or removing a row) and \`./invoice-lines\`.` },
+  { path: `${SHOWCASE_FOLDER}/invoice-store.ts`, code: invoiceStoreCode, note: 'Fixture, not part of the library: the in-memory "server" the showcase reads from and saves to, with configurable delays and failures.' },
+];
+
 const meta: Meta<RecordPageArgs> = {
   title: 'Showcase/Invoices',
   parameters: {
     layout: 'fullscreen',
-    docs: { description: { component: "A complete worked example: an invoice record page (Object Page with sections, validation, a sticky save-bar and a dirty-guard) opened from a List Report, built only from the library's components. Use the controls to open another invoice, slow down the load or open one that does not exist; edit a field and try to leave to see the guard." } },
+    docs: { description: { component: "A complete worked example: an invoice record page (Object Page with sections, validation, a sticky save-bar and a dirty-guard) opened from a List Report, built only from the library's components. Use the controls to open another invoice, slow down the load or open one that does not exist; edit a field and try to leave to see the guard. The source is on [GitHub](" + githubSource(SHOWCASE_FOLDER) + "); its main files are at the bottom of this page." } },
   },
   // A showcase documents no component: every control is a knob of the demo.
   argTypes: storyControls({
@@ -105,6 +123,8 @@ const region = (canvas: ReturnType<typeof within>) => canvas.queryByRole('region
  * fail (those states are what the Controls are for); a zero delay skips the in-flight assertions.
  */
 export const RecordPage: Story = {
+  tags: ['showcase-source'],
+  parameters: showcaseSource(SHOWCASE_FOLDER, SOURCE_FILES),
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
