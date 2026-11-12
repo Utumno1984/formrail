@@ -51,7 +51,7 @@ import type { ListReportRowAction, ListReportSelection } from '../list-report/ty
 import { EMPTY_IDS } from '../list-report/use-list-report';
 import { ToastProvider } from '../toast/ToastProvider';
 import { useToast } from '../toast/use-toast';
-import { InvoiceEditor, InvoiceRecordPage, type InvoiceSaveReviewer } from './InvoiceRecordPage';
+import { InvoiceEditor, InvoiceRecordPage, type InvoiceSaveReviewer, type UseInvoiceEditorAddons } from './InvoiceRecordPage';
 import { ListView, type ListViewProps } from './InvoiceListToRecord';
 import { createInvoiceApi } from './invoice-api';
 import {
@@ -100,6 +100,8 @@ export interface InvoiceCrudProps {
    * Absent, the showcase is unchanged. See `InvoiceEditorProps.reviewSave`.
    */
   reviewSave?: InvoiceSaveReviewer;
+  /** Story-only extension point (#384): see `InvoiceEditorProps.useAddons`. Absent, the showcase is unchanged. */
+  useAddons?: UseInvoiceEditorAddons;
 }
 
 export interface DeletedInvoice {
@@ -153,6 +155,7 @@ function CrudInner({
   deleteOutcome = 'success',
   onDeleted,
   reviewSave,
+  useAddons,
 }: InvoiceCrudProps) {
   const toast = useToast();
   // One store per mount of the story: nothing shared between stories.
@@ -341,6 +344,7 @@ function CrudInner({
         onDelete={deleteFromPage}
         onDeleteDone={deleteDone}
         reviewSave={reviewSave}
+        useAddons={useAddons}
       />
     );
   }

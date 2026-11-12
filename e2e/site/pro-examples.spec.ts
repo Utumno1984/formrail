@@ -14,9 +14,9 @@ const examples = proExamples(REPO_ROOT);
 const notPublic = PRO_DEMO_NOT_PUBLIC as string[];
 
 test.describe('Pro copy-paste examples per build (#447)', () => {
-  test('the scan is not vacuous: every Pro page has an example, and one of them is not public yet', () => {
-    expect(examples.map((example) => example.folder).sort()).toEqual(['change-summary', 'form-rebase', 'list-report']);
-    expect(examples.some((example) => notPublic.includes(example.folder))).toBe(true);
+  test('the scan is not vacuous: every Pro page has an example; every folder is public since #384 (Form rebase)', () => {
+    expect(examples.map((example) => example.folder).sort()).toEqual(['change-summary', 'form-rebase', 'form-rebase', 'list-report']);
+    expect(notPublic).toEqual([]);
   });
 
   test('the Free Storybook carries no Pro example text', () => {
@@ -26,9 +26,10 @@ test.describe('Pro copy-paste examples per build (#447)', () => {
     for (const { file, marker } of examples) expect(text.includes(marker), file).toBe(false);
   });
 
-  test('the Pro demo carries the public Pro examples only', () => {
+  test('the Pro demo carries the public Pro examples only (all of them, the Form rebase ones included)', () => {
     const text = buildText(`${SITE_DIR}pro`);
     for (const { file, folder, marker } of examples) expect(text.includes(marker), file).toBe(!notPublic.includes(folder));
+    for (const marker of ['export function InvoiceRebase(', 'export function InvoiceUpdatedNotice(']) expect(text, marker).toContain(marker);
     // Nor the core examples: the demo has no core page.
     expect(text).not.toContain('export function InvoiceList(');
   });

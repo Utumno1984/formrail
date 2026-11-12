@@ -112,7 +112,8 @@ describe('useFormRebase: applying a rebase', () => {
     expect(h().form.values).toEqual({ ...BASE, number: 'A-2', notes: 'mine', amount: 30 });
     expect(h().form.isDirty).toBe(true);
     expect(h().rebase.conflicts).toEqual([
-      { path: 'number', label: 'Number', base: 'A-1', mine: 'A-2', theirs: 'A-3', baseMissing: false, mineMissing: false, theirsMissing: false },
+      // `currentPath` and `labelPath` added by #384 (the open conflict's current position): every other key as before.
+      { path: 'number', label: 'Number', base: 'A-1', mine: 'A-2', theirs: 'A-3', baseMissing: false, mineMissing: false, theirsMissing: false, currentPath: 'number', labelPath: ['Number'] },
     ]);
     expect(h().rebase.applied.map((e) => e.path)).toEqual(['amount']);
     const after = renders.slice(from);
@@ -295,7 +296,8 @@ describe('useFormRebase: resolving conflicts', () => {
     const incoming: Invoice = { ...BASE };
     act(() => h().rebase.rebase(incoming));
     expect(h().rebase.conflicts).toEqual([
-      { path: 'extra', label: 'Extra', base: 'base', mine: 'mine', theirs: undefined, baseMissing: false, mineMissing: false, theirsMissing: true },
+      // `currentPath` and `labelPath` added by #384: every other key as before.
+      { path: 'extra', label: 'Extra', base: 'base', mine: 'mine', theirs: undefined, baseMissing: false, mineMissing: false, theirsMissing: true, currentPath: 'extra', labelPath: ['Extra'] },
     ]);
     act(() => h().rebase.acceptTheirs('extra'));
     expect(Object.hasOwn(h().form.values, 'extra')).toBe(false);
@@ -317,6 +319,32 @@ describe('useFormRebase: id-keyed arrays', () => {
     act(() => h().rebase.acceptTheirs('lines.0.qty'));
     expect(h().form.values.lines).toEqual(lines([3, 1], [2, 1], [1, 6]));
     expect(h().rebase.conflicts).toEqual([]);
+  });
+
+  it('currentPath and labelPath follow the item by id after a reorder, a removal above it and an addition above it (#384)', () => {
+    const { h } = setup({ arrayIdKeys: { lines: 'id' }, labels: { 'lines.qty': 'Quantity > units' } });
+    act(() => h().form.setValue('lines', lines([1, 5], [2, 1], [3, 1])));
+    act(() => h().rebase.rebase({ ...BASE, lines: lines([1, 6], [2, 1], [3, 1]) }));
+    const at = () => h().rebase.conflicts.map((c) => [c.path, c.currentPath, c.labelPath]);
+    // The rebase-time path stays the key of the choices; the current one follows the item.
+    expect(at()).toEqual([['lines.0.qty', 'lines.0.qty', ['Lines', 'Item 1', 'Quantity > units']]]);
+    act(() => h().form.setValue('lines', lines([2, 1], [1, 5], [3, 1])));
+    expect(at()).toEqual([['lines.0.qty', 'lines.1.qty', ['Lines', 'Item 2', 'Quantity > units']]]);
+    act(() => h().form.setValue('lines', lines([1, 5], [3, 1])));
+    expect(at()).toEqual([['lines.0.qty', 'lines.0.qty', ['Lines', 'Item 1', 'Quantity > units']]]);
+    act(() => h().form.setValue('lines', lines([9, 1], [8, 1], [1, 5], [3, 1])));
+    expect(at()).toEqual([['lines.0.qty', 'lines.2.qty', ['Lines', 'Item 3', 'Quantity > units']]]);
+    // The label is built from the segments, never split on ' > '.
+    expect(h().rebase.conflicts[0]!.label).toBe('Lines > Item 3 > Quantity > units');
+    act(() => h().rebase.acceptTheirs('lines.0.qty'));
+    expect(h().form.values.lines).toEqual(lines([9, 1], [8, 1], [1, 6], [3, 1]));
+  });
+
+  it('a conflict on an item the user removed keeps its rebase-time path (no current position)', () => {
+    const { h } = setup();
+    act(() => h().form.setValue('lines', lines([1, 1], [3, 1])));
+    act(() => h().rebase.rebase({ ...BASE, lines: lines([1, 1], [2, 8], [3, 1]) }));
+    expect(h().rebase.conflicts.map((c) => [c.path, c.currentPath, c.labelPath])).toEqual([['lines.1', 'lines.1', ['Lines', 'Item 2']]]);
   });
 
   it('item removed by the server and modified by the user: acceptTheirs removes it', () => {
@@ -527,5 +555,62 @@ describe('useFormRebase: call sites', () => {
     expect(view.container.textContent).toBe('8');
     expect(error).not.toHaveBeenCalled();
     error.mockRestore();
+  });
+});
+
+describe('useFormRebase: typing while a rebase lands (#384)', () => {
+  /**
+   * A real keystroke can be dispatched between the commit of the render that holds the queued rebase and React's
+   * passive effects (scheduled for later): a microtask after that commit is such a moment. The merge must read
+   * the values that include it, never the ones of the render before it.
+   */
+  it('a keystroke right after the commit of the rebase render is not lost', async () => {
+    const global = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const actEnvironment = global.IS_REACT_ACT_ENVIRONMENT;
+    let handle: { form: UseObjectPageFormReturn<Invoice>; rebase: UseFormRebaseReturn<Invoice> } | undefined;
+    let commits = 0;
+    function Editor() {
+      const form = useObjectPageForm<Invoice>({ baseline: BASE });
+      const rebase = useFormRebase(form);
+      handle = { form, rebase };
+      commits += 1;
+      return (
+        <input
+          aria-label="Notes"
+          data-commit={commits}
+          value={form.values.notes}
+          onChange={(event) => form.setValue('notes', event.target.value)}
+        />
+      );
+    }
+    const view = render(<Editor />);
+    const input = view.getByRole('textbox', { name: 'Notes' }) as HTMLInputElement;
+    act(() => handle!.form.setValue('notes', 'Checked'));
+    const typed = 'Checked by finance';
+    // The native value setter, as a browser sets it before the `input` event (React tracks the old value).
+    const setNative = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    let observer: MutationObserver | undefined;
+    try {
+      global.IS_REACT_ACT_ENVIRONMENT = false;
+      const keystroke = new Promise<void>((resolve) => {
+        // The first commit after `rebase()`: the queued state is rendered, its effects not run yet.
+        observer = new MutationObserver(() => {
+          observer?.disconnect();
+          setNative.call(input, typed);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          resolve();
+        });
+        observer.observe(input, { attributes: true, attributeFilter: ['data-commit'] });
+      });
+      handle!.rebase.rebase({ ...BASE, amount: 99 });
+      await keystroke;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } finally {
+      observer?.disconnect();
+      global.IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    }
+    expect(handle!.form.values).toEqual({ ...BASE, notes: typed, amount: 99 });
+    expect(handle!.form.baseline).toEqual({ ...BASE, amount: 99 });
+    expect(input.value).toBe(typed);
   });
 });

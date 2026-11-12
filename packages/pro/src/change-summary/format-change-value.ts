@@ -254,5 +254,25 @@ export function formatChangeValue(value: unknown, options?: FormatChangeValueOpt
   return formatChangeValueAt(value, options, options?.precise ? 1 : 0);
 }
 
+/** What a reader sees: leading, trailing and repeated white space is not noticeable. */
+const looks = (text: string): string => text.replace(/\s+/g, ' ').trim();
+
+/**
+ * The texts of two values shown side by side (before / after, yours / the server's), more and more
+ * precise while they would look the same: level 0, precise (`null`, `undefined` and a missing key
+ * get their own texts), ISO dates, then the contents written out. If even that matches (two class
+ * instances, a difference past the truncation), the second text says so (`contentsDiffer`).
+ * `text(side, level)` renders side 0 or 1 at a level.
+ */
+export function distinctValueTexts(text: (side: 0 | 1, level: FormatLevel) => string, contentsDiffer: string): [string, string] {
+  let last: [string, string] = ['', ''];
+  for (const level of [0, 1, 2, 3] as const) {
+    last = [text(0, level), text(1, level)];
+    // Whitespace-insensitive: 'abc ' and 'abc' print differently but look the same.
+    if (looks(last[0]) !== looks(last[1])) return last;
+  }
+  return [last[0], `${last[1]} (${contentsDiffer})`];
+}
+
 /** True for the values the component shows in a muted style (`''`, `undefined`, `null`). */
 export const isMutedValue = (value: unknown): boolean => value === undefined || value === null || value === '';

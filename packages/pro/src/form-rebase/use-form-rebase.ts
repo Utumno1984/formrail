@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import type { UseObjectPageFormReturn } from '@formrail/core';
 import type { ChangeEntry } from '../change-summary/types';
+import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
 import { MISSING, idMapKey, isPlainObject, itemId, own, type PlainObject } from '../internal/structural-diff';
 import { arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
-import type { RebaseConflict, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
+import type { OpenRebaseConflict, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
+import { itemLabel } from '../change-summary/infer-label';
+import { labelPathOf, type DiffNode } from '../internal/structural-diff';
 
 interface RebaseState {
   applied: ChangeEntry[];
@@ -88,6 +91,42 @@ function setAt(current: unknown, segments: readonly Segment[], value: unknown, t
   return copy;
 }
 
+/**
+ * The conflict of `record` named at its current position in `values`: every id-keyed item on the way is found
+ * again by id (`Item N` and the index follow it). An item that is not there any more keeps the rebase-time path.
+ */
+function openConflict(record: ConflictRecord, values: unknown): OpenRebaseConflict {
+  const nodes: DiffNode[] = [];
+  for (let n: DiffNode | undefined = record.node; n && n.depth > 0; n = n.parent) nodes.unshift(n);
+  const parts: string[] = [];
+  const labels: string[] = [];
+  let current = values;
+  let moved = nodes.length === record.segments.length;
+  for (let i = 0; moved && i < record.segments.length; i += 1) {
+    const segment = record.segments[i]!;
+    if (isIdSegment(segment)) {
+      const index = Array.isArray(current) ? findById(current, segment) : -1;
+      if (index < 0) moved = false;
+      else {
+        parts.push(String(index));
+        labels.push(itemLabel(index));
+        current = (current as unknown[])[index];
+      }
+    } else {
+      parts.push(segment.key);
+      labels.push(nodes[i]!.label);
+      current = isPlainObject(current) ? own(current, segment.key) : MISSING;
+    }
+  }
+  const labelPath = moved ? labels : labelPathOf(record.node);
+  return {
+    ...record.conflict,
+    currentPath: moved ? parts.join('.') : record.conflict.path,
+    labelPath,
+    label: labelPath.join(' > '),
+  };
+}
+
 /** `current` reordered to the incoming order (items not in `theirs` placed as in `arrange`). */
 function reorderedAs(current: readonly unknown[], theirs: readonly unknown[], idKey: string): unknown[] {
   const currentKeys = keysOf(current, idKey);
@@ -110,9 +149,10 @@ function sameOrder(current: readonly unknown[], theirs: readonly unknown[], idKe
  * Applies the merge of `computeRebase` to a form of core's `useObjectPageForm`, through its public
  * API only (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`).
  *
- * **Applying a rebase**: in an effect after the render in which `rebase(incoming)` is called, with
- * the `baseline` and `values` of that render: `form.reset(incoming)` then `form.setValues(merged)`,
- * in one batch, so no render ever shows `values === incoming` in between (`isDirty` and the footer
+ * **Applying a rebase**: in a layout effect after the render in which `rebase(incoming)` is called,
+ * with the `baseline` and `values` of that render: `form.reset(incoming)` then
+ * `form.setValues(merged)`, in one batch, in the same task as that render (a passive effect could run
+ * after a keystroke the render did not see, and the merge would drop it), so no render ever shows `values === incoming` in between (`isDirty` and the footer
  * do not flicker). The form is dirty after it only when user edits are left against `incoming`.
  * `reset` clears `fieldErrors`, `formErrors` and `saveError`: validation runs again at the next
  * save. A top-level key cannot be removed through `setValues`; the core API never removes one
@@ -175,7 +215,7 @@ export function useFormRebase<Values extends object>(
     return !decisionDiffer(optionsRef.current).differs(record.theirs, current, record.node);
   }, []);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const prev = observedRef.current;
     observedRef.current = { baseline: form.baseline, values: form.values, isSaving: form.isSaving };
     const own = ownBaselineRef.current;
@@ -305,8 +345,8 @@ export function useFormRebase<Values extends object>(
     [close],
   );
 
-  const conflicts = useMemo<RebaseConflict[]>(
-    () => state.records.filter((record) => !isResolved(record, form.values)).map((record) => record.conflict),
+  const conflicts = useMemo<OpenRebaseConflict[]>(
+    () => state.records.filter((record) => !isResolved(record, form.values)).map((record) => openConflict(record, form.values)),
     [state.records, form.values, isResolved],
   );
 

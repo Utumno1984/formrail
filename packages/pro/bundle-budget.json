@@ -6,6 +6,10 @@
       "baseline": 2031,
       "limit": 2235
     },
+    "RebaseNotice": {
+      "baseline": 3629,
+      "limit": 3992
+    },
     "VirtualListReport": {
       "baseline": 4285,
       "limit": 4714

@@ -58,6 +58,15 @@ export class InvoiceNetworkError extends Error {
   }
 }
 
+/**
+ * Story-only (#384): a record changed on the "server" by someone else. `record` is the record as the server
+ * now holds it, or `null` when it was deleted.
+ */
+export interface ServerChange {
+  id: string;
+  record: StoredInvoice | null;
+}
+
 export interface InvoiceStore {
   list: () => Promise<StoredInvoice[]>;
   /** Rejects with `InvoiceNotFoundError` for an unknown id. */
@@ -85,6 +94,28 @@ export interface InvoiceStore {
    * for the first missing one) leaves the store unchanged. Repeated ids count once; no ids resolve at once.
    */
   deleteMany: (ids: readonly string[]) => Promise<void>;
+  /**
+   * Story-only (#384, used by the Pro story "Invoices with Change Summary"): another user changes a record
+   * after `delayMs` (a number of ms or a promise, as `saveDelayMs`; default 0). `change` gets a copy of the
+   * stored record and returns the new one (amount and unit prices rounded to 2 decimals, as by `save`); the
+   * subscribers are then told (`subscribe`). Rejects with `InvoiceNotFoundError` for an id that does not exist
+   * (any more) when the delay ends.
+   *
+   * The server received a save before it answers: an update landing while a save of the same record is in
+   * flight is applied to the stored record at once, then applied AGAIN on top of what that save writes (the
+   * other user's operation is replayed after ours, never overwritten by the copy our save carries). The save
+   * still resolves with what it wrote; the subscribers are told the record with the update on top.
+   * Never called by the Free showcase.
+   */
+  updateFromServer: (
+    id: string,
+    change: (record: StoredInvoice) => StoredInvoice,
+    delayMs?: number | Promise<void>,
+  ) => Promise<StoredInvoice>;
+  /** Story-only (#384): another user deletes a record after `delayMs`; the subscribers get `record: null`. */
+  removeFromServer: (id: string, delayMs?: number | Promise<void>) => Promise<void>;
+  /** Story-only (#384): called after every `updateFromServer`/`removeFromServer` (see there). Returns the unsubscribe. */
+  subscribe: (listener: (change: ServerChange) => void) => () => void;
   /** Changes delays/outcomes; applies to the calls made from now on. */
   configure: (patch: Partial<InvoiceStoreConfig>) => void;
   /** Synchronous read of the current state (for tests and debugging). */
@@ -152,6 +183,14 @@ export function createInvoiceStore(
   let sequence = seed.length;
   // Copies in and out: a caller mutating what it got can never change the store.
   const copy = (r: StoredInvoice): StoredInvoice => ({ ...r, lineItems: r.lineItems.map((l) => ({ ...l })) });
+  const normalize = (r: StoredInvoice): StoredInvoice => ({ ...r, amount: round2(r.amount), lineItems: normalizeLines(r.lineItems) });
+  // #384 (story-only): the saves in flight per record, each with the server updates that landed meanwhile.
+  type Change = (record: StoredInvoice) => StoredInvoice;
+  const inFlight = new Map<string, Set<Change[]>>();
+  const listeners = new Set<(change: ServerChange) => void>();
+  const notify = (change: ServerChange) => {
+    for (const listener of [...listeners]) listener(change);
+  };
 
   async function read<T>(produce: () => T): Promise<T> {
     // The config is read when the call is made, not when the delay ends.
@@ -173,7 +212,16 @@ export function createInvoiceStore(
       }),
     async save(invoice) {
       const { saveDelayMs, saveOutcome } = config;
-      await delay(saveDelayMs);
+      // The server updates of this record that land while this save is in flight (#384; none in the Free showcase).
+      const landed: Change[] = [];
+      const flights = inFlight.get(invoice.id) ?? new Set<Change[]>();
+      inFlight.set(invoice.id, flights.add(landed));
+      try {
+        await delay(saveDelayMs);
+      } finally {
+        flights.delete(landed);
+        if (flights.size === 0) inFlight.delete(invoice.id);
+      }
       if (saveOutcome === 'error') throw new InvoiceNetworkError('Could not save the invoice: network error');
       if (!records.has(invoice.id)) throw new InvoiceNotFoundError(invoice.id);
       const stored: StoredInvoice = {
@@ -181,7 +229,14 @@ export function createInvoiceStore(
         amount: round2(invoice.amount),
         lineItems: normalizeLines(invoice.lineItems),
       };
-      records.set(stored.id, stored);
+      if (landed.length === 0) {
+        records.set(stored.id, stored);
+        return copy(stored);
+      }
+      // Replayed on top of this save, which the server received first: the response is what this save wrote.
+      const merged = landed.reduce((record, change) => normalize(change(copy(record))), stored);
+      records.set(stored.id, merged);
+      notify({ id: stored.id, record: copy(merged) });
       return copy(stored);
     },
     async create(draft) {
@@ -215,6 +270,27 @@ export function createInvoiceStore(
       const missing = unique.find((id) => !records.has(id));
       if (missing !== undefined) throw new InvoiceNotFoundError(missing);
       for (const id of unique) records.delete(id);
+    },
+    async updateFromServer(id, change, delayMs = 0) {
+      await delay(delayMs);
+      const current = records.get(id);
+      if (!current) throw new InvoiceNotFoundError(id);
+      const updated = normalize(change(copy(current)));
+      records.set(id, updated);
+      for (const landed of inFlight.get(id) ?? []) landed.push(change);
+      notify({ id, record: copy(updated) });
+      return copy(updated);
+    },
+    async removeFromServer(id, delayMs = 0) {
+      await delay(delayMs);
+      if (!records.delete(id)) throw new InvoiceNotFoundError(id);
+      notify({ id, record: null });
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
     },
     configure: (patch) => {
       Object.assign(config, patch);

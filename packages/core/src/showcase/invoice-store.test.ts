@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { makeDemoInvoices } from '../internal/demo-invoices';
-import { createInvoiceStore, InvoiceNetworkError, InvoiceNotFoundError } from './invoice-store';
+import { createInvoiceStore, InvoiceNetworkError, InvoiceNotFoundError, type ServerChange } from './invoice-store';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -311,5 +311,156 @@ describe('createInvoiceStore: line items (#378)', () => {
     const row = { id: 'new-1', description: 'Row', quantity: 1, unitPrice: 9.999 };
     const withLines = await store.create({ ...draft, lineItems: [row] });
     expect(withLines.lineItems).toEqual([{ ...row, unitPrice: 10 }]);
+  });
+});
+
+describe('server updates (story-only, #384)', () => {
+  it('updateFromServer changes the record after the delay, normalized, and tells the subscribers once', async () => {
+    const store = createInvoiceStore();
+    const record = await store.get('inv-1');
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const pending = store.updateFromServer('inv-1', (r) => ({ ...r, status: 'approved', amount: 10.005 }), 500);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(listener).not.toHaveBeenCalled();
+    expect(store.snapshot().find((r) => r.id === 'inv-1')).toEqual(record);
+    await vi.advanceTimersByTimeAsync(1);
+    const updated = await pending;
+    expect(updated).toEqual({ ...record, status: 'approved', amount: 10.01 });
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith({ id: 'inv-1', record: updated });
+    expect(await store.get('inv-1')).toEqual(updated);
+  });
+
+  it('the change gets a copy: mutating it changes nothing but what it returns; listeners get copies too', async () => {
+    const store = createInvoiceStore();
+    await store.updateFromServer('inv-3', (r) => {
+      r.lineItems[0]!.quantity = 99;
+      return { ...r, notes: 'From the server' };
+    });
+    const stored = await store.get('inv-3');
+    expect(stored.notes).toBe('From the server');
+    expect(stored.lineItems[0]!.quantity).toBe(99);
+    const listener = vi.fn();
+    store.subscribe(listener);
+    await store.updateFromServer('inv-3', (r) => r);
+    (listener.mock.calls[0]![0] as ServerChange).record!.notes = 'tampered';
+    expect((await store.get('inv-3')).notes).toBe('From the server');
+  });
+
+  it('unsubscribe stops the notifications; an unknown id rejects with not-found and notifies nobody', async () => {
+    const store = createInvoiceStore();
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+    await expect(store.updateFromServer('nope', (r) => r)).rejects.toBeInstanceOf(InvoiceNotFoundError);
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
+    await store.updateFromServer('inv-1', (r) => ({ ...r, notes: 'x' }));
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('removeFromServer deletes the record after the delay and notifies `record: null`', async () => {
+    const store = createInvoiceStore();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const pending = store.removeFromServer('inv-2', 200);
+    await vi.advanceTimersByTimeAsync(199);
+    expect(listener).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(listener).toHaveBeenCalledWith({ id: 'inv-2', record: null });
+    await expect(store.get('inv-2')).rejects.toBeInstanceOf(InvoiceNotFoundError);
+    await expect(store.removeFromServer('inv-2')).rejects.toBeInstanceOf(InvoiceNotFoundError);
+  });
+
+  it('an update landing during a save is replayed on top of it: the save resolves with what it wrote, the store and the listeners get both', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const store = createInvoiceStore(undefined, { saveDelayMs: gate });
+    const record = await store.get('inv-1');
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const saving = store.save({ ...record, notes: 'Mine' });
+    const update = await store.updateFromServer('inv-1', (r) => ({ ...r, status: 'rejected' }));
+    // At once: the update is stored on the record the server holds (the save has not answered yet).
+    expect(update).toEqual({ ...record, status: 'rejected' });
+    expect(listener).toHaveBeenCalledTimes(1);
+    release();
+    const saved = await saving;
+    expect(saved).toEqual({ ...record, notes: 'Mine' });
+    const both = { ...record, notes: 'Mine', status: 'rejected' };
+    expect(await store.get('inv-1')).toEqual(both);
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenLastCalledWith({ id: 'inv-1', record: both });
+  });
+
+  it('the replayed update is normalized like a save (amount rounded to 2 decimals)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const store = createInvoiceStore(undefined, { saveDelayMs: gate });
+    const record = await store.get('inv-1');
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const saving = store.save({ ...record, notes: 'Mine' });
+    await store.updateFromServer('inv-1', (r) => ({ ...r, amount: 10.005 }));
+    release();
+    await saving;
+    expect((await store.get('inv-1')).amount).toBe(10.01);
+    expect((listener.mock.lastCall![0] as ServerChange).record!.amount).toBe(10.01);
+  });
+
+  it('two saves of the same record in flight: an update landing after the first settled is replayed on the second', async () => {
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    const first = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const second = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const store = createInvoiceStore(undefined, { saveDelayMs: first });
+    const record = await store.get('inv-1');
+    const savingFirst = store.save({ ...record, notes: 'First' });
+    store.configure({ saveDelayMs: second });
+    const savingSecond = store.save({ ...record, notes: 'Second' });
+    releaseFirst();
+    await savingFirst;
+    await store.updateFromServer('inv-1', (r) => ({ ...r, status: 'rejected' }));
+    releaseSecond();
+    expect(await savingSecond).toEqual({ ...record, notes: 'Second' });
+    expect(await store.get('inv-1')).toEqual({ ...record, notes: 'Second', status: 'rejected' });
+  });
+
+  it('a failing save keeps the update that landed during it, and notifies nothing more', async () => {
+    const store = createInvoiceStore(undefined, { saveDelayMs: 100, saveOutcome: 'error' });
+    const record = await store.get('inv-1');
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const saving = store.save({ ...record, notes: 'Mine' });
+    const failed = expect(saving).rejects.toBeInstanceOf(InvoiceNetworkError);
+    await store.updateFromServer('inv-1', (r) => ({ ...r, status: 'rejected' }));
+    await vi.advanceTimersByTimeAsync(100);
+    await failed;
+    expect(await store.get('inv-1')).toEqual({ ...record, status: 'rejected' });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('a save notifies nobody by itself, and an update that landed before it started is not replayed (the Free showcase never sees a notification)', async () => {
+    const store = createInvoiceStore();
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const record = await store.get('inv-1');
+    await store.save({ ...record, notes: 'Mine' });
+    expect(listener).not.toHaveBeenCalled();
+    await store.updateFromServer('inv-1', (r) => ({ ...r, status: 'rejected' }));
+    // The client still sends its stale copy: a plain overwrite, as before #384.
+    const later = await store.save({ ...record, notes: 'Again' });
+    expect(later.status).toBe(record.status);
+    expect((await store.get('inv-1')).status).toBe(record.status);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });

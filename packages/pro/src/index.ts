@@ -14,7 +14,10 @@ export type {
 } from './change-summary/types';
 export { computeRebase } from './form-rebase/compute-rebase';
 export { useFormRebase } from './form-rebase/use-form-rebase';
+export { RebaseNotice } from './form-rebase/RebaseNotice';
+export type { RebaseNoticeLabels, RebaseNoticeProps } from './form-rebase/RebaseNotice';
 export type {
+  OpenRebaseConflict,
   RebaseConflict,
   RebaseOptions,
   RebaseResult,

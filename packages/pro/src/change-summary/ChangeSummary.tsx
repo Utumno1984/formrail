@@ -2,6 +2,7 @@ import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn, Text } from '@formrail/core';
 import {
   DEFAULT_VALUE_LABELS,
+  distinctValueTexts,
   formatChangeValueAt,
   isMutedValue,
   type ChangeSummaryValueLabels,
@@ -104,15 +105,11 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
    * contents written out (`["a", "b"]` / `["a", "c"]`). If even that matches (two class instances,
    * a difference past the truncation), the after side says so.
    */
-  const pair = (entry: ChangeEntry): [string, string] => {
-    let last: [string, string] = ['', ''];
-    for (const level of [0, 1, 2, 3] as const) {
-      last = [side(entry.before, entry.beforeMissing, level), side(entry.after, entry.afterMissing, level)];
-      // Whitespace-insensitive: 'abc ' and 'abc' print differently but look the same.
-      if (looks(last[0]) !== looks(last[1])) return last;
-    }
-    return [last[0], `${last[1]} (${labels.contentsDiffer})`];
-  };
+  const pair = (entry: ChangeEntry): [string, string] =>
+    distinctValueTexts(
+      (which, level) => (which === 0 ? side(entry.before, entry.beforeMissing, level) : side(entry.after, entry.afterMissing, level)),
+      labels.contentsDiffer,
+    );
 
   return (
     <div
@@ -169,9 +166,6 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
     </div>
   );
 });
-
-/** What a reader sees: leading, trailing and repeated white space is not noticeable. */
-const looks = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 function definedOnly(labels: Partial<ChangeSummaryValueLabels> | undefined): Partial<ChangeSummaryValueLabels> {
   const out: Partial<ChangeSummaryValueLabels> = {};

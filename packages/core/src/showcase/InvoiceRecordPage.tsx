@@ -1,7 +1,7 @@
 // Story-only: the invoice detail page, composed ONLY from the public Object Page pieces. Not exported
 // by the package. Spec §1.4: the editor is mounted already hydrated (`key` per record + `baseline` at
 // mount); a fetch in flight is a loading state, never an editor that is hydrated afterwards.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Button } from '../button/Button';
 import { useConfirmDialog, type ConfirmOptions } from '../confirm-dialog/use-confirm-dialog';
 import { Field } from '../field/Field';
@@ -15,12 +15,13 @@ import { ObjectPageHeader } from '../object-page/ObjectPageHeader';
 import { ObjectPageSection } from '../object-page/ObjectPageSection';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
-import { useObjectPageForm } from '../object-page/use-object-page-form';
+import { useObjectPageForm, type UseObjectPageFormReturn } from '../object-page/use-object-page-form';
+import { isDev } from '../internal/is-dev';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
-import { InvoiceLineItems } from './InvoiceLineItems';
+import { InvoiceLineItems, helpProps } from './InvoiceLineItems';
 import { DECIMAL, isPlainPositive, isTooLarge, sameNumberText } from './number-text';
 import {
   sameLines,
@@ -46,6 +47,8 @@ export interface InvoiceRecordPageProps {
   onDeleteDone?: () => void;
   /** Story-only extension (#377): see `InvoiceEditorProps.reviewSave`. */
   reviewSave?: InvoiceSaveReviewer;
+  /** Story-only extension (#384): see `InvoiceEditorProps.useAddons`. */
+  useAddons?: UseInvoiceEditorAddons;
 }
 
 /** The values of the editor, as typed (exported for the Pro story of #377 only; not part of the package). */
@@ -103,6 +106,44 @@ export type InvoiceSaveReview = Pick<
 /** Builds the review of a save, or `null` to save without one (nothing to review). */
 export type InvoiceSaveReviewer = (context: InvoiceSaveReviewContext) => InvoiceSaveReview | null;
 
+/** What the story-only `useAddons` extension (#384) receives at every render of an existing invoice's editor. */
+export interface InvoiceEditorAddonContext {
+  form: UseObjectPageFormReturn<InvoiceFormValues>;
+  /** The record the editor was opened with. */
+  record: StoredInvoice;
+  store: InvoiceStore;
+  /** The editor's own conversion of a stored record into its values (the baseline of a save, of a load). */
+  toValues: (record: StoredInvoice) => InvoiceFormValues;
+  /** The page's scroll container (the `ObjectPage` scroller), `null` before the first commit. */
+  scrollerRef: RefObject<HTMLElement | null>;
+}
+
+/** What `useAddons` adds to the editor; every key is optional and absent changes nothing. */
+export interface InvoiceEditorAddons {
+  /**
+   * Rendered ABOVE the page's scroller, outside it (#384, the "appears above the scroller" option): always in
+   * view, its height taken from the top of the scroller. Without it the editor's layout is unchanged.
+   */
+  notice?: ReactNode;
+  /** More header actions, after the editor's own. */
+  actions?: ReactNode;
+  /** A help text for the Field of a form path (`dueDate`, `lineItems.1.quantity`), linked with `aria-describedby`. */
+  fieldHelp?: (path: string) => ReactNode;
+  /** Replaces the `reviewSave` prop. */
+  reviewSave?: InvoiceSaveReviewer;
+}
+
+/**
+ * Story-only extension point (#384, used by the Pro story "Invoices with Change Summary"): a hook called at
+ * every render of the editor of an EXISTING invoice (never a creation). The hook is chosen when the editor mounts
+ * and kept for its whole life (a different hook later would change the order of the hooks): a later change of the
+ * prop is ignored, with a warning in development; remount the editor (`key`) to change it. Absent, nothing changes.
+ */
+export type UseInvoiceEditorAddons = (context: InvoiceEditorAddonContext) => InvoiceEditorAddons;
+
+const NO_ADDONS: InvoiceEditorAddons = {};
+const useNoAddons: UseInvoiceEditorAddons = () => NO_ADDONS;
+
 const SUPPLIER_OPTIONS = SUPPLIERS_EN.map((s) => ({ value: s, label: s }));
 const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as DemoInvoiceStatus[]).map((s) => ({
   value: s,
@@ -125,7 +166,7 @@ const errorText = (error: unknown): string | undefined =>
 type LoadState = { key: string; record: StoredInvoice } | { key: string; error: unknown };
 
 /** Loads the record, then mounts the editor. No editable field exists until the record has arrived. */
-export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, onDeleteDone, reviewSave }: InvoiceRecordPageProps) {
+export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, onDeleteDone, reviewSave, useAddons }: InvoiceRecordPageProps) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<LoadState | null>(null);
   const key = `${recordId}#${attempt}`;
@@ -196,6 +237,7 @@ export function InvoiceRecordPage({ store, recordId, onBack, onSaved, onDelete, 
         onDelete={onDelete}
         onDeleteDone={onDeleteDone}
         reviewSave={reviewSave}
+        useAddons={useAddons}
         focusTitleOnMount={attempt > 0}
       />
     </>
@@ -239,6 +281,8 @@ export interface InvoiceEditorProps {
    * is no second save path), cancelling saves nothing and leaves the form as it was. `null`: saves directly.
    */
   reviewSave?: InvoiceSaveReviewer | undefined;
+  /** Story-only extension point (#384), editing only: see {@link UseInvoiceEditorAddons}. */
+  useAddons?: UseInvoiceEditorAddons | undefined;
 }
 
 /**
@@ -304,7 +348,8 @@ export function InvoiceEditor({
   onCreateDone,
   onDelete,
   onDeleteDone,
-  reviewSave,
+  reviewSave: reviewSaveProp,
+  useAddons: useAddonsProp,
 }: InvoiceEditorProps) {
   const creating = record === null;
   // #365: `deleting` while the confirmed delete waits for the server; `deleted` once the server deleted the
@@ -382,6 +427,24 @@ export function InvoiceEditor({
           close: 'Close',
         },
   });
+  // #384: ONE hook for the life of the editor, chosen at mount: calling another one later (the prop removed or
+  // replaced) would change the order of the hooks. A later change of the prop is ignored, with a warning.
+  const [useAddons] = useState<UseInvoiceEditorAddons>(() => (record && useAddonsProp) || useNoAddons);
+  const mountedAddons = useRef(useAddonsProp);
+  useEffect(() => {
+    if (useAddonsProp !== mountedAddons.current && isDev()) {
+      console.warn('[showcase] InvoiceEditor: useAddons changed after the mount; the hook of the mount is kept (remount the editor with a `key` to change it).');
+    }
+  }, [useAddonsProp]);
+  // The ObjectPage scroller, read from the DOM (the page does not expose it): a stable ref-like object.
+  const [scrollerRef] = useState<RefObject<HTMLElement | null>>(() => ({
+    get current() {
+      return frameRef.current?.querySelector<HTMLElement>('[data-object-page-scroller]') ?? null;
+    },
+  }));
+  const addons = useAddons({ form, record: record as StoredInvoice, store, toValues, scrollerRef });
+  const reviewSave = addons.reviewSave ?? reviewSaveProp;
+  const help = addons.fieldHelp;
   const frameRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
   useEffect(() => {
@@ -482,8 +545,20 @@ export function InvoiceEditor({
   return (
     <div
       ref={frameRef}
-      style={{ height: 'var(--rop-demo-viewport-height, 100dvh)', boxSizing: 'border-box', display: 'grid', gridTemplateRows: 'minmax(0, 1fr)' }}
+      style={{
+        height: 'var(--rop-demo-viewport-height, 100dvh)',
+        boxSizing: 'border-box',
+        display: 'grid',
+        // #384: a row for the notice of an addon, above the page (none without one: the Free layout as before).
+        gridTemplateRows: addons.notice === undefined ? 'minmax(0, 1fr)' : 'auto minmax(0, 1fr)',
+      }}
     >
+      {addons.notice === undefined ? null : (
+        // At most 40% of the height: the page below keeps room to edit; a longer notice scrolls on its own.
+        <div data-editor-notice="" style={{ minWidth: 0, maxHeight: '40vh', overflowY: 'auto' }}>
+          {addons.notice}
+        </div>
+      )}
       <ValidationProvider fieldErrors={form.fieldErrors}>
         <ObjectPage labels={{ anchorBar: 'Sections' }}>
           <ObjectPageHeader
@@ -506,6 +581,7 @@ export function InvoiceEditor({
                     Delete
                   </Button>
                 ) : null}
+                {addons.actions}
               </>
             }
           />
@@ -541,7 +617,7 @@ export function InvoiceEditor({
               <Field label="Invoice number" state="locked" stateReason="The invoice number is assigned by the system.">
                 <Input value={record ? record.number : 'Assigned on save'} readOnly />
               </Field>
-              <Field label="Supplier" name="supplier" required>
+              <Field label="Supplier" name="supplier" required {...helpProps(help, 'supplier')}>
                 <Select
                   options={SUPPLIER_OPTIONS}
                   placeholder="Choose a supplier"
@@ -550,7 +626,7 @@ export function InvoiceEditor({
                   onValueChange={(v) => setValue('supplier', v)}
                 />
               </Field>
-              <Field label="Status" name="status">
+              <Field label="Status" name="status" {...helpProps(help, 'status')}>
                 <Select
                   options={STATUS_OPTIONS}
                   emptyLabel="No options"
@@ -562,17 +638,17 @@ export function InvoiceEditor({
           </ObjectPageSection>
           <ObjectPageSection id="amount" title="Amount">
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
-              <Field label="Amount (EUR)" name="amount" required>
+              <Field label="Amount (EUR)" name="amount" required {...helpProps(help, 'amount')}>
                 <Input
                   inputMode="decimal"
                   value={values.amount}
                   onChange={(e) => setValue('amount', e.target.value)}
                 />
               </Field>
-              <Field label="Invoice date" name="date">
+              <Field label="Invoice date" name="date" {...helpProps(help, 'date')}>
                 <Input type="date" value={values.date} onChange={(e) => setValue('date', e.target.value)} />
               </Field>
-              <Field label="Due date" name="dueDate">
+              <Field label="Due date" name="dueDate" {...helpProps(help, 'dueDate')}>
                 <Input type="date" value={values.dueDate} onChange={(e) => setValue('dueDate', e.target.value)} />
               </Field>
             </div>
@@ -582,11 +658,12 @@ export function InvoiceEditor({
               lines={values.lineItems}
               baselineIds={baselineLineIds}
               onChange={(next) => setValue('lineItems', next)}
+              fieldHelp={help}
             />
           </ObjectPageSection>
           <ObjectPageSection id="notes" title="Notes">
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
-              <Field label="Notes" name="notes">
+              <Field label="Notes" name="notes" {...helpProps(help, 'notes')}>
                 <Input value={values.notes} onChange={(e) => setValue('notes', e.target.value)} />
               </Field>
             </div>

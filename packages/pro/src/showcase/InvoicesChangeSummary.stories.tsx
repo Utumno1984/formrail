@@ -1,12 +1,14 @@
 /// <reference types="vite/client" />
+import { useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 // The Free CRUD showcase itself, from the core sources (one copy, never duplicated in packages/pro): see the
 // `no-restricted-imports` rules of eslint.config.js, which allow this import in `src/showcase/` only.
 import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from '../../../core/src/showcase/crud-story-args';
 import { InvoiceCrud, type InvoiceCrudProps } from '../../../core/src/showcase/InvoiceCrud';
 import { storyControls } from '../../../core/src/internal/story-docs';
 import { invoiceSaveReview } from './invoice-review';
+import { SERVER_CHANGE_KINDS, invoiceRebaseAddons, type InvoiceRebaseOptions } from './invoice-rebase';
 // Story-only helper of the core sources (same exception as the showcase imports above).
 import { githubSource, showcaseFiles, showcaseSource } from '../../../core/src/internal/story-example';
 
@@ -26,7 +28,16 @@ const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
  * goes back to the form with nothing saved. A new invoice ("New invoice" -> "Create") is saved directly.
  */
 
-type Args = Omit<InvoiceCrudProps, 'reviewSave'>;
+type Args = Omit<InvoiceCrudProps, 'reviewSave' | 'useAddons'> & InvoiceRebaseOptions;
+
+/** The showcase with the review step (#377) and the server updates merged into the open editor (#384). */
+function ProInvoices({ serverChange, serverUpdateDelayMs, simulateServerUpdate, onServerChange, ...crud }: Args) {
+  // One hook for the life of the story; it reads the latest args through the ref.
+  const options = useRef<InvoiceRebaseOptions>({ serverChange, serverUpdateDelayMs, simulateServerUpdate, onServerChange });
+  options.current = { serverChange, serverUpdateDelayMs, simulateServerUpdate, onServerChange };
+  const [useAddons] = useState(() => invoiceRebaseAddons(options));
+  return <InvoiceCrud {...crud} reviewSave={invoiceSaveReview} useAddons={useAddons} />;
+}
 
 const meta: Meta<Args> = {
   title: 'Pro/Showcase/Invoices with Change Summary',
@@ -40,9 +51,23 @@ const meta: Meta<Args> = {
     },
   },
   // A showcase documents no component: every control is a knob of the demo.
-  argTypes: storyControls(CRUD_ARGTYPES),
-  args: CRUD_ARGS,
-  render: (args) => <InvoiceCrud {...args} reviewSave={invoiceSaveReview} />,
+  argTypes: storyControls({
+    ...CRUD_ARGTYPES,
+    serverChange: {
+      control: 'select',
+      options: SERVER_CHANGE_KINDS,
+      description:
+        'What "Simulate server update" changes on the stored invoice, as another user would: the status and the due date, one of them, the quantity of line 1, line 1 removed, or the whole invoice deleted.',
+    },
+    serverUpdateDelayMs: {
+      control: 'number',
+      description: 'How long the simulated update takes to reach the server after the click (ms): time to go back to a field and keep typing.',
+    },
+    simulateServerUpdate: { control: 'boolean', description: 'Shows "Simulate server update" in the header of an existing invoice.' },
+    onServerChange: { control: false, description: 'Called with every change of the open invoice the server announces (`{ id, record }`, `record: null` when deleted).' },
+  }),
+  args: { ...CRUD_ARGS, serverChange: 'status-and-due-date', serverUpdateDelayMs: 1000, simulateServerUpdate: true, onServerChange: fn() },
+  render: (args) => <ProInvoices {...args} />,
 };
 export default meta;
 
@@ -157,7 +182,8 @@ const LONG_NOTE =
 /** The dialog over the record page: Supplier, Status and a long Notes changed, Save pressed, not confirmed. */
 export const ReviewDialog: Story = {
   tags: ['visual'],
-  args: { ...CRUD_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, today: '2026-11-09' },
+  // Without "Simulate server update" in the header: the subject is the review dialog (baselines of #377/#379).
+  args: { ...CRUD_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, today: '2026-11-09', simulateServerUpdate: false },
   play: async ({ canvasElement }) => {
     const canvas = await openRecord(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
@@ -240,7 +266,8 @@ export const ReviewOrderOnly: Story = {
 /** The dialog over the record page with one entry of each kind (1 added, 1 removed, 1 changed), not confirmed. */
 export const ReviewLinesDialog: Story = {
   tags: ['visual'],
-  args: { ...CRUD_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, today: '2026-11-09' },
+  // Without "Simulate server update" in the header: the subject is the review dialog (baselines of #377/#379).
+  args: { ...CRUD_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, today: '2026-11-09', simulateServerUpdate: false },
   play: async ({ canvasElement }) => {
     const canvas = await openRecord(canvasElement, RECORD_WITH_LINES);
     const body = within(canvasElement.ownerDocument.body);
@@ -249,5 +276,55 @@ export const ReviewLinesDialog: Story = {
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus());
+  },
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* Server updates while editing (#384).                                                          */
+/* ------------------------------------------------------------------------------------------ */
+
+/**
+ * Another user changes the invoice while it is open: edit the Due date and the Notes, then "Simulate server
+ * update" (the server changes the Status and the Due date). The Status takes the server value, the Notes stay
+ * yours, the Due date is a conflict: "Keep mine for Due date" closes it with your date. Save -> the review lists
+ * your two changes -> "Save changes": the notice goes away with the save, the server has your values on top of
+ * its Status.
+ */
+export const ServerUpdate: Story = {
+  args: { listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, serverUpdateDelayMs: 0, serverChange: 'status-and-due-date' },
+  play: async ({ canvasElement, args }) => {
+    const canvas = await openRecord(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    const body = within(canvasElement.ownerDocument.body);
+    const notice = () => canvasElement.querySelector<HTMLElement>('.rop-pro-rebase-notice');
+    const due = canvas.getByLabelText('Due date');
+    fireEvent.change(due, { target: { value: '2026-03-05' } });
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Notes' }), ' Checked by finance.');
+    const status = canvas.getByRole('combobox', { name: 'Status' }).textContent;
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+    const conflicts = await canvas.findByRole('list', { name: 'Conflicts' });
+    await expect(args.onServerChange).toHaveBeenCalledTimes(1);
+    await expect(within(conflicts).getAllByRole('listitem')).toHaveLength(1);
+    await expect(within(conflicts).getByRole('listitem')).toHaveTextContent(/^Due date Yours: Mar 5, 2026 Server: /);
+    await expect(notice()).toHaveTextContent('This invoice was updated while you were editing.1 field was updated.');
+    await expect(canvas.getByRole('combobox', { name: 'Status' }).textContent).not.toBe(status);
+    await expect(due).toHaveValue('2026-03-05');
+    await expect(due).toHaveAccessibleDescription('Changed on the server too.');
+    await expect((canvas.getByRole('textbox', { name: 'Notes' }) as HTMLInputElement).value.endsWith(' Checked by finance.')).toBe(true);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Keep mine for Due date' }));
+    await waitFor(() => expect(canvas.queryByRole('list', { name: 'Conflicts' })).toBeNull());
+    await expect(due).toHaveValue('2026-03-05');
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    const dialog = await body.findByRole('dialog', { name: 'Review changes' });
+    await expect(dialog).toHaveAccessibleDescription('2 changes will be saved.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull(), { timeout: 5000 });
+    await waitFor(() => expect(notice()).toBeNull());
+    const stored = win?.__ropShowcaseStore?.snapshot().find((r) => r.number === RECORD);
+    await expect(stored?.dueDate).toBe('2026-03-05');
+    await expect(stored?.notes.endsWith(' Checked by finance.')).toBe(true);
   },
 };
