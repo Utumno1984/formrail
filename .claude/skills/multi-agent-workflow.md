@@ -13,9 +13,13 @@ aggirare sotto pressione).
 
 `pianificatore` → `sviluppatore` (branch + PR in bozza) → CI verde → `tester` (QA) →
 `critico-avversariale` (red team) → `gh pr ready`. Se tester o critico respingono, si torna allo
-sviluppatore e si riparte dal controllo CI. **Dopo 2 giri senza esito positivo ci si ferma e si
-chiede a Daniele**, anche se il problema del giro scoped è nuovo (non uno dei
-punti già approvati) — vale lo stesso limite.
+sviluppatore e si riparte dal controllo CI. **Dopo 2 respinte del critico-avversariale, oppure
+dopo 2 respinte del tester, sullo stesso ticket ci si ferma e si chiede a Daniele**; si riprende
+solo su sua istruzione (decisione di Daniele del 2026-11-12). I due conteggi sono separati e si
+contano le respinte, non i ritorni allo sviluppatore. Una CI rossa non conta. Il conteggio è per
+ticket, non per PR. Conta anche la respinta di un giro ristretto ai punti del giro precedente, e
+anche se il problema trovato è nuovo (non uno dei punti già approvati). Il dettaglio è in
+`CLAUDE.md`, punto 2.5.
 
 ## Il critico va invocato DAVVERO
 
