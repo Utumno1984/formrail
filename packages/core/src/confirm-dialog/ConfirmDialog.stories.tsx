@@ -5,6 +5,7 @@ import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { exampleStory } from '../internal/example-story';
 import { settleMotion } from '../internal/settle-motion';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
@@ -129,6 +130,14 @@ function Demo({ args, initialOpen = false, onConfirmOverride }: { args: DemoArgs
 }
 
 /**
+ * Copy-paste example: a button opens a confirmation; Cancel (or Escape) closes it without running the action, confirming runs it. Focus returns to the button.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ConfirmDialog.example.tsx'),
+};
+
+/**
  * Controls: tone, texts and `pendingMs` (the simulated server round-trip of `onConfirm`);
  * `onConfirm`, `onCancel` and `onOpenChange` appear in Actions. The play function opens it, checks
  * that the focus is on Cancel (the safe choice of a `danger` confirmation), clicks "Delete invoice"
@@ -136,6 +145,7 @@ function Demo({ args, initialOpen = false, onConfirmOverride }: { args: DemoArgs
  * the focus is back on the opener.
  */
 export const DeleteWithServerRoundTrip: Story = {
+  tags: ['playground'],
   render: (args) => <Demo args={args} />,
   play: async ({ args, canvasElement }) => {
     const opener = within(canvasElement).getByRole('button', { name: 'Delete…' });

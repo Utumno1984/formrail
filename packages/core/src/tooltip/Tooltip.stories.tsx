@@ -1,5 +1,5 @@
 import { forwardRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import {
@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from '../dialog/Dialog';
 import { internalIcons } from '../internal/icons';
+import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Tooltip, TooltipProvider, type TooltipAlign, type TooltipSide } from './Tooltip';
@@ -57,12 +58,13 @@ const meta: Meta<DemoArgs> = {
     ...withoutControls('open', 'children'),
   },
   args: { content: 'Delete row', side: 'top', align: 'center', delayDuration: 500, onOpenChange: fn() },
-  // Optional in the library (a `Tooltip` supplies its own); here it is shared like in an app.
-  decorators: [(Story) => <TooltipProvider>{Story()}</TooltipProvider>],
 };
 
 export default meta;
 type Story = StoryObj<DemoArgs>;
+
+// Optional in the library (a `Tooltip` supplies its own); here it is shared like in an app. Not on the meta: the Example story brings its own provider, and a meta decorator would wrap it too.
+const decorators: Decorator[] = [(Story) => <TooltipProvider>{Story()}</TooltipProvider>];
 
 const PAGE: CSSProperties = {
   padding: 48,
@@ -97,6 +99,14 @@ async function settle(trigger: HTMLElement) {
 }
 
 /**
+ * Copy-paste example: a button with a tooltip: it is not shown at load, appears on hover or keyboard focus and Escape closes it.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Tooltip.example.tsx'),
+};
+
+/**
  * Controls: every prop (`content`, `side`, `align`, `sideOffset`, `delayDuration`, plus `disabled`
  * and `disabledTriggerFocusable` on the trigger); `onOpenChange` appears in Actions. The play
  * function follows what the controls say: it hovers the icon-only button (the tooltip opens after
@@ -104,6 +114,8 @@ async function settle(trigger: HTMLElement) {
  * disabled trigger, it checks that nothing opens (or, with `disabledTriggerFocusable`, that Tab does).
  */
 export const Playground: Story = {
+  tags: ['playground'],
+  decorators,
   args: { sideOffset: 6, disabled: false, disabledTriggerFocusable: false },
   argTypes: {
     sideOffset: { control: { type: 'number', min: 0, max: 24, step: 2 } },
@@ -161,6 +173,7 @@ export const Playground: Story = {
  * them (a consumer using `open` must not open it at mount: here it is a fixture).
  */
 export const Sides: Story = {
+  decorators,
   tags: ['visual'],
   parameters: NO_CONTROLS,
   render: () => (
@@ -189,6 +202,7 @@ export const Sides: Story = {
 
 /** Long text wraps inside a real maximum width (20rem), never on a single line. Opened by hover. */
 export const LongText: Story = {
+  decorators,
   tags: ['visual'],
   args: {
     content:
@@ -215,6 +229,7 @@ export const LongText: Story = {
  * its long text stay inside the window (collision detection). Opened by hover.
  */
 export const ViewportEdge: Story = {
+  decorators,
   tags: ['visual'],
   args: { content: 'Tooltip near the right edge of the window, with text long enough to wrap onto a new line.', side: 'right', delayDuration: 0 },
   render: ({ content, side, align, delayDuration }) => (
@@ -241,6 +256,7 @@ export const ViewportEdge: Story = {
  * leaves the button with Shift+Tab and comes back with Tab. Hover simulated at the end.
  */
 export const InsideDialog: Story = {
+  decorators,
   tags: ['visual'],
   args: { delayDuration: 0 },
   render: ({ content, side, align, delayDuration }) => (
@@ -292,6 +308,7 @@ export const InsideDialog: Story = {
  * mouse and keyboard input (a play function would open it and hover on its own).
  */
 export const InsideDialogManual: Story = {
+  decorators,
   args: { delayDuration: 0 },
   render: InsideDialog.render,
 };
@@ -302,6 +319,7 @@ export const InsideDialogManual: Story = {
  * No play function: the starting point for the end-to-end test that presses the real key.
  */
 export const OpenedByArrowDown: Story = {
+  decorators,
   args: { delayDuration: 0 },
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => {
@@ -352,6 +370,7 @@ export const OpenedByArrowDown: Story = {
  * state matters. Hover the second one, or Tab to it.
  */
 export const DisabledTrigger: Story = {
+  decorators,
   args: { delayDuration: 0 },
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => (
@@ -379,6 +398,7 @@ export const DisabledTrigger: Story = {
 
 /** An empty `content` renders no tooltip and no `aria-describedby`; useful for a conditional text. */
 export const EmptyContent: Story = {
+  decorators,
   args: { delayDuration: 0 },
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => (
@@ -401,6 +421,7 @@ export const EmptyContent: Story = {
 
 /** A trigger with `autoFocus`: the page loads with the focus on it and no tooltip. */
 export const AutoFocus: Story = {
+  decorators,
   args: { delayDuration: 0 },
   render: ({ content, side, align, delayDuration }) => (
     <Page>
@@ -424,6 +445,7 @@ export const AutoFocus: Story = {
  * button to the next opens the second at once (`skipDelayDuration`) and closes the first.
  */
 export const Toolbar: Story = {
+  decorators,
   name: 'TooltipProvider: shared delays',
   parameters: NO_CONTROLS,
   render: () => (
@@ -462,6 +484,7 @@ export const Toolbar: Story = {
  * portal on `document.body`, so neither clips it.
  */
 export const ClippedAndInSheet: Story = {
+  decorators,
   args: { delayDuration: 0 },
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => (
@@ -502,6 +525,7 @@ export const ClippedAndInSheet: Story = {
  * then press `+` (long text) or `-` (short text).
  */
 export const ContentChangesWhileOpen: Story = {
+  decorators,
   args: { delayDuration: 0 },
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => {
@@ -545,6 +569,7 @@ export const ContentChangesWhileOpen: Story = {
 
 /** A click (or a tap) runs the button's action and closes the tooltip; the label shows the count. */
 export const ClickAction: Story = {
+  decorators,
   args: { delayDuration: 0 },
   parameters: ONLY_DELAY,
   render: ({ delayDuration }) => {
