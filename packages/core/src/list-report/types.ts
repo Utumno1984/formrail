@@ -3,11 +3,17 @@ import type { ReactNode, RefObject } from 'react';
 export type ListReportSortDirection = 'asc' | 'desc';
 
 /** Single-column sort state. `null` = no sort (the input order). */
-export type ListReportSort = { columnId: string; direction: ListReportSortDirection } | null;
+export type ListReportSort = {
+  /** `id` of the sorted column. */
+  columnId: string;
+  /** `asc` or `desc`. */
+  direction: ListReportSortDirection;
+} | null;
 
 export interface ListReportColumn<Row> {
   /** Unique, stable id of the column. */
   id: string;
+  /** Content of the column header (inside its sort button when the column is sortable). */
   header: ReactNode;
   /**
    * Value used for sorting (and, in the future, filtering and searching). Without `cell` it is also
@@ -50,6 +56,7 @@ export interface ListReportColumn<Row> {
   /** Direction of the first click on this column. Default: `'asc'`. The cycle is first -> opposite -> none. */
   firstSortDirection?: ListReportSortDirection;
   // Layout fields: only declared here, consumed by the table component.
+  /** Horizontal alignment of the header and of the cells (e.g. `end` for amounts). Default `'start'`. */
   align?: 'start' | 'center' | 'end';
   /** Column width: a number (px) or a CSS length/percentage. Columns without one share the remaining space equally. */
   width?: number | string;
@@ -68,18 +75,24 @@ export interface ListReportColumn<Row> {
 
 /** One single-choice filter pill. Without `predicate` it keeps every row (e.g. "All"). */
 export interface ListReportFilter<Row> {
+  /** Unique, stable id: the value of `filter`, `defaultFilter` and `onFilterChange`. */
   id: string;
+  /** Text of the pill. */
   label: string;
+  /** Keeps a row when it returns `true`. Memoize it with `filters`: a new function recomputes the results. */
   predicate?: (row: Row) => boolean;
 }
 
 export interface UseListReportOptions<Row> {
+  /** The data, in input order. Never mutated; replace a changed row with a new object (see `ListReportColumn.cell`). */
   rows: readonly Row[];
+  /** The columns. Memoize the array (`useMemo` or a module constant): a new one each render defeats the memoization. */
   columns: readonly ListReportColumn<Row>[];
   /** Unique, stable id of a row (a duplicate is reported with a development warning). */
   getRowId: (row: Row) => string;
   /** Controlled sort (`null` = none). `undefined` leaves the hook uncontrolled. */
   sort?: ListReportSort;
+  /** Initial sort when uncontrolled. On a column not there yet it stays pending until the column appears. Default: none. */
   defaultSort?: ListReportSort;
   /** Called only for a gesture (`toggleSort`, `setSort`), never when `sort` changes from outside. */
   onSortChange?: (sort: ListReportSort) => void;
@@ -89,11 +102,13 @@ export interface UseListReportOptions<Row> {
   filters?: readonly ListReportFilter<Row>[];
   /** Controlled filter id. `undefined` leaves the hook uncontrolled. */
   filter?: string;
+  /** Initial filter id when uncontrolled, and the one `clearFilters` goes back to. Default: the first filter. */
   defaultFilter?: string;
   /** Called only for a gesture (`setFilter`, `clearFilters`), never when `filter` changes from outside. */
   onFilterChange?: (filter: string) => void;
   /** Controlled committed search query. `undefined` leaves the hook uncontrolled. */
   searchQuery?: string;
+  /** Initial committed query (and draft) when uncontrolled. Default `''`. */
   defaultSearchQuery?: string;
   /** Called only when the query is committed by the hook (`commitSearch`, the delay, `clearFilters`). */
   onSearchQueryChange?: (query: string) => void;
@@ -114,6 +129,7 @@ export interface UseListReportOptions<Row> {
    * a new `Set` for every change (e.g. the one `onSelectedIdsChange` gave you).
    */
   selectedIds?: ReadonlySet<string>;
+  /** Initial selected ids when uncontrolled. Default: none. */
   defaultSelectedIds?: ReadonlySet<string>;
   /**
    * Called only for a gesture (`toggle`, `toggleAllResults`, `clearSelection`, `setSelectedIds`), never
@@ -218,17 +234,21 @@ export interface ListReportSelection<Row> {
 }
 
 export interface ListReportHeaderProps {
+  /** Present only on the sorted column. */
   'aria-sort'?: 'ascending' | 'descending';
 }
 
 export interface ListReportSortButtonProps {
+  /** `'button'` (never a form submit); absent for a non-sortable column. */
   type?: 'button';
+  /** Calls `toggleSort` for the column; absent for a non-sortable column. */
   onClick?: () => void;
 }
 
 export interface UseListReportReturn<Row> {
   /** The sorted rows (the input array itself when no sort is active; the input is never mutated). */
   rows: readonly Row[];
+  /** The `columns` option, handed back for the table. */
   columns: readonly ListReportColumn<Row>[];
   /** The `getRowId` option, handed back so a table can key its rows. */
   getRowId: (row: Row) => string;
@@ -236,11 +256,13 @@ export interface UseListReportReturn<Row> {
   sort: ListReportSort;
   /** Next step of the cycle for a column; no-op for an unknown or non-sortable column. */
   toggleSort: (columnId: string) => void;
+  /** Gesture: sets the sort (`null` = none) and calls `onSortChange`. Controlled: only reports it, the parent applies it. */
   setSort: (sort: ListReportSort) => void;
   /** `aria-sort` only on the sorted column. Spread it on the `<th>`. */
   getHeaderProps: (columnId: string) => ListReportHeaderProps;
   /** `type` and `onClick` for the button inside the header; `{}` for a non-sortable column. */
   getSortButtonProps: (columnId: string) => ListReportSortButtonProps;
+  /** The `filters` option (`[]` without it). */
   filters: readonly ListReportFilter<Row>[];
   /** Id of the active filter (`null` when there are no filters). Unknown ids apply no filter. */
   filter: string | null;
@@ -250,6 +272,7 @@ export interface UseListReportReturn<Row> {
   searchQuery: string;
   /** What the user typed; it never goes back on its own while it differs from the committed query. */
   searchDraft: string;
+  /** Gesture: stores what the user typed and commits it `searchCommitDelay` ms later (wire it to the search box). */
   setSearchDraft: (draft: string) => void;
   /** Commits the draft now and cancels the pending timer. No-op when equal to the committed query. */
   commitSearch: () => void;

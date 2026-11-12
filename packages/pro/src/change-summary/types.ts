@@ -26,6 +26,7 @@ export interface ChangeEntry {
   labelPath: string[];
   /** `labelPath.join(' > ')`, e.g. `Line Items > Item 3 > Price`. */
   label: string;
+  /** `added`, `removed` or `changed` (see the type description for what `before`/`after` hold). */
   kind: ChangeKind;
   /** Value in the baseline (`undefined` when `kind === 'added'`). */
   before: unknown;

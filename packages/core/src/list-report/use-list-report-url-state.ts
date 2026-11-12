@@ -52,12 +52,15 @@ export interface ListReportUrlAdapter {
 export interface UseListReportUrlStateReturn {
   /** The pill from the URL, or the default. `undefined` only with no `filters` and no `defaultFilter`. */
   filter: string | undefined;
+  /** Writes the pill to the URL (with the `history` mode of the options). */
   onFilterChange: (filter: string) => void;
   /** The committed search from the URL, or the default. Never the text being typed. */
   searchQuery: string;
+  /** Writes the committed search to the URL (with the `history` mode of the options). */
   onSearchQueryChange: (query: string) => void;
   /** The sort from the URL, or the default. Same identity while it does not change. */
   sort: ListReportSort;
+  /** Writes the sort to the URL (with the `history` mode of the options). */
   onSortChange: (sort: ListReportSort) => void;
 }
 
