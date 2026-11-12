@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
@@ -71,11 +72,18 @@ const column = { display: 'grid', gap: 16, maxWidth: 360 } as const;
 const stateProps = (state: FieldState) =>
   ({ state, stateReason: state === 'default' ? undefined : 'Decided by the framework agreement.' }) as FieldStateProps;
 
+/** Copy-paste example: a controlled text Input in a Field. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Input.example.tsx'),
+};
+
 /**
  * Controls: `size`, `type`, `placeholder`, `disabled`, `readOnly`; `onChange` is in Actions. The play
  * function types a name, then empties the input and checks that the last value reported is `''`.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ onChange, ...props }) => (
     <div style={column}>
       <Field label="Company name">

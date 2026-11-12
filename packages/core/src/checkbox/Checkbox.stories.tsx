@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { useArgs } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
@@ -115,12 +116,19 @@ function PlaygroundDemo({ fieldState, invalid, required, fieldLabel, inlineLabel
   );
 }
 
+/** Copy-paste example: a terms checkbox in a Field, controlled by local state. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Checkbox.example.tsx'),
+};
+
 /**
  * Controls: `checked`, the Field state, `invalid`, `required` and the labels; `onCheckedChange` is in
  * Actions. The play function ticks the box by clicking its inline label, then forces the value with
  * the button and checks that a click on the Field's label and Space change nothing and report nothing.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <PlaygroundDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (args.fieldState !== 'default' || args.checked !== false) return;

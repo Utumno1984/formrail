@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import type { IsoDate } from '../calendar/date-math';
@@ -105,6 +106,12 @@ function PlaygroundDemo(args: DemoArgs) {
   );
 }
 
+/** Copy-paste example: a due date field with an initial date, typed or picked from the calendar. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('DatePicker.example.tsx'),
+};
+
 /**
  * Controls: locale, Field state, size, `today`, limits; `onValueChange` and `onInvalidInput` are in
  * Actions. The play function types a date and presses Enter, opens the calendar with the button,
@@ -112,6 +119,7 @@ function PlaygroundDemo(args: DemoArgs) {
  * button), then types an impossible date and checks `onInvalidInput` and the `null` value.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <PlaygroundDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (args.locale !== 'en-US' || args.fieldState !== 'default' || args.today !== TODAY || args.min || args.max !== '2026-12-31') return;

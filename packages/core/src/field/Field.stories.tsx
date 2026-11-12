@@ -1,5 +1,6 @@
 import { useState, type ButtonHTMLAttributes, type ChangeEvent } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Input } from '../input/Input';
@@ -69,12 +70,19 @@ const column = { display: 'grid', gap: 16, maxWidth: 360 } as const;
 /** `forced`/`locked` need a reason in the type; the Controls hand over plain strings. */
 const stateProps = (state: FieldState, stateReason: string) => ({ state, stateReason }) as FieldStateProps;
 
+/** Copy-paste example: a Field around an Input with help, a required marker and an error, and a locked Field with its reason. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Field.example.tsx'),
+};
+
 /**
  * Controls: label, help, error, required, state and its reason. The play function types in the
  * input, then checks what the Controls wire up: the accessible name, the typed value reaching
  * `onChange` (Actions panel) and the description built from help.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { help: 'How it appears on the invoice.' },
   render: ({ label, name, help, error, required, hideLabel, reserveMessageSpace, state, stateReason, placeholder, onChange }) => (
     <div style={column}>
