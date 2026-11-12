@@ -121,10 +121,13 @@ An accessible, responsive list of the entries of the engine, to show in an Objec
 ### Styles and import order
 
 ```ts
-import '@formrail/core/theme.css'; // 1. tokens (--rop-*)
-import '@formrail/core/styles.css'; // 2. core utilities
-import '@formrail/pro/styles.css'; //  3. pro component styles (consume the tokens, never redefine them)
+// once, at the root of your app: mode (a) of the core README ("Compiled stylesheet")
+import '@formrail/core/styles.css'; // 1. core tokens (--*-rop-*) and utilities
+import '@formrail/pro/styles.css'; //  2. pro component styles (consume the tokens, never redefine them)
 ```
+
+`@formrail/core/theme.css` is not a third import: it is the Tailwind v4 source of the core's mode (b),
+an alternative to the core `styles.css`, never loaded together with it (see the core README).
 
 Pro's `styles.css` holds only its own `.rop-pro-*` component classes, never a Tailwind utility also
 emitted by core, so it cannot override core's responsive variants: the result does not depend on the

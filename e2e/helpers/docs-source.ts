@@ -161,3 +161,31 @@ export function auditListedSource(source: ListedSource, readRepoFile: (path: str
   problems.push(...auditAgainstFile(source.shown, readRepoFile(source.label), source.label));
   return problems;
 }
+
+/**
+ * The stylesheets the reminder next to an example must list, in import order, decided by WHERE the page lives
+ * (ticket #447): a page of packages/pro needs the core stylesheet then the Pro one, every other page the core
+ * one only. Independent of the rule the Docs template uses (what the example imports): the two must agree.
+ */
+export function expectedStylesheets(importPath: string): string[] {
+  const core = '@formrail/core/styles.css';
+  return /^(\.\/)?packages\/pro\//.test(importPath) ? [core, '@formrail/pro/styles.css'] : [core];
+}
+
+/** The stylesheets a reminder names, in order, from its text (`import '<sheet>';` lines). */
+export function remindedStylesheets(text: string): string[] {
+  return [...text.matchAll(/import\s+'([^']+)'/g)].map((match) => match[1]!);
+}
+
+/**
+ * What is wrong with the stylesheet reminder of an example page: none, more than one, or not exactly the
+ * `expected` stylesheets in that order (a Pro page without the Pro line, a core page with it, the order
+ * reversed). `reminders`: the text of every reminder on the page.
+ */
+export function auditStylesheetReminder(reminders: readonly string[], expected: readonly string[]): string[] {
+  if (reminders.length === 0) return ['no stylesheet reminder next to the example'];
+  if (reminders.length > 1) return [`${reminders.length} stylesheet reminders on the page`];
+  const listed = remindedStylesheets(reminders[0]!);
+  if (listed.join('\n') === expected.join('\n')) return [];
+  return [`the stylesheet reminder lists [${listed.join(', ')}], expected [${expected.join(', ')}]`];
+}

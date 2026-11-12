@@ -10,6 +10,7 @@ import {
   type ListReportColumn,
   type ListReportFilter,
 } from '@formrail/core';
+import { exampleStory } from '../../../core/src/internal/example-story';
 import { storyControl, withoutControls } from '../../../core/src/internal/story-docs';
 import { VirtualListReport } from './VirtualListReport';
 import { VirtualListReportTable, type VirtualListReportTableHandle } from './VirtualListReportTable';
@@ -192,6 +193,8 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('VirtualListReport.example.tsx') };
+
 /**
  * 100,000 invoices. Controls: dataset size, threshold, overscan, row height, selection. The play function
  * scrolls to the bottom (last row `aria-rowindex` = N + 1), selects INV-000010, scrolls to INV-005000
@@ -199,6 +202,7 @@ type Story = StoryObj<DemoArgs>;
  * the selection bar's action, then empties the selection with Escape.
  */
 export const Default: Story = {
+  tags: ['playground'],
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const table = canvas.getByRole('table', { name: 'Invoices' });
@@ -237,8 +241,11 @@ export const Default: Story = {
   },
 };
 
-/** Fixture of the e2e suite: `Default` without the play function. */
-export const DefaultNoPlay: Story = { ...Default, play: undefined };
+/**
+ * Fixture of the e2e suite: `Default` without the play function. `tags: []`: without the `playground` tag that
+ * the spread would copy from `Default` (one Playground per Docs page, see story-example.ts).
+ */
+export const DefaultNoPlay: Story = { ...Default, tags: [], play: undefined };
 
 /** Fixture of the e2e suite: the declared ceiling, 200,000 rows (not offered in Controls). */
 export const Ceiling200k: Story = {
