@@ -1,8 +1,7 @@
 /// <reference types="vite/client" />
-import type { Preview } from '@storybook/react-vite';
+import type { Preview, ReactRenderer } from '@storybook/react-vite';
 // The SAME entry the package compiles into dist/styles.css (not a copy).
 import '../packages/core/src/styles/index.css';
-import { createElement, lazy, Suspense } from 'react';
 import { transformSource } from './source-transform';
 import { ropTheme } from './theme';
 
@@ -15,13 +14,18 @@ import { ropTheme } from './theme';
 // ambient value from whatever shell/CI/container runs the build.
 const devToolsDisabled = import.meta.env.PROD;
 
-// The Docs page template (./docs-page.tsx), loaded only when a Docs page renders: it imports
-// `@storybook/addon-docs/blocks`, whose `components` chunk registers a window `beforeunload` listener at
-// module load. Imported eagerly here it would be in every story's iframe too, where the e2e count the
-// page's own `beforeunload` listeners (showcase-edit-flow) and where a story should run exactly as before.
-const LazyDocsPage = lazy(() => import('./docs-page').then((m) => ({ default: m.FormrailDocsPage })));
-function FormrailDocsPage() {
-  return createElement(Suspense, { fallback: null }, createElement(LazyDocsPage));
+// The Docs page template (./docs-page.tsx), loaded only by the Docs renderer (Docs pages), never in a story's
+// iframe: it imports `@storybook/addon-docs/blocks`, whose `components` chunk registers a window `beforeunload`
+// listener at module load. Imported eagerly here it would run in every story too, where a story must run
+// exactly as before (showcase-edit-flow counts the page's own `beforeunload` listeners). Same lazy loading as
+// addon-docs' own default renderer, which this one wraps: a page that sets no `docs.page` (autodocs) gets the
+// template, an MDX page keeps its own.
+async function docsRenderer() {
+  const [{ DocsRenderer }, { FormrailDocsPage }] = await Promise.all([import('@storybook/addon-docs'), import('./docs-page')]);
+  const renderer = new DocsRenderer<ReactRenderer>();
+  const render = renderer.render;
+  renderer.render = (context, docsParameter, element) => render(context, { ...docsParameter, page: docsParameter.page ?? FormrailDocsPage }, element);
+  return renderer;
 }
 
 const preview: Preview = {
@@ -34,7 +38,7 @@ const preview: Preview = {
       theme: ropTheme,
       // Example first, then the Playground with the Controls, then the other stories (ticket #403). Pages
       // without a copy-paste example get Storybook's own template: see ./docs-page.tsx.
-      page: FormrailDocsPage,
+      renderer: docsRenderer,
       source: {
         // "Show code" defaults to `dynamic` (JSX synthesized from the rendered tree, with the live args):
         // right for `render: (args) => <X {...args} />` and for stories with no render of their own
