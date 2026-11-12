@@ -457,6 +457,45 @@ export const InsideSheet: Story = {
   },
 };
 
+/**
+ * Another control ("Save") has the focus when the menu is opened with the pointer: a pointer press
+ * does not move the focus to the trigger, yet Escape and a chosen item return it to the trigger
+ * (ticket #463), not to "Save". The play function goes through both.
+ */
+export const PointerOpenWhileFocusElsewhere: Story = {
+  args: { disabledItem: 'none' },
+  render: (args) => (
+    <Page>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button variant="primary">Save</Button>
+        <BasicMenu args={args} />
+      </div>
+    </Page>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const save = canvas.getByRole('button', { name: 'Save' });
+    const trigger = canvas.getByRole('button', { name: 'More actions' });
+    // Escape.
+    await userEvent.click(save);
+    await expect(save).toHaveFocus();
+    await userEvent.click(trigger);
+    await body.findByRole('menu');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    // A chosen item.
+    await userEvent.click(save);
+    await expect(save).toHaveFocus();
+    await userEvent.click(trigger);
+    await userEvent.click(await body.findByRole('menuitem', { name: 'Duplicate' }));
+    await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+
 /** Open state owned by the application: the focus goes to the first item and closing returns it. */
 export const ExternalState: Story = {
   render: (args) => {

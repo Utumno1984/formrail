@@ -24,6 +24,7 @@ test.describe('Overlays/Menu: stories play', () => {
     'external-state',
     'rtl',
     'menu-in-dialog-from-menu',
+    'pointer-open-while-focus-elsewhere',
   ]) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
@@ -151,6 +152,109 @@ test.describe('Menu: roles, keyboard, focus', () => {
     const l = (await last.boundingBox())!;
     expect(l.y).toBeGreaterThanOrEqual(m.y - 1);
     expect(l.y + l.height).toBeLessThanOrEqual(m.y + m.height + 1);
+  });
+});
+
+// Ticket #463: a pointer press on the trigger does not move the focus to it (Radix prevents the
+// press's default), so the element focused before the opening still has the focus when the menu
+// opens. Closing must give the focus to the trigger anyway, never back to that element.
+test.describe('Menu: focus return after a pointer opening while another control had the focus', () => {
+  const save = (page: Page) => page.getByRole('button', { name: 'Save', includeHidden: true });
+  // Each test waits for the story's own play function (it clicks the same controls) before driving the page.
+  const STORY_ID = STORY('pointer-open-while-focus-elsewhere');
+
+  for (const modal of [true, false]) {
+    const args = modal ? undefined : 'modal:!false';
+    test(`modal=${modal}: Escape returns the focus to the trigger, not to the control focused before`, async ({
+      page,
+    }) => {
+      await expectPlayToPass(page, STORY_ID, args);
+      await save(page).click();
+      await expect(save(page)).toBeFocused();
+      await trigger(page).click();
+      await expect(menuOf(page)).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(menuOf(page)).toHaveCount(0);
+      await expect(trigger(page)).toBeFocused();
+    });
+
+    test(`modal=${modal}: an item chosen with the mouse returns the focus to the trigger`, async ({ page }) => {
+      await expectPlayToPass(page, STORY_ID, args);
+      await save(page).click();
+      await expect(save(page)).toBeFocused();
+      await trigger(page).click();
+      await page.getByRole('menuitem', { name: 'Duplicate' }).click();
+      await expect(menuOf(page)).toHaveCount(0);
+      await expect(trigger(page)).toBeFocused();
+    });
+
+    test(`modal=${modal}: an item chosen with Enter returns the focus to the trigger`, async ({ page }) => {
+      await expectPlayToPass(page, STORY_ID, args);
+      await save(page).click();
+      await expect(save(page)).toBeFocused();
+      await trigger(page).click();
+      await expect(menuOf(page)).toBeVisible();
+      await page.keyboard.press('ArrowDown');
+      await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(menuOf(page)).toHaveCount(0);
+      await expect(trigger(page)).toBeFocused();
+    });
+  }
+
+  test('Tab and Shift+Tab move on from the trigger, not from the control focused before', async ({ page }) => {
+    await expectPlayToPass(page, STORY_ID);
+    // Shift+Tab: the control before the trigger ("Save" itself here).
+    await save(page).click();
+    await trigger(page).click();
+    await expect(menuOf(page)).toBeVisible();
+    await page.keyboard.press('Shift+Tab');
+    await expect(menuOf(page)).toHaveCount(0);
+    await expect(save(page)).toBeFocused();
+    // Tab: nothing tabbable after the trigger, the focus leaves the page (it is not returned anywhere).
+    await trigger(page).click();
+    await expect(menuOf(page)).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(menuOf(page)).toHaveCount(0);
+    await expect(page.locator('body')).toBeFocused();
+  });
+
+  test('modal=false: a click on another control closes the menu and leaves the focus on that control', async ({
+    page,
+  }) => {
+    await expectPlayToPass(page, STORY_ID, 'modal:!false');
+    await trigger(page).click();
+    await expect(menuOf(page)).toBeVisible();
+    await save(page).click();
+    await expect(menuOf(page)).toHaveCount(0);
+    await page.waitForTimeout(150);
+    await expect(save(page)).toBeFocused();
+  });
+
+  test('an item that opens a Dialog leaves the focus in the Dialog; closing it returns it to the trigger', async ({
+    page,
+  }) => {
+    await expectPlayToPass(page, STORY('opens-a-dialog'));
+    // A control outside the menu, focused before the pointer opening.
+    await page.evaluate(() => {
+      const button = document.createElement('button');
+      button.textContent = 'Save';
+      document.getElementById('storybook-root')!.prepend(button);
+    });
+    await save(page).click();
+    await expect(save(page)).toBeFocused();
+    await trigger(page).click();
+    await page.getByRole('menuitem', { name: 'Delete…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete this record?' });
+    await expect(dialog).toBeVisible();
+    const focusInDialog = () => dialog.evaluate((el) => el.contains(document.activeElement));
+    await expect.poll(focusInDialog).toBe(true);
+    // Past the menu's own (deferred) return of the focus: still in the Dialog.
+    await page.waitForTimeout(150);
+    expect(await focusInDialog()).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(trigger(page)).toBeFocused();
   });
 });
 
@@ -299,6 +403,21 @@ test.describe('Menu: touch toggle and nesting @touch', () => {
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     };
   };
+
+  test('opened by a tap while another control has the focus: a tapped item returns the focus to the trigger', async ({
+    page,
+  }) => {
+    await expectPlayToPass(page, STORY('pointer-open-while-focus-elsewhere'));
+    const tap = await tapper(page);
+    const save = page.getByRole('button', { name: 'Save', includeHidden: true });
+    await tap(save);
+    await expect(save).toBeFocused();
+    await tap(trigger(page));
+    await expect(menuOf(page)).toBeVisible();
+    await tap(page.getByRole('menuitem', { name: 'Duplicate' }));
+    await expect(menuOf(page)).toHaveCount(0);
+    await expect(trigger(page)).toBeFocused();
+  });
 
   test('a tap on the trigger of an open menu closes it, once, and it stays closed', async ({ page }) => {
     await gotoStory(page, STORY('playground'));
