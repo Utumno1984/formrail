@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { forwardRef, type AnchorHTMLAttributes } from 'react';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
@@ -68,12 +69,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Breadcrumb.example.tsx') };
+
 /**
  * Controls: number of items, text length, separator, container width. The play function tabs to the
  * second link, activates it with Enter and checks the action, then checks that the last item is the
  * current page (`aria-current`), is not focusable, and that the separators are not announced.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { items: 4 },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
