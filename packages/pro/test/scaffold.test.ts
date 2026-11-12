@@ -17,9 +17,10 @@ describe('@formrail/pro scaffold', () => {
     expect(pro).toBeTypeOf('object');
   });
 
-  it('exports exactly the change-summary engine, the form rebase and the virtualized List Report at runtime', () => {
+  it('exports exactly the change-summary engine, the form rebase (with RebaseNotice, #384) and the virtualized List Report at runtime', () => {
     expect(Object.keys(pro).sort()).toEqual([
       'ChangeSummary',
+      'RebaseNotice',
       'VirtualListReport',
       'VirtualListReportTable',
       'computeChangeSummary',
