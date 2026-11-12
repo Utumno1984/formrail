@@ -1,5 +1,6 @@
 import { useState, type ComponentType } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
@@ -86,6 +87,12 @@ function Demo({ fieldState, invalid, required, autoResize, rows, maxRows, placeh
   );
 }
 
+/** Copy-paste example: an auto-growing Textarea with an initial text. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Textarea.example.tsx'),
+};
+
 /**
  * Controls: Field state, `invalid`, `required`, `autoResize`, `rows`, `maxRows`, `placeholder`;
  * `onChange` is in Actions. The play function types three lines with `autoResize` and `maxRows` 4 and
@@ -93,6 +100,7 @@ function Demo({ fieldState, invalid, required, autoResize, rows, maxRows, placeh
  * scrolls inside.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <Demo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (args.fieldState !== 'default' || !args.autoResize || args.maxRows !== 4 || args.rows !== 2) return;

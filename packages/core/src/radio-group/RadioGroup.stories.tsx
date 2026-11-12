@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { useArgs } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
@@ -131,6 +132,12 @@ function PlaygroundDemo({ fieldState, invalid, required, orientation, disabledIt
   );
 }
 
+/** Copy-paste example: a plan RadioGroup in a Field. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('RadioGroup.example.tsx'),
+};
+
 /**
  * Controls: orientation, Field state, disabled item, `invalid`, `required` and the initial value;
  * `onValueChange` is in Actions. The play function Tabs into the group, selects the third option
@@ -138,6 +145,7 @@ function PlaygroundDemo({ fieldState, invalid, required, orientation, disabledIt
  * arrows and clicks change nothing and report nothing.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { disabledItem: 'team', value: 'free' },
   render: (args) => <PlaygroundDemo {...args} />,
   play: async ({ args, canvasElement }) => {

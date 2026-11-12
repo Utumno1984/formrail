@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import {
@@ -117,12 +118,19 @@ function Controlled({
 const trigger = (canvasElement: HTMLElement, name = 'Country') => within(canvasElement).getByRole('combobox', { name });
 const listbox = () => within(document.body).findByRole('listbox');
 
+/** Copy-paste example: a country Select with a disabled option. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Select.example.tsx'),
+};
+
 /**
  * Controls: `size`, `placeholder` and the Field `state`; `onValueChange` is in
  * Actions. The play function picks an option with the mouse and another with the keyboard (arrows
  * skip the disabled one), then checks the trigger shows it and the Actions got exactly those picks.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ state, ...args }) => (
     <div style={column}>
       <Field label="Country" help="Supplier registered office" {...stateProps(state)}>

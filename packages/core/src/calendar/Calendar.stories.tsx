@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
@@ -111,6 +112,12 @@ function PlaygroundDemo(args: DemoArgs) {
   );
 }
 
+/** Copy-paste example: a delivery date picked on a calendar, with the value in local state. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Calendar.example.tsx'),
+};
+
 /**
  * Controls: locale, first day of the week, limits, `today`, `disabled`/`readOnly`; `onValueChange`
  * and `onMonthChange` are in Actions. The play function Tabs into the grid (landing on today), goes
@@ -118,6 +125,7 @@ function PlaygroundDemo(args: DemoArgs) {
  * ISO string; then moves past `max` and checks that Enter and a click change nothing.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <PlaygroundDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (args.locale !== 'en-US' || args.max !== '2026-04-20' || args.disabled || args.readOnly || args.today !== TODAY) return;

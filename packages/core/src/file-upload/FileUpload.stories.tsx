@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
@@ -116,8 +117,15 @@ function Demo({ fieldState, multiple, invalid, required, accept, maxFiles, maxSi
 const pdf = (name: string, size = 120_000) => new File([new Uint8Array(size)], name, { type: 'application/pdf', lastModified: 1 });
 const nativeInput = (root: HTMLElement) => root.querySelector<HTMLInputElement>('input[type="file"]')!;
 
+/** Copy-paste example: PDF attachments with a rejection message in the Field error, no upload. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('FileUpload.example.tsx'),
+};
+
 /** Controls: Field state, `multiple`, `invalid`, `required`, `accept`, `maxFiles`, `maxSize` and the label; `onValueChange` and `onReject` are in Actions. For manual testing and the e2e that drive the real picker and drag & drop. */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <Demo {...args} />,
 };
 

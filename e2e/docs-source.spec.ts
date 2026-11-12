@@ -270,12 +270,8 @@ test.describe('copy-paste examples (#403)', () => {
   const PENDING: Record<string, { ticket: number; max: number; pages: string[] }> = {
     Forms: {
       ticket: 442,
-      max: 13,
-      pages: [
-        'forms-calendar--docs', 'forms-checkbox--docs', 'forms-combobox--docs', 'forms-datepicker--docs', 'forms-field--docs',
-        'forms-fileupload--docs', 'forms-input--docs', 'forms-multiselect--docs', 'forms-numberinput--docs', 'forms-radiogroup--docs',
-        'forms-select--docs', 'forms-switch--docs', 'forms-textarea--docs',
-      ],
+      max: 0,
+      pages: [],
     },
     Overlays: {
       ticket: 443,
@@ -304,7 +300,7 @@ test.describe('copy-paste examples (#403)', () => {
     },
   };
   /** The sum of the groups' `max`: the list only goes down from here. On a rebase, recompute it from the groups. */
-  const PENDING_MAX = 13;
+  const PENDING_MAX = 0;
   const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
 
   interface Entry {

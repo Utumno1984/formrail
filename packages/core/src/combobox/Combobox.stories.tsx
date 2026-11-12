@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import {
@@ -142,6 +143,12 @@ function Controlled({
 const input = (canvasElement: HTMLElement, name = 'City') => within(canvasElement).getByRole('combobox', { name });
 const listbox = () => within(document.body).findByRole('listbox');
 
+/** Copy-paste example: a city Combobox with local options and an in-memory filter. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Combobox.example.tsx'),
+};
+
 /**
  * Controls: `size`, `placeholder`, `emptyLabel`, `clearOnEmpty` and the Field `state`;
  * `onValueChange` is in Actions. The play function types "mil", moves down past the disabled
@@ -149,6 +156,7 @@ const listbox = () => within(document.body).findByRole('listbox');
  * types a text with no results, leaves with Tab and checks the revert with no new call.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ state, ...args }) => (
     <div style={column}>
       <Field label="City" help="Supplier registered office" {...stateProps(state)}>

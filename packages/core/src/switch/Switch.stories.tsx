@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { useArgs } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
@@ -116,6 +117,12 @@ function PlaygroundDemo({ fieldState, invalid, required, fieldLabel, inlineLabel
   );
 }
 
+/** Copy-paste example: a notifications Switch in a Field. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Switch.example.tsx'),
+};
+
 /**
  * Controls: `checked`, the Field state, `invalid`, `required` and the labels; `onCheckedChange` is in
  * Actions. The play function turns the switch on with Space and checks the thumb moved to the end of
@@ -123,6 +130,7 @@ function PlaygroundDemo({ fieldState, invalid, required, fieldLabel, inlineLabel
  * Space change nothing and report nothing.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <PlaygroundDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (args.fieldState !== 'default' || args.checked !== false) return;

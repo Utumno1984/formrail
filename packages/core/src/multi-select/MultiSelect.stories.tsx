@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import {
@@ -133,6 +134,12 @@ const listbox = () => within(document.body).findByRole('listbox');
 const chipLabels = (canvasElement: HTMLElement) =>
   Array.from(canvasElement.querySelectorAll('[data-rop-multi-select] > span')).map((chip) => chip.textContent);
 
+/** Copy-paste example: a cost-centers MultiSelect with an initial value. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('MultiSelect.example.tsx'),
+};
+
 /**
  * "Cost centers". Controls: the Field state, `size`, `invalid`, `required`, `placeholder`, the
  * `options` fixture; `onValueChange` is in Actions. The play function opens the list, picks three
@@ -140,6 +147,7 @@ const chipLabels = (canvasElement: HTMLElement) =>
  * value and checks its chip stays, then empties the text and removes the last chip with Backspace.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <Demo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (args.fieldState !== 'default' || args.options !== COST_CENTERS) return;

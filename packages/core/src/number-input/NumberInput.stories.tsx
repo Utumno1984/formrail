@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
@@ -82,6 +83,12 @@ function Controlled({
   );
 }
 
+/** Copy-paste example: a quantity NumberInput with min, max and step. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('NumberInput.example.tsx'),
+};
+
 /**
  * "Quantity". Controls: the Field `fieldState`, `invalid` and `required`, `min`/`max`/`step`,
  * `locale` and `size`; `onValueChange` is in Actions. The play function presses ArrowUp three
@@ -89,6 +96,7 @@ function Controlled({
  * field: the value is clamped to `max` and reported once.
  */
 export const Quantity: Story = {
+  tags: ['playground'],
   render: ({ fieldState, invalid, required, ...args }) => (
     <div style={column}>
       <Field
