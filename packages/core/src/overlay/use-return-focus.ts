@@ -11,6 +11,14 @@ export interface UseReturnFocusOptions {
    * can have taken the focus in the meantime. Default: always return, as before.
    */
   skipWhen?: () => boolean;
+  /**
+   * Read at the moment `open` turns true: an element returned here is remembered as the
+   * opener instead of the focused one. For a trigger that does not take the focus when pressed (a
+   * Radix menu trigger prevents the pointer press's default so the panel can take it), the focused
+   * element is still whatever had the focus before the press. `null` / `undefined`: the focused
+   * element, as by default.
+   */
+  opener?: () => HTMLElement | null | undefined;
 }
 
 function canTakeFocus(el: HTMLElement | null | undefined): el is HTMLElement {
@@ -27,6 +35,7 @@ function canTakeFocus(el: HTMLElement | null | undefined): el is HTMLElement {
  *   attached in a layout effect and detached when `open` turns true,
  *   before the children of the newly opened overlay can focus anything, so an `autoFocus` field
  *   inside the content (children's effects run before the parent's) never overwrites it.
+ *   When `opener` returns an element at that moment, that element is the opener instead.
  * - On `open: true -> false` the focus returns in the next animation frame, i.e. after the content
  *   has unmounted. Closing and reopening within that frame cancels the return.
  *
@@ -50,10 +59,11 @@ function canTakeFocus(el: HTMLElement | null | undefined): el is HTMLElement {
  *
  * Wrappers use this instead of Radix's own `onCloseAutoFocus` (call `preventDefault()` there).
  */
-export function useReturnFocus({ open, fallbackRef, skipWhen }: UseReturnFocusOptions): void {
+export function useReturnFocus({ open, fallbackRef, skipWhen, opener }: UseReturnFocusOptions): void {
   const openerRef = useRef<HTMLElement | null>(null);
   const fallbackRefRef = useRef(fallbackRef);
   const skipWhenRef = useRef(skipWhen);
+  const explicitOpenerRef = useRef(opener);
   const wasOpenRef = useRef(open);
   // True from the moment a return-to-opener is scheduled (rAF) until it fires or is cancelled.
   // Guards the race where closing and reopening before that frame makes the layout effect's
@@ -65,6 +75,7 @@ export function useReturnFocus({ open, fallbackRef, skipWhen }: UseReturnFocusOp
   useLayoutEffect(() => {
     fallbackRefRef.current = fallbackRef;
     skipWhenRef.current = skipWhen;
+    explicitOpenerRef.current = opener;
   });
 
   useLayoutEffect(() => {
@@ -80,6 +91,13 @@ export function useReturnFocus({ open, fallbackRef, skipWhen }: UseReturnFocusOp
       // Runs in the mutation phase of the commit that opens the overlay, before any child can take
       // the focus. `focusin` never fires when the focus is lost to `body` (click on an empty area),
       // so the truth is read here: whatever has the focus right now is the opener, or nothing.
+      // An explicit opener (see `opener`) wins, also while a return is pending: it is the caller's
+      // own signal, not a reading of `document.activeElement`.
+      const explicit = explicitOpenerRef.current?.();
+      if (explicit) {
+        openerRef.current = explicit;
+        return;
+      }
       // Skipped while a return is pending (see `pendingReturnRef`): `document.activeElement` is
       // transiently `body` right after the previous overlay's content unmounted, not a real signal.
       if (pendingReturnRef.current) return;

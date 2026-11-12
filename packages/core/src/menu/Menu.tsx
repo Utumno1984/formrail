@@ -120,6 +120,12 @@ export function Menu({ children, open: openProp, defaultOpen = false, onOpenChan
   useReturnFocus({
     open,
     fallbackRef: triggerRef,
+    // Opened by a pointer press on the trigger: Radix prevents the press's default, so the trigger
+    // never takes the focus and whatever had it before (another button) is still focused when the
+    // menu opens. The menu belongs to its trigger: the focus returns there, not to that element
+    // (ticket #463). Opened from the keyboard the trigger has the focus already; opened from the
+    // `open` state the focused element is the opener, as before.
+    opener: () => (openedBy.current === 'pointer' ? triggerRef.current : null),
     skipWhen: () => {
       // Tab with nothing tabbable beyond the trigger: the focus leaves the page, as it would have
       // from the trigger itself, instead of bouncing back to it.
@@ -268,8 +274,9 @@ export interface MenuContentProps extends Omit<RadixMenuContentProps, 'asChild' 
   onInteractOutside?: RadixMenuContentProps['onInteractOutside'];
   /**
    * Called once the menu has closed and left the DOM. It does not control the focus: the menu
-   * returns it itself, to the element that had it before opening (normally the trigger; when Tab
-   * closed the menu, the focus moves on to the next element instead). So `event.preventDefault()` has no effect, and a focus moved from
+   * returns it itself: to the trigger when the menu was opened from it (pointer or keyboard), else
+   * to the element that had it before opening (when Tab closed the menu, the focus moves on to the
+   * next element instead). So `event.preventDefault()` has no effect, and a focus moved from
    * here can race with that return, which may run right after this call.
    */
   onCloseAutoFocus?: RadixMenuContentProps['onCloseAutoFocus'];
