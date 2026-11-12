@@ -146,6 +146,18 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(dueDate(page)).toBeFocused();
   });
 
+  test('"Keep mine" clicked with the mouse, no focus before: the focus goes to the field of the conflict, never <body>', async ({ page }) => {
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    // Nothing focused (a click on an empty spot of the page): the notice has no "where it came from".
+    await dueDate(page).evaluate((el) => (el as HTMLElement).blur());
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    await serverPatch(page, record.id, { dueDate: '2026-03-12' });
+    await page.getByRole('button', { name: 'Keep mine for Due date' }).click();
+    await expect(notice(page)).toHaveCount(0);
+    await expect(dueDate(page)).toBeFocused();
+  });
+
   test('typing while the update lands: the focus stays in the field and no keystroke is lost', async ({ page }) => {
     const record = await openRecord(page);
     const text = 'Checked by the finance team on Monday morning';

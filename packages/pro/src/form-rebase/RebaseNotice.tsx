@@ -109,6 +109,13 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   locale?: string;
   /** IANA time zone of the default date formatting. Default: the runtime time zone. */
   timeZone?: string;
+  /**
+   * Where the focus goes when a choice closes the last conflict and nothing of the notice is left to focus:
+   * typically the field the conflict was about (its control, found with the conflict's `currentPath` for an
+   * open conflict of `useFormRebase`). Called with the conflict as it was when chosen. Without it (or when it
+   * returns nothing), the focus goes back to where it was before entering the notice.
+   */
+  focusTargetFor?: (conflict: RebaseConflict) => HTMLElement | null | undefined;
 }
 
 const RN = 'rop-pro-rebase-notice';
@@ -120,6 +127,8 @@ interface Focused {
   element: HTMLElement;
   index: number;
   action: Action;
+  /** The conflict of that choice (none for "Use all server values"). */
+  conflict: RebaseConflict | undefined;
 }
 
 const merged = (labels: Partial<RebaseNoticeLabels> | undefined): RebaseNoticeLabels => {
@@ -175,9 +184,9 @@ const isLost = (doc: Document): boolean => doc.activeElement === null || doc.act
  * below it the content moves as the browser's scroll anchoring decides.
  *
  * **Focus**: when a choice removes the element that had the focus, the focus goes to the same choice of
- * the conflict that takes its place (the next one, else the previous one), else back to where it was
- * before entering the notice, else to the notice itself (focusable from script only). A callback that
- * moves the focus itself wins.
+ * the conflict that takes its place (the next one, else the previous one), else to `focusTargetFor(conflict)`
+ * (the field the conflict was about), else back to where it was before entering the notice, else to the
+ * notice itself (focusable from script only). A callback that moves the focus itself wins.
  */
 export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNoticeProps>(function RebaseNotice(
   {
@@ -191,6 +200,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     renderValue,
     locale,
     timeZone,
+    focusTargetFor,
     className,
     onFocus,
     onBlur,
@@ -292,8 +302,9 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     const from = event.relatedTarget;
     if (strip && from instanceof HTMLElement && !strip.contains(from)) cameFrom.current = from;
     const target = event.target.closest<HTMLElement>('[data-rebase-action]');
+    const index = Number(target?.dataset.rebaseIndex ?? -1);
     focused.current = target
-      ? { element: target, index: Number(target.dataset.rebaseIndex ?? -1), action: target.dataset.rebaseAction as Action }
+      ? { element: target, index, action: target.dataset.rebaseAction as Action, conflict: conflicts[index] }
       : null;
   };
   const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
@@ -315,6 +326,10 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     let target: HTMLElement | null = null;
     if (last.action !== 'all' && conflicts.length > 0) {
       target = button(Math.min(last.index, conflicts.length - 1), last.action);
+    }
+    if (!target && last.conflict && focusTargetFor) {
+      const chosen = focusTargetFor(last.conflict);
+      if (chosen?.isConnected) target = chosen;
     }
     if (!target && cameFrom.current?.isConnected) target = cameFrom.current;
     if (!target && strip) target = strip;

@@ -15,7 +15,7 @@ import type {
 import type { ServerChange, StoredInvoice } from '../../../core/src/showcase/invoice-store';
 import { ChangeSummary } from '../change-summary/ChangeSummary';
 import { RebaseNotice } from '../form-rebase/RebaseNotice';
-import type { OpenRebaseConflict } from '../form-rebase/types';
+import type { OpenRebaseConflict, RebaseConflict } from '../form-rebase/types';
 import { useFormRebase } from '../form-rebase/use-form-rebase';
 import {
   INVOICE_REVIEW_ARRAY_ID_KEYS,
@@ -257,6 +257,7 @@ export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEdito
         onKeepMine={rebase.keepMine}
         onAcceptAllTheirs={rebase.acceptAllTheirs}
         labels={{ title: NOTICE_TITLE }}
+        focusTargetFor={fieldOf}
         renderValue={renderInvoiceReviewValue}
         locale={REVIEW_LOCALE}
         timeZone="UTC"
@@ -274,6 +275,17 @@ export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEdito
     fieldHelp,
     reviewSave,
   };
+}
+
+/**
+ * The control of the field a conflict was about, at its current position (`data-rop-name` is the Field's `name`);
+ * for a whole line, its first field. `null` when it is not on the page (a line the server removed and the user
+ * accepted to remove).
+ */
+function fieldOf(conflict: RebaseConflict): HTMLElement | null {
+  const path = 'currentPath' in conflict && typeof conflict.currentPath === 'string' ? conflict.currentPath : conflict.path;
+  const name = CSS.escape(path);
+  return document.querySelector<HTMLElement>(`[data-rop-name="${name}"]`) ?? document.querySelector<HTMLElement>(`[data-rop-name^="${name}."]`);
 }
 
 const sameConflicts = (a: readonly OpenRebaseConflict[], b: readonly OpenRebaseConflict[]): boolean =>

@@ -296,7 +296,17 @@ describe('<RebaseNotice />: announcement', () => {
 
 describe('<RebaseNotice />: focus after a choice', () => {
   /** A notice whose choices remove the conflict, as `useFormRebase` does. */
-  function Harness({ initial, applied = [], moveFocus }: { initial: RebaseConflict[]; applied?: ChangeEntry[]; moveFocus?: () => void }) {
+  function Harness({
+    initial,
+    applied = [],
+    moveFocus,
+    focusTargetFor,
+  }: {
+    initial: RebaseConflict[];
+    applied?: ChangeEntry[];
+    moveFocus?: () => void;
+    focusTargetFor?: RebaseNoticeProps['focusTargetFor'];
+  }) {
     const [conflicts, setConflicts] = useState(initial);
     const drop = (path: string) => {
       setConflicts((list) => list.filter((c) => c.path !== path));
@@ -306,7 +316,7 @@ describe('<RebaseNotice />: focus after a choice', () => {
       <>
         <input aria-label="Due date input" />
         <RebaseNotice
-          {...props({ applied, conflicts, onAcceptTheirs: drop, onKeepMine: drop, onAcceptAllTheirs: () => setConflicts([]) })}
+          {...props({ applied, conflicts, onAcceptTheirs: drop, onKeepMine: drop, onAcceptAllTheirs: () => setConflicts([]), focusTargetFor })}
         />
       </>
     );
@@ -318,6 +328,46 @@ describe('<RebaseNotice />: focus after a choice', () => {
     expect(screen.getByRole('button', { name: 'Keep mine for Lines > Item 2 > Qty' })).toHaveFocus();
     await userEvent.click(screen.getByRole('button', { name: 'Use server value for Lines > Item 2 > Qty' }));
     expect(screen.getByRole('button', { name: 'Use server value for Due date' })).toHaveFocus();
+  });
+
+  it('the first of three conflicts closed: the same choice of the new first one', async () => {
+    render(<Harness initial={[DUE, NOTES, QTY]} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Keep mine for Due date' }));
+    expect(screen.getByRole('button', { name: 'Keep mine for Notes' })).toHaveFocus();
+  });
+
+  it('the last conflict closed with a mouse click and no focus before (nothing of the notice left): focusTargetFor(conflict) takes the focus', async () => {
+    const target = vi.fn((c: RebaseConflict) => (c.path === 'dueDate' ? screen.getByRole('textbox', { name: 'Due date input' }) : null));
+    render(<Harness initial={[DUE]} focusTargetFor={target} />);
+    expect(document.activeElement).toBe(document.body);
+    await userEvent.click(screen.getByRole('button', { name: 'Keep mine for Due date' }));
+    expect(strip()).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Due date input' })).toHaveFocus();
+    expect(target).toHaveBeenCalledWith(expect.objectContaining({ path: 'dueDate' }));
+  });
+
+  it('focusTargetFor wins over where the focus came from; the strip is the last resort', async () => {
+    const other = document.createElement('input');
+    other.setAttribute('aria-label', 'Other');
+    document.body.appendChild(other);
+    try {
+      render(<Harness initial={[DUE]} applied={[entry('status', 'Status')]} focusTargetFor={() => screen.getByRole('textbox', { name: 'Due date input' })} />);
+      await userEvent.click(other);
+      await userEvent.click(screen.getByRole('button', { name: 'Use server value for Due date' }));
+      expect(screen.getByRole('textbox', { name: 'Due date input' })).toHaveFocus();
+    } finally {
+      other.remove();
+    }
+  });
+
+  it('the focus left the notice for <body> (blur), then the conflict closes: the focus is not taken back', () => {
+    const view = render(<RebaseNotice {...props({ applied: [entry('status', 'Status')], conflicts: [DUE, NOTES] })} />);
+    const button = screen.getByRole('button', { name: 'Keep mine for Notes' });
+    button.focus();
+    button.blur();
+    expect(document.activeElement).toBe(document.body);
+    view.rerender(<RebaseNotice {...props({ applied: [entry('status', 'Status')], conflicts: [DUE] })} />);
+    expect(document.activeElement).toBe(document.body);
   });
 
   it('the last conflict: back to where the focus was before entering the notice', async () => {
