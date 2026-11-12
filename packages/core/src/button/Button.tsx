@@ -137,7 +137,7 @@ export type ButtonProps = ButtonBaseProps &
     | {
         /**
          * Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a
-         * paragraph): the text sizes, default `md`. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
+         * paragraph): the text sizes. Default `md`. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
          * 32px, `icon-md` 36px) have no default: pass one explicitly, together with `aria-label` or
          * `aria-labelledby` (there is no visible text).
          */
@@ -150,7 +150,7 @@ export type ButtonProps = ButtonBaseProps &
     | ({
         /**
          * Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a
-         * paragraph): the text sizes, default `md`. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
+         * paragraph): the text sizes. Default `md`. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
          * 32px, `icon-md` 36px) have no default: pass one explicitly, together with `aria-label` or
          * `aria-labelledby` (there is no visible text).
          */
