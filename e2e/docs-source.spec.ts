@@ -277,11 +277,8 @@ test.describe('copy-paste examples (#403)', () => {
     },
     Primitives: {
       ticket: 445,
-      max: 10,
-      pages: [
-        'primitives-avatar--docs', 'primitives-button--docs', 'primitives-card--docs', 'primitives-divider--docs', 'primitives-fieldmessage--docs',
-        'primitives-messagestrip--docs', 'primitives-progressbar--docs', 'primitives-skeleton--docs', 'primitives-spinner--docs', 'primitives-statusbadge--docs',
-      ],
+      max: 0,
+      pages: [],
     },
     Foundations: {
       ticket: 446,
@@ -295,7 +292,7 @@ test.describe('copy-paste examples (#403)', () => {
     },
   };
   /** The sum of the groups' `max`: the list only goes down from here. On a rebase, recompute it from the groups. */
-  const PENDING_MAX = 37;
+  const PENDING_MAX = 27;
   const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
 
   interface Entry {
