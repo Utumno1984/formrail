@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useObjectPageForm } from '@formrail/core';
+import { exampleStory } from '../../../core/src/internal/example-story';
 import { storyControls } from '../../../core/src/internal/story-docs';
 import { computeRebase } from './compute-rebase';
 import { useFormRebase } from './use-form-rebase';
@@ -36,6 +37,8 @@ const meta: Meta<DemoArgs> = {
 
 export default meta;
 type Story = StoryObj<DemoArgs>;
+
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('FormRebase.example.tsx') };
 
 interface Invoice {
   number: string;
@@ -153,6 +156,7 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
  * value. "Save" waits `saveDelay` ms: a server update pressed meanwhile is queued until it ends.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <FormRebaseDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useFieldControl, useObjectPageForm } from '@formrail/core';
+import { exampleStory } from '../../../core/src/internal/example-story';
 import { storyControl, withoutControls } from '../../../core/src/internal/story-docs';
 import { ChangeSummary } from './ChangeSummary';
 import { formatChangeValue } from './format-change-value';
@@ -60,6 +61,8 @@ const meta: Meta<DemoArgs> = {
 
 export default meta;
 type Story = StoryObj<DemoArgs>;
+
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('ChangeSummary.example.tsx') };
 
 // ---------------------------------------------------------------------------------------------
 // The demo editor: a real form (`useObjectPageForm` of core, mounted already hydrated) whose
@@ -226,6 +229,7 @@ function readText(node: Node): string {
  * `onDiscard` called once).
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <EditorDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

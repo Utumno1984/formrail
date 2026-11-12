@@ -32,6 +32,22 @@ export const SHOWCASE_SOURCE_TAG = 'showcase-source';
 export const EXAMPLE_RENDER_MARK_KEY = 'formrail.exampleStory.render';
 export const EXAMPLE_RENDER_MARK = Symbol.for(EXAMPLE_RENDER_MARK_KEY);
 
+/** The stylesheet of `@formrail/core` (compiled, mode (a) of its README): every example needs it. */
+export const CORE_STYLESHEET = '@formrail/core/styles.css';
+/** The stylesheet of `@formrail/pro`: its components' own classes only, imported after the core one. */
+export const PRO_STYLESHEET = '@formrail/pro/styles.css';
+
+/**
+ * The stylesheets a copy-paste example needs, in import order (ticket #447): the core one always (the Pro
+ * components are built on the core ones and on its tokens), then the Pro one when the example imports
+ * `@formrail/pro`. Read by the Docs page template for the reminder next to the example; the e2e audit checks
+ * the reminder against the package the page belongs to.
+ */
+export function exampleStylesheets(code: string): string[] {
+  const usesPro = /(?:\bfrom|\bimport)\s*['"]@formrail\/pro(?:\/[^'"]*)?['"]/.test(code);
+  return usesPro ? [CORE_STYLESHEET, PRO_STYLESHEET] : [CORE_STYLESHEET];
+}
+
 /** The repository's `main` branch on GitHub: the only place the URL is written. */
 export const REPOSITORY_MAIN = 'https://github.com/Utumno1984/formrail/blob/main/';
 
