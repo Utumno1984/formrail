@@ -1,23 +1,24 @@
 ---
 name: verifica-e-merge
-description: Procedura che l'orchestratore di ~/projects segue per verificare dal vivo e mergiare una PR di Formrail — usala prima di ogni gh pr ready/merge, mai dentro una sessione del progetto (il merge lo fa solo l'orchestratore).
+description: Procedura che la sessione principale di Formrail segue per verificare dal vivo e mergiare una PR — usala prima di ogni gh pr ready/merge. Agenti e sessioni headless delegate non mergiano mai.
 ---
 
-# Verifica e merge di una PR (solo orchestratore)
+# Verifica e merge di una PR (solo sessione principale del progetto)
 
-Le sessioni di questo progetto non mergiano mai (vedi CLAUDE.md, "Merge e pubblicazione npm").
-Questa procedura è per l'orchestratore di `~/projects` quando una PR è pronta per la revisione
-finale, prima di `gh pr ready`/`gh pr merge`.
+Il merge lo fa la sessione principale di questo progetto (delega di Daniele del 2026-11-12, vedi
+CLAUDE.md, punto 3 "Merge"); gli agenti di `.claude/agents/` e le sessioni headless delegate non
+mergiano mai. Questa procedura si segue quando una PR è pronta per la revisione finale, prima di
+`gh pr ready`/`gh pr merge`.
 
 ## 1. Worktree isolato, mai il checkout condiviso
 
 ```bash
-cd ~/projects/react-object-page && git fetch origin <branch> --quiet
+cd ~/projects/formrail && git fetch origin <branch> --quiet
 rm -rf /tmp/rop-verify-<N>
 git worktree add --detach /tmp/rop-verify-<N> origin/<branch>
 ```
 
-Mai nel checkout condiviso `~/projects/react-object-page`: potrebbe avere una sessione headless
+Mai nel checkout condiviso `~/projects/formrail`: potrebbe avere una sessione headless
 attiva sullo stesso o un altro branch.
 
 ## 2. `node_modules` via hardlink
@@ -73,7 +74,8 @@ ticketato se ricorre (vedi issue #90, #111).
 ## 5. Verificare che il critico sia stato DAVVERO invocato
 
 "APPROVATO" nel report non basta. Controllare nel log/transcript della sessione headless (o nel
-transcript completo in `~/.claude/projects/-home-utumno-projects-react-object-page/<session-id>.jsonl`
+transcript completo in `~/.claude/projects/-home-utumno-projects-formrail/<session-id>.jsonl` —
+`-home-utumno-projects-react-object-page*/` per le sessioni precedenti al 12/11/2026 —
 se il worktree che l'ha generato è già stato rimosso) che il sottoagente `critico-avversariale`
 sia stato lanciato per davvero via tool Agent con `model: opus` quando il ticket lo richiede — una
 revisione manuale del diff fatta dalla sessione stessa su sonnet non è un giro critico, anche se
