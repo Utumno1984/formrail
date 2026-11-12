@@ -13,8 +13,9 @@ aggirare sotto pressione).
 
 `pianificatore` → `sviluppatore` (branch + PR in bozza) → CI verde → `tester` (QA) →
 `critico-avversariale` (red team) → `gh pr ready`. Se tester o critico respingono, si torna allo
-sviluppatore e si riparte dal controllo CI. **Dopo 2 giri senza esito positivo ci si ferma e si
-chiede a Daniele**, anche se il problema del giro scoped è nuovo (non uno dei
+sviluppatore e si riparte dal controllo CI. **Dopo 2 respinte del critico-avversariale sulla stessa PR ci si
+ferma e si chiede a Daniele** (si contano le respinte del critico, non i ritorni allo
+sviluppatore: decisione di Daniele del 2026-11-12), anche se il problema del giro scoped è nuovo (non uno dei
 punti già approvati) — vale lo stesso limite.
 
 ## Il critico va invocato DAVVERO

@@ -20,15 +20,15 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   generale, segmentazione Free/Pro, MVP) è in `docs/planning/design-system-spec.md`. **Il
   pianificatore lo legge sempre prima di creare ticket.**
 
-## Ruolo della sessione principale: orchestratore del progetto
+## Ruolo della sessione principale: coordinare il team del progetto
 
 Daniele parla direttamente con la sessione aperta in questa cartella (decisione del 2026-11-12:
 per Formrail l'orchestratore di `~/projects` non si usa più). Chi lavora in questa cartella
 (sessione interattiva o headless) coordina il team in `.claude/agents/`. Per ogni richiesta segui
 la pipeline, senza saltare passaggi:
 
-1. **pianificatore** → crea i ticket GitHub (o restituisce domande: giralle a Daniele/
-   all'orchestratore e aspetta).
+1. **pianificatore** → crea i ticket GitHub (o restituisce domande: girale a Daniele e
+   aspetta).
 2. Per ogni ticket, in ordine di dipendenza:
    1. **sviluppatore** → branch `feat/<N>-<slug>` (o `fix/<N>-<slug>`) e **PR in bozza subito**
       (`Closes #<N>`), così la CI gira a ogni push. Codice e test insieme: unitari (Vitest),
@@ -40,7 +40,10 @@ la pipeline, senza saltare passaggi:
       smoke test sulla build (Storybook statico e/o il bundle pubblicato), casi non coperti.
    4. **critico-avversariale** → red team del diff, per ultimo, su codice già verde e verificato.
    5. Se tester o critico segnalano problemi, torna allo **sviluppatore** con l'elenco completo
-      e riparti dal punto 2 (CI). Dopo 2 giri senza esito positivo fermati e chiedi a Daniele.
+      e riparti dal punto 2 (CI). Dopo **2 respinte del critico-avversariale** sulla stessa PR
+      fermati e chiedi a Daniele: si contano le respinte del critico, non i ritorni allo
+      sviluppatore (decisione di Daniele del 2026-11-12, per avere un metro oggettivo). Un terzo
+      giro parte solo con la sua autorizzazione esplicita.
    6. Quando CI verde, tester = QA SUPERATO e critico = APPROVATO: `gh pr ready <N>` e riepilogo
       (cosa cambia, test aggiunti, note del critico).
 3. **Merge**: lo fa la sessione principale di questo progetto, in autonomia (delega di Daniele del
@@ -49,8 +52,10 @@ la pipeline, senza saltare passaggi:
    squash); PR impilate in ordine, con la base della successiva riportata su `main`. Gli agenti
    (`.claude/agents/`) e le sessioni headless delegate non uniscono mai. Niente push diretti su
    `main` né push forzati.
-4. **Pubblicazione npm**: non rientra nella delega del merge. Niente `npm publish` senza
-   un'istruzione esplicita di Daniele.
+4. **Versione e pubblicazione npm**: il bump di versione di una PR che tocca `package.json` lo
+   decide la sessione principale (decisione di Daniele del 2026-11-12), mai un agente. La
+   pubblicazione non rientra nella delega del merge: niente `npm publish` senza un'istruzione
+   esplicita di Daniele.
 
 ### Comandi `gh`
 
@@ -60,8 +65,8 @@ la pipeline, senza saltare passaggi:
 
 Se `gh issue create`/`gh pr create` risultano bloccati in una sessione headless (classificatore
 auto-mode di "self-approval", non un problema di sintassi o di permessi): scrivi il contenuto in
-un file locale (es. `.tickets-draft/<nome>.md`, già in `.gitignore`) e restituiscilo
-all'orchestratore, che lo pubblica lui con `gh issue create --body-file`.
+un file locale (es. `.tickets-draft/<nome>.md`, già in `.gitignore`) e restituiscilo alla
+sessione principale, che lo pubblica lei con `gh issue create --body-file`.
 
 ### Modello per carico intellettuale del task (Piano Max dal 01/11/2026)
 
@@ -87,7 +92,7 @@ ma sono priorità non regole rigide:
 prioritario")**: Formrail è ora **prioritario**, non più un progetto a ritmo lento in
 parallelo sul SaaS di approvazione fatture/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
 step salvo una vera decisione da chiedere a Daniele (vedi anche la nota sulla pipeline ad
-oltranza in memoria dell'orchestratore).
+oltranza nella memoria dell'orchestratore di `~/projects`, scritta quando coordinava lui).
 
 ## Regressione e test
 
@@ -191,4 +196,4 @@ oltranza in memoria dell'orchestratore).
   Prima di una PR pronta: anche la suite e2e completa.
 - Segreti: nessuno previsto nel core (nessuna API esterna, nessun database). Se compare un
   bisogno di licensing/chiavi per il Pro, è una decisione architetturale da portare
-  all'orchestratore prima di implementarla, non da inventare sul momento.
+  a Daniele (tramite la sessione principale) prima di implementarla, non da inventare sul momento.
