@@ -1,6 +1,7 @@
 import { forwardRef, useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
+import { exampleStory } from '../internal/example-story';
 import { cn } from './cn';
 import { composeRefs } from './compose-refs';
 
@@ -45,6 +46,8 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Utilities.example.tsx') };
+
 const cond = false as boolean;
 const isCode = true as boolean;
 
@@ -57,6 +60,7 @@ const CASES: Array<[string, string]> = [
 
 /** `cn`: each call and the class string it returns. The play function checks the conflicts resolved and the non-conflicting classes kept. */
 export const ClassNames: Story = {
+  tags: ['playground'],
   render: () => (
     <table>
       <tbody>
