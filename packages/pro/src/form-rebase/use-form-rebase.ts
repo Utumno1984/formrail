@@ -5,7 +5,9 @@ import type { ChangeEntry } from '../change-summary/types';
 import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
 import { MISSING, idMapKey, isPlainObject, itemId, own, type PlainObject } from '../internal/structural-diff';
 import { arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
-import type { RebaseConflict, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
+import type { OpenRebaseConflict, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
+import { itemLabel } from '../change-summary/infer-label';
+import { labelPathOf, type DiffNode } from '../internal/structural-diff';
 
 interface RebaseState {
   applied: ChangeEntry[];
@@ -87,6 +89,42 @@ function setAt(current: unknown, segments: readonly Segment[], value: unknown, t
   if (predecessor >= 0) copy.splice(predecessor + 1, 0, value);
   else copy.push(value);
   return copy;
+}
+
+/**
+ * The conflict of `record` named at its current position in `values`: every id-keyed item on the way is found
+ * again by id (`Item N` and the index follow it). An item that is not there any more keeps the rebase-time path.
+ */
+function openConflict(record: ConflictRecord, values: unknown): OpenRebaseConflict {
+  const nodes: DiffNode[] = [];
+  for (let n: DiffNode | undefined = record.node; n && n.depth > 0; n = n.parent) nodes.unshift(n);
+  const parts: string[] = [];
+  const labels: string[] = [];
+  let current = values;
+  let moved = nodes.length === record.segments.length;
+  for (let i = 0; moved && i < record.segments.length; i += 1) {
+    const segment = record.segments[i]!;
+    if (isIdSegment(segment)) {
+      const index = Array.isArray(current) ? findById(current, segment) : -1;
+      if (index < 0) moved = false;
+      else {
+        parts.push(String(index));
+        labels.push(itemLabel(index));
+        current = (current as unknown[])[index];
+      }
+    } else {
+      parts.push(segment.key);
+      labels.push(nodes[i]!.label);
+      current = isPlainObject(current) ? own(current, segment.key) : MISSING;
+    }
+  }
+  const labelPath = moved ? labels : labelPathOf(record.node);
+  return {
+    ...record.conflict,
+    currentPath: moved ? parts.join('.') : record.conflict.path,
+    labelPath,
+    label: labelPath.join(' > '),
+  };
 }
 
 /** `current` reordered to the incoming order (items not in `theirs` placed as in `arrange`). */
@@ -307,8 +345,8 @@ export function useFormRebase<Values extends object>(
     [close],
   );
 
-  const conflicts = useMemo<RebaseConflict[]>(
-    () => state.records.filter((record) => !isResolved(record, form.values)).map((record) => record.conflict),
+  const conflicts = useMemo<OpenRebaseConflict[]>(
+    () => state.records.filter((record) => !isResolved(record, form.values)).map((record) => openConflict(record, form.values)),
     [state.records, form.values, isResolved],
   );
 

@@ -232,6 +232,45 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(page.getByRole('textbox', { name: 'Line 3 quantity' })).toHaveCount(0);
   });
 
+  test('a conflict on a line follows the line by id: moved down, a line removed above it, a line added', async ({ page }) => {
+    const record = await openRecord(page, RECORD_WITH_LINES);
+    const quantity = (n: number) => page.getByRole('textbox', { name: `Line ${n} quantity` });
+    const first = record.lineItems[0]!.description;
+    const second = record.lineItems[1]!.description;
+    await quantity(1).fill('8');
+    await page.evaluate(
+      (id) => void (window as unknown as ShowcaseWindow).__ropShowcaseStore!.updateFromServer(id, (r) => ({ ...r, lineItems: r.lineItems.map((l, i) => (i === 0 ? { ...l, quantity: 5 } : l)) })),
+      record.id,
+    );
+    await expect(conflicts(page)).toHaveCount(1);
+    expect(await readText(conflicts(page).first())).toMatch(new RegExp(`^Line items > Item 1 \\(${first}\\) > Quantity Yours: 8 Server: 5 `));
+
+    await page.getByRole('button', { name: 'Move line 1 down' }).click();
+    expect(await readText(conflicts(page).first())).toMatch(new RegExp(`^Line items > Item 2 \\(${first}\\) > Quantity Yours: 8 Server: 5 `));
+    await expect(quantity(2)).toHaveAccessibleDescription('Changed on the server too.');
+    await expect(quantity(1)).not.toHaveAccessibleDescription('Changed on the server too.');
+    await expect(page.getByRole('button', { name: `Use server value for Line items > Item 2 (${first}) > Quantity` })).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp(`\\(${second}\\)`) })).toHaveCount(0);
+
+    // The line above it removed, then a new line added at the end: still the same row.
+    await page.getByRole('button', { name: 'Remove line 1' }).click();
+    await page.getByRole('button', { name: 'Add line' }).click();
+    expect(await readText(conflicts(page).first())).toMatch(new RegExp(`^Line items > Item 1 \\(${first}\\) > Quantity Yours: 8 `));
+    await expect(quantity(1)).toHaveAccessibleDescription('Changed on the server too.');
+    // The empty new line would fail the validation of Save: removed again.
+    await page.getByRole('button', { name: 'Remove line 3' }).click();
+
+    // The review names the same row.
+    await saveButton(page).click();
+    await expect(reviewDialog(page).getByRole('list', { name: 'Server changes you overwrite' }).getByRole('listitem')).toHaveText([
+      `Line items > Item 1 (${first}) > Quantity`,
+    ]);
+    await reviewDialog(page).getByRole('button', { name: 'Keep editing' }).click();
+    await page.getByRole('button', { name: `Use server value for Line items > Item 1 (${first}) > Quantity` }).click();
+    await expect(quantity(1)).toHaveValue('5');
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+  });
+
   test('two updates in a row with different conflicts: only the conflicts of the last one, no ghost', async ({ page }) => {
     const record = await openRecord(page);
     await dueDate(page).fill('2026-03-05');

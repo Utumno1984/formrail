@@ -121,6 +121,30 @@ describe('Invoices with Change Summary: server updates (#384)', () => {
     expect(screen.getByRole('textbox', { name: 'Line 1 quantity' })).toHaveAccessibleDescription(REMOVED_HELP);
   }, 20_000);
 
+  it('a conflict on a line follows the line (by id) when lines move or a line above it is removed', async () => {
+    render(<InvoiceCrud {...props()} />);
+    await open('FT-2026-0003', 'inv-3');
+    const quantity = (n: number) => screen.getByRole('textbox', { name: `Line ${n} quantity` });
+    await userEvent.clear(quantity(1));
+    await userEvent.type(quantity(1), '8');
+    await serverUpdate('inv-3', (r) => ({ ...r, lineItems: r.lineItems.map((l, i) => (i === 0 ? { ...l, quantity: 5 } : l)) }));
+    const item = () => within(screen.getByRole('list', { name: 'Conflicts' })).getByRole('listitem');
+    expect(item()).toHaveTextContent(/^Line items > Item 1 \(Materials\) > Quantity Yours: 8 Server: 5/);
+    // Line 1 (Materials) moves down: the conflict, its explanation and its choices follow it.
+    await userEvent.click(screen.getByRole('button', { name: 'Move line 1 down' }));
+    expect(item()).toHaveTextContent(/^Line items > Item 2 \(Materials\) > Quantity Yours: 8 Server: 5/);
+    expect(quantity(2)).toHaveAccessibleDescription(CONFLICT_HELP);
+    expect(quantity(1)).not.toHaveAccessibleDescription(CONFLICT_HELP);
+    expect(screen.getByRole('button', { name: 'Use server value for Line items > Item 2 (Materials) > Quantity' })).toBeTruthy();
+    // The line above it removed: the same row again, now first.
+    await userEvent.click(screen.getByRole('button', { name: 'Remove line 1' }));
+    expect(item()).toHaveTextContent(/^Line items > Item 1 \(Materials\) > Quantity/);
+    expect(quantity(1)).toHaveAccessibleDescription(CONFLICT_HELP);
+    await userEvent.click(screen.getByRole('button', { name: 'Use server value for Line items > Item 1 (Materials) > Quantity' }));
+    expect((quantity(1) as HTMLInputElement).value).toBe('5');
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+  }, 20_000);
+
   it('Save with an open conflict: the review names the server change it overwrites', async () => {
     render(<InvoiceCrud {...props()} />);
     await open();

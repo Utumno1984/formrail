@@ -94,7 +94,8 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   /**
    * Replaces the default text of a value: the same function as `ChangeSummary`'s `renderValue`. Called for
    * each value shown, with the value and the conflict as a change from the user's value to the server's
-   * (`kind: 'changed'`, `before` = `mine`, `after` = `theirs`, `labelPath` = the label split on ` > `).
+   * (`kind: 'changed'`, `before` = `mine`, `after` = `theirs`; `labelPath` = the conflict's own for an open conflict of
+   * `useFormRebase`, the label split on ` > ` for a conflict of `computeRebase`).
    * Never called for a side with no value (`mineMissing` / `theirsMissing`): that side reads `labels.missing`.
    */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
@@ -127,7 +128,8 @@ const merged = (labels: Partial<RebaseNoticeLabels> | undefined): RebaseNoticeLa
 const toEntry = (conflict: RebaseConflict): ChangeEntry => ({
   path: conflict.path,
   label: conflict.label,
-  labelPath: conflict.label.split(' > '),
+  // An open conflict of `useFormRebase` carries its labels; a conflict of `computeRebase` has only the joined label.
+  labelPath: 'labelPath' in conflict && Array.isArray(conflict.labelPath) ? (conflict.labelPath as string[]) : conflict.label.split(' > '),
   kind: 'changed',
   before: conflict.mine,
   after: conflict.theirs,

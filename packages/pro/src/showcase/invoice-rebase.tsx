@@ -15,7 +15,7 @@ import type {
 import type { ServerChange, StoredInvoice } from '../../../core/src/showcase/invoice-store';
 import { ChangeSummary } from '../change-summary/ChangeSummary';
 import { RebaseNotice } from '../form-rebase/RebaseNotice';
-import type { RebaseConflict } from '../form-rebase/types';
+import type { OpenRebaseConflict } from '../form-rebase/types';
 import { useFormRebase } from '../form-rebase/use-form-rebase';
 import {
   INVOICE_REVIEW_ARRAY_ID_KEYS,
@@ -90,25 +90,28 @@ export const OVERWRITE_TITLE = 'You are overwriting a server change';
 const LINE_ROW = /^lineItems\.(\d+)(?=\.|$)/;
 
 /**
- * `Line items > Item 2` alone is ambiguous (see `nameLine` in invoice-review.tsx): the row's description is added,
- * from the merged values (from the server's version for a row the user removed, whose index is the server's).
+ * `Line items > Item 2` alone is ambiguous (see `nameLine` in invoice-review.tsx): the row's description is added.
+ * The row is the one at the conflict's CURRENT position (`currentPath`, found again by id after the user moved,
+ * removed or added lines), never the index of the rebase; a row the user removed is read from the server's
+ * version (the baseline), at the server's index. Built on `labelPath` (one label per segment), never on a split
+ * of `label`.
  */
-function nameConflict(conflict: RebaseConflict, values: InvoiceFormValues, baseline: InvoiceFormValues): RebaseConflict {
-  const match = LINE_ROW.exec(conflict.path);
-  if (!match) return conflict;
+function nameConflict(conflict: OpenRebaseConflict, values: InvoiceFormValues, baseline: InvoiceFormValues): OpenRebaseConflict {
+  const match = LINE_ROW.exec(conflict.currentPath);
+  if (!match || conflict.labelPath[1] === undefined) return conflict;
   const rows = conflict.mineMissing ? baseline.lineItems : values.lineItems;
   const description = rows[Number(match[1])]?.description.trim();
   if (!description) return conflict;
-  const parts = conflict.label.split(' > ');
-  if (parts[1] === undefined) return conflict;
-  parts[1] = `${parts[1]} (${description.replaceAll('(', '[').replaceAll(')', ']')})`;
-  return { ...conflict, label: parts.join(' > ') };
+  const labelPath = conflict.labelPath.map((segment, i) =>
+    i === 1 ? `${segment} (${description.replaceAll('(', '[').replaceAll(')', ']')})` : segment,
+  );
+  return { ...conflict, labelPath, label: labelPath.join(' > ') };
 }
 
 /** The state the review dialog reads while it is open: it follows a server update that lands under it. */
 interface ReviewState {
   context: InvoiceSaveReviewContext;
-  conflicts: RebaseConflict[];
+  conflicts: OpenRebaseConflict[];
 }
 
 function createReviewSource(initial: ReviewState) {
@@ -233,7 +236,8 @@ export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEdito
 
   const fieldHelp = (path: string): ReactNode => {
     for (const conflict of conflicts) {
-      if (path === conflict.path || path.startsWith(`${conflict.path}.`)) return conflict.theirsMissing ? REMOVED_HELP : CONFLICT_HELP;
+      // The field at the conflict's current position (its row may have moved since the rebase).
+      if (path === conflict.currentPath || path.startsWith(`${conflict.currentPath}.`)) return conflict.theirsMissing ? REMOVED_HELP : CONFLICT_HELP;
     }
     return undefined;
   };
@@ -272,7 +276,7 @@ export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEdito
   };
 }
 
-const sameConflicts = (a: readonly RebaseConflict[], b: readonly RebaseConflict[]): boolean =>
+const sameConflicts = (a: readonly OpenRebaseConflict[], b: readonly OpenRebaseConflict[]): boolean =>
   a.length === b.length && a.every((c, i) => c.path === b[i]?.path && c.label === b[i]?.label);
 
 /** The `useAddons` of the story: one hook per mount, reading the latest story args. */

@@ -106,6 +106,20 @@ export interface RebaseConflict {
   theirsMissing: boolean;
 }
 
+/**
+ * An open conflict as `useFormRebase` returns it: the conflict of the rebase plus where its field is NOW.
+ * Items of id-keyed arrays are found again by id, so after the user moves, removes or adds items above it,
+ * `currentPath` and `labelPath` (and `label`) name the same item at its new position, while `path` stays the
+ * key that `acceptTheirs` / `keepMine` take. An item the user removed has no current position: `currentPath`
+ * is then `path`.
+ */
+export interface OpenRebaseConflict extends RebaseConflict {
+  /** Same notation as `path`, with the current index of every id-keyed item on the way. Use it to find the field. */
+  currentPath: string;
+  /** One label per segment of `currentPath` (`Item N` for an array item), as `ChangeEntry.labelPath`; `label` is their join. */
+  labelPath: string[];
+}
+
 /** Return value of `computeRebase`. */
 export interface RebaseResult<Values> {
   /**
@@ -147,8 +161,8 @@ export interface UseFormRebaseReturn<Values extends object> {
   rebase: (incoming: Values) => void;
   /** `applied` of the last rebase, until the form is saved or reset. */
   applied: ChangeEntry[];
-  /** Open conflicts (see the lifecycle on `useFormRebase`). */
-  conflicts: RebaseConflict[];
+  /** Open conflicts (see the lifecycle on `useFormRebase`), with their current position (see {@link OpenRebaseConflict}). */
+  conflicts: OpenRebaseConflict[];
   /** The field (or item, or order) takes the server value and the conflict is closed. Stable identity. */
   acceptTheirs: (path: string) => void;
   /** Closes the conflict and leaves the user's value. Stable identity. */
