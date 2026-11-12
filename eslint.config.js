@@ -109,6 +109,26 @@ export default tseslint.config(
     },
   },
   {
+    // The story of a copy-paste example is `{ tags, ...exampleStory('X.example.tsx') }` and nothing else that
+    // changes what is rendered (ticket #403): the spread brings the example's own `render`, and the page prints
+    // that file's text. A `render`, `component`, `decorators` or `loaders` in the same object would show
+    // something else under the text. Banned BEFORE the spread too: `render` there is dead code (the spread wins)
+    // but `component`, `decorators` and `loaders` survive and change what is shown. The e2e audit covers what
+    // lint cannot see (a story built elsewhere); see e2e/docs-source.spec.ts. (esquery has no `:has(> x)`: `:has`
+    // is a descendant test, so an object that holds an `exampleStory` spread deeper is checked too, which is fine.)
+    files: ['packages/*/src/**/*.stories.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['key.name', 'key.value'].map((key) => ({
+          selector: `ObjectExpression:has(SpreadElement > CallExpression[callee.name='exampleStory']) > Property[${key}=/^(render|component|decorators|loaders)$/]`,
+          message:
+            'A story built with `...exampleStory(...)` renders the example file itself: no `render`, `component`, `decorators` or `loaders` next to the spread, or the page would show something other than the code printed under it (ticket #403).',
+        })),
+      ],
+    },
+  },
+  {
     files: ['**/*.cjs'],
     languageOptions: { sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },

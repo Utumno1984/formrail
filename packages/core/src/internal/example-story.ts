@@ -2,6 +2,7 @@
 // Story-only (ticket #403). Kept apart from story-example.ts because it uses Vite's `import.meta.glob`, and
 // story-example.ts is also read by Node (the e2e guard).
 import { createElement, type ComponentType } from 'react';
+import { EXAMPLE_RENDER_MARK } from './story-example';
 
 // The example files, found by Vite: the component AND the text come from the same file, so the "Show code" of
 // a page cannot print another file's code or code that is not the component rendered above it.
@@ -36,8 +37,10 @@ export function exampleStory(file: string, props: object = {}) {
   const components = Object.values(module).filter((value): value is ComponentType<object> => typeof value === 'function');
   if (components.length !== 1) throw new Error(`${file}: an example file exports exactly one component, found ${components.length}`);
   const Example = components[0]!;
+  // Marked, so the audit can tell this render from one written (or assigned) over it.
+  const render = Object.assign(() => createElement(Example, props), { [EXAMPLE_RENDER_MARK]: true });
   return {
     parameters: { docs: { source: { code, language: 'tsx', type: 'code' as const } } },
-    render: () => createElement(Example, props),
+    render,
   };
 }

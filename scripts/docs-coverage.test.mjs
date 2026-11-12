@@ -62,6 +62,10 @@ describe('docs coverage of the public API', () => {
     expect(INTRO).toMatch(/\*\*Guides\*\*/);
     expect(corePages.map((p) => p.id)).toContain('forms-input--docs');
   });
+
+  it('the e2e audit fixtures (autodocs + internal) are not public pages', () => {
+    expect(corePages.map((p) => p.id).filter((id) => id.startsWith('internal-'))).toEqual([]);
+  });
 });
 
 describe('docs coverage: the guard itself', () => {
@@ -101,6 +105,9 @@ describe('docs coverage: the guard itself', () => {
     );
     expect(parsed).toEqual({ title: 'A/B c', components: ['X', 'Y', 'Z'], autodocs: true });
     expect(parseStoriesFile("export default { title: 'I/J', tags: ['!autodocs', 'internal'] };")?.autodocs).toBe(false);
+    // `internal` alone is enough to keep a page out of the public ones (the e2e audit fixtures have a Docs page).
+    expect(parseStoriesFile("export default { title: 'I/J', tags: ['autodocs', 'internal'] };")?.autodocs).toBe(false);
+    expect(parseStoriesFile("export default { title: 'I/J', tags: ['autodocs', '!visual'] };")?.autodocs).toBe(true);
     expect(docsId('Floorplans/Object Page/Layout')).toBe('floorplans-object-page-layout--docs');
     expect(docsLinks('(?path=/docs/a-b--docs) (?path=/story/a-b--c)')).toEqual(['a-b--docs']);
   });

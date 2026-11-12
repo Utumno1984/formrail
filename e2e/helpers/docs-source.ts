@@ -111,6 +111,36 @@ export function auditAgainstFile(shown: string, onDisk: string | undefined, file
   return [`the printed code differs from ${file}`];
 }
 
+/** What the loaded CSF file says about an `example` story (read from the preview by the e2e spec). */
+export interface ExampleFacts {
+  /** The story's `render` is the function `exampleStory` returned (carries `EXAMPLE_RENDER_MARK`). */
+  ownRender: boolean;
+  /** The story sets a `component` of its own. */
+  component: boolean;
+  /** Number of decorators / loaders on the story itself. */
+  decorators: number;
+  loaders: number;
+  /** Number of decorators / loaders on the page's meta (they would wrap or prepare the example too). */
+  metaDecorators: number;
+  metaLoaders: number;
+}
+
+/**
+ * What makes the component rendered for an `example` story something other than the example file whose text is
+ * printed: a `render` that is not `exampleStory`'s, a `component`, decorators or loaders on the story or on the
+ * page's meta. Global (preview) decorators are legitimate and not looked at. Empty: nothing.
+ */
+export function auditExampleBinding(facts: ExampleFacts): string[] {
+  const problems: string[] = [];
+  if (!facts.ownRender) problems.push("the story's render is not the one of exampleStory (it renders something other than the printed example)");
+  if (facts.component) problems.push('the story sets its own `component`');
+  if (facts.decorators > 0) problems.push('the story has its own decorators (they wrap the example)');
+  if (facts.loaders > 0) problems.push('the story has its own loaders');
+  if (facts.metaDecorators > 0) problems.push("the page's meta has decorators (they wrap the example)");
+  if (facts.metaLoaders > 0) problems.push("the page's meta has loaders");
+  return problems;
+}
+
 /** One listed source file of a showcase page, as the page renders it. */
 export interface ListedSource {
   /** `aria-label` of the section: the repository path the page claims. */

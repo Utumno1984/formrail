@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { rendersLocalComponent } from '../.storybook/source-transform';
 import {
+  EXAMPLE_RENDER_MARK,
   EXAMPLE_TAG,
   PLAYGROUND_TAG,
   REPOSITORY_MAIN,
@@ -13,7 +14,7 @@ import {
   githubSource,
   selectPageStories,
 } from '../packages/core/src/internal/story-example';
-import { auditAgainstFile, auditListedSource, auditSnippet, intrinsicElements, publicExports, type KnownTags } from './helpers/docs-source';
+import { auditAgainstFile, auditExampleBinding, auditListedSource, auditSnippet, intrinsicElements, publicExports, type ExampleFacts, type KnownTags } from './helpers/docs-source';
 
 // "Show code" must print something a reader can use (ticket #333). With Storybook's default `dynamic`
 // source, a story whose `render` declares a local stateful component and renders it (`function XyzDemo()
@@ -314,10 +315,36 @@ test.describe('copy-paste examples (#403)', () => {
     return existsSync(file) ? readFileSync(file, 'utf8') : undefined;
   };
 
+  /** What the loaded CSF file says about a story, for {@link auditExampleBinding}. */
+  async function exampleFacts(page: Page, storyId: string): Promise<ExampleFacts> {
+    return page.evaluate(
+      async ({ id, mark }) => {
+        type Annotations = { render?: unknown; component?: unknown; decorators?: unknown[]; loaders?: unknown[] };
+        const preview = (window as unknown as { __STORYBOOK_PREVIEW__: { storyStoreValue: { loadCSFFileByStoryId: (id: string) => Promise<{ meta: Annotations; stories: Record<string, Annotations> }> } } }).__STORYBOOK_PREVIEW__;
+        const { meta, stories } = await preview.storyStoreValue.loadCSFFileByStoryId(id);
+        const story = stories[id]!;
+        return {
+          ownRender: typeof story.render === 'function' && (story.render as unknown as Record<symbol, unknown>)[mark] === true,
+          component: story.component !== undefined,
+          decorators: story.decorators?.length ?? 0,
+          loaders: story.loaders?.length ?? 0,
+          metaDecorators: meta.decorators?.length ?? 0,
+          metaLoaders: meta.loaders?.length ?? 0,
+        };
+      },
+      { id: storyId, mark: EXAMPLE_RENDER_MARK },
+    );
+  }
+
   /** The listed source files of a showcase page, as rendered (waits for every highlighted block). */
   async function listedSources(page: Page) {
     const blocks = page.locator('.sbdocs-content section[aria-label] pre');
-    await expect(blocks.first(), 'no source file listed').toBeAttached({ timeout: 30_000 });
+    // A listed file that does not exist makes the stories file throw while it loads: Storybook then shows its
+    // error display instead of the page, and that message is the cause worth reading.
+    await blocks.first().waitFor({ state: 'attached', timeout: 30_000 }).catch(async (error: Error) => {
+      const display = await page.locator('#error-message, .sb-errordisplay pre').first().innerText({ timeout: 1_000 }).catch(() => '');
+      throw new Error(`no source file listed${display ? `; the page shows the error: ${display.trim().split('\n')[0]}` : ''} (${error.message.split('\n')[0]})`);
+    });
     await expect(async () => {
       for (const text of await blocks.allInnerTexts()) expect(text).not.toBe('');
     }).toPass({ timeout: 30_000 });
@@ -341,6 +368,7 @@ test.describe('copy-paste examples (#403)', () => {
     const problems = auditSnippet(shown, known);
     // The printed code IS the example file next to the stories (same base name), not another file's text, and
     // not Storybook's synthesized source of a story tagged `example` but written with an inline `render`.
+    if (!showcase) problems.push(...auditExampleBinding(await exampleFacts(page, primary.id)));
     if (!showcase) problems.push(...auditAgainstFile(shown, readRepoFile(primary.importPath.replace(/^\.\//, '').replace(/\.stories\.tsx$/, '.example.tsx')), 'the example file next to the stories'));
     // The demo stories under the example (beyond the example and the Playground) carry the page's "demo code" note.
     const blocks = await page.locator('.sbdocs-content [id^="anchor--"]').count();
@@ -453,11 +481,57 @@ test.describe('copy-paste examples (#403)', () => {
     expect(await audit('internal-docsauditinlinerender--docs')).toContainEqual(expect.stringContaining('differs from'));
   });
 
+  test('a rendered component other than the example fails the audit (negatives, real DOM)', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const known = knownTags();
+    const fixtures = await docsPages(request, true);
+    const audit = (id: string) => {
+      const fixture = fixtures.find((d) => d.id === id)!;
+      expect(fixture, `${id}: fixture page missing`).toBeTruthy();
+      return auditPage(page, fixture.id, fixture.primary, known);
+    };
+    // The text printed IS the example file, and still the page renders something else: only the binding catches it.
+    const overridden = await audit('internal-docsauditoverriddenrender--docs');
+    expect(overridden).toEqual([expect.stringContaining('render is not the one of exampleStory')]);
+    await page.goto('/iframe.html?id=internal-docsauditoverriddenrender--example&viewMode=story');
+    await expect(page.getByText('Another demo'), 'the DOM shows another component than the printed example').toBeVisible();
+    await expect(page.getByRole('button', { name: 'Rendered component' })).toHaveCount(0);
+    // Decorators and loaders of the story and of the meta, with the example's own render intact.
+    const decorated = await audit('internal-docsauditdecorated--docs');
+    expect(decorated).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('its own `component`'),
+        expect.stringContaining('own decorators'),
+        expect.stringContaining('own loaders'),
+        expect.stringContaining('meta has decorators'),
+        expect.stringContaining('meta has loaders'),
+      ]),
+    );
+    expect(decorated).toHaveLength(5);
+    await page.goto('/iframe.html?id=internal-docsauditdecorated--example&viewMode=story');
+    await expect(page.locator('[data-story-decorator] [data-meta-decorator], [data-meta-decorator] [data-story-decorator]')).toHaveCount(1);
+  });
+
+  test('the binding of an example to its rendered component: each way to fail', () => {
+    const ok: ExampleFacts = { ownRender: true, component: false, decorators: 0, loaders: 0, metaDecorators: 0, metaLoaders: 0 };
+    expect(auditExampleBinding(ok)).toEqual([]);
+    expect(auditExampleBinding({ ...ok, ownRender: false })).toEqual([expect.stringContaining('render is not the one of exampleStory')]);
+    expect(auditExampleBinding({ ...ok, component: true })).toEqual([expect.stringContaining('`component`')]);
+    expect(auditExampleBinding({ ...ok, decorators: 1 })).toEqual([expect.stringContaining('own decorators')]);
+    expect(auditExampleBinding({ ...ok, loaders: 2 })).toEqual([expect.stringContaining('own loaders')]);
+    expect(auditExampleBinding({ ...ok, metaDecorators: 1 })).toEqual([expect.stringContaining('meta has decorators')]);
+    expect(auditExampleBinding({ ...ok, metaLoaders: 1 })).toEqual([expect.stringContaining('meta has loaders')]);
+  });
+
   test('the comparison with a file on disk: each way to fail', () => {
     expect(auditAgainstFile('a\nb\n', 'a\nb', 'x')).toEqual([]);
     expect(auditAgainstFile('a\nb', 'a\nb\n', 'x')).toEqual([]);
     expect(auditAgainstFile('a\nc', 'a\nb', 'x')).toEqual(['the printed code differs from x']);
     expect(auditAgainstFile('a', undefined, 'x')).toEqual(['x: no such file on disk']);
+    // Line endings do not matter (a file checked out with CRLF), the content does.
+    expect(auditAgainstFile('a\nb', 'a\r\nb\r\n', 'x')).toEqual([]);
+    expect(auditAgainstFile('a\r\nb', 'a\nb', 'x')).toEqual([]);
+    expect(auditAgainstFile('a\nb', 'a\r\nc\r\n', 'x')).toEqual(['the printed code differs from x']);
     const url = (path: string) => `${REPOSITORY_MAIN}${path}`;
     const files: Record<string, string> = { 'packages/a/One.tsx': 'one', 'packages/a/Two.tsx': 'two' };
     const read = (path: string) => files[path];
