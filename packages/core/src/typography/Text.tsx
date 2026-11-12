@@ -25,7 +25,10 @@ export type TextProps = TextBaseProps &
         /** Only with `as="label"`: the id of the control the label names. */
         htmlFor?: never;
       } & HTMLAttributes<HTMLElement>)
-    | ({ as: 'label' } & LabelHTMLAttributes<HTMLElement>)
+    | ({
+        /** Renders a `<label>`, which also takes `htmlFor`. */
+        as: 'label';
+      } & LabelHTMLAttributes<HTMLElement>)
   );
 
 /** Body text. Renders a `<p>` unless `as` says otherwise (closed set: p, span, div, label). */

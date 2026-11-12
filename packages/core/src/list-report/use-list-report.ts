@@ -84,6 +84,10 @@ const acknowledge = (emitted: string[], value: string): boolean => {
  *   `Set`, the received one never mutated. Sorting, filtering, searching and new data never change it; the
  *   derived counts follow the current results (see `ListReportSelection`). The gestures are no-ops while
  *   `selectable` is off.
+ *
+ * @param options The rows, the columns and the optional sort, filter, search and selection state.
+ * @returns The rows to show and the state and gestures that `ListReportTable` / `ListReport` render
+ *   (pass the whole object as their `table` prop).
  */
 export function useListReport<Row>(options: UseListReportOptions<Row>): UseListReportReturn<Row> {
   const {

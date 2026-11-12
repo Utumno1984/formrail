@@ -98,8 +98,11 @@ export interface RebaseConflict {
   mine: unknown;
   /** Value in `incoming`. */
   theirs: unknown;
+  /** `true` when `baseline` has no key (or no array item) at this path: `base` is then `undefined`. */
   baseMissing: boolean;
+  /** `true` when the user's `values` have no key (or no array item) at this path: `mine` is then `undefined`. */
   mineMissing: boolean;
+  /** `true` when `incoming` has no key (or no array item) at this path: `theirs` is then `undefined`. */
   theirsMissing: boolean;
 }
 
@@ -124,8 +127,11 @@ export interface RebaseResult<Values> {
 
 /** Options of `useFormRebase` (the merge options of {@link RebaseOptions}). */
 export interface UseFormRebaseOptions<Values extends object> {
+  /** Same as `RebaseOptions.arrayIdKeys`: the key that identifies the items of an array, per array path. */
   arrayIdKeys?: RebaseOptions<Values>['arrayIdKeys'];
+  /** Same as `RebaseOptions.labels`: label overrides of the path segments. */
   labels?: RebaseOptions<Values>['labels'];
+  /** Same as `RebaseOptions.isEqual`: replaces the equality of two leaf values. */
   isEqual?: RebaseOptions<Values>['isEqual'];
 }
 

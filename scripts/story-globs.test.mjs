@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import micromatch from 'micromatch';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, storyGlobs } from '../.storybook/story-globs.mjs';
+import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -136,5 +136,16 @@ describe('storyGlobs (#175)', () => {
     expect(deployJob).toMatch(/STORYBOOK_HIDE_INTERNAL: '?1'?/);
     // The e2e/visual builds must keep the fixtures in the sidebar-independent index and local dev shows them.
     expect(ci.slice(0, ci.indexOf('deploy-pages:'))).not.toMatch(/STORYBOOK_HIDE_INTERNAL: /);
+  });
+});
+
+describe('referencePages (#402)', () => {
+  it('adds the reference pages to the Free and complete builds, not to the Pro demo', () => {
+    expect(referencePages({})).toEqual(['./reference/*.mdx']);
+    expect(referencePages({ STORYBOOK_EXCLUDE_PRO: '1' })).toEqual(['./reference/*.mdx']);
+    expect(referencePages({ STORYBOOK_EDITION: 'pro' })).toEqual([]);
+    // The glob (relative to .storybook/) matches the page that exists.
+    expect(existsSync(resolve(ROOT, '.storybook/reference/ListReportReference.mdx'))).toBe(true);
+    expect(micromatch.isMatch('reference/ListReportReference.mdx', referencePages({})[0].replace(/^\.\//, ''))).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toId } from 'storybook/internal/csf';
@@ -20,7 +20,11 @@ const read = (path) => readFileSync(resolve(ROOT, path), 'utf8');
 
 const coreExports = runtimeExports(read('packages/core/src/index.ts'));
 const proExports = runtimeExports(read('packages/pro/src/index.ts'));
-const corePages = collectPages(ROOT, 'packages/core', ['.storybook/Introduction.mdx']);
+// The reference pages generated from the TSDoc (#402) are public Docs pages of core too.
+const REFERENCE_PAGES = readdirSync(resolve(ROOT, '.storybook/reference'))
+  .filter((name) => name.endsWith('.mdx'))
+  .map((name) => `.storybook/reference/${name}`);
+const corePages = collectPages(ROOT, 'packages/core', ['.storybook/Introduction.mdx', ...REFERENCE_PAGES]);
 const proPages = collectPages(ROOT, 'packages/pro', ['.storybook/ProIntroduction.mdx']);
 const INTRO = read('.storybook/Introduction.mdx');
 const PRO_INTRO = read('.storybook/ProIntroduction.mdx');
