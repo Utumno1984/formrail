@@ -30,11 +30,43 @@ export function publicExports(repoRoot: string): Set<string> {
 }
 
 /**
+ * The tag names React accepts as intrinsic elements (`keyof JSX.IntrinsicElements` of `@types/react`: HTML
+ * and SVG). Read from the types, not a regex on the case: a minified wrapper prints as `<y …/>`, lowercase
+ * and still not an element.
+ */
+export function intrinsicElements(repoRoot: string): Set<string> {
+  const probe = resolve(repoRoot, '__docs_source_probe__.tsx');
+  const text = "import type { JSX } from 'react';\nexport declare const tag: keyof JSX.IntrinsicElements;\n";
+  const options: ts.CompilerOptions = { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.ReactJSX, skipLibCheck: true, noEmit: true, types: [] };
+  const host = ts.createCompilerHost(options);
+  const { getSourceFile, fileExists, readFile } = host;
+  host.getSourceFile = (name, version, ...rest) => (name === probe ? ts.createSourceFile(name, text, version) : getSourceFile.call(host, name, version, ...rest));
+  host.fileExists = (name) => name === probe || fileExists.call(host, name);
+  host.readFile = (name) => (name === probe ? text : readFile.call(host, name));
+  const program = ts.createProgram([probe], options, host);
+  const checker = program.getTypeChecker();
+  const source = program.getSourceFile(probe)!;
+  const declaration = source.statements.find(ts.isVariableStatement)!.declarationList.declarations[0]!;
+  const type = checker.getTypeAtLocation(declaration);
+  const names = new Set((type.isUnion() ? type.types : [type]).filter((t) => t.isStringLiteral()).map((t) => (t as ts.StringLiteralType).value));
+  if (!names.has('div') || !names.has('svg')) throw new Error('JSX.IntrinsicElements not readable from @types/react');
+  return names;
+}
+
+/** What a snippet may use as JSX tags besides its own declarations. */
+export interface KnownTags {
+  /** Names exported by the public entries ({@link publicExports}). */
+  exports: ReadonlySet<string>;
+  /** Intrinsic element names ({@link intrinsicElements}). */
+  intrinsic: ReadonlySet<string>;
+}
+
+/**
  * What is wrong with a "Show code" text that a reader is meant to paste: a relative or internal import, a
- * Storybook artefact (`fn(`, `args`), or a JSX tag that is neither an HTML element, nor a public export,
+ * Storybook artefact (`fn(`, `args`), or a JSX tag that is neither an HTML/SVG element, nor a public export,
  * nor a component declared in the snippet itself (or imported from React). Empty: nothing.
  */
-export function auditSnippet(code: string, exports: ReadonlySet<string>): string[] {
+export function auditSnippet(code: string, { exports, intrinsic }: KnownTags): string[] {
   const problems: string[] = [];
   const file = ts.createSourceFile('snippet.tsx', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const declared = new Set<string>();
@@ -57,8 +89,8 @@ export function auditSnippet(code: string, exports: ReadonlySet<string>): string
   visit(file);
   for (const tag of new Set(tags)) {
     const root = tag.split('.')[0]!;
-    const html = tag === root && /^[a-z]/.test(tag);
-    if (!html && !exports.has(root) && !declared.has(root)) problems.push(`<${tag}>: not a public export, an HTML element or a component declared in the snippet`);
+    const element = tag === root && intrinsic.has(tag);
+    if (!element && !exports.has(root) && !declared.has(root)) problems.push(`<${tag}>: not a public export, an HTML/SVG element or a component declared in the snippet`);
   }
   if (/\bfn\(/.test(code)) problems.push('Storybook `fn(`');
   if (/\bargs\b/.test(code)) problems.push('Storybook `args`');

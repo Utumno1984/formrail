@@ -10,7 +10,7 @@ import {
   findPlayground,
   githubSource,
 } from '../packages/core/src/internal/story-example';
-import { auditSnippet, publicExports } from './helpers/docs-source';
+import { auditSnippet, intrinsicElements, publicExports, type KnownTags } from './helpers/docs-source';
 
 // "Show code" must print something a reader can use (ticket #333). With Storybook's default `dynamic`
 // source, a story whose `render` declares a local stateful component and renders it (`function XyzDemo()
@@ -290,12 +290,12 @@ test.describe('copy-paste examples (#403)', () => {
   }
 
   /** Everything wrong with a page's first "Show code" (and, for a showcase, its source listing). */
-  async function auditPage(page: Page, docsId: string, primary: Entry | undefined, exports: ReadonlySet<string>): Promise<string[]> {
+  async function auditPage(page: Page, docsId: string, primary: Entry | undefined, known: KnownTags): Promise<string[]> {
     const tags = primary?.tags ?? [];
     const showcase = tags.includes(SHOWCASE_SOURCE_TAG);
     if (!primary || (!tags.includes(EXAMPLE_TAG) && !showcase)) return [`first story ${primary?.id ?? '(none)'} is not tagged "${EXAMPLE_TAG}" or "${SHOWCASE_SOURCE_TAG}"`];
     await page.goto(`/iframe.html?id=${docsId}&viewMode=docs`);
-    const problems = auditSnippet(await openSource(page, `anchor--primary--${primary.id}`), exports);
+    const problems = auditSnippet(await openSource(page, `anchor--primary--${primary.id}`), known);
     if (showcase) {
       if ((await page.locator(`.sbdocs-content a[href^="${REPOSITORY_MAIN}"]`).count()) === 0) problems.push('no GitHub link to the source');
       if ((await page.locator('.sbdocs-content section[aria-label] pre').count()) === 0) problems.push('no source file listed');
@@ -303,8 +303,10 @@ test.describe('copy-paste examples (#403)', () => {
     return problems;
   }
 
+  const knownTags = (): KnownTags => ({ exports: publicExports(REPO_ROOT), intrinsic: intrinsicElements(REPO_ROOT) });
+
   test('the snippet audit: each rule, both ways', () => {
-    const exports = new Set(['ListReportTable', 'useListReport', 'Menu']);
+    const exports = { exports: new Set(['ListReportTable', 'useListReport', 'Menu']), intrinsic: intrinsicElements(REPO_ROOT) };
     const ok = `import { useState } from 'react';\nimport { ListReportTable, Menu } from '@formrail/core';\nfunction Local() { return <div />; }\nexport function App() { const [x] = useState(0); return <><Local /><Menu.Item /><ListReportTable aria-label="x" /><span>{x}</span></>; }`;
     expect(auditSnippet(ok, exports)).toEqual([]);
     expect(auditSnippet('// a comment, no JSX', exports)).toEqual([]);
@@ -315,6 +317,9 @@ test.describe('copy-paste examples (#403)', () => {
     expect(auditSnippet('const C = (args) => null;', exports)).toEqual(['Storybook `args`']);
     expect(auditSnippet('const t = <TableDemo rows={[]} />;', exports)).toEqual([expect.stringContaining('<TableDemo>')]);
     expect(auditSnippet('const t = <Nope.Item />;', exports)).toEqual([expect.stringContaining('<Nope.Item>')]);
+    // A wrapper minified by the production build prints lowercase (`<y columns={…} />`): still not an element.
+    expect(auditSnippet('const t = <y columns={[]} />;', exports)).toEqual([expect.stringContaining('<y>')]);
+    expect(auditSnippet('const t = <svg viewBox="0 0 1 1"><path d="M0 0" /></svg>;', exports)).toEqual([]);
     // Several problems in one snippet: all reported.
     expect(auditSnippet(`import { a } from '../a';\nconst t = <Showcase {...args} />;`, exports)).toHaveLength(3);
   });
@@ -351,20 +356,22 @@ test.describe('copy-paste examples (#403)', () => {
 
   test('every public Docs page outside PENDING opens with a copy-paste example', async ({ page, request }) => {
     test.setTimeout(600_000);
-    const exports = publicExports(REPO_ROOT);
+    const known = knownTags();
     const pages = (await publicDocs(request)).filter((d) => !pending.has(d.id));
     expect(pages.length, 'converted pages').toBeGreaterThan(10);
-    for (const { id, primary } of pages) expect(await auditPage(page, id, primary, exports), id).toEqual([]);
+    for (const { id, primary } of pages) expect(await auditPage(page, id, primary, known), id).toEqual([]);
   });
 
   test('a page still on a demo wrapper fails the audit (negative)', async ({ page, request }) => {
     test.setTimeout(120_000);
-    const exports = publicExports(REPO_ROOT);
+    const known = knownTags();
     const avatar = (await publicDocs(request)).find((d) => d.id === 'primitives-avatar--docs')!;
-    expect(await auditPage(page, avatar.id, avatar.primary, exports)).toEqual([expect.stringContaining('is not tagged')]);
-    // And the text rule itself, on a real wrapper story's "Show code" (the Playground's `<TableDemo>`).
+    expect(await auditPage(page, avatar.id, avatar.primary, known)).toEqual([expect.stringContaining('is not tagged')]);
+    // And the text rule itself, on a real wrapper story's "Show code": the Playground's `<TableDemo …/>`, which
+    // the production build prints with a minified name (`<y …/>`), and its `onSortChange={…}` from `fn()`.
     await page.goto('/iframe.html?id=data-listreporttable--docs&viewMode=docs');
-    expect(auditSnippet(await openSource(page, 'anchor--data-listreporttable--playground'), exports)).toEqual([expect.stringContaining('<TableDemo>')]);
+    const problems = auditSnippet(await openSource(page, 'anchor--data-listreporttable--playground'), known);
+    expect(problems).toContainEqual(expect.stringContaining('not a public export'));
   });
 
   test('every example renders without errors', async ({ page, request }) => {
