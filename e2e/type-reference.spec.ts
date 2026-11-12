@@ -94,7 +94,9 @@ test.describe('Type reference: fixture page (inline code, structural types, bran
     await expect(page.locator('#cn-2')).toHaveCount(1);
     const ids = await page.locator('[id]').evaluateAll((nodes) => nodes.map((n) => n.id));
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
-    const names = await page.getByRole('region').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label') ?? ''));
+    // The scroll regions of the tables (the sections are named by their heading, whose ids are checked above).
+    const names = await page.locator('[role="region"][aria-label]').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label') ?? ''));
+    expect(names.length).toBeGreaterThan(4);
     expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
     expect(names).toContain('cn parameters');
     expect(names).toContain('cn parameters (2)');
