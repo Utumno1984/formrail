@@ -1,7 +1,7 @@
 // Story-only: the "Line items" section of the invoice page (add, remove, move up/down, per-line total). Not
 // exported by the package. The lines are controlled by the form of the page; this component only decides which
 // control takes the focus after an action (the control that had it may be gone or moved in the DOM).
-import { useRef, type CSSProperties } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
@@ -13,6 +13,8 @@ export interface InvoiceLineItemsProps {
   /** Ids already used by the saved baseline: a new line never reuses one. */
   baselineIds: ReadonlySet<string>;
   onChange: (next: LineValues[]) => void;
+  /** Story-only (#384): a help text for the Field of a path (`lineItems.1.quantity`). */
+  fieldHelp?: ((path: string) => ReactNode) | undefined;
 }
 
 const LIST: CSSProperties = { display: 'grid', gap: 12, listStyle: 'none', margin: 0, padding: 0 };
@@ -32,7 +34,7 @@ const ROW_FIELDS: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
 };
 
-export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineItemsProps) {
+export function InvoiceLineItems({ lines, baselineIds, onChange, fieldHelp }: InvoiceLineItemsProps) {
   const counterRef = useRef(0);
   // Which control takes the focus once the form shows the lines of the action. Target keys:
   // `<action>:<line id>` for the controls of a line, `add` for the button after the list.
@@ -120,7 +122,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                     </Button>
                   </div>
                 </div>
-                <Field label={`Line ${n} description`} name={`lineItems.${i}.description`} required>
+                <Field label={`Line ${n} description`} name={`lineItems.${i}.description`} required help={fieldHelp?.(`lineItems.${i}.description`)}>
                   <Input
                     value={line.description}
                     onChange={(e) => update(i, { description: e.target.value })}
@@ -128,10 +130,10 @@ export function InvoiceLineItems({ lines, baselineIds, onChange }: InvoiceLineIt
                   />
                 </Field>
                 <div style={ROW_FIELDS}>
-                  <Field label={`Line ${n} quantity`} name={`lineItems.${i}.quantity`} required>
+                  <Field label={`Line ${n} quantity`} name={`lineItems.${i}.quantity`} required help={fieldHelp?.(`lineItems.${i}.quantity`)}>
                     <Input inputMode="numeric" value={line.quantity} onChange={(e) => update(i, { quantity: e.target.value })} />
                   </Field>
-                  <Field label={`Line ${n} unit price`} name={`lineItems.${i}.unitPrice`} required>
+                  <Field label={`Line ${n} unit price`} name={`lineItems.${i}.unitPrice`} required help={fieldHelp?.(`lineItems.${i}.unitPrice`)}>
                     <Input inputMode="decimal" value={line.unitPrice} onChange={(e) => update(i, { unitPrice: e.target.value })} />
                   </Field>
                   <div style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
