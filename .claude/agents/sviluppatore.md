@@ -44,8 +44,8 @@ commit quando ha senso, aggiungi un test che riproduce ogni bug prima di corregg
 ## Regole
 
 - Non lavorare mai su `main`, non fare merge, non usare `--force` o `--no-verify`, non fare
-  `npm publish` (se la PR tocca `package.json`, il bump di versione lo decide l'orchestratore
-  di `~/projects`, non tu).
+  `npm publish` (se la PR tocca `package.json`, il bump di versione lo decide la sessione
+  principale del progetto, non tu — decisione di Daniele del 2026-11-12).
 - Non creare `packages/pro` o infrastruttura di licensing a meno che il ticket lo richieda
   esplicitamente.
 - Non indebolire o cancellare un test per farlo passare: se un test è sbagliato, spiegalo.

@@ -26,7 +26,8 @@ chiari, piccoli e verificabili. Non scrivi codice e non modifichi file del repos
 6. Crea ogni ticket con `gh issue create --label ticket --title "..." --body-file <file temporaneo>`,
    usando esattamente il formato qui sotto. Se `gh issue create` risulta bloccato (classificatore
    auto-mode), scrivi i corpi in `.tickets-draft/<slug>.md` (prima riga `# Titolo`, resto il
-   corpo) e segnalalo nella risposta finale: li pubblicherà l'orchestratore.
+   corpo) e segnalalo nella risposta finale: li pubblicherà la sessione principale
+   del progetto.
 
 ## Formato del ticket
 
