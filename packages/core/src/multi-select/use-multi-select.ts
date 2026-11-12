@@ -18,6 +18,10 @@ export interface MultiSelectOption {
   value: string;
   /** Plain text: it is what the chip and the list show and what the filter matches. */
   label: string;
+  /**
+   * Shown but not selectable: the arrow keys skip it and a click does nothing (`aria-disabled`). A
+   * value already selected that matches it stays a chip.
+   */
   disabled?: boolean;
 }
 

@@ -1,0 +1,48 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { FunctionReference, TypeReference } from '../type-reference-blocks';
+
+<Meta title="Reference/List Report" />
+
+# List Report: hook and types
+
+`useListReport` is the headless engine of the List Report: you pass it your rows and columns, it returns
+the sorted, filtered and searched rows plus the state and gestures that `ListReportTable` and `ListReport`
+render. This page is its complete reference: every option, every member of the return value and every
+field of a column, with its type, whether it is required, its default and what it does.
+
+It is generated from the TypeScript sources of the library each time this Storybook is built, so it says
+exactly what your editor shows when you hover a name: it cannot drift from the code. A type name in a
+**Type** cell links to its own reference when that reference is on this page, and every row has its own
+anchor: click a name and the address bar points to that row, ready to share.
+
+## The hook
+
+<FunctionReference name="useListReport" />
+
+## Options
+
+<TypeReference name="UseListReportOptions" />
+
+## Return value
+
+<TypeReference name="UseListReportReturn" />
+
+## Columns
+
+<TypeReference name="ListReportColumn" />
+
+## Related types
+
+The types the options and the return value above are made of.
+
+<TypeReference name="ListReportFilter" />
+
+<TypeReference name="ListReportSort" />
+
+<TypeReference name="ListReportSortDirection" />
+
+<TypeReference name="ListReportSelection" />
+
+<TypeReference name="ListReportHeaderProps" />
+
+<TypeReference name="ListReportSortButtonProps" />

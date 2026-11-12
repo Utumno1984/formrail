@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { CLASS_NAME_ARG } from '../internal/story-docs';
 import { Pagination, type PaginationProps } from './Pagination';
@@ -53,8 +54,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Pagination.example.tsx') };
+
 /** Next from page 1 to the last of 120: the focus follows and the width never changes. */
 export const Playground: Story = {
+  tags: ['playground'],
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const nav = canvas.getByRole('navigation', { name: 'Pagination' });

@@ -7,18 +7,33 @@ import type { FieldErrors } from './field-errors';
  */
 
 /** One path segment of a Standard Schema issue: a key, or an object wrapping it. */
-export type StandardSchemaPathSegment = PropertyKey | { readonly key: PropertyKey };
+export type StandardSchemaPathSegment =
+  | PropertyKey
+  | {
+      /** The key of the segment. */
+      readonly key: PropertyKey;
+    };
 
 /** One validation problem reported by a Standard Schema. An absent or empty `path` is the root. */
 export interface StandardSchemaIssue {
+  /** The text shown to the user (as the field error, or as a form error for the root). */
   readonly message: string;
+  /** Where the problem is, from the root of the values (`['lines', 2, 'price']`). */
   readonly path?: ReadonlyArray<StandardSchemaPathSegment> | undefined;
 }
 
 /** Result of `~standard.validate`: success (no `issues`) or failure (`issues`). */
 export type StandardSchemaResult =
-  | { readonly value: unknown; readonly issues?: undefined }
-  | { readonly issues: ReadonlyArray<StandardSchemaIssue> };
+  | {
+      /** The validated (possibly transformed) value. */
+      readonly value: unknown;
+      /** Absent on success. */
+      readonly issues?: undefined;
+    }
+  | {
+      /** The problems found: the save is refused and they become field and form errors. */
+      readonly issues: ReadonlyArray<StandardSchemaIssue>;
+    };
 
 /**
  * The only part of a Standard Schema that `useObjectPageForm` reads: `~standard.validate`. A Zod,
@@ -26,6 +41,7 @@ export type StandardSchemaResult =
  * that returns a `Promise` is reported as a save error.
  */
 export interface StandardSchemaLike {
+  /** The Standard Schema v1 entry point; only `validate` is read. */
   readonly '~standard': {
     readonly validate: (value: unknown) => StandardSchemaResult | PromiseLike<StandardSchemaResult>;
   };

@@ -87,7 +87,9 @@ comunque con lo stesso rigore.
 Se la PR torna da te dopo le correzioni, **non rifare il red team completo**: verifica solo i
 problemi che avevi segnalato nel giro precedente (ognuno è davvero risolto, con un test che lo
 copre?) e il diff delle correzioni (`git diff <commit del giro precedente>..HEAD`), cercando
-regressioni introdotte da quelle modifiche. I giri sono al massimo 2. Riapplica le mutazioni
+regressioni introdotte da quelle modifiche. Dopo 2 tue respinte sullo stesso ticket la pipeline
+si ferma e la sessione principale chiede a Daniele (`CLAUDE.md`, punto 2.5): un giro ulteriore
+arriva solo su sua istruzione, e in quel caso si svolge come questi. Riapplica le mutazioni
 sopravvissute del giro precedente: ognuna ora deve essere uccisa da un test nuovo o rafforzato.
 
 ## Esito

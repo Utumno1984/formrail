@@ -1,0 +1,25 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+import { FunctionReference, TypeReference } from '../type-reference-blocks';
+
+{/* Test fixture (ticket #402): types the delivered reference pages do not show, so the e2e can check
+    how the generator and the blocks render them. Hidden from the public sidebar by the `internal` tag. */}
+
+<Meta title="Internal/Type reference fixture" tags={['internal']} />
+
+# Type reference fixture
+
+<TypeReference name="ListReportTableProps" />
+
+<TypeReference name="ClassValue" />
+
+<TypeReference name="AccordionProps" />
+
+{/* The same reference twice on one page: the second must not repeat an id or a region name. */}
+
+<TypeReference name="ButtonProps" />
+
+<TypeReference name="ButtonProps" />
+
+<FunctionReference name="cn" />
+
+<FunctionReference name="cn" />

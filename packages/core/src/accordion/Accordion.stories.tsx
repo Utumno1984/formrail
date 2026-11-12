@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
 import { storyControl, withoutControls } from '../internal/story-docs';
@@ -110,6 +111,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Accordion.example.tsx') };
+
 /**
  * Controls: single / multiple, collapsible, disabled, heading level. The play function reaches the
  * first trigger with Tab, opens the second item with ArrowDown + Enter (the Actions panel logs
@@ -117,6 +120,7 @@ type Story = StoryObj<typeof meta>;
  * checks that the second closed and that its field is no longer reachable with Tab.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.tab();
