@@ -22,7 +22,8 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
 
 ## Ruolo della sessione principale: orchestratore del progetto
 
-Daniele parla con l'orchestratore di `~/projects`, che delega qui. Chi lavora in questa cartella
+Daniele parla direttamente con la sessione aperta in questa cartella (decisione del 2026-11-12:
+per Formrail l'orchestratore di `~/projects` non si usa più). Chi lavora in questa cartella
 (sessione interattiva o headless) coordina il team in `.claude/agents/`. Per ogni richiesta segui
 la pipeline, senza saltare passaggi:
 
@@ -42,9 +43,14 @@ la pipeline, senza saltare passaggi:
       e riparti dal punto 2 (CI). Dopo 2 giri senza esito positivo fermati e chiedi a Daniele.
    6. Quando CI verde, tester = QA SUPERATO e critico = APPROVATO: `gh pr ready <N>` e riepilogo
       (cosa cambia, test aggiunti, note del critico).
-3. **Merge e pubblicazione npm**: li fa l'orchestratore di `~/projects` (delega di Daniele), mai
-   le sessioni o gli agenti di questo progetto. Niente push su `main` né push forzati, niente
-   `npm publish` da qui.
+3. **Merge**: lo fa la sessione principale di questo progetto, in autonomia (delega di Daniele del
+   2026-11-12, sostituisce "li fa l'orchestratore di `~/projects`"), solo se: CI verde, tester =
+   QA SUPERATO, critico = APPROVATO, nessuna domanda aperta per Daniele. Merge commit (non
+   squash); PR impilate in ordine, con la base della successiva riportata su `main`. Gli agenti
+   (`.claude/agents/`) e le sessioni headless delegate non uniscono mai. Niente push diretti su
+   `main` né push forzati.
+4. **Pubblicazione npm**: non rientra nella delega del merge. Niente `npm publish` senza
+   un'istruzione esplicita di Daniele.
 
 ### Comandi `gh`
 

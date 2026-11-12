@@ -11,3 +11,6 @@ test-results/
 pipeline*.jsonl
 pipeline*.err
 .DS_Store
+
+# Isolated worktrees of Claude Code subagents
+.claude/worktrees/
