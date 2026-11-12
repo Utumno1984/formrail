@@ -22,35 +22,35 @@ import type { RebaseConflict } from './types';
 
 /** Texts of `<RebaseNotice />` (all overridable through `labels`). */
 export interface RebaseNoticeLabels {
-  /** Title of the notice, first sentence of the announcement. Default `This record was updated while you were editing.` */
+  /** Title of the notice, first sentence of the announcement. Default `'This record was updated while you were editing.'` */
   title: string;
   /** The count of server changes applied. Default `1 field was updated.` / `N fields were updated.` */
   applied: (count: number) => string;
   /** Above the conflicts. Default `1 field you edited was also changed on the server.` / `N fields you edited were also changed on the server.` */
   conflicts: (count: number) => string;
-  /** Accessible name of the list of conflicts. Default `Conflicts`. */
+  /** Accessible name of the list of conflicts. Default `'Conflicts'`. */
   conflictList: string;
-  /** Before the user's value. Default `Yours`. */
+  /** Before the user's value. Default `'Yours'`. */
   mine: string;
-  /** Before the server's value. Default `Server`. */
+  /** Before the server's value. Default `'Server'`. */
   theirs: string;
-  /** A side that has no value (an item removed, a key absent on that side). Default `Removed`. */
+  /** A side that has no value (an item removed, a key absent on that side). Default `'Removed'`. */
   missing: string;
-  /** Visible text of the button that takes the server value. Default `Use server value`. */
+  /** Visible text of the button that takes the server value. Default `'Use server value'`. */
   acceptTheirs: string;
   /** Accessible name of that button, with the conflict's label. Default `Use server value for <label>`. */
   acceptTheirsFor: (label: string) => string;
-  /** Visible text of the button that keeps the user's value. Default `Keep mine`. */
+  /** Visible text of the button that keeps the user's value. Default `'Keep mine'`. */
   keepMine: string;
   /** Accessible name of that button, with the conflict's label. Default `Keep mine for <label>`. */
   keepMineFor: (label: string) => string;
-  /** The button that takes every server value (shown from two conflicts up). Default `Use all server values`. */
+  /** The button that takes every server value (shown from two conflicts up). Default `'Use all server values'`. */
   acceptAllTheirs: string;
-  /** Shown and announced while an update waits for a save in flight. Default `Applying server update after saving…`. */
+  /** Shown and announced while an update waits for a save in flight. Default `'Applying server update after saving…'`. */
   pending: string;
   /**
    * Appended in parentheses to the server's value when both values still read the same with
-   * their contents written out (two class instances, a difference past the truncation). Default `contents differ`.
+   * their contents written out (two class instances, a difference past the truncation). Default `'contents differ'`.
    */
   contentsDiffer: string;
 }
