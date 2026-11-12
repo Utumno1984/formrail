@@ -535,6 +535,12 @@ describe('generator branches (review round 2, point 5)', () => {
         ' * @param b - Second.',
         ' */',
         'export function withDefaults(a = 3, b?: string): void { void a; void b; }',
+        '/**',
+        ' * Labels.',
+        ' * @param label - Text. Default `label`.',
+        ' * @param placeholder - Placeholder. Default `label`.',
+        ' */',
+        'export function labelled(label?: string, placeholder?: string): void { void label; void placeholder; }',
         '/** Defaults. */',
         'export interface Defaults {',
         '  /** Way. Default `vertical`. */',
@@ -584,6 +590,12 @@ describe('generator branches (review round 2, point 5)', () => {
       ['Variant 1', ['a']],
       ['Variant 2', ['b']],
     ]);
+  });
+
+  it("a parameter's default equal to its own name is a string; equal to another parameter's name, an expression", () => {
+    const [label, placeholder] = fixture.entries.labelled.signatures[0].parameters;
+    expect(label).toMatchObject({ name: 'label', default: "'label'" });
+    expect(placeholder).toMatchObject({ name: 'placeholder', default: 'label' });
   });
 
   it('a parameter with an initializer is optional and shows it as its default', () => {
