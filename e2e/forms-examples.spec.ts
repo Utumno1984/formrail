@@ -245,9 +245,12 @@ test.describe('Forms copy-paste examples', () => {
     await expect(trigger).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('listbox')).toBeVisible();
+    // Wait for the open list to hand the focus to the selected option before the next key.
+    await expect(page.getByRole('option', { name: 'France' })).toBeFocused();
     await page.keyboard.press('ArrowDown');
+    // Germany is disabled: the arrow goes on to Spain.
+    await expect(page.getByRole('option', { name: 'Spain' })).toBeFocused();
     await page.keyboard.press('Enter');
-    // Germany is disabled: the arrow went on to Spain.
     await expect(trigger).toHaveText('Spain');
     await expect(page.locator('output')).toHaveText('Selected: es');
     await expect(trigger).toBeFocused();
