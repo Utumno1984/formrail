@@ -1,5 +1,6 @@
 import { useState, type ComponentProps } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { MessageStrip, type MessageStripTone } from './MessageStrip';
 
@@ -24,11 +25,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: a dismissible strip; the focus moves to a visible control when it closes. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('MessageStrip.example.tsx'),
+};
+
 /**
  * Controls: tone, title, content, live, labels. The play function checks what the tone Control
  * changes: the live role (`alert` for error, `status` otherwise) and the hidden tone name.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: {
     tone: 'error',
     title: 'Save failed',

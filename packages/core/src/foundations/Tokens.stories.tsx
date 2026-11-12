@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import tokensCss from '../styles/tokens.css?raw';
 import { paletteOrder, parseDerivedTokens, parseTokenScale } from '../utils/token-scale';
 
@@ -28,7 +29,9 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const readVar = (name: string): string =>
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Tokens.example.tsx') };
+
+const readVar =(name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 const section = { margin: '0 0 32px' } as const;
@@ -108,6 +111,6 @@ function Tokens() {
 
 /** Palette, type scale (with a monospace identifier) and the ordered z-index scale. */
 export const Overview: Story = {
-  tags: ['visual'],
+  tags: ['visual', 'playground'],
   render: () => <Tokens />,
 };

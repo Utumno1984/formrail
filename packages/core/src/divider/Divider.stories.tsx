@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { CLASS_NAME_ARG } from '../internal/story-docs';
@@ -24,11 +25,18 @@ type Story = StoryObj<typeof meta>;
 
 const text = { color: 'var(--color-rop-text)', fontFamily: 'var(--font-rop-sans)' } as const;
 
+/** Copy-paste example: a horizontal divider between blocks and a decorative vertical one in a toolbar. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Divider.example.tsx'),
+};
+
 /**
  * Controls: orientation, spacing, decorative. The play function checks the separator exposed to
  * assistive technology (role, and orientation when vertical) and, with `decorative`, its absence.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => (
     <div
       style={{ ...text, display: 'flex', flexDirection: args.orientation === 'vertical' ? 'row' : 'column', height: args.orientation === 'vertical' ? 80 : undefined, maxWidth: 420 }}

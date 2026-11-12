@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { internalIcons } from '../internal/icons';
 import { Text } from '../typography/Text';
@@ -35,12 +36,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: a save toolbar with text buttons and an icon-only button named by aria-label. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Button.example.tsx'),
+};
+
 /**
  * Controls: variant, size, disabled, label. The play function drives what the Controls toggle: a
  * click reaches the Actions panel while enabled, and a disabled button receives neither focus from
  * Tab nor clicks.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { variant: 'primary', children: 'Save' },
   play: async ({ args, canvasElement }) => {
     const button = within(canvasElement).getByRole('button', { name: 'Save' });

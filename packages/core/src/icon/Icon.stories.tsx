@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
+import { exampleStory } from '../internal/example-story';
 import { internalIcons, type InternalIconName } from '../internal/icons';
 import { Text } from '../typography/Text';
 import { Icon } from './Icon';
@@ -31,12 +32,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Icon.example.tsx') };
+
 /**
  * Controls: size and label. The play function checks what the Controls change: the rendered SVG
  * measures the `lg` token (24px) whatever the SVG's own size, and with a label it is exposed as an
  * image with that name (and the click reaches the Actions panel).
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { size: 'lg', label: 'Error', children: foreignSvg },
   play: async ({ args, canvasElement }) => {
     const icon = within(canvasElement).getByRole('img', { name: 'Error' });
