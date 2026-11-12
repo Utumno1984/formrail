@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { storyControls } from '../internal/story-docs';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { ObjectPage } from './ObjectPage';
 import { ObjectPageFooter } from './ObjectPageFooter';
@@ -134,17 +135,20 @@ function SchemaForm({ schema, initial, onSave }: SchemaFormArgs) {
  */
 const meta = {
   title: 'Floorplans/Object Page/Schema validation',
+  // The page documents a hook option, `useObjectPageForm({ schema })`, not a component: `SchemaForm` is the
+  // story's own demo (it renders the stories; the docgen does not read story files), so there is no props
+  // table, and the controls are the hook's options, under "Story controls".
   component: SchemaForm,
   parameters: { layout: 'fullscreen' },
-  argTypes: {
+  argTypes: storyControls({
     schema: {
       control: { type: 'select', labels: SCHEMA_LABELS },
       options: Object.keys(SCHEMAS),
-      description: 'Standard Schema passed to `useObjectPageForm({ schema })`',
+      description: 'Standard Schema passed to `useObjectPageForm({ schema })`.',
     },
-    initial: { control: 'radio', options: Object.keys(INITIAL), description: 'Initial values (read once, at mount)' },
-    onSave: { control: false, description: 'Save handler: receives the raw values' },
-  },
+    initial: { control: 'radio', options: Object.keys(INITIAL), description: '`useObjectPageForm({ baseline })`: the initial values (read once, at mount).' },
+    onSave: { control: false, description: 'The handler passed to `form.save(handler)`: receives the raw values.' },
+  }),
   args: { schema: 'fields', initial: 'empty', onSave: fn() },
 } satisfies Meta<typeof SchemaForm>;
 

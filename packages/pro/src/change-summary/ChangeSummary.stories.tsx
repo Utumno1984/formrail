@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useFieldControl, useObjectPageForm } from '@formrail/core';
+import { storyControl, withoutControls } from '../../../core/src/internal/story-docs';
 import { ChangeSummary } from './ChangeSummary';
 import { formatChangeValue } from './format-change-value';
 import { inferSegmentLabel } from './infer-label';
@@ -27,19 +28,24 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Pro/ChangeSummary',
+  // The stories drive the component through a demo editor (`Meta<DemoArgs>`): `never` keeps the props
+  // table of the real component without forcing the demo's args to match its props.
+  component: ChangeSummary as never,
   parameters: { layout: 'padded' },
   argTypes: {
-    emptyLabel: { control: 'text', description: 'Text shown when there are no changes.' },
-    label: { control: 'text', description: 'Accessible name of the list.' },
+    emptyLabel: { control: 'text' },
+    label: { control: 'text' },
     locale: { control: 'select', options: ['en-US', 'en-GB', 'de-DE'] },
     timeZone: { control: 'select', options: ['UTC', 'Europe/Rome', 'America/New_York'] },
-    valueFormat: {
+    // Set by the demo (`entries` from useChangeSummary, `renderValue` from the control below).
+    ...withoutControls('entries', 'renderValue', 'valueLabels'),
+    valueFormat: storyControl({
       control: 'radio',
       options: ['default', 'currency'],
-      description: 'Story-only: `currency` passes a `renderValue` that shows `amount` as money.',
-    },
-    onSave: { control: false },
-    onDiscard: { control: false },
+      description: '`currency` passes a `renderValue` that shows `amount` as money.',
+    }),
+    onSave: storyControl({ control: false, description: 'The demo editor\'s "Save" button (receives the form values).' }),
+    onDiscard: storyControl({ control: false, description: 'The demo editor\'s "Discard" button.' }),
   },
   args: {
     emptyLabel: 'No changes',

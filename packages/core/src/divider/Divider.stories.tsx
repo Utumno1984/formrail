@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { CLASS_NAME_ARG } from '../internal/story-docs';
 import { Divider, type DividerSpacing } from './Divider';
 
 const SPACINGS: DividerSpacing[] = ['none', 'sm', 'md', 'lg'];
@@ -13,7 +14,7 @@ const meta = {
     orientation: { control: 'radio', options: ['horizontal', 'vertical'] },
     spacing: { control: 'radio', options: SPACINGS },
     decorative: { control: 'boolean' },
-    className: { control: false },
+    className: CLASS_NAME_ARG,
   },
   args: { orientation: 'horizontal', spacing: 'md', decorative: false },
 } satisfies Meta<typeof Divider>;

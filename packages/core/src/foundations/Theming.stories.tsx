@@ -6,6 +6,7 @@ import { Button } from '../button/Button';
 import { Checkbox } from '../checkbox/Checkbox';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { storyControls } from '../internal/story-docs';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { StatusBadge } from '../status-badge/StatusBadge';
 import tokensCss from '../styles/tokens.css?raw';
@@ -217,10 +218,11 @@ function ScopedDerivedDemo({ onApprove, onDelete, onCheckedChange }: ScopedDemoP
 const meta = {
   title: 'Foundations/Theming',
   parameters: { layout: 'padded' },
-  argTypes: {
-    preset: { control: 'radio', options: ['default', 'violet', 'forest', 'custom'], description: 'Initial theme preset' },
-    customColor: { control: 'color', description: 'Primary colour used by the "custom" preset' },
-  },
+  // A foundations page (CSS custom properties), no component: every control is a knob of the demo.
+  argTypes: storyControls({
+    preset: { control: 'radio', options: ['default', 'violet', 'forest', 'custom'], description: 'Initial theme preset.' },
+    customColor: { control: 'color', description: 'Primary colour used by the "custom" preset.' },
+  }),
   args: { preset: 'default', customColor: '#b4236b' },
   render: (args) => <ThemingDemo {...args} />,
 } satisfies Meta<ThemingDemoProps>;

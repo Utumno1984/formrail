@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import { cn } from './cn';
 
-/** Label typography for a plain-text label wrapped in `OpticalLabel`: size from the token, line-height 1. */
+// Label typography for a plain-text label wrapped in `OpticalLabel`: size from the token, line-height 1.
+// A line comment, not TSDoc: react-docgen-typescript turns any documented export of a .tsx file into a
+// (props-less) component entry, and this is a class string (ticket #401).
 export const OPTICAL_LABEL_TYPOGRAPHY = 'text-[length:var(--text-rop-label)] leading-none';
 
 /**

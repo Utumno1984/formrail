@@ -5,6 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Switch } from './Switch';
 
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -25,13 +26,19 @@ const meta: Meta<DemoArgs> = {
   parameters: { layout: 'padded' },
   argTypes: {
     checked: { control: 'boolean' },
-    // forced = value decided by a business rule; locked = not editable. Neither changes on click or Space.
-    fieldState: { control: 'radio', options: STATES },
-    invalid: { control: 'boolean' },
-    required: { control: 'boolean' },
-    fieldLabel: { control: 'text' },
-    inlineLabel: { control: 'text' },
     onCheckedChange: { control: false },
+    // Set by the demo (`inlineLabel` is the children; the stories use `checked`).
+    ...withoutControls('defaultChecked', 'children'),
+    // forced = value decided by a business rule; locked = not editable. Neither changes on click or Space.
+    fieldState: storyControl({
+      control: 'radio',
+      options: STATES,
+      description: '`state` of the surrounding `Field` (`forced`: value decided by a rule, `locked`: not editable; neither changes on click or Space).',
+    }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
+    fieldLabel: storyControl({ control: 'text', description: '`label` of the surrounding `Field`.' }),
+    inlineLabel: storyControl({ control: 'text', description: "The Switch's `children`: its inline label." }),
   },
   args: {
     checked: false,

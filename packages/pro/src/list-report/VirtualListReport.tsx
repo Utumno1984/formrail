@@ -82,5 +82,8 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
  * selection, Escape, limits).
  */
 export const VirtualListReport = /* @__PURE__ */ forwardRef(VirtualListReportImpl) as <Row>(
-  props: VirtualListReportProps<Row> & { ref?: Ref<HTMLDivElement> },
+  props: VirtualListReportProps<Row> & {
+    /** The floorplan's root `<div>` (the table's scroll container is `scrollerRef`). */
+    ref?: Ref<HTMLDivElement>;
+  },
 ) => ReactElement | null;

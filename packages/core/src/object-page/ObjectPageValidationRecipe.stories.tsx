@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { z } from 'zod';
 import { Button } from '../button/Button';
+import { storyControls } from '../internal/story-docs';
 import { Combobox } from '../combobox/Combobox';
 import { Field, type FieldStateProps } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
@@ -265,7 +266,8 @@ const meta: Meta<RecipeArgs> = {
     layout: 'fullscreen',
     docs: { description: { component: "A copy-paste recipe that combines the Object Page pieces: form state with a baseline, per-field validation, the error summary, focus on the first invalid field and the dirty-guard. Switch the record between empty and valid and press Save." } },
   },
-  argTypes: {
+  // A recipe assembled from several components: every control is a knob of the demo.
+  argTypes: storyControls({
     record: {
       control: 'radio',
       options: ['empty', 'valid'],
@@ -293,7 +295,7 @@ const meta: Meta<RecipeArgs> = {
     },
     onSaved: { control: false, description: 'Called with the values when the Save reaches the handler (the schema passed).' },
     onLeave: { control: false, description: 'The guarded exit action: called at once if clean, after confirmation if dirty.' },
-  },
+  }),
   args: {
     record: 'empty',
     rules: 'required',

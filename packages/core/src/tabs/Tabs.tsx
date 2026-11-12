@@ -59,6 +59,7 @@ export interface TabsProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defaul
 export interface TabsListProps extends ComponentPropsWithoutRef<'div'> {
   /** Accessible name of the tab list. Required: this or `aria-labelledby`. */
   'aria-label'?: string;
+  /** Id of the element that names the tab list (e.g. a visible heading). Required: this or `aria-label`. */
   'aria-labelledby'?: string;
 }
 

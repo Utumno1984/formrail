@@ -230,5 +230,8 @@ function ListReportFilterBarImpl<Row>(props: ListReportFilterBarProps<Row>, ref:
  * - From 640px the search box is a 18rem column next to the pills; below, it takes the whole row.
  */
 export const ListReportFilterBar = /* @__PURE__ */ forwardRef(ListReportFilterBarImpl) as <Row>(
-  props: ListReportFilterBarProps<Row> & { ref?: Ref<HTMLDivElement> },
+  props: ListReportFilterBarProps<Row> & {
+    /** The bar's root (the `role="search"` landmark). */
+    ref?: Ref<HTMLDivElement>;
+  },
 ) => ReactElement | null;

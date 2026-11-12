@@ -87,6 +87,7 @@ export interface MultiSelectProps extends Omit<
   unknownValueLabel?: (value: string) => string;
   /** Height of an empty field (the field grows when the chips wrap). Default `md`. */
   size?: MultiSelectSize;
+  /** Texts of the chips, the list and the announcements (partial: the rest keeps the English defaults). */
   labels?: Partial<MultiSelectLabels>;
 }
 

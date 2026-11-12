@@ -12,7 +12,7 @@ const meta = {
   argTypes: {
     tone: { control: 'radio', options: TONES },
     title: { control: 'text' },
-    children: { control: 'text' },
+    children: { control: 'text', description: 'The message, after the title.' },
     live: { control: 'boolean' },
     toneLabel: { control: 'text' },
     dismissLabel: { control: 'text' },

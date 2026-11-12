@@ -38,5 +38,8 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  * The parts stay exported (`ListReportFilterBar`, `ListReportTable`) for other layouts.
  */
 export const ListReport = /* @__PURE__ */ forwardRef(ListReportImpl) as <Row>(
-  props: ListReportProps<Row> & { ref?: Ref<HTMLDivElement> },
+  props: ListReportProps<Row> & {
+    /** The floorplan's root `<div>` (the table's scroll container is `scrollerRef`). */
+    ref?: Ref<HTMLDivElement>;
+  },
 ) => ReactElement | null;

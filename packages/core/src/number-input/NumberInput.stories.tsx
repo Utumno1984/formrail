@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { NumberInput, type NumberInputSize } from './NumberInput';
 import { clamp, stepFrom } from './number-parse';
 
@@ -30,16 +31,18 @@ const meta: Meta<DemoArgs> = {
   component: NumberInput as never,
   parameters: { layout: 'padded' },
   argTypes: {
-    // forced = value decided by a business rule; locked = not editable. No channel changes the value.
-    fieldState: { control: 'radio', options: STATES, description: 'The `state` of the enclosing Field.' },
-    min: { control: 'number', description: 'Lower limit (typed values and steps are clamped to it).' },
-    max: { control: 'number', description: 'Upper limit.' },
-    step: { control: 'number', description: 'Amount of an arrow key / stepper press (PageUp/PageDown: × 10).' },
-    locale: { control: 'select', options: LOCALES, description: 'Decimal separator of the text (`.` is always accepted too).' },
+    min: { control: 'number' },
+    max: { control: 'number' },
+    step: { control: 'number' },
+    locale: { control: 'select', options: LOCALES },
     size: { control: 'radio', options: SIZES },
-    invalid: { control: 'boolean', description: 'Give the Field an error.' },
-    required: { control: 'boolean', description: 'Mark the Field required.' },
-    onValueChange: { control: false, description: 'One call per committed gesture (Actions panel).' },
+    onValueChange: { control: false },
+    // Set by the demo (a local controlled value, the default texts).
+    ...withoutControls('value', 'defaultValue', 'labels'),
+    // forced = value decided by a business rule; locked = not editable. No channel changes the value.
+    fieldState: storyControl({ control: 'radio', options: STATES, description: '`state` of the surrounding `Field` (`forced` / `locked`: no channel changes the value).' }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
   },
   args: {
     fieldState: 'default',

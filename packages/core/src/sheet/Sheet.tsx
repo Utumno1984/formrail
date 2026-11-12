@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode, type RefObject } from 'react';
+import { forwardRef, type ElementRef, type ReactNode, type RefObject } from 'react';
 import type * as RadixDialog from '@radix-ui/react-dialog';
 import {
   ModalBody,
@@ -12,6 +12,7 @@ import {
   createModalTrigger,
   modalPanelClass,
   type ModalCloseProps,
+  type ModalContentBaseProps,
   type ModalRootProps,
   type ModalTitleProps,
   type ModalTriggerProps,
@@ -58,8 +59,7 @@ export type SheetTriggerProps = ModalTriggerProps;
 /** Opens the sheet on click. `asChild` renders your own element (e.g. a `Button`) instead. */
 export const SheetTrigger = /* @__PURE__ */ createModalTrigger('SheetTrigger', 'Sheet');
 
-export interface SheetContentProps
-  extends Omit<ComponentPropsWithoutRef<typeof RadixDialog.Content>, 'children' | 'forceMount'> {
+export interface SheetContentProps extends ModalContentBaseProps {
   /** The edge the panel is attached to. Default `right`. Can change while the sheet is open. */
   side?: SheetSide;
   /** Width step. Default `md`. A conflicting width in `className` wins. */
@@ -73,6 +73,8 @@ export interface SheetContentProps
   returnFocusRef?: RefObject<HTMLElement | null>;
   /** Header, body and footer of the panel. */
   children?: ReactNode;
+  /** Renders your single child element as the panel instead of the default `<div>`, with the panel's props and behavior merged onto it. */
+  asChild?: boolean;
 }
 
 /**

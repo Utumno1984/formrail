@@ -4,6 +4,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 // `no-restricted-imports` rules of eslint.config.js, which allow this import in `src/showcase/` only.
 import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from '../../../core/src/showcase/crud-story-args';
 import { InvoiceCrud, type InvoiceCrudProps } from '../../../core/src/showcase/InvoiceCrud';
+import { storyControls } from '../../../core/src/internal/story-docs';
 import { invoiceSaveReview } from './invoice-review';
 
 /*
@@ -27,7 +28,8 @@ const meta: Meta<Args> = {
       },
     },
   },
-  argTypes: CRUD_ARGTYPES,
+  // A showcase documents no component: every control is a knob of the demo.
+  argTypes: storyControls(CRUD_ARGTYPES),
   args: CRUD_ARGS,
   render: (args) => <InvoiceCrud {...args} reviewSave={invoiceSaveReview} />,
 };

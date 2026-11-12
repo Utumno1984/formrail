@@ -6,6 +6,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { settleMotion } from '../internal/settle-motion';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
@@ -36,20 +37,21 @@ const meta: Meta<DemoArgs> = {
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     tone: { control: 'radio', options: TONES },
-    initialFocus: {
-      control: 'radio',
-      options: ['auto', 'cancel', 'confirm'],
-      description:
-        'Which button takes the focus on open. `auto` (story only) leaves the prop out: Cancel for `danger`, the confirm button for `default`.',
-    },
+    // `auto` (story only) leaves the prop out.
+    initialFocus: { control: 'radio', options: ['auto', 'cancel', 'confirm'] },
     title: { control: 'text' },
     description: { control: 'text' },
     confirmLabel: { control: 'text' },
     cancelLabel: { control: 'text' },
-    pendingMs: { control: { type: 'number', min: 0, step: 100 } },
     onConfirm: { control: false },
     onCancel: { control: false },
     onOpenChange: { control: false },
+    // Set by the demo (open state, focus return) or not used by it.
+    ...withoutControls('open', 'onError', 'returnFocusRef', 'children'),
+    pendingMs: storyControl({
+      control: { type: 'number', min: 0, step: 100 },
+      description: 'How long the simulated server round-trip of the demo\'s `onConfirm` takes, in ms (0: synchronous).',
+    }),
   },
   args: {
     tone: 'danger',

@@ -6,6 +6,7 @@ import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { ValidationProvider } from '../field/ValidationContext';
 import { Input } from '../input/Input';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { getErrorSummary } from './error-summary';
 import { ObjectPage } from './ObjectPage';
@@ -32,12 +33,14 @@ const meta: Meta<PlaygroundArgs> = {
   component: ObjectPageFooter,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    visible: { control: 'boolean', description: 'Visible and interactive; when hidden it still takes up the same space and is inert' },
-    message: { control: 'text', description: 'Single-line status message (truncated; full text on hover/focus)' },
-    messageTone: { control: 'radio', options: ['error', 'success', 'info'], description: 'Icon and colour of the message' },
-    label: { control: 'text', description: 'Accessible name of the region' },
-    onSave: { control: false },
-    onCancel: { control: false },
+    visible: { control: 'boolean' },
+    message: { control: 'text' },
+    messageTone: { control: 'radio', options: ['error', 'success', 'info'] },
+    label: { control: 'text' },
+    // Set by the demo (the Save / Cancel buttons, the tone's default text).
+    ...withoutControls('children', 'toneLabel'),
+    onSave: storyControl({ control: false, description: 'The "Save" button the demo puts in the footer (`children`).' }),
+    onCancel: storyControl({ control: false, description: 'The "Cancel" button the demo puts in the footer (`children`).' }),
   },
   args: {
     visible: true,

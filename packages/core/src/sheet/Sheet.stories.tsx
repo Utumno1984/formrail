@@ -6,6 +6,7 @@ import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from '..
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { settleMotion } from '../internal/settle-motion';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import {
   Sheet,
   SheetBody,
@@ -38,10 +39,13 @@ const meta: Meta<DemoArgs> = {
   // were rendered inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
-    side: { control: 'radio', options: SIDES },
-    size: { control: 'radio', options: SIZES },
-    dismissible: { control: 'boolean' },
     onOpenChange: { control: false },
+    // Set by the stories (a trigger opens the sheet; the content is the demo).
+    ...withoutControls('open', 'defaultOpen', 'children'),
+    // Props of `SheetContent` (see its tab), driven from the main table.
+    side: storyControl({ control: 'radio', options: SIDES, description: 'Prop of `SheetContent` (see its tab): the edge the panel is attached to.' }),
+    size: storyControl({ control: 'radio', options: SIZES, description: 'Prop of `SheetContent` (see its tab): width step.' }),
+    dismissible: storyControl({ control: 'boolean', description: 'Prop of `SheetContent` (see its tab): whether Escape and a click on the backdrop close the sheet.' }),
   },
   args: { side: 'right', size: 'md', dismissible: true, onOpenChange: fn() },
 };

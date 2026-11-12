@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReportFilterBar } from './ListReportFilterBar';
 import type { ListReportColumn, ListReportFilter } from './types';
 import { useListReport } from './use-list-report';
@@ -92,18 +93,20 @@ const meta: Meta<PlaygroundArgs> = {
   component: ListReportFilterBar as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    searchCommitDelay: {
+    showSearch: { control: 'boolean' },
+    filtersLabel: { control: 'text' },
+    searchLabel: { control: 'text' },
+    // Set by the demo (`table` from useListReport, default texts).
+    ...withoutControls('table', 'searchPlaceholder', 'clearSearchLabel', 'ref'),
+    searchCommitDelay: storyControl({
       control: 'select',
       options: [0, 300, 800, 'Enter only'],
       mapping: { 0: 0, 300: 300, 800: 800, 'Enter only': null },
-      description: '`searchCommitDelay` of `useListReport` (ms); "Enter only" = `null`: commits only on Enter',
-    },
-    showSearch: { control: 'boolean' },
-    filtersLabel: { control: 'text', description: 'Accessible name of the pill group' },
-    searchLabel: { control: 'text', description: 'Accessible name (and placeholder) of the search field' },
-    dir: { control: 'radio', options: ['ltr', 'rtl'] },
-    onFilterChange: { control: false },
-    onSearchQueryChange: { control: false },
+      description: 'An option of the hook, not a prop of the bar: `useListReport({ searchCommitDelay })` (ms); "Enter only" = `null`: commits only on Enter.',
+    }),
+    dir: storyControl({ control: 'radio', options: ['ltr', 'rtl'], description: '`dir` of the demo wrapper around the bar (RTL layout).' }),
+    onFilterChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onFilterChange })`.' }),
+    onSearchQueryChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSearchQueryChange })`.' }),
   },
   args: {
     searchCommitDelay: 300,

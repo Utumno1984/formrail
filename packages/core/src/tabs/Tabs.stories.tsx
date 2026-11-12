@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Tabs, TabsContent, TabsList, TabsTrigger, type TabsProps } from './Tabs';
 
 interface DemoArgs extends Omit<TabsProps, 'children'> {
@@ -64,12 +65,12 @@ const meta = {
     orientation: { control: 'radio', options: ['horizontal', 'vertical'] },
     dir: { control: 'radio', options: ['ltr', 'rtl'] },
     keepMounted: { control: 'boolean' },
-    tabCount: { control: { type: 'range', min: 2, max: 12, step: 1 } },
-    disabledTab: { control: 'select', options: ['', 'tab-2', 'tab-3', 'tab-4'] },
     value: { control: false },
     defaultValue: { control: false },
-    className: { control: false },
+    className: CLASS_NAME_ARG,
     onValueChange: { control: false },
+    tabCount: storyControl({ control: { type: 'range', min: 2, max: 12, step: 1 }, description: 'How many `TabsTrigger`s the demo renders (raise it to try the overflow).' }),
+    disabledTab: storyControl({ control: 'select', options: ['', 'tab-2', 'tab-3', 'tab-4'], description: 'Which `TabsTrigger` gets `disabled` (empty: none).' }),
   },
   args: {
     activationMode: 'automatic',

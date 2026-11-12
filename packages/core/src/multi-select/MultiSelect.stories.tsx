@@ -15,6 +15,7 @@ import {
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { MultiSelect, type MultiSelectOption, type MultiSelectSize } from './MultiSelect';
 
@@ -58,14 +59,16 @@ const meta: Meta<DemoArgs> = {
   component: MultiSelect as never,
   parameters: { layout: 'padded', docs: { story: { inline: false, height: '380px' } } },
   argTypes: {
-    // forced = decided by a business rule; locked = not editable. Neither opens nor changes the value.
-    fieldState: { control: 'radio', options: STATES },
     size: { control: 'radio', options: SIZES },
-    invalid: { control: 'boolean', description: 'Gives the Field an error message.' },
-    required: { control: 'boolean' },
-    placeholder: { control: 'text' },
-    options: { control: 'object', description: 'Cost centers fixture.' },
+    placeholder: { control: 'text', description: 'Native `placeholder` of the search input, shown while nothing is typed.' },
+    options: { control: 'object' },
     onValueChange: { control: false },
+    // Set by the demo (a local controlled value, the default texts and filter).
+    ...withoutControls('value', 'defaultValue', 'filter', 'unknownValueLabel', 'labels'),
+    // forced = decided by a business rule; locked = not editable. Neither opens nor changes the value.
+    fieldState: storyControl({ control: 'radio', options: STATES, description: '`state` of the surrounding `Field` (`forced` / `locked`: neither opens nor changes the value).' }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
   },
   args: {
     fieldState: 'default',

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Avatar, type AvatarProps, type AvatarShape, type AvatarSize } from './Avatar';
 
 const SIZES: AvatarSize[] = ['xs', 'sm', 'md', 'lg', 'xl'];
@@ -56,13 +57,17 @@ const meta = {
   parameters: { layout: 'padded' },
   argTypes: {
     name: { control: 'text' },
-    src: { control: 'text', description: 'Image URL (empty: the local sample photo)' },
+    src: { control: 'text' },
     size: { control: 'radio', options: SIZES },
     shape: { control: 'radio', options: SHAPES },
     decorative: { control: 'boolean' },
-    source: { control: 'select', options: SOURCES, description: 'Demo only: what the image request does' },
     onLoadingStatusChange: { action: 'onLoadingStatusChange' },
-    className: { control: false },
+    className: CLASS_NAME_ARG,
+    source: storyControl({
+      control: 'select',
+      options: SOURCES,
+      description: 'What the image request does in the demo (`slow`: initials first; `broken`: a failing URL). With `src` empty the demo uses a local sample photo.',
+    }),
   },
   args: {
     name: 'Ada Lovelace',

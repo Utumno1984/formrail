@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl } from '../internal/story-docs';
 import { Textarea } from './Textarea';
 
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -24,15 +25,19 @@ const meta: Meta<DemoArgs> = {
   component: Textarea as unknown as ComponentType<DemoArgs>,
   parameters: { layout: 'padded' },
   argTypes: {
+    autoResize: { control: 'boolean' },
+    rows: { control: { type: 'number', min: 1, max: 12 }, description: 'Native `rows`: minimum number of visible rows.' },
+    maxRows: { control: { type: 'number', min: 1, max: 20 } },
+    placeholder: { control: 'text', description: 'Native `placeholder`.' },
+    onChange: { control: false, description: 'Native `onChange` (the demo logs the value in Actions).' },
     // forced = value decided by a business rule; locked = not editable. Neither accepts typing, paste or cut.
-    fieldState: { control: 'radio', options: STATES },
-    invalid: { control: 'boolean' },
-    required: { control: 'boolean' },
-    autoResize: { control: 'boolean', description: 'The height follows the content, between `rows` and `maxRows`.' },
-    rows: { control: { type: 'number', min: 1, max: 12 }, description: 'Minimum number of visible rows.' },
-    maxRows: { control: { type: 'number', min: 1, max: 20 }, description: 'With `autoResize`: the content scrolls inside past this many rows.' },
-    placeholder: { control: 'text' },
-    onChange: { control: false },
+    fieldState: storyControl({
+      control: 'radio',
+      options: STATES,
+      description: '`state` of the surrounding `Field` (`forced` / `locked`: no typing, paste or cut).',
+    }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
   },
   args: {
     fieldState: 'default',
