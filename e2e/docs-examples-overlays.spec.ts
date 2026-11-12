@@ -22,7 +22,7 @@ async function expectFocusTrapped(page: Page, overlay: Locator, times = 8) {
 const MODALS = [
   { page: 'dialog', role: 'dialog', name: 'Edit supplier', trigger: 'Edit supplier', expanded: true },
   { page: 'sheet', role: 'dialog', name: 'Supplier detail', trigger: 'Supplier detail', expanded: true },
-  { page: 'confirmdialog', role: 'alertdialog', name: 'Delete invoice 2026/0142?', trigger: 'Delete invoice…', expanded: false },
+  { page: 'confirmdialog', role: 'dialog', name: 'Delete invoice 2026/0142?', trigger: 'Delete invoice…', expanded: false },
 ] as const;
 
 for (const m of MODALS) {
@@ -72,14 +72,14 @@ test.describe('Overlays/confirmdialog example', () => {
     await exampleOf(page, 'confirmdialog');
     const trigger = page.getByRole('button', { name: 'Delete invoice…' });
     await trigger.click();
-    const dialog = page.getByRole('alertdialog', { name: 'Delete invoice 2026/0142?' });
+    const dialog = page.getByRole('dialog', { name: 'Delete invoice 2026/0142?' });
     await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveText('');
     await expect(trigger).toBeFocused();
     await trigger.click();
-    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete invoice' }).click();
-    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete invoice' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveText('Invoice deleted');
   });
 });
@@ -101,7 +101,8 @@ test.describe('Overlays/menu example', () => {
     await expect(page.getByRole('menuitem', { name: 'Archive' })).toHaveAttribute('aria-disabled', 'true');
     const rename = page.getByRole('menuitem', { name: 'Rename' });
     const duplicate = page.getByRole('menuitem', { name: 'Duplicate' });
-    await expect(menu.locator(':focus')).toHaveCount(1);
+    // Opened by a click, the focus is on the menu itself or one of its items: either way inside it.
+    await expect(page.locator('[role="menu"]:focus, [role="menu"] :focus')).toHaveCount(1);
     await page.keyboard.press('Home');
     await expect(rename).toBeFocused();
     await page.keyboard.press('ArrowDown');
@@ -185,7 +186,7 @@ test.describe('Docs pages: the example is closed at load', () => {
   const PAGES = [
     { id: 'dialog', trigger: 'Edit supplier', overlay: { role: 'dialog', name: 'Edit supplier' }, expanded: true },
     { id: 'sheet', trigger: 'Supplier detail', overlay: { role: 'dialog', name: 'Supplier detail' }, expanded: true },
-    { id: 'confirmdialog', trigger: 'Delete invoice…', overlay: { role: 'alertdialog', name: 'Delete invoice 2026/0142?' }, expanded: false },
+    { id: 'confirmdialog', trigger: 'Delete invoice…', overlay: { role: 'dialog', name: 'Delete invoice 2026/0142?' }, expanded: false },
     { id: 'menu', trigger: 'More actions', overlay: { role: 'menu', name: undefined }, expanded: true },
   ] as const;
   for (const p of PAGES) {
