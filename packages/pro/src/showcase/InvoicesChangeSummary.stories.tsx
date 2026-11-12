@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, fn, userEvent, waitFor, within } from 'storybook/test';
 // The Free CRUD showcase itself, from the core sources (one copy, never duplicated in packages/pro): see the
 // `no-restricted-imports` rules of eslint.config.js, which allow this import in `src/showcase/` only.
 import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from '../../../core/src/showcase/crud-story-args';
@@ -276,5 +276,55 @@ export const ReviewLinesDialog: Story = {
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Keep editing' })).toHaveFocus());
+  },
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* Server updates while editing (#384).                                                          */
+/* ------------------------------------------------------------------------------------------ */
+
+/**
+ * Another user changes the invoice while it is open: edit the Due date and the Notes, then "Simulate server
+ * update" (the server changes the Status and the Due date). The Status takes the server value, the Notes stay
+ * yours, the Due date is a conflict: "Keep mine for Due date" closes it with your date. Save -> the review lists
+ * your two changes -> "Save changes": the notice goes away with the save, the server has your values on top of
+ * its Status.
+ */
+export const ServerUpdate: Story = {
+  args: { listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0, serverUpdateDelayMs: 0, serverChange: 'status-and-due-date' },
+  play: async ({ canvasElement, args }) => {
+    const canvas = await openRecord(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    const body = within(canvasElement.ownerDocument.body);
+    const notice = () => canvasElement.querySelector<HTMLElement>('.rop-pro-rebase-notice');
+    const due = canvas.getByLabelText('Due date');
+    fireEvent.change(due, { target: { value: '2026-03-05' } });
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Notes' }), ' Checked by finance.');
+    const status = canvas.getByRole('combobox', { name: 'Status' }).textContent;
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+    const conflicts = await canvas.findByRole('list', { name: 'Conflicts' });
+    await expect(args.onServerChange).toHaveBeenCalledTimes(1);
+    await expect(within(conflicts).getAllByRole('listitem')).toHaveLength(1);
+    await expect(within(conflicts).getByRole('listitem')).toHaveTextContent(/^Due dateYours: Mar 5, 2026Server: /);
+    await expect(notice()).toHaveTextContent('This invoice was updated while you were editing.1 field was updated.');
+    await expect(canvas.getByRole('combobox', { name: 'Status' }).textContent).not.toBe(status);
+    await expect(due).toHaveValue('2026-03-05');
+    await expect(due).toHaveAccessibleDescription('Changed on the server too.');
+    await expect(canvas.getByRole('textbox', { name: 'Notes' })).toHaveValue(expect.stringMatching(/ Checked by finance\.$/));
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Keep mine for Due date' }));
+    await waitFor(() => expect(canvas.queryByRole('list', { name: 'Conflicts' })).toBeNull());
+    await expect(due).toHaveValue('2026-03-05');
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
+    const dialog = await body.findByRole('dialog', { name: 'Review changes' });
+    await expect(dialog).toHaveAccessibleDescription('2 changes will be saved.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull(), { timeout: 5000 });
+    await waitFor(() => expect(notice()).toBeNull());
+    const stored = win?.__ropShowcaseStore?.snapshot().find((r) => r.number === RECORD);
+    await expect(stored?.dueDate).toBe('2026-03-05');
+    await expect(stored?.notes).toMatch(/ Checked by finance\.$/);
   },
 };

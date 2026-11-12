@@ -41,9 +41,9 @@ export function previewAnnotations(env = process.env) {
  * directly under packages/pro/src. Done with an extglob `!(a|b)` because Storybook does not resolve a
  * leading `!` negated glob relative to `.storybook/` (it treats it as a path). An EMPTY extglob `!()`
  * matches NOTHING (not "everything"), which would silently drop every Pro story: hence the empty case below.
- *   - form-rebase: waiting for the showcase integration (#384); leaked in by #395 (incident #421).
+ * Empty since #384 (form-rebase, kept out by #421 until its showcase integration, is public now).
  */
-export const PRO_DEMO_NOT_PUBLIC = ['form-rebase'];
+export const PRO_DEMO_NOT_PUBLIC = [];
 
 /** Story globs (and the Pro intro page), relative to `.storybook/`. */
 export function storyGlobs(env = process.env, notPublic = PRO_DEMO_NOT_PUBLIC) {

@@ -58,16 +58,23 @@ describe('storyGlobs (#175)', () => {
     const env = { STORYBOOK_EDITION: 'pro' };
 
     it('has only Pro story globs and the Pro introduction page', () => {
-      expect(storyGlobs(env)).toEqual(['../packages/pro/src/!(form-rebase)/**/*.stories.tsx', './ProIntroduction.mdx']);
+      // Every Pro folder is public since #384: the plain glob (an empty extglob `!()` would match nothing).
+      expect(storyGlobs(env)).toEqual(['../packages/pro/src/**/*.stories.tsx', './ProIntroduction.mdx']);
       expect(introductionPages(env)).toEqual([]);
     });
 
-    it('leaves the not-yet-public Form rebase story out of the Pro demo only (#421)', () => {
-      for (const mode of [{}, { STORYBOOK_EXCLUDE_PRO: '1' }]) {
+    it('excludes nothing in any build since #384 (Form rebase public); an exclusion would only apply to the Pro demo (#421)', () => {
+      expect(PRO_DEMO_NOT_PUBLIC).toEqual([]);
+      for (const mode of [{}, { STORYBOOK_EXCLUDE_PRO: '1' }, env]) {
         expect(storyGlobs(mode).some((g) => g.includes('form-rebase') || g.includes('!('))).toBe(false);
       }
-      // Each exclusion must point at a real folder, or it would silently exclude nothing.
+      // The Form rebase stories are in the Pro demo glob.
+      const [proGlob] = storyGlobs(env);
+      expect(micromatch.isMatch('packages/pro/src/form-rebase/FormRebase.stories.tsx', proGlob.replace('../', ''))).toBe(true);
+      expect(micromatch.isMatch('packages/pro/src/form-rebase/RebaseNotice.stories.tsx', proGlob.replace('../', ''))).toBe(true);
+      // An exclusion still only applies to the Pro demo, and must point at a real folder.
       for (const dir of PRO_DEMO_NOT_PUBLIC) expect(existsSync(resolve(ROOT, 'packages/pro/src', dir))).toBe(true);
+      expect(storyGlobs({}, ['form-rebase']).some((g) => g.includes('!('))).toBe(false);
     });
 
     it('an empty PRO_DEMO_NOT_PUBLIC still matches the real Pro stories (empty extglob `!()` matches nothing)', () => {
@@ -179,11 +186,15 @@ describe('exampleSources (#447)', () => {
     for (const example of examples) expect(chosen.includes(example), example).toBe(storiesInBuild(env, example));
   });
 
-  it('the Free build selects no Pro example, the Pro demo not the Form rebase one', () => {
+  it('the Free build selects no Pro example, the Pro demo every Pro example (Form rebase public since #384)', () => {
     expect(selected(FREE).filter((path) => path.startsWith('packages/pro/'))).toEqual([]);
     expect(selected(PRO_DEMO)).toContain('packages/pro/src/change-summary/ChangeSummary.example.tsx');
-    expect(selected(PRO_DEMO)).not.toContain('packages/pro/src/form-rebase/FormRebase.example.tsx');
+    expect(selected(PRO_DEMO)).toContain('packages/pro/src/form-rebase/FormRebase.example.tsx');
+    expect(selected(PRO_DEMO)).toContain('packages/pro/src/form-rebase/RebaseNotice.example.tsx');
     expect(selected({})).toContain('packages/pro/src/form-rebase/FormRebase.example.tsx');
+    // A folder kept out of the Pro demo is still left out of its examples.
+    const kept = micromatch(examples, exampleSources(PRO_DEMO, ['form-rebase']).flatMap((source) => source.globs).map((glob) => glob.replace(/^(!?)\//, '$1')));
+    expect(kept).not.toContain('packages/pro/src/form-rebase/FormRebase.example.tsx');
   });
 
   it('the virtual module: two eager globs per folder on the same patterns, nothing of packages/pro in the Free build', () => {
@@ -193,7 +204,8 @@ describe('exampleSources (#447)', () => {
     expect(free).toContain("query: '?raw', import: 'default'");
     const complete = exampleSourcesModule(exampleSources({}));
     expect(complete).toContain('root: "packages/pro/src"');
-    expect(exampleSourcesModule(exampleSources(PRO_DEMO))).toContain('"!/packages/pro/src/form-rebase/**"');
+    expect(exampleSourcesModule(exampleSources(PRO_DEMO))).not.toContain('"!/packages/pro/src/');
+    expect(exampleSourcesModule(exampleSources(PRO_DEMO, ['form-rebase']))).toContain('"!/packages/pro/src/form-rebase/**"');
     expect(exampleSourcesModule(exampleSources(PRO_DEMO))).not.toContain('packages/core');
   });
 

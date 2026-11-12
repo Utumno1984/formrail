@@ -154,6 +154,9 @@ test.describe('Pro demo: banner', () => {
       ['Change Summary', 'pro-changesummary--docs'],
       ['Invoices with Change Summary', 'pro-showcase-invoices-with-change-summary--docs'],
       ['Virtual List Report', 'pro-floorplans-virtual-list-report--docs'],
+      // Public since #384.
+      ['Form rebase', 'pro-patterns-form-rebase--docs'],
+      ['Rebase notice', 'pro-rebasenotice--docs'],
     ] as const) {
       await page.goto('pro/?path=/docs/pro-introduction--docs');
       await preview.getByRole('link', { name, exact: true }).click();

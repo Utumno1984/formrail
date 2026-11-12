@@ -163,6 +163,30 @@ test.describe('Pro/Patterns/Form rebase example', () => {
   });
 });
 
+test.describe('Pro/RebaseNotice example', () => {
+  const STORY = 'pro-rebasenotice--example';
+  const field = (page: Page, name: string) => page.getByRole('textbox', { name });
+
+  test('a server version over an edited Amount: Supplier updated, a conflict on Amount, the Field explained; Use server value closes it', async ({ page }) => {
+    await gotoStory(page, STORY);
+    await field(page, 'Amount').fill('1250');
+    await page.getByRole('button', { name: 'Receive the server version' }).click();
+    await expect(field(page, 'Supplier')).toHaveValue('Rossi Construction Ltd');
+    await expect(field(page, 'Amount')).toHaveValue('1250');
+    await expect(page.getByRole('status')).toHaveText(
+      'This invoice was updated while you were editing. 1 field was updated. 1 field you edited was also changed on the server.',
+    );
+    await expect(page.getByRole('list', { name: 'Conflicts' }).getByRole('listitem')).toHaveText(['AmountYours: 1250Server: 1350Use server valueKeep mine']);
+    await expect(field(page, 'Amount')).toHaveAccessibleDescription('Changed on the server too.');
+    await page.getByRole('button', { name: 'Use server value for Amount' }).click();
+    await expect(field(page, 'Amount')).toHaveValue('1350');
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(field(page, 'Amount')).not.toHaveAccessibleDescription('Changed on the server too.');
+    // The clicked button is gone: the focus is on a live element, never on <body>.
+    expect(await page.evaluate(() => document.activeElement !== document.body && document.activeElement?.isConnected)).toBe(true);
+  });
+});
+
 test.describe('Pro examples on their Docs pages', () => {
   test('the stylesheet reminder names the core stylesheet, then the Pro one', async ({ page }) => {
     await page.goto('/iframe.html?id=pro-changesummary--docs&viewMode=docs');
@@ -178,7 +202,12 @@ test.describe('Pro examples on their Docs pages', () => {
     expect(existsSync(dir), 'storybook-static/ not built').toBe(true);
     const text = buildText(dir);
     const examples = proExamples(REPO_ROOT);
-    expect(examples.map((example) => example.folder).sort()).toEqual(['change-summary', 'form-rebase', 'list-report']);
+    expect(examples.map((example) => example.file).sort()).toEqual([
+      'packages/pro/src/change-summary/ChangeSummary.example.tsx',
+      'packages/pro/src/form-rebase/FormRebase.example.tsx',
+      'packages/pro/src/form-rebase/RebaseNotice.example.tsx',
+      'packages/pro/src/list-report/VirtualListReport.example.tsx',
+    ]);
     for (const { file, marker } of examples) expect(text.includes(marker), file).toBe(true);
   });
 });
