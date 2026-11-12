@@ -29,7 +29,8 @@ export const SHOWCASE_SOURCE_TAG = 'showcase-source';
  * to know that the component rendered above the printed code is the example's own, not a `render` written next
  * to the spread, or added by `Object.assign`, that lint cannot see (ticket #403).
  */
-export const EXAMPLE_RENDER_MARK = Symbol.for('formrail.exampleStory.render');
+export const EXAMPLE_RENDER_MARK_KEY = 'formrail.exampleStory.render';
+export const EXAMPLE_RENDER_MARK = Symbol.for(EXAMPLE_RENDER_MARK_KEY);
 
 /** The repository's `main` branch on GitHub: the only place the URL is written. */
 export const REPOSITORY_MAIN = 'https://github.com/Utumno1984/formrail/blob/main/';

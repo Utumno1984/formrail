@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { rendersLocalComponent } from '../.storybook/source-transform';
 import {
-  EXAMPLE_RENDER_MARK,
+  EXAMPLE_RENDER_MARK_KEY,
   EXAMPLE_TAG,
   PLAYGROUND_TAG,
   REPOSITORY_MAIN,
@@ -318,7 +318,8 @@ test.describe('copy-paste examples (#403)', () => {
   /** What the loaded CSF file says about a story, for {@link auditExampleBinding}. */
   async function exampleFacts(page: Page, storyId: string): Promise<ExampleFacts> {
     return page.evaluate(
-      async ({ id, mark }) => {
+      async ({ id, markKey }) => {
+        const mark = Symbol.for(markKey); // a symbol cannot be passed to the page: its registry key is
         type Annotations = { render?: unknown; component?: unknown; decorators?: unknown[]; loaders?: unknown[] };
         const preview = (window as unknown as { __STORYBOOK_PREVIEW__: { storyStoreValue: { loadCSFFileByStoryId: (id: string) => Promise<{ meta: Annotations; stories: Record<string, Annotations> }> } } }).__STORYBOOK_PREVIEW__;
         const { meta, stories } = await preview.storyStoreValue.loadCSFFileByStoryId(id);
@@ -332,7 +333,7 @@ test.describe('copy-paste examples (#403)', () => {
           metaLoaders: meta.loaders?.length ?? 0,
         };
       },
-      { id: storyId, mark: EXAMPLE_RENDER_MARK },
+      { id: storyId, markKey: EXAMPLE_RENDER_MARK_KEY },
     );
   }
 
@@ -478,7 +479,9 @@ test.describe('copy-paste examples (#403)', () => {
     // A: the story renders its own component but prints the code of ANOTHER example file.
     expect(await audit('internal-docsauditwrongcode--docs')).toEqual([expect.stringContaining('differs from')]);
     // B: tagged `example` but written with an inline `render`: Storybook's synthesized source is printed.
-    expect(await audit('internal-docsauditinlinerender--docs')).toContainEqual(expect.stringContaining('differs from'));
+    expect(await audit('internal-docsauditinlinerender--docs')).toEqual(
+      expect.arrayContaining([expect.stringContaining('differs from'), expect.stringContaining('render is not the one of exampleStory')]),
+    );
   });
 
   test('a rendered component other than the example fails the audit (negatives, real DOM)', async ({ page, request }) => {
@@ -496,18 +499,18 @@ test.describe('copy-paste examples (#403)', () => {
     await page.goto('/iframe.html?id=internal-docsauditoverriddenrender--example&viewMode=story');
     await expect(page.getByText('Another demo'), 'the DOM shows another component than the printed example').toBeVisible();
     await expect(page.getByRole('button', { name: 'Rendered component' })).toHaveCount(0);
-    // Decorators and loaders of the story and of the meta, with the example's own render intact.
+    // Decorators and loaders of the story and of the meta, with the example's own render intact. (A story-level
+    // `component` is not a CSF field Storybook keeps, so it cannot be shown at runtime; lint bans it next to the spread.)
     const decorated = await audit('internal-docsauditdecorated--docs');
     expect(decorated).toEqual(
       expect.arrayContaining([
-        expect.stringContaining('its own `component`'),
         expect.stringContaining('own decorators'),
         expect.stringContaining('own loaders'),
         expect.stringContaining('meta has decorators'),
         expect.stringContaining('meta has loaders'),
       ]),
     );
-    expect(decorated).toHaveLength(5);
+    expect(decorated).toHaveLength(4);
     await page.goto('/iframe.html?id=internal-docsauditdecorated--example&viewMode=story');
     await expect(page.locator('[data-story-decorator] [data-meta-decorator], [data-meta-decorator] [data-story-decorator]')).toHaveCount(1);
   });

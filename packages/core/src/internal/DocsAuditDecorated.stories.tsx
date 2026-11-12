@@ -16,8 +16,7 @@ const meta: Meta = {
 export default meta;
 
 /** Prints the example file, wrapped by decorators and loaders of its own and of the meta. */
-export const Example: StoryObj = Object.assign({ tags: ['example', '!visual'] }, exampleStory('DocsAuditDecorated.example.tsx'), {
-  component: DecoratedExample,
-  decorators: [(Story: () => ReactElement) => <div data-story-decorator><Story /></div>],
-  loaders: [async () => ({})],
-});
+export const Example: StoryObj = { tags: ['example', '!visual'], ...exampleStory('DocsAuditDecorated.example.tsx') };
+// Assigned afterwards: the lint rule on `...exampleStory()` objects does not see it; the audit must.
+Example.decorators = [(Story: () => ReactElement) => <div data-story-decorator><Story /></div>];
+Example.loaders = [async () => ({})];
