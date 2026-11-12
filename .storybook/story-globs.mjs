@@ -63,3 +63,11 @@ export function storyGlobs(env = process.env, notPublic = PRO_DEMO_NOT_PUBLIC) {
 export function introductionPages(env = process.env) {
   return proEdition(env) ? [] : ['./Introduction.mdx'];
 }
+
+/**
+ * The reference pages of `@formrail/core` hooks and types (ticket #402, generated from the TSDoc): Free and
+ * complete builds. The Pro demo build gets its own when it documents a Pro hook.
+ */
+export function referencePages(env = process.env) {
+  return proEdition(env) ? [] : ['./reference/*.mdx'];
+}

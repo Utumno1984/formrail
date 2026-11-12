@@ -1,6 +1,7 @@
 import { matchesAccept } from './accept';
 
 export interface FileRejection {
+  /** The file that was not added. */
   file: File;
   /** `type`: not allowed by `accept`; `size`: larger than `maxSize`; `count`: no room left (`maxFiles`, or a single-file control). */
   reason: 'type' | 'size' | 'count';

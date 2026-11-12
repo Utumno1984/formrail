@@ -15,6 +15,7 @@ export type FieldState = 'default' | 'disabled' | 'forced' | 'locked';
  * `locked`) and ignore Space/Enter/click while it is true.
  */
 export interface FieldControlProps {
+  /** The control's id: the `<label for>` of the Field points at it. */
   id: string;
   /**
    * The label's id: names controls that `<label for>` cannot reach (e.g. a `div role="switch"`).
@@ -23,12 +24,15 @@ export interface FieldControlProps {
   'aria-labelledby': string;
   /** Ids of the state reason, error and help, in this order; only of messages that exist. */
   'aria-describedby'?: string;
+  /** Present while the Field is invalid: it has an `error`, or its `ValidationProvider` reports one for its `name`. */
   'aria-invalid'?: true;
+  /** Present when the Field is `required`. */
   'aria-required'?: true;
   /** `disabled` state: native, out of the tab order. */
   disabled?: true;
   /** `forced` / `locked`: focusable but not editable. */
   readOnly?: true;
+  /** `forced` / `locked`, for a control with no native `readOnly` (`role="switch"`, `combobox`, ...). */
   'aria-readonly'?: true;
   /**
    * The Field's logical `name`, as a DOM attribute valid on any element (a `<button>` trigger
