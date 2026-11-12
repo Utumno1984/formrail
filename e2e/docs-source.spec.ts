@@ -272,8 +272,8 @@ test.describe('copy-paste examples (#403)', () => {
     },
     Navigation: {
       ticket: 444,
-      max: 5,
-      pages: ['navigation-accordion--docs', 'navigation-breadcrumb--docs', 'navigation-collapsible--docs', 'navigation-pagination--docs', 'navigation-tabs--docs'],
+      max: 0,
+      pages: [],
     },
     Primitives: {
       ticket: 445,
@@ -295,7 +295,7 @@ test.describe('copy-paste examples (#403)', () => {
     },
   };
   /** The sum of the groups' `max`: the list only goes down from here. On a rebase, recompute it from the groups. */
-  const PENDING_MAX = 42;
+  const PENDING_MAX = 37;
   const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
 
   interface Entry {
