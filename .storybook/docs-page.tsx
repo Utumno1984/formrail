@@ -13,7 +13,27 @@
 import { useContext } from 'react';
 import { Controls, Description, DocsContext, DocsPage, DocsStory, Heading, Primary, Source, Subheading, Subtitle, Title } from '@storybook/addon-docs/blocks';
 import type { PreparedStory } from 'storybook/internal/types';
-import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, githubSource, selectPageStories, type SourceFile } from '../packages/core/src/internal/story-example';
+import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, exampleStylesheets, githubSource, selectPageStories, type SourceFile } from '../packages/core/src/internal/story-example';
+
+/**
+ * The stylesheets the pasted example needs (ticket #403; the Pro ones, #447): the core one, then the Pro one
+ * when the example imports `@formrail/pro`, one `<code>` per import line, in import order.
+ */
+function StylesReminder({ sheets }: { sheets: string[] }) {
+  const line = (sheet: string) => <code key={sheet}>import &apos;{sheet}&apos;;</code>;
+  if (sheets.length === 1) return <p data-styles-reminder>To use the example in your app, import the stylesheet once: {line(sheets[0]!)}</p>;
+  return (
+    <p data-styles-reminder>
+      To use the example in your app, import the stylesheets once, in this order:{' '}
+      {sheets.map((sheet, index) => (
+        <span key={sheet}>
+          {index > 0 && ', then '}
+          {line(sheet)}
+        </span>
+      ))}
+    </p>
+  );
+}
 
 function SourceFiles({ files }: { files: SourceFile[] }) {
   return (
@@ -58,11 +78,7 @@ export function FormrailDocsPage() {
       <Description of="meta" />
       <Primary />
       {/* Ticket #403: the one thing the pasted file does not say (a page-level line, not inside the example). */}
-      {isExample && (
-        <p data-styles-reminder>
-          To use the example in your app, import the stylesheet once: <code>import &apos;@formrail/core/styles.css&apos;;</code>
-        </p>
-      )}
+      {isExample && <StylesReminder sheets={exampleStylesheets(String((primary.parameters?.docs as { source?: { code?: unknown } } | undefined)?.source?.code ?? ''))} />}
       {playground ? (
         <>
           <DocsStory of={playground.moduleExport} expanded __forceInitialArgs />

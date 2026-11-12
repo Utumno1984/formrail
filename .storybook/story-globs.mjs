@@ -59,6 +59,21 @@ export function storyGlobs(env = process.env, notPublic = PRO_DEMO_NOT_PUBLIC) {
   return globs;
 }
 
+/**
+ * The copy-paste example files of the build (`*.example.tsx`, tickets #403 and #447), one entry per package
+ * source folder, as Vite globs from the project root: an example is in the build exactly when the stories next
+ * to it are (same packages, same Pro demo exclusions as `storyGlobs`). Served to `exampleStory` by
+ * example-sources-plugin.mjs. So the Free build never globs packages/pro (no Pro example, and nothing it
+ * imports, enters its bundle) and the Pro demo neither the core examples nor the `notPublic` folders.
+ * Negated globs here are Vite's (`!/packages/...`), not Storybook's: no extglob needed.
+ */
+export function exampleSources(env = process.env, notPublic = PRO_DEMO_NOT_PUBLIC) {
+  const core = { root: 'packages/core/src', globs: ['/packages/core/src/**/*.example.tsx'] };
+  const pro = { root: 'packages/pro/src', globs: ['/packages/pro/src/**/*.example.tsx'] };
+  if (proEdition(env)) return [{ ...pro, globs: [...pro.globs, ...notPublic.map((dir) => `!/packages/pro/src/${dir}/**`)] }];
+  return excludePro(env) ? [core] : [core, pro];
+}
+
 /** The introduction page of the Free/complete builds; the Pro demo has its own (in `storyGlobs`). */
 export function introductionPages(env = process.env) {
   return proEdition(env) ? [] : ['./Introduction.mdx'];

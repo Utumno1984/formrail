@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { rendersLocalComponent } from '../.storybook/source-transform';
@@ -10,11 +10,23 @@ import {
   REPOSITORY_MAIN,
   SHOWCASE_SOURCE_TAG,
   controlsStory,
+  exampleStylesheets,
   findPlayground,
   githubSource,
   selectPageStories,
 } from '../packages/core/src/internal/story-example';
-import { auditAgainstFile, auditExampleBinding, auditListedSource, auditSnippet, intrinsicElements, publicExports, type ExampleFacts, type KnownTags } from './helpers/docs-source';
+import {
+  auditAgainstFile,
+  auditExampleBinding,
+  auditListedSource,
+  auditSnippet,
+  auditStylesheetReminder,
+  expectedStylesheets,
+  intrinsicElements,
+  publicExports,
+  type ExampleFacts,
+  type KnownTags,
+} from './helpers/docs-source';
 
 // "Show code" must print something a reader can use (ticket #333). With Storybook's default `dynamic`
 // source, a story whose `render` declares a local stateful component and renders it (`function XyzDemo()
@@ -283,12 +295,12 @@ test.describe('copy-paste examples (#403)', () => {
     },
     Pro: {
       ticket: 447,
-      max: 3,
-      pages: ['pro-changesummary--docs', 'pro-floorplans-virtual-list-report--docs', 'pro-patterns-form-rebase--docs'],
+      max: 0,
+      pages: [],
     },
   };
   /** The sum of the groups' `max`: the list only goes down from here. On a rebase, recompute it from the groups. */
-  const PENDING_MAX = 3;
+  const PENDING_MAX = 0;
   const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
 
   interface Entry {
@@ -376,8 +388,9 @@ test.describe('copy-paste examples (#403)', () => {
     // The demo stories under the example (beyond the example and the Playground) carry the page's "demo code" note.
     const blocks = await page.locator('.sbdocs-content [id^="anchor--"]').count();
     if (!showcase && blocks > 2 && (await page.locator('.sbdocs-content [data-demo-code-note]').count()) !== 1) problems.push('no "demo code" note above the demo stories');
-    // Whoever pastes the example must also import the stylesheet: said once, at page level, next to the example.
-    if (!showcase && (await page.locator('.sbdocs-content [data-styles-reminder]').filter({ hasText: '@formrail/core/styles.css' }).count()) !== 1) problems.push('no stylesheet reminder next to the example');
+    // Whoever pastes the example must also import the stylesheets: said once, at page level, next to the example.
+    // Every one it needs, in order: core's, then Pro's on a page of packages/pro (#447).
+    if (!showcase) problems.push(...auditStylesheetReminder(await page.locator('.sbdocs-content [data-styles-reminder]').allInnerTexts(), expectedStylesheets(primary.importPath)));
     if (showcase) {
       if ((await page.locator(`.sbdocs-content a[href^="${REPOSITORY_MAIN}"]`).count()) === 0) problems.push('no GitHub link to the source');
       const listed = await listedSources(page);
@@ -551,6 +564,36 @@ test.describe('copy-paste examples (#403)', () => {
       'packages/a/Old.tsx: no such file on disk',
     ]);
     expect(auditListedSource({ ...source, href: url('packages/a/Two.tsx') }, read, url)).toEqual([expect.stringContaining('link is')]);
+  });
+
+  test('the stylesheet reminder: core pages name the core sheet, Pro pages core then Pro (each way to fail)', () => {
+    const core = "To use the example in your app, import the stylesheet once: import '@formrail/core/styles.css';";
+    const both = "To use the example in your app, import the stylesheets once, in this order: import '@formrail/core/styles.css';, then import '@formrail/pro/styles.css';";
+    const reversed = "To use the example in your app, import the stylesheets once, in this order: import '@formrail/pro/styles.css';, then import '@formrail/core/styles.css';";
+    const corePage = expectedStylesheets('./packages/core/src/button/Button.stories.tsx');
+    const proPage = expectedStylesheets('./packages/pro/src/change-summary/ChangeSummary.stories.tsx');
+    expect(corePage).toEqual(['@formrail/core/styles.css']);
+    expect(proPage).toEqual(['@formrail/core/styles.css', '@formrail/pro/styles.css']);
+    expect(auditStylesheetReminder([core], corePage)).toEqual([]);
+    expect(auditStylesheetReminder([both], proPage)).toEqual([]);
+    // A Pro page without the Pro line, a core page with it, the order reversed, none, two.
+    expect(auditStylesheetReminder([core], proPage)).toEqual([expect.stringContaining('lists [@formrail/core/styles.css], expected [@formrail/core/styles.css, @formrail/pro/styles.css]')]);
+    expect(auditStylesheetReminder([both], corePage)).toEqual([expect.stringContaining('expected [@formrail/core/styles.css]')]);
+    expect(auditStylesheetReminder([reversed], proPage)).toEqual([expect.stringContaining('lists [@formrail/pro/styles.css, @formrail/core/styles.css]')]);
+    expect(auditStylesheetReminder([], corePage)).toEqual(['no stylesheet reminder next to the example']);
+    expect(auditStylesheetReminder([core, core], corePage)).toEqual(['2 stylesheet reminders on the page']);
+  });
+
+  test('the Docs template and the audit agree on every example file (what it imports vs where it lives)', () => {
+    // The template decides the reminder from the example's imports (exampleStylesheets), the audit from the
+    // package of the page (expectedStylesheets): every example on disk must get the same answer from both.
+    const files = ['core', 'pro'].flatMap((pkg) =>
+      readdirSync(resolve(REPO_ROOT, `packages/${pkg}/src`), { recursive: true, encoding: 'utf8' })
+        .filter((name) => name.endsWith('.example.tsx'))
+        .map((name) => `packages/${pkg}/src/${name.split(sep).join('/')}`),
+    );
+    expect(files.filter((file) => file.startsWith('packages/pro/')).length, 'Pro examples').toBeGreaterThanOrEqual(3);
+    for (const file of files) expect(exampleStylesheets(readRepoFile(file)!), file).toEqual(expectedStylesheets(`./${file}`));
   });
 
   test('the Docs page selects its stories as Storybook does (filter, autodocs, mount)', () => {

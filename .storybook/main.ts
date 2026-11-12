@@ -6,6 +6,8 @@ import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter, 
 import { introductionPages, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
 import { withTypeReference } from './type-reference-plugin.mjs';
+// @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
+import { exampleSourcesPlugin } from './example-sources-plugin.mjs';
 
 const config: StorybookConfig = {
   // Props tables: react-docgen-typescript, not Storybook's default react-docgen (ticket #401).
@@ -68,7 +70,8 @@ const config: StorybookConfig = {
   // the e2e/visual jobs): resolve it to the sources instead, like the Free stories do.
   viteFinal: (viteConfig) => ({
     ...viteConfig,
-    plugins: [...(viteConfig.plugins ?? []), tailwindcss(), docgenRelativePaths()],
+    // `exampleSourcesPlugin`: the copy-paste examples of the packages this build includes (#447).
+    plugins: [...(viteConfig.plugins ?? []), tailwindcss(), docgenRelativePaths(), exampleSourcesPlugin()],
     resolve: {
       ...viteConfig.resolve,
       alias: [

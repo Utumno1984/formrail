@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import micromatch from 'micromatch';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, referenceFixtures, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
+import { EXAMPLE_SOURCES_MODULE, exampleSourcesModule, exampleSourcesPlugin } from '../.storybook/example-sources-plugin.mjs';
+import { PRO_DEMO_NOT_PUBLIC, exampleSources, excludePro, introductionPages, previewAnnotations, proEdition, referenceFixtures, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -136,6 +137,74 @@ describe('storyGlobs (#175)', () => {
     expect(deployJob).toMatch(/STORYBOOK_HIDE_INTERNAL: '?1'?/);
     // The e2e/visual builds must keep the fixtures in the sidebar-independent index and local dev shows them.
     expect(ci.slice(0, ci.indexOf('deploy-pages:'))).not.toMatch(/STORYBOOK_HIDE_INTERNAL: /);
+  });
+});
+
+describe('exampleSources (#447)', () => {
+  const FREE = { STORYBOOK_EXCLUDE_PRO: '1' };
+  const PRO_DEMO = { STORYBOOK_EDITION: 'pro' };
+  const examples = ['core', 'pro'].flatMap((pkg) =>
+    readdirSync(resolve(ROOT, 'packages', pkg, 'src'), { recursive: true, encoding: 'utf8' })
+      .filter((path) => path.endsWith('.example.tsx'))
+      .map((path) => `packages/${pkg}/src/${path.split(sep).join('/')}`),
+  );
+  /** The example files a build's example globs select (Vite globs from the root: a leading `/`, `!` negates). */
+  const selected = (env) => {
+    const globs = exampleSources(env).flatMap((source) => source.globs);
+    return micromatch(examples, globs.map((glob) => glob.replace(/^(!?)\//, '$1')));
+  };
+  /** Whether the stories file next to an example is in the build (Storybook globs, relative to .storybook/). */
+  const storiesInBuild = (env, example) => micromatch.isMatch(example.replace(/\.example\.tsx$/, '.stories.tsx'), storyGlobs(env).map((glob) => glob.replace(/^\.\.\//, '')));
+
+  it('finds the example files of both packages on disk (the checks below are not vacuous)', () => {
+    expect(examples.filter((path) => path.startsWith('packages/core/')).length).toBeGreaterThan(10);
+    expect(examples).toEqual(expect.arrayContaining(['packages/pro/src/change-summary/ChangeSummary.example.tsx', 'packages/pro/src/form-rebase/FormRebase.example.tsx']));
+  });
+
+  it('one entry per package folder of the build: core + Pro, core only in the Free build, Pro only in the Pro demo', () => {
+    expect(exampleSources({}).map((source) => source.root)).toEqual(['packages/core/src', 'packages/pro/src']);
+    expect(exampleSources(FREE)).toEqual([{ root: 'packages/core/src', globs: ['/packages/core/src/**/*.example.tsx'] }]);
+    expect(exampleSources(PRO_DEMO)).toEqual([
+      { root: 'packages/pro/src', globs: ['/packages/pro/src/**/*.example.tsx', ...PRO_DEMO_NOT_PUBLIC.map((dir) => `!/packages/pro/src/${dir}/**`)] },
+    ]);
+    expect(exampleSources(PRO_DEMO, [])).toEqual([{ root: 'packages/pro/src', globs: ['/packages/pro/src/**/*.example.tsx'] }]);
+  });
+
+  it.each([
+    ['complete', {}],
+    ['Free', FREE],
+    ['Pro demo', PRO_DEMO],
+  ])('%s build: an example is selected exactly when the stories next to it are in the build', (_, env) => {
+    const chosen = selected(env);
+    for (const example of examples) expect(chosen.includes(example), example).toBe(storiesInBuild(env, example));
+  });
+
+  it('the Free build selects no Pro example, the Pro demo not the Form rebase one', () => {
+    expect(selected(FREE).filter((path) => path.startsWith('packages/pro/'))).toEqual([]);
+    expect(selected(PRO_DEMO)).toContain('packages/pro/src/change-summary/ChangeSummary.example.tsx');
+    expect(selected(PRO_DEMO)).not.toContain('packages/pro/src/form-rebase/FormRebase.example.tsx');
+    expect(selected({})).toContain('packages/pro/src/form-rebase/FormRebase.example.tsx');
+  });
+
+  it('the virtual module: two eager globs per folder on the same patterns, nothing of packages/pro in the Free build', () => {
+    const free = exampleSourcesModule(exampleSources(FREE));
+    expect(free).not.toContain('packages/pro');
+    expect(free.match(/import\.meta\.glob\(\["\/packages\/core\/src\/\*\*\/\*\.example\.tsx"\], \{ eager: true/g)).toHaveLength(2);
+    expect(free).toContain("query: '?raw', import: 'default'");
+    const complete = exampleSourcesModule(exampleSources({}));
+    expect(complete).toContain('root: "packages/pro/src"');
+    expect(exampleSourcesModule(exampleSources(PRO_DEMO))).toContain('"!/packages/pro/src/form-rebase/**"');
+    expect(exampleSourcesModule(exampleSources(PRO_DEMO))).not.toContain('packages/core');
+  });
+
+  it('the plugin serves the module of its environment under the virtual id only', () => {
+    const plugin = exampleSourcesPlugin({ env: FREE });
+    expect(plugin.resolveId(EXAMPLE_SOURCES_MODULE)).toBe(`\0${EXAMPLE_SOURCES_MODULE}`);
+    expect(plugin.resolveId('./other')).toBeNull();
+    expect(plugin.load(`\0${EXAMPLE_SOURCES_MODULE}`)).toBe(exampleSourcesModule(exampleSources(FREE)));
+    expect(plugin.load(EXAMPLE_SOURCES_MODULE)).toBeNull();
+    // Wired into Storybook's Vite config (main.ts), next to the other plugins.
+    expect(readFileSync(resolve(ROOT, '.storybook/main.ts'), 'utf8')).toMatch(/plugins: \[.*exampleSourcesPlugin\(\)\],/);
   });
 });
 
