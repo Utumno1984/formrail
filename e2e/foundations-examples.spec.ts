@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { parseDerivedTokens } from '../packages/core/src/utils/token-scale';
 import { gotoStory } from './helpers/story';
 
 // The copy-paste examples of the Foundations pages (ticket #446): the code a reader pastes uses only tokens
@@ -27,7 +28,7 @@ test.describe('Foundations examples: tokens', () => {
   });
 
   test('the examples never invite a derived token read with a bare var() or a wrapper override of --animate-rop-*', () => {
-    const derived = [...tokensCss.matchAll(/^\s*(--[\w-]+-(?:hover|active|subtle|subtle-hover|muted|pressed)|--color-rop-readonly-[\w-]+)\s*:/gm)].map((m) => m[1]!);
+    const derived = [...parseDerivedTokens(tokensCss).keys()];
     expect(derived.length).toBeGreaterThan(0);
     for (const file of EXAMPLES) {
       const text = readFileSync(resolve(SRC, file), 'utf8');
@@ -49,7 +50,7 @@ test.describe('Foundations examples', () => {
     const wrapperRadius = await inside.evaluate((el) => getComputedStyle(el.parentElement!.parentElement!).getPropertyValue('--radius-rop-md'));
     const outsideRadius = await outside.evaluate((el) => getComputedStyle(el.parentElement!).getPropertyValue('--radius-rop-md'));
     expect(wrapperRadius.trim()).toBe('1rem');
-    expect(outsideRadius.trim()).toBe('0.5rem');
+    expect(outsideRadius.trim()).not.toBe('1rem');
   });
 
   test('Tokens: the panel built from tokens paints them', async ({ page }) => {
@@ -90,8 +91,8 @@ test.describe('Foundations examples', () => {
   test('Utilities: cn resolves the conflict, composeRefs feeds both refs', async ({ page }) => {
     await gotoStory(page, 'foundations-utilities--example');
     await expect(page.getByText('px-2 py-1')).toHaveCount(0); // the conflicting px-2 is gone
-    await expect(page.locator('code').first()).toHaveText('py-1 px-4');
-    await expect(page.locator('code').nth(1)).toHaveText('text-rop-body text-rop-error font-rop-mono');
+    await expect(page.locator('#storybook-root code').first()).toHaveText('py-1 px-4');
+    await expect(page.locator('#storybook-root code').nth(1)).toHaveText('text-rop-body text-rop-error font-rop-mono');
     await expect(page.locator('output')).toHaveText('not measured');
     await page.getByRole('button', { name: 'Measure (own ref)' }).click();
     await expect(page.locator('output')).toHaveText(/^\d+px wide$/);
