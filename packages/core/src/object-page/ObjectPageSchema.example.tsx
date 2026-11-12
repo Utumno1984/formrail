@@ -1,5 +1,4 @@
 import { useRef } from 'react';
-import { z } from 'zod';
 import {
   Button,
   Field,
@@ -11,17 +10,32 @@ import {
   ValidationProvider,
   useFocusFirstInvalidField,
   useObjectPageForm,
+  type StandardSchemaIssue,
+  type StandardSchemaLike,
 } from '@formrail/core';
 
-// Any Standard Schema works (Zod 3.24+ / 4, Valibot, ArkType): the library itself imports none.
-const orderSchema = z.object({
-  supplier: z.string().trim().min(1, 'Supplier is required'),
-  // The input holds a string: the schema coerces it to check it, the save handler still gets the string.
-  amount: z.coerce.number().positive('Amount must be a positive number'),
-});
+interface Order {
+  supplier: string;
+  amount: string;
+}
+
+// `schema` takes any Standard Schema: with Zod (3.24+ / 4), Valibot or ArkType, pass the schema itself, e.g.
+// `z.object({ supplier: z.string().trim().min(1, 'Supplier is required'), amount: z.coerce.number().positive() })`.
+// Written by hand here so the example needs no schema library: a validator that returns issues with a path.
+const orderSchema: StandardSchemaLike = {
+  '~standard': {
+    validate: (value) => {
+      const order = value as Order;
+      const issues: StandardSchemaIssue[] = [];
+      if (order.supplier.trim() === '') issues.push({ message: 'Supplier is required', path: ['supplier'] });
+      if (!(Number(order.amount) > 0)) issues.push({ message: 'Amount must be a positive number', path: ['amount'] });
+      return issues.length > 0 ? { issues } : { value };
+    },
+  },
+};
 
 export function NewOrder() {
-  const form = useObjectPageForm({ baseline: { supplier: '', amount: '' }, schema: orderSchema });
+  const form = useObjectPageForm<Order>({ baseline: { supplier: '', amount: '' }, schema: orderSchema });
   const containerRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalidField({ containerRef, fieldErrors: form.fieldErrors });
 
