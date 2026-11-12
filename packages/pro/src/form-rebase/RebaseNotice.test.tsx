@@ -260,6 +260,21 @@ describe('<RebaseNotice />: announcement', () => {
     stop();
   });
 
+  it('a pending update that changes nothing once applied: the end is announced, the region never stays on "Applying…"', () => {
+    const view = render(<RebaseNotice {...props()} />);
+    const { texts, take, stop } = watch(live());
+    view.rerender(<RebaseNotice {...props({ pending: true })} />);
+    take();
+    view.rerender(<RebaseNotice {...props({ pending: false, applied: [] })} />);
+    take();
+    expect(texts.map((t) => t.trim())).toEqual([
+      'This record was updated while you were editing. Applying server update after saving…',
+      'This record was updated while you were editing. Server update applied after saving: no field changed.',
+    ]);
+    expect(strip()).toBeNull();
+    stop();
+  });
+
   it('an update never moves the focus', () => {
     const view = render(
       <>

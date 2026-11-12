@@ -49,6 +49,11 @@ export interface RebaseNoticeLabels {
   /** Shown and announced while an update waits for a save in flight. Default `'Applying server update after saving…'`. */
   pending: string;
   /**
+   * Announced when a pending update, once applied, changed nothing (the server holds what was saved). Default
+   * `'Server update applied after saving: no field changed.'`.
+   */
+  pendingNoChanges: string;
+  /**
    * Appended in parentheses to the server's value when both values still read the same with
    * their contents written out (two class instances, a difference past the truncation). Default `'contents differ'`.
    */
@@ -72,6 +77,7 @@ export const DEFAULT_REBASE_NOTICE_LABELS: RebaseNoticeLabels = {
   keepMineFor: (label) => `Keep mine for ${label}`,
   acceptAllTheirs: 'Use all server values',
   pending: 'Applying server update after saving…',
+  pendingNoChanges: 'Server update applied after saving: no field changed.',
   // A literal, not `DEFAULT_VALUE_LABELS.contentsDiffer`: a member read at module level is never tree-shaken.
   contentsDiffer: 'contents differ',
 };
@@ -215,14 +221,17 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
   useEffect(() => {
     const last = announced.current;
     let text: string | undefined;
+    const content = applied.length > 0 || conflicts.length > 0;
     if (pending && !last.pending) text = `${labels.title} ${labels.pending}`;
-    else if (applied !== last.applied && (applied.length > 0 || conflicts.length > 0)) text = message;
+    else if (applied !== last.applied && content) text = message;
+    // The pending update was applied and changed nothing: say so, or the region would keep "Applying…" forever.
+    else if (last.pending && !pending && !content) text = `${labels.title} ${labels.pendingNoChanges}`;
     announced.current = { applied, pending, count: last.count };
     if (text === undefined) return;
     // A trailing no-break space on every other update: the same text twice in a row is still a change.
     announced.current.count += 1;
     setAnnouncement(announced.current.count % 2 === 0 ? `${text}${NO_BREAK_SPACE}` : text);
-  }, [applied, pending, conflicts.length, message, labels.title, labels.pending]);
+  }, [applied, pending, conflicts.length, message, labels.title, labels.pending, labels.pendingNoChanges]);
 
   /* ---------------------------------------------------------------------------------------------- */
   /* Layout: the focused element below the notice keeps its place on screen.                        */

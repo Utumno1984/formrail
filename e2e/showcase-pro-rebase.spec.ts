@@ -198,6 +198,22 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     expect(await stored(page)).toMatchObject({ notes: 'Saved note', status: next });
   });
 
+  test('an update during a save that changes nothing once applied: the end is announced, never stuck on "Applying…"', async ({ page }) => {
+    const record = await openRecord(page, RECORD, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:1500;serverUpdateDelayMs:0');
+    await notes(page).fill('Saved note');
+    await saveButton(page).click();
+    await reviewDialog(page).getByRole('button', { name: 'Save changes' }).click();
+    await expect(footer(page)).toContainText('Saving…');
+    // The other user writes the very value being saved.
+    await serverPatch(page, record.id, { notes: 'Saved note' });
+    const region = page.locator('.rop-pro-rebase-notice__live');
+    await expect(region).toHaveText('This invoice was updated while you were editing. Applying server update after saving…');
+    await expect(footer(page)).toBeHidden({ timeout: 10_000 });
+    await expect(region).toHaveText('This invoice was updated while you were editing. Server update applied after saving: no field changed.');
+    await expect(notice(page)).toHaveCount(0);
+    await expect(notes(page)).toHaveValue('Saved note');
+  });
+
   test('line items: the server changes line 1 quantity, I change line 2: both kept, no conflict', async ({ page }) => {
     const record = await openRecord(page, RECORD_WITH_LINES);
     const line2 = page.getByRole('textbox', { name: 'Line 2 quantity' });
