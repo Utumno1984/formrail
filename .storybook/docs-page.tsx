@@ -12,7 +12,7 @@
 // GitHub link. Every other page renders exactly Storybook's own template (`DocsPage`), untouched.
 import { useContext } from 'react';
 import { Controls, Description, DocsContext, DocsPage, DocsStory, Heading, Primary, Source, Subheading, Subtitle, Title } from '@storybook/addon-docs/blocks';
-import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, findPlayground, githubSource, type SourceFile } from '../packages/core/src/internal/story-example';
+import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, githubSource, type SourceFile } from '../packages/core/src/internal/story-example';
 
 function SourceFiles({ files }: { files: SourceFile[] }) {
   return (
@@ -41,7 +41,9 @@ export function FormrailDocsPage() {
   const isShowcase = !!primary?.tags?.includes(SHOWCASE_SOURCE_TAG);
   if (!primary || (!isExample && !isShowcase)) return <DocsPage />;
 
-  const playground = isExample ? findPlayground(rest) : undefined;
+  // The Controls' story: the Playground after an example (the same rule the props-table guard reads).
+  const target = controlsStory(stories);
+  const playground = target !== primary ? target : undefined;
   const others = rest.filter((s) => s !== playground);
   const files = (primary.parameters?.docs as { sourceFiles?: SourceFile[] } | undefined)?.sourceFiles ?? [];
   return (

@@ -84,3 +84,15 @@ export function findPlayground<T extends TaggedStory>(stories: readonly T[]): T 
   if (tagged.length > 1) throw new Error(`More than one story tagged "${PLAYGROUND_TAG}" on one page: ${tagged.map((s) => s.id).join(', ')}`);
   return tagged[0];
 }
+
+/**
+ * The story whose Controls (and props table) a Docs page shows, given the page's stories in page order: the
+ * Playground when the page opens with a copy-paste example, the primary (first) story otherwise, as in
+ * Storybook's own template. The ONE rule shared by the template (.storybook/docs-page.tsx) and the guards that
+ * read that table (e2e/docs-props.spec.ts).
+ */
+export function controlsStory<T extends TaggedStory>(stories: readonly T[]): T | undefined {
+  const [primary, ...rest] = stories;
+  if (!primary?.tags?.includes(EXAMPLE_TAG)) return primary;
+  return findPlayground(rest) ?? primary;
+}

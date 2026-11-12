@@ -1,5 +1,16 @@
-import { expect, test, type Page } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { rendersLocalComponent } from '../.storybook/source-transform';
+import {
+  EXAMPLE_TAG,
+  PLAYGROUND_TAG,
+  REPOSITORY_MAIN,
+  SHOWCASE_SOURCE_TAG,
+  controlsStory,
+  findPlayground,
+  githubSource,
+} from '../packages/core/src/internal/story-example';
+import { auditSnippet, publicExports } from './helpers/docs-source';
 
 // "Show code" must print something a reader can use (ticket #333). With Storybook's default `dynamic`
 // source, a story whose `render` declares a local stateful component and renders it (`function XyzDemo()
@@ -220,6 +231,156 @@ test.describe('Storybook "Show code"', () => {
         expect(shown).toContain('useState');
         expect(shown).toContain('render:');
       });
+    }
+  });
+});
+
+// Copy-paste examples (ticket #403): the first "Show code" of every public Docs page is code a reader can
+// paste into an app with only `@formrail/core` / `@formrail/pro` installed. The page must open with a story
+// tagged `example` (a `*.example.tsx` file, type-checked and linted with the package, printed verbatim) or,
+// for a showcase, `showcase-source` (a pointer to the source files the page lists, with their GitHub link).
+// The printed text is audited by ./helpers/docs-source.ts: no relative/internal/Storybook import, no `fn(`
+// or `args`, no JSX tag that is not an HTML element, a public export or a component declared in the snippet.
+test.describe('copy-paste examples (#403)', () => {
+  const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+  /**
+   * Public Docs pages not converted yet, by follow-up ticket. The list can only shrink: an entry whose page
+   * already opens with an example (or a showcase source) fails the test (remove it), and so does an entry
+   * with no page.
+   */
+  const PENDING: Record<string, string[]> = {
+    // #403 follow-up: Forms
+    Forms: [
+      'forms-calendar--docs', 'forms-checkbox--docs', 'forms-combobox--docs', 'forms-datepicker--docs', 'forms-field--docs',
+      'forms-fileupload--docs', 'forms-input--docs', 'forms-multiselect--docs', 'forms-numberinput--docs', 'forms-radiogroup--docs',
+      'forms-select--docs', 'forms-switch--docs', 'forms-textarea--docs',
+    ],
+    // #403 follow-up: Overlays
+    Overlays: ['overlays-confirmdialog--docs', 'overlays-dialog--docs', 'overlays-menu--docs', 'overlays-sheet--docs', 'overlays-toast--docs', 'overlays-tooltip--docs'],
+    // #403 follow-up: Primitives, Navigation, Foundations
+    'Primitives-Navigation-Foundations': [
+      'navigation-accordion--docs', 'navigation-breadcrumb--docs', 'navigation-collapsible--docs', 'navigation-pagination--docs', 'navigation-tabs--docs',
+      'primitives-avatar--docs', 'primitives-button--docs', 'primitives-card--docs', 'primitives-divider--docs', 'primitives-fieldmessage--docs',
+      'primitives-messagestrip--docs', 'primitives-progressbar--docs', 'primitives-skeleton--docs', 'primitives-spinner--docs', 'primitives-statusbadge--docs',
+      'foundations-icon--docs', 'foundations-theming--docs', 'foundations-tokens--docs', 'foundations-typography--docs', 'foundations-utilities--docs',
+    ],
+    // #403 follow-up: Pro
+    Pro: ['pro-changesummary--docs', 'pro-floorplans-virtual-list-report--docs', 'pro-patterns-form-rebase--docs'],
+  };
+  const pending = new Set(Object.values(PENDING).flat());
+
+  interface Entry {
+    id: string;
+    type: string;
+    importPath: string;
+    tags?: string[];
+  }
+
+  async function indexEntries(request: APIRequestContext): Promise<Entry[]> {
+    return Object.values(((await (await request.get('/index.json')).json()) as { entries: Record<string, Entry> }).entries);
+  }
+
+  /** Public Docs pages of CSF files (not MDX, not `internal`) with their primary story. */
+  async function publicDocs(request: APIRequestContext) {
+    const entries = await indexEntries(request);
+    return entries
+      .filter((e) => e.type === 'docs' && e.importPath.endsWith('.stories.tsx') && !e.tags?.includes('internal'))
+      .map((docs) => ({ id: docs.id, primary: entries.find((e) => e.type === 'story' && e.importPath === docs.importPath && e.tags?.includes('autodocs')) }));
+  }
+
+  /** Everything wrong with a page's first "Show code" (and, for a showcase, its source listing). */
+  async function auditPage(page: Page, docsId: string, primary: Entry | undefined, exports: ReadonlySet<string>): Promise<string[]> {
+    const tags = primary?.tags ?? [];
+    const showcase = tags.includes(SHOWCASE_SOURCE_TAG);
+    if (!primary || (!tags.includes(EXAMPLE_TAG) && !showcase)) return [`first story ${primary?.id ?? '(none)'} is not tagged "${EXAMPLE_TAG}" or "${SHOWCASE_SOURCE_TAG}"`];
+    await page.goto(`/iframe.html?id=${docsId}&viewMode=docs`);
+    const problems = auditSnippet(await openSource(page, `anchor--primary--${primary.id}`), exports);
+    if (showcase) {
+      if ((await page.locator(`.sbdocs-content a[href^="${REPOSITORY_MAIN}"]`).count()) === 0) problems.push('no GitHub link to the source');
+      if ((await page.locator('.sbdocs-content section[aria-label] pre').count()) === 0) problems.push('no source file listed');
+    }
+    return problems;
+  }
+
+  test('the snippet audit: each rule, both ways', () => {
+    const exports = new Set(['ListReportTable', 'useListReport', 'Menu']);
+    const ok = `import { useState } from 'react';\nimport { ListReportTable, Menu } from '@formrail/core';\nfunction Local() { return <div />; }\nexport function App() { const [x] = useState(0); return <><Local /><Menu.Item /><ListReportTable aria-label="x" /><span>{x}</span></>; }`;
+    expect(auditSnippet(ok, exports)).toEqual([]);
+    expect(auditSnippet('// a comment, no JSX', exports)).toEqual([]);
+    expect(auditSnippet(`import { useListReport } from './use-list-report';`, exports)).toEqual([expect.stringContaining('relative import')]);
+    expect(auditSnippet(`import { x } from '@formrail/core/internal';`, exports)).toEqual([expect.stringContaining('internal import')]);
+    expect(auditSnippet(`import { userEvent } from 'storybook/test';`, exports)).toEqual([expect.stringContaining('Storybook import')]);
+    expect(auditSnippet('const onClick = fn();', exports)).toEqual(['Storybook `fn(`']);
+    expect(auditSnippet('const C = (args) => null;', exports)).toEqual(['Storybook `args`']);
+    expect(auditSnippet('const t = <TableDemo rows={[]} />;', exports)).toEqual([expect.stringContaining('<TableDemo>')]);
+    expect(auditSnippet('const t = <Nope.Item />;', exports)).toEqual([expect.stringContaining('<Nope.Item>')]);
+    // Several problems in one snippet: all reported.
+    expect(auditSnippet(`import { a } from '../a';\nconst t = <Showcase {...args} />;`, exports)).toHaveLength(3);
+  });
+
+  test('the public API is read from the index of core and Pro', () => {
+    const exports = publicExports(REPO_ROOT);
+    for (const name of ['ListReportTable', 'useListReport', 'ObjectPage', 'useDirtyGuard', 'ChangeSummary']) expect(exports, name).toContain(name);
+    expect(exports).not.toContain('TableDemo');
+  });
+
+  test('the Controls follow the Playground only after an example', () => {
+    const s = (id: string, ...tags: string[]) => ({ id, tags });
+    expect(controlsStory([s('a', EXAMPLE_TAG), s('b'), s('c', PLAYGROUND_TAG)])?.id).toBe('c');
+    expect(controlsStory([s('a', EXAMPLE_TAG), s('b')])?.id).toBe('a');
+    expect(controlsStory([s('a'), s('c', PLAYGROUND_TAG)])?.id).toBe('a');
+    expect(controlsStory([])).toBeUndefined();
+    expect(() => findPlayground([s('a', PLAYGROUND_TAG), s('b', PLAYGROUND_TAG)])).toThrow(/More than one/);
+  });
+
+  test('the GitHub URL is built in one place, on main', () => {
+    expect(githubSource('packages/core/src/showcase')).toBe('https://github.com/Utumno1984/formrail/blob/main/packages/core/src/showcase');
+    expect(githubSource('/a.ts')).toBe(`${REPOSITORY_MAIN}a.ts`);
+  });
+
+  test('PENDING lists only pages that exist and do not open with an example yet', async ({ request }) => {
+    const docs = new Map((await publicDocs(request)).map((d) => [d.id, d]));
+    for (const id of pending) {
+      expect(docs.has(id), `${id}: PENDING names no public Docs page (remove it)`).toBe(true);
+      const tags = docs.get(id)?.primary?.tags ?? [];
+      expect(tags, `${id}: opens with an example now, remove it from PENDING`).not.toContain(EXAMPLE_TAG);
+      expect(tags, `${id}: opens with a showcase source now, remove it from PENDING`).not.toContain(SHOWCASE_SOURCE_TAG);
+    }
+  });
+
+  test('every public Docs page outside PENDING opens with a copy-paste example', async ({ page, request }) => {
+    test.setTimeout(600_000);
+    const exports = publicExports(REPO_ROOT);
+    const pages = (await publicDocs(request)).filter((d) => !pending.has(d.id));
+    expect(pages.length, 'converted pages').toBeGreaterThan(10);
+    for (const { id, primary } of pages) expect(await auditPage(page, id, primary, exports), id).toEqual([]);
+  });
+
+  test('a page still on a demo wrapper fails the audit (negative)', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const exports = publicExports(REPO_ROOT);
+    const avatar = (await publicDocs(request)).find((d) => d.id === 'primitives-avatar--docs')!;
+    expect(await auditPage(page, avatar.id, avatar.primary, exports)).toEqual([expect.stringContaining('is not tagged')]);
+    // And the text rule itself, on a real wrapper story's "Show code" (the Playground's `<TableDemo>`).
+    await page.goto('/iframe.html?id=data-listreporttable--docs&viewMode=docs');
+    expect(auditSnippet(await openSource(page, 'anchor--data-listreporttable--playground'), exports)).toEqual([expect.stringContaining('<TableDemo>')]);
+  });
+
+  test('every example renders without errors', async ({ page, request }) => {
+    test.setTimeout(300_000);
+    const examples = (await indexEntries(request)).filter((e) => e.type === 'story' && e.tags?.includes(EXAMPLE_TAG));
+    expect(examples.length).toBeGreaterThan(10);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(String(error)));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    for (const { id } of examples) {
+      await page.goto(`/iframe.html?id=${id}&viewMode=story`);
+      await expect(page.locator('#storybook-root > *').first(), `${id}: nothing rendered`).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator('body'), `${id}: Storybook error display`).not.toHaveClass(/sb-show-errordisplay/);
+      expect(errors, id).toEqual([]);
     }
   });
 });
