@@ -92,6 +92,21 @@ describe('type reference: extraction (#402)', () => {
     expect(reference.entries.AccordionProps.members.every((m) => m.inheritedFrom === undefined)).toBe(true);
   });
 
+  it('Button size (#451): the text branch defaults to md, the icon branch (md is not an icon size) has no default', () => {
+    const sizes = reference.entries.ButtonProps.variants.map((v) => v.members.find((m) => m.name === 'size')).filter(Boolean);
+    // The icon branch is split by the accessible-name union: one variant per alternative.
+    const text = sizes.filter((m) => m.type === 'ButtonTextSize');
+    const icon = sizes.filter((m) => m.type === 'ButtonIconSize');
+    expect(text).toHaveLength(1);
+    expect(icon.length).toBeGreaterThan(0);
+    expect(text[0].optional).toBe(true);
+    expect(text[0].default).toBe("'md'");
+    for (const m of icon) {
+      expect(m.optional).toBe(false);
+      expect(m.default).toBeUndefined();
+    }
+  });
+
   it('a type with no members keeps its definition', () => {
     expect(reference.entries.ListReportSortDirection.definition).toBe("'asc' | 'desc'");
   });

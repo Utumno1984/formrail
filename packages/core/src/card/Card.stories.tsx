@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
@@ -74,6 +75,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: a card with header, body and footer action, as a region named by its title. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Card.example.tsx'),
+};
+
 /**
  * Controls: root element, title level, description, footer, container width. The play function
  * tabs to the footer "Edit" button, checks it has the focus and lies entirely inside the card
@@ -81,6 +88,7 @@ type Story = StoryObj<typeof meta>;
  * and checks the action; then checks that a `section` Card is a region named by its title.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { as: 'section' },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

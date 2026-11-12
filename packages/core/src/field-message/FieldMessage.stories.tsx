@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, within } from 'storybook/test';
 import { Input } from '../input/Input';
 import { FieldMessage } from './FieldMessage';
@@ -18,12 +19,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: a help message that turns into an error, wired to its input with aria-describedby. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('FieldMessage.example.tsx'),
+};
+
 /**
  * Controls: tone, id, text. The play function wires the message to a control the way the Field
  * ticket will: the message is the control's accessible description, and it is not a live region.
  * The real `Input` primitive (not a bare `<input>`): this story predates it (ticket #8, before #9).
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => (
     <div style={{ maxWidth: 320, display: 'grid', gap: 4 }}>
       <label htmlFor="fm-playground-password">Password</label>
