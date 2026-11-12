@@ -450,7 +450,9 @@ class Extractor {
         ...extraDocs(tags),
       };
       this.pendingDefaults.push(() => {
-        const fallback = this.defaultFor(description, tags, this.checker.getTypeOfSymbolAtLocation(symbol, location), siblings);
+        // A value equal to the member's own name is its text (`added: 'added'`), not a reference to itself.
+        const others = siblings.filter((s) => s !== symbol.name);
+        const fallback = this.defaultFor(description, tags, this.checker.getTypeOfSymbolAtLocation(symbol, location), others);
         if (fallback !== undefined) member.default = fallback;
       });
       if (declaredIn && declaredIn !== ownerName) member.inheritedFrom = declaredIn;
@@ -590,7 +592,8 @@ class Extractor {
         if (paramDecl && ts.isParameter(paramDecl) && paramDecl.initializer) out.default = oneLine(paramDecl.initializer.getText());
         else {
           this.pendingDefaults.push(() => {
-            const fallback = this.defaultFor(paramDescription, [], checker.getTypeOfSymbolAtLocation(param, declaration), siblings);
+            const others = siblings.filter((s) => s !== param.name);
+            const fallback = this.defaultFor(paramDescription, [], checker.getTypeOfSymbolAtLocation(param, declaration), others);
             if (fallback !== undefined) out.default = fallback;
           });
         }

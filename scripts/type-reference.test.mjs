@@ -17,6 +17,7 @@ import {
   joinInlineCodeSpans,
   presentDefault,
   publicEntries,
+  scanCodeSpans,
   referenceCompilerOptions,
 } from './type-reference.mjs';
 import { typeReferencePlugin, withTypeReference } from '../.storybook/type-reference-plugin.mjs';
@@ -402,6 +403,10 @@ describe('defaultOf / presentDefault: a default shown is a value of the type', (
     expect(member('ListReportColumn', 'searchable').default).toBe('true');
     expect(member('AccordionProps', 'orientation').default).toBe("'vertical'");
     expect(member('ListReportFilterBarProps', 'searchPlaceholder').default).toBe('searchLabel');
+    // A value equal to the member's own name is a string, not an expression (review round 3).
+    for (const name of ['added', 'removed', 'changed', 'from', 'to']) {
+      expect(member('ChangeSummaryValueLabels', name).default, name).toBe(`'${name}'`);
+    }
   });
 });
 
@@ -416,6 +421,17 @@ function regexSpans(paragraph) {
 describe('inline code spans: multiple backticks, stray backticks (review round 2, point 4)', () => {
   it('joins a double-backtick span broken over lines', () => {
     expect(joinInlineCodeSpans('Text ``x`y\nz`` end.')).toBe('Text ``x`y z`` end.');
+  });
+
+  it('a run of a different length inside a span does not close it (CommonMark)', () => {
+    expect(scanCodeSpans('`a``b`')).toEqual({ spans: [[0, 6]], unpaired: [] });
+  });
+
+  it('an escaped backtick opens no span; the guard names the one left unpaired', () => {
+    const text = '\\`a` and `x`';
+    expect(scanCodeSpans(text)).toEqual({ spans: [[3, 10]], unpaired: [11] });
+    const problems = findMarkdownProblems({ entries: { T: { name: 'T', kind: 'type', description: '', members: [{ name: 'm', description: text }] } } });
+    expect(problems).toEqual([expect.stringMatching(/^T\.m: unpaired backtick/)]);
   });
 
   it('a stray backtick pairs as CommonMark pairs it, and the guard names it', () => {
