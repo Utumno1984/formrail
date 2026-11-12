@@ -34,6 +34,20 @@ const ROW_FIELDS: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
 };
 
+/**
+ * Story-only (#384): the props of a Field for the help an addon gives it. A help takes the room the Field reserves
+ * for a one-line error (the same height: the gap and one caption line), so a help appearing or going away moves
+ * nothing below the Field; with an error shown as well, the Field grows by the help line. No help: no prop at all
+ * (the Field exactly as without an addon).
+ */
+export function helpProps(
+  fieldHelp: ((path: string) => ReactNode) | undefined,
+  path: string,
+): { help?: ReactNode; reserveMessageSpace?: boolean } {
+  const help = fieldHelp?.(path);
+  return help === undefined || help === null || help === false ? {} : { help, reserveMessageSpace: false };
+}
+
 export function InvoiceLineItems({ lines, baselineIds, onChange, fieldHelp }: InvoiceLineItemsProps) {
   const counterRef = useRef(0);
   // Which control takes the focus once the form shows the lines of the action. Target keys:
@@ -122,7 +136,7 @@ export function InvoiceLineItems({ lines, baselineIds, onChange, fieldHelp }: In
                     </Button>
                   </div>
                 </div>
-                <Field label={`Line ${n} description`} name={`lineItems.${i}.description`} required help={fieldHelp?.(`lineItems.${i}.description`)}>
+                <Field label={`Line ${n} description`} name={`lineItems.${i}.description`} required {...helpProps(fieldHelp, `lineItems.${i}.description`)}>
                   <Input
                     value={line.description}
                     onChange={(e) => update(i, { description: e.target.value })}
@@ -130,10 +144,10 @@ export function InvoiceLineItems({ lines, baselineIds, onChange, fieldHelp }: In
                   />
                 </Field>
                 <div style={ROW_FIELDS}>
-                  <Field label={`Line ${n} quantity`} name={`lineItems.${i}.quantity`} required help={fieldHelp?.(`lineItems.${i}.quantity`)}>
+                  <Field label={`Line ${n} quantity`} name={`lineItems.${i}.quantity`} required {...helpProps(fieldHelp, `lineItems.${i}.quantity`)}>
                     <Input inputMode="numeric" value={line.quantity} onChange={(e) => update(i, { quantity: e.target.value })} />
                   </Field>
-                  <Field label={`Line ${n} unit price`} name={`lineItems.${i}.unitPrice`} required help={fieldHelp?.(`lineItems.${i}.unitPrice`)}>
+                  <Field label={`Line ${n} unit price`} name={`lineItems.${i}.unitPrice`} required {...helpProps(fieldHelp, `lineItems.${i}.unitPrice`)}>
                     <Input inputMode="decimal" value={line.unitPrice} onChange={(e) => update(i, { unitPrice: e.target.value })} />
                   </Field>
                   <div style={{ display: 'grid', gap: 4, alignContent: 'start' }}>

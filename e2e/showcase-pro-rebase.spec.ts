@@ -396,33 +396,76 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
   });
 });
 
-test.describe('Pro showcase: the field with the focus never moves when the notice appears or goes away (#384) @engines', () => {
-  for (const scrolled of [false, true]) {
-    test(`Due date focused${scrolled ? ', page scrolled' : ''}: same top (1px) when the conflict appears and when it closes`, async ({ page }) => {
-      await page.setViewportSize({ width: 1280, height: 800 });
-      const record = await openRecord(page);
-      if (scrolled) await dueDate(page).evaluate((el) => el.scrollIntoView({ block: 'center' }));
-      await dueDate(page).fill('2026-03-05');
-      await expect(dueDate(page)).toBeFocused();
-      const before = await top(dueDate(page));
-      await serverPatch(page, record.id, { dueDate: '2026-03-12' });
-      await expect(conflicts(page)).toHaveCount(1);
-      await expect(dueDate(page)).toBeFocused();
-      expect(Math.abs((await top(dueDate(page))) - before)).toBeLessThanOrEqual(1);
-      // The conflict closes by itself (the server value typed by hand): the notice goes away.
-      await dueDate(page).fill('2026-03-12');
-      await expect(notice(page)).toHaveCount(0);
-      await expect(dueDate(page)).toBeFocused();
-      expect(Math.abs((await top(dueDate(page))) - before)).toBeLessThanOrEqual(1);
+test.describe('Pro showcase: no visible field moves when the notice appears or goes away (#384) @engines', () => {
+  interface Spot {
+    index: number;
+    top: number;
+    visible: boolean;
+  }
+  /** Every field of the page's scroller: its top and whether it is fully inside the scroller's visible box. */
+  const spots = (page: Page): Promise<Spot[]> =>
+    page.evaluate(() => {
+      const scroller = document.querySelector('[data-object-page-scroller]')!;
+      const box = scroller.getBoundingClientRect();
+      return [...scroller.querySelectorAll('input, [role="combobox"]')].map((el, index) => {
+        const r = el.getBoundingClientRect();
+        return { index, top: r.top, visible: r.top >= box.top && r.bottom <= box.bottom };
+      });
     });
+  /** The fields visible both times: none of them moved by more than 1px. Returns how many were compared. */
+  function expectStill(before: Spot[], after: Spot[]): number {
+    const pairs = before.filter((b) => b.visible && after[b.index]?.visible);
+    for (const b of pairs) expect(Math.abs(after[b.index]!.top - b.top), `field #${b.index}`).toBeLessThanOrEqual(1);
+    return pairs.length;
   }
 
-  test('Notes focused while typing: the notice appears above it, the field does not move', async ({ page }) => {
+  for (const focus of ['the Due date field', '"Simulate server update" (above the notice)', 'nothing'] as const) {
+    for (const scrolled of [false, true]) {
+      test(`focus on ${focus}, page ${scrolled ? 'scrolled' : 'at the top'}: the visible fields keep their place, the focus stays`, async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 800 });
+        const record = await openRecord(page);
+        await dueDate(page).fill('2026-03-05');
+        if (scrolled) await dueDate(page).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+        if (focus === '"Simulate server update" (above the notice)') await page.getByRole('button', { name: 'Simulate server update' }).focus();
+        if (focus === 'nothing') await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        const focused = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80));
+        const before = await spots(page);
+
+        // A conflict on the Due date: the notice appears.
+        await serverPatch(page, record.id, { dueDate: '2026-03-12' });
+        await expect(conflicts(page)).toHaveCount(1);
+        const shown = await spots(page);
+        expect(expectStill(before, shown)).toBeGreaterThanOrEqual(3);
+        expect(await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))).toBe(focused);
+
+        // The server comes to my date: nothing left to say, the notice goes away.
+        await serverPatch(page, record.id, { dueDate: '2026-03-05' });
+        await expect(notice(page)).toHaveCount(0);
+        expect(expectStill(before, await spots(page))).toBeGreaterThanOrEqual(3);
+        expect(await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80))).toBe(focused);
+      });
+    }
+  }
+
+  test('Notes focused while typing: the notice appears, the field does not move', async ({ page }) => {
     const record = await openRecord(page);
     await notes(page).click();
     const before = await top(notes(page));
     await serverPatch(page, record.id, { status: NEXT_STATUS[record.status], dueDate: laterBy(record.dueDate, 7) });
     await expect(notice(page)).toBeVisible();
     expect(Math.abs((await top(notes(page))) - before)).toBeLessThanOrEqual(1);
+  });
+
+  test('the notice sits above the page, in view, at the top and scrolled', async ({ page }) => {
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    await dueDate(page).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await serverPatch(page, record.id, { dueDate: '2026-03-12' });
+    await expect(notice(page)).toBeInViewport();
+    const [noticeBox, scrollerBox] = await Promise.all([
+      notice(page).boundingBox(),
+      page.locator('[data-object-page-scroller]').boundingBox(),
+    ]);
+    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(scrollerBox!.y + 1);
   });
 });

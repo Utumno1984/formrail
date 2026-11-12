@@ -8,6 +8,7 @@ import {
   type FocusEvent,
   type HTMLAttributes,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { Button, MessageStrip, cn, composeRefs } from '@formrail/core';
 import {
@@ -116,6 +117,12 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
    * returns nothing), the focus goes back to where it was before entering the notice.
    */
   focusTargetFor?: (conflict: RebaseConflict) => HTMLElement | null | undefined;
+  /**
+   * The scroll container whose content in view must not move (see "Layout"). Default: the nearest scroll
+   * container around the notice. Pass it when the notice sits OUTSIDE that container, right above it (the
+   * recommended place: the notice stays in view and the content does not move).
+   */
+  scrollContainerRef?: RefObject<HTMLElement | null>;
 }
 
 const RN = 'rop-pro-rebase-notice';
@@ -162,6 +169,9 @@ function scrollerOf(node: Element): Element {
   return node.ownerDocument.scrollingElement ?? node.ownerDocument.documentElement;
 }
 
+/** A control the user types in (kept in view by the layout rule), not a button or a link. */
+const TYPING_TARGET = 'input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable=""], [contenteditable="true"]';
+
 const isLost = (doc: Document): boolean => doc.activeElement === null || doc.activeElement === doc.body;
 
 /**
@@ -178,10 +188,14 @@ const isLost = (doc: Document): boolean => doc.activeElement === null || doc.act
  * keeps it while conflicts are resolved): pass the hook's array, not a copy made at every render.
  * The focus is never moved by an update (the user may be typing).
  *
- * **Layout**: inside a scroll container (an `ObjectPage`), when the notice appears, grows, shrinks or
- * goes away, the element that has the focus below it stays where it is on screen (the container is
- * scrolled by the same amount): a field the user is typing in never jumps. Without a focused element
- * below it the content moves as the browser's scroll anchoring decides.
+ * **Layout**: when the notice appears, grows, shrinks or goes away, the content in view does not move,
+ * whatever has the focus (a field the user is typing in never jumps): the scroll container is scrolled by
+ * as much as the content right after the notice was pushed (or let up). Recommended place: right ABOVE the
+ * page's scroll container, outside it, with `scrollContainerRef` (an `ObjectPage`'s scroller): the notice is
+ * always in view and takes its room from the top of the scroller, whose content does not move (only what was
+ * in the top strip of it scrolls out of view; a focused field there is scrolled back into view). Inside the
+ * container (the default) the content after it does not move either, but at the top of the page the notice
+ * itself may then be out of view. Never animated.
  *
  * **Focus**: when a choice removes the element that had the focus, the focus goes to the same choice of
  * the conflict that takes its place (the next one, else the previous one), else to `focusTargetFor(conflict)`
@@ -201,6 +215,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     locale,
     timeZone,
     focusTargetFor,
+    scrollContainerRef,
     className,
     onFocus,
     onBlur,
@@ -244,48 +259,61 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
   }, [applied, pending, conflicts.length, message, labels.title, labels.pending, labels.pendingNoChanges]);
 
   /* ---------------------------------------------------------------------------------------------- */
-  /* Layout: the focused element below the notice keeps its place on screen.                        */
+  /* Layout: the content in view never moves when the notice appears, grows, shrinks or goes away.   */
   /* ---------------------------------------------------------------------------------------------- */
-  const anchor = useRef<{ element: Element; top: number } | null>(null);
-  const lastHeight = useRef(0);
-  /** The focused element after the notice in the same scroll container, with its current top. */
-  const record = useCallback(() => {
-    const live = liveRef.current;
-    anchor.current = null;
-    if (!live) return;
-    const doc = live.ownerDocument;
-    const active = doc.activeElement;
-    if (!active || active === doc.body || stripRef.current?.contains(active)) return;
-    if (!(live.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING)) return;
-    if (!scrollerOf(live).contains(active)) return;
-    anchor.current = { element: active, top: active.getBoundingClientRect().top };
+  const containerRef = useRef(scrollContainerRef);
+  useIsomorphicLayoutEffect(() => {
+    containerRef.current = scrollContainerRef;
+  });
+  /** The element right after the notice (its own next sibling, else its parent's...), with its top. */
+  const after = useRef<{ element: Element; top: number } | null>(null);
+  const follower = useCallback((): Element | null => {
+    const start: Element | null = stripRef.current ?? liveRef.current;
+    for (let node: Element | null = start; node && node !== node.ownerDocument.body; node = node.parentElement) {
+      let next = node.nextElementSibling;
+      // The live region of this notice is not content (it is fixed and takes no room).
+      while (next && next === liveRef.current) next = next.nextElementSibling;
+      if (next) return next;
+    }
+    return null;
   }, []);
+  const record = useCallback(() => {
+    const element = follower();
+    after.current = element ? { element, top: element.getBoundingClientRect().top } : null;
+  }, [follower]);
 
   useIsomorphicLayoutEffect(() => {
-    const height = stripRef.current?.getBoundingClientRect().height ?? 0;
-    const held = anchor.current;
-    if (height !== lastHeight.current && held && held.element.isConnected && held.element === held.element.ownerDocument.activeElement) {
+    const live = liveRef.current;
+    const held = after.current;
+    if (live && held && held.element.isConnected && held.element === follower()) {
+      // What the notice pushed down (or let up) since the last record: the container scrolls by as much, so
+      // the content in view stays where it was, whatever has the focus.
       const delta = held.element.getBoundingClientRect().top - held.top;
-      if (delta !== 0 && liveRef.current) {
-        const scroller = scrollerOf(liveRef.current);
-        scroller.scrollTop += delta;
+      if (delta !== 0) {
+        const container = containerRef.current?.current ?? scrollerOf(live);
+        container.scrollTop += delta;
+        // A control the user is typing in that was in the top strip of the container, now covered, is brought
+        // back into view (a button, say "Back" in a header, may scroll away: the content does not move for it).
+        const active = live.ownerDocument.activeElement;
+        if (active instanceof HTMLElement && container !== active && container.contains(active) && active.matches(TYPING_TARGET)) {
+          const box = container.getBoundingClientRect();
+          const rect = active.getBoundingClientRect();
+          if (rect.top < box.top || rect.bottom > box.bottom) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
       }
     }
-    lastHeight.current = height;
     record();
   });
 
-  // Between two renders the anchor moves only by a scroll, a focus change or a resize: record it again then.
+  // Between two renders the content after the notice moves only by a scroll or a resize: record it again then.
   useEffect(() => {
     const doc = liveRef.current?.ownerDocument;
     const view = doc?.defaultView;
     if (!doc || !view) return undefined;
     doc.addEventListener('scroll', record, { capture: true, passive: true });
-    doc.addEventListener('focusin', record);
     view.addEventListener('resize', record);
     return () => {
       doc.removeEventListener('scroll', record, { capture: true });
-      doc.removeEventListener('focusin', record);
       view.removeEventListener('resize', record);
     };
   }, [record]);

@@ -1,7 +1,7 @@
 // Story-only: the invoice detail page, composed ONLY from the public Object Page pieces. Not exported
 // by the package. Spec §1.4: the editor is mounted already hydrated (`key` per record + `baseline` at
 // mount); a fetch in flight is a loading state, never an editor that is hydrated afterwards.
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Button } from '../button/Button';
 import { useConfirmDialog, type ConfirmOptions } from '../confirm-dialog/use-confirm-dialog';
 import { Field } from '../field/Field';
@@ -21,7 +21,7 @@ import { MessageStrip } from '../message-strip/MessageStrip';
 import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../calendar/date-math';
-import { InvoiceLineItems } from './InvoiceLineItems';
+import { InvoiceLineItems, helpProps } from './InvoiceLineItems';
 import { DECIMAL, isPlainPositive, isTooLarge, sameNumberText } from './number-text';
 import {
   sameLines,
@@ -114,11 +114,16 @@ export interface InvoiceEditorAddonContext {
   store: InvoiceStore;
   /** The editor's own conversion of a stored record into its values (the baseline of a save, of a load). */
   toValues: (record: StoredInvoice) => InvoiceFormValues;
+  /** The page's scroll container (the `ObjectPage` scroller), `null` before the first commit. */
+  scrollerRef: RefObject<HTMLElement | null>;
 }
 
 /** What `useAddons` adds to the editor; every key is optional and absent changes nothing. */
 export interface InvoiceEditorAddons {
-  /** Rendered right under the header, inside the page's scroller. */
+  /**
+   * Rendered ABOVE the page's scroller, outside it (#384, the "appears above the scroller" option): always in
+   * view, its height taken from the top of the scroller. Without it the editor's layout is unchanged.
+   */
   notice?: ReactNode;
   /** More header actions, after the editor's own. */
   actions?: ReactNode;
@@ -431,7 +436,13 @@ export function InvoiceEditor({
       console.warn('[showcase] InvoiceEditor: useAddons changed after the mount; the hook of the mount is kept (remount the editor with a `key` to change it).');
     }
   }, [useAddonsProp]);
-  const addons = useAddons({ form, record: record as StoredInvoice, store, toValues });
+  // The ObjectPage scroller, read from the DOM (the page does not expose it): a stable ref-like object.
+  const [scrollerRef] = useState<RefObject<HTMLElement | null>>(() => ({
+    get current() {
+      return frameRef.current?.querySelector<HTMLElement>('[data-object-page-scroller]') ?? null;
+    },
+  }));
+  const addons = useAddons({ form, record: record as StoredInvoice, store, toValues, scrollerRef });
   const reviewSave = addons.reviewSave ?? reviewSaveProp;
   const help = addons.fieldHelp;
   const frameRef = useRef<HTMLDivElement>(null);
@@ -534,8 +545,20 @@ export function InvoiceEditor({
   return (
     <div
       ref={frameRef}
-      style={{ height: 'var(--rop-demo-viewport-height, 100dvh)', boxSizing: 'border-box', display: 'grid', gridTemplateRows: 'minmax(0, 1fr)' }}
+      style={{
+        height: 'var(--rop-demo-viewport-height, 100dvh)',
+        boxSizing: 'border-box',
+        display: 'grid',
+        // #384: a row for the notice of an addon, above the page (none without one: the Free layout as before).
+        gridTemplateRows: addons.notice === undefined ? 'minmax(0, 1fr)' : 'auto minmax(0, 1fr)',
+      }}
     >
+      {addons.notice === undefined ? null : (
+        // At most 40% of the height: the page below keeps room to edit; a longer notice scrolls on its own.
+        <div data-editor-notice="" style={{ minWidth: 0, maxHeight: '40vh', overflowY: 'auto' }}>
+          {addons.notice}
+        </div>
+      )}
       <ValidationProvider fieldErrors={form.fieldErrors}>
         <ObjectPage labels={{ anchorBar: 'Sections' }}>
           <ObjectPageHeader
@@ -562,7 +585,6 @@ export function InvoiceEditor({
               </>
             }
           />
-          {addons.notice}
           <ObjectPageFooter
             visible={!deleted && (creating || form.isDirty)}
             label="Save actions"
@@ -595,7 +617,7 @@ export function InvoiceEditor({
               <Field label="Invoice number" state="locked" stateReason="The invoice number is assigned by the system.">
                 <Input value={record ? record.number : 'Assigned on save'} readOnly />
               </Field>
-              <Field label="Supplier" name="supplier" required help={help?.('supplier')}>
+              <Field label="Supplier" name="supplier" required {...helpProps(help, 'supplier')}>
                 <Select
                   options={SUPPLIER_OPTIONS}
                   placeholder="Choose a supplier"
@@ -604,7 +626,7 @@ export function InvoiceEditor({
                   onValueChange={(v) => setValue('supplier', v)}
                 />
               </Field>
-              <Field label="Status" name="status" help={help?.('status')}>
+              <Field label="Status" name="status" {...helpProps(help, 'status')}>
                 <Select
                   options={STATUS_OPTIONS}
                   emptyLabel="No options"
@@ -616,17 +638,17 @@ export function InvoiceEditor({
           </ObjectPageSection>
           <ObjectPageSection id="amount" title="Amount">
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
-              <Field label="Amount (EUR)" name="amount" required help={help?.('amount')}>
+              <Field label="Amount (EUR)" name="amount" required {...helpProps(help, 'amount')}>
                 <Input
                   inputMode="decimal"
                   value={values.amount}
                   onChange={(e) => setValue('amount', e.target.value)}
                 />
               </Field>
-              <Field label="Invoice date" name="date" help={help?.('date')}>
+              <Field label="Invoice date" name="date" {...helpProps(help, 'date')}>
                 <Input type="date" value={values.date} onChange={(e) => setValue('date', e.target.value)} />
               </Field>
-              <Field label="Due date" name="dueDate" help={help?.('dueDate')}>
+              <Field label="Due date" name="dueDate" {...helpProps(help, 'dueDate')}>
                 <Input type="date" value={values.dueDate} onChange={(e) => setValue('dueDate', e.target.value)} />
               </Field>
             </div>
@@ -641,7 +663,7 @@ export function InvoiceEditor({
           </ObjectPageSection>
           <ObjectPageSection id="notes" title="Notes">
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
-              <Field label="Notes" name="notes" help={help?.('notes')}>
+              <Field label="Notes" name="notes" {...helpProps(help, 'notes')}>
                 <Input value={values.notes} onChange={(e) => setValue('notes', e.target.value)} />
               </Field>
             </div>

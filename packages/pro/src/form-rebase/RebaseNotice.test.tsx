@@ -1,4 +1,4 @@
-import { act, createRef, useState, type ReactNode } from 'react';
+import { act, createRef, useRef, useState, type ReactNode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -427,57 +427,102 @@ describe('<RebaseNotice />: focus after a choice', () => {
   });
 });
 
-describe('<RebaseNotice />: the focused field below keeps its place', () => {
-  /** jsdom has no layout: the field's top is 100 without the strip, 100 + its height with it. */
-  function layout(field: HTMLElement, stripHeight: number) {
-    const rect = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+describe('<RebaseNotice />: the content in view never moves (#384, second review)', () => {
+  const rect = (top: number, height: number) =>
+    ({ top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+
+  /**
+   * jsdom has no layout. Inside the container: the element after the notice is at 100 without the strip, 100 +
+   * its height with it, minus the container's scroll. `strip` is the height the strip has when rendered.
+   */
+  function insideLayout(stripHeight: number) {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const notice = document.querySelector('.rop-pro-rebase-notice');
       const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
       if (this === notice) return rect(50, stripHeight);
-      if (this === field) return rect(100 + (notice ? stripHeight : 0) - scroller.scrollTop, 20);
+      if (this === scroller) return rect(0, 200);
+      if (this.matches('[aria-label="Due date"]')) return rect(100 + (notice ? stripHeight : 0) - scroller.scrollTop, 20);
+      if (this.matches('button')) return rect(10 - scroller.scrollTop, 20);
       return rect(0, 0);
     });
   }
 
-  function Page({ conflicts, focusAbove }: { conflicts: RebaseConflict[]; focusAbove?: boolean }) {
+  function Inside({ conflicts }: { conflicts: RebaseConflict[] }) {
     return (
       <div data-scroller="" style={{ overflowY: 'auto', height: 200 }}>
-        {focusAbove ? <button type="button">Above</button> : null}
+        <button type="button">Above</button>
         <RebaseNotice {...props({ conflicts })} />
         <input aria-label="Due date" />
       </div>
     );
   }
 
-  it('appearing and going away: the scroller is scrolled by the strip, the field does not move', () => {
+  for (const focus of ['the field after the notice', 'a button above the notice', 'nothing'] as const) {
+    it(`focus on ${focus}: appearing and going away scroll the container by as much, the field after it does not move`, () => {
+      const view = render(<Inside conflicts={[]} />);
+      const field = screen.getByRole('textbox', { name: 'Due date' });
+      const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+      insideLayout(80);
+      if (focus === 'the field after the notice') field.focus();
+      if (focus === 'a button above the notice') screen.getByRole('button', { name: 'Above' }).focus();
+      // The mocked layout replaces the real one: a resize makes the notice record where the content is now.
+      window.dispatchEvent(new Event('resize'));
+      const before = field.getBoundingClientRect().top;
+      view.rerender(<Inside conflicts={[DUE]} />);
+      expect(scroller.scrollTop).toBe(80);
+      expect(field.getBoundingClientRect().top).toBe(before);
+      view.rerender(<Inside conflicts={[]} />);
+      expect(scroller.scrollTop).toBe(0);
+      expect(field.getBoundingClientRect().top).toBe(before);
+      vi.restoreAllMocks();
+    });
+  }
+
+  it('outside the container, right above it (scrollContainerRef): the container scrolls by the notice, a covered focused field is brought back into view', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    function Page({ conflicts }: { conflicts: RebaseConflict[] }) {
+      const ref = useRef<HTMLDivElement>(null);
+      return (
+        <div>
+          <div data-notice-row="">
+            <RebaseNotice {...props({ conflicts, scrollContainerRef: ref })} />
+          </div>
+          <div data-page="">
+            <div data-scroller="" ref={ref} style={{ overflowY: 'auto', height: 200 }}>
+              <input aria-label="Top field" />
+              <input aria-label="Due date" />
+            </div>
+          </div>
+        </div>
+      );
+    }
     const view = render(<Page conflicts={[]} />);
-    const field = screen.getByRole('textbox', { name: 'Due date' });
     const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
-    layout(field, 80);
-    field.focus();
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const strip = document.querySelector('.rop-pro-rebase-notice') ? 80 : 0;
+      // The page (and its scroller) start below the notice; the fields move inside the scroller.
+      if (this.matches('[data-page]')) return rect(strip, 400);
+      if (this === scroller) return rect(strip, 200);
+      if (this.matches('[aria-label="Top field"]')) return rect(strip + 10 - scroller.scrollTop, 20);
+      if (this.matches('[aria-label="Due date"]')) return rect(strip + 150 - scroller.scrollTop, 20);
+      return rect(0, 0);
+    });
+    const due = screen.getByRole('textbox', { name: 'Due date' });
+    due.focus();
+    window.dispatchEvent(new Event('resize'));
+    const before = due.getBoundingClientRect().top;
     view.rerender(<Page conflicts={[DUE]} />);
     expect(scroller.scrollTop).toBe(80);
-    expect(field.getBoundingClientRect().top).toBe(100);
+    expect(due.getBoundingClientRect().top).toBe(before);
+    expect(scrollIntoView).not.toHaveBeenCalled();
     view.rerender(<Page conflicts={[]} />);
     expect(scroller.scrollTop).toBe(0);
-    expect(field.getBoundingClientRect().top).toBe(100);
-    expect(field).toHaveFocus();
-    vi.restoreAllMocks();
-  });
-
-  it('no compensation when the focus is above the notice or nowhere', () => {
-    const view = render(<Page conflicts={[]} focusAbove />);
-    const field = screen.getByRole('textbox', { name: 'Due date' });
-    const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
-    layout(field, 80);
-    screen.getByRole('button', { name: 'Above' }).focus();
-    view.rerender(<Page conflicts={[DUE]} focusAbove />);
-    expect(scroller.scrollTop).toBe(0);
-    view.rerender(<Page conflicts={[]} focusAbove />);
-    (document.activeElement as HTMLElement).blur();
-    view.rerender(<Page conflicts={[DUE]} focusAbove />);
-    expect(scroller.scrollTop).toBe(0);
+    expect(due.getBoundingClientRect().top).toBe(before);
+    // The focused field was in the top strip of the container: covered once the notice is there -> into view.
+    screen.getByRole('textbox', { name: 'Top field' }).focus();
+    view.rerender(<Page conflicts={[DUE]} />);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
   });
 });

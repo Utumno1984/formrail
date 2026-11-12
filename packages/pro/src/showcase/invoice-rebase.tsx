@@ -87,6 +87,9 @@ export const DELETED_TITLE = 'This invoice was deleted on the server';
 export const DELETED_TEXT = 'Your changes can no longer be saved. Go back to the list.';
 export const OVERWRITE_TITLE = 'You are overwriting a server change';
 
+/** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
+const NOTICE_MARGIN = { margin: '12px 16px' } as const;
+
 const LINE_ROW = /^lineItems\.(\d+)(?=\.|$)/;
 
 /**
@@ -171,7 +174,7 @@ function ReviewBody({ source }: { source: ReviewSource }) {
  * The hook plugged into the editor (`useAddons`). It never changes the order of its hooks: the editor calls it at
  * every render of an existing invoice.
  */
-export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEditorAddonContext, options: InvoiceRebaseOptions): InvoiceEditorAddons {
+export function useInvoiceRebase({ form, record, store, toValues, scrollerRef }: InvoiceEditorAddonContext, options: InvoiceRebaseOptions): InvoiceEditorAddons {
   const rebase = useFormRebase(form, {
     arrayIdKeys: INVOICE_REVIEW_ARRAY_ID_KEYS,
     labels: INVOICE_REVIEW_PATH_LABELS,
@@ -245,7 +248,7 @@ export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEdito
   const notice = (
     <>
       {deleted ? (
-        <MessageStrip tone="error" title={DELETED_TITLE}>
+        <MessageStrip tone="error" title={DELETED_TITLE} style={NOTICE_MARGIN}>
           {DELETED_TEXT}
         </MessageStrip>
       ) : null}
@@ -258,6 +261,9 @@ export function useInvoiceRebase({ form, record, store, toValues }: InvoiceEdito
         onAcceptAllTheirs={rebase.acceptAllTheirs}
         labels={{ title: NOTICE_TITLE }}
         focusTargetFor={fieldOf}
+        // Above the page's scroller, outside it: the content in view does not move when it appears or goes away.
+        scrollContainerRef={scrollerRef}
+        style={NOTICE_MARGIN}
         renderValue={renderInvoiceReviewValue}
         locale={REVIEW_LOCALE}
         timeZone="UTC"
