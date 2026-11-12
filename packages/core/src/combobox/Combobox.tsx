@@ -43,6 +43,7 @@ export interface ComboboxOption {
   value: string;
   /** Plain text: it is what the input shows and what the filter matches. */
   label: string;
+  /** Shown but not selectable: the arrow keys skip it and a click does nothing (`aria-disabled`). */
   disabled?: boolean;
 }
 

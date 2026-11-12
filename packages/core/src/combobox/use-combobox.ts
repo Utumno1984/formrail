@@ -14,12 +14,15 @@ import { composeRefs } from '../utils/compose-refs';
 import { defaultComboboxFilter } from './filter';
 
 export interface UseComboboxOptions<T> {
+  /** Every item; the hook filters them with the input text (`filteredItems`). */
   items: readonly T[];
+  /** Plain text of an item: what the input shows once it is selected and what the default filter matches. */
   itemToString: (item: T) => string;
   /** Unique, stable key of an item: option ids and "is this the selected one" derive from it. */
   itemToKey: (item: T) => string;
   /** Controlled selection (`null` = nothing selected). `undefined` leaves the hook uncontrolled. */
   selectedItem?: T | null;
+  /** Initial selection when uncontrolled, and the one `reset()` goes back to. Default `null`. */
   defaultSelectedItem?: T | null;
   /** Called only for a selection made by the user, once per gesture, never for the same item. */
   onSelectedItemChange?: (item: T | null) => void;
@@ -33,6 +36,7 @@ export interface UseComboboxOptions<T> {
   onInputValueChange?: (value: string) => void;
   /** Replaces the default filter. Receives the items and the current input text. */
   filter?: (items: readonly T[], inputValue: string) => readonly T[];
+  /** A disabled item is shown but never made active by the arrow keys and never selected by a click. */
   isItemDisabled?: (item: T) => boolean;
   /** Emptying the text and leaving the field clears the selection. Default: the selection stays. */
   clearOnEmpty?: boolean;
@@ -48,6 +52,7 @@ export interface UseComboboxReturn<T> {
   getInputProps: (props?: InputDomProps) => InputHTMLAttributes<HTMLInputElement> & {
     ref: (node: HTMLInputElement | null) => void | (() => void);
   };
+  /** Props for the listbox element: `role`, `id` (the input's `aria-controls`), and a mousedown that keeps the focus on the input. */
   getListboxProps: <E extends HTMLElement = HTMLElement>(props?: ElementDomProps<E>) => ElementDomProps<E>;
   /** `index` (position in `filteredItems`) is not used for tracking: options are tracked by key. */
   getOptionProps: <E extends HTMLElement = HTMLElement>(
@@ -55,13 +60,19 @@ export interface UseComboboxReturn<T> {
     index: number,
     props?: ElementDomProps<E>,
   ) => ElementDomProps<E>;
+  /** Whether the list is open. Keep the listbox mounted (e.g. `hidden`) while it is closed. */
   isOpen: boolean;
   /** Index in `filteredItems` of the active option; `-1` when closed or none. */
   activeIndex: number;
+  /** The items to render as options: `items` filtered by the input text (all of them while the input shows the selection). */
   filteredItems: readonly T[];
+  /** The effective selection (`null` = none). */
   selectedItem: T | null;
+  /** The text of the input: what the user is typing, else the text of the selection. */
   inputValue: string;
+  /** Opens the list (e.g. from a toggle button). */
   open: () => void;
+  /** Closes the list and clears the active option; the text and the selection are left as they are. */
   close: () => void;
   /**
    * Closes the list, drops what the user typed and restores the text of the selection; with an

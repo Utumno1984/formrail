@@ -3,7 +3,9 @@ import tailwindcss from '@tailwindcss/vite';
 import type { StorybookConfig } from '@storybook/react-vite';
 import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter, docgenRelativePaths } from './docgen.ts';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
-import { introductionPages, previewAnnotations, storyGlobs } from './story-globs.mjs';
+import { introductionPages, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
+// @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
+import { withTypeReference } from './type-reference-plugin.mjs';
 
 const config: StorybookConfig = {
   // Props tables: react-docgen-typescript, not Storybook's default react-docgen (ticket #401).
@@ -43,7 +45,7 @@ const config: StorybookConfig = {
   },
   // Core always; packages/pro unless STORYBOOK_EXCLUDE_PRO is set (Free deploy); only packages/pro with
   // STORYBOOK_EDITION=pro (Pro demo deploy). See story-globs.mjs.
-  stories: [...(storyGlobs() as string[]), ...(introductionPages() as string[])],
+  stories: [...(storyGlobs() as string[]), ...(introductionPages() as string[]), ...(referencePages() as string[]), ...(referenceFixtures() as string[])],
   // Docs tab (autodocs, MDX pages): addon-docs is a separate package since Storybook 9.
   addons: ['@storybook/addon-docs'],
   // Favicon for the manager (see manager-head.html).
@@ -83,4 +85,6 @@ const config: StorybookConfig = {
   }),
 };
 
-export default config;
+// The reference of hooks and types generated from the TSDoc (ticket #402), as a Vite plugin added after
+// `viteFinal` above: see type-reference-plugin.mjs.
+export default withTypeReference(config) as StorybookConfig;

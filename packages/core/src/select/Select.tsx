@@ -32,7 +32,9 @@ export type SelectSize = 'sm' | 'md';
 export interface SelectOption {
   /** Non-empty (the empty string is Radix's "no value" and is not accepted). Unique in the list. */
   value: string;
+  /** What the option shows, in the list and in the trigger once selected. Its plain text is what typeahead matches, unless `textValue` is set. */
   label: ReactNode;
+  /** Shown but not selectable, by pointer or keyboard (`aria-disabled`). */
   disabled?: boolean;
   /** Text used by typeahead. Default: the plain text of `label`. */
   textValue?: string;
