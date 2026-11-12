@@ -220,8 +220,9 @@ test.describe('Introduction page', () => {
   // Ticket #407, on the real `index.json`: the static guard (`scripts/docs-coverage.test.mjs`) reads the
   // sources; this one reads what the build publishes.
   test('every Docs link of the index opens an existing page, and every public Docs page is linked', async ({ page, request }) => {
-    const index = (await (await request.get('/index.json')).json()) as { entries: Record<string, { id: string; type?: string; title: string }> };
-    const docs = Object.values(index.entries).filter((e) => e.type === 'docs');
+    const index = (await (await request.get('/index.json')).json()) as { entries: Record<string, { id: string; type?: string; title: string; tags?: string[] }> };
+    // `internal` pages (test fixtures, e.g. the #403 audit fixtures) are not public pages: the Introduction does not link them.
+    const docs = Object.values(index.entries).filter((e) => e.type === 'docs' && !e.tags?.includes('internal'));
     const ids = new Set(docs.map((e) => e.id));
     const hrefs = await page.locator('a[href*="?path=/docs/"]').evaluateAll((links) => links.map((a) => a.getAttribute('href') ?? ''));
     const linked = new Set(hrefs.map((href) => /\?path=\/docs\/([^&#]+)/.exec(href)?.[1] ?? ''));
