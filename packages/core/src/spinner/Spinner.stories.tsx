@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
@@ -69,12 +70,19 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: a spinner shown while a panel loads, then the data, in a panel of stable height. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Spinner.example.tsx'),
+};
+
 /**
  * Controls: size, decorative, label. The play function clicks "Refresh": the spinner appears, its
  * status region says "Loading", and when the simulated load ends (`onLoaded` called once) the
  * spinner is gone and the panel shows the data.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole('status')).toBeNull();

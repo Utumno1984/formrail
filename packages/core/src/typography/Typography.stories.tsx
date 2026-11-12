@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Icon } from '../icon/Icon';
 import { Input } from '../input/Input';
+import { exampleStory } from '../internal/example-story';
 import { internalIcons } from '../internal/icons';
 import { Text } from './Text';
 import { Title } from './Title';
@@ -19,12 +20,15 @@ type Story = StoryObj<typeof meta>;
 type TextStory = StoryObj<typeof Text>;
 type TitleStory = StoryObj<typeof Title>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Typography.example.tsx') };
+
 /**
  * Controls drive every prop of `Text`. The play function proves that the HTML props reach the
  * element (click -> Actions panel) and that `mono` is independent of the variant: a caption in
  * monospace keeps the caption size and switches only the family.
  */
 export const TextPlayground: TextStory = {
+  tags: ['playground'],
   argTypes: {
     variant: { control: 'radio', options: ['body', 'caption', 'label'] },
     as: { control: 'select', options: ['p', 'span', 'div', 'label'] },

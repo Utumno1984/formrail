@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Avatar, type AvatarProps, type AvatarShape, type AvatarSize } from './Avatar';
@@ -89,8 +90,14 @@ const box = (el: HTMLElement) => {
   return { w: r.width, h: r.height };
 };
 
+/** Copy-paste example: initials, a photo and a square avatar; the name is the accessible name. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Avatar.example.tsx'),
+};
+
 /** Controls: name, src, size, shape, decorative, image behaviour (no play function: free to drive). */
-export const Playground: Story = {};
+export const Playground: Story = { tags: ['playground'] };
 
 /**
  * The play function waits for the photo, then clicks "Break the image" (the `src` changes to a URL

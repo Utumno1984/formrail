@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, within } from 'storybook/test';
 import { DescriptionList, DescriptionListItem } from '../description-list/DescriptionList';
 import { internalIcons } from '../internal/icons';
@@ -44,11 +45,18 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: badges for the five tones; the status is always carried by the text. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('StatusBadge.example.tsx'),
+};
+
 /**
  * Controls: tone, text, icon, container width. The play function checks that the badge is static
  * (no live role, no `aria-live`) and decorative-icon-only: the text is its whole accessible content.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { tone: 'warning', icon: internalIcons.warning },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

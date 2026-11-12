@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Text } from '../typography/Text';
@@ -90,6 +91,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: placeholders replaced by the content, in a container whose height does not change. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Skeleton.example.tsx'),
+};
+
 /**
  * A Skeleton is decorative: it is `aria-hidden` and never announces anything. Loading is
  * communicated on the container with `aria-busy="true"` (or with a Spinner / visible text). The play
@@ -97,6 +104,7 @@ type Story = StoryObj<typeof meta>;
  * `aria-busy="true"` to `"false"` and its height does not change.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { textVariant: 'body', lines: 2 },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

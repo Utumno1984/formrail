@@ -6,6 +6,7 @@ import { Button } from '../button/Button';
 import { Checkbox } from '../checkbox/Checkbox';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { exampleStory } from '../internal/example-story';
 import { storyControls } from '../internal/story-docs';
 import { RadioGroup, RadioGroupItem } from '../radio-group/RadioGroup';
 import { StatusBadge } from '../status-badge/StatusBadge';
@@ -230,13 +231,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Theming.example.tsx') };
+
 /**
  * Re-theme live: pick a preset or a custom primary colour and the Field, Buttons and StatusBadges
  * below change at once. Only CSS custom properties are redeclared (see `Foundations/Tokens` for the
  * full list); the components are the same.
  */
 export const Switcher: Story = {
-  tags: ['visual'],
+  tags: ['visual', 'playground'],
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole('radiogroup', { name: 'Theme' })).toBeInTheDocument();

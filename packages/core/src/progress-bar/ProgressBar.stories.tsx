@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
@@ -70,6 +71,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Copy-paste example: a named progress bar driven by an upload, with completion announced in a status line. */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ProgressBar.example.tsx'),
+};
+
 /**
  * Controls: value, indeterminate, tone, label. The play function checks the initial value, starts
  * a simulated upload with a click on "Start upload", waits for 100% and checks the final
@@ -77,6 +84,7 @@ type Story = StoryObj<typeof meta>;
  * does not contain) a live region.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const bar = canvas.getByRole('progressbar', { name: 'Uploading invoices' });

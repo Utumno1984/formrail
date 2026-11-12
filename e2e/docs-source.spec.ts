@@ -273,16 +273,13 @@ test.describe('copy-paste examples (#403)', () => {
     },
     Primitives: {
       ticket: 445,
-      max: 10,
-      pages: [
-        'primitives-avatar--docs', 'primitives-button--docs', 'primitives-card--docs', 'primitives-divider--docs', 'primitives-fieldmessage--docs',
-        'primitives-messagestrip--docs', 'primitives-progressbar--docs', 'primitives-skeleton--docs', 'primitives-spinner--docs', 'primitives-statusbadge--docs',
-      ],
+      max: 0,
+      pages: [],
     },
     Foundations: {
       ticket: 446,
-      max: 5,
-      pages: ['foundations-icon--docs', 'foundations-theming--docs', 'foundations-tokens--docs', 'foundations-typography--docs', 'foundations-utilities--docs'],
+      max: 0,
+      pages: [],
     },
     Pro: {
       ticket: 447,
@@ -291,7 +288,7 @@ test.describe('copy-paste examples (#403)', () => {
     },
   };
   /** The sum of the groups' `max`: the list only goes down from here. On a rebase, recompute it from the groups. */
-  const PENDING_MAX = 24;
+  const PENDING_MAX = 9;
   const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
 
   interface Entry {
