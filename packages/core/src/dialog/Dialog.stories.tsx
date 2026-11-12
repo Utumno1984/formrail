@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { exampleStory } from '../internal/example-story';
 import { settleMotion } from '../internal/settle-motion';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import {
@@ -111,11 +112,20 @@ function Panel({
 }
 
 /**
+ * Copy-paste example: a button opens a dialog with a title, a description, a body and Cancel / Save; focus stays inside until it closes and returns to the button.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Dialog.example.tsx'),
+};
+
+/**
  * Controls: `size` and `dismissible`; `onOpenChange` appears in Actions. The play function opens it
  * from the trigger, checks the modal semantics and the focus trap (Tab cycles inside), closes it with
  * Escape and checks the focus is back on the trigger.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ size, dismissible, onOpenChange }) => (
     <Page>
       <Dialog onOpenChange={onOpenChange}>
