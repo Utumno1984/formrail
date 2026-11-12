@@ -39,10 +39,12 @@ export function githubSource(repoPath: string): string {
  * JSX synthesized from the rendered tree. Spread it into the story and write the tags next to it:
  * `export const Example: Story = { tags: ['example', '!visual'], ...exampleStory(XExample, code) }`.
  */
-export function exampleStory(Example: ComponentType, code: string) {
+export function exampleStory<P extends object>(Example: ComponentType<P>, code: string, ...props: object extends P ? [] : [P]) {
+  // An example that takes what the app owns (a navigation callback) gets it from the story.
+  const given = (props[0] ?? {}) as P;
   return {
     parameters: { docs: { source: { code, language: 'tsx', type: 'code' as const } } },
-    render: () => createElement(Example),
+    render: () => createElement(Example, given),
   };
 }
 

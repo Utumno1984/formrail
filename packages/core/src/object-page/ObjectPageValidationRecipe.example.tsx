@@ -27,7 +27,8 @@ async function saveInvoice(values: Invoice): Promise<Invoice> {
   return values;
 }
 
-export function InvoiceEditor() {
+// `onBack`: your router's navigation back to the list (guarded below while there are unsaved changes).
+export function InvoiceEditor({ onBack }: { onBack: () => void }) {
   const form = useObjectPageForm<Invoice>({
     baseline: saved,
     validate: (values) => ({
@@ -46,7 +47,7 @@ export function InvoiceEditor() {
         <ObjectPageHeader
           title="Invoice INV-0142"
           actions={
-            <Button variant="secondary" onClick={() => guard(() => form.reset())}>
+            <Button variant="secondary" onClick={() => guard(onBack)}>
               Back to list
             </Button>
           }

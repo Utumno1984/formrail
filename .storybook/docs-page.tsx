@@ -60,7 +60,18 @@ export function FormrailDocsPage() {
       ) : (
         <Controls />
       )}
-      {others.length > 0 && <Heading>Stories</Heading>}
+      {others.length > 0 && (
+        <>
+          <Heading>Stories</Heading>
+          {/* Ticket #403: one note for every demo story of the page (they render through demo wrappers). */}
+          {isExample && (
+            <p data-demo-code-note>
+              Demo code: the &quot;Show code&quot; of the stories below prints each demo as written for this page (its
+              wrappers, fixtures and live Controls), not code to paste. Start from the example at the top of the page.
+            </p>
+          )}
+        </>
+      )}
       {others.map((story) => (
         <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
       ))}

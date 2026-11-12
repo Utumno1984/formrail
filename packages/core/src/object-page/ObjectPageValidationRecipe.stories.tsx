@@ -322,7 +322,7 @@ const footerStatus = (canvasElement: HTMLElement) =>
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(InvoiceEditor, invoiceEditorCode),
+  ...exampleStory(InvoiceEditor, invoiceEditorCode, { onBack: () => {} }),
 };
 
 /**

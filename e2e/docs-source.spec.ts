@@ -296,6 +296,9 @@ test.describe('copy-paste examples (#403)', () => {
     if (!primary || (!tags.includes(EXAMPLE_TAG) && !showcase)) return [`first story ${primary?.id ?? '(none)'} is not tagged "${EXAMPLE_TAG}" or "${SHOWCASE_SOURCE_TAG}"`];
     await page.goto(`/iframe.html?id=${docsId}&viewMode=docs`);
     const problems = auditSnippet(await openSource(page, `anchor--primary--${primary.id}`), known);
+    // The demo stories under the example (beyond the example and the Playground) carry the page's "demo code" note.
+    const blocks = await page.locator('.sbdocs-content [id^="anchor--"]').count();
+    if (!showcase && blocks > 2 && (await page.locator('.sbdocs-content [data-demo-code-note]').count()) !== 1) problems.push('no "demo code" note above the demo stories');
     if (showcase) {
       if ((await page.locator(`.sbdocs-content a[href^="${REPOSITORY_MAIN}"]`).count()) === 0) problems.push('no GitHub link to the source');
       if ((await page.locator('.sbdocs-content section[aria-label] pre').count()) === 0) problems.push('no source file listed');
