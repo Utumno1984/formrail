@@ -249,14 +249,15 @@ test.describe('copy-paste examples (#403)', () => {
   const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
   /**
-   * Public Docs pages not converted yet, by group of follow-up tickets. The list can only shrink: an entry whose
-   * page already opens with an example (or a showcase source) fails the test (remove it), an entry with no page
-   * fails too, and neither a group nor the total can grow (`max`, below). When the completion ticket of a
-   * group exists, write its number in `ticket`; converting a group lowers its `max` to what is left.
+   * Public Docs pages not converted yet, one group per completion ticket (`ticket`). The list can only shrink:
+   * an entry whose page already opens with an example (or a showcase source) fails the test (remove it), an
+   * entry with no page fails too, and neither a group nor the total can grow (`max`, below). A ticket touches
+   * the lines of its own group only: converting pages lowers the group's `max` to what is left, and a finished
+   * group stays as `{ ticket, max: 0, pages: [] }`.
    */
-  const PENDING: Record<string, { ticket: number | undefined; max: number; pages: string[] }> = {
+  const PENDING: Record<string, { ticket: number; max: number; pages: string[] }> = {
     Forms: {
-      ticket: undefined, // #403 follow-up: the ticket number goes here
+      ticket: 442,
       max: 13,
       pages: [
         'forms-calendar--docs', 'forms-checkbox--docs', 'forms-combobox--docs', 'forms-datepicker--docs', 'forms-field--docs',
@@ -265,27 +266,35 @@ test.describe('copy-paste examples (#403)', () => {
       ],
     },
     Overlays: {
-      ticket: undefined, // #403 follow-up: the ticket number goes here
+      ticket: 443,
       max: 6,
       pages: ['overlays-confirmdialog--docs', 'overlays-dialog--docs', 'overlays-menu--docs', 'overlays-sheet--docs', 'overlays-toast--docs', 'overlays-tooltip--docs'],
     },
-    'Primitives, Navigation, Foundations': {
-      ticket: undefined, // #403 follow-up: the ticket number goes here
-      max: 20,
+    Navigation: {
+      ticket: 444,
+      max: 5,
+      pages: ['navigation-accordion--docs', 'navigation-breadcrumb--docs', 'navigation-collapsible--docs', 'navigation-pagination--docs', 'navigation-tabs--docs'],
+    },
+    Primitives: {
+      ticket: 445,
+      max: 10,
       pages: [
-        'navigation-accordion--docs', 'navigation-breadcrumb--docs', 'navigation-collapsible--docs', 'navigation-pagination--docs', 'navigation-tabs--docs',
         'primitives-avatar--docs', 'primitives-button--docs', 'primitives-card--docs', 'primitives-divider--docs', 'primitives-fieldmessage--docs',
         'primitives-messagestrip--docs', 'primitives-progressbar--docs', 'primitives-skeleton--docs', 'primitives-spinner--docs', 'primitives-statusbadge--docs',
-        'foundations-icon--docs', 'foundations-theming--docs', 'foundations-tokens--docs', 'foundations-typography--docs', 'foundations-utilities--docs',
       ],
     },
+    Foundations: {
+      ticket: 446,
+      max: 5,
+      pages: ['foundations-icon--docs', 'foundations-theming--docs', 'foundations-tokens--docs', 'foundations-typography--docs', 'foundations-utilities--docs'],
+    },
     Pro: {
-      ticket: undefined, // #403 follow-up: the ticket number goes here
+      ticket: 447,
       max: 3,
       pages: ['pro-changesummary--docs', 'pro-floorplans-virtual-list-report--docs', 'pro-patterns-form-rebase--docs'],
     },
   };
-  /** Today's total (13 + 6 + 20 + 3): the list only goes down from here. */
+  /** The sum of the groups' `max`: the list only goes down from here. On a rebase, recompute it from the groups. */
   const PENDING_MAX = 42;
   const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
 
