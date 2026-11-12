@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
 import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
@@ -87,6 +88,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Tabs.example.tsx') };
+
 /**
  * Controls: activation mode, orientation, direction, keepMounted, number of tabs, disabled tab.
  * The play function types in the first panel, moves to the third tab with the arrow keys (the
@@ -94,6 +97,7 @@ type Story = StoryObj<typeof meta>;
  * to the first tab and checks that the typed value is still there (`keepMounted`).
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { tabCount: 4 },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);

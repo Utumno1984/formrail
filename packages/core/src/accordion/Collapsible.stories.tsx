@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './Collapsible';
@@ -36,12 +37,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Collapsible.example.tsx') };
+
 /**
  * Controls: initially open, disabled. The play function opens the panel with the keyboard (the
  * Actions panel logs `onOpenChange`), checks `aria-expanded` and the visible field, then closes it
  * and checks that the field is gone.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.tab();
