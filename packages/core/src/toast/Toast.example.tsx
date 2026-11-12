@@ -1,20 +1,26 @@
+import { useState } from 'react';
 import { Button, ToastProvider, useToast } from '@formrail/core';
 
 function SaveButton() {
   const toast = useToast();
+  const [saved, setSaved] = useState(false);
   return (
-    <Button
-      variant="primary"
-      onClick={() =>
-        toast.show({
-          tone: 'success',
-          description: 'Supplier note saved',
-          action: { label: 'Undo', onClick: () => undefined },
-        })
-      }
-    >
-      Save
-    </Button>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <Button
+        variant="primary"
+        onClick={() => {
+          setSaved(true);
+          toast.show({
+            tone: 'success',
+            description: 'Supplier note saved',
+            action: { label: 'Undo', onClick: () => setSaved(false) },
+          });
+        }}
+      >
+        Save
+      </Button>
+      <span data-testid="note-state">{saved ? 'Note saved' : 'Note not saved'}</span>
+    </div>
   );
 }
 

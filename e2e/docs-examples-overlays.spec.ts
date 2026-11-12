@@ -81,6 +81,8 @@ test.describe('Overlays/confirmdialog example', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Delete invoice' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveText('Invoice deleted');
+    // The trigger is disabled once the invoice is gone: the focus goes to the outcome message, never to <body>.
+    await expect(page.getByRole('status')).toBeFocused();
   });
 });
 
@@ -163,11 +165,15 @@ test.describe('Overlays/toast example', () => {
     await expect(region).toHaveCount(1);
     await expect(region).toBeEmpty();
     const save = page.getByRole('button', { name: 'Save' });
+    const state = page.getByTestId('note-state');
+    await expect(state).toHaveText('Note not saved');
     await save.click();
     await expect(region).toContainText('Supplier note saved');
+    await expect(state).toHaveText('Note saved');
     await expect(save).toBeFocused();
     await region.getByRole('button', { name: 'Undo' }).click();
     await expect(region).toBeEmpty();
+    await expect(state).toHaveText('Note not saved');
   });
 
   test('several clicks in a row leave a single toast', async ({ page }) => {
@@ -188,6 +194,7 @@ test.describe('Docs pages: the example is closed at load', () => {
     { id: 'sheet', trigger: 'Supplier detail', overlay: { role: 'dialog', name: 'Supplier detail' }, expanded: true },
     { id: 'confirmdialog', trigger: 'Delete invoice…', overlay: { role: 'dialog', name: 'Delete invoice 2026/0142?' }, expanded: false },
     { id: 'menu', trigger: 'More actions', overlay: { role: 'menu', name: undefined }, expanded: true },
+    { id: 'tooltip', trigger: 'Delete', overlay: { role: 'tooltip', name: undefined }, expanded: false },
   ] as const;
   for (const p of PAGES) {
     test(`overlays-${p.id}--docs`, async ({ page }) => {
@@ -200,4 +207,13 @@ test.describe('Docs pages: the example is closed at load', () => {
       await expect(trigger).not.toBeFocused();
     });
   }
+
+  // The Toast page: the example's live region is empty until the click, nothing is announced at load.
+  test('overlays-toast--docs', async ({ page }) => {
+    await page.goto('/iframe.html?id=overlays-toast--docs&viewMode=docs');
+    const frame: Root = page.frameLocator('iframe[id="iframe--overlays-toast--example"]');
+    await expect(frame.getByRole('button', { name: 'Save', exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(frame.getByRole('status')).toBeEmpty();
+    await expect(frame.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+  });
 });
