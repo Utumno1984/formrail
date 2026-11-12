@@ -127,8 +127,7 @@ import '@formrail/pro/styles.css'; //  2. pro component styles (consume the toke
 ```
 
 `@formrail/core/theme.css` is not a third import: it is the Tailwind v4 source of the core's mode (b),
-an alternative to the core `styles.css`, never loaded together with it (see the core README). In a
-Tailwind v4 project keep the core's mode (b) setup and add only `import '@formrail/pro/styles.css'`.
+an alternative to the core `styles.css`, never loaded together with it (see the core README).
 
 Pro's `styles.css` holds only its own `.rop-pro-*` component classes, never a Tailwind utility also
 emitted by core, so it cannot override core's responsive variants: the result does not depend on the
