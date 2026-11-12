@@ -134,7 +134,7 @@ describe('<RebaseNotice />: rendering', () => {
   });
 
   it('renderValue gets the labelPath of an open conflict (useFormRebase) as it is, never the label split on " > "', () => {
-    const renderValue = vi.fn((value: unknown) => String(value));
+    const renderValue = vi.fn((value: unknown, entry: ChangeEntry) => `${entry.path}=${String(value)}`);
     const open = { ...conflict('a.b', 'Size > large > Height', 1, 2), currentPath: 'a.b', labelPath: ['Size > large', 'Height'] };
     render(<RebaseNotice {...props({ conflicts: [open], renderValue })} />);
     expect(renderValue.mock.calls[0]![1]).toMatchObject({ labelPath: ['Size > large', 'Height'], label: 'Size > large > Height' });

@@ -4,6 +4,7 @@ import type {
   ChangeEntry,
   ChangeKind,
   ChangeSummaryOptions,
+  OpenRebaseConflict,
   RebaseConflict,
   RebaseOptions,
   RebaseResult,
@@ -80,6 +81,18 @@ describe('public types', () => {
       mineMissing: boolean;
       theirsMissing: boolean;
     }>();
+    expectTypeOf<OpenRebaseConflict>().toEqualTypeOf<{
+      path: string;
+      label: string;
+      base: unknown;
+      mine: unknown;
+      theirs: unknown;
+      baseMissing: boolean;
+      mineMissing: boolean;
+      theirsMissing: boolean;
+      currentPath: string;
+      labelPath: string[];
+    }>();
     expectTypeOf<RebaseResult<Invoice>>().toEqualTypeOf<{
       values: Invoice;
       baseline: Invoice;
@@ -93,7 +106,8 @@ describe('public types', () => {
     expectTypeOf<UseFormRebaseReturn<Invoice>>().toEqualTypeOf<{
       rebase: (incoming: Invoice) => void;
       applied: ChangeEntry[];
-      conflicts: RebaseConflict[];
+      // #384: the open conflicts carry their current position.
+      conflicts: OpenRebaseConflict[];
       acceptTheirs: (path: string) => void;
       keepMine: (path: string) => void;
       acceptAllTheirs: () => void;
