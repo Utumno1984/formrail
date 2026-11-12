@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import type { UseObjectPageFormReturn } from '@formrail/core';
 import type { ChangeEntry } from '../change-summary/types';
+import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
 import { MISSING, idMapKey, isPlainObject, itemId, own, type PlainObject } from '../internal/structural-diff';
 import { arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
 import type { RebaseConflict, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
@@ -110,9 +111,10 @@ function sameOrder(current: readonly unknown[], theirs: readonly unknown[], idKe
  * Applies the merge of `computeRebase` to a form of core's `useObjectPageForm`, through its public
  * API only (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`).
  *
- * **Applying a rebase**: in an effect after the render in which `rebase(incoming)` is called, with
- * the `baseline` and `values` of that render: `form.reset(incoming)` then `form.setValues(merged)`,
- * in one batch, so no render ever shows `values === incoming` in between (`isDirty` and the footer
+ * **Applying a rebase**: in a layout effect after the render in which `rebase(incoming)` is called,
+ * with the `baseline` and `values` of that render: `form.reset(incoming)` then
+ * `form.setValues(merged)`, in one batch, in the same task as that render (a passive effect could run
+ * after a keystroke the render did not see, and the merge would drop it), so no render ever shows `values === incoming` in between (`isDirty` and the footer
  * do not flicker). The form is dirty after it only when user edits are left against `incoming`.
  * `reset` clears `fieldErrors`, `formErrors` and `saveError`: validation runs again at the next
  * save. A top-level key cannot be removed through `setValues`; the core API never removes one
@@ -175,7 +177,7 @@ export function useFormRebase<Values extends object>(
     return !decisionDiffer(optionsRef.current).differs(record.theirs, current, record.node);
   }, []);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const prev = observedRef.current;
     observedRef.current = { baseline: form.baseline, values: form.values, isSaving: form.isSaving };
     const own = ownBaselineRef.current;

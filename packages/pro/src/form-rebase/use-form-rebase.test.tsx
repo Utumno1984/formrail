@@ -529,3 +529,60 @@ describe('useFormRebase: call sites', () => {
     error.mockRestore();
   });
 });
+
+describe('useFormRebase: typing while a rebase lands (#384)', () => {
+  /**
+   * A real keystroke can be dispatched between the commit of the render that holds the queued rebase and React's
+   * passive effects (scheduled for later): a microtask after that commit is such a moment. The merge must read
+   * the values that include it, never the ones of the render before it.
+   */
+  it('a keystroke right after the commit of the rebase render is not lost', async () => {
+    const global = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+    const actEnvironment = global.IS_REACT_ACT_ENVIRONMENT;
+    let handle: { form: UseObjectPageFormReturn<Invoice>; rebase: UseFormRebaseReturn<Invoice> } | undefined;
+    let commits = 0;
+    function Editor() {
+      const form = useObjectPageForm<Invoice>({ baseline: BASE });
+      const rebase = useFormRebase(form);
+      handle = { form, rebase };
+      commits += 1;
+      return (
+        <input
+          aria-label="Notes"
+          data-commit={commits}
+          value={form.values.notes}
+          onChange={(event) => form.setValue('notes', event.target.value)}
+        />
+      );
+    }
+    const view = render(<Editor />);
+    const input = view.getByRole('textbox', { name: 'Notes' }) as HTMLInputElement;
+    act(() => handle!.form.setValue('notes', 'Checked'));
+    const typed = 'Checked by finance';
+    // The native value setter, as a browser sets it before the `input` event (React tracks the old value).
+    const setNative = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    let observer: MutationObserver | undefined;
+    try {
+      global.IS_REACT_ACT_ENVIRONMENT = false;
+      const keystroke = new Promise<void>((resolve) => {
+        // The first commit after `rebase()`: the queued state is rendered, its effects not run yet.
+        observer = new MutationObserver(() => {
+          observer?.disconnect();
+          setNative.call(input, typed);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          resolve();
+        });
+        observer.observe(input, { attributes: true, attributeFilter: ['data-commit'] });
+      });
+      handle!.rebase.rebase({ ...BASE, amount: 99 });
+      await keystroke;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    } finally {
+      observer?.disconnect();
+      global.IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+    }
+    expect(handle!.form.values).toEqual({ ...BASE, notes: typed, amount: 99 });
+    expect(handle!.form.baseline).toEqual({ ...BASE, amount: 99 });
+    expect(input.value).toBe(typed);
+  });
+});
