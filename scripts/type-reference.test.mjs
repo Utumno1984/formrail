@@ -338,6 +338,9 @@ describe('defaultOf / presentDefault: a default shown is a value of the type', (
     ['no', literals('false', 'true'), 'false'],
     ['default', literals("'disabled'"), undefined],
     ['md', literals("'icon-sm'", "'icon-md'"), undefined],
+    // A closed set takes only its own values, not an expression or a sibling's name.
+    ['labels.size', literals("'sm'", "'md'"), undefined],
+    ['searchLabel', literals("'sm'", "'md'"), undefined],
     ['3', literals('1', '2', '3'), '3'],
     ['Next month', { literals: ['undefined'], string: true }, "'Next month'"],
     ['100%', { literals: [], string: true, number: true }, "'100%'"],
