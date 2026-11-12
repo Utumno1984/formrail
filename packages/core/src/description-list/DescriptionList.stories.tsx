@@ -1,8 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { InvoiceSummary } from './DescriptionList.example';
-import invoiceSummaryCode from './DescriptionList.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import {
@@ -135,7 +133,7 @@ const rect = (el: Element) => el.getBoundingClientRect();
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(InvoiceSummary, invoiceSummaryCode),
+  ...exampleStory('DescriptionList.example.tsx'),
 };
 
 /**

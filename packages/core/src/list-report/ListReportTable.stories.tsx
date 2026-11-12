@@ -2,9 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { addons } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { exampleStory } from '../internal/story-example';
-import { InvoiceTable } from './ListReportTable.example';
-import invoiceTableCode from './ListReportTable.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReportTable } from './ListReportTable';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
@@ -207,7 +205,7 @@ const INVOICES = makeInvoices(40);
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(InvoiceTable, invoiceTableCode),
+  ...exampleStory('ListReportTable.example.tsx'),
 };
 
 /**

@@ -99,6 +99,9 @@ export default tseslint.config(
           patterns: [
             { regex: '^\\.', message: 'A copy-paste example imports only the public packages by name (@formrail/core, @formrail/pro), never a relative path (ticket #403).' },
             { regex: '(^|/)internal(/|$)', message: 'A copy-paste example uses only public API: no `internal` module (ticket #403).' },
+            // Allow-list, extendable: `react` and the `@formrail/*` packages (the peers a consumer has installed
+            // to paste the example). Anything else (zod, a date library...) is a dependency the reader does not have.
+            { regex: '^(?!(react|@formrail/[\\w-]+)(/|$))[^.]', message: 'A copy-paste example imports only `react` and `@formrail/*` packages (the peers of the library); add a package to this list in eslint.config.js only if it is a declared peer dependency (ticket #403).' },
             { regex: '^(storybook|@storybook)(/|$)', message: 'A copy-paste example is plain React code: no Storybook import (fn, args, ...) (ticket #403).' },
           ],
         },

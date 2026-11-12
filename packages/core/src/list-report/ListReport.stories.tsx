@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { InvoiceList } from './ListReport.example';
-import invoiceListCode from './ListReport.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
@@ -218,7 +216,7 @@ const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(InvoiceList, invoiceListCode),
+  ...exampleStory('ListReport.example.tsx'),
 };
 
 /**

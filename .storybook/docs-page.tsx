@@ -12,14 +12,16 @@
 // GitHub link. Every other page renders exactly Storybook's own template (`DocsPage`), untouched.
 import { useContext } from 'react';
 import { Controls, Description, DocsContext, DocsPage, DocsStory, Heading, Primary, Source, Subheading, Subtitle, Title } from '@storybook/addon-docs/blocks';
-import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, githubSource, type SourceFile } from '../packages/core/src/internal/story-example';
+import type { PreparedStory } from 'storybook/internal/types';
+import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, githubSource, selectPageStories, type SourceFile } from '../packages/core/src/internal/story-example';
 
 function SourceFiles({ files }: { files: SourceFile[] }) {
   return (
     <>
       <Heading>Source</Heading>
+      {/* min-width 0 / overflow-x auto: a long line scrolls inside its own block and never widens the page. */}
       {files.map((file) => (
-        <section key={file.path} aria-label={file.path}>
+        <section key={file.path} aria-label={file.path} style={{ minWidth: 0, maxWidth: '100%', overflowX: 'auto' }}>
           <Subheading>{file.path}</Subheading>
           <p>
             {file.note} <a href={githubSource(file.path)}>View on GitHub</a>
@@ -32,19 +34,22 @@ function SourceFiles({ files }: { files: SourceFile[] }) {
 }
 
 export function FormrailDocsPage() {
-  const { componentStories } = useContext(DocsContext);
-  // The same selection as Storybook's `Primary` / `Stories` blocks: autodocs stories, no `mount` stories.
-  const all = componentStories();
-  const stories = all.some((s) => s.tags?.includes('autodocs')) ? all.filter((s) => s.tags?.includes('autodocs') && !s.usesMount) : all;
-  const [primary, ...rest] = stories;
+  const { componentStories, projectAnnotations, getStoryContext, filterByAutodocs } = useContext(DocsContext);
+  // The same selection as Storybook's `Primary` / `Stories` blocks, including `parameters.docs.stories.filter`
+  // (tags excluded from the Docs) and `filterByAutodocs`.
+  const configured = projectAnnotations.parameters?.docs?.stories?.filter as ((story: PreparedStory, context: unknown) => boolean) | undefined;
+  const { primary, others: selected } = selectPageStories(componentStories(), {
+    filter: configured && ((story) => configured(story, getStoryContext(story))),
+    filterByAutodocs,
+  });
   const isExample = !!primary?.tags?.includes(EXAMPLE_TAG);
   const isShowcase = !!primary?.tags?.includes(SHOWCASE_SOURCE_TAG);
   if (!primary || (!isExample && !isShowcase)) return <DocsPage />;
 
   // The Controls' story: the Playground after an example (the same rule the props-table guard reads).
-  const target = controlsStory(stories);
+  const target = controlsStory([primary, ...selected]);
   const playground = target !== primary ? target : undefined;
-  const others = rest.filter((s) => s !== playground);
+  const others = selected.filter((s) => s !== playground);
   const files = (primary.parameters?.docs as { sourceFiles?: SourceFile[] } | undefined)?.sourceFiles ?? [];
   return (
     <>
@@ -52,6 +57,12 @@ export function FormrailDocsPage() {
       <Subtitle />
       <Description of="meta" />
       <Primary />
+      {/* Ticket #403: the one thing the pasted file does not say (a page-level line, not inside the example). */}
+      {isExample && (
+        <p data-styles-reminder>
+          To use the example in your app, import the stylesheet once: <code>import &apos;@formrail/core/styles.css&apos;;</code>
+        </p>
+      )}
       {playground ? (
         <>
           <DocsStory of={playground.moduleExport} expanded __forceInitialArgs />

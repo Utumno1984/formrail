@@ -1,8 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { SupplierPage } from './ObjectPageAnchorBar.example';
-import supplierPageCode from './ObjectPageAnchorBar.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
@@ -92,7 +90,7 @@ const scrollerOf = (canvasElement: HTMLElement) => canvasElement.querySelector('
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(SupplierPage, supplierPageCode),
+  ...exampleStory('ObjectPageAnchorBar.example.tsx'),
 };
 
 /**

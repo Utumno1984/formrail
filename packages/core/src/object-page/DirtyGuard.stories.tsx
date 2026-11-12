@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { GuardedEditor } from './DirtyGuard.example';
-import guardedEditorCode from './DirtyGuard.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { storyControls } from '../internal/story-docs';
@@ -80,7 +78,7 @@ function Demo({ when, title, description, stay, leave, close, action }: DemoArgs
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(GuardedEditor, guardedEditorCode),
+  ...exampleStory('DirtyGuard.example.tsx'),
 };
 
 /**

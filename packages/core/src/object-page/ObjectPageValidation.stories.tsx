@@ -1,8 +1,6 @@
 import { useRef, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { NewSupplier } from './ObjectPageValidation.example';
-import newSupplierCode from './ObjectPageValidation.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { storyControls } from '../internal/story-docs';
@@ -133,7 +131,7 @@ const render = (args: ValidationArgs) => <ValidationDemo {...args} />;
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(NewSupplier, newSupplierCode),
+  ...exampleStory('ObjectPageValidation.example.tsx'),
 };
 
 /**

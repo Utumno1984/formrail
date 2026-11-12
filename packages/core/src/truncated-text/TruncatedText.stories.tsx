@@ -1,8 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { SupplierRow } from './TruncatedText.example';
-import supplierRowCode from './TruncatedText.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Tooltip, TooltipProvider } from '../tooltip/Tooltip';
@@ -75,7 +73,7 @@ async function settle(trigger: HTMLElement) {
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(SupplierRow, supplierRowCode),
+  ...exampleStory('TruncatedText.example.tsx'),
 };
 
 /**

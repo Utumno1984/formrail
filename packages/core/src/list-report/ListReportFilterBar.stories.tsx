@@ -1,8 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { FilteredInvoices } from './ListReportFilterBar.example';
-import filteredInvoicesCode from './ListReportFilterBar.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
@@ -135,7 +133,7 @@ const customers = (canvas: ReturnType<typeof within>): string[] =>
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(FilteredInvoices, filteredInvoicesCode),
+  ...exampleStory('ListReportFilterBar.example.tsx'),
 };
 
 /**

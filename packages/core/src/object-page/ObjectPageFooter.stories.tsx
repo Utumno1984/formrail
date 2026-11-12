@@ -1,8 +1,6 @@
 import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { EditInvoice } from './ObjectPageFooter.example';
-import editInvoiceCode from './ObjectPageFooter.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { z } from 'zod';
 import { Button } from '../button/Button';
@@ -97,7 +95,7 @@ const scrollerOf = (root: HTMLElement) => root.querySelector('[data-object-page-
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(EditInvoice, editInvoiceCode),
+  ...exampleStory('ObjectPageFooter.example.tsx'),
 };
 
 /**

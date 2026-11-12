@@ -1,8 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { InvoiceEditor } from './ObjectPageValidationRecipe.example';
-import invoiceEditorCode from './ObjectPageValidationRecipe.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { z } from 'zod';
 import { Button } from '../button/Button';
@@ -322,7 +320,7 @@ const footerStatus = (canvasElement: HTMLElement) =>
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(InvoiceEditor, invoiceEditorCode, { onBack: () => {} }),
+  ...exampleStory('ObjectPageValidationRecipe.example.tsx', { onBack: () => {} }),
 };
 
 /**

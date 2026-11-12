@@ -121,7 +121,8 @@ export function parseStoriesFile(source) {
       }
     }
     if (name === 'tags' && ts.isArrayLiteralExpression(value)) {
-      if (value.elements.some((el) => ts.isStringLiteralLike(el) && el.text === '!autodocs')) autodocs = false;
+      // `internal` fixtures are never public pages, even when they have a Docs page (e2e audit fixtures, #403).
+      if (value.elements.some((el) => ts.isStringLiteralLike(el) && (el.text === '!autodocs' || el.text === 'internal'))) autodocs = false;
     }
   }
   return title === null ? null : { title, components, autodocs };

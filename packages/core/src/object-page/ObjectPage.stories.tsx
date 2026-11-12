@@ -1,8 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { exampleStory } from '../internal/story-example';
-import { InvoicePage } from './ObjectPage.example';
-import invoicePageCode from './ObjectPage.example.tsx?raw';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
@@ -114,7 +112,7 @@ const statusBadge = (
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory(InvoicePage, invoicePageCode),
+  ...exampleStory('ObjectPage.example.tsx'),
 };
 
 /**

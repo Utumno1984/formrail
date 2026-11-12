@@ -96,3 +96,38 @@ export function auditSnippet(code: string, { exports, intrinsic }: KnownTags): s
   if (/\bargs\b/.test(code)) problems.push('Storybook `args`');
   return problems;
 }
+
+/** The text of a file as the page prints it: same lines, no trailing newline. */
+const withoutTrailingNewline = (text: string) => text.replace(/\r\n/g, '\n').replace(/\n+$/, '');
+
+/**
+ * What is wrong with a "Show code" text that must BE a file on disk (an example's `*.example.tsx`, a
+ * showcase's listed source): the file is missing, or the text differs from it (another file's code, or
+ * Storybook's synthesized source instead of the file). Compared whole, apart from the final newline.
+ */
+export function auditAgainstFile(shown: string, onDisk: string | undefined, file: string): string[] {
+  if (onDisk === undefined) return [`${file}: no such file on disk`];
+  if (withoutTrailingNewline(shown) === withoutTrailingNewline(onDisk)) return [];
+  return [`the printed code differs from ${file}`];
+}
+
+/** One listed source file of a showcase page, as the page renders it. */
+export interface ListedSource {
+  /** `aria-label` of the section: the repository path the page claims. */
+  label: string;
+  /** The section's heading. */
+  heading: string;
+  /** The "View on GitHub" link. */
+  href: string;
+  /** The printed code. */
+  shown: string;
+}
+
+/** What is wrong with a listed source: a path that is not in the repo, a heading or link that disagree with it, or another file's text. */
+export function auditListedSource(source: ListedSource, readRepoFile: (path: string) => string | undefined, sourceUrl: (path: string) => string): string[] {
+  const problems: string[] = [];
+  if (source.heading !== source.label) problems.push(`${source.label}: heading says "${source.heading}"`);
+  if (source.href !== sourceUrl(source.label)) problems.push(`${source.label}: link is ${source.href}`);
+  problems.push(...auditAgainstFile(source.shown, readRepoFile(source.label), source.label));
+  return problems;
+}

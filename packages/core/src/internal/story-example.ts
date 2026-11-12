@@ -2,7 +2,6 @@
 // readable source of the showcases. Shared by the core and Pro stories, by the Docs page template
 // (.storybook/docs-page.tsx) and by the guard that checks them (e2e/docs-source.spec.ts), so the three
 // agree on the same tags and the same repository URL by construction.
-import { createElement, type ComponentType } from 'react';
 
 /**
  * Tag of the story at the top of a Docs page that renders a copy-paste example: a `*.example.tsx` file next
@@ -33,21 +32,6 @@ export function githubSource(repoPath: string): string {
   return `${REPOSITORY_MAIN}${repoPath.replace(/^\/+/, '')}`;
 }
 
-/**
- * The story of a copy-paste example: renders the example's component and prints the example file's text
- * (`import code from './X.example.tsx?raw'`) as "Show code". `type: 'code'`: the text as written, never a
- * JSX synthesized from the rendered tree. Spread it into the story and write the tags next to it:
- * `export const Example: Story = { tags: ['example', '!visual'], ...exampleStory(XExample, code) }`.
- */
-export function exampleStory<P extends object>(Example: ComponentType<P>, code: string, ...props: object extends P ? [] : [P]) {
-  // An example that takes what the app owns (a navigation callback) gets it from the story.
-  const given = (props[0] ?? {}) as P;
-  return {
-    parameters: { docs: { source: { code, language: 'tsx', type: 'code' as const } } },
-    render: () => createElement(Example, given),
-  };
-}
-
 /** One source file shown on a showcase's Docs page, in a `Source` block with its GitHub link. */
 export interface SourceFile {
   /** Repository path (`packages/core/src/showcase/InvoiceCrud.tsx`): the heading and the GitHub link. */
@@ -56,6 +40,20 @@ export interface SourceFile {
   code: string;
   /** What the file is, and which of its imports are not public API (fixtures, story-only helpers). */
   note: string;
+}
+
+/**
+ * The files a showcase lists, from ONE source: `sources` is the stories file's own
+ * `import.meta.glob('./*.{ts,tsx}', { query: '?raw', import: 'default', eager: true })` and `notes` is keyed by
+ * the file name. The repository path and the text shown both derive from that name, so a renamed file or a
+ * path pointing at another file's text cannot happen (a name with no file throws).
+ */
+export function showcaseFiles(folder: string, sources: Record<string, string>, notes: Record<string, string>): SourceFile[] {
+  return Object.entries(notes).map(([name, note]) => {
+    const code = sources[`./${name}`];
+    if (code === undefined) throw new Error(`${folder}/${name}: no such file next to the stories (the showcase lists it)`);
+    return { path: `${folder}/${name}`, code, note };
+  });
 }
 
 /**
@@ -97,4 +95,28 @@ export function controlsStory<T extends TaggedStory>(stories: readonly T[]): T |
   const [primary, ...rest] = stories;
   if (!primary?.tags?.includes(EXAMPLE_TAG)) return primary;
   return findPlayground(rest) ?? primary;
+}
+
+/** What {@link selectPageStories} reads of a story. */
+export interface PageStory extends TaggedStory {
+  usesMount?: boolean;
+}
+
+/**
+ * The stories of a Docs page, selected exactly as Storybook's own `Primary` and `Stories` blocks do (the
+ * template renders those blocks' content itself, so it must not drift from them): the primary is the first
+ * autodocs story (the first story when `filterByAutodocs` is `false`, as for the docs of an external
+ * preview); the others are the stories left by `parameters.docs.stories.filter` (tags excluded from the Docs,
+ * `parameters.docs.disable`...), then, when any of those is tagged `autodocs`, only the autodocs ones without
+ * `mount` in their play function. The primary is never repeated among the others.
+ */
+export function selectPageStories<T extends PageStory>(
+  all: readonly T[],
+  options: { filter?: ((story: T) => boolean) | null; filterByAutodocs?: boolean } = {},
+): { primary: T | undefined; others: T[] } {
+  const autodocs = (story: T) => !!story.tags?.includes('autodocs');
+  const primary = options.filterByAutodocs === false ? all[0] : all.find(autodocs);
+  let others = options.filter ? all.filter(options.filter) : [...all];
+  if (others.some(autodocs)) others = others.filter((story) => autodocs(story) && !story.usesMount);
+  return { primary, others: others.filter((story) => story !== primary) };
 }

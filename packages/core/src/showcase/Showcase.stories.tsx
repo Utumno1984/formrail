@@ -1,11 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { githubSource, showcaseSource } from '../internal/story-example';
-import invoiceCrudCode from './InvoiceCrud.tsx?raw';
-import invoiceLineItemsCode from './InvoiceLineItems.tsx?raw';
-import invoiceListToRecordCode from './InvoiceListToRecord.tsx?raw';
-import invoiceRecordPageCode from './InvoiceRecordPage.tsx?raw';
-import invoiceStoreCode from './invoice-store.ts?raw';
+import { githubSource, showcaseFiles, showcaseSource } from '../internal/story-example';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { InvoiceCrud, type InvoiceCrudProps } from './InvoiceCrud';
 import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from './crud-story-args';
@@ -52,13 +47,16 @@ const SHOWCASE_FOLDER = 'packages/core/src/showcase';
 // Every file of the showcase lives inside the core package, so it imports the components by relative path:
 // in an app, those are imports from `@formrail/core`. What is NOT public API is said file by file.
 const IN_APP = 'Imports the components by relative path because it lives inside the core package: in your app, import them from `@formrail/core`.';
-const SOURCE_FILES = [
-  { path: `${SHOWCASE_FOLDER}/InvoiceCrud.tsx`, code: invoiceCrudCode, note: `The whole application: list, record page, create, delete and bulk delete, with toasts and confirmations. ${IN_APP} Not public: \`../internal/demo-invoices\` (fixture data), \`./invoice-api\`, \`./invoice-store\` (an in-memory server) and \`./showcase-router\` (a minimal router for the story).` },
-  { path: `${SHOWCASE_FOLDER}/InvoiceListToRecord.tsx`, code: invoiceListToRecordCode, note: `The List Report with URL state and scroll restoration, opening the record page. ${IN_APP} Not public: \`../internal/demo-invoices\`, \`./invoice-api\`, \`./invoice-store\`, \`./invoice-list-shared\`, \`./showcase-router\`.` },
-  { path: `${SHOWCASE_FOLDER}/InvoiceRecordPage.tsx`, code: invoiceRecordPageCode, note: `The Object Page: loading, form with a baseline, validation, error summary, save bar and dirty-guard. ${IN_APP} Not public: \`../calendar/date-math\` (an internal date helper), \`../internal/demo-invoices\`, \`./invoice-store\`, \`./showcase-data\`, \`./number-text\`, \`./invoice-lines\`.` },
-  { path: `${SHOWCASE_FOLDER}/InvoiceLineItems.tsx`, code: invoiceLineItemsCode, note: `The editable line items of an invoice. ${IN_APP} Not public: \`../internal/use-list-mutation-focus\` (where the focus goes after adding or removing a row) and \`./invoice-lines\`.` },
-  { path: `${SHOWCASE_FOLDER}/invoice-store.ts`, code: invoiceStoreCode, note: 'Fixture, not part of the library: the in-memory "server" the showcase reads from and saves to, with configurable delays and failures.' },
-];
+// The listed files' text and repository path both derive from the file name (`showcaseFiles` throws on a name
+// with no file next to this one), and e2e/docs-source.spec.ts compares what the page shows with the file on disk.
+const SOURCES = import.meta.glob<string>(['./*.{ts,tsx}', '!./*.{test,stories}.{ts,tsx}'], { query: '?raw', import: 'default', eager: true });
+const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
+  'InvoiceCrud.tsx': `The whole application: list, record page, create, delete and bulk delete, with toasts and confirmations. ${IN_APP} Not public: \`../internal/demo-invoices\` (fixture data), \`./invoice-api\`, \`./invoice-store\` (an in-memory server), \`./showcase-router\` (a minimal router for the story) and \`EMPTY_IDS\` from \`../list-report/use-list-report\` (an empty selection: write \`new Set<string>()\`).`,
+  'InvoiceListToRecord.tsx': `The List Report with URL state and scroll restoration, opening the record page. ${IN_APP} Not public: \`../internal/demo-invoices\`, \`./invoice-api\`, \`./invoice-store\`, \`./invoice-list-shared\`, \`./showcase-router\` and \`EMPTY_IDS\` from \`../list-report/use-list-report\` (an empty selection: write \`new Set<string>()\`).`,
+  'InvoiceRecordPage.tsx': `The Object Page: loading, form with a baseline, validation, error summary, save bar and dirty-guard. ${IN_APP} Not public: \`../calendar/date-math\` (an internal date helper), \`../internal/demo-invoices\`, \`./invoice-store\`, \`./showcase-data\`, \`./number-text\`, \`./invoice-lines\`.`,
+  'InvoiceLineItems.tsx': `The editable line items of an invoice. ${IN_APP} Not public: \`../internal/use-list-mutation-focus\` (where the focus goes after adding or removing a row) and \`./invoice-lines\`.`,
+  'invoice-store.ts': 'Fixture, not part of the library: the in-memory "server" the showcase reads from and saves to, with configurable delays and failures.',
+});
 
 const meta: Meta<RecordPageArgs> = {
   title: 'Showcase/Invoices',

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 // The Free CRUD showcase itself, from the core sources (one copy, never duplicated in packages/pro): see the
@@ -6,17 +7,16 @@ import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from '../../../core/src/s
 import { InvoiceCrud, type InvoiceCrudProps } from '../../../core/src/showcase/InvoiceCrud';
 import { storyControls } from '../../../core/src/internal/story-docs';
 import { invoiceSaveReview } from './invoice-review';
-import invoiceReviewCode from './invoice-review.tsx?raw';
 // Story-only helper of the core sources (same exception as the showcase imports above).
-import { githubSource, showcaseSource } from '../../../core/src/internal/story-example';
+import { githubSource, showcaseFiles, showcaseSource } from '../../../core/src/internal/story-example';
 
-const SOURCE_FILES = [
-  {
-    path: 'packages/pro/src/showcase/invoice-review.tsx',
-    code: invoiceReviewCode,
-    note: 'The review step plugged into the Free showcase through its `reviewSave` extension point: `ChangeSummary` against the saved record. In your app, import `ChangeSummary` from `@formrail/pro`. Not public: the relative imports of the Pro sources (`../change-summary/compute-change-summary`, `../change-summary/format-change-value`) and of the Free showcase (`../../../core/src/showcase/...`, fixtures and the record page).',
-  },
-];
+const SHOWCASE_FOLDER = 'packages/pro/src/showcase';
+// The listed file's text and repository path both derive from its name (see the Free showcase's stories).
+const SOURCES = import.meta.glob<string>(['./*.{ts,tsx}', '!./*.{test,stories}.{ts,tsx}'], { query: '?raw', import: 'default', eager: true });
+const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
+  'invoice-review.tsx':
+    'The review step plugged into the Free showcase through its `reviewSave` extension point: `ChangeSummary` against the saved record. In your app, import `ChangeSummary`, `computeChangeSummary`, `formatChangeValue` and the `ChangeEntry` type from `@formrail/pro` (this file reaches them through relative imports because it lives inside the Pro package). Not public: the relative imports of the Free showcase (`../../../core/src/showcase/...`: the record page, `number-text` and `showcase-data` fixtures).',
+});
 
 /*
  * The Pro Change Summary in a real flow: the SAME CRUD showcase as `Showcase/Invoices` (List Report -> Object
@@ -97,7 +97,7 @@ const otherStatus = (canvas: ReturnType<typeof within>): string =>
  */
 export const ReviewChanges: Story = {
   tags: ['showcase-source'],
-  parameters: showcaseSource('packages/pro/src/showcase', SOURCE_FILES),
+  parameters: showcaseSource(SHOWCASE_FOLDER, SOURCE_FILES),
   play: async ({ canvasElement, args }) => {
     const canvas = await openRecord(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
