@@ -7,76 +7,10 @@ import {
   defaultOf,
   findLeaks,
   findUndocumented,
-  gapKey,
   generateReference,
   publicEntries,
 } from './type-reference.mjs';
 import { typeReferencePlugin, withTypeReference } from '../.storybook/type-reference-plugin.mjs';
-
-/**
- * Gaps the props tables of ticket #401 (PR #436, still open when #402 was written) close in the SAME lines of
- * the component files (Radix props redeclared with TSDoc, the `TableName` / `Field` state unions documented).
- * Closing them here too would make the two PRs conflict line by line, so they are listed explicitly instead,
- * and the "still a real gap" test below fails as soon as one of them gets its TSDoc: whichever PR merges
- * second removes the entries it closed. The list may only shrink; never add a gap to it.
- */
-const PENDING_401 = new Set([
-  'DialogCloseProps.asChild',
-  'DialogContentProps.asChild',
-  'DialogTitleProps.asChild',
-  'DialogTriggerProps.asChild',
-  'FieldProps.state (Variant 2)',
-  'FieldProps.state (Variant 3)',
-  'FieldProps.stateReason (Variant 1)',
-  'FieldStateProps.state (Variant 2)',
-  'FieldStateProps.state (Variant 3)',
-  'FieldStateProps.stateReason (Variant 1)',
-  'ListReportTableProps.aria-label (Variant 1)',
-  'ListReportTableProps.aria-label (Variant 2)',
-  'ListReportTableProps.aria-label (Variant 3)',
-  'ListReportTableProps.aria-labelledby (Variant 1)',
-  'ListReportTableProps.aria-labelledby (Variant 2)',
-  'ListReportTableProps.aria-labelledby (Variant 3)',
-  'ListReportTableProps.caption (Variant 1)',
-  'ListReportTableProps.caption (Variant 2)',
-  'ListReportTableProps.caption (Variant 3)',
-  'MenuContentProps.alignOffset',
-  'MenuContentProps.arrowPadding',
-  'MenuContentProps.avoidCollisions',
-  'MenuContentProps.collisionBoundary',
-  'MenuContentProps.collisionPadding',
-  'MenuContentProps.hideWhenDetached',
-  'MenuContentProps.onEscapeKeyDown',
-  'MenuContentProps.onFocusOutside',
-  'MenuContentProps.onInteractOutside',
-  'MenuContentProps.onPointerDownOutside',
-  'MenuContentProps.sideOffset',
-  'MenuContentProps.sticky',
-  'MenuContentProps.updatePositionStrategy',
-  'MenuGroupProps.asChild',
-  'MenuItemProps.disabled',
-  'MenuItemProps.textValue',
-  'MenuLabelProps.asChild',
-  'MenuProps.children',
-  'MenuProps.defaultOpen',
-  'MenuProps.onOpenChange',
-  'MenuSeparatorProps.asChild',
-  'MultiSelectProps.labels',
-  'ObjectPageSectionProps.children',
-  'SheetCloseProps.asChild',
-  'SheetContentProps.asChild',
-  'SheetTitleProps.asChild',
-  'SheetTriggerProps.asChild',
-  'VirtualListReportTableProps.aria-label (Variant 1)',
-  'VirtualListReportTableProps.aria-label (Variant 2)',
-  'VirtualListReportTableProps.aria-label (Variant 3)',
-  'VirtualListReportTableProps.aria-labelledby (Variant 1)',
-  'VirtualListReportTableProps.aria-labelledby (Variant 2)',
-  'VirtualListReportTableProps.aria-labelledby (Variant 3)',
-  'VirtualListReportTableProps.caption (Variant 1)',
-  'VirtualListReportTableProps.caption (Variant 2)',
-  'VirtualListReportTableProps.caption (Variant 3)',
-]);
 
 // One program over both packages, shared by the tests below (about 2 s).
 let reference;
@@ -162,14 +96,8 @@ describe('type reference: extraction (#402)', () => {
 });
 
 describe('type reference: the TSDoc guard (#402)', () => {
-  it('every member of every type exported by core and Pro has TSDoc (except the gaps #401 closes)', () => {
-    const gaps = findUndocumented(reference).filter((message) => !PENDING_401.has(gapKey(message)));
-    expect(gaps).toEqual([]);
-  });
-
-  it('every entry of PENDING_401 is still a real gap (remove it once its TSDoc lands)', () => {
-    const current = new Set(findUndocumented(reference).map(gapKey));
-    expect([...PENDING_401].filter((key) => !current.has(key))).toEqual([]);
+  it('every member of every type exported by core and Pro has TSDoc, every public function too', () => {
+    expect(findUndocumented(reference)).toEqual([]);
   });
 });
 

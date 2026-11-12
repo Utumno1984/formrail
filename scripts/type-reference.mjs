@@ -472,9 +472,6 @@ export function findUndocumented(reference) {
   return [...new Set(problems)];
 }
 
-/** The stable part of a `findUndocumented` message (`Type.member` or `Type.member (Variant 2)`), without the source line. */
-export const gapKey = (message) => message.replace(/ \((?:packages|node_modules)\/[^)]*\): .*$/, '');
-
 /**
  * What must never reach a public page: the Pro-only `@formrail/core/internal` subpath, an inline
  * `import("...")` type (the checker's way of naming a type the entry does not import), an absolute path of
