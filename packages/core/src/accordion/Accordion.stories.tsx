@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Input } from '../input/Input';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger, type AccordionHeadingLevel } from './Accordion';
 
 interface DemoArgs {
@@ -75,13 +76,23 @@ const meta = {
   parameters: { layout: 'padded' },
   argTypes: {
     type: { control: 'radio', options: ['single', 'multiple'] },
-    collapsible: { control: 'boolean', description: 'Only `type="single"`: can the open item be closed.' },
+    collapsible: { control: 'boolean' },
     disabled: { control: 'boolean' },
     headingLevel: { control: 'select', options: [2, 3, 4, 5, 6] },
-    disabledItem: { control: 'select', options: ['none', 'shipping', 'billing'] },
-    open: { control: 'check', options: ['details', 'shipping', 'billing'] },
-    longLabel: { control: 'boolean' },
     onValueChange: { control: false },
+    // Set by the demo (`defaultValue` from the `open` control) or not used by it.
+    ...withoutControls('value', 'defaultValue', 'orientation', 'dir'),
+    disabledItem: storyControl({
+      control: 'select',
+      options: ['none', 'shipping', 'billing'],
+      description: 'Which item gets `disabled` on its `AccordionItem` (`none`: no one).',
+    }),
+    open: storyControl({
+      control: 'check',
+      options: ['details', 'shipping', 'billing'],
+      description: 'Items open at first, passed as `defaultValue` (the first one only with `type="single"`).',
+    }),
+    longLabel: storyControl({ control: 'boolean', description: 'Replaces the first label with a very long one (wrapping).' }),
   },
   args: {
     type: 'single',

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Spinner, type SpinnerProps } from './Spinner';
 
 interface DemoArgs extends SpinnerProps {
@@ -56,10 +57,10 @@ const meta = {
   parameters: { layout: 'padded' },
   argTypes: {
     size: { control: 'radio', options: ['xs', 'sm', 'md', 'lg', 'xl'] },
-    decorative: { control: 'boolean', description: 'aria-hidden, no role, no text' },
-    label: { control: 'text', description: 'Announced text (announced mode)' },
-    className: { control: false },
-    onLoaded: { control: false },
+    decorative: { control: 'boolean' },
+    label: { control: 'text' },
+    className: CLASS_NAME_ARG,
+    onLoaded: storyControl({ control: false, description: 'Called once when the simulated load of the demo\'s "Refresh" ends.' }),
   },
   args: { size: 'md', decorative: false, label: 'Loading', onLoaded: fn() },
   render: (args) => <RefreshPanel {...args} />,

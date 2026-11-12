@@ -14,6 +14,7 @@ export type ObjectPageSectionProps = Omit<HTMLAttributes<HTMLElement>, 'title' |
   id: string;
   /** Heading of the section. The region's accessible name is its text only (icons are left out). */
   title: ReactNode;
+  /** The section's content (fields, tables, ...), under its heading. */
   children?: ReactNode;
 };
 

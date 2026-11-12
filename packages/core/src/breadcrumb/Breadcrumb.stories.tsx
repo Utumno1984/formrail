@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { forwardRef, type AnchorHTMLAttributes } from 'react';
 import { expect, fn, userEvent, within } from 'storybook/test';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, type BreadcrumbProps } from './Breadcrumb';
 
 const SHORT = ['Home', 'Invoices', 'Suppliers', 'Acme', 'Orders', '2026-0142'];
@@ -27,12 +28,13 @@ const meta = {
   subcomponents: { BreadcrumbItem, BreadcrumbLink, BreadcrumbPage },
   parameters: { layout: 'padded' },
   argTypes: {
-    items: { control: { type: 'range', min: 1, max: 6, step: 1 }, description: 'Number of items (the last is the current page)' },
-    textLength: { control: 'select', options: ['short', 'long'] },
     separator: { control: 'select', options: ['chevron', 'slash'] },
-    width: { control: { type: 'range', min: 200, max: 800, step: 10 }, description: 'Demo container width (px)' },
-    className: { control: false },
-    onNavigate: { control: false },
+    'aria-label': { control: 'text' },
+    className: CLASS_NAME_ARG,
+    items: storyControl({ control: { type: 'range', min: 1, max: 6, step: 1 }, description: 'Number of `BreadcrumbItem`s (the last is the current page, `BreadcrumbPage`).' }),
+    textLength: storyControl({ control: 'select', options: ['short', 'long'], description: 'Short or long item labels (truncation).' }),
+    width: storyControl({ control: { type: 'range', min: 200, max: 800, step: 10 }, description: 'Width of the demo container (px).' }),
+    onNavigate: storyControl({ control: false, description: "Called by the demo's `BreadcrumbLink` `onClick` with the item's label." }),
   },
   args: { items: 3, textLength: 'short', separator: 'chevron', width: 480, onNavigate: fn() },
   render: ({ items, textLength, width, onNavigate, ...args }) => {

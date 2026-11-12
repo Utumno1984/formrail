@@ -14,15 +14,9 @@ const meta = {
   parameters: { layout: 'padded' },
   argTypes: {
     variant: { control: 'radio', options: VARIANTS },
-    // `ButtonProps` is an intersection with a union (the icon sizes require an accessible name), which the
-    // docgen cannot describe member by member: size, disabled and onClick are documented here.
-    size: {
-      control: 'select',
-      options: [...TEXT_SIZES, ...ICON_SIZES],
-      description:
-        'Height scale (`sm` 32px, `md` 36px, `lg` 44px), `inline` (one text line, for use inside a paragraph) or a square icon-only size (`icon-xs` 24px, `icon-sm` 32px, `icon-md` 36px), which requires `aria-label` or `aria-labelledby`.',
-      table: { type: { summary: "'sm' | 'md' | 'lg' | 'inline' | 'icon-xs' | 'icon-sm' | 'icon-md'" }, defaultValue: { summary: "'md'" } },
-    },
+    // `size`, `aria-label`, `aria-labelledby`: from the TSDoc of the union members (react-docgen-typescript).
+    // `disabled` and `onClick` are inherited `<button>` attributes (not in the docgen): described here.
+    size: { control: 'select', options: [...TEXT_SIZES, ...ICON_SIZES] },
     disabled: {
       control: 'boolean',
       description: 'Native `disabled`: not focusable, no click. With `asChild` it becomes `aria-disabled` and a blocked click.',

@@ -22,6 +22,8 @@ const SeparatorContext = /* @__PURE__ */ createContext<BreadcrumbSeparator>('che
 export interface BreadcrumbProps extends HTMLAttributes<HTMLElement> {
   /** Decorative separator between items. Default `chevron` (mirrored in RTL). */
   separator?: BreadcrumbSeparator;
+  /** Accessible name of the navigation landmark. Default "Breadcrumb" (pass your own for another language). */
+  'aria-label'?: string;
 }
 
 /**

@@ -19,6 +19,7 @@ import type {
 } from './types';
 import { useListReport } from './use-list-report';
 import { createMemoryUrlAdapter } from '../internal/memory-url-adapter';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { useListReportScrollRestoration } from './use-list-report-scroll-restoration';
 import { useListReportUrlState } from './use-list-report-url-state';
 
@@ -147,23 +148,42 @@ const meta: Meta<ShowcaseArgs> = {
   component: ListReport as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    status: { control: 'radio', options: ['ready', 'loading', 'error'], description: '`status` of `ListReport`' },
-    dataset: { control: 'select', options: [0, 3, 200], description: 'Rows of the invoice queue: none, 3 or 200' },
-    searchCommitDelay: {
+    status: { control: 'radio', options: ['ready', 'loading', 'error'] },
+    onRetry: { control: false },
+    // Set by the demo (`table` from useListReport, the title and actions, default texts and layout).
+    ...withoutControls(
+      'title',
+      'table',
+      'labels',
+      'titleLevel',
+      'actions',
+      'errorMessage',
+      'onClearFilters',
+      'loadingRowCount',
+      'filtersLabel',
+      'searchLabel',
+      'showSearch',
+      'scrollerRef',
+      'bulkActions',
+      'rowActions',
+      'rowActionsInline',
+      'ref',
+    ),
+    dataset: storyControl({ control: 'select', options: [0, 3, 200], description: 'Rows given to `useListReport({ rows })`: none, 3 or 200 invoices.' }),
+    searchCommitDelay: storyControl({
       control: 'select',
       options: [0, 300, 800, 'Enter only'],
-      description: '`searchCommitDelay` of `useListReport` (ms); "Enter only" = commits only on Enter',
-    },
-    firstSortDirection: {
+      description: 'An option of the hook, not a prop: `useListReport({ searchCommitDelay })` (ms); "Enter only" = `null`, commits only on Enter.',
+    }),
+    firstSortDirection: storyControl({
       control: 'radio',
       options: ['asc', 'desc'],
-      description: '`firstSortDirection` of the "Date" column: direction of the first click',
-    },
-    containerWidth: { control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Container width (px)' },
-    onSortChange: { control: false },
-    onFilterChange: { control: false },
-    onSearchQueryChange: { control: false },
-    onRetry: { control: false },
+      description: 'The `firstSortDirection` of the "Date" column (a column option of `useListReport({ columns })`): direction of the first click.',
+    }),
+    containerWidth: storyControl({ control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Width of the demo container (px).' }),
+    onSortChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSortChange })`.' }),
+    onFilterChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onFilterChange })`.' }),
+    onSearchQueryChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSearchQueryChange })`.' }),
     defaultFilter: { control: false, table: { disable: true } },
     defaultSearchQuery: { control: false, table: { disable: true } },
     flow: { control: false, table: { disable: true } },

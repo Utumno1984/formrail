@@ -379,5 +379,8 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
  *   sized; the first client render is identical (measured afterwards), so hydration does not mismatch.
  */
 export const VirtualListReportTable = /* @__PURE__ */ forwardRef(VirtualListReportTableImpl) as <Row>(
-  props: VirtualListReportTableProps<Row> & { ref?: Ref<HTMLDivElement> },
+  props: VirtualListReportTableProps<Row> & {
+    /** The table's scroll container (the focusable `<div>` around the `<table>`). */
+    ref?: Ref<HTMLDivElement>;
+  },
 ) => ReactElement | null;

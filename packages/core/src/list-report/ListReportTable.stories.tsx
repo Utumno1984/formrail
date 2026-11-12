@@ -5,6 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { exampleStory } from '../internal/story-example';
 import { InvoiceTable } from './ListReportTable.example';
 import invoiceTableCode from './ListReportTable.example.tsx?raw';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReportTable } from './ListReportTable';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
 import { useListReport } from './use-list-report';
@@ -151,31 +152,26 @@ const meta: Meta<PlaygroundArgs> = {
   component: ListReportTable as never,
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    maxHeight: { control: { type: 'range', min: 160, max: 700, step: 10 }, description: 'maxHeight of the scroll container (px)' },
-    containerWidth: { control: { type: 'range', min: 320, max: 1200, step: 10 }, description: 'Width of the demo box (px)' },
-    dir: { control: 'radio', options: ['ltr', 'rtl'] },
-    dateFirstSort: {
-      control: 'radio',
-      options: ['asc', 'desc'],
-      description: '`firstSortDirection` of the "Date" column',
-    },
-    status: {
-      control: 'radio',
-      options: ['ready', 'loading', 'error'],
-      description: '`loading` keeps the rows that are there (or shows the skeletons); `error` replaces the body',
-    },
-    loadingRowCount: {
-      control: { type: 'number', min: 0, max: 20, step: 1 },
-      description: 'Skeleton rows and minimum body height (rows)',
-    },
-    dataset: {
-      control: 'select',
-      options: ['empty', '3 rows', '40 rows', '200 rows', 'filter that excludes everything'],
-      description: 'The rows given to the table; "filter that excludes everything" starts with a filter that hides every row',
-    },
-    onSortChange: { control: false },
+    maxHeight: { control: { type: 'range', min: 160, max: 700, step: 10 } },
+    dir: { control: 'radio', options: ['ltr', 'rtl'], description: 'Native `dir` of the scroll container: `rtl` mirrors the columns and the scroll.' },
+    status: { control: 'radio', options: ['ready', 'loading', 'error'] },
+    loadingRowCount: { control: { type: 'number', min: 0, max: 20, step: 1 } },
     onRetry: { control: false },
     onClearFilters: { control: false },
+    // Set by the demo (`table` from useListReport, the name, the texts and row actions).
+    ...withoutControls('table', 'errorMessage', 'labels', 'rowActions', 'rowActionsInline', 'aria-label', 'aria-labelledby', 'caption', 'ref'),
+    containerWidth: storyControl({ control: { type: 'range', min: 320, max: 1200, step: 10 }, description: 'Width of the demo box (px).' }),
+    dateFirstSort: storyControl({
+      control: 'radio',
+      options: ['asc', 'desc'],
+      description: 'The `firstSortDirection` of the "Date" column (a column option of `useListReport({ columns })`).',
+    }),
+    dataset: storyControl({
+      control: 'select',
+      options: ['empty', '3 rows', '40 rows', '200 rows', 'filter that excludes everything'],
+      description: 'The rows given to `useListReport({ rows })`; "filter that excludes everything" starts with a filter that hides every row.',
+    }),
+    onSortChange: storyControl({ control: false, description: 'An option of the hook, not a prop of the table: `useListReport({ onSortChange })`.' }),
   },
   args: {
     maxHeight: 360,

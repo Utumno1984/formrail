@@ -6,6 +6,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { settleMotion } from '../internal/settle-motion';
+import { storyControls, withoutControls } from '../internal/story-docs';
 import { Select } from '../select/Select';
 import { Sheet,SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { ToastProvider } from './ToastProvider';
@@ -30,14 +31,23 @@ const meta: Meta<DemoArgs> = {
   // Overlays opened at mount, autofocus and history changes would take over the Docs page if the stories
   // were rendered inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '360px' } } },
+  // The controls are the options of one toast, `useToast().show({ ... })`: not props of `ToastProvider`
+  // (whose props are set by the decorator below, and listed in the table without controls).
   argTypes: {
-    tone: { control: 'radio', options: TONES },
-    duration: { control: 'select', options: DURATIONS },
-    title: { control: 'text' },
-    description: { control: 'text' },
-    withAction: { control: 'boolean' },
-    onDismiss: { control: false },
-    onActionClick: { control: false },
+    ...withoutControls('labels', 'hotkey', 'defaultDuration', 'children'),
+    ...storyControls({
+      tone: { control: 'radio', options: TONES, description: '`useToast().show({ tone })`: the colour and icon of the toast.' },
+      duration: {
+        control: 'select',
+        options: DURATIONS,
+        description: '`useToast().show({ duration })`: ms before it closes by itself; `persistent` passes `duration: null` (stays until dismissed).',
+      },
+      title: { control: 'text', description: '`useToast().show({ title })`: optional first line (empty: none).' },
+      description: { control: 'text', description: '`useToast().show({ description })`: the message.' },
+      withAction: { control: 'boolean', description: 'Adds `useToast().show({ action: { label: "Undo", onClick } })`: a button inside the toast.' },
+      onDismiss: { control: false, description: '`useToast().show({ onDismiss })`: called with the reason when the toast closes.' },
+      onActionClick: { control: false, description: "The `onClick` of the demo's `action`." },
+    }),
   },
   args: {
     tone: 'success',

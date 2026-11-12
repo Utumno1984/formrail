@@ -4,7 +4,9 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { ObjectPage } from './ObjectPage';
+import { ObjectPageFooter } from './ObjectPageFooter';
 import { ObjectPageHeader } from './ObjectPageHeader';
 import { ObjectPageSection } from './ObjectPageSection';
 
@@ -22,17 +24,19 @@ interface PlaygroundArgs {
 const meta: Meta<PlaygroundArgs> = {
   title: 'Floorplans/Object Page/Layout',
   component: ObjectPage,
-  subcomponents: { ObjectPageHeader, ObjectPageSection },
+  subcomponents: { ObjectPageHeader, ObjectPageSection, ObjectPageFooter },
   parameters: { layout: 'fullscreen' },
   argTypes: {
-    headingLevel: { control: 'select', options: [1, 2, 3, 4], description: 'Heading level of the header title; the sections use the next one' },
-    sectionCount: { control: { type: 'range', min: 1, max: 8, step: 1 }, description: 'Number of sections' },
-    title: { control: 'text' },
-    subtitle: { control: 'text' },
-    showActions: { control: 'boolean' },
-    showStatus: { control: 'boolean' },
-    onApprove: { control: false },
-    onReject: { control: false },
+    headingLevel: { control: 'select', options: [1, 2, 3, 4] },
+    // Set by the demo (default navigation and texts, the sections).
+    ...withoutControls('sectionNavigation', 'labels', 'children'),
+    title: storyControl({ control: 'text', description: 'Prop of `ObjectPageHeader` (see its tab): the record title.' }),
+    subtitle: storyControl({ control: 'text', description: 'Prop of `ObjectPageHeader` (see its tab): the line under the title.' }),
+    sectionCount: storyControl({ control: { type: 'range', min: 1, max: 8, step: 1 }, description: 'How many `ObjectPageSection`s the demo renders.' }),
+    showActions: storyControl({ control: 'boolean', description: 'Gives the header `actions` (Approve / Reject buttons).' }),
+    showStatus: storyControl({ control: 'boolean', description: 'Gives the header a status badge.' }),
+    onApprove: storyControl({ control: false, description: 'The header\'s "Approve" button.' }),
+    onReject: storyControl({ control: false, description: 'The header\'s "Reject" button.' }),
   },
   args: {
     headingLevel: 1,

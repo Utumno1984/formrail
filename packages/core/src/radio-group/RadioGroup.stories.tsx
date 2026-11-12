@@ -5,6 +5,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { RadioGroup, RadioGroupItem, type RadioGroupOrientation } from './RadioGroup';
 
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -27,19 +28,28 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/RadioGroup',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
-  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
-  subcomponents: { RadioGroup, RadioGroupItem },
+  // The stories drive the component through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: RadioGroup as never,
+  subcomponents: { RadioGroupItem },
   parameters: { layout: 'padded', docs: { description: { component: "RadioGroup: native `<input type=\"radio\">` items (`RadioGroupItem`) with roving focus, arrow-key selection, and `forced` / `locked` / `disabled` states through a surrounding `Field`." } } },
+  // The props' rows take their description from the TSDoc; only the controls are set here.
   argTypes: {
     orientation: { control: 'radio', options: ['vertical', 'horizontal'] satisfies RadioGroupOrientation[] },
-    // forced = value decided by a business rule; locked = not editable. Neither changes on click or arrows.
-    fieldState: { control: 'radio', options: STATES },
-    disabledItem: { control: 'select', options: ['none', ...OPTIONS.map((o) => o.value)] },
-    invalid: { control: 'boolean' },
-    required: { control: 'boolean' },
+    // Empty: none selected. The demo keeps it in local state.
     value: { control: 'select', options: ['', ...OPTIONS.map((o) => o.value)] },
     onValueChange: { control: false },
+    // Set by the demo itself, or by the surrounding `Field` (`disabled`, `aria-*`).
+    ...withoutControls('defaultValue', 'disabled', 'name', 'aria-invalid', 'aria-required', 'aria-readonly', 'children'),
+    // forced = value decided by a business rule; locked = not editable. Neither changes on click or arrows.
+    fieldState: storyControl({
+      control: 'radio',
+      options: STATES,
+      description: '`state` of the surrounding `Field` (`forced` / `locked`: neither clicks nor arrows change the value).',
+    }),
+    disabledItem: storyControl({ control: 'select', options: ['none', ...OPTIONS.map((o) => o.value)], description: 'Which `RadioGroupItem` gets `disabled` (`none`: no one).' }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
   },
   args: {
     orientation: 'vertical',

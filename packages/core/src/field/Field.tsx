@@ -15,18 +15,21 @@ import { ValidationContext } from './ValidationContext';
  */
 export type FieldStateProps =
   | {
-      /** `default` (editable), `disabled`, `forced` or `locked`. Default `default`. */
+      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. Default `default`. */
       state?: 'default';
+      /** Why the field is not editable, read by assistive technology through `aria-describedby`. Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`. */
       stateReason?: never;
     }
   | {
+      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. Default `default`. */
       state: 'disabled';
-      /** Why the field is disabled; read by assistive technology through `aria-describedby`. Optional here. */
+      /** Why the field is not editable, read by assistive technology through `aria-describedby`. Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`. */
       stateReason?: ReactNode;
     }
   | {
+      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. Default `default`. */
       state: 'forced' | 'locked';
-      /** Why the value cannot be changed (a business rule, permissions, the record's status). Required, and read by assistive technology. */
+      /** Why the field is not editable, read by assistive technology through `aria-describedby`. Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`. */
       stateReason: ReactNode;
     };
 
