@@ -46,6 +46,7 @@ function useMenuContext(part: string): MenuContextValue {
 }
 
 export interface MenuProps {
+  /** The `MenuTrigger` and the `MenuContent`. */
   children?: ReactNode;
   /**
    * Controlled open state. Whatever opens the menu (the trigger, or the application setting `open`),
@@ -53,7 +54,9 @@ export interface MenuProps {
    * `onOpenChange` reports the user's opening and closing, not the application's own changes.
    */
   open?: boolean;
+  /** Open state at mount, when `open` is not controlled. Default `false`. */
   defaultOpen?: boolean;
+  /** Called when the user opens or closes the menu (trigger, Escape, outside click, an item's selection). */
   onOpenChange?: (open: boolean) => void;
   /**
    * Modal (default `true`): the page behind is inert while the menu is open, and an outside click or
@@ -209,20 +212,67 @@ export const MenuTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, MenuTri
   },
 );
 
-export interface MenuContentProps extends Omit<
-  ComponentPropsWithoutRef<typeof RadixMenu.Content>,
-  'asChild' | 'forceMount'
-> {
+type RadixMenuContentProps = ComponentPropsWithoutRef<typeof RadixMenu.Content>;
+
+// The Radix props below are redeclared (same types) only to document them: Radix's own declarations
+// carry no description, or one this component does not honour (`onCloseAutoFocus`: the focus return
+// is `useReturnFocus`'s), and the props table shows the TSDoc of the declaration (ticket #401).
+export interface MenuContentProps extends Omit<RadixMenuContentProps, 'asChild' | 'forceMount'> {
   /**
    * Arrow-key navigation wraps from the last item to the first and back (default `true`). With
    * `false` it stops at the first / last item. (Radix's own default is `false`; this component
    * has always wrapped, so `true` is kept.)
    */
   loop?: boolean;
-  /** Default `bottom`. */
+  /** The side of the trigger the menu opens on. Default `bottom`. */
   side?: 'top' | 'right' | 'bottom' | 'left';
-  /** Default `start`. */
+  /** Alignment of the menu against the trigger. Default `start`. */
   align?: 'start' | 'center' | 'end';
+  /** Distance in px between the trigger and the menu. Default `4`. */
+  sideOffset?: RadixMenuContentProps['sideOffset'];
+  /** Offset in px from the `align` edge (`start` / `end`); ignored with `center`. Default `0`. */
+  alignOffset?: RadixMenuContentProps['alignOffset'];
+  /** Whether the menu flips side or shifts to stay inside the collision boundary. Default `true`. */
+  avoidCollisions?: RadixMenuContentProps['avoidCollisions'];
+  /** The element(s) the menu stays inside when `avoidCollisions` is on. Default: the viewport. */
+  collisionBoundary?: RadixMenuContentProps['collisionBoundary'];
+  /** Distance in px kept from the collision boundary edges (a number, or one per side). Default `8`. */
+  collisionPadding?: RadixMenuContentProps['collisionPadding'];
+  /** Padding in px between an arrow and the menu's corners. The menu draws no arrow, so it has no effect unless you add one. Default `0`. */
+  arrowPadding?: RadixMenuContentProps['arrowPadding'];
+  /** `partial` keeps the menu in the boundary on the align axis even when the trigger leaves it; `always` also keeps it when the trigger is fully out. Default `partial`. */
+  sticky?: RadixMenuContentProps['sticky'];
+  /** Hides the menu when the trigger is fully clipped out of view (e.g. scrolled away). Default `false`. */
+  hideWhenDetached?: RadixMenuContentProps['hideWhenDetached'];
+  /** `always` recomputes the position on every animation frame (for a trigger that moves without a scroll or resize); `optimized` only on layout changes. Default `optimized`. */
+  updatePositionStrategy?: RadixMenuContentProps['updatePositionStrategy'];
+  /** Called on Escape, before the menu closes. Call `event.preventDefault()` to keep it open. */
+  onEscapeKeyDown?: RadixMenuContentProps['onEscapeKeyDown'];
+  /**
+   * Called on a pointer press outside the menu, before it closes. Call `event.preventDefault()` to
+   * keep it open. Except for a touch tap outside a modal menu (the default): that one closes the menu
+   * at the press whatever the handler does, so the tap cannot reach the page underneath.
+   */
+  onPointerDownOutside?: RadixMenuContentProps['onPointerDownOutside'];
+  /**
+   * Called when the focus moves outside the menu. A modal menu (the default) never closes for it (the
+   * focus is kept inside); with `modal={false}` it closes, unless you call `event.preventDefault()`.
+   */
+  onFocusOutside?: RadixMenuContentProps['onFocusOutside'];
+  /**
+   * Called on any interaction outside the menu, right after `onPointerDownOutside` or
+   * `onFocusOutside`, with the same event. Call `event.preventDefault()` to keep it open, with the
+   * same exceptions: a touch tap outside a modal menu closes it whatever the handler does, and a
+   * focus moving out never closes a modal menu.
+   */
+  onInteractOutside?: RadixMenuContentProps['onInteractOutside'];
+  /**
+   * Called once the menu has closed and left the DOM. It does not control the focus: the menu
+   * returns it itself, to the element that had it before opening (normally the trigger; when Tab
+   * closed the menu, the focus moves on to the next element instead). So `event.preventDefault()` has no effect, and a focus moved from
+   * here can race with that return, which may run right after this call.
+   */
+  onCloseAutoFocus?: RadixMenuContentProps['onCloseAutoFocus'];
 }
 
 // Full literals (Tailwind scan). The stacking level is `overlayLayer.popover`, set on the element.
@@ -339,6 +389,10 @@ export interface MenuItemProps extends Omit<ComponentPropsWithoutRef<typeof Radi
   onSelect?: (event: Event) => void;
   /** `danger`: a destructive action; marked with a bar besides the colour. Name the action in the text ("Delete…"). */
   tone?: MenuItemTone;
+  /** Skipped by arrow keys and typeahead, and never calls `onSelect`. Default `false`. */
+  disabled?: boolean;
+  /** The text typeahead matches for this item. Default: the item's text content (set it when the content is not plain text). */
+  textValue?: string;
 }
 
 const ITEM =
@@ -373,7 +427,10 @@ export const MenuItem = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.I
 
 const GroupContext = /* @__PURE__ */ createContext<{ register: (id: string, on: boolean) => void } | null>(null);
 
-export type MenuGroupProps = ComponentPropsWithoutRef<typeof RadixMenu.Group>;
+export interface MenuGroupProps extends ComponentPropsWithoutRef<typeof RadixMenu.Group> {
+  /** Renders your single child element instead of the default `<div role="group">`, with the group's props merged onto it. */
+  asChild?: boolean;
+}
 
 /** A named set of items: its `MenuLabel`s (usually one) are the group's accessible name. */
 export const MenuGroup = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.Group>, MenuGroupProps>(
@@ -400,7 +457,10 @@ export const MenuGroup = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.
   },
 );
 
-export type MenuLabelProps = ComponentPropsWithoutRef<typeof RadixMenu.Label>;
+export interface MenuLabelProps extends ComponentPropsWithoutRef<typeof RadixMenu.Label> {
+  /** Renders your single child element instead of the default `<div>`, with the label's props merged onto it. */
+  asChild?: boolean;
+}
 
 const LABEL = 'select-none px-3 py-1.5 text-rop-caption font-semibold text-rop-text-muted';
 
@@ -419,7 +479,10 @@ export const MenuLabel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.
   },
 );
 
-export type MenuSeparatorProps = ComponentPropsWithoutRef<typeof RadixMenu.Separator>;
+export interface MenuSeparatorProps extends ComponentPropsWithoutRef<typeof RadixMenu.Separator> {
+  /** Renders your single child element instead of the default `<div role="separator">`, with the separator's props merged onto it. */
+  asChild?: boolean;
+}
 
 /** A `role="separator"` rule between items (its own, not the `Divider`). */
 export const MenuSeparator = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.Separator>, MenuSeparatorProps>(

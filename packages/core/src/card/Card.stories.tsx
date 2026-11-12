@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Card, CardBody, CardDescription, CardFooter, CardHeader, CardTitle, type CardProps, type CardTitleLevel } from './Card';
 
 const LEVELS: CardTitleLevel[] = [2, 3, 4, 5, 6];
@@ -26,13 +27,13 @@ const meta = {
   parameters: { layout: 'padded', docs: { story: { inline: false, height: '360px' } } },
   argTypes: {
     as: { control: 'radio', options: ['div', 'section', 'article'] },
-    level: { control: 'select', options: LEVELS, description: 'Heading level of the CardTitle' },
-    showDescription: { control: 'boolean' },
-    showFooter: { control: 'boolean' },
-    width: { control: { type: 'range', min: 240, max: 640, step: 10 }, description: 'Demo container width (px)' },
-    className: { control: false },
-    onEdit: { control: false },
-    onCancel: { control: false },
+    level: storyControl({ control: 'select', options: LEVELS, description: 'Prop of `CardTitle` (see its tab): the heading level of the title.' }),
+    className: CLASS_NAME_ARG,
+    showDescription: storyControl({ control: 'boolean', description: 'Renders a `CardDescription` under the title.' }),
+    showFooter: storyControl({ control: 'boolean', description: 'Renders a `CardFooter` with two buttons.' }),
+    width: storyControl({ control: { type: 'range', min: 240, max: 640, step: 10 }, description: 'Width of the demo container (px).' }),
+    onEdit: storyControl({ control: false, description: 'The footer\'s "Edit" button.' }),
+    onCancel: storyControl({ control: false, description: 'The footer\'s "Cancel" button.' }),
   },
   args: {
     as: 'div',

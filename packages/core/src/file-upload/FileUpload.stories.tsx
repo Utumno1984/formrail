@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { FileUpload, type FileRejection } from './FileUpload';
 
 const STATES: FieldState[] = ['default', 'disabled', 'forced', 'locked'];
@@ -25,17 +26,19 @@ const meta: Meta<DemoArgs> = {
   component: FileUpload,
   parameters: { layout: 'padded' },
   argTypes: {
-    // forced = value decided by a business rule; locked = not editable. Neither opens the picker or accepts a drop.
-    fieldState: { control: 'radio', options: STATES },
     multiple: { control: 'boolean' },
-    invalid: { control: 'boolean' },
-    required: { control: 'boolean' },
-    accept: { control: 'text', description: 'Same syntax as the native attribute; also applied to dropped files.' },
+    accept: { control: 'text' },
     maxFiles: { control: { type: 'number', min: 1, step: 1 } },
-    maxSize: { control: { type: 'number', min: 0, step: 100_000 }, description: 'Bytes.' },
-    fieldLabel: { control: 'text' },
+    maxSize: { control: { type: 'number', min: 0, step: 100_000 } },
     onValueChange: { control: false },
     onReject: { control: false },
+    // Set by the demo (a local controlled value, the default texts) or not used by it.
+    ...withoutControls('value', 'defaultValue', 'locale', 'labels', 'className'),
+    // forced = value decided by a business rule; locked = not editable. Neither opens the picker or accepts a drop.
+    fieldState: storyControl({ control: 'radio', options: STATES, description: '`state` of the surrounding `Field` (`forced` / `locked`: no picker, no drop).' }),
+    invalid: storyControl({ control: 'boolean', description: 'Gives the surrounding `Field` an `error`.' }),
+    required: storyControl({ control: 'boolean', description: '`required` of the surrounding `Field`.' }),
+    fieldLabel: storyControl({ control: 'text', description: '`label` of the surrounding `Field`.' }),
   },
   args: {
     fieldState: 'default',

@@ -45,9 +45,30 @@ export type ListReportTableStatus = 'ready' | 'loading' | 'error';
 
 /** The table must have an accessible name: at least one of the three. */
 type TableName =
-  | { 'aria-label': string; 'aria-labelledby'?: string; caption?: ReactNode }
-  | { 'aria-labelledby': string; 'aria-label'?: string; caption?: ReactNode }
-  | { caption: NonNullable<ReactNode>; 'aria-label'?: string; 'aria-labelledby'?: string };
+  | {
+      /** Accessible name of the table. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      'aria-label': string;
+      /** Id of the element that names the table. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      'aria-labelledby'?: string;
+      /** Visible `<caption>` of the table, which also names it. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      caption?: ReactNode;
+    }
+  | {
+      /** Id of the element that names the table. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      'aria-labelledby': string;
+      /** Accessible name of the table. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      'aria-label'?: string;
+      /** Visible `<caption>` of the table, which also names it. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      caption?: ReactNode;
+    }
+  | {
+      /** Visible `<caption>` of the table, which also names it. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      caption: NonNullable<ReactNode>;
+      /** Accessible name of the table. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      'aria-label'?: string;
+      /** Id of the element that names the table. Required: at least one of `aria-label`, `aria-labelledby`, `caption`. */
+      'aria-labelledby'?: string;
+    };
 
 export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'aria-label' | 'aria-labelledby'> & {
   /** What `useListReport` returned: the table only renders it. */

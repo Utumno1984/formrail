@@ -91,7 +91,10 @@ const ICON_SIZE: Record<ButtonSize, IconSize> = {
 
 type IconElement = ReactElement<SVGProps<SVGSVGElement>>;
 
-interface ButtonBaseProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+// `aria-label` / `aria-labelledby` are left out here and declared by every size branch below, with
+// the same TSDoc: an HTML declaration would add its generic text to theirs in the props table.
+interface ButtonBaseProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'aria-label' | 'aria-labelledby'> {
   /** Visual emphasis. Default `secondary`. */
   variant?: ButtonVariant;
   /**
@@ -111,8 +114,18 @@ interface ButtonBaseProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 }
 
 type AccessibleName =
-  | { 'aria-label': string; 'aria-labelledby'?: string }
-  | { 'aria-labelledby': string; 'aria-label'?: string };
+  | {
+      /** Accessible name. Required with the `icon-*` sizes (this or `aria-labelledby`): they have no visible text. */
+      'aria-label': string;
+      /** Id of the element that names the button. Required with the `icon-*` sizes (this or `aria-label`). */
+      'aria-labelledby'?: string;
+    }
+  | {
+      /** Id of the element that names the button. Required with the `icon-*` sizes (this or `aria-label`). */
+      'aria-labelledby': string;
+      /** Accessible name. Required with the `icon-*` sizes (this or `aria-labelledby`): they have no visible text. */
+      'aria-label'?: string;
+    };
 
 /**
  * Text sizes need nothing extra. The `icon-*` sizes have no visible text, so TypeScript requires an
@@ -122,11 +135,23 @@ type AccessibleName =
 export type ButtonProps = ButtonBaseProps &
   (
     | {
-        /** Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a paragraph). Default `md`. */
+        /**
+         * Height scale (`sm` 32px, `md` 36px, `lg` 44px), `inline` (one text line, for use inside a
+         * paragraph), or a square icon-only size (`icon-xs` 24px, `icon-sm` 32px, `icon-md` 36px), which
+         * requires `aria-label` or `aria-labelledby`: there is no visible text. Default `md`.
+         */
         size?: ButtonTextSize;
+        /** Accessible name. Required with the `icon-*` sizes (this or `aria-labelledby`): they have no visible text. */
+        'aria-label'?: string | undefined;
+        /** Id of the element that names the button. Required with the `icon-*` sizes (this or `aria-label`). */
+        'aria-labelledby'?: string | undefined;
       }
     | ({
-        /** Square icon-only button (24, 32 or 36px). Needs `aria-label` or `aria-labelledby`: there is no visible text. */
+        /**
+         * Height scale (`sm` 32px, `md` 36px, `lg` 44px), `inline` (one text line, for use inside a
+         * paragraph), or a square icon-only size (`icon-xs` 24px, `icon-sm` 32px, `icon-md` 36px), which
+         * requires `aria-label` or `aria-labelledby`: there is no visible text. Default `md`.
+         */
         size: ButtonIconSize;
       } & AccessibleName)
   );

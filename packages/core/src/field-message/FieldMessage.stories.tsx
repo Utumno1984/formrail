@@ -10,7 +10,7 @@ const meta = {
   argTypes: {
     tone: { control: 'radio', options: ['help', 'error'] },
     id: { control: 'text' },
-    children: { control: 'text' },
+    children: { control: 'text', description: 'The message text.' },
   },
   args: { id: 'field-message', tone: 'help', children: 'At least 8 characters.' },
 } satisfies Meta<typeof FieldMessage>;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { CLASS_NAME_ARG } from '../internal/story-docs';
 import { Pagination, type PaginationProps } from './Pagination';
 
 interface DemoArgs extends Omit<PaginationProps, 'onPageChange'> {
@@ -42,7 +43,7 @@ const meta = {
     boundaryCount: { control: { type: 'number', min: 0, max: 4 } },
     disabled: { control: 'boolean' },
     labels: { control: 'object' },
-    className: { control: false },
+    className: CLASS_NAME_ARG,
     onPageChange: { control: false },
   },
   args: { page: 1, pageCount: 120, siblingCount: 1, boundaryCount: 1, disabled: false, onPageChange: fn() },

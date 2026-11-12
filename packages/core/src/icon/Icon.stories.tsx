@@ -21,8 +21,9 @@ const meta = {
   parameters: { layout: 'padded' },
   argTypes: {
     size: { control: 'radio', options: SIZES },
-    label: { control: 'text', description: 'Empty = decorative (aria-hidden); filled = role="img" with this name' },
+    label: { control: 'text' },
     children: { control: false },
+    onClick: { description: 'Any HTML attribute is passed through to the rendered element (here `onClick`, logged in Actions).' },
   },
   args: { size: 'md', label: 'Error', children: internalIcons.error, onClick: fn() },
 } satisfies Meta<typeof Icon>;

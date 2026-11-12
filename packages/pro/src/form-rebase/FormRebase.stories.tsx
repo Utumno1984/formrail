@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useObjectPageForm } from '@formrail/core';
+import { storyControls } from '../../../core/src/internal/story-docs';
 import { computeRebase } from './compute-rebase';
 import { useFormRebase } from './use-form-rebase';
 
@@ -17,14 +18,15 @@ interface DemoArgs {
 const meta: Meta<DemoArgs> = {
   title: 'Pro/Patterns/Form rebase',
   parameters: { layout: 'padded' },
-  argTypes: {
+  // A hook page (`useFormRebase`): every control is a knob of the demo.
+  argTypes: storyControls({
     saveDelay: {
       control: { type: 'range', min: 0, max: 5000, step: 250 },
       description: 'Duration of the simulated save (ms). A server update pressed while saving is queued until the save settles.',
     },
-    onSave: { control: false },
-    onServerUpdate: { control: false },
-  },
+    onSave: { control: false, description: 'Called with the values sent by "Save".' },
+    onServerUpdate: { control: false, description: 'Called with the incoming version when "Simulate server update" is pressed.' },
+  }),
   args: {
     saveDelay: 1000,
     onSave: fn(),

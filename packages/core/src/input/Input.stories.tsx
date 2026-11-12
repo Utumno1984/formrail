@@ -47,12 +47,12 @@ const meta: Meta<DemoArgs> = {
     },
   },
   argTypes: {
-    size: { control: 'radio', options: SIZES, description: 'Height scale: `sm` 32px, `md` 36px.', table: { defaultValue: { summary: "'md'" } } },
+    size: { control: 'radio', options: SIZES },
     type: { control: 'select', options: TYPES, description: 'Native input type.' },
-    placeholder: { control: 'text' },
+    placeholder: { control: 'text', description: 'Native `placeholder`.' },
     disabled: { control: 'boolean', description: 'Native `disabled`. Inside a `Field`, prefer the `Field` `state`.' },
     readOnly: { control: 'boolean', description: 'Native `readOnly`: focusable, not editable.' },
-    onChange: { control: false },
+    onChange: { control: false, description: 'Native `onChange`.' },
   },
   args: {
     size: 'md',

@@ -4,6 +4,7 @@ import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Text } from '../typography/Text';
 import { Title } from '../typography/Title';
+import { CLASS_NAME_ARG, storyControl } from '../internal/story-docs';
 import { Skeleton, type SkeletonProps, type SkeletonTextVariant } from './Skeleton';
 
 interface DemoArgs extends SkeletonProps {
@@ -79,8 +80,8 @@ const meta = {
     lines: { control: { type: 'range', min: 0, max: 6, step: 1 } },
     width: { control: 'number' },
     height: { control: 'number' },
-    className: { control: false },
-    onLoad: { control: false },
+    className: CLASS_NAME_ARG,
+    onLoad: storyControl({ control: false, description: 'Called once when the simulated load of the demo card ends (the skeleton gives way to the content).' }),
   },
   args: { variant: 'text', textVariant: 'body', lines: 3, onLoad: fn() },
   render: (args) => <CardDemo {...(args as DemoArgs)} />,

@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Input } from '../input/Input';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Field, type FieldStateProps } from './Field';
 import type { FieldControlProps, FieldState } from './FieldContext';
 import { useFieldControl } from './useFieldControl';
@@ -36,24 +37,14 @@ const meta: Meta<PlaygroundArgs> = {
     error: { control: 'text' },
     required: { control: 'boolean' },
     hideLabel: { control: 'boolean' },
-    reserveMessageSpace: {
-      control: 'boolean',
-      description: 'Reserve one caption line for the error, so a one-line error appearing moves nothing below. Turn off for a Field that never shows one.',
-    },
-    // forced = value decided by a business rule; locked = not editable (permissions / record status).
-    // Same interaction: focusable, read-only, reason read by the screen reader.
-    state: {
-      control: 'radio',
-      options: STATES,
-      description: '`default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only.',
-      table: { defaultValue: { summary: "'default'" } },
-    },
-    stateReason: {
-      control: 'text',
-      description: 'Why the field is not editable, read by assistive technology. Required with `forced` and `locked`.',
-    },
-    placeholder: { control: 'text' },
-    onChange: { control: false },
+    reserveMessageSpace: { control: 'boolean' },
+    // `state` / `stateReason`: a union (`FieldStateProps`) read by react-docgen-typescript, TSDoc included.
+    state: { control: 'radio', options: STATES },
+    stateReason: { control: 'text' },
+    // Set by the demo (the Input child, a generated id).
+    ...withoutControls('children', 'id'),
+    placeholder: storyControl({ control: 'text', description: '`placeholder` of the demo\'s `Input` (the Field\'s child).' }),
+    onChange: storyControl({ control: false, description: '`onChange` of the demo\'s `Input` (the Field\'s child).' }),
   },
   args: {
     label: 'Company name',

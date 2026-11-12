@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { storyControls } from '../internal/story-docs';
 import {
   Dialog,
   DialogContent,
@@ -29,15 +30,16 @@ const meta: Meta<DemoArgs> = {
     layout: 'fullscreen',
     docs: { story: { inline: false, height: '360px' }, description: { component: "`useDirtyGuard({ when, labels })` protects a page with unsaved changes. `guard(action)` runs `action` right away when nothing is dirty, otherwise opens a confirmation dialog first (focus on \"Keep editing\", focus back on the opener when closed). The same dialog also intercepts the browser's Back/Forward, and a reload or tab close asks the browser for its own confirmation. Render the `dialog` the hook returns anywhere in the page." } },
   },
-  argTypes: {
-    when: { control: 'boolean' },
-    title: { control: 'text' },
-    description: { control: 'text' },
-    stay: { control: 'text' },
-    leave: { control: 'text' },
-    close: { control: 'text' },
-    action: { control: false },
-  },
+  // A hook page: the controls are the hook's options, not props.
+  argTypes: storyControls({
+    when: { control: 'boolean', description: '`useDirtyGuard({ when })`: there are unsaved changes (the guard is active).' },
+    title: { control: 'text', description: '`useDirtyGuard({ labels: { title } })`: the dialog title.' },
+    description: { control: 'text', description: '`useDirtyGuard({ labels: { description } })`: the dialog text.' },
+    stay: { control: 'text', description: '`useDirtyGuard({ labels: { stay } })`: the button that keeps editing (focused on open).' },
+    leave: { control: 'text', description: '`useDirtyGuard({ labels: { leave } })`: the button that confirms the exit.' },
+    close: { control: 'text', description: "`useDirtyGuard({ labels: { close } })`: accessible name of the dialog's close button (empty: the default)." },
+    action: { control: false, description: 'The guarded exit, `guard(action)`: called only when the exit is confirmed (or at once when clean).' },
+  }),
   args: {
     when: true,
     title: 'Unsaved changes',

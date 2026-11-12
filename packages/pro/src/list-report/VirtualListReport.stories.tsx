@@ -10,8 +10,9 @@ import {
   type ListReportColumn,
   type ListReportFilter,
 } from '@formrail/core';
+import { storyControl, withoutControls } from '../../../core/src/internal/story-docs';
 import { VirtualListReport } from './VirtualListReport';
-import type { VirtualListReportTableHandle } from './VirtualListReportTable';
+import { VirtualListReportTable, type VirtualListReportTableHandle } from './VirtualListReportTable';
 import { DEMO_STATUS_LABEL, formatAmount, makeDemoRows, type DemoRow } from './demo-rows';
 
 const FILTERS: ListReportFilter<DemoRow>[] = [
@@ -125,6 +126,8 @@ async function scrollTable(canvasElement: HTMLElement, top: number) {
 
 const meta: Meta<DemoArgs> = {
   title: 'Pro/Floorplans/Virtual List Report',
+  component: VirtualListReport as never,
+  subcomponents: { VirtualListReportTable: VirtualListReportTable as never },
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -138,18 +141,40 @@ const meta: Meta<DemoArgs> = {
     },
   },
   argTypes: {
-    rowCount: { control: 'select', options: [50, 1000, 100_000], description: 'Rows in the dataset (deterministic, generated once)' },
-    virtualizeThreshold: { control: { type: 'number', min: 0, step: 50 }, description: '`virtualizeThreshold`: results from which the rows are virtualized' },
-    overscan: { control: { type: 'number', min: 0, max: 50, step: 1 }, description: '`overscan`: rows mounted above and below the viewport' },
-    rowHeight: {
+    virtualizeThreshold: { control: { type: 'number', min: 0, step: 50 } },
+    overscan: { control: { type: 'number', min: 0, max: 50, step: 1 } },
+    // Set by the demo (`table` from useListReport, title, actions, texts, the handle).
+    ...withoutControls(
+      'title',
+      'status',
+      'table',
+      'titleLevel',
+      'actions',
+      'errorMessage',
+      'onRetry',
+      'onClearFilters',
+      'loadingRowCount',
+      'filtersLabel',
+      'searchLabel',
+      'showSearch',
+      'scrollerRef',
+      'bulkActions',
+      'rowActions',
+      'rowActionsInline',
+      'handleRef',
+      'labels',
+      'ref',
+    ),
+    rowCount: storyControl({ control: 'select', options: [50, 1000, 100_000], description: 'Rows given to `useListReport({ rows })` (deterministic, generated once).' }),
+    rowHeight: storyControl({
       control: 'radio',
       options: ['default', '3rem'],
-      description: 'Overrides `--rop-list-report-row-height` on the scroll container: the pitch is re-measured',
-    },
-    selectable: { control: 'boolean', description: '`useListReport({ selectable })`' },
-    onSelectedIdsChange: { control: false },
-    onApprove: { control: false },
-    onExport: { control: false },
+      description: 'Overrides `--rop-list-report-row-height` on the scroll container (consumer CSS): the pitch is re-measured.',
+    }),
+    selectable: storyControl({ control: 'boolean', description: 'An option of the hook, not a prop: `useListReport({ selectable })`.' }),
+    onSelectedIdsChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSelectedIdsChange })`.' }),
+    onApprove: storyControl({ control: false, description: 'The "Approve" button of the demo\'s `bulkActions`.' }),
+    onExport: storyControl({ control: false, description: 'The "Export" button of the demo\'s `bulkActions`.' }),
   },
   args: {
     rowCount: 100_000,

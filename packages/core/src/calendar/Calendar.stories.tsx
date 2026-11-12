@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { Calendar } from './Calendar';
 import { dayOfWeek, type IsoDate, type IsoMonth, type Weekday } from './date-math';
 import { parseDisabledDates } from './disabled-dates';
@@ -30,27 +31,30 @@ interface DemoArgs {
 
 const meta: Meta<DemoArgs> = {
   title: 'Forms/Calendar',
-  // No `component`: the stories pass URL args (e2e) that the docgen-inferred argTypes would reject; the
-  // real props table comes from `subcomponents` (docgen only, no inferred argTypes).
-  subcomponents: { Calendar },
+  // The stories drive the component through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the docs
+  // props table of the real component without forcing the wrapper's args to match its props.
+  component: Calendar as never,
   parameters: { layout: 'padded', docs: { description: { component: "Calendar: an inline month grid to pick one date, with keyboard navigation (arrows, Home/End, PageUp/PageDown), `min` / `max` limits and `disabled` / `readOnly` states. Controlled with `value` / `onValueChange`." } } },
+  // The props' rows take their description from the TSDoc; only the controls are set here.
   argTypes: {
     locale: { control: 'select', options: LOCALES },
-    // 'auto' = derived from the locale (Intl week info, else the CLDR region table, else Monday).
+    // 'auto' = not passed: derived from the locale (Intl week info, else the CLDR region table, else Monday).
     weekStartsOn: {
       control: 'select',
       options: WEEK_STARTS,
       labels: { auto: 'auto (from locale)', 0: 'Sunday', 1: 'Monday', 2: 'Tuesday', 3: 'Wednesday', 4: 'Thursday', 5: 'Friday', 6: 'Saturday' },
     },
-    defaultMonth: { control: 'text', description: 'Initial month, YYYY-MM (applied on remount).' },
-    today: { control: 'text', description: 'The date marked as today, YYYY-MM-DD.' },
-    min: { control: 'text', description: 'First selectable date, YYYY-MM-DD (empty = none).' },
-    max: { control: 'text', description: 'Last selectable date, YYYY-MM-DD (empty = none).' },
-    disableWeekends: { control: 'boolean', description: 'Demo of `isDateDisabled`: Saturdays and Sundays.' },
+    defaultMonth: { control: 'text' },
+    today: { control: 'text' },
+    min: { control: 'text' },
+    max: { control: 'text' },
     disabled: { control: 'boolean' },
     readOnly: { control: 'boolean' },
     onValueChange: { control: false },
     onMonthChange: { control: false },
+    // Set by the demo itself (`value`: local state; `isDateDisabled`: from `disableWeekends`).
+    ...withoutControls('value', 'defaultValue', 'month', 'isDateDisabled', 'labels'),
+    disableWeekends: storyControl({ control: 'boolean', description: 'Passes an `isDateDisabled` that disables Saturdays and Sundays.' }),
   },
   args: {
     locale: 'en-US',

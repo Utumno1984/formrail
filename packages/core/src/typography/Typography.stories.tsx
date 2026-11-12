@@ -6,10 +6,11 @@ import { internalIcons } from '../internal/icons';
 import { Text } from './Text';
 import { Title } from './Title';
 
-// No `component` on the meta: the page documents Text AND Title, each story types its own args.
+// The page documents Text (component) AND Title (subcomponent); each story types its own args.
 const meta = {
   title: 'Foundations/Typography',
   component: Text,
+  subcomponents: { Title },
   parameters: { layout: 'padded' },
 } satisfies Meta;
 
@@ -28,7 +29,8 @@ export const TextPlayground: TextStory = {
     variant: { control: 'radio', options: ['body', 'caption', 'label'] },
     as: { control: 'select', options: ['p', 'span', 'div', 'label'] },
     mono: { control: 'boolean' },
-    children: { control: 'text' },
+    children: { control: 'text', description: 'The text.' },
+    onClick: { description: 'Any HTML attribute of the element is passed through (here `onClick`, logged in Actions).' },
   },
   args: { variant: 'caption', as: 'p', mono: true, children: 'INV-2026-00042', onClick: fn() },
   render: (args) => <Text {...args} />,
@@ -47,7 +49,8 @@ export const TitlePlayground: TitleStory = {
   argTypes: {
     level: { control: 'select', options: [1, 2, 3, 4, 5, 6] },
     size: { control: 'radio', options: ['sm', 'md', 'lg'] },
-    children: { control: 'text' },
+    children: { control: 'text', description: 'The heading text.' },
+    onClick: { description: 'Any HTML attribute of the heading is passed through (here `onClick`, logged in Actions).' },
   },
   args: { level: 1, size: 'sm', children: 'Invoice approvals', onClick: fn() },
   render: (args) => <Title {...args} />,
