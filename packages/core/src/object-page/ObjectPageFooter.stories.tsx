@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { z } from 'zod';
 import { Button } from '../button/Button';
@@ -90,12 +91,24 @@ function LongContent() {
 const scrollerOf = (root: HTMLElement) => root.querySelector('[data-object-page-scroller]') as HTMLElement;
 
 /**
+ * Copy-paste example: `useObjectPageForm({ baseline })` and a save bar shown while the form is dirty; edit a field to see it, "Discard changes" goes back to the baseline.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ObjectPageFooter.example.tsx'),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * The footer is a presentational bar: here it is driven by the `visible` control, and by two buttons
  * that behave like a real save (Save and Cancel changes both hide it, as a clean form would).
  * "Edit" (in a toolbar above the page, so reachable at any scroll position) shows it again,
  * standing in for the first edit of a field.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: function Render(args) {
     const { message, messageTone, label, onSave, onCancel } = args;
     // Local state, set again whenever the `visible` control changes (updating the args from here would

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
@@ -85,12 +86,24 @@ function Sections({ count, lastHeight, titles = TITLES }: { count: number; lastH
 const scrollerOf = (canvasElement: HTMLElement) => canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
 
 /**
+ * Copy-paste example: one anchor-bar tab per `ObjectPageSection`, from its `title`; the tab of the section in view follows the scroll.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ObjectPageAnchorBar.example.tsx'),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: navigation mode, number of sections (1-10), height of the short last section and the name of
  * the `<nav>`. The play function clicks the last link, checks `aria-current`, the focus on the section's
  * title and that the URL did not change, then scrolls the scroller back to the top and checks that the
  * first link is active again.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ sectionNavigation, sectionCount, lastSectionHeight, anchorBarLabel }) => (
     <div style={FRAME}>
       <ObjectPage sectionNavigation={sectionNavigation} labels={{ anchorBar: anchorBarLabel }}>

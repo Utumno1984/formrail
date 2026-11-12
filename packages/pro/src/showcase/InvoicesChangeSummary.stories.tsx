@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 // The Free CRUD showcase itself, from the core sources (one copy, never duplicated in packages/pro): see the
@@ -6,6 +7,16 @@ import { CRUD_ARGS, CRUD_ARGTYPES, resetListToRecord } from '../../../core/src/s
 import { InvoiceCrud, type InvoiceCrudProps } from '../../../core/src/showcase/InvoiceCrud';
 import { storyControls } from '../../../core/src/internal/story-docs';
 import { invoiceSaveReview } from './invoice-review';
+// Story-only helper of the core sources (same exception as the showcase imports above).
+import { githubSource, showcaseFiles, showcaseSource } from '../../../core/src/internal/story-example';
+
+const SHOWCASE_FOLDER = 'packages/pro/src/showcase';
+// The listed file's text and repository path both derive from its name (see the Free showcase's stories).
+const SOURCES = import.meta.glob<string>(['./*.{ts,tsx}', '!./*.{test,stories}.{ts,tsx}'], { query: '?raw', import: 'default', eager: true });
+const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
+  'invoice-review.tsx':
+    'The review step plugged into the Free showcase through its `reviewSave` extension point: `ChangeSummary` against the saved record. In your app, import `ChangeSummary`, `computeChangeSummary`, `formatChangeValue` and the `ChangeEntry` type from `@formrail/pro` (this file reaches them through relative imports because it lives inside the Pro package). Not public: the relative imports of the Free showcase (`../../../core/src/showcase/...`: the record page, `number-text` and `showcase-data` fixtures).',
+});
 
 /*
  * The Pro Change Summary in a real flow: the SAME CRUD showcase as `Showcase/Invoices` (List Report -> Object
@@ -24,7 +35,7 @@ const meta: Meta<Args> = {
     docs: {
       description: {
         component:
-          'The CRUD showcase of `Showcase/Invoices` with a review step before saving: open an invoice, edit it, press Save and the dialog lists every change (with the field labels and readable values) against the saved record. The line items are reported row by row, matched by `id` (a changed quantity is one entry for that row, a removed row is reported with the values it had); when only their order changed the dialog says so instead of listing nothing. Confirm to save, or keep editing. Controls: `saveDelayMs` (how long the save takes once confirmed), `saveOutcome` (`error`: the save fails, the form stays edited and a new Save reviews the same changes).',
+          'The CRUD showcase of `Showcase/Invoices` with a review step before saving: open an invoice, edit it, press Save and the dialog lists every change (with the field labels and readable values) against the saved record. The line items are reported row by row, matched by `id` (a changed quantity is one entry for that row, a removed row is reported with the values it had); when only their order changed the dialog says so instead of listing nothing. Confirm to save, or keep editing. Controls: `saveDelayMs` (how long the save takes once confirmed), `saveOutcome` (`error`: the save fails, the form stays edited and a new Save reviews the same changes). The source is on [GitHub](' + githubSource('packages/pro/src/showcase') + '), built on the [Free showcase](' + githubSource('packages/core/src/showcase') + '); the review step is at the bottom of this page.',
       },
     },
   },
@@ -85,6 +96,8 @@ const otherStatus = (canvas: ReturnType<typeof within>): string =>
  * showcase's own save ("Saving…" in the footer), then "Back to list": the row shows the new status.
  */
 export const ReviewChanges: Story = {
+  tags: ['showcase-source'],
+  parameters: showcaseSource(SHOWCASE_FOLDER, SOURCE_FILES),
   play: async ({ canvasElement, args }) => {
     const canvas = await openRecord(canvasElement);
     const body = within(canvasElement.ownerDocument.body);

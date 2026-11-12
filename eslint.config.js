@@ -88,6 +88,47 @@ export default tseslint.config(
     },
   },
   {
+    // The copy-paste examples of the Docs pages (ticket #403): their text is what a reader copies ("Show
+    // code" prints the file verbatim), so they import only what a consumer can: the public packages by name.
+    // Listed after the core rule above so it replaces it for these files (the `internal` facade stays banned).
+    files: ['packages/*/src/**/*.example.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { regex: '^\\.', message: 'A copy-paste example imports only the public packages by name (@formrail/core, @formrail/pro), never a relative path (ticket #403).' },
+            { regex: '(^|/)internal(/|$)', message: 'A copy-paste example uses only public API: no `internal` module (ticket #403).' },
+            // Allow-list, extendable: `react` and the `@formrail/*` packages (the peers a consumer has installed
+            // to paste the example). Anything else (zod, a date library...) is a dependency the reader does not have.
+            { regex: '^(?!(react|@formrail/[\\w-]+)(/|$))[^.]', message: 'A copy-paste example imports only `react` and `@formrail/*` packages (the peers of the library); add a package to this list in eslint.config.js only if it is a declared peer dependency (ticket #403).' },
+            { regex: '^(storybook|@storybook)(/|$)', message: 'A copy-paste example is plain React code: no Storybook import (fn, args, ...) (ticket #403).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The story of a copy-paste example is `{ tags, ...exampleStory('X.example.tsx') }` and nothing else that
+    // changes what is rendered (ticket #403): the spread brings the example's own `render`, and the page prints
+    // that file's text. A `render`, `component`, `decorators` or `loaders` in the same object would show
+    // something else under the text. Banned BEFORE the spread too: `render` there is dead code (the spread wins)
+    // but `component`, `decorators` and `loaders` survive and change what is shown. The e2e audit covers what
+    // lint cannot see (a story built elsewhere); see e2e/docs-source.spec.ts. (esquery has no `:has(> x)`: `:has`
+    // is a descendant test, so an object that holds an `exampleStory` spread deeper is checked too, which is fine.)
+    files: ['packages/*/src/**/*.stories.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['key.name', 'key.value'].map((key) => ({
+          selector: `ObjectExpression:has(SpreadElement > CallExpression[callee.name='exampleStory']) > Property[${key}=/^(render|component|decorators|loaders)$/]`,
+          message:
+            'A story built with `...exampleStory(...)` renders the example file itself: no `render`, `component`, `decorators` or `loaders` next to the spread, or the page would show something other than the code printed under it (ticket #403).',
+        })),
+      ],
+    },
+  },
+  {
     files: ['**/*.cjs'],
     languageOptions: { sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },

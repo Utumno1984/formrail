@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
@@ -211,6 +212,17 @@ const heading = (canvas: ReturnType<typeof within>) => canvas.getByRole('heading
 const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row').slice(1);
 
 /**
+ * Copy-paste example: the whole floorplan (title, actions, filter pills, search and table) from one `useListReport` call, in a parent with a bounded height.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ListReport.example.tsx'),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * An invoice queue example: title with count, actions, filters and search, and a table that
  * fills the space with a single scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
  * `firstSortDirection` of the "Date" column and container width; the callbacks show up in Actions.
@@ -219,6 +231,7 @@ const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row
  * and checks that 200 rows are back and that the focus is on the search field.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   play: async ({ args, canvasElement }) => {
     // Written for the default configuration: with another dataset or status (picked in Controls)
     // the scenario has nothing to check.

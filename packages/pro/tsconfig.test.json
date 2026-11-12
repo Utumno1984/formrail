@@ -1,6 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    // The copy-paste examples (`*.example.tsx`, ticket #403) import the package by its public name, as a
+    // consumer would: resolved to the sources, so a changed API fails the typecheck at once (no rebuild).
+    "paths": { "@formrail/pro": ["./src/index.ts"] },
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": ["src", "test", "tsup.config.ts", "vitest.config.ts", "../core/src/types/*.d.ts"]

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { storyControls } from '../internal/story-docs';
@@ -73,12 +74,24 @@ function Demo({ when, title, description, stay, leave, close, action }: DemoArgs
 }
 
 /**
+ * Copy-paste example: edit the name, then "Back to list": the guard asks before leaving; with nothing changed it leaves at once.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('DirtyGuard.example.tsx'),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: `when` (unsaved changes), the four texts of the dialog. `action` is wired to Actions and
  * is called only when the exit is confirmed. The play function opens the dialog, checks the focus on
  * "Keep editing", stays (nothing in Actions, the focus back on the opener), then opens it
  * again and leaves: exactly one call.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: (args) => <Demo {...args} />,
   play: async ({ args, canvasElement }) => {
     if (!args.when) return;

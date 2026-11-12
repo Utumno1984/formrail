@@ -1,5 +1,20 @@
-import { expect, test, type Page } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { rendersLocalComponent } from '../.storybook/source-transform';
+import {
+  EXAMPLE_RENDER_MARK_KEY,
+  EXAMPLE_TAG,
+  PLAYGROUND_TAG,
+  REPOSITORY_MAIN,
+  SHOWCASE_SOURCE_TAG,
+  controlsStory,
+  findPlayground,
+  githubSource,
+  selectPageStories,
+} from '../packages/core/src/internal/story-example';
+import { auditAgainstFile, auditExampleBinding, auditListedSource, auditSnippet, intrinsicElements, publicExports, type ExampleFacts, type KnownTags } from './helpers/docs-source';
 
 // "Show code" must print something a reader can use (ticket #333). With Storybook's default `dynamic`
 // source, a story whose `render` declares a local stateful component and renders it (`function XyzDemo()
@@ -220,6 +235,381 @@ test.describe('Storybook "Show code"', () => {
         expect(shown).toContain('useState');
         expect(shown).toContain('render:');
       });
+    }
+  });
+});
+
+// Copy-paste examples (ticket #403): the first "Show code" of every public Docs page is code a reader can
+// paste into an app with only `@formrail/core` / `@formrail/pro` installed. The page must open with a story
+// tagged `example` (a `*.example.tsx` file, type-checked and linted with the package, printed verbatim) or,
+// for a showcase, `showcase-source` (a pointer to the source files the page lists, with their GitHub link).
+// The printed text is audited by ./helpers/docs-source.ts: no relative/internal/Storybook import, no `fn(`
+// or `args`, no JSX tag that is not an HTML element, a public export or a component declared in the snippet.
+test.describe('copy-paste examples (#403)', () => {
+  const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+  /**
+   * Public Docs pages not converted yet, by group of follow-up tickets. The list can only shrink: an entry whose
+   * page already opens with an example (or a showcase source) fails the test (remove it), an entry with no page
+   * fails too, and neither a group nor the total can grow (`max`, below). When the completion ticket of a
+   * group exists, write its number in `ticket`; converting a group lowers its `max` to what is left.
+   */
+  const PENDING: Record<string, { ticket: number | undefined; max: number; pages: string[] }> = {
+    Forms: {
+      ticket: undefined, // #403 follow-up: the ticket number goes here
+      max: 13,
+      pages: [
+        'forms-calendar--docs', 'forms-checkbox--docs', 'forms-combobox--docs', 'forms-datepicker--docs', 'forms-field--docs',
+        'forms-fileupload--docs', 'forms-input--docs', 'forms-multiselect--docs', 'forms-numberinput--docs', 'forms-radiogroup--docs',
+        'forms-select--docs', 'forms-switch--docs', 'forms-textarea--docs',
+      ],
+    },
+    Overlays: {
+      ticket: undefined, // #403 follow-up: the ticket number goes here
+      max: 6,
+      pages: ['overlays-confirmdialog--docs', 'overlays-dialog--docs', 'overlays-menu--docs', 'overlays-sheet--docs', 'overlays-toast--docs', 'overlays-tooltip--docs'],
+    },
+    'Primitives, Navigation, Foundations': {
+      ticket: undefined, // #403 follow-up: the ticket number goes here
+      max: 20,
+      pages: [
+        'navigation-accordion--docs', 'navigation-breadcrumb--docs', 'navigation-collapsible--docs', 'navigation-pagination--docs', 'navigation-tabs--docs',
+        'primitives-avatar--docs', 'primitives-button--docs', 'primitives-card--docs', 'primitives-divider--docs', 'primitives-fieldmessage--docs',
+        'primitives-messagestrip--docs', 'primitives-progressbar--docs', 'primitives-skeleton--docs', 'primitives-spinner--docs', 'primitives-statusbadge--docs',
+        'foundations-icon--docs', 'foundations-theming--docs', 'foundations-tokens--docs', 'foundations-typography--docs', 'foundations-utilities--docs',
+      ],
+    },
+    Pro: {
+      ticket: undefined, // #403 follow-up: the ticket number goes here
+      max: 3,
+      pages: ['pro-changesummary--docs', 'pro-floorplans-virtual-list-report--docs', 'pro-patterns-form-rebase--docs'],
+    },
+  };
+  /** Today's total (13 + 6 + 20 + 3): the list only goes down from here. */
+  const PENDING_MAX = 42;
+  const pending = new Set(Object.values(PENDING).flatMap((group) => group.pages));
+
+  interface Entry {
+    id: string;
+    type: string;
+    importPath: string;
+    tags?: string[];
+  }
+
+  async function indexEntries(request: APIRequestContext): Promise<Entry[]> {
+    return Object.values(((await (await request.get('/index.json')).json()) as { entries: Record<string, Entry> }).entries);
+  }
+
+  /** Docs pages of CSF files (not MDX) with their primary story; `internal` ones (fixtures) only when asked. */
+  async function docsPages(request: APIRequestContext, internal: boolean) {
+    const entries = await indexEntries(request);
+    return entries
+      .filter((e) => e.type === 'docs' && e.importPath.endsWith('.stories.tsx') && !!e.tags?.includes('internal') === internal)
+      .map((docs) => ({ id: docs.id, primary: entries.find((e) => e.type === 'story' && e.importPath === docs.importPath && e.tags?.includes('autodocs')) }));
+  }
+  const publicDocs = (request: APIRequestContext) => docsPages(request, false);
+
+  /** A repository file's text, `undefined` when it does not exist. */
+  const readRepoFile = (repoPath: string) => {
+    const file = resolve(REPO_ROOT, repoPath);
+    return existsSync(file) ? readFileSync(file, 'utf8') : undefined;
+  };
+
+  /** What the loaded CSF file says about a story, for {@link auditExampleBinding}. */
+  async function exampleFacts(page: Page, storyId: string): Promise<ExampleFacts> {
+    return page.evaluate(
+      async ({ id, markKey }) => {
+        const mark = Symbol.for(markKey); // a symbol cannot be passed to the page: its registry key is
+        type Annotations = { render?: unknown; component?: unknown; decorators?: unknown[]; loaders?: unknown[] };
+        const preview = (window as unknown as { __STORYBOOK_PREVIEW__: { storyStoreValue: { loadCSFFileByStoryId: (id: string) => Promise<{ meta: Annotations; stories: Record<string, Annotations> }> } } }).__STORYBOOK_PREVIEW__;
+        const { meta, stories } = await preview.storyStoreValue.loadCSFFileByStoryId(id);
+        const story = stories[id]!;
+        return {
+          ownRender: typeof story.render === 'function' && (story.render as unknown as Record<symbol, unknown>)[mark] === true,
+          component: story.component !== undefined,
+          decorators: story.decorators?.length ?? 0,
+          loaders: story.loaders?.length ?? 0,
+          metaDecorators: meta.decorators?.length ?? 0,
+          metaLoaders: meta.loaders?.length ?? 0,
+        };
+      },
+      { id: storyId, markKey: EXAMPLE_RENDER_MARK_KEY },
+    );
+  }
+
+  /** The listed source files of a showcase page, as rendered (waits for every highlighted block). */
+  async function listedSources(page: Page) {
+    const blocks = page.locator('.sbdocs-content section[aria-label] pre');
+    // A listed file that does not exist makes the stories file throw while it loads: Storybook then shows its
+    // error display instead of the page, and that message is the cause worth reading.
+    await blocks.first().waitFor({ state: 'attached', timeout: 30_000 }).catch(async (error: Error) => {
+      const display = await page.locator('#error-message, .sb-errordisplay pre').first().innerText({ timeout: 1_000 }).catch(() => '');
+      throw new Error(`no source file listed${display ? `; the page shows the error: ${display.trim().split('\n')[0]}` : ''} (${error.message.split('\n')[0]})`);
+    });
+    await expect(async () => {
+      for (const text of await blocks.allInnerTexts()) expect(text).not.toBe('');
+    }).toPass({ timeout: 30_000 });
+    return page.locator('.sbdocs-content section[aria-label]').evaluateAll((sections) =>
+      sections.map((section) => ({
+        label: section.getAttribute('aria-label') ?? '',
+        heading: section.querySelector('h1, h2, h3, h4, h5, h6')?.textContent?.trim() ?? '',
+        href: [...section.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'View on GitHub')?.getAttribute('href') ?? '',
+        shown: section.querySelector('pre')?.innerText ?? '',
+      })),
+    );
+  }
+
+  /** Everything wrong with a page's first "Show code" (and, for a showcase, its source listing). */
+  async function auditPage(page: Page, docsId: string, primary: Entry | undefined, known: KnownTags): Promise<string[]> {
+    const tags = primary?.tags ?? [];
+    const showcase = tags.includes(SHOWCASE_SOURCE_TAG);
+    if (!primary || (!tags.includes(EXAMPLE_TAG) && !showcase)) return [`first story ${primary?.id ?? '(none)'} is not tagged "${EXAMPLE_TAG}" or "${SHOWCASE_SOURCE_TAG}"`];
+    await page.goto(`/iframe.html?id=${docsId}&viewMode=docs`);
+    const shown = await openSource(page, `anchor--primary--${primary.id}`);
+    const problems = auditSnippet(shown, known);
+    // The printed code IS the example file next to the stories (same base name), not another file's text, and
+    // not Storybook's synthesized source of a story tagged `example` but written with an inline `render`.
+    if (!showcase) problems.push(...auditExampleBinding(await exampleFacts(page, primary.id)));
+    if (!showcase) problems.push(...auditAgainstFile(shown, readRepoFile(primary.importPath.replace(/^\.\//, '').replace(/\.stories\.tsx$/, '.example.tsx')), 'the example file next to the stories'));
+    // The demo stories under the example (beyond the example and the Playground) carry the page's "demo code" note.
+    const blocks = await page.locator('.sbdocs-content [id^="anchor--"]').count();
+    if (!showcase && blocks > 2 && (await page.locator('.sbdocs-content [data-demo-code-note]').count()) !== 1) problems.push('no "demo code" note above the demo stories');
+    // Whoever pastes the example must also import the stylesheet: said once, at page level, next to the example.
+    if (!showcase && (await page.locator('.sbdocs-content [data-styles-reminder]').filter({ hasText: '@formrail/core/styles.css' }).count()) !== 1) problems.push('no stylesheet reminder next to the example');
+    if (showcase) {
+      if ((await page.locator(`.sbdocs-content a[href^="${REPOSITORY_MAIN}"]`).count()) === 0) problems.push('no GitHub link to the source');
+      const listed = await listedSources(page);
+      if (listed.length === 0) problems.push('no source file listed');
+      for (const source of listed) problems.push(...auditListedSource(source, readRepoFile, githubSource));
+    }
+    return problems;
+  }
+
+  const knownTags = (): KnownTags => ({ exports: publicExports(REPO_ROOT), intrinsic: intrinsicElements(REPO_ROOT) });
+
+  test('the snippet audit: each rule, both ways', () => {
+    const exports = { exports: new Set(['ListReportTable', 'useListReport', 'Menu']), intrinsic: intrinsicElements(REPO_ROOT) };
+    const ok = `import { useState } from 'react';\nimport { ListReportTable, Menu } from '@formrail/core';\nfunction Local() { return <div />; }\nexport function App() { const [x] = useState(0); return <><Local /><Menu.Item /><ListReportTable aria-label="x" /><span>{x}</span></>; }`;
+    expect(auditSnippet(ok, exports)).toEqual([]);
+    expect(auditSnippet('// a comment, no JSX', exports)).toEqual([]);
+    expect(auditSnippet(`import { useListReport } from './use-list-report';`, exports)).toEqual([expect.stringContaining('relative import')]);
+    expect(auditSnippet(`import { x } from '@formrail/core/internal';`, exports)).toEqual([expect.stringContaining('internal import')]);
+    expect(auditSnippet(`import { userEvent } from 'storybook/test';`, exports)).toEqual([expect.stringContaining('Storybook import')]);
+    expect(auditSnippet('const onClick = fn();', exports)).toEqual(['Storybook `fn(`']);
+    expect(auditSnippet('const C = (args) => null;', exports)).toEqual(['Storybook `args`']);
+    expect(auditSnippet('const t = <TableDemo rows={[]} />;', exports)).toEqual([expect.stringContaining('<TableDemo>')]);
+    expect(auditSnippet('const t = <Nope.Item />;', exports)).toEqual([expect.stringContaining('<Nope.Item>')]);
+    // A wrapper minified by the production build prints lowercase (`<y columns={…} />`): still not an element.
+    expect(auditSnippet('const t = <y columns={[]} />;', exports)).toEqual([expect.stringContaining('<y>')]);
+    expect(auditSnippet('const t = <svg viewBox="0 0 1 1"><path d="M0 0" /></svg>;', exports)).toEqual([]);
+    // Several problems in one snippet: all reported.
+    expect(auditSnippet(`import { a } from '../a';\nconst t = <Showcase {...args} />;`, exports)).toHaveLength(3);
+  });
+
+  test('the public API is read from the index of core and Pro', () => {
+    const exports = publicExports(REPO_ROOT);
+    for (const name of ['ListReportTable', 'useListReport', 'ObjectPage', 'useDirtyGuard', 'ChangeSummary']) expect(exports, name).toContain(name);
+    expect(exports).not.toContain('TableDemo');
+  });
+
+  test('the Controls follow the Playground only after an example', () => {
+    const s = (id: string, ...tags: string[]) => ({ id, tags });
+    expect(controlsStory([s('a', EXAMPLE_TAG), s('b'), s('c', PLAYGROUND_TAG)])?.id).toBe('c');
+    expect(controlsStory([s('a', EXAMPLE_TAG), s('b')])?.id).toBe('a');
+    expect(controlsStory([s('a'), s('c', PLAYGROUND_TAG)])?.id).toBe('a');
+    expect(controlsStory([])).toBeUndefined();
+    expect(() => findPlayground([s('a', PLAYGROUND_TAG), s('b', PLAYGROUND_TAG)])).toThrow(/More than one/);
+  });
+
+  test('the GitHub URL is built in one place, on main', () => {
+    expect(githubSource('packages/core/src/showcase')).toBe('https://github.com/Utumno1984/formrail/blob/main/packages/core/src/showcase');
+    expect(githubSource('/a.ts')).toBe(`${REPOSITORY_MAIN}a.ts`);
+  });
+
+  test('PENDING can only shrink', () => {
+    const all = Object.values(PENDING).flatMap((group) => group.pages);
+    expect(new Set(all).size, 'a page listed twice').toBe(all.length);
+    for (const [name, group] of Object.entries(PENDING)) expect(group.pages.length, `${name}: grew past ${group.max}`).toBeLessThanOrEqual(group.max);
+    expect(all.length, 'PENDING grew').toBeLessThanOrEqual(PENDING_MAX);
+    expect(Object.values(PENDING).reduce((sum, group) => sum + group.max, 0), 'group maxima do not add up to the total').toBeLessThanOrEqual(PENDING_MAX);
+  });
+
+  test('PENDING lists only pages that exist and do not open with an example yet', async ({ request }) => {
+    const docs = new Map((await publicDocs(request)).map((d) => [d.id, d]));
+    for (const id of pending) {
+      expect(docs.has(id), `${id}: PENDING names no public Docs page (remove it)`).toBe(true);
+      const tags = docs.get(id)?.primary?.tags ?? [];
+      expect(tags, `${id}: opens with an example now, remove it from PENDING`).not.toContain(EXAMPLE_TAG);
+      expect(tags, `${id}: opens with a showcase source now, remove it from PENDING`).not.toContain(SHOWCASE_SOURCE_TAG);
+    }
+  });
+
+  test('every public Docs page outside PENDING opens with a copy-paste example', async ({ page, request }) => {
+    test.setTimeout(600_000);
+    const known = knownTags();
+    const pages = (await publicDocs(request)).filter((d) => !pending.has(d.id));
+    expect(pages.length, 'converted pages').toBeGreaterThan(10);
+    for (const { id, primary } of pages) expect(await auditPage(page, id, primary, known), id).toEqual([]);
+  });
+
+  test('a page still on a demo wrapper fails the audit (negative)', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const known = knownTags();
+    // A dedicated internal fixture (DocsAuditWrapper.stories.tsx): it does not depend on any real page, so
+    // converting a PENDING page never breaks this test.
+    const wrapper = (await docsPages(request, true)).find((d) => d.id === 'internal-docsauditwrapper--docs')!;
+    expect(wrapper, 'fixture page missing').toBeTruthy();
+    expect(await auditPage(page, wrapper.id, wrapper.primary, known)).toEqual([expect.stringContaining('is not tagged')]);
+    // And the text rule itself, on a real wrapper story's "Show code": the Playground's `<TableDemo …/>`, which
+    // the production build prints with a minified name (`<y …/>`), and its `onSortChange={…}` from `fn()`.
+    await page.goto('/iframe.html?id=data-listreporttable--docs&viewMode=docs');
+    const problems = auditSnippet(await openSource(page, 'anchor--data-listreporttable--playground'), known);
+    expect(problems).toContainEqual(expect.stringContaining('not a public export'));
+  });
+
+  test('an example that does not print its own file fails the audit (negatives)', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const known = knownTags();
+    const fixtures = await docsPages(request, true);
+    const audit = (id: string) => {
+      const fixture = fixtures.find((d) => d.id === id)!;
+      expect(fixture, `${id}: fixture page missing`).toBeTruthy();
+      return auditPage(page, fixture.id, fixture.primary, known);
+    };
+    // A: the story renders its own component but prints the code of ANOTHER example file.
+    expect(await audit('internal-docsauditwrongcode--docs')).toEqual([expect.stringContaining('differs from')]);
+    // B: tagged `example` but written with an inline `render`: Storybook's synthesized source is printed.
+    expect(await audit('internal-docsauditinlinerender--docs')).toEqual(
+      expect.arrayContaining([expect.stringContaining('differs from'), expect.stringContaining('render is not the one of exampleStory')]),
+    );
+  });
+
+  test('a rendered component other than the example fails the audit (negatives, real DOM)', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const known = knownTags();
+    const fixtures = await docsPages(request, true);
+    const audit = (id: string) => {
+      const fixture = fixtures.find((d) => d.id === id)!;
+      expect(fixture, `${id}: fixture page missing`).toBeTruthy();
+      return auditPage(page, fixture.id, fixture.primary, known);
+    };
+    // The text printed IS the example file, and still the page renders something else: only the binding catches it.
+    const overridden = await audit('internal-docsauditoverriddenrender--docs');
+    expect(overridden).toEqual([expect.stringContaining('render is not the one of exampleStory')]);
+    await page.goto('/iframe.html?id=internal-docsauditoverriddenrender--example&viewMode=story');
+    await expect(page.getByText('Another demo'), 'the DOM shows another component than the printed example').toBeVisible();
+    await expect(page.getByRole('button', { name: 'Rendered component' })).toHaveCount(0);
+    // Decorators and loaders of the story and of the meta, with the example's own render intact. (A story-level
+    // `component` is not a CSF field Storybook keeps, so it cannot be shown at runtime; lint bans it next to the spread.)
+    const decorated = await audit('internal-docsauditdecorated--docs');
+    expect(decorated).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('own decorators'),
+        expect.stringContaining('own loaders'),
+        expect.stringContaining('meta has decorators'),
+        expect.stringContaining('meta has loaders'),
+      ]),
+    );
+    expect(decorated).toHaveLength(4);
+    await page.goto('/iframe.html?id=internal-docsauditdecorated--example&viewMode=story');
+    await expect(page.locator('[data-story-decorator] [data-meta-decorator], [data-meta-decorator] [data-story-decorator]')).toHaveCount(1);
+  });
+
+  test('the binding of an example to its rendered component: each way to fail', () => {
+    const ok: ExampleFacts = { ownRender: true, component: false, decorators: 0, loaders: 0, metaDecorators: 0, metaLoaders: 0 };
+    expect(auditExampleBinding(ok)).toEqual([]);
+    expect(auditExampleBinding({ ...ok, ownRender: false })).toEqual([expect.stringContaining('render is not the one of exampleStory')]);
+    expect(auditExampleBinding({ ...ok, component: true })).toEqual([expect.stringContaining('`component`')]);
+    expect(auditExampleBinding({ ...ok, decorators: 1 })).toEqual([expect.stringContaining('own decorators')]);
+    expect(auditExampleBinding({ ...ok, loaders: 2 })).toEqual([expect.stringContaining('own loaders')]);
+    expect(auditExampleBinding({ ...ok, metaDecorators: 1 })).toEqual([expect.stringContaining('meta has decorators')]);
+    expect(auditExampleBinding({ ...ok, metaLoaders: 1 })).toEqual([expect.stringContaining('meta has loaders')]);
+  });
+
+  test('the comparison with a file on disk: each way to fail', () => {
+    expect(auditAgainstFile('a\nb\n', 'a\nb', 'x')).toEqual([]);
+    expect(auditAgainstFile('a\nb', 'a\nb\n', 'x')).toEqual([]);
+    expect(auditAgainstFile('a\nc', 'a\nb', 'x')).toEqual(['the printed code differs from x']);
+    expect(auditAgainstFile('a', undefined, 'x')).toEqual(['x: no such file on disk']);
+    // Line endings do not matter (a file checked out with CRLF), the content does.
+    expect(auditAgainstFile('a\nb', 'a\r\nb\r\n', 'x')).toEqual([]);
+    expect(auditAgainstFile('a\r\nb', 'a\nb', 'x')).toEqual([]);
+    expect(auditAgainstFile('a\nb', 'a\r\nc\r\n', 'x')).toEqual(['the printed code differs from x']);
+    const url = (path: string) => `${REPOSITORY_MAIN}${path}`;
+    const files: Record<string, string> = { 'packages/a/One.tsx': 'one', 'packages/a/Two.tsx': 'two' };
+    const read = (path: string) => files[path];
+    const source = { label: 'packages/a/One.tsx', heading: 'packages/a/One.tsx', href: url('packages/a/One.tsx'), shown: 'one\n' };
+    expect(auditListedSource(source, read, url)).toEqual([]);
+    // The path and the code point to different files.
+    expect(auditListedSource({ ...source, shown: 'two' }, read, url)).toEqual([expect.stringContaining('differs from packages/a/One.tsx')]);
+    // A renamed file whose path was not updated: the path is not in the repo (and the title/link were not updated either).
+    expect(auditListedSource({ ...source, label: 'packages/a/Old.tsx' }, read, url)).toEqual([
+      expect.stringContaining('heading says'),
+      expect.stringContaining('link is'),
+      'packages/a/Old.tsx: no such file on disk',
+    ]);
+    expect(auditListedSource({ ...source, href: url('packages/a/Two.tsx') }, read, url)).toEqual([expect.stringContaining('link is')]);
+  });
+
+  test('the Docs page selects its stories as Storybook does (filter, autodocs, mount)', () => {
+    const s = (id: string, tags: string[] = ['autodocs'], usesMount = false) => ({ id, tags, usesMount });
+    const ids = (stories: { id: string }[]) => stories.map((story) => story.id);
+    const all = [s('a'), s('b'), s('c', ['autodocs', 'hidden']), s('d', []), s('e', ['autodocs'], true)];
+    // Autodocs stories without `mount`; the primary is not repeated.
+    expect(selectPageStories(all).primary?.id).toBe('a');
+    expect(ids(selectPageStories(all).others)).toEqual(['b', 'c']);
+    // `parameters.docs.stories.filter` (here: the tag `hidden` is excluded from the Docs) applies to the others.
+    expect(ids(selectPageStories(all, { filter: (story) => !story.tags.includes('hidden') }).others)).toEqual(['b']);
+    // Without any autodocs story the stock rule keeps them all, and there is no primary (the stock page renders).
+    const plain = [s('a', []), s('b', [])];
+    expect(selectPageStories(plain).primary).toBeUndefined();
+    expect(ids(selectPageStories(plain).others)).toEqual(['a', 'b']);
+    // `filterByAutodocs: false` (external docs): the first story is the primary.
+    expect(selectPageStories(plain, { filterByAutodocs: false }).primary?.id).toBe('a');
+  });
+
+  // Ticket #403 item: a showcase page lists source files in blocks that scroll on their own; they must not
+  // widen the document (a long line in a `pre` used to push the page past the viewport).
+  test('the listed sources do not widen the page', async ({ page, request }) => {
+    test.setTimeout(180_000);
+    const showcases = (await publicDocs(request)).filter((d) => d.primary?.tags?.includes(SHOWCASE_SOURCE_TAG));
+    expect(showcases.length, 'showcase pages').toBeGreaterThanOrEqual(2);
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const { id } of showcases) {
+        await page.goto(`/iframe.html?id=${id}&viewMode=docs`);
+        await listedSources(page);
+        const measure = () =>
+          page.evaluate(() => ({
+            document: document.documentElement.scrollWidth,
+            viewport: document.documentElement.clientWidth,
+            sectionsRight: Math.max(...[...document.querySelectorAll('.sbdocs-content section[aria-label]')].map((el) => el.getBoundingClientRect().right)),
+          }));
+        const withSources = await measure();
+        await page.evaluate(() => document.querySelectorAll<HTMLElement>('.sbdocs-content section[aria-label]').forEach((el) => (el.style.display = 'none')));
+        const without = await measure();
+        const where = `${id} at ${width}px`;
+        expect(withSources.sectionsRight, `${where}: a source block sticks out of the viewport`).toBeLessThanOrEqual(withSources.viewport);
+        // Whatever else widens the page (Storybook's props table) is not this ticket's: the sources add nothing.
+        expect(withSources.document, `${where}: the listed sources widen the document`).toBeLessThanOrEqual(without.document);
+      }
+    }
+  });
+
+  test('every example renders without errors', async ({ page, request }) => {
+    test.setTimeout(300_000);
+    const examples = (await indexEntries(request)).filter((e) => e.type === 'story' && e.tags?.includes(EXAMPLE_TAG));
+    expect(examples.length).toBeGreaterThan(10);
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(String(error)));
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    for (const { id } of examples) {
+      await page.goto(`/iframe.html?id=${id}&viewMode=story`);
+      await expect(page.locator('#storybook-root > *').first(), `${id}: nothing rendered`).toBeVisible({ timeout: 30_000 });
+      await expect(page.locator('body'), `${id}: Storybook error display`).not.toHaveClass(/sb-show-errordisplay/);
+      expect(errors, id).toEqual([]);
     }
   });
 });

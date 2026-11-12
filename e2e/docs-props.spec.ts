@@ -8,6 +8,7 @@ import {
   type DocgenComponent,
   type DocsPageFacts,
 } from './helpers/docs-props';
+import { controlsStory } from '../packages/core/src/internal/story-example';
 
 // Props tables of the Docs pages (ticket #401): every public Docs page shows ALL AND ONLY the real props of
 // its component (and of its subcomponents, in their tabs), each with its TSDoc; the story's demo knobs and
@@ -165,9 +166,10 @@ async function pageFacts(page: Page, pages: { title: string; storyId: string }[]
 }
 
 /**
- * Public Docs pages of CSF files (not MDX, not `internal`), with their primary story: the first story of
- * the file that the Docs page includes (a story tagged `!autodocs` is not on the page, so not the one
- * whose argTypes the table shows).
+ * Public Docs pages of CSF files (not MDX, not `internal`), with the story whose argTypes the page's table
+ * shows: among the stories of the file that the Docs page includes (a story tagged `!autodocs` is not on the
+ * page), the one the Docs page template attaches its Controls to (`controlsStory`, ticket #403): the
+ * Playground when the page opens with a copy-paste example, the first story otherwise.
  */
 async function publicPages(page: Page): Promise<{ title: string; storyId: string }[]> {
   const index = (await (await page.request.get('/index.json')).json()) as { entries: Record<string, IndexEntry> };
@@ -176,7 +178,7 @@ async function publicPages(page: Page): Promise<{ title: string; storyId: string
     .filter((e) => e.type === 'docs' && e.importPath.endsWith('.stories.tsx') && !e.tags?.includes('internal'))
     .map((docs) => ({
       title: docs.title,
-      storyId: entries.find((e) => e.type === 'story' && e.importPath === docs.importPath && e.tags?.includes('autodocs'))?.id ?? '',
+      storyId: controlsStory(entries.filter((e) => e.type === 'story' && e.importPath === docs.importPath && e.tags?.includes('autodocs')))?.id ?? '',
     }));
 }
 

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
@@ -107,12 +108,24 @@ const statusBadge = (
 );
 
 /**
+ * Copy-paste example: a read-only record page (header with status and actions, two sections) in a parent with a bounded height.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ObjectPage.example.tsx'),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: heading level, number of sections (1-8), title, subtitle, status and actions. The play
  * function checks the heading hierarchy and the name of every region, focuses the field of the last
  * section and checks that it ends up inside the visible area of the (only) scroller, then clicks an
  * action of the header (Actions panel).
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ headingLevel, sectionCount, title, subtitle, showActions, showStatus, onApprove, onReject }) => (
     <div style={FRAME}>
       <ObjectPage headingLevel={headingLevel}>

@@ -1,5 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { z } from 'zod';
 import { Button } from '../button/Button';
@@ -315,6 +316,17 @@ const footerStatus = (canvasElement: HTMLElement) =>
   within(within(canvasElement).getByRole('region', { name: 'Save actions' })).getByRole('status');
 
 /**
+ * Copy-paste example: baseline, per-field validation, the error summary in the save bar, focus on the first invalid field and the dirty-guard, together.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ObjectPageValidationRecipe.example.tsx', { onBack: () => {} }),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * The whole flow with real input: an edit makes the form dirty (the footer appears), Save with the
  * rest empty fails (messages on the fields, "3 invalid fields" in the footer, the focus on the first
  * invalid field, the form still dirty, the guard still asking), each field is corrected (the count
@@ -322,6 +334,7 @@ const footerStatus = (canvasElement: HTMLElement) =>
  * Controls: the record, the rules, the footer, and which field is blocked (and how).
  */
 export const ValidationFlow: Story = {
+  tags: ['playground'],
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);

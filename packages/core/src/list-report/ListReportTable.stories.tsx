@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { addons } from 'storybook/preview-api';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReportTable } from './ListReportTable';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
@@ -199,6 +200,18 @@ const NO_CONTROLS = { controls: { disable: true } };
 const INVOICES = makeInvoices(40);
 
 /**
+ * Copy-paste example: `columns` memoized, `useListReport({ rows, columns, getRowId })` returns the `table`,
+ * `<ListReportTable table={table} aria-label="…" />` fills a flex parent with `min-height: 0`.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('ListReportTable.example.tsx'),
+};
+
+/**
+ * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
+ * the example at the top of the page).
+ *
  * Controls: `maxHeight` of the scroll container, `containerWidth` of the demo box (narrow it to see the
  * horizontal scroll stay inside the box), `dir`, `firstSortDirection` of the "Date" column, `status`
  * (`ready` / `loading` / `error`), `loadingRowCount` and the `dataset` (empty, 3, 40 or 200 rows, or a
@@ -208,6 +221,7 @@ const INVOICES = makeInvoices(40);
  * two sort changes were notified.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   render: ({ maxHeight, containerWidth, dir, dateFirstSort, status, loadingRowCount, dataset, onSortChange, onRetry, onClearFilters }) => {
     const cols = columns(dateFirstSort);
     const excludeAll = dataset === 'filter that excludes everything';
