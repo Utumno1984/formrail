@@ -114,6 +114,66 @@
     @apply text-rop-text-muted italic;
   }
 
+  /* RebaseNotice (packages/pro/src/form-rebase/RebaseNotice.tsx), on top of the core MessageStrip. Nothing is
+     animated: the notice appears in its final state (the scroll that keeps the focused field in place is not
+     animated either). */
+  .rop-pro-rebase-notice {
+    @apply min-w-0;
+
+    /* Focusable from script only (where the focus goes when nothing else of the notice is left). */
+    &:focus-visible {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  /* The live region: always in the document, visually hidden, out of the flow (it is never a grid or
+     flex item of the container, so an empty notice adds no gap). `fixed`, not `absolute`: an absolute box
+     whose containing block is outside the scroll container could stretch the document and add a second
+     scroller; a fixed one never does. */
+  .rop-pro-rebase-notice__live {
+    @apply sr-only;
+    position: fixed;
+  }
+
+  .rop-pro-rebase-notice__text {
+    @apply m-0;
+  }
+
+  .rop-pro-rebase-notice__list {
+    @apply m-0 mt-2 flex list-none flex-col gap-3 p-0;
+  }
+
+  .rop-pro-rebase-notice__item {
+    @apply flex min-w-0 flex-col gap-1;
+
+    &:not(:first-child) {
+      @apply pt-3;
+      border-top: 1px solid var(--color-rop-border);
+    }
+  }
+
+  .rop-pro-rebase-notice__label {
+    @apply font-[500] [overflow-wrap:anywhere];
+  }
+
+  /* "Yours" and "Server" side by side while they fit, one under the other otherwise; a long value wraps. */
+  .rop-pro-rebase-notice__values {
+    @apply flex min-w-0 flex-wrap gap-x-4 gap-y-1;
+  }
+
+  .rop-pro-rebase-notice__side {
+    @apply min-w-0 [overflow-wrap:anywhere];
+  }
+
+  .rop-pro-rebase-notice__side-label {
+    @apply text-rop-text-muted;
+  }
+
+  .rop-pro-rebase-notice__actions {
+    @apply mt-1 flex min-w-0 flex-wrap gap-2;
+  }
+
   /* VirtualListReportTable (packages/pro/src/list-report/VirtualListReportTable.tsx): a virtualized row
      has a fixed pitch, so the content of its cells is capped at the row height and never grows the
      row. The `node` wrapper already clips (`overflow: hidden`); nothing else is clipped here (the
