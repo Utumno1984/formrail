@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import {
@@ -309,6 +310,30 @@ test.describe('Docs props tables', () => {
       const leaked: DocsPageFacts = { ...real, component: { ...component, propFiles: [...component.propFiles, path] } };
       expect(auditDocsPage(leaked, options)).toEqual([expect.stringContaining(`path "${path}" in the bundle is not repo-relative`)]);
     }
+  });
+
+  test('Button: the `size` row shows one description, true for both branches of the union (ticket #451)', async ({ page }) => {
+    // `size` is optional in the text branch (default `md`) and required in the icon branch (no default):
+    // the docgen merges the branches, so both TSDoc blocks must carry the same text, and the row must show
+    // exactly that text once (not two concatenated, not "Default `md`" next to the icon sizes).
+    const EXPECTED =
+      'Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a paragraph): the text sizes, default `md`. ' +
+      'The square icon-only sizes (`icon-xs` 24px, `icon-sm` 32px, `icon-md` 36px) have no default: pass one explicitly, ' +
+      'together with `aria-label` or `aria-labelledby` (there is no visible text).';
+    const { facts } = await realPage(page, 'Primitives/Button');
+    const rows = facts.rows.filter((r) => r.name === 'size');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.description).toBe(EXPECTED);
+    expect(facts.component?.props.size?.description).toBe(EXPECTED);
+
+    // Source: the TSDoc of `size` in every branch is the same text.
+    const source = readFileSync(new URL('../packages/core/src/button/Button.tsx', import.meta.url), 'utf8');
+    const blocks = [...source.matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*size\??: Button(?:Text|Icon)Size;/g)].map((m) =>
+      (m[1] ?? '').replace(/\n\s*\*/g, ' ').replace(/\s+/g, ' ').trim(),
+    );
+    expect(blocks).toHaveLength(2);
+    expect(new Set(blocks).size).toBe(1);
+    expect(blocks[0]).toBe(EXPECTED);
   });
 
   test('negative: a Radix prop dropped by the docgen filter, and a TSDoc inherited from @types/react, fail the guard', async ({ page }) => {
