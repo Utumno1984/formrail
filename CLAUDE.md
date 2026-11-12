@@ -40,10 +40,16 @@ la pipeline, senza saltare passaggi:
       smoke test sulla build (Storybook statico e/o il bundle pubblicato), casi non coperti.
    4. **critico-avversariale** → red team del diff, per ultimo, su codice già verde e verificato.
    5. Se tester o critico segnalano problemi, torna allo **sviluppatore** con l'elenco completo
-      e riparti dal punto 2 (CI). Dopo **2 respinte del critico-avversariale** sulla stessa PR
-      fermati e chiedi a Daniele: si contano le respinte del critico, non i ritorni allo
-      sviluppatore (decisione di Daniele del 2026-11-12, per avere un metro oggettivo). Un terzo
-      giro parte solo con la sua autorizzazione esplicita.
+      e riparti dal punto 2 (CI). **Limite (decisione di Daniele del 2026-11-12)**: dopo
+      **2 respinte del critico-avversariale**, oppure dopo **2 respinte del tester**, sullo stesso
+      ticket, fermati e chiedi a Daniele; si riprende solo su sua istruzione. Come si conta:
+      - i due conteggi sono separati (2 del critico, 2 del tester) e non si sommano;
+      - si contano le respinte, non i ritorni allo sviluppatore: è un metro oggettivo;
+      - una CI rossa non è una respinta: torna allo sviluppatore senza entrare nel conteggio;
+      - il conteggio è per ticket, non per PR: chiudere una PR e aprirne un'altra sullo stesso
+        ticket non lo azzera;
+      - conta anche la respinta di un giro ristretto ai soli punti segnalati nel giro precedente,
+        e anche se il problema trovato è nuovo.
    6. Quando CI verde, tester = QA SUPERATO e critico = APPROVATO: `gh pr ready <N>` e riepilogo
       (cosa cambia, test aggiunti, note del critico).
 3. **Merge**: lo fa la sessione principale di questo progetto, in autonomia (delega di Daniele del
@@ -53,9 +59,9 @@ la pipeline, senza saltare passaggi:
    (`.claude/agents/`) e le sessioni headless delegate non uniscono mai. Niente push diretti su
    `main` né push forzati.
 4. **Versione e pubblicazione npm**: il bump di versione di una PR che tocca `package.json` lo
-   decide la sessione principale (decisione di Daniele del 2026-11-12), mai un agente. La
-   pubblicazione non rientra nella delega del merge: niente `npm publish` senza un'istruzione
-   esplicita di Daniele.
+   decide la sessione che coordina la pipeline (decisione di Daniele del 2026-11-12), mai uno
+   degli agenti di `.claude/agents/`. La pubblicazione non rientra nella delega del merge:
+   niente `npm publish` senza un'istruzione esplicita di Daniele.
 
 ### Comandi `gh`
 
@@ -92,7 +98,8 @@ ma sono priorità non regole rigide:
 prioritario")**: Formrail è ora **prioritario**, non più un progetto a ritmo lento in
 parallelo sul SaaS di approvazione fatture/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
 step salvo una vera decisione da chiedere a Daniele (vedi anche la nota sulla pipeline ad
-oltranza nella memoria dell'orchestratore di `~/projects`, scritta quando coordinava lui).
+oltranza nella memoria dell'orchestratore di `~/projects`, scritta quando il coordinamento era
+suo).
 
 ## Regressione e test
 
