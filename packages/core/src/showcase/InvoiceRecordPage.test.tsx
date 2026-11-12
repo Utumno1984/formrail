@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { InvoiceRecordPage } from './InvoiceRecordPage';
+import { InvoiceEditor, InvoiceRecordPage, type UseInvoiceEditorAddons } from './InvoiceRecordPage';
 import { createInvoiceStore, type InvoiceStore } from './invoice-store';
 
 beforeEach(() => {
@@ -321,5 +322,36 @@ describe('InvoiceRecordPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
     await screen.findByRole('dialog');
     check();
+  });
+});
+
+describe('InvoiceEditor: the story-only useAddons extension point (#384)', () => {
+  // An addon with state of its own: swapping it for another hook under a mounted editor would break the order of
+  // the hooks (React throws).
+  const useCounterAddons: UseInvoiceEditorAddons = () => {
+    const [count] = useState(1);
+    return { notice: <p>{`addon ${count}`}</p> };
+  };
+
+  it('the hook chosen at mount is kept for the life of the editor; a change of the prop warns in development', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const store = createInvoiceStore();
+    const record = await store.get('inv-2');
+    const ui = (useAddons: UseInvoiceEditorAddons | undefined) => (
+      <InvoiceEditor store={store} record={record} onBack={vi.fn()} focusTitleOnMount={false} useAddons={useAddons} />
+    );
+    const view = render(ui(useCounterAddons));
+    expect(screen.getByText('addon 1')).toBeTruthy();
+    view.rerender(ui(undefined));
+    // Still the addon of the mount: no hook-order error, the notice still there.
+    expect(screen.getByText('addon 1')).toBeTruthy();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('useAddons changed'));
+    warn.mockRestore();
+  });
+
+  it('a creation (no record) never calls the addon hook', () => {
+    const addon = vi.fn(() => ({}));
+    render(<InvoiceEditor store={createInvoiceStore()} record={null} onBack={vi.fn()} focusTitleOnMount={false} today="2026-11-09" useAddons={addon} />);
+    expect(addon).not.toHaveBeenCalled();
   });
 });

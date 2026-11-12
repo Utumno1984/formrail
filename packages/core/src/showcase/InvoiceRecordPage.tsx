@@ -16,6 +16,7 @@ import { ObjectPageSection } from '../object-page/ObjectPageSection';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { useObjectPageForm, type UseObjectPageFormReturn } from '../object-page/use-object-page-form';
+import { isDev } from '../internal/is-dev';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { Select } from '../select/Select';
 import { StatusBadge } from '../status-badge/StatusBadge';
@@ -129,8 +130,9 @@ export interface InvoiceEditorAddons {
 
 /**
  * Story-only extension point (#384, used by the Pro story "Invoices with Change Summary"): a hook called at
- * every render of the editor of an EXISTING invoice (never a creation), always the same one for the life of the
- * editor. Absent, nothing changes.
+ * every render of the editor of an EXISTING invoice (never a creation). The hook is chosen when the editor mounts
+ * and kept for its whole life (a different hook later would change the order of the hooks): a later change of the
+ * prop is ignored, with a warning in development; remount the editor (`key`) to change it. Absent, nothing changes.
  */
 export type UseInvoiceEditorAddons = (context: InvoiceEditorAddonContext) => InvoiceEditorAddons;
 
@@ -420,8 +422,15 @@ export function InvoiceEditor({
           close: 'Close',
         },
   });
-  // #384: one hook for the life of the editor (`record` and `useAddons` never change under a mounted editor).
-  const useAddons = (record && useAddonsProp) || useNoAddons;
+  // #384: ONE hook for the life of the editor, chosen at mount: calling another one later (the prop removed or
+  // replaced) would change the order of the hooks. A later change of the prop is ignored, with a warning.
+  const [useAddons] = useState<UseInvoiceEditorAddons>(() => (record && useAddonsProp) || useNoAddons);
+  const mountedAddons = useRef(useAddonsProp);
+  useEffect(() => {
+    if (useAddonsProp !== mountedAddons.current && isDev()) {
+      console.warn('[showcase] InvoiceEditor: useAddons changed after the mount; the hook of the mount is kept (remount the editor with a `key` to change it).');
+    }
+  }, [useAddonsProp]);
   const addons = useAddons({ form, record: record as StoredInvoice, store, toValues });
   const reviewSave = addons.reviewSave ?? reviewSaveProp;
   const help = addons.fieldHelp;
