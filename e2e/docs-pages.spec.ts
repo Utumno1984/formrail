@@ -8,7 +8,16 @@ interface IndexEntry {
   id: string;
   type?: string;
   title: string;
+  importPath?: string;
 }
+
+/**
+ * Docs pages with no story, so no "Show code" to offer: the Introduction, and the reference pages generated
+ * from the TSDoc (ticket #402, `.storybook/reference/*.mdx`: text and tables only). Every other check below
+ * still applies to them.
+ */
+const withoutStories = (entry: IndexEntry) =>
+  entry.id === 'introduction--docs' || (entry.importPath ?? '').startsWith('./.storybook/reference/');
 
 test.describe('Storybook Docs pages', () => {
   test('every Docs page renders, is not hidden or locked by a story, and offers "Show code"', async ({ page, request }) => {
@@ -39,7 +48,7 @@ test.describe('Storybook Docs pages', () => {
       }));
       expect(state.hidden, `${entry.id}: the Docs page is aria-hidden (a modal opened by a story)`).toBe(false);
       expect(state.locked, `${entry.id}: body has pointer-events none (a modal opened by a story)`).toBe(false);
-      if (entry.id !== 'introduction--docs') expect(state.showCode, `${entry.id}: no "Show code"`).toBeGreaterThan(0);
+      if (!withoutStories(entry)) expect(state.showCode, `${entry.id}: no "Show code"`).toBeGreaterThan(0);
     }
   });
 });
