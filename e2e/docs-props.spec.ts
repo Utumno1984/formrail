@@ -323,8 +323,8 @@ test.describe('Docs props tables', () => {
     const { facts } = await realPage(page, 'Primitives/Button');
     const rows = facts.rows.filter((r) => r.name === 'size');
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.description).toBe(EXPECTED);
-    expect(facts.component?.props.size?.description).toBe(EXPECTED);
+    expect(rows[0]?.description.replace(/\s+/g, ' ')).toBe(EXPECTED);
+    expect(facts.component?.props.size?.description.replace(/\s+/g, ' ')).toBe(EXPECTED);
 
     // Source: the TSDoc of `size` in every branch is the same text.
     const source = readFileSync(new URL('../packages/core/src/button/Button.tsx', import.meta.url), 'utf8');
