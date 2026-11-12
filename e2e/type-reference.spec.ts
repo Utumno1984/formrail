@@ -85,6 +85,22 @@ test.describe('Type reference: fixture page (inline code, structural types, bran
     await expect(entry).toContainText('ClassArray');
   });
 
+  test('the same reference twice on a page: no repeated id, no repeated region name, the first keeps the deep links', async ({ page }) => {
+    await page.goto(FIXTURE);
+    await expect(page.locator('[data-type-reference="ButtonProps"]')).toHaveCount(2);
+    await expect(page.locator('[data-type-reference="cn"]')).toHaveCount(2);
+    // The second rendering renames itself after mount: wait for it.
+    await expect(page.locator('#buttonprops-2')).toHaveCount(1);
+    await expect(page.locator('#cn-2')).toHaveCount(1);
+    const ids = await page.locator('[id]').evaluateAll((nodes) => nodes.map((n) => n.id));
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+    const names = await page.getByRole('region').evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label') ?? ''));
+    expect(names.filter((name, index) => names.indexOf(name) !== index)).toEqual([]);
+    expect(names).toContain('cn parameters');
+    expect(names).toContain('cn parameters (2)');
+    await expect(page.locator('[data-type-reference="ButtonProps"]').first().locator('h3')).toHaveAttribute('id', 'buttonprops');
+  });
+
   test('a branch section never says "Inherited from" itself', async ({ page }) => {
     await page.goto(FIXTURE);
     const entry = page.locator('[data-type-reference="AccordionProps"]');

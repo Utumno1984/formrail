@@ -2,8 +2,8 @@
 //
 // Reads the public entries of the packages (`packages/core/src/index.ts`, `packages/pro/src/index.ts`) with
 // the TypeScript compiler API (already a devDependency: no TypeDoc, no second pipeline) and returns a plain
-// JSON object that the MDX blocks of `.storybook/blocks/TypeReference.tsx` render. The Storybook build
-// generates it on demand (Vite plugin in `.storybook/type-reference-plugin.ts`, a virtual module): it is never
+// JSON object that the MDX blocks of `.storybook/type-reference-blocks.tsx` render. The Storybook build
+// generates it on demand (Vite plugin in `.storybook/type-reference-plugin.mjs`, a virtual module): it is never
 // written to the repo, so it cannot go stale. `findUndocumented` is the guard (scripts/type-reference.test.mjs).
 //
 // What one entry holds:
@@ -16,8 +16,8 @@
 // Left out: what is tagged `@internal`; members inherited from `@types/react` (the HTML/DOM attributes every
 // component accepts, hundreds of rows with no project TSDoc: summarised by the `inherits` line instead, the
 // same rule as the props tables of ticket #401); components (their props tables document them).
-import { existsSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -54,13 +54,120 @@ export function referenceCompilerOptions(root = REPO_ROOT) {
   };
 }
 
-/** A TypeScript program over the entries. Pass the previous one to reuse its unchanged files (dev server). */
-export function createReferenceProgram(entries, { compilerOptions = referenceCompilerOptions(), oldProgram } = {}) {
-  return ts.createProgram({ rootNames: entries.map((e) => e.file), options: compilerOptions, oldProgram });
+/**
+ * A compiler host that keeps every parsed `SourceFile` and hands the same object back while the file's
+ * modification time is unchanged (the dev server: `lib.*.d.ts`, `@types/react` and the untouched sources are
+ * parsed once, not on every save). Without one, `ts.createProgram({ oldProgram })` reads and parses every file
+ * again: it reuses an old file only when the host returns that very object.
+ */
+export function createCachingHost(compilerOptions) {
+  const host = ts.createCompilerHost(compilerOptions);
+  const getSourceFile = host.getSourceFile.bind(host);
+  const cache = new Map();
+  host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) => {
+    let mtime;
+    try {
+      mtime = statSync(fileName).mtimeMs;
+    } catch {
+      return getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile);
+    }
+    const hit = cache.get(fileName);
+    if (hit && hit.mtime === mtime && !shouldCreateNewSourceFile) return hit.file;
+    const file = getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile);
+    if (file) cache.set(fileName, { mtime, file });
+    return file;
+  };
+  return host;
+}
+
+/**
+ * A TypeScript program over the entries. Pass the previous one and a `createCachingHost` host to reuse its
+ * unchanged files (dev server).
+ */
+export function createReferenceProgram(entries, { compilerOptions = referenceCompilerOptions(), oldProgram, host } = {}) {
+  return ts.createProgram({ rootNames: entries.map((e) => e.file), options: compilerOptions, oldProgram, host });
 }
 
 // ---------------------------------------------------------------------------------------------------------
 // TSDoc helpers
+
+/**
+ * The inline code spans of one markdown paragraph, by the CommonMark rule: a run of N backticks opens a span
+ * that the next run of exactly N backticks closes (```` ``a`b`` ```` is one span); a run with no closing run
+ * is a literal backtick (`unpaired`), and so is an escaped one (`` \` ``). Returns `{ spans, unpaired }`:
+ * `spans` as `[start, end)` offsets (delimiters included), `unpaired` as the offsets of the lonely runs.
+ */
+export function scanCodeSpans(paragraph) {
+  const spans = [];
+  const unpaired = [];
+  const runAt = (i) => {
+    let n = 0;
+    while (paragraph[i + n] === '`') n += 1;
+    return n;
+  };
+  let i = 0;
+  while (i < paragraph.length) {
+    const char = paragraph[i];
+    if (char === '\\' && paragraph[i + 1] === '`') {
+      i += 2;
+      continue;
+    }
+    if (char !== '`') {
+      i += 1;
+      continue;
+    }
+    const n = runAt(i);
+    let close = -1;
+    for (let j = i + n; j < paragraph.length; ) {
+      if (paragraph[j] !== '`') {
+        j += 1;
+        continue;
+      }
+      const m = runAt(j);
+      if (m === n) {
+        close = j;
+        break;
+      }
+      j += m;
+    }
+    if (close === -1) {
+      unpaired.push(i);
+      i += n;
+    } else {
+      spans.push([i, close + n]);
+      i = close + n;
+    }
+  }
+  return { spans, unpaired };
+}
+
+/**
+ * The paragraphs of a markdown text outside its fenced code blocks, as `{ text, line }` (`line`: 0-based line
+ * of the first line of the paragraph), in order. A paragraph ends at a blank line or at a fence.
+ */
+export function markdownParagraphs(text) {
+  const out = [];
+  let fenced = false;
+  let paragraph = [];
+  let start = 0;
+  const flush = () => {
+    if (paragraph.length > 0) out.push({ text: paragraph.join('\n'), line: start });
+    paragraph = [];
+  };
+  text.split('\n').forEach((line, index) => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      flush();
+      fenced = !fenced;
+    } else if (fenced || line.trim() === '') {
+      flush();
+    } else {
+      if (paragraph.length === 0) start = index;
+      paragraph.push(line);
+    }
+  });
+  flush();
+  return out;
+}
 
 /**
  * A line break inside an inline code span is a break of the comment's layout in the source, not of the text:
@@ -68,30 +175,20 @@ export function createReferenceProgram(entries, { compilerOptions = referenceCom
  * split it). Fenced code blocks and paragraphs (separated by a blank line) are left as they are.
  */
 export function joinInlineCodeSpans(text) {
-  const out = [];
-  let fenced = false;
-  let paragraph = [];
-  const flush = () => {
-    if (paragraph.length === 0) return;
-    out.push(paragraph.join('\n').replace(/`[^`]+`/g, (span) => span.replace(/\s*\n\s*/g, ' ')));
-    paragraph = [];
-  };
-  for (const line of text.split('\n')) {
-    if (/^\s*(```|~~~)/.test(line)) {
-      if (!fenced) flush();
-      fenced = !fenced;
-      out.push(line);
-    } else if (fenced) {
-      out.push(line);
-    } else if (line.trim() === '') {
-      flush();
-      out.push(line);
-    } else {
-      paragraph.push(line);
+  const lines = text.split('\n');
+  // Bottom-up, so the line numbers of the paragraphs still to rewrite stay valid.
+  for (const { text: paragraph, line } of markdownParagraphs(text).reverse()) {
+    const { spans } = scanCodeSpans(paragraph);
+    let joined = '';
+    let last = 0;
+    for (const [start, end] of spans) {
+      joined += paragraph.slice(last, start) + paragraph.slice(start, end).replace(/\s*\n\s*/g, ' ');
+      last = end;
     }
+    joined += paragraph.slice(last);
+    lines.splice(line, paragraph.split('\n').length, ...joined.split('\n'));
   }
-  flush();
-  return out.join('\n');
+  return lines.join('\n');
 }
 
 const normalise = (text) => joinInlineCodeSpans(text.replace(/\r\n/g, '\n').trim());
@@ -103,6 +200,12 @@ function partsToMarkdown(parts) {
   let inLink = false;
   let linkText = '';
   for (const part of parts) {
+    // The checker puts a `lineBreak` part between the comments of two declarations (the overloads of a
+    // function): two paragraphs, not one.
+    if (part.kind === 'lineBreak') {
+      out += '\n\n';
+      continue;
+    }
     if (part.kind === 'link') {
       if (part.text.startsWith('{@link')) {
         inLink = true;
@@ -132,31 +235,87 @@ const hasTag = (tags, name) => tags.some((t) => t.name === name);
 /** Tags of a declaration node (not of the symbol: an alias would merge the tags of its target). */
 const nodeTags = (node) => ts.getJSDocTags(node).map((t) => ({ name: t.tagName.text, text: t.comment }));
 
-const isInternalNode = (node) => nodeTags(node).some((t) => t.name === 'internal');
+/**
+ * `@internal` on the declaration itself, or, for a re-export (`export { foo } from './x'`), on the
+ * `export { ... }` statement: the comment belongs to the statement, not to the specifier.
+ */
+const isInternalNode = (node) =>
+  nodeTags(node).some((t) => t.name === 'internal') ||
+  (ts.isExportSpecifier(node) && nodeTags(node.parent.parent).some((t) => t.name === 'internal'));
 
-const CODE_SPAN = /^`([^`]+)`/;
-const TOKEN = /^(-?\d[\w.%]*|true|false|null|undefined|yes|no)\b/;
+// A code span with any number of backticks (```` ``a`b`` ````): its content is group 2.
+const CODE_SPAN = /^(`+)(?!`)([\s\S]*?[^`])\1(?!`)/;
+// A bare value: a number with an optional unit (`300`, `1.5`, `120px`, `100%`) or a keyword. The lookahead
+// keeps a sentence's full stop out of the number ("Default 300.") and a `%` in it ("100% of the box").
+const TOKEN = /^(-?\d+(?:\.\d+)?[a-z%]*|true|false|null|undefined|yes|no)(?![\w%]|\.\d)/;
+// A second value right after the first one ("Default `filter`, `q`, `sort`", "`1 item` / `${n} items`"): the
+// default is composite and said in the description; the column shows nothing rather than its first piece.
+const NEXT_VALUE = /^\s*[,/]\s*(?:(?:and|or)\s+)?(?:`|-?\d|(?:true|false|null|yes|no)\b)/;
 // "Default `x`", "Default: `x`", "Default 300;", "(default 120px)", "(default: yes)": at the start of a
 // sentence or after an opening parenthesis, so "defaults to `defaultFilter`, else the first" is not mistaken
 // for one (its value is a rule, said in the description).
 const PROSE_DEFAULT = /(?:^|[.;:!?]\s+|\n\s*|\(\s*)(?:Default|default)(?:\s+is)?:?\s+/g;
 
 /**
- * The default of a member: its `@default` tag, else the first "Default `x`" / "Default 300" of its prose.
- * `undefined` when neither says it as a value (a default described in words stays in the description).
+ * The default of a member as written: its `@default` tag, else (unless `prose: false`) the first
+ * "Default `x`" / "Default 300" of its prose. `undefined` when neither says it as one value (a default
+ * described in words, or made of several values, stays in the description). See `presentDefault` for what
+ * the column shows.
  */
-export function defaultOf(description, tags = []) {
+export function defaultOf(description, tags = [], { prose = true } = {}) {
   const tag = tags.find((t) => t.name === 'default' || t.name === 'defaultValue');
   if (tag) {
     const text = tagText(tag);
-    if (text) return CODE_SPAN.exec(text)?.[1] ?? text;
+    if (text) return CODE_SPAN.exec(text)?.[2] ?? text;
   }
+  if (!prose) return undefined;
   for (const match of description.matchAll(PROSE_DEFAULT)) {
     const rest = description.slice(match.index + match[0].length);
-    const value = CODE_SPAN.exec(rest)?.[1] ?? TOKEN.exec(rest)?.[1];
-    if (value) return value;
+    const span = CODE_SPAN.exec(rest);
+    const token = span ? undefined : TOKEN.exec(rest);
+    const found = span ?? token;
+    if (!found) continue;
+    if (NEXT_VALUE.test(rest.slice(found[0].length))) return undefined;
+    return span ? span[2] : token[1];
   }
   return undefined;
+}
+
+/**
+ * What a type accepts, for `presentDefault`: its literal values as TypeScript writes them (`'asc'`, `3`,
+ * `true`, `null`, `undefined`) and whether it also takes any string, any number, a function, or anything else.
+ * @typedef {{ literals: string[], string?: boolean, number?: boolean, fn?: boolean, other?: boolean }} TypeShape
+ */
+
+/** Only a function (plus `null`/`undefined`): a default read from the prose would be a piece of its output. */
+export const isFunctionShape = (shape) =>
+  Boolean(shape.fn) && !shape.string && !shape.number && !shape.other && shape.literals.every((l) => l === 'null' || l === 'undefined');
+
+/**
+ * The default the column shows: a value assignable to the member's type, written the TypeScript way, or
+ * `undefined` when it is not one (in doubt the column stays empty; the prose stays in the description).
+ * - a literal of the type: `vertical` -> `'vertical'`, `"asc"` -> `'asc'`, `yes` -> `true`;
+ * - a type that takes any string: plain text is a string (`Next month` -> `'Next month'`, `100%` -> `'100%'`);
+ *   an expression (`labels.error`, `window.sessionStorage`, the name of a sibling member) stays as written;
+ * - a number for a type that takes numbers; `[]`, `{}` and expressions for any type that is not a closed set.
+ * @param {string} raw @param {TypeShape} shape @param {{ siblings?: string[] }} [options]
+ */
+export function presentDefault(raw, shape, { siblings = [] } = {}) {
+  let value = raw.trim();
+  const doubleQuoted = /^"([^"]*)"$/.exec(value);
+  if (doubleQuoted) value = `'${doubleQuoted[1]}'`;
+  const literals = new Set(shape.literals);
+  if ((value === 'yes' || value === 'no') && literals.has('true')) value = value === 'yes' ? 'true' : 'false';
+  if (literals.has(value)) return value;
+  if (literals.has(`'${value}'`)) return `'${value}'`;
+  const open = shape.string || shape.number || shape.fn || shape.other;
+  if (!open) return undefined;
+  if (/^'.*'$/.test(value)) return shape.string ? value : undefined;
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return shape.number ? value : undefined;
+  if (/^(?:true|false|null|undefined|yes|no)$/.test(value)) return undefined;
+  const expression = siblings.includes(value) || (/^[A-Za-z_$[{(]/.test(value) && /[.([{]/.test(value)) || value.includes('${');
+  if (expression) return value;
+  return shape.string ? `'${value.replace(/'/g, "\\'")}'` : undefined;
 }
 
 /** `@example` / `@deprecated` / ... that the reference renders, as markdown. */
@@ -192,6 +351,14 @@ class Extractor {
     this.program = program;
     this.checker = program.getTypeChecker();
     this.root = root;
+    // The defaults need the checker's type of every member; asking for it while the types are still being
+    // listed creates types in a different order and reorders the members of mapped types (`Omit<...>`):
+    // they are worked out once every entry is listed (`resolveDefaults`).
+    this.pendingDefaults = [];
+  }
+
+  resolveDefaults() {
+    for (const resolveDefault of this.pendingDefaults.splice(0)) resolveDefault();
   }
 
   location(node) {
@@ -225,11 +392,36 @@ class Extractor {
     return text;
   }
 
+  /** What a type accepts (`TypeShape`, for `presentDefault`). */
+  typeShape(type) {
+    const shape = { literals: [], string: false, number: false, fn: false, other: false };
+    for (const t of type.isUnion() ? type.types : [type]) {
+      if (t.isStringLiteral()) shape.literals.push(`'${t.value}'`);
+      else if (t.isNumberLiteral()) shape.literals.push(String(t.value));
+      else if (t.flags & (ts.TypeFlags.BooleanLiteral | ts.TypeFlags.Null | ts.TypeFlags.Undefined)) shape.literals.push(this.checker.typeToString(t));
+      else if (t.flags & (ts.TypeFlags.String | ts.TypeFlags.TemplateLiteral | ts.TypeFlags.StringMapping)) shape.string = true;
+      else if (t.flags & ts.TypeFlags.Number) shape.number = true;
+      else if (this.checker.getSignaturesOfType(t, ts.SignatureKind.Call).length > 0 && this.checker.getPropertiesOfType(t).length === 0) shape.fn = true;
+      else shape.other = true;
+    }
+    return shape;
+  }
+
+  /** The default shown for a member or a parameter of type `type` (see `defaultOf`, `presentDefault`). */
+  defaultFor(description, tags, type, siblings) {
+    const shape = this.typeShape(type);
+    // A function's prose says what it returns ("Default `(n)`"), never a function: only `@default` counts.
+    const raw = defaultOf(description, tags, { prose: !isFunctionShape(shape) });
+    return raw === undefined ? undefined : presentDefault(raw, shape, { siblings });
+  }
+
   /** The members of an object type: `{ members, external }`, `external` = how many came from `@types/react`. */
   members(type, ownerName, location) {
     const members = [];
     let external = 0;
-    for (const symbol of this.checker.getPropertiesOfType(type)) {
+    const properties = this.checker.getPropertiesOfType(type);
+    const siblings = properties.map((p) => p.name);
+    for (const symbol of properties) {
       const declarations = symbol.declarations ?? [];
       // Never the members of the standard library (`Array#length`, `Function#call`, ...): they belong to
       // a structural type the alias merely mentions, not to the public type.
@@ -257,8 +449,10 @@ class Extractor {
         description,
         ...extraDocs(tags),
       };
-      const fallback = defaultOf(description, tags);
-      if (fallback !== undefined) member.default = fallback;
+      this.pendingDefaults.push(() => {
+        const fallback = this.defaultFor(description, tags, this.checker.getTypeOfSymbolAtLocation(symbol, location), siblings);
+        if (fallback !== undefined) member.default = fallback;
+      });
       if (declaredIn && declaredIn !== ownerName) member.inheritedFrom = declaredIn;
       if (declaration) member.source = this.location(declaration);
       members.push(member);
@@ -380,6 +574,7 @@ class Extractor {
       const sigDecl = signature.getDeclaration();
       const typeParameters = sigDecl?.typeParameters ? sigDecl.typeParameters.map((p) => oneLine(p.getText())) : [];
       const sigTags = signature.getJsDocTags();
+      const siblings = signature.getParameters().map((p) => p.name);
       const parameters = signature.getParameters().map((param) => {
         const paramDecl = param.valueDeclaration;
         const text = paramDecl && ts.isParameter(paramDecl) && paramDecl.type ? oneLine(paramDecl.type.getText()) : checker.typeToString(checker.getTypeOfSymbolAtLocation(param, declaration), declaration, PRINT_FLAGS);
@@ -391,8 +586,14 @@ class Extractor {
           description: paramDescription,
         };
         if (paramDecl && ts.isParameter(paramDecl) && paramDecl.dotDotDotToken) out.rest = true;
-        const fallback = paramDecl && ts.isParameter(paramDecl) && paramDecl.initializer ? oneLine(paramDecl.initializer.getText()) : defaultOf(paramDescription);
-        if (fallback !== undefined) out.default = fallback;
+        // An initializer is code the compiler checked: shown as written.
+        if (paramDecl && ts.isParameter(paramDecl) && paramDecl.initializer) out.default = oneLine(paramDecl.initializer.getText());
+        else {
+          this.pendingDefaults.push(() => {
+            const fallback = this.defaultFor(paramDescription, [], checker.getTypeOfSymbolAtLocation(param, declaration), siblings);
+            if (fallback !== undefined) out.default = fallback;
+          });
+        }
         return out;
       });
       const returnType =
@@ -465,6 +666,7 @@ export function extractReference(program, entries, { root = REPO_ROOT } = {}) {
       byName[item.name] = item;
     }
   }
+  extractor.resolveDefaults();
   // "Inherited from" names only a public type (one with its own entry): a base the package does not export
   // (`AccordionBaseProps`, `ListReportFrameLabels`) would be a name the reader can find nowhere.
   for (const item of Object.values(byName)) {
@@ -529,6 +731,90 @@ export function findLeaks(reference, root = REPO_ROOT) {
   return problems;
 }
 
+/** Every markdown text of an entry (rendered with `<Markdown>`), as `[where, text]`: `where` names the member. */
+function* markdownTexts(entry) {
+  const own = (where, item) => [
+    [where, item.description ?? ''],
+    [where, item.deprecated ?? ''],
+    ...(item.examples ?? []).map((example) => [`${where} (example)`, example]),
+  ];
+  yield* own(entry.name, entry);
+  for (const group of [{ title: null, members: entry.members ?? [] }, ...(entry.variants ?? [])]) {
+    for (const member of group.members) yield* own(`${entry.name}.${member.name}${group.title ? ` (${group.title})` : ''}`, member);
+  }
+  for (const [index, signature] of (entry.signatures ?? []).entries()) {
+    const overload = entry.signatures.length > 1 ? ` (overload ${index + 1})` : '';
+    for (const parameter of signature.parameters) yield* own(`${entry.name}(${parameter.name})${overload}`, parameter);
+    yield [`${entry.name} returns${overload}`, signature.returns.description];
+  }
+}
+
+/**
+ * What the markdown renderer would get wrong in a description, an example or a deprecation: an unpaired
+ * backtick (the spans after it pair up wrongly, or one swallows the rest of the paragraph) and a `<` outside
+ * code (`Map<string, Row>`, `<b>` read as an HTML tag and dropped). One message per problem, naming the type
+ * and the member.
+ */
+export function findMarkdownProblems(reference) {
+  const problems = [];
+  for (const entry of Object.values(reference.entries)) {
+    for (const [where, text] of markdownTexts(entry)) {
+      for (const { text: paragraph } of markdownParagraphs(text)) {
+        const { spans, unpaired } = scanCodeSpans(paragraph);
+        if (unpaired.length > 0) problems.push(`${where}: unpaired backtick in "${paragraph.slice(Math.max(0, unpaired[0] - 20), unpaired[0] + 20)}"`);
+        let outside = '';
+        let last = 0;
+        for (const [start, end] of spans) {
+          outside += paragraph.slice(last, start);
+          last = end;
+        }
+        outside += paragraph.slice(last);
+        if (outside.includes('<')) problems.push(`${where}: "<" outside a code span (read as HTML): wrap the type or tag in backticks`);
+      }
+    }
+  }
+  return [...new Set(problems)];
+}
+
+/** The `.mdx` files under a directory, recursively (absolute paths). */
+function mdxFiles(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
+    d.isDirectory() ? (d.name === 'node_modules' ? [] : mdxFiles(join(dir, d.name))) : d.name.endsWith('.mdx') ? [join(dir, d.name)] : [],
+  );
+}
+
+/** The `<TypeReference name="..."/>` / `<FunctionReference name="..."/>` of an MDX source, as `{ block, name }`. */
+export function referenceBlocksOf(source) {
+  return [...source.matchAll(/<(TypeReference|FunctionReference)\s+name=(?:"([^"]*)"|'([^']*)'|\{\s*["'`]([^"'`]*)["'`]\s*\})/g)].map((m) => ({
+    block: m[1],
+    name: m[2] ?? m[3] ?? m[4],
+  }));
+}
+
+/**
+ * The reference blocks of an MDX page that the reference cannot render: a name that is not a public export,
+ * a type in `<FunctionReference>` or a function in `<TypeReference>`. One message per block, naming the page
+ * and the name (`page`: how to name the page in the messages).
+ */
+export function findUnknownReferences(reference, source, page) {
+  const problems = [];
+  for (const { block, name } of referenceBlocksOf(source)) {
+    const entry = reference.entries[name];
+    if (!entry) problems.push(`${page}: <${block} name="${name}"> is not a public export of the packages in this build`);
+    else if (block === 'TypeReference' && entry.kind === 'function') problems.push(`${page}: <TypeReference name="${name}"> is a function, use <FunctionReference>`);
+    else if (block === 'FunctionReference' && entry.kind !== 'function') problems.push(`${page}: <FunctionReference name="${name}"> is a type, use <TypeReference>`);
+  }
+  return problems;
+}
+
+/** `findUnknownReferences` over every MDX page of `.storybook/` (the guard). */
+export function findUnknownReferencesInPages(reference, root = REPO_ROOT) {
+  return mdxFiles(resolve(root, '.storybook')).flatMap((file) =>
+    findUnknownReferences(reference, readFileSync(file, 'utf8'), relative(root, file).split('\\').join('/')),
+  );
+}
+
 // CLI: `node scripts/type-reference.mjs [--json]` prints the gaps (or the whole JSON).
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const started = performance.now();
@@ -536,7 +822,12 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv.includes('--json')) {
     process.stdout.write(`${JSON.stringify(reference, null, 2)}\n`);
   } else {
-    const problems = findUndocumented(reference);
+    const problems = [
+      ...findUndocumented(reference),
+      ...findMarkdownProblems(reference),
+      ...findLeaks(reference),
+      ...findUnknownReferencesInPages(reference),
+    ];
     const count = Object.keys(reference.entries).length;
     console.log(`${count} entries in ${Math.round(performance.now() - started)} ms`);
     for (const problem of problems) console.log(problem);

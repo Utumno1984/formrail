@@ -1,15 +1,23 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   REPO_ROOT,
+  createCachingHost,
+  createReferenceProgram,
   defaultOf,
+  extractReference,
   findLeaks,
+  findMarkdownProblems,
   findUndocumented,
+  findUnknownReferences,
+  findUnknownReferencesInPages,
   generateReference,
   joinInlineCodeSpans,
+  presentDefault,
   publicEntries,
+  referenceCompilerOptions,
 } from './type-reference.mjs';
 import { typeReferencePlugin, withTypeReference } from '../.storybook/type-reference-plugin.mjs';
 
@@ -47,7 +55,8 @@ describe('type reference: extraction (#402)', () => {
     const byName = Object.fromEntries(reference.entries.ListReportColumn.members.map((m) => [m.name, m]));
     expect(byName.firstSortDirection.default).toBe("'asc'");
     expect(byName.truncate.default).toBe('true');
-    expect(byName.minWidth.default).toBe('120px');
+    // A string for a `number | string` member, written the TypeScript way (review round 2, point 3).
+    expect(byName.minWidth.default).toBe("'120px'");
     expect(byName.cell.type).toBe('(row: Row) => ReactNode');
   });
 
@@ -202,9 +211,12 @@ describe('type reference: the guard fails on a type without TSDoc', () => {
         '  hidden?: boolean;',
         '}',
         'export function fakeHook(options: FakeOptions): void { void options; }',
+        '/** @internal */',
+        "export { foo } from './x';",
         '',
       ].join('\n'),
     );
+    writeFileSync(join(dir, 'x.ts'), '/** Documented, but re-exported as internal. */\nexport function foo(): void {}\n');
     fixture = generateReference({ root: dir, entries: [{ package: 'fake', file: join(dir, 'index.ts') }] }).reference;
   }, 60_000);
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -220,6 +232,10 @@ describe('type reference: the guard fails on a type without TSDoc', () => {
     const names = fixture.entries.FakeOptions.members.map((m) => m.name);
     expect(names).toEqual(['documented', 'undocumented']);
     expect(fixture.entries.FakeOptions.members[0].default).toBe('3');
+  });
+
+  it('leaves out a re-export tagged @internal on the export statement', () => {
+    expect(Object.keys(fixture.entries)).toEqual(['FakeOptions', 'fakeHook']);
   });
 });
 
@@ -262,4 +278,378 @@ describe('typeReferencePlugin', () => {
     const out = await config.viteFinal({}, {});
     expect(out.plugins.map((p) => p.name)).toEqual(['own', 'formrail:type-reference']);
   });
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Review round 2 (PR #437)
+
+describe('findLeaks: fires on each leak', () => {
+  it('names the internal subpath, the inline import() type and the absolute path, one message each', () => {
+    const root = '/build/machine/formrail';
+    const synthetic = {
+      entries: {
+        X: {
+          name: 'X',
+          kind: 'type',
+          description: 'See `@formrail/core/internal`.',
+          definition: 'import("./x").Y',
+          source: `${root}/packages/core/src/x.ts:1`,
+        },
+        Clean: { name: 'Clean', kind: 'type', description: 'Nothing to see.', definition: "'a'", source: 'packages/core/src/x.ts:2' },
+      },
+    };
+    expect(findLeaks(synthetic, root)).toEqual([
+      'X: mentions @formrail/core/internal',
+      'X: has an inline import("...") type',
+      'X: has an absolute path of this machine',
+    ]);
+  });
+});
+
+describe('defaultOf / presentDefault: a default shown is a value of the type', () => {
+  it.each([
+    ['Default true.', 'true'],
+    ['Width. Default 100% of the container.', '100%'],
+    ['Ratio. Default 1.5.', '1.5'],
+    ['Milliseconds. Default 300.', '300'],
+    ['Default ``a`b``.', 'a`b'],
+  ])('%j -> %j', (text, expected) => {
+    expect(defaultOf(text)).toBe(expected);
+  });
+
+  it.each(['Names of the parameters. Default `filter`, `q`, `sort`.', 'Announced. Default `1 item selected` / `${n} items selected`.', 'Default 1, 2.'])(
+    'a composite default is not a value: %j',
+    (text) => {
+      expect(defaultOf(text)).toBeUndefined();
+    },
+  );
+
+  it('prose: false reads only the @default tag (function members)', () => {
+    expect(defaultOf('Count. Default `(n)`.', [], { prose: false })).toBeUndefined();
+    expect(defaultOf('Count.', [{ name: 'default', text: [{ kind: 'text', text: '`(n) => String(n)`' }] }], { prose: false })).toBe('(n) => String(n)');
+  });
+
+  const literals = (...values) => ({ literals: values });
+  it.each([
+    ['vertical', literals("'vertical'", "'horizontal'"), "'vertical'"],
+    ['"asc"', literals("'asc'", "'desc'"), "'asc'"],
+    ["'asc'", literals("'asc'", "'desc'"), "'asc'"],
+    ['yes', literals('false', 'true', 'undefined'), 'true'],
+    ['no', literals('false', 'true'), 'false'],
+    ['default', literals("'disabled'"), undefined],
+    ['md', literals("'icon-sm'", "'icon-md'"), undefined],
+    ['3', literals('1', '2', '3'), '3'],
+    ['Next month', { literals: ['undefined'], string: true }, "'Next month'"],
+    ['100%', { literals: [], string: true, number: true }, "'100%'"],
+    ['100', { literals: [], string: true, number: true }, '100'],
+    ['300', { literals: [], string: true }, undefined],
+    ['F8', { literals: ['null'], string: true }, "'F8'"],
+    ['labels.error', { literals: [], string: true, other: true }, 'labels.error'],
+    ['searchLabel', { literals: [], string: true }, 'searchLabel'],
+    ['[]', { literals: [], other: true }, '[]'],
+    ['yes', { literals: [], string: true }, undefined],
+    ['plain', { literals: [], other: true }, undefined],
+  ])('%j for %j -> %j', (raw, shape, expected) => {
+    expect(presentDefault(raw, shape, { siblings: ['searchLabel'] })).toBe(expected);
+  });
+
+  it('the real reference: no yes/no, and the default of a closed type is one of its values', () => {
+    const entries = reference.entries;
+    /** The values of a type text that is a union of literals (through the aliases of the reference), else null. */
+    const literalSet = (text, seen = new Set()) => {
+      const out = [];
+      for (const branch of text.split('|').map((b) => b.trim())) {
+        if (/^'[^']*'$|^-?\d+(\.\d+)?$|^(true|false|null|undefined)$/.test(branch)) out.push(branch);
+        else if (branch === 'boolean') out.push('true', 'false');
+        else if (/^\w+$/.test(branch) && entries[branch]?.definition && !seen.has(branch)) {
+          seen.add(branch);
+          const inner = literalSet(entries[branch].definition, seen);
+          if (!inner) return null;
+          out.push(...inner);
+        } else return null;
+      }
+      return out;
+    };
+    const wrong = [];
+    let checked = 0;
+    for (const entry of Object.values(entries)) {
+      const groups = [entry.members ?? [], ...(entry.variants ?? []).map((v) => v.members), ...(entry.signatures ?? []).map((s) => s.parameters)];
+      for (const member of groups.flat()) {
+        if (member.default === undefined) continue;
+        if (/^(yes|no)$/.test(member.default)) wrong.push(`${entry.name}.${member.name}: ${member.default}`);
+        if (member.type === 'string' && !/^'.*'$/.test(member.default) && !/^[\w$.]+$/.test(member.default)) wrong.push(`${entry.name}.${member.name}: ${member.default}`);
+        const values = literalSet(member.type);
+        if (!values) continue;
+        checked += 1;
+        if (!values.includes(member.default)) wrong.push(`${entry.name}.${member.name}: ${member.default} is not one of ${values.join(' | ')}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+    expect(checked).toBeGreaterThan(20);
+  });
+
+  it('the cases of the review, on the real reference', () => {
+    const member = (type, name) => reference.entries[type].members.find((m) => m.name === name);
+    expect(member('SkeletonProps', 'width').default).toBe("'100%'");
+    expect(member('UseListReportUrlStateOptions', 'params').default).toBeUndefined();
+    expect(member('ListReportLabels', 'count').default).toBeUndefined();
+    expect(member('VirtualListReportLabels', 'count').default).toBeUndefined();
+    expect(member('MultiSelectLabels', 'selectedCount').default).toBeUndefined();
+    expect(member('DatePickerLabels', 'chooseDateSelected').default).toBeUndefined();
+    expect(member('ListReportColumn', 'searchable').default).toBe('true');
+    expect(member('AccordionProps', 'orientation').default).toBe("'vertical'");
+    expect(member('ListReportFilterBarProps', 'searchPlaceholder').default).toBe('searchLabel');
+  });
+});
+
+/** The inline code spans of a paragraph by a regex (an independent reading of the CommonMark rule). */
+function regexSpans(paragraph) {
+  const pattern = /(?<!`)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g;
+  const spans = [...paragraph.matchAll(pattern)].map((m) => m[0]);
+  const rest = paragraph.replace(pattern, '').replace(/\\`/g, '');
+  return { spans, stray: rest.includes('`') };
+}
+
+describe('inline code spans: multiple backticks, stray backticks (review round 2, point 4)', () => {
+  it('joins a double-backtick span broken over lines', () => {
+    expect(joinInlineCodeSpans('Text ``x`y\nz`` end.')).toBe('Text ``x`y z`` end.');
+  });
+
+  it('a stray backtick pairs as CommonMark pairs it, and the guard names it', () => {
+    const text = 'Stray ` tick, then `foo\nbar` end';
+    // CommonMark: "` tick, then `" is the span, the last backtick is literal; nothing to join.
+    expect(joinInlineCodeSpans(text)).toBe(text);
+    const problems = findMarkdownProblems({ entries: { T: { name: 'T', kind: 'type', description: '', members: [{ name: 'm', description: text }] } } });
+    expect(problems).toEqual([expect.stringMatching(/^T\.m: unpaired backtick/)]);
+  });
+
+  it('every generated text: no span broken over lines, no stray backtick (independent check, outside fences)', () => {
+    const broken = [];
+    for (const [entryName, entry] of Object.entries(reference.entries)) {
+      for (const [path, text] of textsOf(entry)) {
+        let fenced = false;
+        const paragraphs = [[]];
+        for (const line of text.split('\n')) {
+          if (/^\s*(```|~~~)/.test(line)) {
+            fenced = !fenced;
+            paragraphs.push([]);
+          } else if (!fenced) {
+            if (line.trim() === '') paragraphs.push([]);
+            else paragraphs.at(-1).push(line);
+          }
+        }
+        for (const paragraph of paragraphs.map((lines) => lines.join('\n'))) {
+          const { spans, stray } = regexSpans(paragraph);
+          if (stray || spans.some((span) => span.includes('\n'))) broken.push(`${entryName}${path}`);
+        }
+      }
+    }
+    expect(broken).toEqual([]);
+    expect(findMarkdownProblems(reference)).toEqual([]);
+  });
+});
+
+describe('markdown guard: "<" outside code (review round 2, point 9)', () => {
+  it('fails on a type or a tag outside backticks, naming type and member; not inside a span or a fence', () => {
+    const entry = {
+      name: 'T',
+      kind: 'type',
+      description: 'A `Map<string, Row>` is fine.\n\n```tsx\n<Button />\n```',
+      members: [
+        { name: 'rows', description: 'A Map<string, Row> of rows.' },
+        { name: 'bold', description: 'A <b>bold</b> word.' },
+      ],
+    };
+    expect(findMarkdownProblems({ entries: { T: entry } })).toEqual([
+      expect.stringMatching(/^T\.rows: "<" outside a code span/),
+      expect.stringMatching(/^T\.bold: "<" outside a code span/),
+    ]);
+  });
+});
+
+describe('MDX pages: unknown names fail early (review round 2, point 8)', () => {
+  it('names the page and the name', () => {
+    const source = '<TypeReference name="Nope" />\n<FunctionReference name="UseListReportOptions" />\n<TypeReference name="useListReport" />\n<TypeReference name="ListReportSort" />';
+    expect(findUnknownReferences(reference, source, 'page.mdx')).toEqual([
+      'page.mdx: <TypeReference name="Nope"> is not a public export of the packages in this build',
+      'page.mdx: <FunctionReference name="UseListReportOptions"> is a type, use <TypeReference>',
+      'page.mdx: <TypeReference name="useListReport"> is a function, use <FunctionReference>',
+    ]);
+  });
+
+  it('every reference block of the .storybook pages names an entry of the right kind', () => {
+    expect(findUnknownReferencesInPages(reference)).toEqual([]);
+  });
+});
+
+describe('generator branches (review round 2, point 5)', () => {
+  let root;
+  let fixture;
+  const indexFile = () => join(root, 'packages/core/src/index.ts');
+  beforeAll(() => {
+    root = mkdtempSync(join(tmpdir(), 'type-reference-branches-'));
+    mkdirSync(join(root, 'packages/core/src'), { recursive: true });
+    mkdirSync(join(root, '.storybook'), { recursive: true });
+    writeFileSync(join(root, 'tsconfig.base.json'), JSON.stringify({ compilerOptions: { strict: true, module: 'ESNext', moduleResolution: 'Bundler', target: 'ES2022' } }));
+    writeFileSync(
+      indexFile(),
+      [
+        '/** Rows. */',
+        'export interface RowList extends Array<string> {',
+        '  /** Total. */',
+        '  total: number;',
+        '}',
+        '/** Sized. */',
+        'export interface Sized extends Array<string> {',
+        '  /** Own length. */',
+        '  length: number;',
+        '}',
+        '/** Flags. */',
+        "export type Flags = { [K in 'a' | 'b']?: boolean };",
+        '/** A choice. */',
+        'export type Choice =',
+        '  | { /** A. */ a: string; /** Never. */ n: never; /** Shared. */ shared?: number }',
+        '  | { /** B. */ b: number; /** Optional. */ o?: string; /** Shared. */ shared?: number };',
+        '/**',
+        ' * Initializers.',
+        ' * @param a - First.',
+        ' * @param b - Second.',
+        ' */',
+        'export function withDefaults(a = 3, b?: string): void { void a; void b; }',
+        '/** Defaults. */',
+        'export interface Defaults {',
+        '  /** Way. Default `vertical`. */',
+        "  way?: 'vertical' | 'horizontal';",
+        '  /** Flag (default: yes). */',
+        '  flag?: boolean;',
+        '  /** Label. Default `Next month`. */',
+        '  label?: string;',
+        '  /** Count text. Default `(n)`. */',
+        '  count?: (n: number) => string;',
+        '  /**',
+        '   * Format.',
+        '   * @default `(n) => String(n)`',
+        '   */',
+        '  format?: (n: number) => string;',
+        '  /** Names. Default `a`, `b`. */',
+        '  names?: { a: string; b: string };',
+        '  /** State. Default `default`. */',
+        "  state?: 'disabled' | 'locked';",
+        '}',
+        '/** First overload. */',
+        'export function over(a: string): void;',
+        '/** Second overload. */',
+        'export function over(a: number): void;',
+        'export function over(a: unknown): void { void a; }',
+        '',
+      ].join('\n'),
+    );
+    fixture = generateReference({ root, entries: publicEntries(root, { pro: false }) }).reference;
+  }, 60_000);
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it('a type extending Array lists its own members only, an own member named like a library one included', () => {
+    expect(fixture.entries.RowList.members.map((m) => m.name)).toEqual(['total']);
+    expect(fixture.entries.Sized.members.map((m) => m.name)).toEqual(['length']);
+  });
+
+  it('an optional member with no type node (mapped type) has no "| undefined"', () => {
+    expect(fixture.entries.Flags.members.map((m) => [m.name, m.type, m.optional])).toEqual([
+      ['a', 'boolean', true],
+      ['b', 'boolean', true],
+    ]);
+  });
+
+  it('an anonymous branch is told apart by its required members (not optional ones, not never ones)', () => {
+    expect(fixture.entries.Choice.variants.map((v) => [v.title, v.requires])).toEqual([
+      ['Variant 1', ['a']],
+      ['Variant 2', ['b']],
+    ]);
+  });
+
+  it('a parameter with an initializer is optional and shows it as its default', () => {
+    const [a, b] = fixture.entries.withDefaults.signatures[0].parameters;
+    expect(a).toMatchObject({ name: 'a', optional: true, default: '3' });
+    expect(b).toMatchObject({ name: 'b', optional: true });
+    expect(b.default).toBeUndefined();
+    expect(fixture.entries.withDefaults.signatures[0].signature).toBe('withDefaults(a?: number, b?: string): void');
+  });
+
+  it('defaults through the checker: literal, boolean, string, function, composite, foreign value', () => {
+    const byName = Object.fromEntries(fixture.entries.Defaults.members.map((m) => [m.name, m.default]));
+    expect(byName).toEqual({
+      way: "'vertical'",
+      flag: 'true',
+      label: "'Next month'",
+      count: undefined,
+      format: '(n) => String(n)',
+      names: undefined,
+      state: undefined,
+    });
+  });
+
+  it('the descriptions of two overloads are two paragraphs', () => {
+    expect(fixture.entries.over.signatures).toHaveLength(2);
+    expect(fixture.entries.over.description).toBe('First overload.\n\nSecond overload.');
+  });
+
+  it('a name exported by two packages throws', () => {
+    const second = join(root, 'packages/core/src/again.ts');
+    writeFileSync(second, "export type { RowList } from './index';\n");
+    const entries = [
+      { package: '@formrail/core', file: indexFile() },
+      { package: '@formrail/pro', file: second },
+    ];
+    const program = createReferenceProgram(entries, { compilerOptions: referenceCompilerOptions(root) });
+    expect(() => extractReference(program, entries, { root })).toThrow('type-reference: RowList is exported by both @formrail/core and @formrail/pro');
+  });
+
+  it('the plugin fails the build on an MDX page with an unknown name, naming page and name', () => {
+    const plugin = typeReferencePlugin({ env: { STORYBOOK_EXCLUDE_PRO: '1' }, root });
+    const bad = join(root, '.storybook/Bad.mdx');
+    const good = join(root, '.storybook/Good.mdx');
+    writeFileSync(bad, '<TypeReference name="Nope" />\n');
+    writeFileSync(good, '<TypeReference name="RowList" />\n<FunctionReference name="over" />\n');
+    expect(() => plugin.transform.call({}, 'compiled', bad)).toThrow('.storybook/Bad.mdx: <TypeReference name="Nope"> is not a public export');
+    expect(plugin.transform.call({}, 'compiled', good)).toBeNull();
+    expect(plugin.transform.call({}, 'compiled', indexFile())).toBeNull();
+  }, 60_000);
+
+  it('dev server: a package source change regenerates the module, any other file does not', () => {
+    const plugin = typeReferencePlugin({ env: { STORYBOOK_EXCLUDE_PRO: '1' }, root });
+    const id = plugin.resolveId('virtual:formrail/type-reference');
+    const first = plugin.load.call({}, id);
+    expect(first).toContain('Total.');
+    const mod = { id };
+    const invalidated = [];
+    const server = { moduleGraph: { getModuleById: (x) => (x === id ? mod : undefined), invalidateModule: (m) => invalidated.push(m) } };
+    for (const file of [join(root, 'README.md'), join(root, 'packages/core/src/index.stories.tsx'), join(root, '.storybook/Good.mdx')]) {
+      expect(plugin.handleHotUpdate({ file, server, modules: [] }), file).toBeUndefined();
+    }
+    expect(invalidated).toEqual([]);
+    expect(plugin.load.call({}, id)).toBe(first);
+    const source = readFileSync(indexFile(), 'utf8');
+    writeFileSync(indexFile(), source.replace('/** Total. */', '/** Total rows. */'));
+    const later = new Date(Date.now() + 5_000);
+    utimesSync(indexFile(), later, later);
+    expect(plugin.handleHotUpdate({ file: indexFile(), server, modules: [] })).toEqual([mod]);
+    expect(invalidated).toEqual([mod]);
+    const second = plugin.load.call({}, id);
+    expect(second).toContain('Total rows.');
+    writeFileSync(indexFile(), source);
+  }, 60_000);
+
+  it('the caching host hands back the same parsed file until its modification time changes', () => {
+    const options = referenceCompilerOptions(root);
+    const host = createCachingHost(options);
+    const entries = publicEntries(root, { pro: false });
+    const one = createReferenceProgram(entries, { compilerOptions: options, host });
+    const lib = one.getSourceFiles().find((f) => one.isSourceFileDefaultLibrary(f));
+    const before = one.getSourceFile(indexFile());
+    const later = new Date(Date.now() + 10_000);
+    utimesSync(indexFile(), later, later);
+    const two = createReferenceProgram(entries, { compilerOptions: options, host, oldProgram: one });
+    expect(two.getSourceFile(lib.fileName)).toBe(lib);
+    expect(two.getSourceFile(indexFile())).not.toBe(before);
+  }, 60_000);
 });

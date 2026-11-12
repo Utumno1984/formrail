@@ -7,7 +7,7 @@
 // (`ropTheme`), so a reference looks like the rest of the page. Only what that styling lacks is set here: the
 // horizontal scroll container (a wide table scrolls inside it on a phone, not the whole page), the code font of
 // the types, the anchors.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { AnchorMdx, HeaderMdx, Markdown } from '@storybook/addon-docs/blocks';
 import { styled } from 'storybook/theming';
 import reference, { type ReferenceMember, type ReferenceTypeEntry, type ReferenceVariant } from 'virtual:formrail/type-reference';
@@ -22,6 +22,25 @@ export const slug = (...parts: string[]): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+/**
+ * Which rendering of the same reference this one is on the page (0 for the first): the second
+ * `<TypeReference name="X">` of a page gets `x-2-...` ids and "(2)" in its region names, so no id and no
+ * accessible name is repeated. The first keeps the plain ids, which are the deep links.
+ */
+function useOccurrence(name: string) {
+  const ref = useRef<HTMLElement>(null);
+  const [occurrence, setOccurrence] = useState(0);
+  useLayoutEffect(() => {
+    const all = Array.from(document.querySelectorAll(`[data-type-reference="${CSS.escape(name)}"]`));
+    setOccurrence(Math.max(0, all.indexOf(ref.current as Element)));
+  }, [name]);
+  return { ref, occurrence, key: occurrence > 0 ? `${name}-${occurrence + 1}` : name, suffix: occurrence > 0 ? ` (${occurrence + 1})` : '' };
+}
+
+/** Name of the parameters region of a signature: the overload number when there are several. */
+export const parametersLabel = (name: string, index: number, count: number): string =>
+  count > 1 ? `${name} parameters, overload ${index + 1} of ${count}` : `${name} parameters`;
 
 function entryOf(name: string) {
   if (reference.version !== SUPPORTED_VERSION) {
@@ -212,10 +231,11 @@ export function TypeReference({ name }: TypeReferenceProps) {
   const entry = entryOf(name);
   if (entry.kind === 'function') throw new Error(`Type reference: "${name}" is a function, use <FunctionReference>.`);
   const typeEntry: ReferenceTypeEntry = entry;
-  const id = slug(name);
+  const { ref, key, suffix } = useOccurrence(name);
+  const id = slug(key);
   const title = withTypeParameters(name, typeEntry.typeParameters);
   return (
-    <section aria-labelledby={id} data-type-reference={name}>
+    <section ref={ref} aria-labelledby={id} data-type-reference={name}>
       <Heading id={id} level="h3">
         <code>{title}</code>
       </Heading>
@@ -231,16 +251,20 @@ export function TypeReference({ name }: TypeReferenceProps) {
         </Pre>
       ) : null}
       {typeEntry.members && typeEntry.members.length > 0 ? (
-        <MembersTable owner={name} label={typeEntry.variants ? `${name}: members of every variant` : `${name} members`} members={typeEntry.members} />
+        <MembersTable
+          owner={key}
+          label={`${typeEntry.variants ? `${name}: members of every variant` : `${name} members`}${suffix}`}
+          members={typeEntry.members}
+        />
       ) : null}
       {(typeEntry.variants ?? []).map((variant) => {
-        const variantId = slug(name, variant.title);
+        const variantId = slug(key, variant.title);
         return (
           <div key={variant.title}>
             <Heading id={variantId} level="h4">
               {variantTitle(variant)}
             </Heading>
-            <MembersTable owner={`${name}-${variant.title}`} label={`${name}: ${variant.title}`} members={variant.members} />
+            <MembersTable owner={`${key}-${variant.title}`} label={`${name}: ${variant.title}${suffix}`} members={variant.members} />
           </div>
         );
       })}
@@ -283,9 +307,10 @@ export interface FunctionReferenceProps {
 export function FunctionReference({ name }: FunctionReferenceProps) {
   const entry = entryOf(name);
   if (entry.kind !== 'function') throw new Error(`Type reference: "${name}" is a type, use <TypeReference>.`);
-  const id = slug(name);
+  const { ref, key, suffix } = useOccurrence(name);
+  const id = slug(key);
   return (
-    <section aria-labelledby={id} data-type-reference={name}>
+    <section ref={ref} aria-labelledby={id} data-type-reference={name}>
       <Heading id={id} level="h3">
         <code>{name}</code>
       </Heading>
@@ -304,8 +329,8 @@ export function FunctionReference({ name }: FunctionReferenceProps) {
         <div key={signature.signature}>
           {signature.parameters.length > 0 ? (
             <MembersTable
-              owner={entry.signatures.length > 1 ? `${name}-${index + 1}` : name}
-              label={`${name} parameters`}
+              owner={entry.signatures.length > 1 ? `${key}-${index + 1}` : key}
+              label={`${parametersLabel(name, index, entry.signatures.length)}${suffix}`}
               members={signature.parameters}
             />
           ) : null}

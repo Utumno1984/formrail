@@ -5,18 +5,23 @@
 // the guard). Lazy: the TypeScript program is built the first time a page imports the module, so a build in
 // which no page uses a reference block pays nothing. In the dev server a change to a package source
 // invalidates the module: reloading the page shows the new TSDoc, with no restart and no manual step.
-import { resolve, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 // Plain .mjs on both sides: Storybook loads main.ts with Node, so no TS-only import syntax is needed here.
-import { REPO_ROOT, extractReference, createReferenceProgram, publicEntries, referenceCompilerOptions } from '../scripts/type-reference.mjs';
+import {
+  REPO_ROOT,
+  createCachingHost,
+  createReferenceProgram,
+  extractReference,
+  findUnknownReferences,
+  publicEntries,
+  referenceBlocksOf,
+  referenceCompilerOptions,
+} from '../scripts/type-reference.mjs';
 import { excludePro } from './story-globs.mjs';
 
 export const TYPE_REFERENCE_MODULE = 'virtual:formrail/type-reference';
 const RESOLVED = `\0${TYPE_REFERENCE_MODULE}`;
-
-const PACKAGE_SOURCES = [resolve(REPO_ROOT, 'packages/core/src') + sep, resolve(REPO_ROOT, 'packages/pro/src') + sep];
-/** A package source the reference can read (stories and tests never reach a public entry). */
-const isReferenceSource = (file) =>
-  PACKAGE_SOURCES.some((dir) => file.startsWith(dir)) && /\.tsx?$/.test(file) && !/\.(stories|test)\.tsx?$/.test(file);
 
 /**
  * @param {{ env?: NodeJS.ProcessEnv, root?: string }} [options] `env`: the Free build (`STORYBOOK_EXCLUDE_PRO`)
@@ -24,10 +29,31 @@ const isReferenceSource = (file) =>
  */
 export function typeReferencePlugin({ env = process.env, root = REPO_ROOT } = {}) {
   const entries = publicEntries(root, { pro: !excludePro(env) });
+  const packageSources = [resolve(root, 'packages/core/src') + sep, resolve(root, 'packages/pro/src') + sep];
+  /** A package source the reference can read (stories and tests never reach a public entry). */
+  const isReferenceSource = (file) =>
+    packageSources.some((dir) => resolve(file).startsWith(dir)) && /\.tsx?$/.test(file) && !/\.(stories|test)\.tsx?$/.test(file);
+  const compilerOptions = referenceCompilerOptions(root);
+  // One host for the life of the plugin: it keeps the parsed files, so a regeneration re-parses only the
+  // files whose modification time changed (see `createCachingHost`).
+  const host = createCachingHost(compilerOptions);
   /** @type {import('typescript').Program | undefined} */
   let program;
   /** @type {string | undefined} */
   let code;
+  /** @type {any} */
+  let reference;
+  /** @param {{ info?: (message: string) => void }} [context] */
+  const generate = (context) => {
+    if (code === undefined) {
+      const started = performance.now();
+      program = createReferenceProgram(entries, { compilerOptions, oldProgram: program, host });
+      reference = extractReference(program, entries, { root });
+      code = `export default ${JSON.stringify(reference)};\n`;
+      context?.info?.(`type reference: ${Object.keys(reference.entries).length} entries in ${Math.round(performance.now() - started)} ms`);
+    }
+    return reference;
+  };
   return {
     name: 'formrail:type-reference',
     resolveId(id) {
@@ -35,17 +61,28 @@ export function typeReferencePlugin({ env = process.env, root = REPO_ROOT } = {}
     },
     load(id) {
       if (id !== RESOLVED) return null;
-      if (code === undefined) {
-        const started = performance.now();
-        program = createReferenceProgram(entries, { compilerOptions: referenceCompilerOptions(root), oldProgram: program });
-        const reference = extractReference(program, entries, { root });
-        code = `export default ${JSON.stringify(reference)};\n`;
-        this.info?.(`type reference: ${Object.keys(reference.entries).length} entries in ${Math.round(performance.now() - started)} ms`);
-      }
+      generate(this);
       return code;
     },
+    // An MDX page that names a type the reference does not have fails the build here, naming the page and
+    // the name, instead of throwing in the reader's browser. Read from disk: by now the MDX plugin may have
+    // compiled the page to JavaScript.
+    transform(_source, id) {
+      const file = id.split('?')[0];
+      if (!file.endsWith('.mdx')) return null;
+      let source;
+      try {
+        source = readFileSync(file, 'utf8');
+      } catch {
+        return null;
+      }
+      if (referenceBlocksOf(source).length === 0) return null;
+      const problems = findUnknownReferences(generate(this), source, relative(root, file).split(sep).join('/'));
+      if (problems.length > 0) throw new Error(`type reference:\n${problems.join('\n')}`);
+      return null;
+    },
     // Dev server: a package source changed -> drop the cached JSON and reload the pages that import it. The
-    // previous program is kept, so the next generation re-parses only the files that changed.
+    // next generation reuses the parsed files of the caching host: only the files saved since are parsed again.
     handleHotUpdate({ file, server, modules }) {
       if (!isReferenceSource(file)) return undefined;
       code = undefined;
