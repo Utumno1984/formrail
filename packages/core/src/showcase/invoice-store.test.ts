@@ -396,6 +396,45 @@ describe('server updates (story-only, #384)', () => {
     expect(listener).toHaveBeenLastCalledWith({ id: 'inv-1', record: both });
   });
 
+  it('the replayed update is normalized like a save (amount rounded to 2 decimals)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const store = createInvoiceStore(undefined, { saveDelayMs: gate });
+    const record = await store.get('inv-1');
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const saving = store.save({ ...record, notes: 'Mine' });
+    await store.updateFromServer('inv-1', (r) => ({ ...r, amount: 10.005 }));
+    release();
+    await saving;
+    expect((await store.get('inv-1')).amount).toBe(10.01);
+    expect((listener.mock.lastCall![0] as ServerChange).record!.amount).toBe(10.01);
+  });
+
+  it('two saves of the same record in flight: an update landing after the first settled is replayed on the second', async () => {
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    const first = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const second = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+    const store = createInvoiceStore(undefined, { saveDelayMs: first });
+    const record = await store.get('inv-1');
+    const savingFirst = store.save({ ...record, notes: 'First' });
+    store.configure({ saveDelayMs: second });
+    const savingSecond = store.save({ ...record, notes: 'Second' });
+    releaseFirst();
+    await savingFirst;
+    await store.updateFromServer('inv-1', (r) => ({ ...r, status: 'rejected' }));
+    releaseSecond();
+    expect(await savingSecond).toEqual({ ...record, notes: 'Second' });
+    expect(await store.get('inv-1')).toEqual({ ...record, notes: 'Second', status: 'rejected' });
+  });
+
   it('a failing save keeps the update that landed during it, and notifies nothing more', async () => {
     const store = createInvoiceStore(undefined, { saveDelayMs: 100, saveOutcome: 'error' });
     const record = await store.get('inv-1');
