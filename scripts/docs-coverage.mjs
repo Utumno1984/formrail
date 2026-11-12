@@ -44,6 +44,7 @@ export const DOCUMENTED_IN = {
   formatChangeValue: ['Pro/ChangeSummary'],
   computeRebase: ['Pro/Patterns/Form rebase'],
   useFormRebase: ['Pro/Patterns/Form rebase'],
+  RebaseNotice: ['Pro/RebaseNotice'],
   VirtualListReport: ['Pro/Floorplans/Virtual List Report'],
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };

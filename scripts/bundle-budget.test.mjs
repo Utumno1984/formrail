@@ -309,6 +309,7 @@ describe('multi-package check (#174)', () => {
     const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.json'), 'utf8'));
     expect(Object.keys(budget.exports).sort()).toEqual([
       'ChangeSummary',
+      'RebaseNotice',
       'VirtualListReport',
       'VirtualListReportTable',
       'computeChangeSummary',

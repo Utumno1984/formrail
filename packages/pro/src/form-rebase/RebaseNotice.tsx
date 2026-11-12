@@ -11,7 +11,6 @@ import {
 } from 'react';
 import { Button, MessageStrip, cn, composeRefs } from '@formrail/core';
 import {
-  DEFAULT_VALUE_LABELS,
   distinctValueTexts,
   formatChangeValueAt,
   isMutedValue,
@@ -73,7 +72,8 @@ export const DEFAULT_REBASE_NOTICE_LABELS: RebaseNoticeLabels = {
   keepMineFor: (label) => `Keep mine for ${label}`,
   acceptAllTheirs: 'Use all server values',
   pending: 'Applying server update after saving…',
-  contentsDiffer: DEFAULT_VALUE_LABELS.contentsDiffer,
+  // A literal, not `DEFAULT_VALUE_LABELS.contentsDiffer`: a member read at module level is never tree-shaken.
+  contentsDiffer: 'contents differ',
 };
 
 export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'title' | 'role'> {
