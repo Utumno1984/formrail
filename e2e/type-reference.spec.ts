@@ -57,3 +57,39 @@ test.describe('Type reference: List Report page', () => {
     await expect(region).toHaveAttribute('tabindex', '0');
   });
 });
+
+// Types the delivered page does not show: rendered by the fixture page (Internal/Type reference fixture).
+test.describe('Type reference: fixture page (inline code, structural types, branches)', () => {
+  const FIXTURE = '/iframe.html?id=internal-type-reference-fixture--docs&viewMode=docs';
+
+  test('an inline code span broken over two lines in the TSDoc is one span, and the console stays clean', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(FIXTURE);
+    const row = page.locator('#listreporttableprops-rowactionsinline');
+    await expect(row).toBeVisible();
+    await expect(row.locator('code', { hasText: 'labels.rowAction(label, rowLabel)' })).toHaveCount(1);
+    // No empty block inside the description.
+    await expect(row.locator('p div')).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+
+  test('an alias of a structural type is shown as an alias, not as the members of Array', async ({ page }) => {
+    await page.goto(FIXTURE);
+    const entry = page.locator('[data-type-reference="ClassValue"]');
+    await expect(entry).toBeVisible();
+    await expect(entry.locator('tbody tr')).toHaveCount(0);
+    await expect(entry).toContainText('ClassArray');
+  });
+
+  test('a branch section never says "Inherited from" itself', async ({ page }) => {
+    await page.goto(FIXTURE);
+    const entry = page.locator('[data-type-reference="AccordionProps"]');
+    await expect(entry).toBeVisible();
+    await expect(entry).not.toContainText('Inherited from AccordionSingleProps');
+    await expect(entry).not.toContainText('Inherited from AccordionMultipleProps');
+  });
+});

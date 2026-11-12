@@ -8,6 +8,7 @@ import {
   findLeaks,
   findUndocumented,
   generateReference,
+  joinInlineCodeSpans,
   publicEntries,
 } from './type-reference.mjs';
 import { typeReferencePlugin, withTypeReference } from '../.storybook/type-reference-plugin.mjs';
@@ -93,6 +94,88 @@ describe('type reference: extraction (#402)', () => {
   it('nothing internal, no inline import() types, no absolute path of this machine', () => {
     expect(findLeaks(reference)).toEqual([]);
   });
+});
+
+/** Every string of the reference (descriptions, examples, deprecations), with where it is. */
+function* textsOf(value, path = '') {
+  if (typeof value === 'string') yield [path, value];
+  else if (Array.isArray(value)) for (const [i, v] of value.entries()) yield* textsOf(v, `${path}[${i}]`);
+  else if (value && typeof value === 'object') for (const [k, v] of Object.entries(value)) yield* textsOf(v, `${path}.${k}`);
+}
+
+describe('type reference: markdown normalisation (#402)', () => {
+  it('joins an inline code span broken over two lines, leaves fences and paragraphs alone', () => {
+    const input = ['Named `labels.rowAction(label,', ' rowLabel)`: "Delete".', 'Next line.', '', 'Second `a', '', 'b` paragraph.', '', '```ts', 'const x = `a', 'b`;', '```'].join('\n');
+    expect(joinInlineCodeSpans(input)).toBe(
+      ['Named `labels.rowAction(label, rowLabel)`: "Delete".', 'Next line.', '', 'Second `a', '', 'b` paragraph.', '', '```ts', 'const x = `a', 'b`;', '```'].join('\n'),
+    );
+  });
+
+  it('rowActionsInline: the span of labels.rowAction is on one line', () => {
+    const member = reference.entries.ListReportTableProps.members.find((m) => m.name === 'rowActionsInline');
+    expect(member.description).toContain('named `labels.rowAction(label, rowLabel)`: "Delete FT-2026-0001"');
+  });
+
+  it('no generated text has an inline code span broken over lines (outside fenced blocks)', () => {
+    const broken = [];
+    for (const [entryName, entry] of Object.entries(reference.entries)) {
+      for (const [path, text] of textsOf(entry)) {
+        if (joinInlineCodeSpans(text) !== text) broken.push(`${entryName}${path}`);
+      }
+    }
+    expect(broken).toEqual([]);
+  });
+});
+
+describe('type reference: structural and standard-library members (#402)', () => {
+  it('ClassValue is an alias, not the members of Array', () => {
+    const entry = reference.entries.ClassValue;
+    expect(entry.members ?? []).toEqual([]);
+    expect(entry.definition).toContain('ClassArray');
+  });
+
+  it('no public type lists a member declared in the standard library', () => {
+    const names = new Set(['length', 'pop', 'push', 'concat', 'join', 'slice', 'toString', 'call', 'apply', 'bind']);
+    const offenders = [];
+    for (const entry of Object.values(reference.entries)) {
+      for (const group of [entry.members ?? [], ...(entry.variants ?? []).map((v) => v.members)]) {
+        for (const m of group) if (names.has(m.name) && /lib\..*\.d\.ts/.test(m.source ?? '')) offenders.push(`${entry.name}.${m.name}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('"Inherited from" never names the section that lists the member (AccordionProps branches)', () => {
+    for (const entry of Object.values(reference.entries)) {
+      for (const variant of entry.variants ?? []) {
+        for (const m of variant.members) expect(m.inheritedFrom, `${entry.name}/${variant.title}.${m.name}`).not.toBe(variant.title);
+      }
+      for (const m of entry.members ?? []) expect(m.inheritedFrom, `${entry.name}.${m.name}`).not.toBe(entry.name);
+    }
+    const single = reference.entries.AccordionProps.variants.find((v) => v.title === 'AccordionSingleProps');
+    expect(single.members.length).toBeGreaterThan(0);
+  });
+});
+
+describe('type reference: the Pro build configuration (#402)', () => {
+  // The Pro Storybook build has no reference page yet (the first arrives with #410): this keeps the
+  // generator's Pro output from regressing unseen until then.
+  it('the plugin of the Pro build (no STORYBOOK_EXCLUDE_PRO) serves the Pro types with members and TSDoc', () => {
+    const plugin = typeReferencePlugin({ env: {} });
+    const code = plugin.load.call({}, plugin.resolveId('virtual:formrail/type-reference'));
+    const data = JSON.parse(code.replace(/^export default /, '').replace(/;\n$/, ''));
+    for (const name of ['ChangeEntry', 'UseFormRebaseOptions', 'RebaseConflict']) {
+      const entry = data.entries[name];
+      expect(entry, name).toBeDefined();
+      expect(entry.package, name).toBe('@formrail/pro');
+      expect(entry.description, name).not.toBe('');
+      expect(entry.members.length, name).toBeGreaterThan(0);
+      for (const member of entry.members) {
+        expect(member.description, `${name}.${member.name}`).not.toBe('');
+        expect(member.type, `${name}.${member.name}`).not.toBe('');
+      }
+    }
+  }, 60_000);
 });
 
 describe('type reference: the TSDoc guard (#402)', () => {

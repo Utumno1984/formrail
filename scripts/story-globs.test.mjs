@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import micromatch from 'micromatch';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
+import { PRO_DEMO_NOT_PUBLIC, excludePro, introductionPages, previewAnnotations, proEdition, referenceFixtures, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -136,6 +136,15 @@ describe('storyGlobs (#175)', () => {
     expect(deployJob).toMatch(/STORYBOOK_HIDE_INTERNAL: '?1'?/);
     // The e2e/visual builds must keep the fixtures in the sidebar-independent index and local dev shows them.
     expect(ci.slice(0, ci.indexOf('deploy-pages:'))).not.toMatch(/STORYBOOK_HIDE_INTERNAL: /);
+  });
+});
+
+describe('referenceFixtures (#402)', () => {
+  it('are in the complete build only, never in the Free deploy or the Pro demo', () => {
+    expect(referenceFixtures({})).toEqual(['./fixtures/*.mdx']);
+    expect(referenceFixtures({ STORYBOOK_EXCLUDE_PRO: '1' })).toEqual([]);
+    expect(referenceFixtures({ STORYBOOK_EDITION: 'pro' })).toEqual([]);
+    expect(existsSync(resolve(ROOT, '.storybook/fixtures/TypeReferenceFixture.mdx'))).toBe(true);
   });
 });
 

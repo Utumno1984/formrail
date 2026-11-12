@@ -62,7 +62,39 @@ export function createReferenceProgram(entries, { compilerOptions = referenceCom
 // ---------------------------------------------------------------------------------------------------------
 // TSDoc helpers
 
-const normalise = (text) => text.replace(/\r\n/g, '\n').trim();
+/**
+ * A line break inside an inline code span is a break of the comment's layout in the source, not of the text:
+ * `labels.rowAction(label,\n rowLabel)` becomes one span on one line (the markdown renderer would otherwise
+ * split it). Fenced code blocks and paragraphs (separated by a blank line) are left as they are.
+ */
+export function joinInlineCodeSpans(text) {
+  const out = [];
+  let fenced = false;
+  let paragraph = [];
+  const flush = () => {
+    if (paragraph.length === 0) return;
+    out.push(paragraph.join('\n').replace(/`[^`]+`/g, (span) => span.replace(/\s*\n\s*/g, ' ')));
+    paragraph = [];
+  };
+  for (const line of text.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      if (!fenced) flush();
+      fenced = !fenced;
+      out.push(line);
+    } else if (fenced) {
+      out.push(line);
+    } else if (line.trim() === '') {
+      flush();
+      out.push(line);
+    } else {
+      paragraph.push(line);
+    }
+  }
+  flush();
+  return out.join('\n');
+}
+
+const normalise = (text) => joinInlineCodeSpans(text.replace(/\r\n/g, '\n').trim());
 
 /** Display parts as markdown: `{@link X}` / `{@linkcode X}` become the code span `X`. */
 function partsToMarkdown(parts) {
@@ -199,6 +231,9 @@ class Extractor {
     let external = 0;
     for (const symbol of this.checker.getPropertiesOfType(type)) {
       const declarations = symbol.declarations ?? [];
+      // Never the members of the standard library (`Array#length`, `Function#call`, ...): they belong to
+      // a structural type the alias merely mentions, not to the public type.
+      if (declarations.length > 0 && declarations.every((d) => this.program.isSourceFileDefaultLibrary(d.getSourceFile()))) continue;
       if (declarations.length > 0 && declarations.every((d) => isReactTypesFile(d.getSourceFile().fileName))) {
         external += 1;
         continue;
@@ -273,6 +308,7 @@ class Extractor {
   isObjectLike(type) {
     if (type.flags & (ts.TypeFlags.Primitive | ts.TypeFlags.Literal | ts.TypeFlags.Never | ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return false;
     if (type.isUnion()) return false;
+    if (this.checker.isArrayType(type) || this.checker.isTupleType(type)) return false;
     if (this.checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0 && this.checker.getPropertiesOfType(type).length === 0) return false;
     return this.checker.getPropertiesOfType(type).length > 0;
   }
@@ -432,8 +468,13 @@ export function extractReference(program, entries, { root = REPO_ROOT } = {}) {
   // "Inherited from" names only a public type (one with its own entry): a base the package does not export
   // (`AccordionBaseProps`, `ListReportFrameLabels`) would be a name the reader can find nowhere.
   for (const item of Object.values(byName)) {
-    for (const group of [item.members ?? [], ...(item.variants ?? []).map((v) => v.members)]) {
-      for (const member of group) if (member.inheritedFrom && !byName[member.inheritedFrom]) delete member.inheritedFrom;
+    const groups = [{ title: item.name, members: item.members ?? [] }, ...(item.variants ?? [])];
+    for (const group of groups) {
+      // Nor the section itself: the members of the `AccordionSingleProps` branch are not "inherited from"
+      // `AccordionSingleProps`.
+      for (const member of group.members) {
+        if (member.inheritedFrom && (!byName[member.inheritedFrom] || member.inheritedFrom === group.title)) delete member.inheritedFrom;
+      }
     }
   }
   const sorted = Object.fromEntries(Object.keys(byName).sort().map((name) => [name, byName[name]]));

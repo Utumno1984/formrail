@@ -71,3 +71,11 @@ export function introductionPages(env = process.env) {
 export function referencePages(env = process.env) {
   return proEdition(env) ? [] : ['./reference/*.mdx'];
 }
+
+/**
+ * Docs fixtures of the reference blocks (ticket #402, tagged `internal`): in the complete build (dev, e2e,
+ * visual) only, so neither the Free deploy nor the Pro demo carries a page that is not documentation.
+ */
+export function referenceFixtures(env = process.env) {
+  return proEdition(env) || excludePro(env) ? [] : ['./fixtures/*.mdx'];
+}

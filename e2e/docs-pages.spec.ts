@@ -13,11 +13,12 @@ interface IndexEntry {
 
 /**
  * Docs pages with no story, so no "Show code" to offer: the Introduction, and the reference pages generated
- * from the TSDoc (ticket #402, `.storybook/reference/*.mdx`: text and tables only). Every other check below
+ * from the TSDoc (ticket #402, `.storybook/reference/*.mdx` and the fixture `.storybook/fixtures/*.mdx`: text
+ * and tables only). Every other check below
  * still applies to them.
  */
 const withoutStories = (entry: IndexEntry) =>
-  entry.id === 'introduction--docs' || (entry.importPath ?? '').startsWith('./.storybook/reference/');
+  entry.id === 'introduction--docs' || ['./.storybook/reference/', './.storybook/fixtures/'].some((dir) => (entry.importPath ?? '').startsWith(dir));
 
 test.describe('Storybook Docs pages', () => {
   test('every Docs page renders, is not hidden or locked by a story, and offers "Show code"', async ({ page, request }) => {
