@@ -16,6 +16,10 @@
 @source not '../**/*.stories.*';
 @source not '../**/*.test.*';
 @source not '../**/*.css';
+/* The copy-paste examples of the Docs pages and their story-only helper (#403): not in the package, and
+   their prose (`shadow`, `filters`, ...) would be read as utilities. */
+@source not '../**/*.example.*';
+@source not '../internal/story-example.ts';
 /* The combobox files hold no class names (the Combobox's are in internal/combobox-styles.ts), but
    their `filter` option would be read as the `filter` utility. Excluded file by file: a styled
    component added to that folder is still scanned. */
