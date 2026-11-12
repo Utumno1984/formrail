@@ -88,6 +88,24 @@ export default tseslint.config(
     },
   },
   {
+    // The copy-paste examples of the Docs pages (ticket #403): their text is what a reader copies ("Show
+    // code" prints the file verbatim), so they import only what a consumer can: the public packages by name.
+    // Listed after the core rule above so it replaces it for these files (the `internal` facade stays banned).
+    files: ['packages/*/src/**/*.example.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { regex: '^\\.', message: 'A copy-paste example imports only the public packages by name (@formrail/core, @formrail/pro), never a relative path (ticket #403).' },
+            { regex: '(^|/)internal(/|$)', message: 'A copy-paste example uses only public API: no `internal` module (ticket #403).' },
+            { regex: '^(storybook|@storybook)(/|$)', message: 'A copy-paste example is plain React code: no Storybook import (fn, args, ...) (ticket #403).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.cjs'],
     languageOptions: { sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },

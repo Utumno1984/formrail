@@ -2,6 +2,7 @@
 import type { Preview } from '@storybook/react-vite';
 // The SAME entry the package compiles into dist/styles.css (not a copy).
 import '../packages/core/src/styles/index.css';
+import { FormrailDocsPage } from './docs-page';
 import { transformSource } from './source-transform';
 import { ropTheme } from './theme';
 
@@ -22,6 +23,9 @@ const preview: Preview = {
     layout: 'padded',
     docs: {
       theme: ropTheme,
+      // Example first, then the Playground with the Controls, then the other stories (ticket #403). Pages
+      // without a copy-paste example get Storybook's own template: see ./docs-page.tsx.
+      page: FormrailDocsPage,
       source: {
         // "Show code" defaults to `dynamic` (JSX synthesized from the rendered tree, with the live args):
         // right for `render: (args) => <X {...args} />` and for stories with no render of their own

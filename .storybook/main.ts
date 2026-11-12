@@ -35,6 +35,8 @@ const config: StorybookConfig = {
         // `/internal` (ticket #230): Pro stories build their own table from these building blocks;
         // resolved to the source facade for the same reason as the bare specifier above.
         { find: /^@formrail\/core\/internal$/, replacement: fileURLToPath(new URL('../packages/core/src/internal.ts', import.meta.url)) },
+        // The copy-paste examples of the Pro pages import `@formrail/pro` by name, as a consumer would (#403).
+        { find: /^@formrail\/pro$/, replacement: fileURLToPath(new URL('../packages/pro/src/index.ts', import.meta.url)) },
         { find: /^@formrail\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
         ...(Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : Object.entries(viteConfig.resolve?.alias ?? {}).map(([find, replacement]) => ({ find, replacement }))),
       ],
