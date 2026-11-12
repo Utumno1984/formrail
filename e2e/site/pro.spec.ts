@@ -70,9 +70,13 @@ test.describe('Pro demo: manager and index', () => {
     await expect(page.getByRole('link', { name: 'Formrail Pro (preview)' }).first()).toBeVisible();
     const sidebar = page.locator('#storybook-explorer-tree');
     await expect(sidebar.getByText('Pro introduction', { exact: true })).toBeVisible();
-    for (const free of ['Forms', 'Overlays', 'Primitives', 'Patterns', 'Introduction']) {
+    for (const free of ['Forms', 'Overlays', 'Primitives', 'Introduction']) {
       await expect(sidebar.getByRole('button', { name: free, exact: true })).toHaveCount(0);
     }
+    // Since #384 the Pro demo has its own "Patterns" group (Pro/Patterns/Form rebase): the Free one (id
+    // `patterns`, a root) is still absent, told apart by its id.
+    await expect(sidebar.locator('[data-item-id="patterns"]')).toHaveCount(0);
+    await expect(sidebar.locator('[data-item-id="pro-patterns"]')).toHaveCount(1);
   });
 
   test('index.json: Pro stories and the introduction only, no Free story, no internal fixture needed', async ({ page }) => {
@@ -85,10 +89,13 @@ test.describe('Pro demo: manager and index', () => {
       'Pro introduction',
       'Pro/ChangeSummary',
       'Pro/Floorplans/Virtual List Report',
+      // Public since #384.
+      'Pro/Patterns/Form rebase',
+      'Pro/RebaseNotice',
       'Pro/Showcase/Invoices with Change Summary',
     ]);
     const ids = entries.map((e) => e.id);
-    for (const id of ['pro-introduction--docs', 'pro-changesummary--playground', 'pro-floorplans-virtual-list-report--default', 'pro-showcase-invoices-with-change-summary--review-changes']) {
+    for (const id of ['pro-introduction--docs', 'pro-changesummary--playground', 'pro-floorplans-virtual-list-report--default', 'pro-showcase-invoices-with-change-summary--review-changes', 'pro-patterns-form-rebase--playground', 'pro-rebasenotice--playground', 'pro-showcase-invoices-with-change-summary--server-update']) {
       expect(ids).toContain(id);
     }
   });
