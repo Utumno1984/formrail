@@ -110,7 +110,7 @@ export const Playground: Story = {
     const canvas = within(canvasElement);
     const items = () => within(canvas.getByRole('list', { name: 'Conflicts' })).getAllByRole('listitem');
     await expect(items()).toHaveLength(2);
-    await expect(items()[0]).toHaveTextContent('Due dateYours: Mar 5, 2026Server: Mar 12, 2026');
+    await expect(items()[0]).toHaveTextContent('Due date Yours: Mar 5, 2026 Server: Mar 12, 2026');
 
     await userEvent.click(canvas.getByRole('button', { name: 'Use server value for Due date' }));
     await expect(args.onAcceptTheirs).toHaveBeenCalledWith('dueDate');

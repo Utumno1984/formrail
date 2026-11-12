@@ -96,7 +96,7 @@ describe('Invoices with Change Summary: server updates (#384)', () => {
     await serverUpdate('inv-1', (r) => ({ ...r, dueDate: '2026-03-12' }));
     expect(dueDate().value).toBe('2026-03-05');
     const item = within(screen.getByRole('list', { name: 'Conflicts' })).getByRole('listitem');
-    expect(item).toHaveTextContent('Due dateYours: Mar 5, 2026Server: Mar 12, 2026');
+    expect(item).toHaveTextContent('Due date Yours: Mar 5, 2026 Server: Mar 12, 2026');
     expect(item).not.toHaveTextContent('2026-03');
     const field = dueDate();
     expect(field).toHaveAccessibleDescription(CONFLICT_HELP);
@@ -117,7 +117,7 @@ describe('Invoices with Change Summary: server updates (#384)', () => {
     await userEvent.type(quantity, '7');
     await serverUpdate('inv-3', serverChangeOf('remove-line-1'));
     const item = within(screen.getByRole('list', { name: 'Conflicts' })).getByRole('listitem');
-    expect(item).toHaveTextContent(/^Line items > Item 1 \(Materials\)Yours: Materials, 7 × €42\.90Server: Removed/);
+    expect(item).toHaveTextContent(/^Line items > Item 1 \(Materials\) Yours: Materials, 7 × €42\.90 Server: Removed/);
     expect(screen.getByRole('textbox', { name: 'Line 1 quantity' })).toHaveAccessibleDescription(REMOVED_HELP);
   }, 20_000);
 

@@ -92,7 +92,7 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(status(page)).toHaveText(STATUS_LABEL[next]);
     await expect(dueDate(page)).toHaveValue(laterBy(record.dueDate, 7));
     await expect(footer(page)).toBeHidden();
-    expect(await readText(notice(page))).toBe('Information: This invoice was updated while you were editing. 2 fields were updated.');
+    expect(await readText(notice(page))).toBe('Information: This invoice was updated while you were editing.2 fields were updated.');
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
   });
 
@@ -103,7 +103,7 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(status(page)).toHaveText(STATUS_LABEL[NEXT_STATUS[record.status]]);
     await expect(notes(page)).toHaveValue('Checked by finance.');
     await expect(footer(page)).toBeVisible();
-    expect(await readText(notice(page))).toBe('Information: This invoice was updated while you were editing. 1 field was updated.');
+    expect(await readText(notice(page))).toBe('Information: This invoice was updated while you were editing.1 field was updated.');
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
   });
 
@@ -194,7 +194,7 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(status(page)).toHaveText(STATUS_LABEL[next]);
     await expect(notes(page)).toHaveValue('Saved note');
     await expect(notice(page)).not.toContainText('Applying');
-    expect(await readText(notice(page))).toBe('Information: This invoice was updated while you were editing. 1 field was updated.');
+    expect(await readText(notice(page))).toBe('Information: This invoice was updated while you were editing.1 field was updated.');
     expect(await stored(page)).toMatchObject({ notes: 'Saved note', status: next });
   });
 

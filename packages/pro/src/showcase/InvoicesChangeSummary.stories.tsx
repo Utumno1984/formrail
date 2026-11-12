@@ -306,12 +306,12 @@ export const ServerUpdate: Story = {
     const conflicts = await canvas.findByRole('list', { name: 'Conflicts' });
     await expect(args.onServerChange).toHaveBeenCalledTimes(1);
     await expect(within(conflicts).getAllByRole('listitem')).toHaveLength(1);
-    await expect(within(conflicts).getByRole('listitem')).toHaveTextContent(/^Due dateYours: Mar 5, 2026Server: /);
+    await expect(within(conflicts).getByRole('listitem')).toHaveTextContent(/^Due date Yours: Mar 5, 2026 Server: /);
     await expect(notice()).toHaveTextContent('This invoice was updated while you were editing.1 field was updated.');
     await expect(canvas.getByRole('combobox', { name: 'Status' }).textContent).not.toBe(status);
     await expect(due).toHaveValue('2026-03-05');
     await expect(due).toHaveAccessibleDescription('Changed on the server too.');
-    await expect(canvas.getByRole('textbox', { name: 'Notes' })).toHaveValue(expect.stringMatching(/ Checked by finance\.$/));
+    await expect((canvas.getByRole('textbox', { name: 'Notes' }) as HTMLInputElement).value.endsWith(' Checked by finance.')).toBe(true);
 
     await userEvent.click(canvas.getByRole('button', { name: 'Keep mine for Due date' }));
     await waitFor(() => expect(canvas.queryByRole('list', { name: 'Conflicts' })).toBeNull());
@@ -325,6 +325,6 @@ export const ServerUpdate: Story = {
     await waitFor(() => expect(notice()).toBeNull());
     const stored = win?.__ropShowcaseStore?.snapshot().find((r) => r.number === RECORD);
     await expect(stored?.dueDate).toBe('2026-03-05');
-    await expect(stored?.notes).toMatch(/ Checked by finance\.$/);
+    await expect(stored?.notes.endsWith(' Checked by finance.')).toBe(true);
   },
 };

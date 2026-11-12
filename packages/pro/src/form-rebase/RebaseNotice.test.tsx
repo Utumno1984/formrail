@@ -88,8 +88,8 @@ describe('<RebaseNotice />: rendering', () => {
     expect(strip()).toHaveTextContent('2 fields you edited were also changed on the server.');
     const items = within(screen.getByRole('list', { name: 'Conflicts' })).getAllByRole('listitem');
     expect(items.map(readText)).toEqual([
-      'Due dateYours: Mar 5, 2026Server: Mar 12, 2026Use server valueKeep mine',
-      'NotesYours: MineServer: TheirsUse server valueKeep mine',
+      'Due date Yours: Mar 5, 2026 Server: Mar 12, 2026 Use server value Keep mine',
+      'Notes Yours: Mine Server: Theirs Use server value Keep mine',
     ]);
     // Visible text "Use server value", accessible name with the field (label in name).
     const accept = screen.getByRole('button', { name: 'Use server value for Due date' });
@@ -102,7 +102,7 @@ describe('<RebaseNotice />: rendering', () => {
 
   it('two values that read the same at the default level are told apart (precise rendering)', () => {
     render(<RebaseNotice {...props({ conflicts: [conflict('n', 'N', null, undefined)] })} />);
-    expect(readText(screen.getByRole('listitem'))).toBe('NYours: NullServer: UndefinedUse server valueKeep mine');
+    expect(readText(screen.getByRole('listitem'))).toBe('N Yours: Null Server: Undefined Use server value Keep mine');
   });
 
   it('a side with no value reads "Removed", and renderValue is never called for it', () => {
@@ -112,7 +112,7 @@ describe('<RebaseNotice />: rendering', () => {
         {...props({ conflicts: [conflict('lines.1', 'Lines > Item 2', 'row', undefined, { theirsMissing: true })], renderValue })}
       />,
     );
-    expect(readText(screen.getByRole('listitem'))).toBe('Lines > Item 2Yours: [row]Server: RemovedUse server valueKeep mine');
+    expect(readText(screen.getByRole('listitem'))).toBe('Lines > Item 2 Yours: [row] Server: Removed Use server value Keep mine');
     expect(renderValue).toHaveBeenCalled();
     for (const [value] of renderValue.mock.calls) expect(value).toBe('row');
   });
@@ -130,7 +130,7 @@ describe('<RebaseNotice />: rendering', () => {
       beforeMissing: false,
       afterMissing: false,
     });
-    expect(readText(screen.getByRole('listitem'))).toContain('Yours: lines.1.qty=2Server: lines.1.qty=3');
+    expect(readText(screen.getByRole('listitem'))).toContain('Yours: lines.1.qty=2 Server: lines.1.qty=3');
   });
 
   it('"Use all server values" from two conflicts up, calling onAcceptAllTheirs', async () => {

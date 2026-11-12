@@ -377,12 +377,14 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
                   const entry = toEntry(conflict);
                   const [mineText, theirsText] = renderValue ? ['', ''] : texts(conflict);
                   return (
+                    // The `{' '}` between the flex items render nothing (white space between flex items is not laid
+                    // out) but keep the words apart in the text of the item (`Due date Yours: … Server: …`).
                     <li key={keyOf(conflict.path)} className={`${RN}__item`}>
-                      <span className={`${RN}__label`}>{conflict.label}</span>
+                      <span className={`${RN}__label`}>{conflict.label}</span>{' '}
                       <span className={`${RN}__values`}>
-                        {side(conflict, entry, 'mine', mineText)}
+                        {side(conflict, entry, 'mine', mineText)}{' '}
                         {side(conflict, entry, 'theirs', theirsText)}
-                      </span>
+                      </span>{' '}
                       <span className={`${RN}__actions`}>
                         <Button
                           size="sm"
@@ -393,7 +395,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
                           onClick={() => onAcceptTheirs(conflict.path)}
                         >
                           {labels.acceptTheirs}
-                        </Button>
+                        </Button>{' '}
                         <Button
                           size="sm"
                           variant="secondary"
