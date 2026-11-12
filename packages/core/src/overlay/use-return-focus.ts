@@ -16,7 +16,8 @@ export interface UseReturnFocusOptions {
    * opener instead of the focused one. For a trigger that does not take the focus when pressed (a
    * Radix menu trigger prevents the pointer press's default so the panel can take it), the focused
    * element is still whatever had the focus before the press. `null` / `undefined`: the focused
-   * element, as by default.
+   * element, as by default. It is read in an effect cleanup, which sees the callback of the render
+   * before the one that opens: read refs in it, not values of the opening render.
    */
   opener?: () => HTMLElement | null | undefined;
 }

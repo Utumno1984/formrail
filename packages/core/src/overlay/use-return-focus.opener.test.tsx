@@ -91,15 +91,34 @@ describe('useReturnFocus opener', () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it('wins over a pending return: closed and reopened before the frame, the explicit opener is kept', async () => {
-    const { get, set } = setup({ toTrigger: true });
+  it('wins over a pending return: reopened by the trigger before the frame, the trigger becomes the opener', async () => {
+    // The first opening names no explicit opener ("elsewhere", the focused element, is the opener);
+    // the reopening, while the first close's return is still pending, names the trigger. The callback
+    // reads a mutable value, as `Menu` reads its `openedBy` ref (see the hook's `opener` docs).
+    const pick: { current: 'trigger' | null } = { current: null };
+    function Switching({ open }: { open: boolean }) {
+      const triggerRef = useRef<HTMLButtonElement>(null);
+      useReturnFocus({ open, opener: () => (pick.current === 'trigger' ? triggerRef.current : null) });
+      return (
+        <>
+          <button data-testid="elsewhere">elsewhere</button>
+          <button ref={triggerRef} data-testid="trigger">
+            trigger
+          </button>
+          {open && <button data-testid="inside">inside</button>}
+        </>
+      );
+    }
+    const view = render(<Switching open={false} />);
+    const get = (id: string) => view.getByTestId(id);
     act(() => get('elsewhere').focus());
-    set(true);
+    view.rerender(<Switching open />);
     act(() => get('inside').focus());
-    set(false);
-    set(true);
+    view.rerender(<Switching open={false} />); // schedules a return to "elsewhere"
+    pick.current = 'trigger';
+    view.rerender(<Switching open />); // reopened before that frame, by the trigger
     act(() => get('inside').focus());
-    set(false);
+    view.rerender(<Switching open={false} />);
     await nextFrame();
     expect(document.activeElement).toBe(get('trigger'));
   });
