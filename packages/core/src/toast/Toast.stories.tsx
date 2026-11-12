@@ -1,10 +1,11 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { exampleStory } from '../internal/example-story';
 import { settleMotion } from '../internal/settle-motion';
 import { storyControls, withoutControls } from '../internal/story-docs';
 import { Select } from '../select/Select';
@@ -58,11 +59,13 @@ const meta: Meta<DemoArgs> = {
     onDismiss: fn(),
     onActionClick: fn(),
   },
-  decorators: [(Story) => <ToastProvider>{Story()}</ToastProvider>],
 };
 
 export default meta;
 type Story = StoryObj<DemoArgs>;
+
+// Not on the meta: the Example story brings its own provider (it is the code a reader pastes), and a meta decorator would wrap it too.
+const decorators: Decorator[] = [(Story) => <ToastProvider>{Story()}</ToastProvider>];
 
 const PAGE: CSSProperties = {
   padding: 24,
@@ -115,12 +118,22 @@ function SaveForm({ args }: { args: DemoArgs }) {
 }
 
 /**
+ * Copy-paste example: a button shows a toast, announced without taking the focus; it closes by itself or with its action or close button.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Toast.example.tsx'),
+};
+
+/**
  * Controls: `tone`, `duration`, `title`, `description` and `withAction`; `onDismiss` and the action's
  * `onClick` appear in Actions. The play function types in the field, saves, checks the focus stayed on
  * "Save" and the text arrived in the live region that was already there, then moves the focus into the
  * toast with F8 and closes it with Escape, which returns the focus to "Save".
  */
 export const Playground: Story = {
+  tags: ['playground'],
+  decorators,
   render: (args) => (
     <Page>
       <SaveForm args={args} />
@@ -190,6 +203,7 @@ const allShown = async () => {
 
 /** The four tones, each in its own slot: icon, border and the hidden tone name differ. */
 export const Tones: Story = {
+  decorators,
   tags: ['visual'],
   parameters: { controls: { disable: true } },
   render: () => (
@@ -203,6 +217,7 @@ export const Tones: Story = {
 
 /** Title, action, both, and neither. */
 export const Variants: Story = {
+  decorators,
   tags: ['visual'],
   parameters: { controls: { disable: true } },
   render: () => (
@@ -229,6 +244,7 @@ export const Variants: Story = {
  * activates "Undo" with Enter and checks the action ran, the toast closed and the focus is back on "Save".
  */
 export const WithAction: Story = {
+  decorators,
   args: { tone: 'info', description: 'Supplier removed.', withAction: true, duration: 'persistent' },
   render: Playground.render,
   play: async ({ args, canvasElement }) => {
@@ -248,6 +264,7 @@ export const WithAction: Story = {
 
 /** A long message and an unbroken URL wrap inside the toast; nothing overflows, also at 375px. */
 export const LongText: Story = {
+  decorators,
   tags: ['visual'],
   parameters: { controls: { disable: true } },
   render: () => (
@@ -282,6 +299,7 @@ function SaveInOverlay({ label }: { label: string }) {
  * open, which is why a toast with an action stays until closed.
  */
 export const InsideDialog: Story = {
+  decorators,
   tags: ['visual'],
   parameters: { controls: { disable: true } },
   render: () => (
@@ -331,6 +349,7 @@ function centerOf(el: HTMLElement): [number, number] {
  * stacking e2e test; no play (the test opens the Select).
  */
 export const OverSelectInsideDialog: Story = {
+  decorators,
   parameters: { controls: { disable: true } },
   render: () => (
     <Page>
@@ -365,6 +384,7 @@ export const OverSelectInsideDialog: Story = {
  * action. Fixture for the focus e2e test (`withAction` control); no play.
  */
 export const ShownByTimer: Story = {
+  decorators,
   args: { withAction: true, duration: 'persistent', description: 'Synced' },
   render: (args) => <TimerDemo args={args} />,
 };
@@ -389,6 +409,7 @@ function TimerDemo({ args }: { args: DemoArgs }) {
 
 /** The same inside a Sheet. */
 export const InsideSheet: Story = {
+  decorators,
   parameters: { controls: { disable: true } },
   render: () => (
     <Page>

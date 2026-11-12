@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../dialog/Dialog';
+import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from './Menu';
@@ -143,12 +144,21 @@ function BasicMenu({ args }: { args: DemoArgs }) {
 }
 
 /**
+ * Copy-paste example: a button opens a menu with grouped items; arrow keys move between them, a disabled item is skipped, a chosen item acts and Escape returns the focus to the button.
+ */
+export const Example: Story = {
+  tags: ['example', '!visual'],
+  ...exampleStory('Menu.example.tsx'),
+};
+
+/**
  * Controls: `side`, `align`, `modal`, `loop`, and which item is disabled; every `onSelect` and
  * `onOpenChange` is in Actions. The play function opens the menu with ArrowDown, checks that the
  * disabled item is skipped, picks "Duplicate" with Enter and checks the action, the closing and the
  * focus back on the trigger.
  */
 export const Playground: Story = {
+  tags: ['playground'],
   args: { disabledItem: 'rename' },
   render: (args) => (
     <Page>
