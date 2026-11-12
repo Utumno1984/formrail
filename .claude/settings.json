@@ -34,7 +34,6 @@
       "Bash(git log *)"
     ],
     "deny": [
-      "Bash(gh pr merge *)",
       "Bash(git push --force *)",
       "Bash(git push -f *)",
       "Bash(git push * --force *)",
