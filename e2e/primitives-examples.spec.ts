@@ -36,6 +36,28 @@ test.describe('Primitives copy-paste examples', () => {
     await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Dismiss message: Session expiring' })).toBeVisible();
+    // The focus goes to a NON-live wrapper: the strip inside it is the live region, and speaks once.
+    const wrapper = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
+    await expect(wrapper).toBeFocused();
+    await expect(wrapper).toBeVisible();
+    await expect(wrapper).not.toHaveAttribute('role', /.+/);
+    await expect(wrapper).not.toHaveAttribute('aria-live', /.+/);
+    const outline = await wrapper.evaluate((el) => {
+      const c = getComputedStyle(el);
+      return { style: c.outlineStyle, width: c.outlineWidth, color: c.outlineColor };
+    });
+    expect(outline.style).toBe('solid');
+    expect(outline.width).toBe('2px');
+    const primary = await page.evaluate(() => {
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--color-rop-primary)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    expect(outline.color).toBe(primary);
+    await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeDisabled();
   });
 
   test('ProgressBar: named, and completes with an announcement', async ({ page }) => {
@@ -59,7 +81,7 @@ test.describe('Primitives copy-paste examples', () => {
     expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(1);
     await expect(page.getByText('Invoice 1001')).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
-    expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(24);
+    expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(1);
     await expectNoA11yViolations(page);
   });
 
