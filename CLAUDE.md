@@ -18,10 +18,11 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   sua, dettaglio in `docs/planning/design-system-spec.md` §8)**: target team aziendali (ERP,
   gestionali, portali amministrativi); licenza annuale per sviluppatore con 12 mesi di
   aggiornamenti inclusi, venduta tramite un Merchant of Record (es. Lemon Squeezy) che gestisce
-  IVA UE e fatturazione; distribuzione tramite org npm privata. Prima di spingere sulle vendite:
-  landing page con lista d'attesa/pre-ordine (validazione della domanda). I motori Pro (Change
-  Summary, Form Rebase) vanno resi usabili anche senza `@formrail/core` (React Hook Form, TanStack
-  Form).
+  IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
+  d'attesa/pre-ordine (validazione della domanda). Aperto un ticket di studio/refactoring per
+  rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
+  usa React Hook Form o TanStack Form. La distribuzione resta come da §2.4 della spec (org npm
+  privata, nessun licensing a runtime): non è toccata dalle decisioni.
 - Il documento di pianificazione completo (inventario componenti, insidie tecniche di classe
   generale, segmentazione Free/Pro, MVP) è in `docs/planning/design-system-spec.md`. **Il
   pianificatore lo legge sempre prima di creare ticket.**
