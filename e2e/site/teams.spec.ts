@@ -247,6 +247,16 @@ test.describe('privacy page', () => {
     ]);
     const main = page.locator('main');
     await expect(main).toContainText('Daniele Ingusci');
+    const fields = main.locator('#data-title ~ ul li');
+    await expect(fields).toHaveText([
+      /email address \(required\)/,
+      /size of your team \(required\)/,
+      /when you would need Formrail Pro \(required\)/,
+      /form libraries you use today \(optional, you can pick several\)/,
+      /your consent .* \(required\)/,
+    ]);
+    await expect(main).toContainText('Without the required fields the form cannot be submitted');
+    await expect(main).not.toContainText('Giving it is optional');
     await expect(main).toContainText('art. 6(1)(a)');
     await expect(main).toContainText('not checked');
     await expect(main).toContainText('servers in the European Union');
@@ -388,6 +398,32 @@ test.describe('responsive', () => {
     expect(m.left).toBeGreaterThanOrEqual(0);
     expect(m.right).toBeLessThanOrEqual(m.iw);
     expect(m.height).toBeGreaterThan(44);
+  });
+
+  test('teams: no word of the Free/Pro table is split across lines (320, 375, 768px) and nothing overflows sideways', async ({ page }) => {
+    for (const width of [320, 375, 768]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('teams/');
+      const split = await page.evaluate(() => {
+        const broken: string[] = [];
+        for (const cell of document.querySelectorAll('.compare th, .compare td')) {
+          const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            const text = node.textContent ?? '';
+            for (const match of text.matchAll(/[^\s-]+/g)) {
+              const range = document.createRange();
+              range.setStart(node, match.index!);
+              range.setEnd(node, match.index! + match[0].length);
+              const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top)));
+              if (lines.size > 1) broken.push(match[0]);
+            }
+          }
+        }
+        return { broken, sw: document.documentElement.scrollWidth, iw: window.innerWidth };
+      });
+      expect(split.broken, `${width}px`).toEqual([]);
+      expect(split.sw, `${width}px`).toBeLessThanOrEqual(split.iw);
+    }
   });
 
   test('teams: the license line and the table cells are readable (>= 14px) and inside the viewport at 320px', async ({ page }) => {
