@@ -220,6 +220,7 @@ test.describe('waitlist call-to-action', () => {
       await expect(note).toContainText('nothing is embedded');
       await expect(note.getByRole('link', { name: 'privacy page' })).toHaveAttribute('href', '../privacy/');
       await expect(note).toContainText('consent');
+    await expect(note).toContainText('your email to contact you about Formrail Pro early access and your answers to plan the product');
       await expect(note).toContainText('its size');
       await expect(page.getByRole('link', { name: 'Join the waitlist' })).toHaveAttribute('href', '#waitlist');
     },
@@ -268,8 +269,9 @@ test.describe('privacy page', () => {
     await expect(main).toContainText('withdraw your consent at any time');
     await expect(main).toContainText('not copied to email or to any other service');
     await expect(main).toContainText('GitHub Pages');
-    await expect(main).toContainText('no longer than 24 months from your sign-up');
-    await expect(main).toContainText('at least once a year');
+    await expect(main).toContainText('no later than 24 months after sign-up, or earlier if you withdraw your consent');
+    await expect(main).not.toContainText('once a year');
+    await expect(main).toContainText('Formrail is a project by Daniele Ingusci');
     await expect(main).not.toContainText('12 months after');
     await expect(main).toContainText('not checked');
     await expect(main).toContainText('servers in the European Union');
@@ -300,8 +302,30 @@ test.describe('privacy page', () => {
     for (const url of ['', 'teams/', 'privacy/']) {
       await page.goto(url);
       await expect(page.getByRole('contentinfo'), url).toContainText(
-        'Formrail Pro: annual license per developer, 12 months of updates included, terms published before sales.',
+        'Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.',
       );
+    }
+  });
+});
+
+test.describe('public wording matches the privacy notice', () => {
+  test('no page says the data is used "only" to contact people; the CTA notes name both purposes', async ({ page }) => {
+    for (const url of ['', 'teams/', 'privacy/']) {
+      await page.goto(url);
+      const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+      expect(text, url).not.toMatch(/only to contact|only use your answers/i);
+    }
+    test.skip(!earlyAccessUrl, 'no CTA note without a URL');
+    await page.goto('');
+    await expect(page.locator('#pro .cta')).toContainText('your answers to plan the product');
+    await expect(page.locator('#pro .cta')).toContainText('privacy page');
+  });
+
+  test('the license sentence of the footers is the decided one, letter for letter', async ({ page }) => {
+    for (const url of ['', 'teams/', 'privacy/']) {
+      await page.goto(url);
+      const footer = (await page.getByRole('contentinfo').innerText()).replace(/\s+/g, ' ');
+      expect(footer, url).toContain('Annual license per developer, 12 months of updates included, terms published before sales.');
     }
   });
 });

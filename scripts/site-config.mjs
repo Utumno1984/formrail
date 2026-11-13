@@ -14,9 +14,9 @@ export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
 /**
  * Target of the "Request early access" call-to-action (tickets #382, #490): the waitlist form, a Tally
- * form (EU servers) created by Daniele, opened from an external link (never embedded). Its first field
- * is an unchecked consent checkbox and it asks three qualification questions (team size, form library
- * in use, timing).
+ * form (EU servers) created by Daniele, opened from an external link (never embedded). It asks for the email,
+ * three qualification questions (team size, form libraries in use, timing) and ends with an unchecked
+ * consent checkbox.
  *
  * Must be an absolute `https://` URL. Setting it to '' makes the assembler leave every CTA out of the
  * pages (never a link to `#` or a broken one); the strict guard rejects '' too.

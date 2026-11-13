@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { assembleSite, renderPrice, renderPrivacyEmail } from './assemble-site.mjs';
+import { assembleSite, isStrictRun, renderPrice, renderPrivacyEmail } from './assemble-site.mjs';
 import { assertConfigPublishable, findConfigProblems } from './check-site-config.mjs';
 import { EARLY_ACCESS_URL, EXPECTED_PRICE_TEXT, PRIVACY_EMAIL } from './site-config.mjs';
 
@@ -101,6 +101,23 @@ describe('assembled pages', () => {
     for (const html of [home, teams, privacy]) expect(html).not.toContain('terms to be defined');
   });
 
+  it('no page of the site says the answers are used "only" to contact people (the notice names two purposes)', () => {
+    const { teams, privacy, home, notFound } = build();
+    for (const html of [teams, privacy, home, notFound]) {
+      expect(html.replace(/\s+/g, ' ')).not.toMatch(/only to contact|only use your answers/i);
+    }
+    for (const html of [teams, home]) {
+      expect(html.replace(/\s+/g, ' ')).toContain('your answers to plan the product');
+    }
+  });
+
+  it('the footer license sentence is the decided one, letter for letter, on every page', () => {
+    const { teams, privacy, home } = build();
+    for (const html of [teams, privacy, home]) {
+      expect(html).toContain('Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.');
+    }
+  });
+
   it('the new pages carry no script at all', () => {
     const { teams, privacy } = build();
     for (const html of [teams, privacy]) expect(html).not.toContain('<script');
@@ -108,6 +125,12 @@ describe('assembled pages', () => {
 });
 
 describe('placeholder guard', () => {
+  it('the CLI reads --strict from the command line (and only from the arguments)', () => {
+    expect(isStrictRun(['node', 'assemble-site.mjs', '--strict'])).toBe(true);
+    expect(isStrictRun(['node', 'assemble-site.mjs'])).toBe(false);
+    expect(isStrictRun(['node', '--strict'])).toBe(false);
+  });
+
   // The guard tests use their own fake values, never the committed configuration.
   const FAKE_PLACEHOLDERS = {
     earlyAccessUrl: 'https://tally.so/r/PLACEHOLDER-waitlist-form',
@@ -165,6 +188,7 @@ describe('placeholder guard', () => {
     ['example.com URL', { earlyAccessUrl: 'https://example.com/form' }, /still a placeholder/],
     ['empty email', { privacyEmail: '' }, /PRIVACY_EMAIL is empty/],
     ['not an email', { privacyEmail: 'privacy' }, /not an email/],
+    ['email without a top-level domain', { privacyEmail: 'a@b' }, /not an email/],
     ['placeholder email', { privacyEmail: 'PLACEHOLDER@formrail.dev' }, /still a placeholder/],
     ['.invalid email', { privacyEmail: 'me@x.invalid' }, /still a placeholder/],
     ['example.com email', { privacyEmail: 'me@example.com' }, /still a placeholder/],

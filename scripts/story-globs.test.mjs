@@ -147,6 +147,49 @@ describe('storyGlobs (#175)', () => {
   });
 });
 
+// The jobs of ci.yml by name (ticket #490). The checks above slice the file at `deploy-pages:`, which, since the
+// PR-only `site` job lives below it, also covers `site`; these ones look at one job at a time, so a flag or a
+// Pro build removed from deploy-pages alone turns them red.
+describe('ci.yml: which job sets the public-site Storybook flags (#490)', () => {
+  const ci = readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8');
+  const jobNames = [...ci.slice(ci.indexOf('\njobs:')).matchAll(/^ {2}([a-z][a-z0-9-]*):\s*$/gm)].map((m) => m[1]);
+  const job = (name) => {
+    const start = ci.search(new RegExp(`^ {2}${name}:\\s*$`, 'm'));
+    expect(start, `job ${name}`).toBeGreaterThan(-1);
+    const rest = ci.slice(start + 1);
+    const next = rest.search(/\n {2}[a-z][a-z0-9-]*:\s*\n/);
+    return next === -1 ? rest : rest.slice(0, next);
+  };
+  // `site` is the only job besides deploy-pages allowed to build the public-site Storybooks: it is the PR run of
+  // the Pages smoke and must test exactly the artefact that gets published (#490).
+  const ALLOWED = new Set(['deploy-pages', 'site']);
+
+  it('deploy-pages ALONE sets both flags and runs the Pro build', () => {
+    const deploy = job('deploy-pages');
+    expect(deploy).toMatch(/STORYBOOK_EXCLUDE_PRO: '?1'?/);
+    expect(deploy).toMatch(/STORYBOOK_HIDE_INTERNAL: '?1'?/);
+    expect(deploy).toContain('npm run build-storybook:pro');
+  });
+
+  it('every other job except the explicit `site` exception leaves the flags and the Pro build out', () => {
+    expect(jobNames).toContain('deploy-pages');
+    for (const name of jobNames.filter((n) => !ALLOWED.has(n))) {
+      const body = job(name);
+      expect(body, name).not.toMatch(/STORYBOOK_EXCLUDE_PRO: /);
+      expect(body, name).not.toMatch(/STORYBOOK_HIDE_INTERNAL: /);
+      expect(body, name).not.toContain('build-storybook:pro');
+    }
+  });
+
+  it('the `site` exception builds the same way as the deploy', () => {
+    const site = job('site');
+    expect(site).toMatch(/STORYBOOK_EXCLUDE_PRO: '?1'?/);
+    expect(site).toMatch(/STORYBOOK_HIDE_INTERNAL: '?1'?/);
+    expect(site).toContain('npm run build-storybook:pro');
+    expect(site).toContain("github.event_name == 'pull_request'");
+  });
+});
+
 describe('exampleSources (#447)', () => {
   const FREE = { STORYBOOK_EXCLUDE_PRO: '1' };
   const PRO_DEMO = { STORYBOOK_EDITION: 'pro' };

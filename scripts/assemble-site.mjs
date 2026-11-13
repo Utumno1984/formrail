@@ -99,6 +99,11 @@ export function renderPrivacyEmail(html, email) {
   return html.replaceAll('{{PRIVACY_EMAIL}}', () => text);
 }
 
+/** Whether the command line asks for the deploy's strict mode (placeholder guard), see `assembleSite`. */
+export function isStrictRun(argv) {
+  return argv.slice(2).includes('--strict');
+}
+
 /** The source of `site-root/redirect.mjs` as plain script code: `export` stripped, ready to inline. */
 export function redirectScriptSource(siteRootDir) {
   const source = readFileSync(path.join(siteRootDir, 'redirect.mjs'), 'utf8');
@@ -186,6 +191,6 @@ export function assembleSite({
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const strict = process.argv.includes('--strict');
+  const strict = isStrictRun(process.argv);
   console.log(`Assembled the site in ${assembleSite({ proStorybookDir: path.join(REPO_ROOT, 'storybook-static-pro'), strict })}`);
 }
