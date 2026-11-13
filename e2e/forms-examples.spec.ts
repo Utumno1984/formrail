@@ -104,10 +104,20 @@ test.describe('Forms copy-paste examples', () => {
   test('Field: label, control, help and error are wired; the locked field is read-only from the keyboard too', async ({ page }) => {
     await gotoStory(page, 'forms-field--example');
     const vat = page.getByRole('textbox', { name: 'VAT number' });
-    await expect(vat).toHaveValue('123');
     await expect(vat).toHaveAttribute('aria-required', 'true');
+    // Pristine: no error and no aria-invalid before any gesture.
+    await expect(vat).not.toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByText('The VAT number must have 11 digits.')).toHaveCount(0);
+    await expect(vat).toHaveValue('12345678901');
+    await expect(vat).toHaveAccessibleDescription('Eleven digits, no spaces.');
+    // Edit to an invalid value: still no error while typing, it appears once the field is left.
+    await vat.fill('123');
+    await expect(page.getByText('The VAT number must have 11 digits.')).toHaveCount(0);
+    await expect(vat).not.toHaveAttribute('aria-invalid', 'true');
+    await vat.blur();
     await expect(vat).toHaveAttribute('aria-invalid', 'true');
     await expect(vat).toHaveAccessibleDescription(/The VAT number must have 11 digits\./);
+    // Fixing the value clears the error right away.
     await vat.fill('12345678901');
     await expect(vat).not.toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByText('The VAT number must have 11 digits.')).toHaveCount(0);
@@ -148,10 +158,16 @@ test.describe('Forms copy-paste examples', () => {
     await expect(page.getByText('Not added: notes.txt. Only PDF files up to 5 MB.')).toBeVisible();
     await expect(page.getByRole('list', { name: 'Selected files' }).getByText('notes.txt')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Choose files/ })).toHaveAccessibleDescription(/Not added: notes\.txt/);
-    // Removing a file keeps the focus on a live control.
+    await input.setInputFiles({ name: 'invoice-2.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(2_000) });
+    await expect(page.getByRole('list', { name: 'Selected files' }).getByText('invoice-2.pdf')).toBeVisible();
+    // Removing one of two files moves the focus to the Remove button of the file that took its place.
     await page.getByRole('button', { name: 'Remove invoice-1.pdf' }).click();
     await expect(page.getByText('invoice-1.pdf')).toHaveCount(0);
-    await expect(page.locator(':focus')).not.toHaveJSProperty('tagName', 'BODY');
+    await expect(page.getByRole('button', { name: 'Remove invoice-2.pdf' })).toBeFocused();
+    // Removing the only file moves it to "Choose files", not to the body or any other element.
+    await page.getByRole('button', { name: 'Remove invoice-2.pdf' }).click();
+    await expect(page.getByText('invoice-2.pdf')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Choose files/ })).toBeFocused();
     expect(external).toEqual([]);
     expect(posts).toEqual([]);
     await expectNoA11yViolations(page);
@@ -162,10 +178,14 @@ test.describe('Forms copy-paste examples', () => {
     const input = page.getByRole('textbox', { name: 'Company name' });
     await expect(input).toHaveValue('Acme Ltd');
     await expect(input).toHaveAccessibleName('Company name');
-    await expect(page.locator('output')).toHaveText('8 characters');
+    const counter = page.getByText(/^\d+ characters$/);
+    // The counter is not a live region: a screen reader must not announce it at every keystroke.
+    await expect(counter).toHaveText('8 characters');
+    expect(await counter.evaluate((el) => el.tagName)).not.toBe('OUTPUT');
+    await expect(page.getByRole('status')).toHaveCount(0);
     await expectNotDirty(page);
     await input.fill('Acme Holdings Ltd');
-    await expect(page.locator('output')).toHaveText('17 characters');
+    await expect(counter).toHaveText('17 characters');
     // The accessible name does not change with the edit.
     await expect(page.getByRole('textbox', { name: 'Company name' })).toHaveValue('Acme Holdings Ltd');
     await expect(input).toHaveAccessibleDescription('As it appears on the invoice.');
@@ -277,7 +297,10 @@ test.describe('Forms copy-paste examples', () => {
     await gotoStory(page, 'forms-textarea--example');
     const area = page.getByRole('textbox', { name: 'Rejection reason' });
     await expect(area).toHaveValue('Amount does not match the purchase order.');
-    await expect(page.locator('output')).toHaveText('41 characters');
+    const counter = page.getByText(/^\d+ characters$/);
+    await expect(counter).toHaveText('41 characters');
+    expect(await counter.evaluate((el) => el.tagName)).not.toBe('OUTPUT');
+    await expect(page.getByRole('status')).toHaveCount(0);
     await expectNotDirty(page);
     const height = async () => (await area.boundingBox())!.height;
     const lineHeight = parseFloat(await area.evaluate((el) => getComputedStyle(el).lineHeight));
@@ -290,7 +313,7 @@ test.describe('Forms copy-paste examples', () => {
     // Six rows is the limit: the control stops growing and the text scrolls inside it.
     await expect.poll(() => area.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
     await expect.poll(() => area.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
-    expect(await height()).toBeLessThanOrEqual(before + lineHeight * 5 + 1);
+    expect(await height()).toBeLessThanOrEqual(before + lineHeight * 4 + 1);
     await expectNoA11yViolations(page);
   });
 });
