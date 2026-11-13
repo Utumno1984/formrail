@@ -353,6 +353,47 @@ export function normalizeDefault(text) {
   return t;
 }
 
+/**
+ * The text of the `@default` (or `@defaultValue`) TSDoc tag of a prop, `undefined` when there is none (a bare tag
+ * is `''`). Read from the property symbol of the component's props type (every member of a union), else from the
+ * interface / type alias the docgen reports as the prop's declaration.
+ */
+export function declaredDefaultOf(name, fn, propInfo, program, checker) {
+  const fromSymbol = (sym) => {
+    // The prop's own declarations only: `symbol.getJsDocTags()` also inherits the tags of a prop it overrides
+    // (Radix's `loop` has `@default false`), which the docgen does not show for the redeclared prop either.
+    for (const d of sym?.declarations ?? []) {
+      const tag = ts.getJSDocTags(d).find((t) => t.tagName.text === 'default' || t.tagName.text === 'defaultValue');
+      if (tag) return ts.getTextOfJSDocComment(tag.comment) ?? '';
+    }
+    return undefined;
+  };
+  const param = fn?.parameters[0];
+  if (param) {
+    const type = checker.getTypeAtLocation(param);
+    for (const t of type.isUnion() ? type.types : [type]) {
+      const found = fromSymbol(checker.getPropertyOfType(t, name));
+      if (found !== undefined) return found;
+    }
+  }
+  for (const decl of propInfo.declarations ?? []) {
+    const sf = program.getSourceFile(decl.fileName);
+    if (!sf) continue;
+    let found;
+    const visit = (node) => {
+      if (found !== undefined) return;
+      if ((ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) && node.name.text === decl.name) {
+        const members = ts.isInterfaceDeclaration(node) ? node.members : ts.isTypeLiteralNode(node.type) ? node.type.members : [];
+        for (const m of members) if (m.name && ts.isIdentifier(m.name) && m.name.text === name) found = fromSymbol(checker.getSymbolAtLocation(m.name));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 export function measure({ root = REPO_ROOT, entries = ENTRIES } = {}) {
   const entryFiles = entries.map((e) => resolve(root, e));
   const program = ts.createProgram(entryFiles, docgenCompilerOptions);
@@ -396,14 +437,16 @@ export function measure({ root = REPO_ROOT, entries = ENTRIES } = {}) {
     const rows = [];
     const inTable = new Set(Object.keys(doc.props));
     for (const [name, prop] of Object.entries(doc.props)) {
-      const tagDefault = prop.tags?.default ?? prop.tags?.defaultValue;
-      // `declared` is `undefined` only when there is no tag: an empty or falsy `@default` is still declared.
-      const declared = tagDefault === undefined ? undefined : String(tagDefault);
+      // `declared` is `undefined` only when there is no tag: a bare, empty or falsy `@default` is still declared.
+      // The docgen swallows the tag into `defaultValue` (and loses it when the source has a default too), so it
+      // is read from the TSDoc of the prop itself.
+      const declared = declaredDefaultOf(name, fn, prop, program, checker);
+      const tagValued = declared !== undefined && declared.trim() !== '';
       const own = defaults.get(name);
       const src = own ?? delegated.out.get(name);
-      const hasSource = src !== undefined || tagDefault !== undefined;
+      const hasSource = src !== undefined || tagValued;
       const emptyCol = prop.defaultValue == null;
-      const source = src ? src.text : `@default ${tagDefault}`;
+      const source = src ? src.text : `@default ${declared}`;
       const literal = src ? src.literal : true;
       const union = unionCause(sf, name) === 'union';
       const prose = PROSE_DEFAULT.test(prop.description ?? '');
@@ -422,6 +465,8 @@ export function measure({ root = REPO_ROOT, entries = ENTRIES } = {}) {
       else if (hasSource) rows.push({ prop: name, kind: 'ok', source, literal, where: src ? src.where : 'tag', union, cause: '', ...extra });
       // No destructuring default but the column is filled: the docgen read a `@default` tag (it does).
       else if (!emptyCol) rows.push({ prop: name, kind: 'ok', source: `@default ${prop.defaultValue.value}`, literal: true, where: 'tag', union, cause: '', ...extra });
+      // A bare `@default` (no value, no source default): the row exists so that `check` can name it.
+      else if (declared !== undefined) rows.push({ prop: name, kind: 'ok', source: '@default', literal: true, where: 'tag', union, cause: '', ...extra });
     }
     const defaultsNotInTable = [...defaults.keys()].filter((k) => !inTable.has(k)).sort();
     components.push({ component: doc.displayName, file: rel, shape, propsInTable: inTable.size, rows: rows.sort((a, b) => a.prop.localeCompare(b.prop)), defaultsNotInTable, unresolvedDelegations: [...new Set(delegated.unresolved)].sort() });
@@ -494,7 +539,8 @@ export function check({ components }, { allowlist = NON_LITERAL_ALLOWLIST } = {}
   for (const c of components) {
     for (const r of c.rows) {
       const id = `${c.component}.${r.prop}`;
-      if (r.kind === 'gap') push(c.component, r.prop, 'missing-default', `default ${flat(r.source)} in the source, no \`@default\` tag`);
+      // A bare `@default` has its own error below; it must not also be called missing.
+      if (r.kind === 'gap' && r.declared === undefined) push(c.component, r.prop, 'missing-default', `default ${flat(r.source)} in the source, no \`@default\` tag`);
       else if (r.kind === 'prose-only') push(c.component, r.prop, 'missing-default', 'default only in the prose, no `@default` tag');
       const unresolvable = r.where !== 'tag' && r.sourceValue === null && r.kind !== 'prose-only';
       if (unresolvable) needed.add(id);
@@ -523,10 +569,13 @@ export function formatCheck(issues) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const result = measure();
+  // `--root <dir>`: measure another package tree (the tests run the CLI on fixture packages).
+  const rootAt = process.argv.indexOf('--root');
+  const result = rootAt > 0 ? measure({ root: resolve(process.argv[rootAt + 1]) }) : measure();
   const json = process.argv.includes('--json');
   if (process.argv.includes('--check')) {
-    const issues = check(result);
+    // The allowlist names props of this repository: another root has none.
+    const issues = rootAt > 0 ? check(result, { allowlist: {} }) : check(result);
     process.stdout.write(json ? JSON.stringify(issues, null, 2) + '\n' : formatCheck(issues));
     process.exitCode = issues.length ? 1 : 0;
   } else process.stdout.write(json ? JSON.stringify(result, null, 2) + '\n' : format(result));

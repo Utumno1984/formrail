@@ -1,9 +1,10 @@
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
-import { PROSE_DEFAULT, REPO_ROOT, causeOf, destructuringDefaults, findComponentFunction, isLiteralInitializer, measure } from './default-column-measure.mjs';
+import { PROSE_DEFAULT, REPO_ROOT, causeOf, check, destructuringDefaults, findComponentFunction, formatCheck, isLiteralInitializer, literalNodeOf, measure, normalizeDefault } from './default-column-measure.mjs';
 
 // Tests of the measure for the empty Default column (ticket #460). The helpers are pure and tested on
 // snippets; `measure` runs the real docgen on small fixture packages (one case per file) and on the repo.
@@ -239,4 +240,475 @@ describe('measure on the repository', { timeout: 60_000 }, () => {
   it('is deterministic', () => {
     expect(measure()).toEqual(result);
   }, 60_000);
+});
+
+// ---------------------------------------------------------------------------------------------------------
+// Ticket #474: the measure becomes a guard (`--check`), follows nested / render-prop / hook delegations and
+// compares `@default` with the default written in the source. Same method as above: real docgen on fixture
+// packages, one component per case.
+
+/** A throw-away package tree (core + an empty pro) with the given component files; returns its root. */
+const fixtureRoot = (files) => {
+  const dir = mkdtempSync(join(tmpdir(), 'formrail-guard-'));
+  const core = join(dir, 'packages/core/src');
+  mkdirSync(core, { recursive: true });
+  mkdirSync(join(dir, 'packages/pro/src'), { recursive: true });
+  symlinkSync(join(REPO_ROOT, 'node_modules'), join(dir, 'node_modules'));
+  writeFileSync(join(dir, 'packages/pro/src/index.ts'), 'export {};\n');
+  const tsx = Object.keys(files).filter((f) => f.endsWith('.tsx'));
+  writeFileSync(join(core, 'index.ts'), tsx.map((f) => `export * from './${f.replace('.tsx', '')}';`).join('\n') + '\n');
+  for (const [name, code] of Object.entries(files)) writeFileSync(join(core, name), code);
+  return dir;
+};
+
+const rowIn = (result, component, prop) => result.components.find((c) => c.component === component)?.rows.find((r) => r.prop === prop);
+const issuesOf = (issues, component) => issues.filter((i) => i.component === component);
+
+describe('normalizeDefault', () => {
+  it.each([
+    ["'md'", 'md'], ['"md"', 'md'], ['`md`', 'md'], ['md', 'md'], ['  md  ', 'md'],
+    ["''", ''], ['``', ''], ['0', '0'], ['false', 'false'], ['null', 'null'], ['undefined', 'undefined'],
+    ["[ 'a',\n 'b' ]", '["a","b"]'], ['{ a: 1 }', '{a:1}'], ['two  words', 'two words'],
+  ])('%j -> %j', (input, out) => expect(normalizeDefault(input)).toBe(out));
+  it('keeps the empty string, undefined, null, false and 0 all different from each other', () => {
+    const values = ["''", 'undefined', 'null', 'false', '0'].map(normalizeDefault);
+    expect(new Set(values).size).toBe(values.length);
+  });
+});
+
+describe('literalNodeOf (constants resolved through the checker)', () => {
+  const program = (code) => {
+    const host = ts.createCompilerHost({});
+    const sf = ts.createSourceFile('/x.ts', code, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
+    const orig = host.getSourceFile.bind(host);
+    host.getSourceFile = (name, ...rest) => (name === '/x.ts' ? sf : orig(name, ...rest));
+    const p = ts.createProgram(['/x.ts'], { noLib: true }, host);
+    return { sf, checker: p.getTypeChecker() };
+  };
+  const lastInit = (sf) => sf.statements.at(-1).declarationList.declarations[0].initializer;
+  it('resolves a const to its literal, through a chain', () => {
+    const { sf, checker } = program('const A = 5; const B = A; const target = B;');
+    expect(literalNodeOf(lastInit(sf), checker).getText()).toBe('5');
+  });
+  it('does not resolve a let or a call', () => {
+    const l = program('let A = 5; const target = A;');
+    expect(literalNodeOf(lastInit(l.sf), l.checker)).toBeUndefined();
+    const c = program('declare function f(): number; const A = f(); const target = A;');
+    expect(literalNodeOf(lastInit(c.sf), c.checker)).toBeUndefined();
+  });
+  it('does not loop on a cycle', () => {
+    const { sf, checker } = program('const A: number = B; const B: number = A; const target = A;');
+    expect(literalNodeOf(lastInit(sf), checker)).toBeUndefined();
+  });
+});
+
+describe('delegations on fixture packages (#474)', () => {
+  const files = {
+    'Shared.tsx': `export interface InnerProps {
+        /** x. */ side?: 'top' | 'bottom';
+        /** x. */ level?: string;
+        /** x. */ other?: string;
+        /** x. */ gap?: number;
+      }
+      export function Inner({ side = 'top', other = 'o', gap = 4 }: InnerProps) { return <i>{side}{other}{gap}</i>; }`,
+    // Nested: Outer -> Middle -> Deepest (the default lives in the last one).
+    'Nested.tsx': `import { Inner } from './Shared';
+      import type { InnerProps } from './Shared';
+      function Deepest({ level = 'deep' }: InnerProps) { return <i>{level}</i>; }
+      function Middle(props: InnerProps) { return <Deepest {...props} />; }
+      export function Outer(props: InnerProps) { return <Middle {...props} />; }
+      // The nearer default wins: Mid2 defaults level before it reaches Deepest.
+      function Mid2({ level = 'mid' }: InnerProps) { return <Deepest level={level} />; }
+      export function Outer2(props: InnerProps) { return <Mid2 {...props} />; }
+      export function Quiet(props: InnerProps) { return <Inner {...props} />; }`,
+    // A spread that is not the props.
+    'Unrelated2.tsx': `import { Inner } from './Shared';
+      import type { InnerProps } from './Shared';
+      export function UnrelatedSpread({ side }: InnerProps) {
+        const unrelated = { other: 'x' };
+        return <Inner {...unrelated} data-side={side} />;
+      }`,
+    // Hooks that destructure the defaults.
+    'Hooks.tsx': `import type { InnerProps } from './Shared';
+      declare function makeHook(): (p: InnerProps) => string;
+      export function useGap({ gap = 7 }: InnerProps) { return String(gap); }
+      export const useOpaque = makeHook();
+      export function HookConst(props: InnerProps) { const v = useGap(props); return <i>{v}</i>; }
+      export function HookReturn(props: InnerProps) { return <i>{useGap(props)}</i>; }
+      export function HookOpaque(props: InnerProps) { return <i>{useOpaque(props)}</i>; }`,
+    // Render prop: Host calls renderBody({ status, count, other: <changed>, id: 'x' }).
+    'RenderProp.tsx': `import type { ReactNode } from 'react';
+      export interface HostProps {
+        /** x. */ status?: 'ready' | 'loading';
+        /** x. */ count?: number;
+        /** x. */ other?: string;
+        /** x. */ renderBody: (p: { status?: 'ready' | 'loading'; count?: number; other?: string; id: string }) => ReactNode;
+      }
+      export function Host({ renderBody, status, count, other }: HostProps) {
+        return <div>{renderBody({ status, count, other: other?.toUpperCase(), id: 'x' })}</div>;
+      }
+      export function Body({ status = 'ready', count = 2, other = 'o' }: { status?: 'ready' | 'loading'; count?: number; other?: string; id?: string }) {
+        return <i>{status}{count}{other}</i>;
+      }
+      export type PublicProps = Omit<HostProps, 'renderBody'>;
+      export function RenderSpread(props: PublicProps) { return <Host {...props} renderBody={(p) => <Body {...p} />} />; }
+      export function RenderNamed({ status }: PublicProps) { return <Host status={status} renderBody={(p) => <Body {...p} />} />; }
+      export function RenderNoSpread(props: PublicProps) { return <Host {...props} renderBody={(p) => <Body id={p.id} />} />; }
+      export function HostOpaque({ render, ...rest }: { render: (p: object) => ReactNode; status?: 'ready' | 'loading' }) { return <div>{render(rest)}</div>; }
+      export function RenderOpaque(props: { status?: 'ready' | 'loading' }) { return <HostOpaque {...props} render={(p) => <Body {...p} />} />; }`,
+    // A default in the public component and a different one in the internal one.
+    'Diverge.tsx': `import { Inner } from './Shared';
+      import type { InnerProps } from './Shared';
+      export function Diverge(props: InnerProps) { const { side = 'bottom', ...rest } = props; return <Inner side={side} {...rest} />; }
+      export function SameValue(props: InnerProps) { const { side = "top", ...rest } = props; return <Inner side={side} {...rest} />; }`,
+    // Alias between files.
+    'AliasBase.tsx': `export function AliasBase({ tone = 'info' }: { /** x. */ tone?: 'info' | 'warn' }) { return <i>{tone}</i>; }`,
+    'Alias.tsx': `import { AliasBase } from './AliasBase';
+      export const AliasTitle = AliasBase;`,
+    // Unions: the prop is declared in one branch only; default in the parameter and in the body.
+    'Unions.tsx': `export type P = { /** x. */ size?: 'sm' | 'md'; label: string } | { icon: string };
+      export function UnionParam2({ size = 'md' }: Extract<P, { label: string }>) { return <i>{size}</i>; }
+      export function UnionBody(props: P) { const { size = 'md' } = props as Extract<P, { label: string }>; return <i>{size}</i>; }`,
+  };
+  const root = fixtureRoot(files);
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const result = measure({ root, entries: ['packages/core/src/index.ts'] });
+  const row = (c, p) => rowIn(result, c, p);
+
+  it('nested delegation: the default of the last internal component reaches the public prop', () => {
+    expect(row('Outer', 'level')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'deep'", via: 'Middle' });
+  });
+  it('nested delegation: the nearer default wins over the deeper one', () => {
+    expect(row('Outer2', 'level')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'mid'", via: 'Mid2' });
+  });
+  it('a spread of something that is not the props delegates nothing', () => {
+    expect(row('UnrelatedSpread', 'other')).toBeUndefined();
+    expect(row('UnrelatedSpread', 'side')).toBeUndefined();
+  });
+  it('a component that passes its props to one with no default for them has no row for those', () => {
+    expect(row('Quiet', 'level')).toBeUndefined();
+    expect(row('Quiet', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated' });
+  });
+  it('hooks: `const v = useX(props)` and `return useX(props)` follow the defaults the hook destructures', () => {
+    expect(row('HookConst', 'gap')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'useGap', source: '7' });
+    expect(row('HookReturn', 'gap')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'useGap', source: '7' });
+  });
+  it('hooks: one the script cannot read is listed in unresolvedDelegations, never silent', () => {
+    expect(result.components.find((c) => c.component === 'HookOpaque').unresolvedDelegations).toEqual(['useOpaque']);
+  });
+  it('render prop: what the host passes unchanged to the callback reaches the child through `{...p}`', () => {
+    for (const comp of ['RenderSpread', 'RenderNamed']) expect(row(comp, 'status'), comp).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'Body', source: "'ready'" });
+    expect(row('RenderSpread', 'count')).toMatchObject({ kind: 'gap', cause: 'delegated', source: '2' });
+  });
+  it('render prop: a key the host changes (`other: other?.toUpperCase()`) does not carry the child default', () => {
+    expect(row('RenderSpread', 'other')).toBeUndefined();
+  });
+  it('render prop: only the props the public component hands to the host are delegated', () => {
+    expect(row('RenderNamed', 'count')).toBeUndefined();
+  });
+  it('render prop: a callback that does not spread its parameter delegates nothing', () => {
+    expect(row('RenderNoSpread', 'status')).toBeUndefined();
+  });
+  it('render prop: a host that does not call the prop with an object literal is listed as unresolved', () => {
+    expect(result.components.find((c) => c.component === 'RenderOpaque').unresolvedDelegations).toEqual(['HostOpaque.render']);
+  });
+  it('a default in the public component and another in the internal one: the public wins and the divergence is reported', () => {
+    expect(row('Diverge', 'side')).toMatchObject({ source: "'bottom'", divergence: { own: "'bottom'", inner: "'top'", via: 'Inner' } });
+  });
+  it('the same default written with other quotes is not a divergence', () => {
+    expect(row('SameValue', 'side').divergence).toBeUndefined();
+  });
+  it('an alias between files is classified as alias', () => {
+    expect(row('AliasTitle', 'tone')).toMatchObject({ kind: 'gap', cause: 'alias' });
+  });
+  it('union with the prop in a single branch: default in the parameter is read by the docgen, in the body is a gap', () => {
+    expect(row('UnionParam2', 'size')).toMatchObject({ kind: 'ok', where: 'param', union: true });
+    expect(row('UnionBody', 'size')).toMatchObject({ kind: 'gap', where: 'body', cause: 'body-destructuring', union: true });
+  });
+});
+
+describe('check: the guard on fixture packages (#474)', () => {
+  const files = {
+    'Tags.tsx': `export interface P {
+        /** x.
+         * @default 'md' */
+        ok?: 'sm' | 'md';
+        /** x.
+         * @default "lg" */
+        mismatch?: 'sm' | 'md' | 'lg';
+        /** x.
+         * @default \`md\` */
+        backtick?: 'sm' | 'md';
+        /** x.
+         * @default md */
+        bare?: 'sm' | 'md';
+        /** x. */
+        missing?: 'sm' | 'md';
+        /** Weight. Default \`bold\`. */
+        proseOnly?: string;
+        /** Redundant. Default \`md\`.
+         * @default 'md' */
+        redundant?: 'sm' | 'md';
+        /** x.
+         * @default */
+        empty?: string;
+      }
+      export function Tags(props: P) {
+        const { ok = 'md', mismatch = 'md', backtick = 'md', bare = 'md', missing = 'md', redundant = 'md', empty = 'x' } = props;
+        return <i>{ok}{mismatch}{backtick}{bare}{missing}{redundant}{empty}{props.proseOnly ?? 'bold'}</i>;
+      }`,
+    // `@default` must be able to say undefined / null / false / 0 / '' without being read as "absent".
+    'Falsy.tsx': `export interface P {
+        /** x.
+         * @default undefined */
+        u?: string;
+        /** x.
+         * @default null */
+        n?: string | null;
+        /** x.
+         * @default false */
+        f?: boolean;
+        /** x.
+         * @default 0 */
+        z?: number;
+        /** x.
+         * @default '' */
+        e?: string;
+        /** x.
+         * @default 'x' */
+        eMismatch?: string;
+        /** x.
+         * @default 0 */
+        zVsFalse?: boolean;
+        /** x.
+         * @default undefined */
+        uVsEmpty?: string;
+        /** x. */
+        noTag?: string;
+      }
+      export function Falsy(props: P) {
+        const { u = undefined, n = null, f = false, z = 0, e = '', eMismatch = '', zVsFalse = false, uVsEmpty = '', noTag = '' } = props;
+        return <i>{u}{n}{String(f)}{z}{e}{eMismatch}{String(zVsFalse)}{uVsEmpty}{noTag}</i>;
+      }`,
+    // Constants (same file, imported from another file), a template literal, a computed default.
+    'Consts.tsx': `import { LIMIT, NAME } from './consts';
+      const LOCAL = 5;
+      declare function stepFrom(n: number): number;
+      export interface P {
+        /** x.
+         * @default 5 */
+        local?: number;
+        /** x.
+         * @default 6 */
+        localWrong?: number;
+        /** x.
+         * @default 10 */
+        imported?: number;
+        /** x.
+         * @default 11 */
+        importedWrong?: number;
+        /** x.
+         * @default 1 */
+        computed?: number;
+        /** x.
+         * @default 1 */
+        computedAllowed?: number;
+        /** x. */
+        computedNoTag?: number;
+        /** x.
+         * @default 3 */
+        coalesce?: number;
+      }
+      export function Consts(props: P) {
+        const { local = LOCAL, localWrong = LOCAL, imported = LIMIT, importedWrong = LIMIT, computed = stepFrom(1), computedAllowed = stepFrom(2), computedNoTag = stepFrom(3), coalesce = LIMIT ?? 3 } = props;
+        return <i>{local}{localWrong}{imported}{importedWrong}{computed}{computedAllowed}{computedNoTag}{coalesce}{NAME}</i>;
+      }
+      export interface TplProps {
+        /** x.
+         * @default 'name' */
+        name?: string;
+      }
+      export function Tpl(props: TplProps) { const { name = \`name\` } = props; return <i>{name}</i>; }`,
+    'consts.ts': `export const LIMIT = 10;\nexport const NAME = 'name';\n`,
+    // Tag order and multi-line values.
+    'Layout.tsx': `export interface P {
+        /**
+         * x.
+         * @since 1.0.0
+         * @default 'md'
+         * @deprecated no.
+         */
+        before?: 'sm' | 'md';
+        /**
+         * x.
+         * @deprecated no.
+         * @default 'md'
+         * @since 1.0.0
+         */
+        after?: 'sm' | 'md';
+        /**
+         * x.
+         * @default [
+         *   'a',
+         *   'b',
+         * ]
+         */
+        multi?: string[];
+        /**
+         * x.
+         * @default [
+         *   'a',
+         * ]
+         */
+        multiWrong?: string[];
+      }
+      export function Layout(props: P) {
+        const { before = 'md', after = 'md', multi = ['a', 'b',], multiWrong = ['a', 'b'] } = props;
+        return <i>{before}{after}{multi}{multiWrong}</i>;
+      }`,
+    // No default anywhere: no false positive.
+    'Plain.tsx': `export interface P {
+        /** The label. */
+        label?: string;
+        /** The default theme is dark, whatever that means. */
+        theme?: string;
+      }
+      export function Plain({ label, theme }: P) { return <i>{label}{theme}</i>; }`,
+    // Complete and coherent: the parameter default is shown by the docgen, the body default has its tag.
+    'Complete.tsx': `export interface P {
+        /** x. */
+        param?: 'sm' | 'md';
+        /** x.
+         * @default 'md' */
+        body?: 'sm' | 'md';
+      }
+      export function Complete({ param = 'md', ...props }: P) { const { body = 'md' } = props; return <i>{body}{param}</i>; }`,
+  };
+  const root = fixtureRoot(files);
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const result = measure({ root, entries: ['packages/core/src/index.ts'] });
+  const allow = { 'Consts.computedAllowed': 'the default is a call (`stepFrom`), there is no literal to compare' };
+  const issues = check(result, { allowlist: allow });
+  const kinds = (component, prop) => issuesOf(issues, component).filter((i) => i.prop === prop).map((i) => i.kind);
+
+  it('a matching @default (quotes, backticks or none, any spacing) is not an issue', () => {
+    for (const p of ['ok', 'backtick', 'bare']) expect(kinds('Tags', p), p).toEqual([]);
+  });
+  it('a different @default is a mismatch naming component, prop, declared and source value', () => {
+    const [m] = issuesOf(issues, 'Tags').filter((i) => i.prop === 'mismatch');
+    expect(m.kind).toBe('mismatch');
+    expect(m.message).toContain('@default "lg"');
+    expect(m.message).toContain("'md'");
+    expect(formatCheck([m])).toContain('Tags.mismatch [mismatch]');
+  });
+  it('a default in the source with no @default is missing; so is one only in the prose', () => {
+    expect(kinds('Tags', 'missing')).toEqual(['missing-default']);
+    expect(kinds('Tags', 'proseOnly')).toEqual(['missing-default']);
+  });
+  it('a @default repeated in the prose is redundant', () => {
+    expect(kinds('Tags', 'redundant')).toEqual(['redundant-prose']);
+  });
+  it('a @default without a value is its own error', () => {
+    expect(kinds('Tags', 'empty')).toEqual(['empty-default']);
+  });
+  it('undefined, null, false, 0 and the empty string are declared defaults, not absent ones', () => {
+    for (const p of ['u', 'n', 'f', 'z', 'e']) expect(kinds('Falsy', p), p).toEqual([]);
+    expect(rowIn(result, 'Falsy', 'e').declared).toBe("''");
+  });
+  it('they are not interchangeable either: each wrong pairing is a mismatch', () => {
+    for (const p of ['eMismatch', 'zVsFalse', 'uVsEmpty']) expect(kinds('Falsy', p), p).toEqual(['mismatch']);
+  });
+  it('a falsy source default without a tag is still missing', () => {
+    expect(kinds('Falsy', 'noTag')).toEqual(['missing-default']);
+  });
+  it('a constant (same file or imported) and a template literal are resolved and compared', () => {
+    for (const p of ['local', 'imported']) expect(kinds('Consts', p), p).toEqual([]);
+    expect(kinds('Consts', 'localWrong')).toEqual(['mismatch']);
+    expect(kinds('Consts', 'importedWrong')).toEqual(['mismatch']);
+    expect(kinds('Tpl', 'name')).toEqual([]);
+  });
+  it('a computed default is not compared: an error unless it is in the allowlist with a reason', () => {
+    expect(kinds('Consts', 'computed')).toEqual(['non-literal']);
+    expect(kinds('Consts', 'coalesce')).toEqual(['non-literal']);
+    expect(kinds('Consts', 'computedAllowed')).toEqual([]);
+  });
+  it('a computed default without a tag is a plain missing default, not an allowlist matter', () => {
+    expect(kinds('Consts', 'computedNoTag')).toEqual(['missing-default']);
+  });
+  it('an allowlist entry that is no longer needed fails the check (prop resolvable, prop gone, component gone)', () => {
+    const stale = check(result, { allowlist: { ...allow, 'Consts.local': 'x', 'Consts.gone': 'x', 'Nope.prop': 'x' } }).filter((i) => i.kind === 'stale-allowlist');
+    expect(stale.map((i) => `${i.component}.${i.prop}`)).toEqual(['Consts.gone', 'Consts.local', 'Nope.prop']);
+    expect(check(result, { allowlist: allow }).filter((i) => i.kind === 'stale-allowlist')).toEqual([]);
+  });
+  it('tag order and a multi-line @default do not matter', () => {
+    for (const p of ['before', 'after', 'multi']) expect(kinds('Layout', p), p).toEqual([]);
+    expect(kinds('Layout', 'multiWrong')).toEqual(['mismatch']);
+  });
+  it('a component with no default anywhere has no issue and no row', () => {
+    expect(issuesOf(issues, 'Plain')).toEqual([]);
+    expect(result.components.find((c) => c.component === 'Plain').rows).toEqual([]);
+  });
+  it('a complete component has no issue', () => {
+    expect(issuesOf(issues, 'Complete')).toEqual([]);
+  });
+  it('reports divergent defaults and unresolved delegations as issues', () => {
+    const synthetic = {
+      components: [{ component: 'C', rows: [{ prop: 'p', kind: 'ok', where: 'param', source: "'a'", sourceValue: 'a', declared: undefined, prose: false, divergence: { own: "'a'", inner: "'b'", via: 'Inner' } }], unresolvedDelegations: ['Opaque'] }],
+    };
+    expect(check(synthetic, { allowlist: {} }).map((i) => `${i.prop}:${i.kind}`)).toEqual(['Opaque:unresolved-delegation', 'p:divergent-default']);
+  });
+  it('issues are sorted and identical on two runs', () => {
+    const again = check(measure({ root, entries: ['packages/core/src/index.ts'] }), { allowlist: allow });
+    expect(again).toEqual(issues);
+    const keys = issues.map((i) => `${i.component}.${i.prop}`);
+    expect(keys).toEqual([...keys].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+  });
+});
+
+describe('the --check command line', { timeout: 120_000 }, () => {
+  const run = (root) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/default-column-measure.mjs'), '--check', '--root', root], { encoding: 'utf8' });
+  const clean = fixtureRoot({ 'Clean.tsx': `export interface P { /** x. */ size?: 'sm' | 'md'; }\nexport function Clean({ size = 'md' }: P) { return <i>{size}</i>; }` });
+  const dirty = fixtureRoot({ 'Dirty.tsx': `export interface P {\n  /** x.\n   * @default 'lg' */\n  size?: 'sm' | 'md' | 'lg';\n}\nexport function Dirty(props: P) { const { size = 'md' } = props; return <i>{size}</i>; }` });
+  afterAll(() => {
+    rmSync(clean, { recursive: true, force: true });
+    rmSync(dirty, { recursive: true, force: true });
+  });
+
+  it('exits 0 and says OK on a package with no gaps or incoherences', () => {
+    const r = run(clean);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe('Default column check: OK\n');
+  });
+  it('exits non-zero on an incoherence and prints component, prop, declared and source value', () => {
+    const r = run(dirty);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain("Dirty.size [mismatch] `@default 'lg'` but the source default is 'md'");
+    expect(r.stdout).toContain('1 problem');
+  });
+  it('prints the same bytes twice', () => {
+    expect(run(dirty).stdout).toBe(run(dirty).stdout);
+  });
+});
+
+describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
+  const result = measure();
+  const script = join(REPO_ROOT, 'scripts/default-column-measure.mjs');
+  it('exits non-zero while #475/#476 have not documented the props, with a sorted, repeatable list', () => {
+    const r1 = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
+    const r2 = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
+    expect(r1.status).toBe(1);
+    expect(r1.stdout).toBe(r2.stdout);
+    expect(r1.stdout).toContain('Button.size [missing-default]');
+  });
+  it('ListReport and VirtualListReport get status and loadingRowCount through the renderTable render prop', () => {
+    for (const comp of ['ListReport', 'VirtualListReport']) {
+      for (const prop of ['status', 'loadingRowCount']) {
+        expect(rowIn(result, comp, prop), `${comp}.${prop}`).toMatchObject({ kind: 'gap', cause: 'delegated' });
+      }
+    }
+  });
+  it('has no unresolved delegation, no divergent default and no stale allowlist entry', () => {
+    const kinds = ['unresolved-delegation', 'divergent-default', 'stale-allowlist', 'mismatch', 'redundant-prose', 'empty-default', 'non-literal'];
+    expect(check(result).filter((i) => kinds.includes(i.kind))).toEqual([]);
+  });
 });
