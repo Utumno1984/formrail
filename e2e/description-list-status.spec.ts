@@ -123,8 +123,10 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
     await gotoStory(page, PLAY);
     const status = page.getByTestId('status');
     await select(page, 'active, no status');
-    expect((await status.ariaSnapshot()).trim()).toBe('');
+    await expect.poll(async () => (await status.ariaSnapshot()).trim()).toBe('');
     await select(page, 'archived with audit');
+    // Retrying reads: the rerender after the selection change is not synchronous with select().
+    await expect.poll(async () => (await status.ariaSnapshot()).includes('Maria Rossi')).toBe(true);
     const snap = await status.ariaSnapshot();
     expect(snap.indexOf('Archived')).toBeGreaterThanOrEqual(0);
     expect(snap.indexOf('Archived')).toBeLessThan(snap.indexOf('Maria Rossi'));
