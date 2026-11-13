@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
-import { expectPlayToPass, gotoStory } from './helpers/story';
+import { expectPlayToFail, expectPlayToPass, gotoStory } from './helpers/story';
 
 const LAYERS = 'internal-overlaylayers--layers';
 
@@ -87,7 +87,7 @@ test.describe('Internal/ReturnFocus', () => {
   test('opened with the button (auto-focused field inside): Escape returns the focus to the button', async ({
     page,
   }) => {
-    await gotoStory(page, 'internal-returnfocus--from-button');
+    await expectPlayToPass(page, 'internal-returnfocus--from-button');
     const opener = page.getByRole('button', { name: 'Open overlay' });
     await opener.click();
     await expect(page.getByRole('textbox', { name: 'Name' })).toBeFocused();
@@ -98,7 +98,7 @@ test.describe('Internal/ReturnFocus', () => {
   test('opened from the keyboard shortcut (state outside any trigger): focus returns to the previous element', async ({
     page,
   }) => {
-    await gotoStory(page, 'internal-returnfocus--from-keyboard-shortcut');
+    await expectPlayToPass(page, 'internal-returnfocus--from-keyboard-shortcut');
     const other = page.getByRole('button', { name: /Other control/ });
     await other.focus();
     await page.keyboard.press('Alt+o');
@@ -113,7 +113,7 @@ test.describe('Internal/ReturnFocus', () => {
     page.on('console', (m) => {
       if (m.type() === 'error') problems.push(m.text());
     });
-    await gotoStory(page, 'internal-returnfocus--opener-removed');
+    await expectPlayToPass(page, 'internal-returnfocus--opener-removed');
     await page.getByRole('button', { name: 'Open overlay' }).click();
     await expect(page.getByRole('button', { name: 'Open overlay' })).toHaveCount(0);
     await page.keyboard.press('Escape');
@@ -126,7 +126,11 @@ test.describe('Internal/ReturnFocus', () => {
   }) => {
     const problems: string[] = [];
     page.on('pageerror', (e) => problems.push(String(e)));
-    await gotoStory(page, 'internal-returnfocus--opener-removed', 'withFallback:!false');
+    // The play of this story expects the fallback to get the focus, so with `withFallback:!false` it
+    // fails by design (expectPlayToPass would throw), and it must fail on THAT expectation (the
+    // Fallback button never gets the focus), not on anything else. It still clicks Open overlay and
+    // presses Escape: it must end before the test drives the same controls.
+    await expectPlayToFail(page, 'internal-returnfocus--opener-removed', 'withFallback:!false', /^expect\(element\)\.toHaveFocus\(\)[\s\S]*Fallback/);
     await page.getByRole('button', { name: 'Open overlay' }).click();
     await page.keyboard.press('Escape');
     await page.waitForTimeout(100);

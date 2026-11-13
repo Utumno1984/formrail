@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const VPS = [
   ['desktop', { width: 1280, height: 800 }, 'ltr'],
@@ -69,7 +69,7 @@ for (const [vp, size, dir] of VPS) {
 }
 
 test('tab order: error slot not focusable', async ({ page }) => {
-  await gotoStory(page, 'forms-field--error-reserves-space');
+  await expectPlayToPass(page, 'forms-field--error-reserves-space');
   await page.getByRole('button', { name: 'Show error', exact: true }).click();
   const seq: string[] = [];
   await page.locator('body').click({ position: { x: 1, y: 1 } });

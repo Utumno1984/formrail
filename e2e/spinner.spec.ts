@@ -100,7 +100,7 @@ test.describe('Primitives/Spinner', () => {
 
   test('reduced motion also applies in the announced Playground (no animation, region still announces)', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await gotoStory(page, 'primitives-spinner--playground');
+    await expectPlayToPass(page, 'primitives-spinner--playground');
     await page.getByRole('button', { name: 'Refresh' }).click();
     const status = page.getByRole('status');
     await expect(status).toHaveText('Loading');

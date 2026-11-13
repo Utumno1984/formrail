@@ -26,7 +26,7 @@ test.describe('forced / locked: the value cannot change', () => {
 
   for (const state of ['forced', 'locked'] as const) {
     test(`(2) ${state}: typing, paste, Backspace, Delete, cut and a text drag change nothing`, async ({ page }) => {
-      await gotoStory(page, 'forms-textarea--forced', `fieldState:${state}`);
+      await expectPlayToPass(page, 'forms-textarea--forced', `fieldState:${state}`);
       const forced = area(page);
       await expect(forced).toHaveAttribute('readonly', '');
       await expect(forced).toHaveAccessibleDescription(/Decided by the framework agreement\./);
