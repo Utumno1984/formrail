@@ -244,6 +244,57 @@ describe('Menu', () => {
     await waitFor(() => expect(trigger()).toHaveFocus());
   });
 
+  // #463: a pointer press on the trigger does not move the focus to it (Radix prevents its default).
+  it('opened by a click while another control has the focus: Escape and an item return it to the trigger', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    render(
+      <>
+        <button>Save</button>
+        <Demo onEdit={onEdit} />
+      </>,
+    );
+    const save = screen.getByRole('button', { name: 'Save', hidden: true });
+    await user.click(save);
+    expect(save).toHaveFocus();
+    await user.click(trigger());
+    await screen.findByRole('menu');
+    expect(save).not.toHaveFocus();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger()).toHaveFocus());
+    await user.click(save);
+    await user.click(trigger());
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger()).toHaveFocus());
+  });
+
+  it('opened from the open state while another control has the focus: the focus returns to that control', async () => {
+    function Controlled() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button onClick={() => setOpen(true)}>Open elsewhere</button>
+          <Demo open={open} onOpenChange={setOpen} />
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Controlled />);
+    const elsewhere = screen.getByRole('button', { name: 'Open elsewhere', hidden: true });
+    // A press on the trigger that opens nothing (right button) must not make the trigger the opener
+    // of a later opening from state.
+    await user.pointer({ keys: '[MouseRight]', target: trigger() });
+    expect(screen.queryByRole('menu')).toBeNull();
+    await user.click(elsewhere);
+    await screen.findByRole('menu');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(elsewhere).toHaveFocus());
+  });
+
   it('a disabled trigger opens neither by click nor by keyboard', async () => {
     const user = userEvent.setup();
     render(

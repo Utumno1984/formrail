@@ -124,6 +124,37 @@ test.describe('Overlays/menu example', () => {
     await expect(trigger).toBeFocused();
   });
 
+  // Ticket #463: on a real page (a Docs page holds several stories) another control often has the focus when
+  // the trigger is clicked; a pointer press does not move the focus to the trigger, yet closing returns it there.
+  test('opened by a click while another control has the focus: Escape and a chosen item return it to the trigger', async ({
+    page,
+  }) => {
+    await exampleOf(page, 'menu');
+    // The example has no other control: one is added to the page, outside the example.
+    await page.evaluate(() => {
+      const button = document.createElement('button');
+      button.textContent = 'Save';
+      document.body.prepend(button);
+    });
+    const save = page.getByRole('button', { name: 'Save', includeHidden: true });
+    const trigger = page.getByRole('button', { name: 'More actions', includeHidden: true });
+    await save.click();
+    await expect(save).toBeFocused();
+    await trigger.click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
+    await save.click();
+    await expect(save).toBeFocused();
+    await trigger.click();
+    await page.getByRole('menuitem', { name: 'Rename' }).click();
+    await expect(page.getByRole('status')).toHaveText('Chosen: Rename');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
   test('the menu is above the page content', async ({ page }) => {
     await exampleOf(page, 'menu');
     await page.getByRole('button', { name: 'More actions' }).click();
