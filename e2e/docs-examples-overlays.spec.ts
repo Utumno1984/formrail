@@ -82,7 +82,30 @@ test.describe('Overlays/confirmdialog example', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('status')).toHaveText('Invoice deleted');
     // The trigger is disabled once the invoice is gone: the focus goes to the outcome message, never to <body>.
-    await expect(page.getByRole('status')).toBeFocused();
+    // A single live region, which is NOT the element that takes the focus (one announcement, not two).
+    const message = page.getByRole('status');
+    await expect(message).toHaveCount(1);
+    await expect(message).not.toBeFocused();
+    const focused = message.locator('xpath=..');
+    await expect(focused).toBeFocused();
+    await expect(focused).not.toHaveAttribute('role', /.+/);
+    await expect(focused).not.toHaveAttribute('aria-live', /.+/);
+    // The focus is visible: a real outline, in the focus-ring colour of the controls.
+    const outline = await focused.evaluate((el) => {
+      const c = getComputedStyle(el);
+      return { style: c.outlineStyle, width: c.outlineWidth, color: c.outlineColor };
+    });
+    expect(outline.style).toBe('solid');
+    expect(outline.width).toBe('2px');
+    const primary = await page.evaluate(() => {
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--color-rop-primary)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    expect(outline.color).toBe(primary);
   });
 });
 

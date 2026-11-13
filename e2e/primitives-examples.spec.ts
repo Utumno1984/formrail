@@ -36,6 +36,12 @@ test.describe('Primitives copy-paste examples', () => {
     await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Dismiss message: Session expiring' })).toBeVisible();
+    // The "Show again" button is disabled while the strip is open: the focus must not stay on it.
+    const strip = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
+    await expect(strip).toBeFocused();
+    await expect(strip).toBeVisible();
+    await expect(strip).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeDisabled();
   });
 
   test('ProgressBar: named, and completes with an announcement', async ({ page }) => {
@@ -59,7 +65,7 @@ test.describe('Primitives copy-paste examples', () => {
     expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(1);
     await expect(page.getByText('Invoice 1001')).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
-    expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(24);
+    expect(Math.abs((await panel.boundingBox())!.height - before)).toBeLessThanOrEqual(1);
     await expectNoA11yViolations(page);
   });
 
