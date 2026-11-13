@@ -12,6 +12,10 @@ const SRC = resolve(fileURLToPath(new URL('.', import.meta.url)), '../packages/c
 const EXAMPLES = ['icon/Icon', 'foundations/Theming', 'foundations/Tokens', 'typography/Typography', 'utils/Utilities'].map((name) => `${name}.example.tsx`);
 const tokensCss = readFileSync(resolve(SRC, 'styles/tokens.css'), 'utf8');
 
+// A bare read of a derived token: `var(--token)` with optional whitespace and no fallback. The README recipe
+// `var(--token, color-mix(...))` carries a fallback, so it is allowed.
+const bareVar = (token: string) => new RegExp(`var\\(\\s*${token}\\s*\\)`);
+
 test.describe('Foundations examples: tokens', () => {
   test('every library token an example reads or redeclares is declared in tokens.css', () => {
     const cited = new Set<string>();
@@ -33,8 +37,16 @@ test.describe('Foundations examples: tokens', () => {
     for (const file of EXAMPLES) {
       const text = readFileSync(resolve(SRC, file), 'utf8');
       expect(text, `${file}: animate token`).not.toContain('--animate-rop');
-      for (const token of derived) expect(text, `${file}: bare var(${token})`).not.toContain(`var(${token}`);
+      for (const token of derived) expect(text, `${file}: bare var(${token})`).not.toMatch(bareVar(token));
     }
+  });
+
+  test('the bare-var guard rejects var() without a fallback, spaces included, and accepts the README recipe', () => {
+    const token = '--color-rop-primary-hover';
+    expect(`color: var(${token});`).toMatch(bareVar(token));
+    expect(`color: var( ${token} );`).toMatch(bareVar(token));
+    expect(`color: var(${token}, color-mix(in srgb, var(--color-rop-primary) 80%, black));`).not.toMatch(bareVar(token));
+    expect(`color: var( ${token} , #123456);`).not.toMatch(bareVar(token));
   });
 });
 
@@ -46,11 +58,11 @@ test.describe('Foundations examples', () => {
     const background = (button: typeof inside) => button.evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(await background(inside)).toBe('rgb(107, 63, 160)');
     expect(await background(outside)).toBe('rgb(10, 110, 209)');
-    // The radius token redeclared on the wrapper reaches the field inside it only.
-    const wrapperRadius = await inside.evaluate((el) => getComputedStyle(el.parentElement!.parentElement!).getPropertyValue('--radius-rop-md'));
-    const outsideRadius = await outside.evaluate((el) => getComputedStyle(el.parentElement!).getPropertyValue('--radius-rop-md'));
-    expect(wrapperRadius.trim()).toBe('1rem');
-    expect(outsideRadius.trim()).not.toBe('1rem');
+    // The radius token redeclared on the wrapper is actually used by the components inside it only.
+    const radius = (locator: typeof inside) => locator.evaluate((el) => getComputedStyle(el).borderTopLeftRadius);
+    expect(await radius(inside)).toBe('16px');
+    expect(await radius(page.getByRole('textbox', { name: 'Supplier' }))).toBe('16px');
+    expect(await radius(outside)).toBe('8px');
   });
 
   test('Tokens: the panel built from tokens paints them', async ({ page }) => {

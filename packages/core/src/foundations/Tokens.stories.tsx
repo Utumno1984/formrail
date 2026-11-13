@@ -31,7 +31,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('Tokens.example.tsx') };
 
-const readVar =(name: string): string =>
+const readVar = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 const section = { margin: '0 0 32px' } as const;

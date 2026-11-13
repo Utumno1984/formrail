@@ -1,6 +1,8 @@
+import { useId } from 'react';
 import { Input, Text, Title } from '@formrail/core';
 
 export function InvoiceHeading() {
+  const supplierCodeId = useId();
   return (
     <div style={{ display: 'grid', gap: 8, maxWidth: 360 }}>
       {/* `level` is the semantics (h1..h6), `size` is the look (sm, md, lg): they are independent. */}
@@ -19,10 +21,10 @@ export function InvoiceHeading() {
       </Text>
 
       {/* `as="label"` renders a real <label>: clicking it focuses the field. */}
-      <Text as="label" variant="label" htmlFor="supplier-code">
+      <Text as="label" variant="label" htmlFor={supplierCodeId}>
         Supplier code
       </Text>
-      <Input id="supplier-code" />
+      <Input id={supplierCodeId} />
     </div>
   );
 }

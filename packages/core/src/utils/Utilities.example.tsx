@@ -16,9 +16,8 @@ const MeasuredInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'inp
   );
 });
 
-export function UtilitiesExample() {
+export function UtilitiesExample({ isCode = true }: { isCode?: boolean }) {
   const outer = useRef<HTMLInputElement>(null);
-  const isCode = true as boolean;
   return (
     <div style={{ display: 'grid', gap: 16, justifyItems: 'start' }}>
       {/* cn: clsx syntax, and conflicting Tailwind classes are resolved (the last one wins). A component that
