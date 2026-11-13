@@ -11,7 +11,7 @@ export function TokenPanel() {
         gap: 8,
         color: 'var(--color-rop-text)',
         background: 'var(--color-rop-surface)',
-        border: '1px solid var(--color-rop-border-subtle)',
+        border: '1px solid var(--color-rop-border)',
         borderRadius: 'var(--radius-rop-md)',
         fontFamily: 'var(--font-rop-sans)',
         fontSize: 'var(--text-rop-body)',
@@ -25,7 +25,7 @@ export function TokenPanel() {
       <code style={{ fontFamily: 'var(--font-rop-mono)', fontSize: 'var(--text-rop-caption)' }}>EUR 1,240.00</code>
       <span style={{ color: 'var(--color-rop-error)' }}>Payment overdue</span>
       {/* Derived tokens (primary-hover, error-active, ...) are not set by default: do not read them with a
-          bare var(). Use the base colours above, or see the "Derived tokens" section of the package README. */}
+          bare var(). Use the base colours above, or see "Derived colors" under "Tokens" in the package README. */}
     </div>
   );
 }
