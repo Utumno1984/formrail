@@ -436,6 +436,9 @@ export function InvoiceEditor({
       console.warn('[showcase] InvoiceEditor: useAddons changed after the mount; the hook of the mount is kept (remount the editor with a `key` to change it).');
     }
   }, [useAddonsProp]);
+  // Declared BEFORE the getter below and the addons hook (#470): an addon that reads `scrollerRef.current` during
+  // its render gets `null` before the first commit, never a ReferenceError (temporal dead zone of a later `const`).
+  const frameRef = useRef<HTMLDivElement>(null);
   // The ObjectPage scroller, read from the DOM (the page does not expose it): a stable ref-like object.
   const [scrollerRef] = useState<RefObject<HTMLElement | null>>(() => ({
     get current() {
@@ -445,7 +448,6 @@ export function InvoiceEditor({
   const addons = useAddons({ form, record: record as StoredInvoice, store, toValues, scrollerRef });
   const reviewSave = addons.reviewSave ?? reviewSaveProp;
   const help = addons.fieldHelp;
-  const frameRef = useRef<HTMLDivElement>(null);
   useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
   useEffect(() => {
     if (focusTitleOnMount) frameRef.current?.querySelector('h1')?.focus();
