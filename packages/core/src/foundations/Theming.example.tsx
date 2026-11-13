@@ -13,7 +13,8 @@ import { Button, Field, Input, StatusBadge } from '@formrail/core';
 //
 // With a light primary (a yellow, a pale green) the white text of a primary Button becomes unreadable:
 // redeclare --color-rop-primary-contrast as well, with a dark colour. Redeclare the base colours only: hover,
-// pressed and read-only shades are computed from them. Menus, dialogs and other portaled content render outside the wrapper, so they take the theme of :root.
+// pressed and read-only shades are computed from them. Menus, dialogs and other portaled content render outside the
+// wrapper, so they take the theme of :root.
 const violetTheme = {
   '--color-rop-primary': '#6b3fa0',
   '--color-rop-primary-contrast': '#ffffff',
