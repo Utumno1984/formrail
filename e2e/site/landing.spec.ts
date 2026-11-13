@@ -73,11 +73,11 @@ test.describe('links', () => {
     }
   });
 
-  test('the Pro banner "Learn more" lands on #pro of the landing', async ({ page }) => {
+  test('the Pro banner "Learn more" lands on the Pro page for teams (ticket #490; it was #pro of the landing)', async ({ page }) => {
     await page.goto('pro/iframe.html?id=pro-introduction--docs&viewMode=docs');
     await page.locator('.rop-pro-banner a', { hasText: 'Learn more' }).click();
-    await page.waitForURL(`**${base}#pro`);
-    await expect(page.getByRole('heading', { level: 2, name: 'Pro' })).toBeVisible();
+    await page.waitForURL(`**${base}teams/`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Formrail Pro for teams' })).toBeVisible();
   });
 
   test('external links (GitHub) point to the repository', async ({ page }) => {

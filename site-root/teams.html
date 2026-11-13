@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Formrail Pro for teams: record-edit integrity for business apps</title>
+    <meta
+      name="description"
+      content="Formrail Pro for teams building ERP, back-office and admin screens: show what changes before saving and keep the user's edits when the record changes on the server. Annual license per developer."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Formrail Pro for teams" />
+    <meta
+      property="og:description"
+      content="Show what changes before saving and keep the user's edits when a record changes on the server: Change Summary and Form Rebase for React business apps."
+    />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../landing.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../">Formrail</a>
+        <nav aria-label="Main">
+          <ul class="nav-list">
+            <li><a href="../storybook/">Components</a></li>
+            <li><a href="./" aria-current="page">Pro for teams</a></li>
+            <li><a href="https://github.com/Utumno1984/formrail">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="wrap">
+          <h1 id="hero-title">Formrail Pro for teams</h1>
+          <p class="lead">
+            Record-edit integrity for business apps: show what is about to change before saving, and keep the
+            user's edits when the record is updated on the server in the meantime.
+          </p>
+          <p class="status">Preview: Pro is not on sale yet.</p>
+          <div class="actions">
+            <!--EARLY_ACCESS_START-->
+            <a class="btn btn-primary" href="#waitlist">Join the waitlist</a>
+            <!--EARLY_ACCESS_END-->
+            <a class="btn btn-secondary" href="../pro/">Explore the Pro preview</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="band" aria-labelledby="integrity-title">
+        <div class="wrap">
+          <h2 id="integrity-title">Edit records without losing work</h2>
+          <p class="section-lead">
+            ERP screens, back-office tools and admin portals share one problem: people edit long records, often while
+            someone else or a background job changes the same record. Formrail Pro covers that moment.
+          </p>
+          <ul class="cards">
+            <li class="card">
+              <h3>Change Summary</h3>
+              <p>
+                Before saving, a readable list of every changed field with its label and the before and after value,
+                computed against the saved record, never against a default.
+              </p>
+              <p class="card-links demo-links">
+                <a href="../pro/?path=/docs/pro-changesummary--docs">Change Summary</a>
+                <a href="../pro/?path=/docs/pro-showcase-invoices-with-change-summary--docs">Invoices example</a>
+              </p>
+            </li>
+            <li class="card">
+              <h3>Form Rebase</h3>
+              <p>
+                When a newer version of the record arrives while the user is editing, fields they did not touch take
+                the server value, fields changed on both sides keep the user's value and are listed as conflicts.
+              </p>
+              <p class="card-links demo-links">
+                <a href="../pro/?path=/docs/pro-patterns-form-rebase--docs">Form rebase</a>
+                <a href="../pro/?path=/docs/pro-rebasenotice--docs">Rebase notice</a>
+              </p>
+            </li>
+            <li class="card">
+              <h3>Virtual List Report</h3>
+              <p>
+                The List Report with virtualized rows for very large datasets. It keeps the props and state of the free
+                List Report and behaves as the free table below a row threshold.
+              </p>
+              <p class="card-links demo-links">
+                <a href="../pro/?path=/docs/pro-floorplans-virtual-list-report--docs">Virtual List Report</a>
+              </p>
+            </li>
+          </ul>
+          <p class="muted">
+            The demo is there to explore. No license to use Formrail Pro is granted yet.
+          </p>
+        </div>
+      </section>
+
+      <section aria-labelledby="compare-title">
+        <div class="wrap">
+          <h2 id="compare-title">Free and Pro</h2>
+          <p class="section-lead">
+            The free core stays free: MIT license, public on npm. Pro adds the three pieces above and builds on the
+            core.
+          </p>
+          <table class="compare">
+            <caption class="visually-hidden">
+              What the free core and Formrail Pro include
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Feature</th>
+                <th scope="col">Free</th>
+                <th scope="col">Pro</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">List Report, Object Page, form fields, dialogs and dirty-tracking</th>
+                <td>Included</td>
+                <td>Needed: Pro builds on the free core</td>
+              </tr>
+              <tr>
+                <th scope="row">Change Summary</th>
+                <td>Not included</td>
+                <td>Included</td>
+              </tr>
+              <tr>
+                <th scope="row">Form Rebase and Rebase notice</th>
+                <td>Not included</td>
+                <td>Included</td>
+              </tr>
+              <tr>
+                <th scope="row">Virtual List Report</th>
+                <td>Not included</td>
+                <td>Included</td>
+              </tr>
+              <tr>
+                <th scope="row">License</th>
+                <td>MIT, free on npm</td>
+                <td>Commercial license</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="band" id="license" aria-labelledby="license-title">
+        <div class="wrap">
+          <h2 id="license-title">License</h2>
+          <p class="license-line">
+            Annual license per developer, 12 months of updates included, terms published before sales.
+          </p>
+          <!--PRICE_START-->
+          <p class="price">{{EXPECTED_PRICE_TEXT}}</p>
+          <p class="muted">The price is indicative and not final.</p>
+          <!--PRICE_END-->
+          <p class="muted">
+            These conditions are not final and this page is not a binding offer. Nothing can be bought yet: no payment
+            or pre-order is taken.
+          </p>
+        </div>
+      </section>
+
+      <!--EARLY_ACCESS_START-->
+      <section id="waitlist" aria-labelledby="waitlist-title">
+        <div class="wrap">
+          <h2 id="waitlist-title">Join the waitlist</h2>
+          <div class="cta">
+            <p>
+              The form asks for your email, an explicit consent (the box is not checked for you) and three questions
+              about your team: its size, which form libraries you use (optional) and when you would need this.
+            </p>
+            <a class="btn btn-primary" href="{{EARLY_ACCESS_URL}}" target="_blank" rel="noopener">Request early access</a>
+            <p class="muted">
+              Opens an external form (Tally, servers in the EU) in a new tab; nothing is embedded in this page. We use
+              your email to contact you about Formrail Pro early access and your answers to plan the product. Details
+              on the
+              <a href="../privacy/">privacy page</a>.
+            </p>
+          </div>
+        </div>
+      </section>
+      <!--EARLY_ACCESS_END-->
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <ul class="footer-list">
+          <li><a href="https://github.com/Utumno1984/formrail">Source on GitHub</a></li>
+          <li>Formrail Core: MIT license, free on npm.</li>
+          <li>Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.</li>
+          <li><a href="../privacy/">Privacy</a></li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

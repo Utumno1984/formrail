@@ -29,23 +29,41 @@ test.beforeAll(() => {
   }) as string;
 });
 
-test('visual: landing', async ({ page }, testInfo) => {
-  if (testInfo.config.updateSnapshots !== 'none' && !process.env.VISUAL_DOCKER) {
-    throw new Error(
-      'visual: refusing to update baselines outside the pinned Docker image (VISUAL_DOCKER is not set). ' +
-        'Run "npm run test:visual:update" instead; nothing was written.',
-    );
-  }
-  await page.route(`**${PREFIX}**`, (route) => {
-    const rel = new URL(route.request().url()).pathname.slice(PREFIX.length) || 'index.html';
-    try {
-      route.fulfill({ body: readFileSync(path.join(siteDir, rel)), contentType: TYPES[path.extname(rel)] ?? 'application/octet-stream' });
-    } catch {
-      route.fulfill({ status: 404, body: 'not found' });
+// The public pages of the site: the landing (#382), the Pro page for teams and the privacy notice (#490).
+const PAGES = [
+  { name: 'landing', path: '', heading: 'Formrail' },
+  { name: 'teams', path: 'teams/', heading: 'Formrail Pro for teams' },
+  { name: 'privacy', path: 'privacy/', heading: 'Privacy notice' },
+] as const;
+
+for (const { name, path: pagePath, heading } of PAGES) {
+  test(`visual: ${name}`, async ({ page }, testInfo) => {
+    if (testInfo.config.updateSnapshots !== 'none' && !process.env.VISUAL_DOCKER) {
+      throw new Error(
+        'visual: refusing to update baselines outside the pinned Docker image (VISUAL_DOCKER is not set). ' +
+          'Run "npm run test:visual:update" instead; nothing was written.',
+      );
     }
+    await page.route(`**${PREFIX}**`, (route) => {
+      let rel = new URL(route.request().url()).pathname.slice(PREFIX.length);
+      if (rel === '' || rel.endsWith('/')) rel += 'index.html';
+      try {
+        route.fulfill({
+          body: readFileSync(path.join(siteDir, rel)),
+          contentType: TYPES[path.extname(rel)] ?? 'application/octet-stream',
+        });
+      } catch {
+        route.fulfill({ status: 404, body: 'not found' });
+      }
+    });
+    await page.goto(PREFIX + pagePath);
+    await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot(`${name}.png`, {
+      fullPage: true,
+      animations: 'disabled',
+      caret: 'hide',
+      scale: 'css',
+    });
   });
-  await page.goto(PREFIX);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot('landing.png', { fullPage: true, animations: 'disabled', caret: 'hide', scale: 'css' });
-});
+}

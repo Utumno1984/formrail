@@ -13,17 +13,32 @@ const B = `${O}/formrail/`;
 describe('resolveRedirect', () => {
   const cases = [
     ['deep link to a docs page', `${B}?path=/docs/introduction--docs`, 'index', `${B}storybook/?path=/docs/introduction--docs`],
-    ['deep link with globals and hash', `${B}?path=/docs/a--docs&globals=theme:dark#anchor`, 'index', `${B}storybook/?path=/docs/a--docs&globals=theme:dark#anchor`],
+    [
+      'deep link with globals and hash',
+      `${B}?path=/docs/a--docs&globals=theme:dark#anchor`,
+      'index',
+      `${B}storybook/?path=/docs/a--docs&globals=theme:dark#anchor`,
+    ],
     ['path and hash together', `${B}?path=/story/a--b#x`, 'index', `${B}storybook/?path=/story/a--b#x`],
     ['index.html spelled out', `${B}index.html?path=/docs/a--docs`, 'index', `${B}storybook/?path=/docs/a--docs`],
     ['id / viewMode / args only', `${B}?id=a--b&viewMode=story&args=x:1`, 'index', `${B}storybook/?id=a--b&viewMode=story&args=x:1`],
-    ['foreign and Storybook parameters together are all forwarded', `${B}?utm_source=x&path=/docs/a--docs`, 'index', `${B}storybook/?utm_source=x&path=/docs/a--docs`],
+    [
+      'foreign and Storybook parameters together are all forwarded',
+      `${B}?utm_source=x&path=/docs/a--docs`,
+      'index',
+      `${B}storybook/?utm_source=x&path=/docs/a--docs`,
+    ],
     ['iframe link', `${B}iframe.html?id=x&viewMode=story`, 'iframe', `${B}storybook/iframe.html?id=x&viewMode=story`],
     ['iframe link with hash', `${B}iframe.html?id=x&viewMode=docs#h`, 'iframe', `${B}storybook/iframe.html?id=x&viewMode=docs#h`],
     ['bare iframe.html', `${B}iframe.html`, 'iframe', `${B}storybook/iframe.html`],
     ['bare iframe.html with foreign parameters', `${B}iframe.html?utm_source=x`, 'iframe', `${B}storybook/iframe.html?utm_source=x`],
     ['host without a prefix (custom domain)', `${O}/?path=/docs/a--docs`, 'index', `${O}/storybook/?path=/docs/a--docs`],
-    ['encoded characters are not re-encoded', `${B}?path=/story/a--b&args=label:Caf%C3%A9`, 'index', `${B}storybook/?path=/story/a--b&args=label:Caf%C3%A9`],
+    [
+      'encoded characters are not re-encoded',
+      `${B}?path=/story/a--b&args=label:Caf%C3%A9`,
+      'index',
+      `${B}storybook/?path=/story/a--b&args=label:Caf%C3%A9`,
+    ],
   ];
   it.each(cases)('%s', (_name, from, page, to) => {
     expect(resolveRedirect(from, page)).toBe(to);
@@ -35,6 +50,9 @@ describe('resolveRedirect', () => {
     ['index.html spelled out', `${B}index.html`],
     ['only a hash', `${B}#top`],
     ['the Pro anchor', `${B}#pro`],
+    ['the Pro page for teams (ticket #490)', `${B}teams/`],
+    ['the Pro page for teams with foreign parameters', `${B}teams/?utm_source=x#license`],
+    ['the privacy page', `${B}privacy/`],
     ['foreign parameters', `${B}?utm_source=x`],
     ['custom domain without a prefix', `${O}/`],
   ])('%s stays on the landing', (_name, href) => {
@@ -83,8 +101,10 @@ describe('assembleSite', () => {
       'iframe.html',
       'index.html',
       'landing.css',
+      'privacy',
       'pro',
       'storybook',
+      'teams',
       'tokens.css',
     ]);
     expect(readFileSync(path.join(outDir, 'storybook', 'index.html'), 'utf8')).toBe('<!-- manager -->');
@@ -121,7 +141,10 @@ describe('assembleSite', () => {
       const html = readFileSync(path.join(outDir, file), 'utf8');
       const code = /<script>([\s\S]*?)<\/script>/.exec(html)[1];
       const replaced = [];
-      vm.runInNewContext(code, { URL, location: { href, replace: (u) => replaced.push(u) } });
+      vm.runInNewContext(code, {
+        URL,
+        location: { href, replace: (u) => replaced.push(u) },
+      });
       return replaced;
     };
     expect(run('index.html', `${B}?path=/docs/a--docs#h`)).toEqual([`${B}storybook/?path=/docs/a--docs#h`]);
@@ -131,24 +154,35 @@ describe('assembleSite', () => {
   });
 
   // The invariant: everything that can fail is read/validated before the previous output is touched.
-  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html']])('missing site-root/%s', (missing) => {
-    it('fails before outDir is touched (the previous site stays intact)', () => {
-      const { tmp, storybookDir, outDir } = setup();
-      const siteRootDir = path.join(tmp, 'site-root');
-      cpSync(path.join(import.meta.dirname, '..', 'site-root'), siteRootDir, { recursive: true });
-      rmSync(path.join(siteRootDir, missing));
-      mkdirSync(outDir);
-      writeFileSync(path.join(outDir, 'previous.txt'), 'published');
-      expect(() => assembleSite({ storybookDir, siteRootDir, outDir })).toThrow();
-      expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
-    });
-  });
+  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html'], ['teams.html'], ['privacy.html']])(
+    'missing site-root/%s',
+    (missing) => {
+      it('fails before outDir is touched (the previous site stays intact)', () => {
+        const { tmp, storybookDir, outDir } = setup();
+        const siteRootDir = path.join(tmp, 'site-root');
+        cpSync(path.join(import.meta.dirname, '..', 'site-root'), siteRootDir, {
+          recursive: true,
+        });
+        rmSync(path.join(siteRootDir, missing));
+        mkdirSync(outDir);
+        writeFileSync(path.join(outDir, 'previous.txt'), 'published');
+        expect(() => assembleSite({ storybookDir, siteRootDir, outDir })).toThrow();
+        expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
+      });
+    },
+  );
 
   it('a missing favicon fails before outDir is touched', () => {
     const { tmp, storybookDir, outDir } = setup();
     mkdirSync(outDir);
     writeFileSync(path.join(outDir, 'previous.txt'), 'published');
-    expect(() => assembleSite({ storybookDir, outDir, faviconPath: path.join(tmp, 'nope.svg') })).toThrow(/favicon/i);
+    expect(() =>
+      assembleSite({
+        storybookDir,
+        outDir,
+        faviconPath: path.join(tmp, 'nope.svg'),
+      }),
+    ).toThrow(/favicon/i);
     expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
   });
 
@@ -184,7 +218,13 @@ describe('assembleSite', () => {
 
   it('fails loudly when the Pro demo build was requested but not built', () => {
     const { tmp, storybookDir, outDir } = setup();
-    expect(() => assembleSite({ storybookDir, proStorybookDir: path.join(tmp, 'missing'), outDir })).toThrow(/build-storybook:pro/);
+    expect(() =>
+      assembleSite({
+        storybookDir,
+        proStorybookDir: path.join(tmp, 'missing'),
+        outDir,
+      }),
+    ).toThrow(/build-storybook:pro/);
     expect(existsSync(outDir)).toBe(false);
   });
 
@@ -217,7 +257,8 @@ describe('landing: early access call-to-action (ticket #382)', () => {
     expect(html).toContain(`href="${EARLY_ACCESS_URL}"`);
     expect(html).toContain('rel="noopener"');
     expect(html).toContain('Request early access');
-    expect(html).toContain('see the privacy note in the form.');
+    expect(html).toContain('see the privacy note in the form');
+    expect(html).toContain('href="privacy/"');
   });
 
   it('with an empty URL the CTA is not in the page at all', () => {
@@ -267,7 +308,11 @@ describe('themeTokensToRoot', () => {
 
   it('on the real theme: every token the landing stylesheet uses is declared', () => {
     const root = themeTokensToRoot(readFileSync(new URL('../packages/core/src/styles/tokens.css', import.meta.url), 'utf8'));
-    const used = new Set(readFileSync(new URL('../site-root/landing.css', import.meta.url), 'utf8').match(/var\((--[a-z0-9-]+)\)/g)?.map((m) => m.slice(4, -1)));
+    const used = new Set(
+      readFileSync(new URL('../site-root/landing.css', import.meta.url), 'utf8')
+        .match(/var\((--[a-z0-9-]+)\)/g)
+        ?.map((m) => m.slice(4, -1)),
+    );
     expect(used.size).toBeGreaterThan(10);
     for (const name of used) expect(root, name).toContain(`  ${name}:`);
     expect(root).not.toContain('@keyframes');
