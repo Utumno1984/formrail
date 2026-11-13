@@ -104,11 +104,11 @@ test.describe('Forms copy-paste examples', () => {
   test('Field: label, control, help and error are wired; the locked field is read-only from the keyboard too', async ({ page }) => {
     await gotoStory(page, 'forms-field--example');
     const vat = page.getByRole('textbox', { name: 'VAT number' });
-    await expect(vat).toHaveValue('12345678901');
     await expect(vat).toHaveAttribute('aria-required', 'true');
     // Pristine: no error and no aria-invalid before any gesture.
     await expect(vat).not.toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByText('The VAT number must have 11 digits.')).toHaveCount(0);
+    await expect(vat).toHaveValue('12345678901');
     await expect(vat).toHaveAccessibleDescription('Eleven digits, no spaces.');
     // Edit to an invalid value: still no error while typing, it appears once the field is left.
     await vat.fill('123');
