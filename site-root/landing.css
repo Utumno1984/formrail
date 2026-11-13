@@ -318,3 +318,7 @@ section {
     scroll-behavior: auto !important;
   }
 }
+
+.cards + .muted {
+  margin-top: 1rem;
+}
