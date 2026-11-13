@@ -321,6 +321,17 @@ describe('delegations on fixture packages (#474)', () => {
       function Mid2({ level = 'mid' }: InnerProps) { return <Deepest level={level} />; }
       export function Outer2(props: InnerProps) { return <Mid2 {...props} />; }
       export function Quiet(props: InnerProps) { return <Inner {...props} />; }`,
+    // Two branches reach the same internal component, the first one with only some of the props.
+    'Branches.tsx': `import type { InnerProps } from './Shared';
+      function Dd({ level = 'dd', side = 'top' }: InnerProps) { return <i>{level}{side}</i>; }
+      function Shared2(props: InnerProps) { return <Dd {...props} />; }
+      function BranchA({ level }: InnerProps) { return <Shared2 level={level} />; }
+      function BranchB(props: InnerProps) { return <Shared2 {...props} />; }
+      export function Both(props: InnerProps) { return <><BranchA {...props} /><BranchB {...props} /></>; }`,
+    // A callback that is not a render prop (never spreads its parameter): nothing to follow, nothing to report.
+    'NotRender.tsx': `import type { InnerProps } from './Shared';
+      function Click({ onGo }: { onGo?: (n: number) => void }) { return <button onClick={() => onGo?.(1)} />; }
+      export function NotRender({ side }: InnerProps) { return <Click onGo={(n) => void n} data-side={side} />; }`,
     // A spread that is not the props.
     'Unrelated2.tsx': `import { Inner } from './Shared';
       import type { InnerProps } from './Shared';
@@ -380,6 +391,13 @@ describe('delegations on fixture packages (#474)', () => {
   });
   it('nested delegation: the nearer default wins over the deeper one', () => {
     expect(row('Outer2', 'level')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'mid'", via: 'Mid2' });
+  });
+  it('a component reached by two branches is read for each of them (the first may pass fewer props)', () => {
+    expect(row('Both', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'top'" });
+    expect(row('Both', 'level')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'dd'" });
+  });
+  it('a callback that does not spread its parameter is not reported as an unresolved delegation', () => {
+    expect(result.components.find((c) => c.component === 'NotRender').unresolvedDelegations).toEqual([]);
   });
   it('a spread of something that is not the props delegates nothing', () => {
     expect(row('UnrelatedSpread', 'other')).toBeUndefined();
@@ -566,6 +584,17 @@ describe('check: the guard on fixture packages (#474)', () => {
         const { before = 'md', after = 'md', multi = ['a', 'b',], multiWrong = ['a', 'b'] } = props;
         return <i>{before}{after}{multi}{multiWrong}</i>;
       }`,
+    // A prop that redeclares an inherited one: the base's `@default` is not the prop's (the docgen does not show it).
+    'Inherit.tsx': `interface Base {
+        /** x.
+         * @default false */
+        loop?: boolean;
+      }
+      export interface P extends Base {
+        /** x. */
+        loop?: boolean;
+      }
+      export function Inherit(props: P) { const { loop = true } = props; return <i>{String(loop)}</i>; }`,
     // No default anywhere: no false positive.
     'Plain.tsx': `export interface P {
         /** The label. */
@@ -643,6 +672,10 @@ describe('check: the guard on fixture packages (#474)', () => {
   it('tag order and a multi-line @default do not matter', () => {
     for (const p of ['before', 'after', 'multi']) expect(kinds('Layout', p), p).toEqual([]);
     expect(kinds('Layout', 'multiWrong')).toEqual(['mismatch']);
+  });
+  it('the @default of an inherited prop is not read for a prop that redeclares it', () => {
+    expect(rowIn(result, 'Inherit', 'loop').declared).toBeUndefined();
+    expect(kinds('Inherit', 'loop')).toEqual(['missing-default']);
   });
   it('a component with no default anywhere has no issue and no row', () => {
     expect(issuesOf(issues, 'Plain')).toEqual([]);
