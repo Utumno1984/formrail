@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
-import { expectPlayToPass, gotoStory, waitForPlayEnd } from './helpers/story';
+import { expectPlayToFail, expectPlayToPass, gotoStory } from './helpers/story';
 
 const LAYERS = 'internal-overlaylayers--layers';
 
@@ -126,11 +126,11 @@ test.describe('Internal/ReturnFocus', () => {
   }) => {
     const problems: string[] = [];
     page.on('pageerror', (e) => problems.push(String(e)));
-    await gotoStory(page, 'internal-returnfocus--opener-removed', 'withFallback:!false');
     // The play of this story expects the fallback to get the focus, so with `withFallback:!false` it
-    // fails by design (expectPlayToPass would throw). It still clicks Open overlay and presses
-    // Escape: let it end before the test drives the same controls.
-    await waitForPlayEnd(page);
+    // fails by design (expectPlayToPass would throw), and it must fail on THAT expectation (the
+    // Fallback button never gets the focus), not on anything else. It still clicks Open overlay and
+    // presses Escape: it must end before the test drives the same controls.
+    await expectPlayToFail(page, 'internal-returnfocus--opener-removed', 'withFallback:!false', /Fallback|toHaveFocus|focus/i);
     await page.getByRole('button', { name: 'Open overlay' }).click();
     await page.keyboard.press('Escape');
     await page.waitForTimeout(100);

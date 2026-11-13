@@ -107,10 +107,14 @@ test.describe('Data/DescriptionList', () => {
   test('forced layouts hold at 280px and 600px', async ({ page }) => {
     for (const width of [280, 600]) {
       await gotoStory(page, PLAYGROUND, `layout:inline;width:${width}`);
+      // The Playground play (it ends before gotoStory returns; it fails by design with a forced layout)
+      // resizes the container itself and leaves it wherever it stopped: measure at the declared width.
+      await setWidth(page, width);
       for (const g of await itemsGeometry(page.getByTestId('list'))) {
         expect(g.dd.left).toBeGreaterThanOrEqual(g.dt.right);
       }
       await gotoStory(page, PLAYGROUND, `layout:stacked;width:${width}`);
+      await setWidth(page, width);
       for (const g of await itemsGeometry(page.getByTestId('list'))) {
         expect(g.dd.top).toBeGreaterThanOrEqual(g.dt.bottom - EPS);
         expect(Math.abs(g.dd.left - g.dt.left)).toBeLessThanOrEqual(EPS);

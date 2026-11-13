@@ -30,24 +30,30 @@ for (const [vp, size, dir] of [
         if (dir === 'rtl') await page.evaluate(() => (document.documentElement.dir = 'rtl'));
         const base = await tops(page);
         await page.getByRole('button', { name: 'Show error', exact: true }).click();
+        // Retrying wait for the error to be rendered, then the layout reads.
+        await expect.poll(async () => (await tops(page)).err).toBeCloseTo(16, 0);
         const short = await tops(page);
         expect(short.second).toBeCloseTo(base.second, 1);
         expect(short.help).toBe(base.help);
         expect(short.err).toBeCloseTo(16, 0);
         await page.getByRole('button', { name: 'Show long error' }).click();
+        await expect.poll(async () => (await tops(page)).err).toBeGreaterThan(16);
         const long = await tops(page);
         expect(long.err).toBeGreaterThan(16);
         expect(long.second - base.second).toBeCloseTo(long.err - 16, 1);
         await page.getByRole('button', { name: 'Clear' }).click();
+        await expect.poll(async () => (await tops(page)).err).toBe(0);
         expect((await tops(page)).second).toBeCloseTo(base.second, 1);
       });
       test('opt-out, help=' + help + ': error takes own room', async ({ page }) => {
         await expectPlayToPass(page, ID, 'reserveMessageSpace:!false;help:' + help);
         const base = await tops(page);
         await page.getByRole('button', { name: 'Show error', exact: true }).click();
+        await expect.poll(async () => (await tops(page)).err).toBeGreaterThan(0);
         const short = await tops(page);
         expect(short.second - base.second).toBeCloseTo(short.err + 8, 1);
         await page.getByRole('button', { name: 'Clear' }).click();
+        await expect.poll(async () => (await tops(page)).err).toBe(0);
         expect((await tops(page)).second).toBeCloseTo(base.second, 1);
       });
     }

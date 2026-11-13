@@ -159,7 +159,8 @@ test.describe('overlays', () => {
       await gotoStory(page, STORY(story));
       const modal = page.getByRole('dialog', { name: 'Edit invoice' });
       await expect(modal).toBeVisible();
-      // The Dialog story's play leaves the popover open: start from a closed one.
+      // gotoStory returns after the story's play (it opens the popover and closes it with Escape); the
+      // check is kept as a guard so the test starts from a closed popover whatever the play does.
       if (await popover(page).count()) {
         await page.keyboard.press('Escape');
         await expect(popover(page)).toHaveCount(0);

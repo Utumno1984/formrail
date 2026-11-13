@@ -201,7 +201,7 @@ test.describe('overlays', () => {
     }) => {
       await gotoStory(page, STORY(container));
       const box = page.getByRole('dialog').getByRole('combobox', { name: 'City' });
-      // The story's play function has typed in the field already: start from a known text.
+      // gotoStory returns after the story's play (it typed in this field and picked a city): start from a known text.
       await box.fill('o');
       await expect(listbox(page)).toBeVisible();
       const opts = page.getByRole('option');

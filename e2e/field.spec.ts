@@ -149,6 +149,7 @@ test.describe('Forms/Field: reserved message space', () => {
     const before = await metrics(page);
     await page.getByRole('button', { name: 'Show long error' }).click();
     const message = page.locator('[id$="-error"]');
+    await expect(message).toBeVisible();
     const box = (await message.boundingBox())!;
     expect(box.height).toBeGreaterThan(32); // two lines or more
     const { reserved, gap } = await message.evaluate((el) => ({

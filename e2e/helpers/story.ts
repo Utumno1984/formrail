@@ -1,4 +1,5 @@
-import type { Page } from '@playwright/test';
+import { appendFileSync } from 'node:fs';
+import { test, type Page } from '@playwright/test';
 
 interface StorybookIndex {
   entries?: Record<string, { id: string; type?: string }>;
@@ -10,6 +11,48 @@ interface StorybookIndex {
  * let a broken interaction pass. `args` is Storybook's URL syntax, e.g. `mono:!false;size:lg`.
  */
 export async function expectPlayToPass(page: Page, storyId: string, args?: string): Promise<void> {
+  const errors = await openAfterPlay(page, storyId, args);
+  if (errors.length > 0) {
+    throw new Error(`expectPlayToPass: the play function of "${storyId}" failed:\n${errors.join('\n')}`);
+  }
+}
+
+/**
+ * For a story whose play FAILS BY DESIGN under the args the test needs (e.g. it asserts a layout the
+ * args switch off) but still drives the controls the test is about to use: opens it, waits for the
+ * play to end and checks that it failed with the EXPECTED error (`expected` matches the recorded
+ * failure), not with any error.
+ */
+export async function expectPlayToFail(
+  page: Page,
+  storyId: string,
+  args: string | undefined,
+  expected: RegExp,
+): Promise<void> {
+  const errors = await openAfterPlay(page, storyId, args);
+  if (errors.length === 0) {
+    throw new Error(`expectPlayToFail: the play function of "${storyId}" was expected to fail but passed`);
+  }
+  if (!errors.some((e) => expected.test(e))) {
+    throw new Error(`expectPlayToFail: "${storyId}" failed with an unexpected error (wanted ${expected}):\n${errors.join('\n')}`);
+  }
+}
+
+const recorderInstalled = new WeakSet<Page>();
+
+/** Opens the story, waits for its play to end and returns the failures it recorded. */
+async function openAfterPlay(page: Page, storyId: string, args?: string): Promise<string[]> {
+  await installPlayErrorRecorder(page);
+  await openStory(page, storyId, args);
+  await waitForPlayEnd(page);
+  return page.evaluate(() => (window as unknown as { __ropPlayErrors?: string[] }).__ropPlayErrors ?? []);
+}
+
+async function installPlayErrorRecorder(page: Page): Promise<void> {
+  // One init script per page, however many stories the test opens (repeated calls would register
+  // the channel listeners several times and report every failure more than once).
+  if (recorderInstalled.has(page)) return;
+  recorderInstalled.add(page);
   // The channel is created by the preview after load, before the play function runs: subscribe to
   // the failure events as soon as it exists and record them for the check below.
   await page.addInitScript(() => {
@@ -27,14 +70,6 @@ export async function expectPlayToPass(page: Page, storyId: string, args?: strin
       }
     }, 1);
   });
-  await gotoStory(page, storyId, args);
-  await waitForPlayEnd(page);
-  const errors = await page.evaluate(
-    () => (window as unknown as { __ropPlayErrors?: string[] }).__ropPlayErrors ?? [],
-  );
-  if (errors.length > 0) {
-    throw new Error(`expectPlayToPass: the play function of "${storyId}" failed:\n${errors.join('\n')}`);
-  }
 }
 
 /**
@@ -50,7 +85,7 @@ export async function waitForPlayEnd(page: Page): Promise<void> {
         window as unknown as { __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } } }
       ).__STORYBOOK_PREVIEW__?.currentRender;
       const p = render?.phase;
-      return !!p && ['played', 'completed', 'finished', 'errored', 'aborted'].includes(p);
+      return !!p && ['played', 'completing', 'completed', 'finished', 'errored', 'aborted'].includes(p);
     },
     undefined,
     { timeout: 10_000 },
@@ -64,6 +99,40 @@ export async function waitForPlayEnd(page: Page): Promise<void> {
  * `args` overrides the story args (Storybook URL syntax, e.g. `mono:!false`).
  */
 export async function gotoStory(page: Page, storyId: string, args?: string): Promise<void> {
+  await openStory(page, storyId, args);
+  // A story WITH a play function is still being driven by it when it first renders: a test that
+  // starts now races against the play (same controls, same state; seen in the census below, #480).
+  // So when the story has a play, wait for it to END (whatever its outcome: use `expectPlayToPass`
+  // to also require that it passed, `expectPlayToFail` when it must fail by design). Stories without
+  // a play (`-no-play` fixtures) are not delayed. NB: after a play the story is left in the state the
+  // play ended in (or, for a play that failed half-way, wherever it stopped).
+  const { hasPlay, phase } = await page.evaluate(() => {
+    const render = (
+      window as unknown as {
+        __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string; story?: { playFunction?: unknown } } };
+      }
+    ).__STORYBOOK_PREVIEW__?.currentRender;
+    return { hasPlay: !!render?.story?.playFunction, phase: render?.phase ?? null };
+  });
+  if (process.env.ROP_PLAY_CENSUS) recordCensus(storyId, args, hasPlay, phase);
+  if (hasPlay) await waitForPlayEnd(page);
+}
+
+/**
+ * Opt-in census (`ROP_PLAY_CENSUS=<file>`): every `gotoStory` appends one JSON line with the test,
+ * the story, whether it has a play function and the render phase when the page had just rendered,
+ * BEFORE the wait above (`playing`/`rendering`... = the play was running when the test would have
+ * started). Use it to audit the suite or a new spec.
+ */
+function recordCensus(storyId: string, args: string | undefined, hasPlay: boolean, phase: string | null): void {
+  const t = test.info();
+  appendFileSync(
+    process.env.ROP_PLAY_CENSUS!,
+    JSON.stringify({ file: t.file.split('/').pop(), test: t.title, storyId, args: args ?? null, hasPlay, phase }) + '\n',
+  );
+}
+
+async function openStory(page: Page, storyId: string, args?: string): Promise<void> {
   const res = await page.request.get('/index.json');
   if (!res.ok()) {
     throw new Error(`gotoStory: cannot read /index.json (HTTP ${res.status()})`);
