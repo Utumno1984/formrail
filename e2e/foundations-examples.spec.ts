@@ -100,6 +100,20 @@ test.describe('Foundations examples', () => {
     expect(mono.fontSize).toBe('12px');
   });
 
+  test('Typography: mounted twice, each label focuses its own field (distinct ids)', async ({ page }) => {
+    await gotoStory(page, 'internal-typographyexampletwice--twice');
+    const fields = page.getByRole('textbox', { name: 'Supplier code' });
+    await expect(fields).toHaveCount(2);
+    const ids = await fields.evaluateAll((els) => els.map((el) => el.id));
+    expect(ids[0]).toBeTruthy();
+    expect(ids[1]).toBeTruthy();
+    expect(ids[0]).not.toBe(ids[1]);
+    for (const index of [1, 0]) {
+      await page.getByText('Supplier code').nth(index).click();
+      await expect(fields.nth(index)).toBeFocused();
+    }
+  });
+
   test('Utilities: cn resolves the conflict, composeRefs feeds both refs', async ({ page }) => {
     await gotoStory(page, 'foundations-utilities--example');
     await expect(page.getByText('px-2 py-1')).toHaveCount(0); // the conflicting px-2 is gone
