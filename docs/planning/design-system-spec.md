@@ -616,6 +616,10 @@ Tre opzioni, da decidere (vedi §5):
 minimo per validare che qualcuno sia disposto a pagare, prima di investire in un sistema di
 licensing più sofisticato (opzione 2) quando i volumi lo giustificano.
 
+**Aggiornamento 2026-11-13**: Daniele non ha modificato questa scelta. L'opzione 1 (org npm
+privata, nessun licensing a runtime) resta la raccomandazione corrente, compatibile con la licenza
+annuale per sviluppatore venduta tramite un Merchant of Record (§8).
+
 ---
 
 ## 3. Segmentazione Free vs Pro
@@ -683,18 +687,23 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    documentazione pubblica. Motivo: evitare qualunque superficie che possa essere letta come un
    collegamento con l'esperienza lavorativa pregressa di Daniele, al di là di quanto già
    strettamente necessario a descrivere pattern UI generici e di pubblico dominio.
-4. **Abbonamento ricorrente vs licenza perpetua per il Pro**: coerente con l'indicazione "sempre
+4. **Abbonamento ricorrente vs licenza perpetua per il Pro** (superato il 2026-11-13, vedi in fondo
+   al punto): coerente con l'indicazione "sempre
    nell'ottica di monetizzare" di Daniele, un **abbonamento ricorrente per-seat o per-progetto**
    (tipico di questo mercato: molte "admin template"/"component Pro" commerciali React vendono a
    licenza perpetua per progetto con upgrade opzionali — ma un abbonamento con aggiornamenti
    continui + supporto si allinea meglio alla richiesta esplicita di reddito ricorrente, ed è anche
    il modello già scelto per l'altro filone di monetizzazione in corso, l'add-on Fatture in Cloud).
-   Da decidere con Daniele.
+   **Decisa il 2026-11-13** (prende il posto dell'abbonamento ricorrente del 2026-11-03): licenza
+   annuale per sviluppatore con 12 mesi di aggiornamenti inclusi, tramite Merchant of Record. Cosa
+   succede alla scadenza (rinnovo, uso delle versioni già ricevute) non è deciso. Vedi §8.
 5. **Target di clienti Pro**: freelance/piccoli team React che costruiscono backoffice/admin
    enterprise (stesso target implicito dei competitor noti in questo spazio: librerie di
    admin-template/dashboard Pro React). Da validare se è lo stesso target o diverso da quello della
    fascia Free (probabile: Free attira adozione/community ampia, Pro converte chi ha davvero un
    backoffice complesso da costruire in produzione).
+   **Decisa il 2026-11-13**: il target Pro sono i **team aziendali** (ERP, gestionali, portali
+   amministrativi), non freelance/piccoli team. Vedi §8.
 6. **Rischio di diluizione dell'attenzione**: Daniele ha già 2 pacchetti pubblici attivi
    (react-virtual-tree-view, react-virtual-dnd-table) più 3 prodotti in corso (il SaaS di approvazione fatture, agent-scout,
    sniper-trading-bot) più il filone Fatture in Cloud. Questo è un **quinto/sesto fronte**. Va
@@ -741,6 +750,9 @@ già un primo componente Pro vendibile per validare la domanda, senza costruire 
 5. **Primo canale di vendita**: npm org privata (§2.4 opzione 1) per il pacchetto Pro, pagina di
    landing con demo Storybook pubblica del Free + demo "a tempo/watermark" del Pro, prezzo iniziale
    semplice (per-progetto, non per-seat, per abbassare la frizione del primo acquisto).
+   **Superato il 2026-11-13** per il modello di prezzo (licenza annuale per sviluppatore, non per
+   progetto) e per l'ordine: prima la landing con lista d'attesa/pre-ordine, poi le vendite. La
+   "demo a tempo/watermark" del Pro non è né confermata né superata (non trattata). Vedi §8.
 
 **Non fare subito** (rischio di sovra-ingegnerizzare prima di validare): sistema di license-key,
 soft-delete come pattern Pro completo, Picker/Assignment dialog (è notoriamente il componente più
@@ -838,3 +850,81 @@ function ChangeSummary(props: {
 - **Performance**: il diff va ricalcolato con `useMemo` tenuto stabile su `values`/`baseline` per
   identità (stesso pattern già in uso per `isDirty` in `useObjectPageForm`), non ricalcolato ad ogni
   render per valore.
+
+---
+
+## 8. Piano commerciale Pro — decisioni di Daniele (2026-11-13)
+
+Nasce da una revisione critica del piano Pro rispetto alla vendibilità, fatta dalla sessione
+principale il 13/11. I punti emersi sono **valutazioni della sessione, non decisioni di Daniele**;
+Daniele ha condiviso l'analisi e ha preso le decisioni elencate più sotto.
+- Il valore del Pro è concentrato in poche migliaia di righe di logica (circa 3.600-4.100 righe
+  non di test in `packages/pro/src`, secondo come si conta), con sorgente e regole pubblici: un
+  team piccolo può riscriverlo.
+- Il target dichiarato (freelance e piccoli team) è quello che paga meno volentieri.
+- Il Pro dipende dal core, che non ha ancora utenti.
+- La virtualizzazione è un bene comune (TanStack Virtual, DataGrid gratuite).
+- Un abbonamento senza licensing a runtime compra solo aggiornamenti.
+- La licenza "da definire" non permette nemmeno una prova.
+- La domanda non è stata validata (§6 punti 3 e 5 non fatti).
+
+Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 5) e §6 (punto 5).
+
+### Decisioni prese
+
+1. **Validazione prima delle vendite.** I ticket in corso non si fermano: il core è vicino alla
+   v0.1.0 e la demo Pro è in via di completamento. La prossima mossa prioritaria, subito dopo i
+   ticket in corso, è
+   una **landing page con lista d'attesa o pre-ordine**, prima di spingere sulle vendite.
+2. **Motori indipendenti dal core.** Un ticket di studio e refactoring rende i motori **Change
+   Summary** e **Form Rebase** usabili senza `@formrail/core`, per offrirli anche a chi usa React
+   Hook Form o TanStack Form. Stato di oggi: il calcolo di Change Summary consuma già solo
+   `values`/`baseline`; il hook di Form Rebase dipende dal tipo del form del core
+   (`UseObjectPageFormReturn` in `use-form-rebase.ts`), mentre `compute-rebase.ts` è puro. I
+   componenti visivi usano i token e `cn` del core.
+3. **Target: team aziendali** (ERP, gestionali, portali amministrativi). Hanno budget, sentono il
+   dolore della concorrenza sui dati e accettano costi di licenza se risolvono un problema
+   strutturale.
+4. **Modello commerciale: licenza annuale per sviluppatore, con 12 mesi di aggiornamenti
+   inclusi** (schema standard enterprise). La vendita passa da un **Merchant of Record** (es. Lemon
+   Squeezy), che gestisce IVA UE e fatturazione.
+
+**Non toccato dalle decisioni**: la distribuzione resta come da §2.4 (org npm privata, nessun
+licensing a runtime).
+
+### Proposte della sessione di pianificazione (non decise da Daniele)
+
+Il pianificatore può usarle come orientamento, ma non come vincoli. Una proposta diventa vincolante
+solo se Daniele la conferma.
+
+- **Posizionamento del Pro**: "integrità della modifica dei record", cioè non perdere mai le
+  modifiche dell'utente, mostrare cosa cambia e gestire gli aggiornamenti concorrenti. Il cuore sono
+  Change Summary, Form Rebase, dirty-tracking robusto con idratazione asincrona e Combobox asincrona
+  production-grade. La List Report virtualizzata resta nel Pro ma non è l'argomento di vendita
+  principale.
+- **Requisiti di chi compra in azienda**, da coprire prima di vendere:
+  - condizioni di licenza scritte (oggi `packages/pro/LICENSE` dice "TO BE DEFINED");
+  - fattura (tramite il Merchant of Record);
+  - descrizione del supporto;
+  - nota di sicurezza: nessun accesso di rete e nessuna chiave. Il bundle buildato è già
+    verificato da `packages/pro/test/dist.smoke.test.ts` ("contains no runtime licensing / network
+    mechanism").
+- **Coerenza della documentazione pubblica**: il README non deve presentare come Pro funzioni non
+  costruite (oggi cita "advanced dirty-tracking" e "a dialog with an embedded grid").
+- I nuovi ticket Pro privilegiano ciò che rafforza il posizionamento qui sopra. La priorità
+  bassa delle rifiniture #484-#486 viene invece da Daniele: "da accodare come piccoli ticket a
+  bassa priorità", 13/11.
+
+### Domande ancora aperte (da portare a Daniele quando servono, non decise)
+
+- **Prezzo** della licenza per sviluppatore ed eventuali sconti per team.
+- **Condizioni di prova e valutazione**: per esempio uso gratuito in sviluppo e per valutazione,
+  licenza richiesta in produzione.
+- **Dopo i 12 mesi**: le versioni uscite durante la licenza restano utilizzabili senza rinnovo,
+  oppure no?
+- **Livello di supporto** promesso (canale, tempi di risposta).
+- **Strumento della lista d'attesa e privacy (GDPR)**: servizio esterno o funzione del Merchant of
+  Record. Dove sta la landing: oggi esiste già la home su GitHub Pages.
+- **Concessione dell'accesso all'org npm** dopo l'acquisto e revoca alla scadenza: manuale
+  all'inizio, oppure automatizzata dal webhook del Merchant of Record.
+- **Uso di Formrail in vistato come prova reale** (§6 punto 3): raccomandato, non deciso.

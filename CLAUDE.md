@@ -13,9 +13,16 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
 - `packages/pro`: licenza commerciale ("da definire"), **vive in questo monorepo pubblico**
   (decisione di Daniele del 2026-11-03: il sorgente è leggibile, il moat è servizio/licenza), con
   `"private": true` finché non esiste l'org npm privata (nessun licensing a runtime). Si estende
-  solo con ticket espliciti (roadmap MVP, §6). Distribuzione iniziale pianificata: npm org
-  privata, abbonamento ricorrente (decisione di Daniele, non rinegoziabile senza nuova istruzione
-  sua).
+  solo con ticket espliciti (roadmap MVP, §6). **Piano commerciale (decisioni di Daniele del
+  2026-11-13, sostituiscono "abbonamento ricorrente"; non rinegoziabili senza nuova istruzione
+  sua, dettaglio in `docs/planning/design-system-spec.md` §8)**: target team aziendali (ERP,
+  gestionali, portali amministrativi); licenza annuale per sviluppatore con 12 mesi di
+  aggiornamenti inclusi, venduta tramite un Merchant of Record (es. Lemon Squeezy) che gestisce
+  IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
+  d'attesa/pre-ordine (validazione della domanda), ticket #490. Ticket di studio/refactoring #489
+  per rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
+  usa React Hook Form o TanStack Form. La distribuzione resta come da §2.4 della spec (org npm
+  privata, nessun licensing a runtime): non è toccata dalle decisioni.
 - Il documento di pianificazione completo (inventario componenti, insidie tecniche di classe
   generale, segmentazione Free/Pro, MVP) è in `docs/planning/design-system-spec.md`. **Il
   pianificatore lo legge sempre prima di creare ticket.**
