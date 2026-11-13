@@ -8,11 +8,9 @@ export const SITE_BASE = `/${repo}/`;
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
-// PLACEHOLDERS (ticket #490). The waitlist form URL below still carries the word PLACEHOLDER: it is a stand-in
-// until Daniele supplies the real Tally URL (the privacy email is final). It is
-// valid-looking on purpose, so PR builds and local runs render a complete site. The deploy must never
-// publish them: `scripts/check-site-config.mjs` (run by the `deploy-pages` job, and by
-// `assemble-site.mjs --strict`) fails while any value is still a placeholder.
+// Final values (ticket #490): the waitlist form URL and the privacy contact below were supplied by Daniele.
+// `scripts/check-site-config.mjs` (run by the `deploy-pages` job, and by `assemble-site.mjs --strict`)
+// still refuses to publish if any of them is ever replaced by a placeholder, an empty or a malformed value.
 
 /**
  * Target of the "Request early access" call-to-action (tickets #382, #490): the waitlist form, a Tally
@@ -23,7 +21,7 @@ export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
  * Must be an absolute `https://` URL. Setting it to '' makes the assembler leave every CTA out of the
  * pages (never a link to `#` or a broken one); the strict guard rejects '' too.
  */
-export const EARLY_ACCESS_URL = 'https://tally.so/r/PLACEHOLDER-waitlist-form';
+export const EARLY_ACCESS_URL = 'https://tally.so/r/vXepWQ';
 
 /** Contact address of the data controller, printed on the privacy page (GDPR art. 13). */
 export const PRIVACY_EMAIL = 'formrail.dev@gmail.com';
