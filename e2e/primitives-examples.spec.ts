@@ -36,11 +36,27 @@ test.describe('Primitives copy-paste examples', () => {
     await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Dismiss message: Session expiring' })).toBeVisible();
-    // The "Show again" button is disabled while the strip is open: the focus must not stay on it.
-    const strip = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
-    await expect(strip).toBeFocused();
-    await expect(strip).toBeVisible();
-    await expect(strip).toBeEnabled();
+    // The focus goes to a NON-live wrapper: the strip inside it is the live region, and speaks once.
+    const wrapper = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
+    await expect(wrapper).toBeFocused();
+    await expect(wrapper).toBeVisible();
+    await expect(wrapper).not.toHaveAttribute('role', /.+/);
+    await expect(wrapper).not.toHaveAttribute('aria-live', /.+/);
+    const outline = await wrapper.evaluate((el) => {
+      const c = getComputedStyle(el);
+      return { style: c.outlineStyle, width: c.outlineWidth, color: c.outlineColor };
+    });
+    expect(outline.style).toBe('solid');
+    expect(outline.width).toBe('2px');
+    const primary = await page.evaluate(() => {
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--color-rop-primary)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    expect(outline.color).toBe(primary);
     await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeDisabled();
   });
 
