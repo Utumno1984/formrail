@@ -46,6 +46,12 @@ describe('findComponentFunction + destructuringDefaults', () => {
     const d = defaultsOf("export const C = forwardRef((props, ref) => { const { a = 'x', ...rest } = props; return null; });");
     expect(d.get('a')).toMatchObject({ text: "'x'", where: 'body' });
   });
+  it('reads the body destructuring through as / satisfies / parentheses / non-null on the initializer', () => {
+    for (const init of ['props as Omit<P, "x"> & { y: 1 }', '(props)', 'props satisfies P', 'props!']) {
+      const d = defaultsOf(`export const C = forwardRef((props, ref) => { const { a = 1 } = ${init}; return null; });`);
+      expect(d.get('a'), init).toMatchObject({ text: '1', where: 'body' });
+    }
+  });
   it('a default that depends on something else is not a literal', () => {
     expect(defaultsOf('export function C({ a = LIMIT, b = 2 }) { return null; }').get('a').literal).toBe(false);
   });
@@ -95,6 +101,42 @@ describe('measure on fixture packages (the real docgen, one case per component)'
       export interface P { /** x. */ size?: 'sm' | 'md'; }
       export const Fwd = forwardRef<HTMLElement, P>(function Fwd({ size = 'md' }, ref) { return <i ref={ref}>{size}</i>; });
       export const Memoed = memo(function Memoed({ size = 'md' }: P) { return <i>{size}</i>; });`,
+    'CastBody.tsx': `export interface P {
+        /** x. */
+        open?: boolean;
+      }
+      export function CastBody(props: P) {
+        const { open = true } = props as P & { extra?: string };
+        return <i>{String(open)}</i>;
+      }`,
+    'Inner.tsx': `export interface InnerProps {
+        /** x. */
+        side?: 'top' | 'bottom';
+        /** x. */
+        gap?: number;
+        /** x. Default \`3\`. */
+        count?: number;
+      }
+      export function Inner({ side = 'top', gap = 4, count = 3 }: InnerProps) { return <i>{side}{gap}{count}</i>; }
+      export function InnerFn({ side = 'top' }: InnerProps) { return <i>{side}</i>; }
+      export function Other({ label = 'x' }: { label?: string }) { return <i>{label}</i>; }
+      export const Opaque = makeThing();
+      declare function makeThing(): (props: InnerProps) => null;`,
+    'Spread.tsx': `import { Inner } from './Inner';
+      import type { InnerProps } from './Inner';
+      export function Spread(props: InnerProps) { return <Inner {...props} />; }`,
+    'Named.tsx': `import { Inner } from './Inner';
+      import type { InnerProps } from './Inner';
+      export function Named({ side, gap }: InnerProps) { return <Inner side={side} gap={gap} />; }`,
+    'Called.tsx': `import { InnerFn } from './Inner';
+      import type { InnerProps } from './Inner';
+      export function Called(props: InnerProps) { return InnerFn(props); }`,
+    'Unrelated.tsx': `import { Other } from './Inner';
+      import type { InnerProps } from './Inner';
+      export function Unrelated({ side }: InnerProps) { return <Other label="fixed" data-side={side} />; }`,
+    'Unresolved.tsx': `import { Opaque } from './Inner';
+      import type { InnerProps } from './Inner';
+      export function Unresolved(props: InnerProps) { return <Opaque {...props} />; }`,
     'Dependent.tsx': `const LIMIT = 5;
       export interface P { /** x. */ limit?: number; }
       export function Dependent({ limit = LIMIT }: P) { return <i>{limit}</i>; }`,
@@ -135,6 +177,32 @@ describe('measure on fixture packages (the real docgen, one case per component)'
     expect(row('Fwd', 'size')).toMatchObject({ kind: 'ok' });
     expect(row('Memoed', 'size')).toMatchObject({ kind: 'ok' });
   });
+  it('a body destructuring through a cast is found (Accordion.collapsible)', () => {
+    expect(row('CastBody', 'open')).toMatchObject({ kind: 'gap', cause: 'body-destructuring' });
+  });
+  it('follows <Inner {...props} /> to the default of the internal component', () => {
+    expect(row('Spread', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'Inner', source: "'top'" });
+    expect(row('Spread', 'gap')).toMatchObject({ kind: 'gap', cause: 'delegated' });
+  });
+  it('a default only in prose that the internal component really has is delegated, not prose-only', () => {
+    expect(row('Spread', 'count')).toMatchObject({ kind: 'gap', cause: 'delegated', source: '3' });
+  });
+  it('follows props passed one by one with the same name, and only those', () => {
+    expect(row('Named', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated' });
+    expect(row('Named', 'gap')).toMatchObject({ kind: 'gap', cause: 'delegated' });
+    expect(row('Named', 'count')).toMatchObject({ kind: 'prose-only' });
+  });
+  it('follows `return Inner(props)`', () => {
+    expect(row('Called', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'InnerFn' });
+  });
+  it('does not call delegated a child that gets other values', () => {
+    expect(row('Unrelated', 'side')).toBeUndefined();
+  });
+  it('lists a delegation it cannot follow instead of staying silent', () => {
+    const c = result.components.find((x) => x.component === 'Unresolved');
+    expect(c.unresolvedDelegations).toEqual(['Opaque']);
+    expect(result.summary.unresolvedDelegations).toContain('Unresolved -> Opaque');
+  });
   it('flags a default that depends on another value as non-literal', () => {
     const r = row('Dependent', 'limit');
     expect(r.literal).toBe(false);
@@ -158,6 +226,15 @@ describe('measure on the repository', { timeout: 60_000 }, () => {
     expect(files.some((f) => f.startsWith('packages/core/'))).toBe(true);
     expect(files.some((f) => f.startsWith('packages/pro/'))).toBe(true);
     expect(result.components.find((c) => c.component === 'Select')?.shape).toBe('wrapped/arrow');
+  });
+  it('finds the known false negative and the known delegations', () => {
+    const rowOf = (component, prop) => result.components.find((c) => c.component === component)?.rows.find((r) => r.prop === prop);
+    expect(rowOf('Accordion', 'collapsible')).toMatchObject({ kind: 'gap', cause: 'body-destructuring' });
+    expect(rowOf('Tooltip', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'TooltipInternal' });
+    expect(rowOf('ConfirmDialog', 'tone')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ConfirmDialogBase' });
+    expect(rowOf('Dialog', 'defaultOpen')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ModalRoot' });
+    expect(rowOf('ListReport', 'titleLevel')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ListReportFrame' });
+    expect(rowOf('ListReportTable', 'status')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ListReportTableShell' });
   });
   it('is deterministic', () => {
     expect(measure()).toEqual(result);
