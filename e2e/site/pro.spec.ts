@@ -113,13 +113,13 @@ test.describe('Pro demo: manager and index', () => {
 });
 
 test.describe('Pro demo: banner', () => {
-  test('on a padded story: role=note, text, link to the Pro section of the landing, in the flow above the story', async ({ page }) => {
+  test('on a padded story: role=note, text, link to the Pro page for teams, in the flow above the story', async ({ page }) => {
     await openProStory(page, 'pro-changesummary--playground');
     const banner = page.getByRole('note');
     await expect(banner).toHaveCount(1);
     await expect(banner).toHaveText(BANNER_TEXT);
     const link = banner.getByRole('link', { name: 'Learn more' });
-    await expect(link).toHaveAttribute('href', '/formrail/#pro');
+    await expect(link).toHaveAttribute('href', '/formrail/teams/');
     await expect(banner.getByRole('link')).toHaveCount(1);
     await expect(banner.getByRole('button')).toHaveCount(0);
     const geometry = await page.evaluate(() => {
