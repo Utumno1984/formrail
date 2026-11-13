@@ -29,7 +29,8 @@ const NOT_BUILT = [
 ];
 const OFFICIAL_POLICIES = [
   'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
-  'https://tally.so/privacy-policy',
+  'https://tally.so/help/gdpr',
+  'https://tally.so/help/privacy-policy',
 ];
 const THIRD_PARTY = [
   'sap',
@@ -278,14 +279,23 @@ test.describe('privacy page', () => {
     await expect(transfers.nth(0)).toContainText('GitHub Inc., USA');
     await expect(transfers.nth(0)).toContainText('independent controller');
     await expect(transfers.nth(0)).toContainText('EU-US Data Privacy Framework');
-    await expect(transfers.nth(1)).toContainText('standard contractual clauses');
+    await expect(transfers.nth(1)).toContainText('Tally BV, Belgium');
+    await expect(transfers.nth(1)).toContainText('stores the responses in the European Union');
+    await expect(transfers.nth(1)).toContainText('outside the EEA');
+    await expect(transfers.nth(1)).not.toContainText(/standard contractual clauses/i);
     const githubPolicy = main.getByRole('link', { name: 'privacy statement' });
     const tallyPolicy = main.getByRole('link', { name: 'privacy policy' });
     await expect(githubPolicy).toHaveAttribute(
       'href',
       'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
     );
-    await expect(tallyPolicy).toHaveAttribute('href', 'https://tally.so/privacy-policy');
+    const tallyGdpr = main.getByRole('link', { name: 'GDPR page' });
+    await expect(tallyPolicy).toHaveAttribute('href', 'https://tally.so/help/privacy-policy');
+    await expect(tallyGdpr).toHaveAttribute('href', 'https://tally.so/help/gdpr');
+    await expect(tallyGdpr).toHaveAttribute('rel', /noopener/);
+    // The old, dead URL must be gone.
+    await expect(main.locator('a[href="https://tally.so/privacy-policy"]')).toHaveCount(0);
+    expect(await main.innerHTML()).not.toContain('https://tally.so/privacy-policy"');
     await expect(githubPolicy).toHaveAttribute('rel', /noopener/);
     await expect(tallyPolicy).toHaveAttribute('rel', /noopener/);
     // No postal address: the contact is the email only.
