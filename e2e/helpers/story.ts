@@ -13,15 +13,18 @@ interface StorybookIndex {
 export async function expectPlayToPass(page: Page, storyId: string, args?: string): Promise<void> {
   const errors = await openAfterPlay(page, storyId, args);
   if (errors.length > 0) {
-    throw new Error(`expectPlayToPass: the play function of "${storyId}" failed:\n${errors.join('\n')}`);
+    throw new Error(
+      `expectPlayToPass: the play function of "${storyId}" failed:\n${errors.map((e) => `${e.event}: ${e.raw}`).join('\n')}`,
+    );
   }
 }
 
 /**
  * For a story whose play FAILS BY DESIGN under the args the test needs (e.g. it asserts a layout the
  * args switch off) but still drives the controls the test is about to use: opens it, waits for the
- * play to end and checks that it failed with the EXPECTED error (`expected` matches the recorded
- * failure), not with any error.
+ * play to end and checks that it failed with the EXPECTED error: `expected` is matched against the
+ * error MESSAGE only (never the serialized payload, which also holds the stack and a DOM dump that
+ * would match almost any pattern), not with any error.
  */
 export async function expectPlayToFail(
   page: Page,
@@ -33,19 +36,28 @@ export async function expectPlayToFail(
   if (errors.length === 0) {
     throw new Error(`expectPlayToFail: the play function of "${storyId}" was expected to fail but passed`);
   }
-  if (!errors.some((e) => expected.test(e))) {
-    throw new Error(`expectPlayToFail: "${storyId}" failed with an unexpected error (wanted ${expected}):\n${errors.join('\n')}`);
+  if (!errors.some((e) => expected.test(e.message))) {
+    throw new Error(
+      `expectPlayToFail: "${storyId}" failed with an unexpected error (wanted ${expected}):\n${errors.map((e) => `${e.event}: ${e.message}`).join('\n')}`,
+    );
   }
 }
 
 const recorderInstalled = new WeakSet<Page>();
 
 /** Opens the story, waits for its play to end and returns the failures it recorded. */
-async function openAfterPlay(page: Page, storyId: string, args?: string): Promise<string[]> {
+interface PlayError {
+  event: string;
+  message: string;
+  raw: string;
+}
+
+async function openAfterPlay(page: Page, storyId: string, args?: string): Promise<PlayError[]> {
   await installPlayErrorRecorder(page);
   await openStory(page, storyId, args);
   await waitForPlayEnd(page);
-  return page.evaluate(() => (window as unknown as { __ropPlayErrors?: string[] }).__ropPlayErrors ?? []);
+  const recorded = await page.evaluate(() => (window as unknown as { __ropPlayErrors?: string[] }).__ropPlayErrors ?? []);
+  return recorded.map((r) => JSON.parse(r) as PlayError);
 }
 
 async function installPlayErrorRecorder(page: Page): Promise<void> {
@@ -66,7 +78,12 @@ async function installPlayErrorRecorder(page: Page): Promise<void> {
       if (!channel) return;
       clearInterval(timer);
       for (const event of ['playFunctionThrewException', 'storyThrewException', 'storyErrored']) {
-        channel.on(event, (payload) => w.__ropPlayErrors?.push(`${event}: ${JSON.stringify(payload)}`));
+        channel.on(event, (payload) => {
+          const message = (payload as { message?: unknown } | null)?.message;
+          w.__ropPlayErrors?.push(
+            JSON.stringify({ event, message: typeof message === 'string' ? message : String(payload), raw: JSON.stringify(payload) }),
+          );
+        });
       }
     }, 1);
   });

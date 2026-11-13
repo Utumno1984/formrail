@@ -130,7 +130,7 @@ test.describe('Internal/ReturnFocus', () => {
     // fails by design (expectPlayToPass would throw), and it must fail on THAT expectation (the
     // Fallback button never gets the focus), not on anything else. It still clicks Open overlay and
     // presses Escape: it must end before the test drives the same controls.
-    await expectPlayToFail(page, 'internal-returnfocus--opener-removed', 'withFallback:!false', /Fallback|toHaveFocus|focus/i);
+    await expectPlayToFail(page, 'internal-returnfocus--opener-removed', 'withFallback:!false', /^expect\(element\)\.toHaveFocus\(\)[\s\S]*Fallback/);
     await page.getByRole('button', { name: 'Open overlay' }).click();
     await page.keyboard.press('Escape');
     await page.waitForTimeout(100);
