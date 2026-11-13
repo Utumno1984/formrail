@@ -28,6 +28,22 @@ export async function expectPlayToPass(page: Page, storyId: string, args?: strin
     }, 1);
   });
   await gotoStory(page, storyId, args);
+  await waitForPlayEnd(page);
+  const errors = await page.evaluate(
+    () => (window as unknown as { __ropPlayErrors?: string[] }).__ropPlayErrors ?? [],
+  );
+  if (errors.length > 0) {
+    throw new Error(`expectPlayToPass: the play function of "${storyId}" failed:\n${errors.join('\n')}`);
+  }
+}
+
+/**
+ * Waits until the story's play function has ended, whatever its outcome (the render phase is
+ * terminal: played / completed / finished / errored / aborted). Use it, after `gotoStory`, for a
+ * story whose play cannot pass under the args the test needs (so `expectPlayToPass` would fail)
+ * but whose play still clicks the controls the test is about to drive.
+ */
+export async function waitForPlayEnd(page: Page): Promise<void> {
   await page.waitForFunction(
     () => {
       const render = (
@@ -39,12 +55,6 @@ export async function expectPlayToPass(page: Page, storyId: string, args?: strin
     undefined,
     { timeout: 10_000 },
   );
-  const errors = await page.evaluate(
-    () => (window as unknown as { __ropPlayErrors?: string[] }).__ropPlayErrors ?? [],
-  );
-  if (errors.length > 0) {
-    throw new Error(`expectPlayToPass: the play function of "${storyId}" failed:\n${errors.join('\n')}`);
-  }
 }
 
 /**

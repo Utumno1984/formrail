@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 
 /** Gap in px between the label's bottom and the focus ring's top (outline width + offset). */
 async function ringGap(page: Page, control: Locator, label: Locator): Promise<number> {
@@ -57,13 +57,13 @@ for (const [vp, size] of VIEWPORTS) {
     }
 
     test('Select: the ring keeps >=4px from the reason text', async ({ page }) => {
-      await gotoStory(page, 'forms-select--forced');
+      await expectPlayToPass(page, 'forms-select--forced');
       const trigger = page.locator('button[role="combobox"]').first();
       expect(await bottomGap(page, trigger, page.locator('[id$="-reason"]').first())).toBeGreaterThanOrEqual(4);
     });
 
     test('Combobox: the ring keeps >=4px from the reason text', async ({ page }) => {
-      await gotoStory(page, 'forms-combobox--forced');
+      await expectPlayToPass(page, 'forms-combobox--forced');
       const input = page.getByRole('combobox').first();
       expect(await bottomGap(page, input, page.locator('[id$="-reason"]').first())).toBeGreaterThanOrEqual(4);
     });
@@ -85,7 +85,7 @@ test.describe('Field focus ring vs label (#138)', () => {
   });
 
   test('Combobox: the ring keeps >=4px from the label', async ({ page }) => {
-    await gotoStory(page, 'forms-combobox--base');
+    await expectPlayToPass(page, 'forms-combobox--base');
     const input = page.getByRole('combobox').first();
     const label = page.locator(`label[for="${await input.getAttribute('id')}"]`);
     expect(await ringGap(page, input, label)).toBeGreaterThanOrEqual(4);

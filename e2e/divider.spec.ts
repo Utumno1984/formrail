@@ -89,7 +89,7 @@ test.describe('Primitives/Divider', () => {
   });
 
   test('vertical in a toolbar: 1px wide, as tall as the buttons row, role + aria-orientation, skipped by Tab', async ({ page }) => {
-    await gotoStory(page, 'primitives-divider--toolbar');
+    await expectPlayToPass(page, 'primitives-divider--toolbar');
     const seps = page.getByRole('separator');
     await expect(seps).toHaveCount(2);
     const row = await page.getByRole('button', { name: 'Cut' }).evaluate((el) => el.getBoundingClientRect().height);

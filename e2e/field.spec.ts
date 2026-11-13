@@ -62,7 +62,7 @@ test.describe('Forms/Field', () => {
 
   test('forced: real typing, Ctrl+V and Backspace change nothing and fire no input event', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await gotoStory(page, 'forms-field--forced');
+    await expectPlayToPass(page, 'forms-field--forced');
     const input = page.getByRole('textbox', { name: 'Company name' });
     await page.evaluate(() => navigator.clipboard.writeText('incollato'));
     await input.focus();
@@ -77,7 +77,7 @@ test.describe('Forms/Field', () => {
   });
 
   test('forced type=number: arrows and the mouse wheel do not change the value', async ({ page }) => {
-    await gotoStory(page, 'forms-field--forced-number');
+    await expectPlayToPass(page, 'forms-field--forced-number');
     const input = page.getByRole('spinbutton', { name: 'Quantity' });
     await input.focus();
     await page.keyboard.press('ArrowUp');
@@ -88,7 +88,7 @@ test.describe('Forms/Field', () => {
   });
 
   test('render-prop locked control: click, Space and Enter do not switch it', async ({ page }) => {
-    await gotoStory(page, 'forms-field--render-prop-locked');
+    await expectPlayToPass(page, 'forms-field--render-prop-locked');
     const toggle = page.getByRole('switch', { name: 'Active' });
     await expect(toggle).toHaveAccessibleDescription('Managed by the administrator');
     await toggle.click();
@@ -99,9 +99,9 @@ test.describe('Forms/Field', () => {
   });
 
   test('useFieldControl in a child of an unblocked Field lets the control switch', async ({ page }) => {
-    await gotoStory(page, 'forms-field--hook-toggle-enabled');
+    await expectPlayToPass(page, 'forms-field--hook-toggle-enabled');
     const toggle = page.getByRole('switch', { name: 'Notifiche' });
-    // The story's play function has already clicked it once: start from whatever state it is in.
+    // The play function (awaited by expectPlayToPass) has already clicked it once: start from whatever state it is in.
     const before = await toggle.getAttribute('aria-checked');
     await toggle.focus();
     await page.keyboard.press('Space');
@@ -109,7 +109,7 @@ test.describe('Forms/Field', () => {
   });
 
   test('a value set from outside after mount fires no input event; typing does', async ({ page }) => {
-    await gotoStory(page, 'forms-field--external-value');
+    await expectPlayToPass(page, 'forms-field--external-value');
     const input = page.getByRole('textbox', { name: 'Company name' });
     await countInputEvents(page);
     await page.getByRole('button', { name: 'Load data' }).click();
@@ -134,7 +134,7 @@ test.describe('Forms/Field: reserved message space', () => {
   });
 
   test('a one-line error appearing or going away does not move the next field', async ({ page }) => {
-    await gotoStory(page, STORY);
+    await expectPlayToPass(page, STORY);
     const before = await metrics(page);
     await page.getByRole('button', { name: 'Show error', exact: true }).click();
     await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
@@ -145,7 +145,7 @@ test.describe('Forms/Field: reserved message space', () => {
   });
 
   test('a wrapped error moves the next field by exactly the extra height', async ({ page }) => {
-    await gotoStory(page, STORY);
+    await expectPlayToPass(page, STORY);
     const before = await metrics(page);
     await page.getByRole('button', { name: 'Show long error' }).click();
     const message = page.locator('[id$="-error"]');
@@ -162,7 +162,7 @@ test.describe('Forms/Field: reserved message space', () => {
   });
 
   test('the help sits next to its own control: closer to it than to the next field (no error shown)', async ({ page }) => {
-    await gotoStory(page, STORY);
+    await expectPlayToPass(page, STORY);
     const first = page.getByTestId('er-first');
     const input = (await first.getByRole('textbox').boundingBox())!;
     const help = (await first.locator('[id$="-help"]').boundingBox())!;
@@ -174,13 +174,13 @@ test.describe('Forms/Field: reserved message space', () => {
   });
 
   test('the error line stays reserved with no help text too, and without the control it is not', async ({ page }) => {
-    await gotoStory(page, STORY, 'help:');
+    await expectPlayToPass(page, STORY, 'help:');
     const before = await metrics(page);
     await page.getByRole('button', { name: 'Show error', exact: true }).click();
     await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();
     expect(await metrics(page)).toEqual(before);
 
-    await gotoStory(page, STORY, 'help:;reserveMessageSpace:!false');
+    await expectPlayToPass(page, STORY, 'help:;reserveMessageSpace:!false');
     const bare = await metrics(page);
     await page.getByRole('button', { name: 'Show error', exact: true }).click();
     await expect(page.getByText('Enter a valid VAT number.')).toBeVisible();

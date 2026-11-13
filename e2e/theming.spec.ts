@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
-import { expectPlayToPass, gotoStory } from './helpers/story';
+import { expectPlayToPass } from './helpers/story';
 
 const STORY = 'foundations-theming--switcher';
 
@@ -13,7 +13,7 @@ test.describe('Foundations/Theming', () => {
   });
 
   test('changing preset or custom colour restyles Button and StatusBadge without a reload', async ({ page }) => {
-    await gotoStory(page, STORY);
+    await expectPlayToPass(page, STORY);
     await page.evaluate(() => ((window as unknown as { __noReload: boolean }).__noReload = true));
     const button = page.getByRole('button', { name: 'Approve' });
     const badge = page.getByTestId('themed-badge');
@@ -50,7 +50,7 @@ test.describe('Foundations/Theming', () => {
   // which draws its own indicator: the radio is `appearance: none` and a sibling dot is displayed
   // only for the checked one, so the selected state never depends on native radio rendering.
   test('the selected theme radio shows a drawn indicator (not the native one)', async ({ page }) => {
-    await gotoStory(page, STORY);
+    await expectPlayToPass(page, STORY);
     const dotOf = (name: string) =>
       page.getByRole('radio', { name }).evaluate((el) => {
         const dot = el.nextElementSibling as HTMLElement;
@@ -70,7 +70,7 @@ test.describe('Foundations/Theming', () => {
   // fieldset/legend around it and no aria-label on it repeating "Theme", so a screen reader
   // entering the switcher hears the group name a single time.
   test('the theme switcher group is named "Theme" exactly once', async ({ page }) => {
-    await gotoStory(page, STORY);
+    await expectPlayToPass(page, STORY);
     const group = page.getByRole('radiogroup', { name: 'Theme', exact: true });
     await expect(group).toHaveCount(1);
     await expect(group).toHaveAccessibleName('Theme');

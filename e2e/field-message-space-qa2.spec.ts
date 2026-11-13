@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const ID = 'forms-field--error-reserves-space';
 const tops = (page: Page) =>
@@ -26,7 +26,7 @@ for (const [vp, size, dir] of [
     test.use({ viewport: size });
     for (const help of ['Some+help', '']) {
       test('reserve on, help=' + help + ': short error moves nothing, long moves by extra only', async ({ page }) => {
-        await gotoStory(page, ID, 'help:' + help);
+        await expectPlayToPass(page, ID, 'help:' + help);
         if (dir === 'rtl') await page.evaluate(() => (document.documentElement.dir = 'rtl'));
         const base = await tops(page);
         await page.getByRole('button', { name: 'Show error', exact: true }).click();
@@ -42,7 +42,7 @@ for (const [vp, size, dir] of [
         expect((await tops(page)).second).toBeCloseTo(base.second, 1);
       });
       test('opt-out, help=' + help + ': error takes own room', async ({ page }) => {
-        await gotoStory(page, ID, 'reserveMessageSpace:!false;help:' + help);
+        await expectPlayToPass(page, ID, 'reserveMessageSpace:!false;help:' + help);
         const base = await tops(page);
         await page.getByRole('button', { name: 'Show error', exact: true }).click();
         const short = await tops(page);

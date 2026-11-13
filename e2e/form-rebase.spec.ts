@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
-import { expectPlayToPass, gotoStory } from './helpers/story';
+import { expectPlayToPass } from './helpers/story';
 
 const PLAYGROUND = 'pro-patterns-form-rebase--playground';
 
@@ -10,7 +10,7 @@ test.describe('Pro/Patterns/Form rebase', () => {
   });
 
   test('a server update during a save is queued, then merged against the saved baseline', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND, 'saveDelay:1500');
+    await expectPlayToPass(page, PLAYGROUND, 'saveDelay:1500');
     const field = (name: string) => page.getByRole('textbox', { name });
     // Let the play function finish (it ends on a clean conflict list with the server values).
     await expect(page.getByRole('list', { name: /Conflicts \(0\)/ })).toBeAttached();
@@ -34,7 +34,7 @@ test.describe('Pro/Patterns/Form rebase', () => {
   });
 
   test('keep my value closes the conflict and leaves the field as typed', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND);
+    await expectPlayToPass(page, PLAYGROUND);
     const field = (name: string) => page.getByRole('textbox', { name });
     await expect(field('Amount')).toHaveValue('150');
     await field('Amount').fill('175');
@@ -47,7 +47,7 @@ test.describe('Pro/Patterns/Form rebase', () => {
   });
 
   test('no axe violations with an open conflict', async ({ page }) => {
-    await gotoStory(page, PLAYGROUND);
+    await expectPlayToPass(page, PLAYGROUND);
     const field = (name: string) => page.getByRole('textbox', { name });
     await expect(field('Amount')).toHaveValue('150');
     await field('Amount').fill('175');
