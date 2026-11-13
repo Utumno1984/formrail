@@ -175,25 +175,13 @@ function scrollerOf(node: Element): Element {
   return node.ownerDocument.scrollingElement ?? node.ownerDocument.documentElement;
 }
 
-/** A control the user types in (always kept in view by the layout rule, whatever brought the focus there). */
+/** A control the user types in (kept in view by the layout rule), not a button or a link. */
 const TYPING_TARGET = 'input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable=""], [contenteditable="true"]';
 
 /** Room left between a revealed control and what covers the top of its container: its focus ring (2px + 2px offset) and air. */
 const REVEAL_GAP = 8;
 
 const isLost = (doc: Document): boolean => doc.activeElement === null || doc.activeElement === doc.body;
-
-/**
- * Whether the user sees where the focus is, i.e. whether its indicator is shown (`:focus-visible`): a control reached
- * with the keyboard, not a button pressed with a pointer. A browser that does not know the selector counts as yes.
- */
-function focusShown(element: HTMLElement): boolean {
-  try {
-    return element.matches(':focus-visible');
-  } catch {
-    return true;
-  }
-}
 
 /**
  * The bottom of what the container keeps stuck over its own top edge (a sticky Anchor Bar), found by hit-testing
@@ -262,12 +250,13 @@ function reveal(active: HTMLElement, container: Element): void {
  * in the top strip of it scrolls out of view). Inside the container (the default) the content after it does not
  * move either, but at the top of the page the notice itself may then be out of view. Never animated.
  *
- * **Focus not obscured** (WCAG 2.4.11): when the focused control was in that strip, it is scrolled back into view,
- * below whatever the container keeps stuck at its top (a sticky Anchor Bar), and the content moves by the least
- * that shows it: always for a control the user types in, and for any other control whose focus indicator is shown
- * (`:focus-visible`, reached with the keyboard). A button pressed with a pointer shows no indicator, so the
- * content does not move for it. The rule holds whatever moved the strip: the notice appearing, growing,
- * shrinking or going away.
+ * **Focus not obscured** (WCAG 2.4.11): a control the user types in that was in that strip is scrolled back into
+ * view, below whatever the container keeps stuck at its top (a sticky Anchor Bar); the content moves by the least
+ * that shows it. Any other focused control (a header button, also when reached with the keyboard) may scroll out of
+ * view with the strip, and the content does not move for it: SC 2.4.11 applies when a component receives the focus,
+ * and that control received it fully visible (an update never moves the focus; the next control the user moves to
+ * is scrolled into view by the browser). A field being typed in is kept in view because the user has no next step
+ * that would bring it back.
  *
  * **Focus**: when a choice removes the element that had the focus, the focus goes to the same choice of
  * the conflict that takes its place (the next one, else the previous one), else to `focusTargetFor(conflict)`
@@ -371,18 +360,14 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
         // the follower's own move already includes any such clamp.
         const base = held.container === container && !container.contains(held.element) ? held.scrollTop : container.scrollTop;
         container.scrollTop = base + delta;
-        // WCAG 2.4.11 Focus Not Obscured (#470): the focus the user sees is never left out of view or under a sticky
-        // bar by an update they did not trigger. A control that was in the top strip of the container, now out of
-        // view, is brought back (the content then moves by the least that shows it), when it is a control the user
-        // types in, or any control whose focus indicator is shown (reached with the keyboard). A button pressed with
-        // a pointer shows no indicator: there is nothing to keep in view, and the content does not move for it.
+        // A control the user is typing in that was in the top strip of the container, now covered, is brought back
+        // into view, below what the container keeps stuck at its top (a sticky Anchor Bar: #470, it was left under
+        // it). Any other control (a header button, even reached with the keyboard) may scroll out of view and the
+        // content does not move for it. WCAG 2.4.11 (#470): the criterion holds when a component RECEIVES the focus;
+        // this button received it fully visible, an update never moves the focus, and the next control the user
+        // moves to is scrolled into view by the browser. A field being typed in has no "next": it is kept in view.
         const active = live.ownerDocument.activeElement;
-        if (
-          active instanceof HTMLElement &&
-          container !== active &&
-          container.contains(active) &&
-          (active.matches(TYPING_TARGET) || focusShown(active))
-        ) {
+        if (active instanceof HTMLElement && container !== active && container.contains(active) && active.matches(TYPING_TARGET)) {
           reveal(active, container);
         }
       }

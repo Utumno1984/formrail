@@ -3,7 +3,7 @@
 ---
 
 `<RebaseNotice />` follow-ups (#470):
-- **Focus not obscured (WCAG 2.4.11)**: when the notice takes the top strip of the scroll container and the focused control was in it, the control is scrolled back into view. This applies to a control the user types in, and now also to any control whose focus indicator is shown (`:focus-visible`, for example a header button reached with the keyboard). The control lands below what the container keeps stuck at its top, such as a sticky Anchor Bar: until now a field brought back could stay hidden under that bar. A button pressed with a pointer shows no indicator, so the content still does not move for it.
+- **Focus not obscured (WCAG 2.4.11)**: a field being typed in that the notice pushes out of the top strip of the scroll container is brought back below what the container keeps stuck at its top, such as a sticky Anchor Bar. Until now it could stay hidden under that bar. Any other focused control still does not move the content, also when reached with the keyboard. That choice is documented: SC 2.4.11 applies when a control receives the focus, and an update never moves the focus.
 - **Layout**: the position is recorded again when the box the notice sits in is resized from outside, for example a consumer that caps the notice's row above the virtual keyboard. Before, the next render scrolled by that move too. The scroll position the browser clamps in the relayout, at the end of the content, is no longer counted twice.
 - **Docs**: `focusTargetFor` says what to return when the conflict's field is gone, for an item the server removed.
 

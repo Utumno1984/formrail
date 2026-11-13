@@ -527,7 +527,7 @@ describe('<RebaseNotice />: the content in view never moves (#384, second review
   });
 });
 
-describe('<RebaseNotice />: focus not obscured (WCAG 2.4.11, #470)', () => {
+describe('<RebaseNotice />: focus not obscured (WCAG 2.4.11, #470): a field being typed in is kept in view, below a sticky bar', () => {
   const rect = (top: number, height: number) =>
     ({ top, bottom: top + height, left: 0, right: 100, width: 100, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
   const STRIP = 80;
@@ -592,7 +592,7 @@ describe('<RebaseNotice />: focus not obscured (WCAG 2.4.11, #470)', () => {
     delete (document as { elementFromPoint?: unknown }).elementFromPoint;
   });
 
-  /** Makes `element` match `:focus-visible` (keyboard) or not (pointer), whatever jsdom decides. */
+  /** Makes `element` match `:focus-visible` (keyboard) or not (pointer), whatever jsdom decides: the rule must not depend on it. */
   function modality(element: HTMLElement, shown: boolean) {
     const matches = Element.prototype.matches;
     vi.spyOn(element, 'matches').mockImplementation(function (this: HTMLElement, selector: string) {
@@ -600,32 +600,21 @@ describe('<RebaseNotice />: focus not obscured (WCAG 2.4.11, #470)', () => {
     });
   }
 
-  it('a button in the covered strip, reached with the keyboard: back in view, below the sticky bar (the content moves by the least)', () => {
-    const { view, scroller, scrollIntoView } = setup();
-    const back = screen.getByRole('button', { name: 'Back' });
-    back.focus();
-    modality(back, true);
-    view.rerender(<Page conflicts={[DUE]} />);
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-    // The container top is at 80, the bar ends at 110: the button starts 8px below it.
-    expect(back.getBoundingClientRect().top).toBe(STRIP + BAR + 8);
-    expect(scroller.scrollTop).toBe(2);
-    expect(back).toHaveFocus();
-  });
-
-  it('the same button pressed with a pointer (no focus indicator): the content does not move for it', () => {
-    const { view, scroller, scrollIntoView } = setup();
-    const back = screen.getByRole('button', { name: 'Back' });
-    back.focus();
-    modality(back, false);
-    const due = screen.getByRole('textbox', { name: 'Due date' });
-    const before = due.getBoundingClientRect().top;
-    view.rerender(<Page conflicts={[DUE]} />);
-    expect(scroller.scrollTop).toBe(STRIP);
-    expect(due.getBoundingClientRect().top).toBe(before);
-    expect(scrollIntoView).not.toHaveBeenCalled();
-    expect(back).toHaveFocus();
-  });
+  for (const shown of [true, false]) {
+    it(`a button in the covered strip, focus indicator ${shown ? 'shown (keyboard)' : 'not shown (pointer)'}: the content does not move for it, the focus stays (the documented 2.4.11 choice)`, () => {
+      const { view, scroller, scrollIntoView } = setup();
+      const back = screen.getByRole('button', { name: 'Back' });
+      back.focus();
+      modality(back, shown);
+      const due = screen.getByRole('textbox', { name: 'Due date' });
+      const before = due.getBoundingClientRect().top;
+      view.rerender(<Page conflicts={[DUE]} />);
+      expect(scroller.scrollTop).toBe(STRIP);
+      expect(due.getBoundingClientRect().top).toBe(before);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(back).toHaveFocus();
+    });
+  }
 
   it('a field being typed in, in the covered strip: back in view and no longer under the sticky bar (the pointer does not matter)', () => {
     const { view, scroller } = setup();

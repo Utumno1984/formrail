@@ -581,36 +581,39 @@ function expectFieldsStill(before: FieldSpot[], after: FieldSpot[]): number {
   return pairs.length;
 }
 
-test.describe('Pro showcase: the focus the user sees is never obscured by the notice (WCAG 2.4.11, #470) @engines', () => {
+test.describe('Pro showcase: focus not obscured by the notice (WCAG 2.4.11, #470) @engines', () => {
   for (const [name, viewport] of [
     ['desktop', { width: 1280, height: 800 }],
     ['phone', { width: 390, height: 500 }],
   ] as const) {
-    test(`${name}: "Simulate server update" reached with the keyboard and pressed with Enter: the button stays in view below the Anchor Bar, focused`, async ({ page }) => {
+    test(`${name}: "Simulate server update" reached with the keyboard and pressed with Enter: no visible field moves, the focus stays; the next Tab lands on a control in view`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await openRecord(page);
       await dueDate(page).fill('2026-03-05');
-      // Keyboard navigation to the button (Tab from the previous header action): its focus indicator is shown.
+      // Keyboard navigation to the button (Tab from the previous header action): its focus indicator is shown, and
+      // it was whole in view when it received the focus (what SC 2.4.11 asks).
       await page.getByRole('button', { name: 'Delete' }).focus();
       await page.keyboard.press('Tab');
       const simulate = page.getByRole('button', { name: 'Simulate server update' });
       await expect(simulate).toBeFocused();
-      expect((await focusSpot(page)).focusVisible).toBe(true);
-      // The header is at the top of the scroller: in the strip the notice takes.
+      const received = await focusSpot(page);
+      expect(received.focusVisible).toBe(true);
+      expectFocusInView(received);
+      const before = await fieldSpots(page);
+      // The header is at the top of the scroller: in the strip the notice takes. The documented choice (#470): the
+      // content does not move for a control that is not a typing field, the focus is not moved.
       await page.keyboard.press('Enter');
       await expect(conflicts(page)).toHaveCount(1);
       await expect(simulate).toBeFocused();
-      const shown = await focusSpot(page);
-      expectFocusInView(shown);
-      // The content moved by the least that shows it: the button sits right under the bar (8px of room).
-      expect(shown.top - shown.barBottom).toBeLessThanOrEqual(9);
-
-      // The notice goes away (the server comes to my date): the button is still in view, still focused.
-      const record = (await stored(page))!;
-      await serverPatch(page, record.id, { dueDate: '2026-03-05' });
-      await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
-      await expect(simulate).toBeFocused();
-      expectFocusInView(await focusSpot(page));
+      expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
+      // The next control the keyboard reaches is scrolled into view by the browser: not entirely hidden (SC 2.4.11,
+      // Minimum). The browser's own focus scrolling ignores the sticky Anchor Bar, so the control may end partly
+      // under it (an Object Page behaviour, with or without the notice: reported on #470, not changed here).
+      await page.keyboard.press('Tab');
+      await expect(simulate).not.toBeFocused();
+      const next = await focusSpot(page);
+      expect(next.bottom, `${next.label}: partly below the Anchor Bar`).toBeGreaterThan(next.barBottom);
+      expect(next.top, `${next.label}: partly above the bottom of the scroller`).toBeLessThan(next.scrollerBottom);
     });
 
     test(`${name}: "Simulate server update" clicked with the mouse (no focus indicator): no visible field moves`, async ({ page }) => {
