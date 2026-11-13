@@ -115,6 +115,12 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
    * typically the field the conflict was about (its control, found with the conflict's `currentPath` for an
    * open conflict of `useFormRebase`). Called with the conflict as it was when chosen. Without it (or when it
    * returns nothing), the focus goes back to where it was before entering the notice.
+   *
+   * The field may be gone: after "Use server value" on an item the server removed, that item is removed from the
+   * form, and the `currentPath` read at the choice names the item that took its place (the next one). Return a
+   * live element in that case too (that next item, else the previous one, else a control that is always there):
+   * when the notice has nothing left to show it unmounts, and with no target and no element to go back to the
+   * focus would be left on `<body>`.
    */
   focusTargetFor?: (conflict: RebaseConflict) => HTMLElement | null | undefined;
   /**
@@ -169,10 +175,70 @@ function scrollerOf(node: Element): Element {
   return node.ownerDocument.scrollingElement ?? node.ownerDocument.documentElement;
 }
 
-/** A control the user types in (kept in view by the layout rule), not a button or a link. */
+/** A control the user types in (always kept in view by the layout rule, whatever brought the focus there). */
 const TYPING_TARGET = 'input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]), textarea, select, [contenteditable=""], [contenteditable="true"]';
 
+/** Room left between a revealed control and what covers the top of its container: its focus ring (2px + 2px offset) and air. */
+const REVEAL_GAP = 8;
+
 const isLost = (doc: Document): boolean => doc.activeElement === null || doc.activeElement === doc.body;
+
+/**
+ * Whether the user sees where the focus is, i.e. whether its indicator is shown (`:focus-visible`): a control reached
+ * with the keyboard, not a button pressed with a pointer. A browser that does not know the selector counts as yes.
+ */
+function focusShown(element: HTMLElement): boolean {
+  try {
+    return element.matches(':focus-visible');
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The bottom of what the container keeps stuck over its own top edge (a sticky Anchor Bar), found by hit-testing
+ * just below that edge, above `x`; `null` when nothing covers it. Only the container's own content counts (an
+ * overlay above the page holds the focus itself), and a layer that holds `focused` does not cover it (an Anchor Bar
+ * link with the focus).
+ */
+function coverBottom(container: Element, x: number, focused: HTMLElement): number | null {
+  const doc = container.ownerDocument;
+  const view = doc.defaultView;
+  // Not in every DOM (jsdom has no layout).
+  if (typeof doc.elementFromPoint !== 'function' || !view) return null;
+  const box = container.getBoundingClientRect();
+  let bottom: number | null = null;
+  // Stacked sticky layers (a bar under a bar): look again below each one found, a few times at most.
+  for (let y = box.top + 1, round = 0; round < 3 && y < box.bottom; round += 1) {
+    const hit = doc.elementFromPoint(x, y);
+    if (!hit || hit === container || !container.contains(hit)) break;
+    let layer: Element | null = null;
+    for (let el: Element | null = hit; el && el !== container; el = el.parentElement) {
+      const position = view.getComputedStyle(el).position;
+      if (position === 'sticky' || position === 'fixed') layer = el;
+    }
+    if (!layer || layer.contains(focused)) break;
+    bottom = layer.getBoundingClientRect().bottom;
+    y = bottom + 1;
+  }
+  return bottom;
+}
+
+/**
+ * Brings the focused `active` back into the visible part of `container`, clear of what stays stuck over its top: the
+ * container scrolls by the least that shows it whole (`scrollIntoView` first, then below a sticky bar).
+ */
+function reveal(active: HTMLElement, container: Element): void {
+  const box = container.getBoundingClientRect();
+  let rect = active.getBoundingClientRect();
+  if (rect.top < box.top || rect.bottom > box.bottom) {
+    active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    rect = active.getBoundingClientRect();
+  }
+  const x = Math.min(Math.max(rect.left + rect.width / 2, box.left + 1), box.right - 1);
+  const cover = coverBottom(container, x, active);
+  if (cover !== null && rect.top < cover + REVEAL_GAP) container.scrollTop -= cover + REVEAL_GAP - rect.top;
+}
 
 /**
  * "This record was updated while you were editing": the result of a `useFormRebase` rebase, as a
@@ -193,9 +259,15 @@ const isLost = (doc: Document): boolean => doc.activeElement === null || doc.act
  * as much as the content right after the notice was pushed (or let up). Recommended place: right ABOVE the
  * page's scroll container, outside it, with `scrollContainerRef` (an `ObjectPage`'s scroller): the notice is
  * always in view and takes its room from the top of the scroller, whose content does not move (only what was
- * in the top strip of it scrolls out of view; a focused field there is scrolled back into view). Inside the
- * container (the default) the content after it does not move either, but at the top of the page the notice
- * itself may then be out of view. Never animated.
+ * in the top strip of it scrolls out of view). Inside the container (the default) the content after it does not
+ * move either, but at the top of the page the notice itself may then be out of view. Never animated.
+ *
+ * **Focus not obscured** (WCAG 2.4.11): when the focused control was in that strip, it is scrolled back into view,
+ * below whatever the container keeps stuck at its top (a sticky Anchor Bar), and the content moves by the least
+ * that shows it: always for a control the user types in, and for any other control whose focus indicator is shown
+ * (`:focus-visible`, reached with the keyboard). A button pressed with a pointer shows no indicator, so the
+ * content does not move for it. The rule holds whatever moved the strip: the notice appearing, growing,
+ * shrinking or going away.
  *
  * **Focus**: when a choice removes the element that had the focus, the focus goes to the same choice of
  * the conflict that takes its place (the next one, else the previous one), else to `focusTargetFor(conflict)`
@@ -266,7 +338,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     containerRef.current = scrollContainerRef;
   });
   /** The element right after the notice (its own next sibling, else its parent's...), with its top. */
-  const after = useRef<{ element: Element; top: number } | null>(null);
+  const after = useRef<{ element: Element; top: number; container: Element | null; scrollTop: number } | null>(null);
   const follower = useCallback((): Element | null => {
     const start: Element | null = stripRef.current ?? liveRef.current;
     for (let node: Element | null = start; node && node !== node.ownerDocument.body; node = node.parentElement) {
@@ -279,7 +351,9 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
   }, []);
   const record = useCallback(() => {
     const element = follower();
-    after.current = element ? { element, top: element.getBoundingClientRect().top } : null;
+    const live = liveRef.current;
+    const container = live ? (containerRef.current?.current ?? scrollerOf(live)) : null;
+    after.current = element ? { element, top: element.getBoundingClientRect().top, container, scrollTop: container?.scrollTop ?? 0 } : null;
   }, [follower]);
 
   useIsomorphicLayoutEffect(() => {
@@ -291,30 +365,48 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
       const delta = held.element.getBoundingClientRect().top - held.top;
       if (delta !== 0) {
         const container = containerRef.current?.current ?? scrollerOf(live);
-        container.scrollTop += delta;
-        // A control the user is typing in that was in the top strip of the container, now covered, is brought
-        // back into view (a button, say "Back" in a header, may scroll away: the content does not move for it).
+        // Outside the container (right above it), the container grows or shrinks by `delta` at its top, and the
+        // browser may already have clamped its scroll position in that relayout (at the bottom of the content, a
+        // taller container scrolls up by itself, #470): the position comes from the record, not from now. Inside it,
+        // the follower's own move already includes any such clamp.
+        const base = held.container === container && !container.contains(held.element) ? held.scrollTop : container.scrollTop;
+        container.scrollTop = base + delta;
+        // WCAG 2.4.11 Focus Not Obscured (#470): the focus the user sees is never left out of view or under a sticky
+        // bar by an update they did not trigger. A control that was in the top strip of the container, now out of
+        // view, is brought back (the content then moves by the least that shows it), when it is a control the user
+        // types in, or any control whose focus indicator is shown (reached with the keyboard). A button pressed with
+        // a pointer shows no indicator: there is nothing to keep in view, and the content does not move for it.
         const active = live.ownerDocument.activeElement;
-        if (active instanceof HTMLElement && container !== active && container.contains(active) && active.matches(TYPING_TARGET)) {
-          const box = container.getBoundingClientRect();
-          const rect = active.getBoundingClientRect();
-          if (rect.top < box.top || rect.bottom > box.bottom) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        if (
+          active instanceof HTMLElement &&
+          container !== active &&
+          container.contains(active) &&
+          (active.matches(TYPING_TARGET) || focusShown(active))
+        ) {
+          reveal(active, container);
         }
       }
     }
     record();
   });
 
-  // Between two renders the content after the notice moves only by a scroll or a resize: record it again then.
+  // Between two renders the content after the notice moves only by a scroll, a resize, or a change of the box the
+  // notice sits in that this component did not make (#470: a consumer that caps the notice's row by the room left
+  // above the virtual keyboard): record it again then, or the next render would scroll by that move too.
   useEffect(() => {
-    const doc = liveRef.current?.ownerDocument;
+    const live = liveRef.current;
+    const doc = live?.ownerDocument;
     const view = doc?.defaultView;
-    if (!doc || !view) return undefined;
+    if (!live || !doc || !view) return undefined;
     doc.addEventListener('scroll', record, { capture: true, passive: true });
     view.addEventListener('resize', record);
+    const slot = live.parentElement;
+    const observer = slot && typeof view.ResizeObserver === 'function' ? new view.ResizeObserver(record) : null;
+    if (slot) observer?.observe(slot);
     return () => {
       doc.removeEventListener('scroll', record, { capture: true });
       view.removeEventListener('resize', record);
+      observer?.disconnect();
     };
   }, [record]);
 

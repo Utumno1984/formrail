@@ -527,6 +527,240 @@ describe('<RebaseNotice />: the content in view never moves (#384, second review
   });
 });
 
+describe('<RebaseNotice />: focus not obscured (WCAG 2.4.11, #470)', () => {
+  const rect = (top: number, height: number) =>
+    ({ top, bottom: top + height, left: 0, right: 100, width: 100, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  const STRIP = 80;
+  const BAR = 30;
+
+  /**
+   * The recommended placement (the notice right above the container), with a sticky bar stuck at the top of the
+   * container (an Anchor Bar). jsdom has no layout: every box is mocked, the container scrolls by `scrollTop`, and
+   * `scrollIntoView` aligns the element's top with the container's (what `block: 'nearest'` does from above).
+   */
+  function Page({ conflicts }: { conflicts: RebaseConflict[] }) {
+    const ref = useRef<HTMLDivElement>(null);
+    return (
+      <div>
+        <div data-notice-row="">
+          <RebaseNotice {...props({ conflicts, scrollContainerRef: ref })} />
+        </div>
+        <div data-page="">
+          <div data-scroller="" ref={ref} style={{ overflowY: 'auto', height: 200 }}>
+            <nav data-bar="" style={{ position: 'sticky', top: 0 }}>
+              <a href="#due">Bar link</a>
+            </nav>
+            <button type="button">Back</button>
+            <input aria-label="Top field" />
+            <input aria-label="Due date" id="due" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function setup() {
+    const view = render(<Page conflicts={[]} />);
+    const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+    const bar = document.querySelector<HTMLElement>('[data-bar]')!;
+    const top = () => (document.querySelector('.rop-pro-rebase-notice') ? STRIP : 0);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.matches('[data-page]')) return rect(top(), 400);
+      if (this === scroller) return rect(top(), 200);
+      if (this === bar || this.matches('[data-bar] a')) return rect(top(), BAR);
+      if (this.matches('button')) return rect(top() + 40 - scroller.scrollTop, 20);
+      if (this.matches('[aria-label="Top field"]')) return rect(top() + 70 - scroller.scrollTop, 20);
+      if (this.matches('[aria-label="Due date"]')) return rect(top() + 150 - scroller.scrollTop, 20);
+      return rect(0, 0);
+    });
+    const scrollIntoView = vi.fn(function (this: HTMLElement) {
+      scroller.scrollTop -= scroller.getBoundingClientRect().top - this.getBoundingClientRect().top;
+    });
+    Element.prototype.scrollIntoView = scrollIntoView;
+    // The point just under the container's top edge is the bar's while the bar is there.
+    const link = bar.querySelector('a')!;
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn((_x: number, y: number) => (y < top() + BAR ? link : scroller)),
+    });
+    window.dispatchEvent(new Event('resize'));
+    return { view, scroller, scrollIntoView, link };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+  });
+
+  /** Makes `element` match `:focus-visible` (keyboard) or not (pointer), whatever jsdom decides. */
+  function modality(element: HTMLElement, shown: boolean) {
+    const matches = Element.prototype.matches;
+    vi.spyOn(element, 'matches').mockImplementation(function (this: HTMLElement, selector: string) {
+      return selector === ':focus-visible' ? shown : matches.call(this, selector);
+    });
+  }
+
+  it('a button in the covered strip, reached with the keyboard: back in view, below the sticky bar (the content moves by the least)', () => {
+    const { view, scroller, scrollIntoView } = setup();
+    const back = screen.getByRole('button', { name: 'Back' });
+    back.focus();
+    modality(back, true);
+    view.rerender(<Page conflicts={[DUE]} />);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    // The container top is at 80, the bar ends at 110: the button starts 8px below it.
+    expect(back.getBoundingClientRect().top).toBe(STRIP + BAR + 8);
+    expect(scroller.scrollTop).toBe(2);
+    expect(back).toHaveFocus();
+  });
+
+  it('the same button pressed with a pointer (no focus indicator): the content does not move for it', () => {
+    const { view, scroller, scrollIntoView } = setup();
+    const back = screen.getByRole('button', { name: 'Back' });
+    back.focus();
+    modality(back, false);
+    const due = screen.getByRole('textbox', { name: 'Due date' });
+    const before = due.getBoundingClientRect().top;
+    view.rerender(<Page conflicts={[DUE]} />);
+    expect(scroller.scrollTop).toBe(STRIP);
+    expect(due.getBoundingClientRect().top).toBe(before);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(back).toHaveFocus();
+  });
+
+  it('a field being typed in, in the covered strip: back in view and no longer under the sticky bar (the pointer does not matter)', () => {
+    const { view, scroller } = setup();
+    const field = screen.getByRole('textbox', { name: 'Top field' });
+    field.focus();
+    modality(field, false);
+    view.rerender(<Page conflicts={[DUE]} />);
+    expect(field.getBoundingClientRect().top).toBe(STRIP + BAR + 8);
+    expect(scroller.scrollTop).toBe(32);
+  });
+
+  it('a focused control outside the strip, or inside the sticky bar itself, moves nothing', () => {
+    const { view, scroller, scrollIntoView, link } = setup();
+    const due = screen.getByRole('textbox', { name: 'Due date' });
+    due.focus();
+    const before = due.getBoundingClientRect().top;
+    view.rerender(<Page conflicts={[DUE]} />);
+    expect(scroller.scrollTop).toBe(STRIP);
+    expect(due.getBoundingClientRect().top).toBe(before);
+    view.rerender(<Page conflicts={[]} />);
+    expect(scroller.scrollTop).toBe(0);
+    link.focus();
+    modality(link, true);
+    view.rerender(<Page conflicts={[DUE]} />);
+    expect(scroller.scrollTop).toBe(STRIP);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+});
+
+describe('<RebaseNotice />: the box it sits in resized from outside (#470)', () => {
+  const rect = (top: number, height: number) =>
+    ({ top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+
+  it('outside the container: a scroll position the browser clamped in the relayout (no scroll event yet) is not counted twice', () => {
+    function Page({ conflicts }: { conflicts: RebaseConflict[] }) {
+      const ref = useRef<HTMLDivElement>(null);
+      return (
+        <div>
+          <div data-notice-row="">
+            <RebaseNotice {...props({ conflicts, scrollContainerRef: ref })} />
+          </div>
+          <div data-page="">
+            <div data-scroller="" ref={ref} style={{ overflowY: 'auto', height: 200 }}>
+              <input aria-label="Due date" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    const view = render(<Page conflicts={[DUE]} />);
+    const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+    const height = { strip: 80 };
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const row = document.querySelector('.rop-pro-rebase-notice') ? height.strip : 0;
+      if (this.matches('[data-page]')) return rect(row, 400);
+      if (this === scroller) return rect(row, 200);
+      return rect(0, 0);
+    });
+    try {
+      // At the bottom of the content (scrollTop 300): recorded there.
+      scroller.scrollTop = 300;
+      window.dispatchEvent(new Event('resize'));
+      // The strip shrinks by 30: the container grows by 30 at its top, and the browser, at the end of the content,
+      // already pulled its scroll position up by those 30px in the relayout (no scroll event dispatched yet).
+      height.strip = 50;
+      scroller.scrollTop = 270;
+      view.rerender(<Page conflicts={[NOTES]} />);
+      // 300 - 30, not 270 - 30: the content in view does not move.
+      expect(scroller.scrollTop).toBe(270);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('a consumer that caps the notice row (no render of the notice): recorded again, the next render does not scroll by that move', () => {
+    const callbacks: ResizeObserverCallback[] = [];
+    const observed: Element[] = [];
+    class FakeResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        callbacks.push(callback);
+      }
+      observe(target: Element) {
+        observed.push(target);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+    function Page({ conflicts }: { conflicts: RebaseConflict[] }) {
+      const ref = useRef<HTMLDivElement>(null);
+      return (
+        <div>
+          <div data-notice-row="">
+            <RebaseNotice {...props({ conflicts, scrollContainerRef: ref })} />
+          </div>
+          <div data-page="">
+            <div data-scroller="" ref={ref} style={{ overflowY: 'auto', height: 200 }}>
+              <input aria-label="Due date" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    // The height of the notice row: the strip's, unless the consumer caps it.
+    const layout = { cap: Infinity };
+    const row = () => (document.querySelector('.rop-pro-rebase-notice') ? Math.min(80, layout.cap) : 0);
+    try {
+      const view = render(<Page conflicts={[]} />);
+      const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        if (this.matches('[data-page]')) return rect(row(), 400);
+        if (this === scroller) return rect(row(), 200);
+        if (this.matches('[aria-label="Due date"]')) return rect(row() + 150 - scroller.scrollTop, 20);
+        return rect(0, 0);
+      });
+      window.dispatchEvent(new Event('resize'));
+      expect(observed).toContain(document.querySelector('[data-notice-row]'));
+      view.rerender(<Page conflicts={[DUE]} />);
+      expect(scroller.scrollTop).toBe(80);
+      // The keyboard opens: the consumer caps the row at 50px, the page moves up by 30px (no render of the notice).
+      layout.cap = 50;
+      act(() => {
+        for (const callback of callbacks) callback([], {} as ResizeObserver);
+      });
+      // A later render of the notice (a second conflict arrives with the same strip height) scrolls by nothing.
+      view.rerender(<Page conflicts={[DUE, NOTES]} />);
+      expect(scroller.scrollTop).toBe(80);
+      view.unmount();
+    } finally {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
+  });
+});
+
 describe('<RebaseNotice />: server rendering', () => {
   it('hydrates the server HTML (explicit locale and time zone) without a mismatch', async () => {
     const tree = <RebaseNotice {...props({ applied: [entry('status', 'Status')], conflicts: [DUE] })} />;
