@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
-import { PROSE_DEFAULT, REPO_ROOT, causeOf, check, destructuringDefaults, findComponentFunction, formatCheck, isLiteralInitializer, literalNodeOf, measure, normalizeDefault } from './default-column-measure.mjs';
+import { PROSE_DEFAULT, REPO_ROOT, UNCOMPARABLE_ALLOWLIST, causeOf, check, destructuringDefaults, findComponentFunction, formatCheck, isLiteralInitializer, literalNodeOf, measure, normalizeDefault } from './default-column-measure.mjs';
 
 // Tests of the measure for the empty Default column (ticket #460). The helpers are pure and tested on
 // snippets; `measure` runs the real docgen on small fixture packages (one case per file) and on the repo.
@@ -698,6 +698,330 @@ describe('check: the guard on fixture packages (#474)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------------------
+// #474, second round (critic of PR #496): tags the docgen does not read, defaults written as fallbacks in the
+// body, defaults with no readable source (allowlist), prose without backticks, partial spreads and overrides,
+// `props.a` / `useX({ a })` / `<X.Y />`, the resolved value in the mismatch message.
+
+describe('PROSE_DEFAULT: quotes, apostrophes and bare values (#474, round 2)', () => {
+  it.each([
+    "Defaults to 'md'.", 'Default "Loading". An empty label...', 'Default 1.', 'Default 0.', 'default: true', 'Default -1',
+    'the anchor bar (default "Sections").', 'Default: "Error" / "Success".', 'The default is `md`.', 'Default “md”.', 'Default false',
+    'Default: "Dismiss message: `<title>`", so strips', 'Defaults to `true`.',
+  ])('matches %j', (text) => expect(PROSE_DEFAULT.test(text)).toBe(true));
+  it.each([
+    // The word itself quoted: it names a value (Field.stateReason, ConfirmDialog.initialFocus).
+    'Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`.',
+    "the confirm button for `default`).\n\nUse `'cancel'` with `tone=\"default\"` when",
+    // "the default <noun>": not the default of the prop (`asChild`).
+    'Renders your single child element as the panel instead of the default `<div>`, with the props merged.',
+    "The default theme is dark.", "the default's value", 'Default: derived from the tone', 'defaults to the first item',
+  ])('does not match %j', (text) => expect(PROSE_DEFAULT.test(text)).toBe(false));
+});
+
+describe('check on synthetic rows (#474, round 2)', () => {
+  const comp = (rows) => ({ components: [{ component: 'C', rows, unresolvedDelegations: [] }] });
+  it('a gap whose `@default` the docgen did not show is `unread-tag`, never silent', () => {
+    const rows = [{ prop: 'p', kind: 'gap', where: 'body', source: "'md'", sourceValue: 'md', declared: "'md'", declaredTag: 'default', prose: false }];
+    expect(check(comp(rows), { allowlist: {} }).map((i) => i.kind)).toEqual(['unread-tag']);
+  });
+  it('`@defaultValue` is `wrong-tag` even when the column is filled', () => {
+    const rows = [{ prop: 'p', kind: 'ok', where: 'param', source: "'md'", sourceValue: 'md', declared: "'md'", declaredTag: 'defaultValue', prose: false }];
+    expect(check(comp(rows), { allowlist: {} }).map((i) => i.kind)).toEqual(['wrong-tag']);
+  });
+});
+
+describe('the guard, second round, on fixture packages (#474)', () => {
+  const files = {
+    'Inner.tsx': `export interface InP {
+        /** x. */ a?: string;
+        /** x. */ b?: string;
+      }
+      export function Inner({ a = 'ia', b = 'ib' }: InP) { return <i>{a}{b}</i>; }
+      export function useThing({ a = 'hook' }: InP) { return a; }`,
+    // 1. \`@defaultValue\` (TSDoc spelling): the docgen ignores it.
+    'Tags2.tsx': `export interface H1P {
+        /**
+         * x.
+         * @defaultValue 'md'
+         */
+        size?: 'sm' | 'md';
+      }
+      export function H1(props: H1P) { const { size = 'md' } = props; return <i>{size}</i>; }
+      export interface H1bP {
+        /**
+         * x.
+         * @defaultValue 'lg'
+         */
+        size?: 'sm' | 'md' | 'lg';
+      }
+      export function H1b(props: H1bP) { const { size = 'md' } = props; return <i>{size}</i>; }`,
+    // 2. Fallbacks in the body, and declared defaults with no readable source.
+    'Fallbacks.tsx': `export interface P {
+        /**
+         * x.
+         * @default 'lg'
+         */
+        size?: string;
+      }
+      export function P6c({ size }: P) { const s = size ?? 'md'; return <i>{s}</i>; }
+      export function FbOk({ size }: P) { return <i>{size ?? 'lg'}</i>; }
+      export function FbProps(props: P) { return <i>{props.size ?? 'md'}</i>; }
+      export function FbRest({ ...rest }: P) { return <i>{rest.size ?? 'md'}</i>; }
+      export function FbOr(props: P) { const a = props.size || 'or'; return <i>{a}</i>; }
+      export function FbConflict({ size }: P) { return <i>{size ?? 'lg'}{size ?? 'xl'}</i>; }
+      export function FbComputed({ size, label }: P & { label?: string }) { return <i>{size ?? label}</i>; }
+      export function H9({ size }: P) { return <i>{size}</i>; }
+      export function H9Allowed({ size }: P) { return <i>{size}</i>; }
+      // Not a fallback of the prop: a local with the same name, \`||\` with undefined.
+      export function FbLocal({ size: _s }: P) { const size = 'z' as string | undefined; return <i>{size ?? 'lg'}</i>; }
+      export function FbOrUndefined({ size }: P) { return <i data-x={size || undefined} />; }
+      export interface QP {
+        /** x. */
+        quiet?: string;
+        /**
+         * x.
+         * @default false
+         */
+        flag?: boolean;
+      }
+      // A fallback with nothing declared is not a row of its own.
+      export function FbQuiet({ quiet }: QP) { return <i>{quiet ?? 'q'}</i>; }
+      export function FbFlag({ flag }: QP) { return <i aria-disabled={flag || undefined} />; }
+      // \`||\` as a boolean or: not a default.
+      export function FbOrBool({ flag, other }: QP & { other?: boolean }) { return <i data-x={String(flag || other)} data-y={String(flag || null)} />; }`,
+    // 3. Prose without backticks next to a @default.
+    'Prose2.tsx': `export interface P4 {
+        /**
+         * x. Defaults to 'md'.
+         * @default 'md'
+         */
+        size?: string;
+      }
+      export function P4c(props: P4) { const { size = 'md' } = props; return <i>{size}</i>; }
+      export interface P5 {
+        /**
+         * x. Default 1.
+         * @default 1
+         */
+        level?: number;
+      }
+      export function P5c(props: P5) { const { level = 1 } = props; return <i>{level}</i>; }
+      export interface P7 {
+        /** Accessible name. Default "Loading". */
+        label?: string;
+        /** Not allowed with \`default\`. */
+        reason?: string;
+      }
+      export function P7c({ label, reason }: P7) { return <i>{label}{reason}</i>; }`,
+    // 4. Partial spread, override after the spread, a local value, renames.
+    'Spreads.tsx': `import { Inner } from './Inner';
+      import type { InP } from './Inner';
+      export function H4(props: InP) { const { a, ...rest } = props; return <><Inner {...rest} /><span>{a}</span></>; }
+      export function H4Param({ a, ...rest }: InP) { return <><Inner {...rest} /><span>{a}</span></>; }
+      export function H4Back(props: InP) { const { a, ...rest } = props; return <Inner {...rest} a={a} />; }
+      export function H6(props: InP) { return <Inner {...props} a="fixed" />; }
+      export function H6Before(props: InP) { return <Inner a="fixed" {...props} />; }
+      export function H8({ b }: InP) { const a = 'z'; return <Inner a={a} b={b} />; }
+      export function Renamed({ b }: InP) { return <Inner a={b} />; }
+      // A renamed key before a spread that carries the same key: two possible sources, not attributed.
+      export function RenamedBefore(props: InP) { return <Inner a={props.b} {...props} />; }`,
+    // 5. Union with the tag in a single branch (C3), \`Inner(props, ref)\` (C5).
+    'Union2.tsx': `export type U2P = {
+        /**
+         * x.
+         * @default 'lg'
+         */
+        size?: 'sm' | 'md' | 'lg';
+        label: string;
+      } | { icon: string };
+      export function U2(props: U2P) { const { size = 'md' } = props as { size?: 'sm' | 'md' | 'lg' }; return <i>{size}</i>; }`,
+    'Calls.tsx': `import { forwardRef, type Ref } from 'react';
+      import type { InP } from './Inner';
+      import { useThing } from './Inner';
+      function Impl({ a = 'impl' }: InP, ref: Ref<HTMLElement>) { return <i ref={ref}>{a}</i>; }
+      export const TwoArgs = forwardRef<HTMLElement, InP>(function TwoArgs(props, ref) { return Impl(props, ref); });
+      export function H13({ a }: InP) { const v = useThing({ a }); return <i>{v}</i>; }
+      export function H13Spread(props: InP) { const v = useThing({ ...props, a: 'own' }); return <i>{v}</i>; }`,
+    // 6. \`props.a\`, member tags, a member of a consumer value.
+    'Members.tsx': `import type { ComponentType } from 'react';
+      import * as Parts from './Inner';
+      import { Inner, type InP } from './Inner';
+      export function H5(props: InP) { return <Inner a={props.a} b={props.b} />; }
+      export const Kit = Object.assign(function KitRoot() { return null; }, { Item: Inner });
+      export function NsTag(props: InP) { return <Parts.Inner {...props} />; }
+      export function KitTag(props: InP) { return <Kit.Item {...props} />; }
+      declare function makeKit(): { Item: ComponentType<InP> };
+      export const Opaque = makeKit();
+      export function OpaqueTag(props: InP) { return <Opaque.Item {...props} />; }
+      export function ConsumerTag(props: InP & { Row: ComponentType<InP> }) { return <props.Row {...props} />; }`,
+    // Render callback with a destructured parameter.
+    'Render2.tsx': `import type { ReactNode } from 'react';
+      import { Inner } from './Inner';
+      function HostD({ renderX, a }: { renderX: (p: { a?: string }) => ReactNode; a?: string }) { return <div>{renderX({ a })}</div>; }
+      export function H12(props: { /** x. */ a?: string }) { return <HostD {...props} renderX={({ a }) => <Inner a={a} />} />; }
+      export function H12Rest(props: { /** x. */ a?: string }) { return <HostD {...props} renderX={({ ...p }) => <Inner {...p} />} />; }`,
+    // 7. Constants: the mismatch shows the resolved literal.
+    'Const2.tsx': `const LIMIT = 5;
+      export interface P {
+        /**
+         * x.
+         * @default 9
+         */
+        limit?: number;
+      }
+      export function ConstWrong(props: P) { const { limit = LIMIT } = props; return <i>{limit}</i>; }`,
+    // A body destructuring of the rest of the parameter pattern.
+    'RestBody.tsx': `export interface P {
+        /**
+         * x.
+         * @default 'lg'
+         */
+        body?: string;
+      }
+      export function RestBody({ ...props }: P) { const { body = 'md' } = props; return <i>{body}</i>; }`,
+  };
+  const root = fixtureRoot(files);
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const result = measure({ root, entries: ['packages/core/src/index.ts'] });
+  const allow = {
+    'H9Allowed.size': 'a default of a third-party component',
+    'FbComputed.size': 'derived from `label`',
+  };
+  const issues = check(result, { allowlist: allow });
+  const kinds = (component, prop) => issuesOf(issues, component).filter((i) => i.prop === prop).map((i) => i.kind);
+  const row = (c, p) => rowIn(result, c, p);
+
+  // 1
+  it('`@defaultValue` (which the docgen ignores) is an explicit error, not a silent pass nor a "missing tag"', () => {
+    expect(row('H1', 'size')).toMatchObject({ kind: 'gap', declared: "'md'", declaredTag: 'defaultValue' });
+    expect(kinds('H1', 'size')).toEqual(['wrong-tag']);
+    const [i] = issuesOf(issues, 'H1');
+    expect(i.message).toContain('write `@default`');
+  });
+  it('`@defaultValue` is still compared with the source', () => {
+    expect(kinds('H1b', 'size')).toEqual(['mismatch', 'wrong-tag']);
+  });
+
+  // 2
+  it('`prop ?? literal` in the body is compared with `@default` (P6c)', () => {
+    expect(row('P6c', 'size')).toMatchObject({ where: 'fallback', sourceValue: 'md' });
+    expect(kinds('P6c', 'size')).toEqual(['mismatch']);
+    expect(kinds('FbOk', 'size')).toEqual([]);
+  });
+  it('`props.x ?? literal`, `rest.x ?? literal` and `props.x || literal` are compared too', () => {
+    expect(kinds('FbProps', 'size')).toEqual(['mismatch']);
+    expect(kinds('FbRest', 'size')).toEqual(['mismatch']);
+    expect(row('FbOr', 'size')).toMatchObject({ where: 'fallback', sourceValue: 'or' });
+    expect(kinds('FbOr', 'size')).toEqual(['mismatch']);
+  });
+  it('two fallbacks that disagree, or a computed one, are not comparable: an error unless allowlisted', () => {
+    expect(kinds('FbConflict', 'size')).toEqual(['non-literal']);
+    expect(kinds('FbComputed', 'size')).toEqual([]);
+    expect(check(result, { allowlist: {} }).filter((i) => i.component === 'FbComputed').map((i) => i.kind)).toEqual(['non-literal']);
+  });
+  it('a `@default` with no default in the source (H9) is an error unless it is in the allowlist with a reason', () => {
+    expect(row('H9', 'size')).toMatchObject({ where: 'tag', sourceValue: null });
+    expect(kinds('H9', 'size')).toEqual(['unverified-default']);
+    expect(kinds('H9Allowed', 'size')).toEqual([]);
+  });
+  it('a local with the name of the prop and `prop || undefined` are not fallbacks of the prop', () => {
+    expect(row('FbLocal', 'size').where).toBe('tag');
+    expect(kinds('FbLocal', 'size')).toEqual(['unverified-default']);
+    expect(kinds('FbFlag', 'flag')).toEqual(['unverified-default']);
+  });
+  it('`prop || other` and `prop || null` are a boolean or, not a fallback', () => {
+    expect(row('FbOrBool', 'flag').where).toBe('tag');
+    expect(kinds('FbOrBool', 'flag')).toEqual(['unverified-default']);
+  });
+  it('a fallback with nothing declared makes no row (it only verifies a declared default)', () => {
+    expect(row('FbQuiet', 'quiet')).toBeUndefined();
+  });
+  it('allowlist entries for undeclared-source defaults go stale like the others', () => {
+    const stale = check(result, { allowlist: { ...allow, 'FbOk.size': 'x', 'FbQuiet.quiet': 'x' } }).filter((i) => i.kind === 'stale-allowlist');
+    expect(stale.map((i) => `${i.component}.${i.prop}`)).toEqual(['FbOk.size', 'FbQuiet.quiet']);
+  });
+
+  // 3
+  it('prose with apostrophes or a bare number next to a @default is redundant (P4c, P5c)', () => {
+    expect(kinds('P4c', 'size')).toEqual(['redundant-prose']);
+    expect(kinds('P5c', 'level')).toEqual(['redundant-prose']);
+  });
+  it('a default in double quotes is prose-only; "with `default`" is not a default', () => {
+    expect(row('P7c', 'label')).toMatchObject({ kind: 'prose-only' });
+    expect(row('P7c', 'reason')).toBeUndefined();
+  });
+
+  // 4
+  it('a prop destructured before `...rest` does not reach the child through the rest (H4)', () => {
+    for (const c of ['H4', 'H4Param']) {
+      expect(row(c, 'a'), c).toBeUndefined();
+      expect(row(c, 'b'), c).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ib'" });
+    }
+  });
+  it('...unless it is passed back explicitly', () => {
+    expect(row('H4Back', 'a')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ia'" });
+  });
+  it('a key overridden after the spread, or set before a spread that carries it, does not get the child default (H6)', () => {
+    expect(row('H6', 'a')).toBeUndefined();
+    expect(row('H6', 'b')).toMatchObject({ kind: 'gap', cause: 'delegated' });
+    expect(row('H6Before', 'a')).toBeUndefined();
+  });
+  it('a local value with the name of a prop is not the prop (H8)', () => {
+    expect(row('H8', 'a')).toBeUndefined();
+    expect(row('H8', 'b')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ib'" });
+  });
+  it('a prop passed under another name carries the child default of that name', () => {
+    expect(row('Renamed', 'b')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ia'" });
+  });
+  it('a renamed key followed by a spread that carries it is not attributed to the renamed prop', () => {
+    expect(row('RenamedBefore', 'b')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ib'" });
+    expect(row('RenamedBefore', 'a')).toBeUndefined();
+  });
+
+  // 5
+  it('a @default in one branch of a union of props is read (U2)', () => {
+    expect(row('U2', 'size').declared).toBe("'lg'");
+    expect(kinds('U2', 'size')).toEqual(['mismatch']);
+  });
+  it('`Impl(props, ref)` (two arguments) is followed', () => {
+    expect(row('TwoArgs', 'a')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'Impl', source: "'impl'" });
+  });
+
+  // 6
+  it('`a={props.a}` is followed (H5)', () => {
+    expect(row('H5', 'a')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ia'" });
+    expect(row('H5', 'b')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ib'" });
+  });
+  it('`useX({ a })` with an object literal is followed, and a key set in it is not (H13)', () => {
+    expect(row('H13', 'a')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'useThing', source: "'hook'" });
+    expect(row('H13Spread', 'a')).toBeUndefined();
+  });
+  it('`<Parts.Inner {...props} />` and `<Kit.Item {...props} />` are followed', () => {
+    for (const c of ['NsTag', 'KitTag']) expect(row(c, 'a'), c).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'Inner' });
+  });
+  it('a member tag of a project value the script cannot read is unresolved; one of a consumer value is not followed', () => {
+    expect(result.components.find((c) => c.component === 'OpaqueTag').unresolvedDelegations).toEqual(['Opaque.Item']);
+    expect(result.components.find((c) => c.component === 'ConsumerTag').unresolvedDelegations).toEqual([]);
+    expect(row('ConsumerTag', 'a')).toBeUndefined();
+  });
+  it('a render callback with a destructured parameter is followed; with a rest element it is unresolved', () => {
+    expect(row('H12', 'a')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'Inner', source: "'ia'" });
+    expect(result.components.find((c) => c.component === 'H12Rest').unresolvedDelegations).toEqual(['HostD.renderX']);
+  });
+
+  // 7
+  it('the mismatch on a constant shows the value it resolves to', () => {
+    const [m] = issuesOf(issues, 'ConstWrong');
+    expect(m.message).toBe('`@default 9` but the source default is LIMIT (= 5)');
+  });
+
+  it('a body destructuring of the rest of the parameter is a source default, compared with @default', () => {
+    expect(row('RestBody', 'body')).toMatchObject({ where: 'body', sourceValue: 'md' });
+    expect(kinds('RestBody', 'body')).toEqual(['mismatch']);
+  });
+});
+
 describe('the --check command line', { timeout: 120_000 }, () => {
   const run = (root) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/default-column-measure.mjs'), '--check', '--root', root], { encoding: 'utf8' });
   const clean = fixtureRoot({ 'Clean.tsx': `export interface P { /** x. */ size?: 'sm' | 'md'; }\nexport function Clean({ size = 'md' }: P) { return <i>{size}</i>; }` });
@@ -743,5 +1067,44 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
   it('has no unresolved delegation, no divergent default and no stale allowlist entry', () => {
     const kinds = ['unresolved-delegation', 'divergent-default', 'stale-allowlist', 'mismatch', 'redundant-prose', 'empty-default', 'non-literal'];
     expect(check(result).filter((i) => kinds.includes(i.kind))).toEqual([]);
+  });
+  it('round 2: only missing defaults are left, none of the new kinds', () => {
+    expect([...new Set(check(result).map((i) => i.kind))]).toEqual(['missing-default']);
+  });
+  it('round 2: every default the script cannot compare is in the allowlist, so #475 can add `@default` without being blocked', () => {
+    // Simulate #475: a `@default` on every prop the guard reports as missing (written as the source value when there
+    // is one), the prose removed.
+    const missing = new Set(check(result).filter((i) => i.kind === 'missing-default').map((i) => `${i.component}.${i.prop}`));
+    const tagged = {
+      components: result.components.map((c) => ({
+        ...c,
+        rows: c.rows.map((r) => (missing.has(`${c.component}.${r.prop}`) ? { ...r, kind: 'ok', declared: r.sourceLiteral ?? r.source, declaredTag: 'default', prose: false } : r)),
+      })),
+    };
+    expect(check(tagged)).toEqual([]);
+    // Without the allowlist each of them would be an error: the entries are exactly the props that cannot be compared
+    // (plus ProgressBar.getValueLabel, whose column the docgen already fills).
+    const blocked = check(tagged, { allowlist: {} }).map((i) => `${i.component}.${i.prop}`).sort();
+    expect(blocked).toEqual(Object.keys(UNCOMPARABLE_ALLOWLIST).filter((id) => id !== 'ProgressBar.getValueLabel').sort());
+  });
+  it('round 2: defaults stated in quotes are found (prose-only), and "with `default`" / "the default `<div>`" are not', () => {
+    for (const id of ['MessageStrip.dismissLabel', 'ObjectPageFooter.toneLabel', 'ObjectPage.labels']) {
+      const [c, p] = id.split('.');
+      expect(rowIn(result, c, p), id).toMatchObject({ kind: 'prose-only' });
+    }
+    expect(rowIn(result, 'Field', 'stateReason')).toBeUndefined();
+    expect(rowIn(result, 'DialogContent', 'asChild')).toBeUndefined();
+  });
+  it('round 2: a @default added next to `Default "Loading"` / `Default 1.` prose is redundant', () => {
+    for (const id of ['Spinner.label', 'ObjectPageFooter.label', 'ObjectPage.headingLevel']) {
+      const [c, p] = id.split('.');
+      const r = rowIn(result, c, p);
+      expect(r, id).toMatchObject({ prose: true });
+      const withTag = { components: [{ component: c, rows: [{ ...r, declared: r.sourceLiteral ?? r.source, declaredTag: 'default' }], unresolvedDelegations: [] }] };
+      expect(check(withTag, { allowlist: {} }).map((i) => i.kind), id).toEqual(['redundant-prose']);
+    }
+  });
+  it('round 2: `useCombobox({ clearOnEmpty })` is followed (object literal argument)', () => {
+    expect(rowIn(result, 'Combobox', 'clearOnEmpty')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'useCombobox', source: 'false' });
   });
 });
