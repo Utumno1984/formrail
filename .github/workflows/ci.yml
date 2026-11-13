@@ -161,41 +161,6 @@ jobs:
             test-results/
           retention-days: 7
 
-  # Pre-merge run of the Pages smoke (e2e/site/, `npm run test:site`) on pull requests (ticket #490). Until
-  # then it ran only in deploy-pages, i.e. after the merge: a broken landing, Pro page or privacy page was
-  # found on main, with the deploy blocked. This job assembles the same site (Free + Pro Storybook + pages)
-  # with the placeholder values of scripts/site-config.mjs, which is deliberate: PR builds must not need
-  # the real form URL or email (only deploy-pages runs the placeholder guard). The cost is one extra
-  # Storybook pair build and the site suite per PR; it runs in parallel with the other jobs.
-  site:
-    name: site smoke
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run build-storybook
-        env:
-          STORYBOOK_EXCLUDE_PRO: '1'
-          STORYBOOK_HIDE_INTERNAL: '1'
-      - run: npm run build-storybook:pro
-      - run: node scripts/assemble-site.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:site
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: playwright-report-site
-          path: |
-            playwright-report-site/
-            test-results/
-          retention-days: 7
-
   # Publishes the site (Storybook under /storybook/) to GitHub Pages. Runs only after every gate above is green, and
   # only on push to main (or a manual dispatch) - never on pull requests. The workflow-level token
   # stays read-only; this job alone gets the Pages permissions. Only the Free core stories are built
@@ -249,3 +214,41 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # Placed after deploy-pages on purpose: scripts/story-globs.test.mjs asserts that the jobs BEFORE deploy-pages
+  # (e2e, visual) never set the public-site Storybook flags; this job must build exactly the published
+  # artefact, so it carries them and lives below the marker.
+  # Pre-merge run of the Pages smoke (e2e/site/, `npm run test:site`) on pull requests (ticket #490). Until
+  # then it ran only in deploy-pages, i.e. after the merge: a broken landing, Pro page or privacy page was
+  # found on main, with the deploy blocked. This job assembles the same site (Free + Pro Storybook + pages)
+  # with the placeholder values of scripts/site-config.mjs, which is deliberate: PR builds must not need
+  # the real form URL or email (only deploy-pages runs the placeholder guard). The cost is one extra
+  # Storybook pair build and the site suite per PR; it runs in parallel with the other jobs.
+  site:
+    name: site smoke
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build-storybook
+        env:
+          STORYBOOK_EXCLUDE_PRO: '1'
+          STORYBOOK_HIDE_INTERNAL: '1'
+      - run: npm run build-storybook:pro
+      - run: node scripts/assemble-site.mjs
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:site
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report-site
+          path: |
+            playwright-report-site/
+            test-results/
+          retention-days: 7
