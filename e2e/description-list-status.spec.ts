@@ -22,7 +22,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
 
   for (const width of [280, 600]) {
     test(`empty row has the same height as a full one (${width}px)`, async ({ page }) => {
-      await gotoStory(page, PLAY);
+      await expectPlayToPass(page, PLAY);
       await setWidth(page, width);
       const status = page.getByTestId('status');
       const heights: number[] = [];
@@ -35,7 +35,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   }
 
   test('the <dl> top never moves across all entity combinations, in both directions', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     const list = page.getByTestId('list');
     const top = (await box(list)).y;
     const order = [...ENTITIES, ...[...ENTITIES].reverse(), ENTITIES[0], ENTITIES[2], ENTITIES[3], ENTITIES[1]];
@@ -48,7 +48,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   test('long detail on a narrow container stays on one line, height unchanged, tooltip only on real hover', async ({
     page,
   }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     const status = page.getByTestId('status');
     await select(page, 'active, no status');
     await setWidth(page, 280);
@@ -67,7 +67,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   });
 
   test('detail that changes (entity switch under the pointer) leaves no orphan tooltip', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     await select(page, 'archived with audit');
     await setWidth(page, 250);
     await page.getByTestId('status').locator('> span').last().hover();
@@ -77,7 +77,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   });
 
   test('badge and detail are vertically centred and the row is no taller than a body line', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     await select(page, 'archived with audit');
     const status = page.getByTestId('status');
     const [badge, detail, row] = await Promise.all([
@@ -91,7 +91,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   });
 
   test('order is badge then detail; RTL keeps the logical order', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     await select(page, 'archived with audit');
     const status = page.getByTestId('status');
     const badge = status.locator('> span').first();
@@ -104,7 +104,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   });
 
   test('zoom (larger root font): empty and full rows stay equal and grow with the text', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     const status = page.getByTestId('status');
     await select(page, 'active, no status');
     const before = (await box(status)).height;
@@ -120,22 +120,22 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   test('accessibility tree: empty row exposes nothing; filled row reads badge then detail, no live region', async ({
     page,
   }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     const status = page.getByTestId('status');
     await select(page, 'active, no status');
     await expect.poll(async () => (await status.ariaSnapshot()).trim()).toBe('');
     await select(page, 'archived with audit');
-    // Retrying reads: the rerender after the selection change is not synchronous with select().
-    await expect.poll(async () => (await status.ariaSnapshot()).includes('Maria Rossi')).toBe(true);
-    const snap = await status.ariaSnapshot();
-    expect(snap.indexOf('Archived')).toBeGreaterThanOrEqual(0);
-    expect(snap.indexOf('Archived')).toBeLessThan(snap.indexOf('Maria Rossi'));
+    // Retrying, ordered match in one assertion: badge text first, then the detail text.
+    await expect(status).toMatchAriaSnapshot(`
+      - text: Archived
+      - text: /Archived on .* by Maria Rossi/
+    `);
     await expect(page.locator('[aria-live]:not([aria-live="off"])')).toHaveCount(0);
     await expect(page.getByTestId('status').locator('[role]')).toHaveCount(0);
   });
 
   test('axe: status present, status empty, summaries', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     for (const e of ENTITIES) {
       await select(page, e);
       await expectNoA11yViolations(page);
@@ -145,7 +145,7 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
   });
 
   test('no animation or transition on appear/disappear', async ({ page }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     const durations = await page
       .getByTestId('status')
       .evaluate((el) =>
