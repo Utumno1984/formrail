@@ -95,3 +95,28 @@ export const ThrowsOnRender: Story = {
     throw new Error('harness-boom');
   },
 };
+
+/**
+ * Fixture for the self-tests of the play helpers (`e2e/play-helpers.spec.ts`, #480): with `gated`
+ * on, the play parks at a gate (`window.__ropOpenPlayGate`) until the test opens it, so the test can
+ * prove that `gotoStory` does not return while a play is still running, however fast the play is.
+ * With `gated` off (the default) the play goes straight through: browsing the story never hangs.
+ */
+export const GatedPlay: StoryObj<{ gated: boolean }> = {
+  args: { gated: false },
+  render: () => (
+    <p data-testid="gated-play" data-state="rendered">
+      Gated play fixture
+    </p>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const status = canvasElement.querySelector<HTMLElement>('[data-testid="gated-play"]')!;
+    if (args.gated) {
+      status.dataset.state = 'parked';
+      await new Promise<void>((resolve) => {
+        (window as unknown as { __ropOpenPlayGate?: () => void }).__ropOpenPlayGate = resolve;
+      });
+    }
+    status.dataset.state = 'played';
+  },
+};

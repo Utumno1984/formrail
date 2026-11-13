@@ -89,24 +89,60 @@ async function installPlayErrorRecorder(page: Page): Promise<void> {
   });
 }
 
+/** Render phases in which the play function (if any) has ended and the story has settled. */
+const PLAY_END_PHASES = ['played', 'completed', 'finished', 'errored', 'aborted'];
+
 /**
  * Waits until the story's play function has ended, whatever its outcome (the render phase is
- * terminal: played / completed / finished / errored / aborted). Use it, after `gotoStory`, for a
+ * terminal: played / completed / finished / errored / aborted). `completing` is NOT terminal: it is
+ * the phase in which Storybook waits for the animations started by the render/play to finish, and
+ * the story is only settled once it reaches `completed`. Use it, after `gotoStory`, for a
  * story whose play cannot pass under the args the test needs (so `expectPlayToPass` would fail)
  * but whose play still clicks the controls the test is about to drive.
  */
 export async function waitForPlayEnd(page: Page): Promise<void> {
   await page.waitForFunction(
-    () => {
+    (terminal) => {
       const render = (
         window as unknown as { __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } } }
       ).__STORYBOOK_PREVIEW__?.currentRender;
       const p = render?.phase;
-      return !!p && ['played', 'completing', 'completed', 'finished', 'errored', 'aborted'].includes(p);
+      return !!p && terminal.includes(p);
     },
-    undefined,
+    PLAY_END_PHASES,
     { timeout: 10_000 },
   );
+}
+
+/**
+ * Reads, from Storybook's preview, whether the story just opened has a play function and the
+ * current render phase. It relies on Storybook internals (`__STORYBOOK_PREVIEW__.currentRender`,
+ * whose prepared `story` always carries a `playFunction` key, `undefined` when there is no play):
+ * if that structure is not there (e.g. a Storybook upgrade renamed it) it THROWS instead of
+ * answering "no play", which would silently turn off the wait in `gotoStory` for the whole suite.
+ * Self-tested in `e2e/play-helpers.spec.ts`.
+ */
+export async function readPlayState(page: Page): Promise<{ hasPlay: boolean; phase: string }> {
+  const state = await page.evaluate(() => {
+    const preview = (window as unknown as { __STORYBOOK_PREVIEW__?: { currentRender?: unknown } })
+      .__STORYBOOK_PREVIEW__;
+    if (!preview) return { error: 'window.__STORYBOOK_PREVIEW__ is missing' };
+    const render = preview.currentRender as { phase?: unknown; story?: Record<string, unknown> } | undefined;
+    if (!render) return { error: '__STORYBOOK_PREVIEW__.currentRender is missing' };
+    if (typeof render.phase !== 'string') return { error: 'currentRender.phase is not a string' };
+    if (!render.story || typeof render.story !== 'object') return { error: 'currentRender.story is missing' };
+    if (!('playFunction' in render.story)) {
+      return { error: `currentRender.story has no "playFunction" key (keys: ${Object.keys(render.story).join(', ')})` };
+    }
+    return { hasPlay: typeof render.story.playFunction === 'function', phase: render.phase };
+  });
+  if ('error' in state) {
+    throw new Error(
+      `readPlayState: unexpected Storybook preview structure (${state.error}): cannot tell whether the story has a play function. ` +
+        'Update readPlayState in e2e/helpers/story.ts for this Storybook version.',
+    );
+  }
+  return state;
 }
 
 /**
@@ -123,14 +159,8 @@ export async function gotoStory(page: Page, storyId: string, args?: string): Pro
   // to also require that it passed, `expectPlayToFail` when it must fail by design). Stories without
   // a play (`-no-play` fixtures) are not delayed. NB: after a play the story is left in the state the
   // play ended in (or, for a play that failed half-way, wherever it stopped).
-  const { hasPlay, phase } = await page.evaluate(() => {
-    const render = (
-      window as unknown as {
-        __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string; story?: { playFunction?: unknown } } };
-      }
-    ).__STORYBOOK_PREVIEW__?.currentRender;
-    return { hasPlay: !!render?.story?.playFunction, phase: render?.phase ?? null };
-  });
+  // `readPlayState` throws if Storybook's internal structure changed (never a silent "no play").
+  const { hasPlay, phase } = await readPlayState(page);
   if (process.env.ROP_PLAY_CENSUS) recordCensus(storyId, args, hasPlay, phase);
   if (hasPlay) await waitForPlayEnd(page);
 }
@@ -141,7 +171,7 @@ export async function gotoStory(page: Page, storyId: string, args?: string): Pro
  * BEFORE the wait above (`playing`/`rendering`... = the play was running when the test would have
  * started). Use it to audit the suite or a new spec.
  */
-function recordCensus(storyId: string, args: string | undefined, hasPlay: boolean, phase: string | null): void {
+function recordCensus(storyId: string, args: string | undefined, hasPlay: boolean, phase: string): void {
   const t = test.info();
   appendFileSync(
     process.env.ROP_PLAY_CENSUS!,
