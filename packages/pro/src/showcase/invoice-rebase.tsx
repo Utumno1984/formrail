@@ -283,15 +283,34 @@ export function useInvoiceRebase({ form, record, store, toValues, scrollerRef }:
   };
 }
 
+/** The control of a form path (`data-rop-name` is the Field's `name`); for a whole line, its first field. */
+const controlOf = (path: string): HTMLElement | null => {
+  const name = CSS.escape(path);
+  return document.querySelector<HTMLElement>(`[data-rop-name="${name}"]`) ?? document.querySelector<HTMLElement>(`[data-rop-name^="${name}."]`);
+};
+
 /**
- * The control of the field a conflict was about, at its current position (`data-rop-name` is the Field's `name`);
- * for a whole line, its first field. `null` when it is not on the page (a line the server removed and the user
- * accepted to remove).
+ * `focusTargetFor` of the notice: where the focus goes when a choice closes the last conflict. The control of the
+ * field the conflict was about, at its current position (`currentPath`, read when the choice was made); for a whole
+ * line, its first field (the description).
+ *
+ * A line the server removed, after "Use server value" (#470): that line is gone, and `currentPath` (say
+ * `lineItems.0`) now names the line that took its place. So the focus goes to the description of the NEXT line
+ * (the one that moved up into that position), else of the previous one (the removed line was the last), else to
+ * "Add line" (no line left). The same order as the editor's own "Remove line" and as the notice between its own
+ * choices: the focus never lands on `<body>`.
  */
 function fieldOf(conflict: RebaseConflict): HTMLElement | null {
   const path = 'currentPath' in conflict && typeof conflict.currentPath === 'string' ? conflict.currentPath : conflict.path;
-  const name = CSS.escape(path);
-  return document.querySelector<HTMLElement>(`[data-rop-name="${name}"]`) ?? document.querySelector<HTMLElement>(`[data-rop-name^="${name}."]`);
+  const own = controlOf(path);
+  if (own) return own;
+  const row = LINE_ROW.exec(path);
+  if (!row) return null;
+  for (let index = Number(row[1]) - 1; index >= 0; index -= 1) {
+    const previous = controlOf(`lineItems.${index}`);
+    if (previous) return previous;
+  }
+  return [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === 'Add line') ?? null;
 }
 
 const sameConflicts = (a: readonly OpenRebaseConflict[], b: readonly OpenRebaseConflict[]): boolean =>
