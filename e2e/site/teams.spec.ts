@@ -27,6 +27,10 @@ const NOT_BUILT = [
   /bulk action/i,
   /soft[- ]?delete/i,
 ];
+const OFFICIAL_POLICIES = [
+  'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
+  'https://tally.so/privacy-policy',
+];
 const THIRD_PARTY = [
   'sap',
   'fiori',
@@ -242,6 +246,7 @@ test.describe('privacy page', () => {
       'Data we collect',
       'Purpose and legal basis',
       'Where the data goes',
+      'Transfers outside the EEA',
       'Retention',
       'Your rights',
       'No cookies, no analytics',
@@ -269,6 +274,22 @@ test.describe('privacy page', () => {
     await expect(main).toContainText('withdraw your consent at any time');
     await expect(main).toContainText('not copied to email or to any other service');
     await expect(main).toContainText('GitHub Pages');
+    const transfers = main.locator('#transfers-title ~ p');
+    await expect(transfers.nth(0)).toContainText('GitHub Inc., USA');
+    await expect(transfers.nth(0)).toContainText('independent controller');
+    await expect(transfers.nth(0)).toContainText('EU-US Data Privacy Framework');
+    await expect(transfers.nth(1)).toContainText('standard contractual clauses');
+    const githubPolicy = main.getByRole('link', { name: 'privacy statement' });
+    const tallyPolicy = main.getByRole('link', { name: 'privacy policy' });
+    await expect(githubPolicy).toHaveAttribute(
+      'href',
+      'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
+    );
+    await expect(tallyPolicy).toHaveAttribute('href', 'https://tally.so/privacy-policy');
+    await expect(githubPolicy).toHaveAttribute('rel', /noopener/);
+    await expect(tallyPolicy).toHaveAttribute('rel', /noopener/);
+    // No postal address: the contact is the email only.
+    await expect(main).not.toContainText(/postal address/i);
     await expect(main).toContainText('no later than 24 months after sign-up, or earlier if you withdraw your consent');
     await expect(main).not.toContainText('once a year');
     await expect(main).toContainText('Formrail is a project by Daniele Ingusci');
@@ -357,7 +378,9 @@ test.describe('network and weight', () => {
 
   test('the only absolute URLs are GitHub and, when set, the form (the email is a mailto)', () => {
     for (const file of ['teams/index.html', 'privacy/index.html']) {
-      const html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '');
+      let html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '');
+      // Only the privacy page may carry the two official policy links (art. 13(1)(f)).
+      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replace(url, '');
       expect(html, file).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/formrail)/);
     }
   });
