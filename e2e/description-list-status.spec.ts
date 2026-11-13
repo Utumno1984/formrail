@@ -125,11 +125,13 @@ test.describe('Data/DescriptionList — DescriptionListStatus', () => {
     await select(page, 'active, no status');
     await expect.poll(async () => (await status.ariaSnapshot()).trim()).toBe('');
     await select(page, 'archived with audit');
-    // Retrying, ordered match in one assertion: badge text first, then the detail text.
+    // Retrying, ordered matches (no separate final read). The accessibility tree merges the two
+    // inline spans into one text node: the regex pins badge first, then the detail; toHaveText on
+    // the spans pins the DOM order exactly (the detail text itself starts with "Archived").
     await expect(status).toMatchAriaSnapshot(`
-      - text: Archived
-      - text: /Archived on .* by Maria Rossi/
+      - text: /^Archived Archived on .* by Maria Rossi/
     `);
+    await expect(status.locator('> span')).toHaveText([/^Archived$/, /^Archived on .* by Maria Rossi/]);
     await expect(page.locator('[aria-live]:not([aria-live="off"])')).toHaveCount(0);
     await expect(page.getByTestId('status').locator('[role]')).toHaveCount(0);
   });

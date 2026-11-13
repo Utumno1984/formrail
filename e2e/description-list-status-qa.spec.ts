@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const PLAY = 'data-descriptionlist--status-and-summary';
 const VISUAL = 'data-descriptionlist--status-and-summary-visual';
@@ -13,7 +13,7 @@ test.describe('DescriptionListStatus QA — mobile 375px', () => {
   test('no horizontal overflow, same row height and same <dl> top across all entities, detail truncated on one line', async ({
     page,
   }) => {
-    await gotoStory(page, PLAY, 'width:280');
+    await expectPlayToPass(page, PLAY, 'width:280');
     const status = page.getByTestId('status');
     const list = page.getByTestId('list');
     const h0 = (await status.boundingBox())!.height;
@@ -26,12 +26,13 @@ test.describe('DescriptionListStatus QA — mobile 375px', () => {
       expect(overflow).toBeLessThanOrEqual(0);
     }
     await select(page, 'archived with audit');
-    const truncated = await status.locator('> span').last().evaluate((el) => el.scrollWidth > el.clientWidth);
-    expect(truncated).toBe(true);
+    await expect
+      .poll(() => status.locator('> span').last().evaluate((el) => el.scrollWidth > el.clientWidth))
+      .toBe(true);
   });
 
   test('summaries stacked on mobile: dd flush with dt, status row contained in the container', async ({ page }) => {
-    await gotoStory(page, PLAY, 'width:280;layout:auto');
+    await expectPlayToPass(page, PLAY, 'width:280;layout:auto');
     const status = (await page.getByTestId('status').boundingBox())!;
     const container = (await page.getByTestId('container').boundingBox())!;
     expect(status.x + status.width).toBeLessThanOrEqual(container.x + container.width + 0.5);
@@ -46,7 +47,7 @@ test.describe('DescriptionListStatus QA — markup and edge cases', () => {
   test('rendered markup: status is a sibling of the <dl>, <dl> has only <div> children, no undefined/null text, no leaked props', async ({
     page,
   }) => {
-    await gotoStory(page, PLAY);
+    await expectPlayToPass(page, PLAY);
     for (const e of ENTITIES) {
       await select(page, e);
       const info = await page.evaluate(() => {
@@ -73,7 +74,7 @@ test.describe('DescriptionListStatus QA — markup and edge cases', () => {
   });
 
   test('RTL: summary dd sits on the logical value column, ellipsis on the end side, no overflow', async ({ page }) => {
-    await gotoStory(page, PLAY, 'width:250');
+    await expectPlayToPass(page, PLAY, 'width:250');
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     await select(page, 'archived with audit');
     const status = page.getByTestId('status');
@@ -90,7 +91,7 @@ test.describe('DescriptionListStatus QA — markup and edge cases', () => {
   });
 
   test('open tooltip never keeps the old detail text when the detail changes under it', async ({ page }) => {
-    await gotoStory(page, PLAY, 'width:250');
+    await expectPlayToPass(page, PLAY, 'width:250');
     await select(page, 'archived with audit');
     await page.getByTestId('status').locator('> span').last().hover();
     await expect(page.getByRole('tooltip')).toContainText('Maria Rossi', { timeout: 3000 });
