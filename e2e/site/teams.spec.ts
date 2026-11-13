@@ -247,7 +247,7 @@ test.describe('privacy page', () => {
     ]);
     const main = page.locator('main');
     await expect(main).toContainText('Daniele Ingusci');
-    const fields = main.locator('#data-title ~ ul li');
+    const fields = main.locator('#data-title + p + ul li');
     await expect(fields).toHaveText([
       /email address \(required\)/,
       /size of your team \(required\)/,
@@ -258,6 +258,19 @@ test.describe('privacy page', () => {
     await expect(main).toContainText('Without the required fields the form cannot be submitted');
     await expect(main).not.toContainText('Giving it is optional');
     await expect(main).toContainText('art. 6(1)(a)');
+    await expect(main.locator('#purpose-title + p + ul li')).toHaveText([
+      /contact you.*Formrail Pro early access/,
+      /answers \(team size, form libraries, timing\) to plan the product/,
+    ]);
+    await expect(main).toContainText(
+      'I agree that Formrail may use my email address to contact me about Formrail Pro early access, and my answers to plan the product, as described in the privacy notice above.',
+    );
+    await expect(main).toContainText('withdraw your consent at any time');
+    await expect(main).toContainText('not copied to email or to any other service');
+    await expect(main).toContainText('GitHub Pages');
+    await expect(main).toContainText('no longer than 24 months from your sign-up');
+    await expect(main).toContainText('at least once a year');
+    await expect(main).not.toContainText('12 months after');
     await expect(main).toContainText('not checked');
     await expect(main).toContainText('servers in the European Union');
     await expect(main).toContainText('sets no cookies and runs no analytics');
