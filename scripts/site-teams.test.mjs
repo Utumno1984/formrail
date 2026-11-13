@@ -112,7 +112,8 @@ describe('placeholder guard', () => {
     expect(() => build()).not.toThrow();
     expect(() => build({ strict: true })).toThrow(/not ready to publish/);
     expect(() => build({ strict: true, privacyEmail: FINAL.privacyEmail })).toThrow(/EARLY_ACCESS_URL is still a placeholder/);
-    expect(() => build({ strict: true, earlyAccessUrl: FINAL.earlyAccessUrl })).toThrow(/PRIVACY_EMAIL is still a placeholder/);
+    expect(() => build({ strict: true, earlyAccessUrl: FINAL.earlyAccessUrl, privacyEmail: 'PLACEHOLDER@example.invalid' })).toThrow(/PRIVACY_EMAIL is still a placeholder/);
+    expect(() => build({ strict: true, earlyAccessUrl: FINAL.earlyAccessUrl })).not.toThrow(); // the committed email is final
     expect(() => build({ strict: true, ...FINAL })).not.toThrow();
   });
 
@@ -124,14 +125,14 @@ describe('placeholder guard', () => {
     expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
   });
 
-  it('the committed config is still placeholder, so the deploy fails until Daniele fills it in', () => {
+  it('the committed form URL is still a placeholder, so the deploy fails until Daniele fills it in', () => {
     const config = {
       earlyAccessUrl: EARLY_ACCESS_URL,
       privacyEmail: PRIVACY_EMAIL,
     };
     const problems = findConfigProblems(config).join('\n');
     expect(problems).toMatch(/EARLY_ACCESS_URL is still a placeholder/);
-    expect(problems).toMatch(/PRIVACY_EMAIL is still a placeholder/);
+    expect(problems).not.toMatch(/PRIVACY_EMAIL/); // the email is final; only the form URL blocks the deploy
     expect(() => assertConfigPublishable(config)).toThrow(/not ready to publish/);
   });
 

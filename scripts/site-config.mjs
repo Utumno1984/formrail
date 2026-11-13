@@ -8,8 +8,8 @@ export const SITE_BASE = `/${repo}/`;
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
-// PLACEHOLDERS (ticket #490). The two values below that carry the word PLACEHOLDER are stand-ins
-// until Daniele supplies the real ones: the privacy contact email and the waitlist form URL. They are
+// PLACEHOLDERS (ticket #490). The waitlist form URL below still carries the word PLACEHOLDER: it is a stand-in
+// until Daniele supplies the real Tally URL (the privacy email is final). It is
 // valid-looking on purpose, so PR builds and local runs render a complete site. The deploy must never
 // publish them: `scripts/check-site-config.mjs` (run by the `deploy-pages` job, and by
 // `assemble-site.mjs --strict`) fails while any value is still a placeholder.
@@ -26,7 +26,7 @@ export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 export const EARLY_ACCESS_URL = 'https://tally.so/r/PLACEHOLDER-waitlist-form';
 
 /** Contact address of the data controller, printed on the privacy page (GDPR art. 13). */
-export const PRIVACY_EMAIL = 'PLACEHOLDER-privacy-contact@example.invalid';
+export const PRIVACY_EMAIL = 'formrail.dev@gmail.com';
 
 /**
  * The indicative price, shown on the Pro page for teams exactly as written (decision of 2026-11-13).
