@@ -16,8 +16,8 @@ export function DeleteInvoice() {
       <span
         ref={outcomeRef}
         tabIndex={-1}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onFocus={(e) => setFocused(e.target === e.currentTarget)}
+        onBlur={(e) => e.target === e.currentTarget && setFocused(false)}
         style={{ outline: focused ? '2px solid var(--color-rop-primary)' : 'none', outlineOffset: 2 }}
       >
         <span role="status">{deleted ? 'Invoice deleted' : ''}</span>

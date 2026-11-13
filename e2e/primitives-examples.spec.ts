@@ -60,6 +60,60 @@ test.describe('Primitives copy-paste examples', () => {
     await expect(page.getByRole('button', { name: 'Show the notice again' })).toBeDisabled();
   });
 
+  test('MessageStrip: the focus ring is drawn on the wrapper itself, never when a descendant has the focus', async ({ page }) => {
+    await gotoStory(page, 'primitives-messagestrip--example');
+    const close = page.getByRole('button', { name: 'Dismiss message: Session expiring' });
+    const show = page.getByRole('button', { name: 'Show the notice again' });
+    const wrapper = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
+    const outlineOf = (el: typeof wrapper) =>
+      el.evaluate((n) => {
+        const c = getComputedStyle(n);
+        return { style: c.outlineStyle, width: c.outlineWidth };
+      });
+    // The live region is the strip inside the wrapper, which has neither role nor aria-live.
+    await expect(wrapper.getByRole('status')).toHaveCount(1);
+    await expect(wrapper).not.toHaveAttribute('role', /.+/);
+    await expect(wrapper).not.toHaveAttribute('aria-live', /.+/);
+
+    // Focus on the Dismiss button (Tab): no ring on the wrapper, the button keeps its own.
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
+    expect((await outlineOf(wrapper)).style).toBe('none');
+    expect((await outlineOf(close)).style).not.toBe('none');
+
+    // Close and reopen, twice: every time the wrapper takes the focus with a single 2px ring.
+    for (let round = 0; round < 2; round++) {
+      await close.press('Enter');
+      await expect(show).toBeFocused();
+      await show.press('Enter');
+      await expect(wrapper).toBeFocused();
+      await expect(wrapper.getByRole('status')).toHaveCount(1);
+      expect(await outlineOf(wrapper)).toEqual({ style: 'solid', width: '2px' });
+      // Wrapper -> Dismiss -> wrapper, more than once: the state is never stuck.
+      for (let i = 0; i < 2; i++) {
+        await page.keyboard.press('Tab');
+        await expect(close).toBeFocused();
+        expect((await outlineOf(wrapper)).style).toBe('none');
+        // tabindex=-1 is not in the Tab order: Shift+Tab skips the wrapper, so the focus comes back to it by script.
+        await wrapper.focus();
+        await expect(wrapper).toBeFocused();
+        expect(await outlineOf(wrapper)).toEqual({ style: 'solid', width: '2px' });
+      }
+    }
+
+    // Focus moved to the Dismiss button with the mouse (press, no release: a click would close the strip).
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
+    await page.mouse.move(0, 0);
+    await wrapper.focus();
+    const box = (await close.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await expect(close).toBeFocused();
+    expect((await outlineOf(wrapper)).style).toBe('none');
+    await page.mouse.up();
+  });
+
   test('ProgressBar: named, and completes with an announcement', async ({ page }) => {
     await gotoStory(page, 'primitives-progressbar--example');
     const bar = page.getByRole('progressbar', { name: 'Uploading invoices' });
