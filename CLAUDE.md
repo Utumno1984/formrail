@@ -19,8 +19,8 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   gestionali, portali amministrativi); licenza annuale per sviluppatore con 12 mesi di
   aggiornamenti inclusi, venduta tramite un Merchant of Record (es. Lemon Squeezy) che gestisce
   IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
-  d'attesa/pre-ordine (validazione della domanda). Aperto un ticket di studio/refactoring per
-  rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
+  d'attesa/pre-ordine (validazione della domanda), ticket #490. Ticket di studio/refactoring #489
+  per rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
   usa React Hook Form o TanStack Form. La distribuzione resta come da §2.4 della spec (org npm
   privata, nessun licensing a runtime): non è toccata dalle decisioni.
 - Il documento di pianificazione completo (inventario componenti, insidie tecniche di classe
