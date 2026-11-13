@@ -9,7 +9,7 @@ export function RejectionReasonTextarea() {
       <Field label="Rejection reason" help="Shown to the supplier." required>
         <Textarea value={reason} onChange={(event) => setReason(event.target.value)} autoResize rows={2} maxRows={6} />
       </Field>
-      <output>{reason.length} characters</output>
+      <p style={{ margin: 0 }}>{reason.length} characters</p>
     </div>
   );
 }

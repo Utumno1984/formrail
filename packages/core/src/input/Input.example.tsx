@@ -9,7 +9,7 @@ export function CompanyNameInput() {
       <Field label="Company name" help="As it appears on the invoice." required>
         <Input value={name} onChange={(event) => setName(event.target.value)} />
       </Field>
-      <output>{name.length} characters</output>
+      <p style={{ margin: 0 }}>{name.length} characters</p>
     </div>
   );
 }
