@@ -67,8 +67,10 @@ test.describe('state without colour', () => {
     expect(off).toBeLessThan(0);
     await el.click();
     await expect.poll(() => thumbOffset(el)).toBeGreaterThan(0);
-    // Retrying read: the thumb is still sliding for a few frames after the first positive offset.
-    await expect.poll(async () => Math.abs((await thumbOffset(el)) + off)).toBeLessThan(1);
+    // The thumb is still sliding for a few frames after the first positive offset: wait for its
+    // transition to end, then read once.
+    await el.evaluate((input) => Promise.allSettled(input.nextElementSibling!.getAnimations().map((a) => a.finished)).then(() => undefined));
+    expect(Math.abs((await thumbOffset(el)) + off)).toBeLessThan(1);
   });
 
   test('the width of the row does not change between on and off', async ({ page }) => {
