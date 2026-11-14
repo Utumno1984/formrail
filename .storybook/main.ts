@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import type { StorybookConfig } from '@storybook/react-vite';
 import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter, docgenRelativePaths } from './docgen.ts';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
-import { introductionPages, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
+import { introductionPages, legacyRedirectFixtures, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
 import { withTypeReference } from './type-reference-plugin.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
@@ -49,16 +49,14 @@ const config: StorybookConfig = {
   },
   // Core always; packages/pro unless STORYBOOK_EXCLUDE_PRO is set (Free deploy); only packages/pro with
   // STORYBOOK_EDITION=pro (Pro demo deploy). See story-globs.mjs.
-  //
-  // `LegacyRedirectTarget.stories.tsx` (ticket #516): the landing story of the redirect probe in
-  // legacy-story-ids.mjs, in EVERY build (Free, Pro demo, complete), so the e2e of each build opens the same
-  // old URL. Tagged `internal`: hidden from the public sidebars, like the other fixtures.
+  // `legacyRedirectFixtures`: the landing story of a redirect probe of legacy-story-ids.mjs (ticket #516), Free
+  // and complete builds only.
   stories: [
     ...(storyGlobs() as string[]),
     ...(introductionPages() as string[]),
     ...(referencePages() as string[]),
     ...(referenceFixtures() as string[]),
-    './LegacyRedirectTarget.stories.tsx',
+    ...(legacyRedirectFixtures() as string[]),
   ],
   // Renamed story ids (ticket #516): the map of legacy-story-ids.mjs, inlined at the very top of both heads,
   // rewrites an old `?path=` (manager) or `?id=` (preview) with `history.replaceState` before Storybook reads

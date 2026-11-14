@@ -3,10 +3,15 @@ import type { Page } from '@playwright/test';
 // Shared by e2e/legacy-story-ids.spec.ts (complete build at `/`) and e2e/site/legacy-story-ids.spec.ts
 // (Free and Pro deploy builds under the Pages prefix), ticket #516.
 
-/** The redirect probe of .storybook/legacy-story-ids.mjs and where it lands. */
+/**
+ * The redirect probes of .storybook/legacy-story-ids.mjs and where they land: `story` and `docs` in the Free and
+ * complete builds, `pro` (a public Pro story: the Pro demo carries no internal fixture) in the Pro demo and
+ * complete builds.
+ */
 export const PROBE = {
   story: { old: 'internal-legacy-redirect-probe--default', new: 'internal-legacyredirecttarget--default' },
   docs: { old: 'internal-legacy-redirect-probe--docs', new: 'internal-docsauditwrapper--docs' },
+  pro: { old: 'internal-legacy-redirect-probe--pro', new: 'pro-rebasenotice--playground' },
 } as const;
 
 interface HistoryWindow extends Window {

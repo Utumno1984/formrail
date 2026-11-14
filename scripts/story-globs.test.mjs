@@ -4,9 +4,21 @@ import micromatch from 'micromatch';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXAMPLE_SOURCES_MODULE, exampleSourcesModule, exampleSourcesPlugin } from '../.storybook/example-sources-plugin.mjs';
-import { PRO_DEMO_NOT_PUBLIC, exampleSources, excludePro, introductionPages, previewAnnotations, proEdition, referenceFixtures, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
+import { PRO_DEMO_NOT_PUBLIC, exampleSources, excludePro, introductionPages, legacyRedirectFixtures, previewAnnotations, proEdition, referenceFixtures, referencePages, storyGlobs } from '../.storybook/story-globs.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+describe('legacyRedirectFixtures (#516)', () => {
+  it('is in the Free and complete builds, not in the Pro demo (which carries no internal fixture)', () => {
+    expect(legacyRedirectFixtures({})).toEqual(['./LegacyRedirectTarget.stories.tsx']);
+    expect(legacyRedirectFixtures({ STORYBOOK_EXCLUDE_PRO: '1' })).toEqual(['./LegacyRedirectTarget.stories.tsx']);
+    expect(legacyRedirectFixtures({ STORYBOOK_EDITION: 'pro' })).toEqual([]);
+  });
+
+  it('points at a file that exists', () => {
+    expect(existsSync(resolve(ROOT, '.storybook', legacyRedirectFixtures({})[0]))).toBe(true);
+  });
+});
 
 describe('storyGlobs (#175)', () => {
   it('includes packages/pro when the variable is not set', () => {

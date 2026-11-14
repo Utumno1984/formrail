@@ -1,6 +1,6 @@
 // Landing story of the redirect probe (ticket #516): `internal-legacy-redirect-probe--default` in
-// legacy-story-ids.mjs points here. Listed in main.ts outside the package globs, so it is in every build
-// (Free, Pro demo, complete): the e2e of each build opens the same old URL and must land on this story.
+// legacy-story-ids.mjs points here. In the Free and complete builds only (`legacyRedirectFixtures` in
+// story-globs.mjs): the Pro demo carries no internal fixture, its probe lands on a public Pro story.
 // Not documentation, not a visual baseline; `internal`: hidden from the public sidebars (#296).
 import type { Meta, StoryObj } from '@storybook/react-vite';
 

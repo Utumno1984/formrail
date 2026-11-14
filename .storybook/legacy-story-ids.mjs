@@ -15,11 +15,13 @@
 
 /** Old story/Docs id -> the id that replaced it. One hop only: a value is never a key. */
 export var LEGACY_STORY_IDS = {
-  // Probes (ticket #516), not renames: they exercise the mechanism end to end in the e2e suites. The
-  // story one lands on a fixture that exists in all three builds (.storybook/LegacyRedirectTarget.stories.tsx),
-  // the Docs one on a Docs page of the Free and complete builds. Keep them.
+  // Probes (ticket #516), not renames: they exercise the mechanism end to end in the e2e suites. Keep them.
+  // `--default`: a fixture of the Free and complete builds (.storybook/LegacyRedirectTarget.stories.tsx).
+  // `--docs`: a Docs page of the Free and complete builds. `--pro`: a PUBLIC Pro story (the Pro demo carries
+  // no internal fixture), so a rename of that story must update this entry too: the destination check says so.
   'internal-legacy-redirect-probe--default': 'internal-legacyredirecttarget--default',
   'internal-legacy-redirect-probe--docs': 'internal-docsauditwrapper--docs',
+  'internal-legacy-redirect-probe--pro': 'pro-rebasenotice--playground',
 };
 
 // `path` of the manager: `/story/<id>` or `/docs/<id>`, possibly followed by more segments (kept).

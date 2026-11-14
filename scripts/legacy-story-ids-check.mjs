@@ -8,6 +8,8 @@
 const SLUG = '[a-z0-9]+(?:-[a-z0-9]+)*';
 const STORY_ID = new RegExp(`^${SLUG}--${SLUG}$`);
 const isDocs = (id) => id.endsWith('--docs');
+/** The old ids of the probe entries (ticket #516): not renames, they exercise the redirect in the e2e suites. */
+export const PROBE_PREFIX = 'internal-legacy-redirect-probe--';
 
 /**
  * What is wrong with the map itself, as readable messages (empty: nothing). An old id must be a well-formed
@@ -75,7 +77,14 @@ export function legacyIndexProblems(map, indexes, { targets = true } = {}) {
     const shadowed = where(from);
     if (shadowed.length > 0) problems.push(`old id "${from}" still exists in ${shadowed.join(', ')}: the redirect would hide it`);
     if (targets && where(to).length === 0) {
-      problems.push(`new id "${to}" (for "${from}") exists in none of ${indexes.map(({ name }) => name).join(', ')}`);
+      const missing = `new id "${to}" (for "${from}") exists in none of ${indexes.map(({ name }) => name).join(', ')}`;
+      // A probe lands on a real story (the Pro one on a PUBLIC story): renaming that story breaks the probe, not a
+      // published link, so the message says which entry to update rather than suggesting a redirect is missing.
+      problems.push(
+        from.startsWith(PROBE_PREFIX)
+          ? `${missing}: "${from}" is a redirect probe (ticket #516) whose target was renamed or removed; update the probe entry in .storybook/legacy-story-ids.mjs to point at an existing story`
+          : missing,
+      );
     }
   }
   return problems;

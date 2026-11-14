@@ -94,7 +94,21 @@ describe('LEGACY_STORY_IDS (the real map)', () => {
     expect(LEGACY_STORY_IDS).toMatchObject({
       'internal-legacy-redirect-probe--default': 'internal-legacyredirecttarget--default',
       'internal-legacy-redirect-probe--docs': 'internal-docsauditwrapper--docs',
+      'internal-legacy-redirect-probe--pro': 'pro-rebasenotice--playground',
     });
+  });
+
+  it('a rename of the public Pro story the probe lands on fails the destination check, naming the probe entry to update', () => {
+    // The Pro index as it would be after a rename of `Pro/RebaseNotice` (e.g. by #531): the playground moved.
+    const free = { name: 'storybook/index.json (Free)', entries: { 'internal-legacyredirecttarget--default': {}, 'internal-docsauditwrapper--docs': {} } };
+    const renamedPro = { name: 'pro/index.json (Pro)', entries: { 'pro-record-conflict-notice--playground': {} } };
+    expect(legacyIndexProblems(LEGACY_STORY_IDS, [free, renamedPro])).toEqual([
+      'new id "pro-rebasenotice--playground" (for "internal-legacy-redirect-probe--pro") exists in none of storybook/index.json (Free), pro/index.json (Pro): ' +
+        '"internal-legacy-redirect-probe--pro" is a redirect probe (ticket #516) whose target was renamed or removed; update the probe entry in .storybook/legacy-story-ids.mjs to point at an existing story',
+    ]);
+    // And with the Pro story where it is today, the same check passes.
+    const pro = { name: 'pro/index.json (Pro)', entries: { 'pro-rebasenotice--playground': {} } };
+    expect(legacyIndexProblems(LEGACY_STORY_IDS, [free, pro])).toEqual([]);
   });
 
   it('no new id of the real map is redirected again', () => {

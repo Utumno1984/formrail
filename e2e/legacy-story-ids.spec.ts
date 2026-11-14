@@ -88,6 +88,16 @@ test.describe('renamed story ids: complete build (#516)', () => {
     expect(new URL(page.url()).searchParams.get('id')).toBe(PROBE.docs.new);
   });
 
+  test('the Pro probe lands on its public Pro story (manager and iframe)', async ({ page }) => {
+    await page.goto(`/?path=/story/${PROBE.pro.old}`);
+    await expectManagerOn(page, `/story/${PROBE.pro.new}`, PROBE.pro.new);
+    await expect(page.frameLocator('#storybook-preview-iframe').locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
+    await page.goto(`/iframe.html?id=${PROBE.pro.old}&viewMode=story`);
+    await expect(page.locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('body.sb-show-errordisplay')).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.get('id')).toBe(PROBE.pro.new);
+  });
+
   test('a current id is left alone: no redirect call at all', async ({ page }) => {
     await page.goto(`/iframe.html?id=${PROBE.story.new}&viewMode=story`);
     await expect(page.getByTestId('legacy-redirect-target')).toBeVisible({ timeout: 30_000 });
@@ -104,5 +114,6 @@ test.describe('renamed story ids: complete build (#516)', () => {
     // The probes land on entries of this build.
     expect(index.entries[PROBE.story.new]).toBeDefined();
     expect(index.entries[PROBE.docs.new]).toBeDefined();
+    expect(index.entries[PROBE.pro.new]).toBeDefined();
   });
 });
