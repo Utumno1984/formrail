@@ -1,0 +1,5 @@
+---
+'@formrail/pro': minor
+---
+
+New entry `@formrail/pro/engine` (#489): the Change Summary and Form Rebase engines (`computeChangeSummary`, `useChangeSummary`, `inferSegmentLabel`, `formatChangeValue`, `computeRebase`, `useFormRebase` and their types) without `@formrail/core`, at runtime and in the declaration files, for a form of another library (React Hook Form, TanStack Form) or of your own. `useFormRebase` of this entry takes any form that keeps the new `RebaseFormBinding` contract (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`); core's `useObjectPageForm()` is one as is. The main entry `@formrail/pro` is unchanged: same names (plus the `RebaseFormBinding` type), same `useFormRebase` signature (core's form); it imports the engines from the engine files, so an app that uses both entries loads them once. The visual components (`ChangeSummary`, `RebaseNotice`) stay in the main entry. The package stays private.
