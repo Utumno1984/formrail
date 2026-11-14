@@ -244,6 +244,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
           aria-labelledby={`${baseId}-selection ${nameId}`}
           aria-controls={tableId}
           data-rop-selection-bar=""
+          data-rop-bulk-actions={bulkActions ? 'true' : 'false'}
           className={selectionBarClass}
         >
           <span id={`${baseId}-selection`} hidden>
