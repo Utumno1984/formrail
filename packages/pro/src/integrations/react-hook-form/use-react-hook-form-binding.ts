@@ -299,8 +299,10 @@ class BindingStore<Values extends FieldValues> {
  * does not go through `handleSubmit` passes `isSaving` and `saveError` (see the options). While a save is in
  * flight, `reset(saved)` ends it as core's `save` does: `saved` is the baseline, the fields edited since
  * `isSaving` turned `true` keep the typed value (dirty), the others take what the server stored (clean);
- * `values` is `saved` itself when nothing was edited meanwhile. A discard or a rehydration during the save wins
- * (`reset(saved)` is then a plain hydration).
+ * `values` is `saved` itself when nothing was edited meanwhile; the rows of an array are matched by id with the
+ * `arrayIdKeys` option (otherwise an array edited meanwhile is kept whole). A discard or a rehydration during the
+ * save wins (`reset(saved)` is then a plain hydration). During a save the binding writes with React Hook Form's
+ * `setValues` / `resetDefaultValues`, never `reset`, so `isSaving` stays `true` until the handler returns.
  *
  * **Hydration**: `form.reset(data)`, the `values` prop, or an async `defaultValues`: while it loads
  * (`formState.isLoading`), `baseline` is `values` (nothing is edited yet).

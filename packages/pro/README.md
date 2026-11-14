@@ -109,7 +109,9 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
   async function (`defaultValues: () => api.loadInvoice(id)`). The form is not dirty, no summary row ever
   shows (while an async `defaultValues` loads, `formState.isLoading`, `binding.baseline` is `binding.values`:
   nothing is edited yet), no `type: 'change'` event reaches your `watch` / `subscribe` callbacks, and for
-  `useFormRebase` it is a rehydration (open conflicts closed).
+  `useFormRebase` it is a rehydration (open conflicts closed). If the async `defaultValues` rejects, React
+  Hook Form stays `isLoading` and the form keeps showing no change: catch in the loader (return the record or
+  an empty one, show the error yourself), never let it reject.
 - `resetField(name, { defaultValue })` replaces React Hook Form's defaults, so it is a rehydration too: it
   closes the open conflicts, also those on other fields (the user's values stay, as edits against the new
   baseline). Resolve the conflicts before, or call it only when none is open. `resetField(name)` without a
@@ -139,9 +141,26 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
   core's `save` does: `saved` becomes the baseline; a field edited since the save started keeps the typed
   value and stays dirty (in the summary and in `dirtyFields`); every other field takes the value the server
   stored, its normalization included, and is clean. Nothing edited meanwhile: `values` is `saved` itself.
-  "Since the save started" is measured from the values when `isSaving` turned `true`, field by field (an
-  array the user resized meanwhile is kept whole). A discard (`form.reset()`, `binding.reset()`) or a
-  rehydration during the save wins: `reset(saved)` is then a plain hydration.
+  "Since the save started" is measured from the values when `isSaving` turned `true`, field by field. The
+  rows of an array are matched by id when you pass the id key, the same `arrayIdKeys` you give the engines:
+  `useReactHookFormBinding(form, { arrayIdKeys: { lineItems: 'id' } })`. A reorder by the server then never
+  moves an edit to another row, and the rows take the server's order (the user's, if the user reordered
+  them). Without an id key, or with a row without id, an array edited during the save is kept whole. A
+  discard (`form.reset()`, `binding.reset()`) or a rehydration during the save wins: `reset(saved)` is then a
+  plain hydration.
+- What the binding writes during a save (`reset(saved)`, `setValues`, `acceptTheirs` / `keepMine` of the
+  rebase) goes through React Hook Form's `setValues` and `resetDefaultValues`, never through its `reset`,
+  which would end `isSubmitting` and make `handleSubmit` skip its own end. So `isSaving` stays `true` until
+  the handler really returns, and `isSubmitted`, `isSubmitSuccessful` and `submitCount` are React Hook
+  Form's. One exception: a `reset(saved)` whose record lacks a top-level key that the form holds without an
+  input (only a reset can remove a key) is written with a reset and ends the submit there.
+- One submit at a time: keep the submit button disabled while `isSaving` (as the examples do). A second
+  `handleSubmit` started while the first is in flight shares its start: the first `reset(saved)` ends the
+  tracking, and what the user types during the second one is not kept by its `reset(saved)`.
+- Call `useReactHookFormBinding` in the component that calls `useForm` (or under it with
+  `useFormContext()`). In a child that does not re-render on React Hook Form's state (a `React.memo`
+  component that receives `form` as a prop), `formState.isSubmitting` never reaches the binding: pass
+  `isSaving` yourself, or the save is not seen and what is typed during it is not kept.
 - A submit that succeeds closes the open conflicts; one that fails (handler error, validation) leaves them
   open, and a queued update is merged anyway.
 - A save that does not go through `handleSubmit` (a mutation of your data layer): pass its state,
