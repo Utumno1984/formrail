@@ -21,9 +21,9 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
       await expect(count(page)).toHaveText(new RegExp(`^\\(.+ of ${total}\\)$`));
       const selection = page.locator('[data-rop-selection-count]');
       await expect(selection).toHaveText(
-        new RegExp(`^${escape(fmt(locale, FERRARI))} selected \\(${escape(fmt(locale, TOTAL - FERRARI))} hidden by filters\\)$`.replace(/[\u00a0\u202f]/g, ' ')),
+        new RegExp(`^${escape(fmt(locale, FERRARI))} selected \\(${escape(fmt(locale, TOTAL - FERRARI))} hidden by filters\\)$`.replace(/[\u00a0\u202f]/g, '\\s')),
       );
-      // toHaveText folds every kind of space: the exact characters of Intl are checked on the raw text.
+      // The regex accepts any space: the exact characters of Intl are checked on the raw text.
       expect(await selection.textContent()).toBe(`${fmt(locale, FERRARI)} selected (${fmt(locale, TOTAL - FERRARI)} hidden by filters)`);
     });
   }
