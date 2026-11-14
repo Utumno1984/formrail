@@ -286,12 +286,12 @@ test.describe('selection', () => {
     await scrollToTop(page, 4990 * g.pitch);
     await expect(page.getByRole('checkbox', { name: 'Select INV-000010' })).toHaveCount(0);
     await page.getByRole('checkbox', { name: 'Select INV-005000' }).click({ modifiers: ['Shift'] });
-    await expect(page.getByText('4991 selected')).toBeVisible();
+    await expect(page.getByText('4,991 selected')).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'Select INV-005000' })).toBeFocused();
     // nothing of the page got text-selected by the shift-click
     expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
     await page.getByRole('button', { name: 'Select all 100,000 results' }).click();
-    await expect(page.getByText('100000 selected')).toBeVisible();
+    await expect(page.getByText('100,000 selected')).toBeVisible();
     await expect(page.getByRole('checkbox', { name: 'Select all results' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(page.getByText('No items selected')).toBeVisible();
@@ -485,7 +485,7 @@ test.describe('performance (reported, not gating)', () => {
       return { ms: performance.now() - t0, checked: el.checked };
     });
     expect(selectAll.checked).toBe(true);
-    await expect(page.getByText('100000 selected')).toBeVisible();
+    await expect(page.getByText('100,000 selected')).toBeVisible();
     const line = `[perf] 100,000 rows (${testInfo.project.name}): mount ${mount.toFixed(1)} ms, 100 scrollBy ${scroll.toFixed(0)} ms (${(scroll / 100).toFixed(1)} ms/frame), select all ${selectAll.ms.toFixed(1)} ms`;
     console.log(line);
     testInfo.annotations.push({ type: 'perf', description: line });

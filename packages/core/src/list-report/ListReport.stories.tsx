@@ -54,11 +54,13 @@ function columns(firstDateDirection: ListReportSortDirection): ListReportColumn<
 }
 
 type DelayChoice = 0 | 300 | 800 | 'Enter only';
-type Dataset = 0 | 3 | 200;
+type Dataset = 0 | 3 | 200 | 10_000;
+type LocaleChoice = 'en-US' | 'de-DE' | 'fr-FR';
 
 interface ShowcaseArgs {
   status: 'ready' | 'loading' | 'error';
   dataset: Dataset;
+  locale: LocaleChoice;
   searchCommitDelay: DelayChoice;
   firstSortDirection: ListReportSortDirection;
   containerWidth: number;
@@ -69,6 +71,7 @@ interface ShowcaseArgs {
   /** Fixtures: not in Controls. */
   defaultFilter?: string;
   defaultSearchQuery?: string;
+  selectable?: boolean;
   /** No parent height: the report lives in the normal flow of the page. */
   flow?: boolean;
 }
@@ -85,6 +88,8 @@ const PAGE: CSSProperties = {
 function Showcase({
   status,
   dataset,
+  locale,
+  selectable,
   searchCommitDelay,
   firstSortDirection,
   containerWidth,
@@ -110,6 +115,8 @@ function Showcase({
     filters: FILTERS,
     defaultFilter,
     defaultSearchQuery,
+    locale,
+    selectable,
     searchCommitDelay: searchCommitDelay === 'Enter only' ? null : searchCommitDelay,
     onSortChange,
     onFilterChange,
@@ -170,7 +177,12 @@ const meta: Meta<ShowcaseArgs> = {
       'rowActionsInline',
       'ref',
     ),
-    dataset: storyControl({ control: 'select', options: [0, 3, 200], description: 'Rows given to `useListReport({ rows })`: none, 3 or 200 invoices.' }),
+    dataset: storyControl({ control: 'select', options: [0, 3, 200, 10_000], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 10,000 invoices.' }),
+    locale: storyControl({
+      control: 'select',
+      options: ['en-US', 'de-DE', 'fr-FR'],
+      description: 'An option of the hook, not a prop: `useListReport({ locale })`. Formats the numbers of the default count and selection text with `Intl.NumberFormat`.',
+    }),
     searchCommitDelay: storyControl({
       control: 'select',
       options: [0, 300, 800, 'Enter only'],
@@ -188,10 +200,12 @@ const meta: Meta<ShowcaseArgs> = {
     defaultFilter: { control: false, table: { disable: true } },
     defaultSearchQuery: { control: false, table: { disable: true } },
     flow: { control: false, table: { disable: true } },
+    selectable: { control: false, table: { disable: true } },
   },
   args: {
     status: 'ready',
     dataset: 200,
+    locale: 'en-US',
     searchCommitDelay: 300,
     firstSortDirection: 'desc',
     containerWidth: 1100,
@@ -269,6 +283,27 @@ export const Playground: Story = {
     await expect(canvas.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(search).toHaveValue('');
     await expect(search).toHaveFocus();
+  },
+};
+
+/**
+ * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 10,000 invoices. The play function
+ * searches a supplier, checks the "n of 10,000" count in the chosen locale, selects a row and checks the
+ * selection text. Stories and baselines always use a fixed locale.
+ */
+export const LocaleCount: Story = {
+  args: { dataset: 10_000, selectable: true },
+  argTypes: { dataset: { control: false } },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const fmt = new Intl.NumberFormat(args.locale);
+    await expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(10_000)})`);
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
+    const found = makeDemoInvoices(10_000).filter((r) => r.supplier.includes('Ferrari')).length;
+    await waitFor(() => expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(found)} of ${fmt.format(10_000)})`));
+    await userEvent.click(canvas.getAllByRole('checkbox')[1]!);
+    await expect(canvas.getByText('1 selected')).toBeInTheDocument();
   },
 };
 
