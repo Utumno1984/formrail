@@ -45,6 +45,10 @@ describe('demo dates', () => {
     for (const bad of ['2026-02-29', '2026-13-01', '2026-04-31', '2026-3-29', '29/03/2026', '', '2026-03-29T00:00:00Z']) {
       expect(() => parseIsoDate(bad)).toThrow(RangeError);
     }
+    // The 31st of every 30-day month (a dropped month in the table would let "Nov 31" through).
+    for (const bad of ['2026-04-31', '2026-06-31', '2026-09-31', '2026-11-31']) {
+      expect(() => parseIsoDate(bad)).toThrow(RangeError);
+    }
     expect(() => addDays(DEMO_TODAY, 1.5)).toThrow(RangeError);
     expect(() => daysAgo(Number.NaN)).toThrow(RangeError);
   });
