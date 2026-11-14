@@ -199,7 +199,12 @@ const employees = createDataset('makeEmployees', makeEmployee);
  */
 export const makeEmployees = (n: number): readonly DemoEmployee[] => employees.make(n);
 
-/** The employee with this id (any row, generated on demand), or `undefined` for a malformed id. */
+/**
+ * The employee of any well-formed id (`emp-<positive integer>`), generated on demand, or `undefined`
+ * for a malformed id. Every well-formed id resolves, also beyond the rows a story loaded: so
+ * `get…(id) !== undefined` does not prove that a reference points into a generated list; for
+ * referential integrity check membership in `makeEmployees(n)` (or in its reference pool) instead.
+ */
 export function getEmployee(id: string): DemoEmployee | undefined {
   const index = indexFromId(id, 'emp-');
   return index < 0 ? undefined : employees.at(index);

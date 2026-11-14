@@ -32,6 +32,10 @@ export interface DemoCustomer {
   readonly name: string;
   readonly industry: DemoIndustry;
   readonly status: DemoCustomerStatus;
+  /**
+   * The account's country. Generated equal to `billingAddress.country` (two fields, one fact): an
+   * editor that lets the billing country change must update both, or treat this one as derived.
+   */
   readonly country: DemoCountryCode;
   readonly billingAddress: DemoAddress;
   /** One to four contacts; exactly one has `primary: true`. */
@@ -191,7 +195,12 @@ const customers = createDataset('makeCustomers', makeCustomer);
  */
 export const makeCustomers = (n: number): readonly DemoCustomer[] => customers.make(n);
 
-/** The customer with this id (any row, generated on demand), or `undefined` for a malformed id. */
+/**
+ * The customer of any well-formed id (`cus-<positive integer>`), generated on demand, or `undefined`
+ * for a malformed id. Every well-formed id resolves, also beyond the rows a story loaded: so
+ * `get…(id) !== undefined` does not prove that a reference points into a generated list; for
+ * referential integrity check membership in `makeCustomers(n)` (or in its reference pool) instead.
+ */
 export function getCustomer(id: string): DemoCustomer | undefined {
   const index = indexFromId(id, 'cus-');
   return index < 0 ? undefined : customers.at(index);

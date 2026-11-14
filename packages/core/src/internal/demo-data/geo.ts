@@ -2,7 +2,9 @@
 // spelling (München, Malmö, Kraków, Industriestraße, Bjørkeveien) so search, sorting and truncation meet
 // real accents, `ß` and `ø`; only Latin scripts (right-to-left is not supported yet, spec §1.13.4).
 // Phone numbers use the ranges reserved for fiction where a country has one (NANP 555-01xx, Ofcom
-// drama ranges), and a `555 0xxx` subscriber pattern elsewhere.
+// drama ranges for the UK). Elsewhere no such range is known, so the subscriber part starts with
+// `000`, which national numbering plans do not assign after an area code: clearly not a real line,
+// though not formally reserved either.
 import type { DemoCurrency } from './currency';
 import type { Rng } from './rng';
 
@@ -447,7 +449,7 @@ export function phoneNumbers(address: DemoAddress): (rng: Rng) => string {
       const prefix = `+1 ${area}-555-01`;
       numbers = (rng) => prefix + DIGITS_3[rng.int(0, 99)]!.slice(1);
     } else {
-      const prefix = address.country === 'GB' ? `+44 ${area} 496 0` : `+${country.callingCode} ${area} 555 0`;
+      const prefix = address.country === 'GB' ? `+44 ${area} 496 0` : `+${country.callingCode} ${area} 000 0`;
       numbers = (rng) => prefix + DIGITS_3[rng.int(0, 999)]!;
     }
     PHONE_SOURCES.set(address.city, numbers);

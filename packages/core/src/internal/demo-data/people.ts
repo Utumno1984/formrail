@@ -61,14 +61,12 @@ interface PreparedPool {
   readonly first: readonly string[];
   readonly last: readonly string[];
   readonly firstSlug: readonly string[];
-  readonly lastSlug: readonly string[];
 }
 
 const prepare = (pool: NamePool): PreparedPool => ({
   first: pool.first,
   last: pool.last,
   firstSlug: pool.first.map((name) => toAsciiSlug(name, '')),
-  lastSlug: pool.last.map((name) => toAsciiSlug(name, '')),
 });
 
 const PREPARED: Readonly<Record<DemoLanguageArea, PreparedPool>> = {
@@ -100,15 +98,24 @@ export function personNamesOf(area: DemoLanguageArea): readonly PersonName[] {
 }
 
 /** Every name of every area, built once up front (9 x 400) and shared by all rows and contacts. */
-const buildNames = (pool: PreparedPool): readonly PersonName[] =>
+/**
+ * Polish surnames in -ski / -cki / -dzki agree with the gender of the given name (Kowalski, Kowalska).
+ * Every Polish given name of the pool that ends in -a is feminine (no Kuba or Barnaba among them).
+ */
+const polishSurname = (first: string, last: string): string =>
+  first.endsWith('a') ? last.replace(/(sk|ck|dzk)i$/, '$1a') : last;
+
+const buildNames = (pool: PreparedPool, agree?: (first: string, last: string) => string): readonly PersonName[] =>
   Array.from({ length: PERSON_NAME_SLOTS }, (_, s) => {
     const f = s % pool.first.length;
     const l = Math.floor(s / pool.first.length) % pool.last.length;
+    const first = pool.first[f]!;
+    const last = agree ? agree(first, pool.last[l]!) : pool.last[l]!;
     return Object.freeze({
-      firstName: pool.first[f]!,
-      lastName: pool.last[l]!,
-      fullName: `${pool.first[f]} ${pool.last[l]}`,
-      emailLocal: `${pool.firstSlug[f]}.${pool.lastSlug[l]}`,
+      firstName: first,
+      lastName: last,
+      fullName: `${first} ${last}`,
+      emailLocal: `${pool.firstSlug[f]}.${toAsciiSlug(last, '')}`,
     });
   });
 
@@ -120,7 +127,7 @@ const NAMES: Readonly<Record<DemoLanguageArea, readonly PersonName[]>> = {
   es: buildNames(PREPARED.es),
   it: buildNames(PREPARED.it),
   nordic: buildNames(PREPARED.nordic),
-  pl: buildNames(PREPARED.pl),
+  pl: buildNames(PREPARED.pl, polishSurname),
   ja: buildNames(PREPARED.ja),
 };
 

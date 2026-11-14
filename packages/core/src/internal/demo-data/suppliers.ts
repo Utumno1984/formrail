@@ -24,6 +24,7 @@ export interface DemoSupplier {
   /** The product category the supplier makes (products of that category may name it as supplier). */
   readonly category: DemoProductCategory;
   readonly status: DemoSupplierStatus;
+  /** Generated equal to `address.country` (two fields, one fact; see `DemoCustomer.country`). */
   readonly country: DemoCountryCode;
   readonly address: DemoAddress;
   /** One to three contacts; exactly one has `primary: true`. */
@@ -139,7 +140,12 @@ const suppliers = createDataset('makeSuppliers', makeSupplier);
  */
 export const makeSuppliers = (n: number): readonly DemoSupplier[] => suppliers.make(n);
 
-/** The supplier with this id (any row, generated on demand), or `undefined` for a malformed id. */
+/**
+ * The supplier of any well-formed id (`sup-<positive integer>`), generated on demand, or `undefined`
+ * for a malformed id. Every well-formed id resolves, also beyond the rows a story loaded: so
+ * `get…(id) !== undefined` does not prove that a reference points into a generated list; for
+ * referential integrity check membership in `makeSuppliers(n)` (or in its reference pool) instead.
+ */
 export function getSupplier(id: string): DemoSupplier | undefined {
   const index = indexFromId(id, 'sup-');
   return index < 0 ? undefined : suppliers.at(index);

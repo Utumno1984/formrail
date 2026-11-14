@@ -147,7 +147,12 @@ const products = createDataset('makeProducts', makeProduct);
  */
 export const makeProducts = (n: number): readonly DemoProduct[] => products.make(n);
 
-/** The product with this id (any row, generated on demand), or `undefined` for a malformed id. */
+/**
+ * The product of any well-formed id (`prd-<positive integer>`), generated on demand, or `undefined`
+ * for a malformed id. Every well-formed id resolves, also beyond the rows a story loaded: so
+ * `get…(id) !== undefined` does not prove that a reference points into a generated list; for
+ * referential integrity check membership in `makeProducts(n)` (or in its reference pool) instead.
+ */
 export function getProduct(id: string): DemoProduct | undefined {
   const index = indexFromId(id, 'prd-');
   return index < 0 ? undefined : products.at(index);
