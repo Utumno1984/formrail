@@ -810,6 +810,52 @@ describe('<RebaseNotice />: the box it sits in resized from outside (#470)', () 
     }
   });
 
+  it('inside (default) placement, near the end, partial clamp: the field after the notice does not move', () => {
+    // The notice inside the container, the content near its end: scrollTop 110 of a maximum of 115. The strip
+    // shrinks from 80 to 50px, the content by 30px: the new maximum is 85 and the browser clamps the position to it
+    // in the relayout. The follower's own move already includes that clamp: the record must not count it again.
+    const height = { strip: 80 };
+    function Inside({ conflicts }: { conflicts: RebaseConflict[] }) {
+      return (
+        <div data-scroller="" style={{ overflowY: 'auto', height: 200 }}>
+          <button type="button">Above</button>
+          <RebaseNotice {...props({ conflicts })} />
+          <input aria-label="Due date" />
+        </div>
+      );
+    }
+    const view = render(<Inside conflicts={[DUE, NOTES]} />);
+    const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+    const strip = () => (document.querySelector('.rop-pro-rebase-notice') ? height.strip : 0);
+    const max = () => 235 + strip() - 200;
+    let position = 0;
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, get: () => 200 });
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, get: () => 235 + strip() });
+    // What a browser does: the position stays within [0, max], also when the content gets shorter under it.
+    Object.defineProperty(scroller, 'scrollTop', {
+      configurable: true,
+      get: () => Math.min(Math.max(position, 0), max()),
+      set: (value: number) => void (position = Math.min(Math.max(value, 0), max())),
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this === scroller) return rect(0, 200);
+      if (this.matches('[aria-label="Due date"]')) return rect(100 + strip() - scroller.scrollTop, 20);
+      return rect(0, 0);
+    });
+    try {
+      scroller.scrollTop = 110;
+      window.dispatchEvent(new Event('resize'));
+      const field = screen.getByRole('textbox', { name: 'Due date' });
+      expect(field.getBoundingClientRect().top).toBe(70);
+      height.strip = 50;
+      view.rerender(<Inside conflicts={[DUE]} />);
+      expect(scroller.scrollTop).toBe(80);
+      expect(field.getBoundingClientRect().top).toBe(70);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   /** A notice whose "Keep mine" closes the conflict, shrinks the strip by 30px and then runs `also` in the same task. */
   function KeepMineHarness({ Page, height, also }: { Page: ReturnType<typeof outsideFixture>['Page']; height: { strip: number }; also: () => void }) {
     const [conflicts, setConflicts] = useState([DUE, NOTES]);
