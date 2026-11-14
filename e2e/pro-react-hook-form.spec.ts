@@ -60,6 +60,24 @@ test.describe('Pro/Integrations/React Hook Form', () => {
     await expect(conflictsList(page).getByRole('listitem')).toHaveCount(0);
   });
 
+  test('typing during "Saving…": the typed value stays after the save and is still an unsaved change (QA #507, point 1)', async ({ page }) => {
+    await expectPlayToPass(page, PLAYGROUND, 'saveDelay:1500');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    await field(page, 'Notes').fill('typed during save');
+    // The save ends (the button is back): what was sent is saved, what was typed meanwhile is not.
+    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible({ timeout: 5_000 });
+    await expect(field(page, 'Notes')).toHaveValue('typed during save');
+    await expect(field(page, 'Amount')).toHaveValue('120');
+    await expect(page.getByRole('status')).toHaveText('Unsaved changes');
+    await expect(summaryRows(page)).toHaveCount(1);
+    await expect(summaryRows(page).first()).toHaveText('Notes: "" → "typed during save"');
+    // And it can be saved in turn.
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('status')).toHaveText('All saved', { timeout: 5_000 });
+    await expect(field(page, 'Notes')).toHaveValue('typed during save');
+  });
+
   test('accept the server value: the field takes it, the conflict and its summary row go', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND);
     await field(page, 'Amount').fill('175');
