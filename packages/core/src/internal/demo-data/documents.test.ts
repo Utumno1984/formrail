@@ -367,6 +367,14 @@ describe('makeSupportCases / getSupportCase', () => {
     expect(Math.min(...lengths)).toBeLessThan(200);
   });
 
+  it('has unassigned cases (new ones only) and the customer writes first in every thread', () => {
+    expect(makeSupportCases(50).some((supportCase) => supportCase.assigneeId === null)).toBe(true);
+    for (const supportCase of cases.slice(0, 1500)) {
+      const [first] = getSupportCase(supportCase.id)!.comments;
+      if (first) expect(first.authorKind).toBe('customer');
+    }
+  });
+
   it('shows every status and every priority within the first 50 rows', () => {
     const first = makeSupportCases(50);
     expect(new Set(first.map((supportCase) => supportCase.status))).toEqual(new Set(Object.keys(SUPPORT_CASE_STATUS_LABEL)));

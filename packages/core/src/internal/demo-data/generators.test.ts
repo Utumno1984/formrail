@@ -177,7 +177,8 @@ function expectDeepFrozen(value: unknown, path = 'record'): void {
 /** The list row inside a detail record (the record itself for domains without a detail). */
 function withoutDetail(c: Case, record: Row | undefined): Row | undefined {
   if (!record || !c.detailKey) return record;
-  const { [c.detailKey]: _detail, ...row } = record as Row & Record<string, unknown>;
+  const row: Record<string, unknown> = { ...record };
+  delete row[c.detailKey];
   return row as unknown as Row;
 }
 
