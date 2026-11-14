@@ -296,6 +296,20 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(previous).toBeFocused();
   });
 
+  test('"Use server value" on line 2 of an invoice with two lines, which the server removed: the focus goes to the description of line 1', async ({ page }) => {
+    const record = await openRecord(page, 'FT-2026-0002');
+    expect(record.lineItems).toHaveLength(2);
+    await page.getByRole('textbox', { name: 'Line 2 quantity' }).fill('8');
+    await serverRemovesLine(page, record.id, 1);
+    await expect(conflicts(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^Use server value for Line items > Item 2 / }).click();
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Line 2 description' })).toHaveCount(0);
+    const first = page.getByRole('textbox', { name: 'Line 1 description' });
+    await expect(first).toHaveValue(record.lineItems[0]!.description);
+    await expect(first).toBeFocused();
+  });
+
   test('"Use server value" on the ONLY line, which the server removed: the focus goes to "Add line"', async ({ page }) => {
     const record = await openRecord(page);
     expect(record.lineItems).toHaveLength(1);
@@ -580,6 +594,55 @@ function expectFieldsStill(before: FieldSpot[], after: FieldSpot[]): number {
   for (const b of pairs) expect(Math.abs(after[b.index]!.top - b.top), `field #${b.index}`).toBeLessThanOrEqual(1);
   return pairs.length;
 }
+
+test.describe('Pro showcase: a scroll made in the same task as a choice in the notice is kept (#470, round 2) @engines', () => {
+  /** Two conflicts (Due date and Notes): the notice gets shorter when one of them is closed. */
+  async function twoConflicts(page: Page): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    await notes(page).fill('Mine');
+    await serverPatch(page, record.id, { dueDate: '2026-03-12', notes: 'Theirs' });
+    await expect(conflicts(page)).toHaveCount(2);
+  }
+  const rowHeight = (page: Page) => page.locator('[data-editor-notice]').evaluate((el) => el.getBoundingClientRect().height);
+
+  test('the page is scrolled by 120px and "Keep mine" is pressed in the same task: the 120px are kept, only the notice is compensated', async ({ page }) => {
+    await twoConflicts(page);
+    // Nothing focused (a field being typed in would be kept in view, which is another rule).
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.locator('[data-object-page-scroller]').evaluate((el) => void (el.scrollTop = 300));
+    const rowBefore = await rowHeight(page);
+    // One task: a scroll (its event comes a frame later), then the click that closes a conflict.
+    await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('[data-object-page-scroller]')!;
+      scroller.scrollTop += 120;
+      document.querySelector<HTMLElement>('[aria-label="Keep mine for Due date"]')!.click();
+    });
+    await expect(conflicts(page)).toHaveCount(1);
+    const rowAfter = await rowHeight(page);
+    expect(rowAfter).toBeLessThan(rowBefore - 1);
+    const scrollTop = await page.locator('[data-object-page-scroller]').evaluate((el) => el.scrollTop);
+    expect(Math.abs(scrollTop - (300 + 120 + rowAfter - rowBefore))).toBeLessThanOrEqual(1);
+  });
+
+  test('from the end of the content, a listener of "Keep mine" moves the focus to "Back to list" (the browser scrolls to it): the focus stays in view', async ({ page }) => {
+    await twoConflicts(page);
+    await page.locator('[data-object-page-scroller]').evaluate((el) => void (el.scrollTop = el.scrollHeight));
+    // A callback that moves the focus itself (the documented "a callback that moves the focus itself wins").
+    await page.evaluate(() => {
+      const back = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Back to list')!;
+      document.querySelector('[aria-label="Keep mine for Due date"]')!.addEventListener('click', () => back.focus());
+    });
+    await page.getByRole('button', { name: 'Keep mine for Due date' }).click();
+    await expect(conflicts(page)).toHaveCount(1);
+    const back = page.getByRole('button', { name: 'Back to list' });
+    await expect(back).toBeFocused();
+    const spot = await focusSpot(page);
+    expect(spot.top, 'Back to list: not above the scroller').toBeGreaterThanOrEqual(spot.scrollerTop);
+    expect(spot.bottom, 'Back to list: not below the scroller').toBeLessThanOrEqual(spot.scrollerBottom);
+  });
+});
 
 test.describe('Pro showcase: focus not obscured by the notice (WCAG 2.4.11, #470) @engines', () => {
   for (const [name, viewport] of [
