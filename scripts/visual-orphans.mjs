@@ -62,6 +62,9 @@ export function readBaselines(dir) {
     const path = resolve(dir, folder);
     if (folder.startsWith('visual-') && statSync(path).isDirectory()) files[folder] = readdirSync(path);
   }
+  if (Object.keys(files).length === 0) {
+    throw new Error(`visual-orphans: no visual-* folder in ${dir} (moved or renamed baselines?)`);
+  }
   return files;
 }
 

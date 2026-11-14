@@ -52,7 +52,12 @@ built) fails listing every PNG with no `visual` story or `visual-docs` page of t
 `git rm ...` to remove them. Locally, run it after `npm run build-storybook`. The filter is the one of
 `visual.spec.ts` (`visual-stories.mjs`); the PNGs of `landing.spec.ts` (`landing`, `teams`, `privacy`) are known
 explicitly. It reads the complete build (Free + Pro stories); a story left out of it must be passed with
-another `--index <path>/index.json` (several are merged). A missing index is an error, not "no orphans".
+another `--index <path>/index.json` (several are merged). A missing index, a missing baselines folder or an
+unknown argument is an error (exit 2), not "no orphans".
+
+Order when renaming a story: first `npm run test:visual:update` (writes the new PNGs), then the guard (lists
+the old ones to `git rm`). A renamed public story also needs its entry in the redirect map of #516
+(`.storybook/legacy-story-ids.mjs`, when it lands), so old links keep working.
 
 ## When a check fails
 
