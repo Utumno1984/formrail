@@ -5,9 +5,10 @@
 // resolution walks up to it. So the test builds a sandbox in the OS temp directory: `consumer/`, the BUILT
 // @formrail/pro (package.json + dist, as `npm pack` ships it: run `npm run build` first) and links to the
 // other packages, and checks that no @formrail/core is reachable from it. Negative controls: the main entry
-// `@formrail/pro`, which names the core, fails to typecheck and to load in the same sandbox.
+// `@formrail/pro`, which names the core, fails to typecheck and to load in the same sandbox. A second suite
+// installs the packed package with npm and checks that the optional core peer is left out.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,5 +90,69 @@ describe('@formrail/pro/engine in a project without @formrail/core', () => {
     const result = run(['--input-type=module', '-e', "await import('@formrail/pro')"]);
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/Cannot find (package|module) '@formrail\/core/);
+  });
+});
+
+// Smoke test 1 of the ticket: `npm install` of the packed @formrail/pro in a project that does not ask for the
+// core leaves the core out, because it is an optional peer (`peerDependenciesMeta`). Offline, from local
+// tarballs only (react, react-dom and scheduler packed from the monorepo copies): no registry access.
+describe('npm install of the packed @formrail/pro (optional core peer)', () => {
+  let project: string;
+  const npm = (args: string[], cwd = project) =>
+    spawnSync('npm', [...args, '--offline', '--no-audit', '--no-fund', '--ignore-scripts', '--loglevel=error'], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, npm_config_workspaces: '', NODE_OPTIONS: '' },
+    });
+
+  /** `npm pack` of `dir` into `project`; returns the tarball name. */
+  const pack = (dir: string): string => {
+    const result = npm(['pack', dir, '--pack-destination', project, '--json']);
+    if (result.status !== 0) throw new Error(`npm pack ${dir}: ${result.stderr}`);
+    return (JSON.parse(result.stdout) as { filename: string }[])[0]!.filename;
+  };
+
+  /** A project depending on the packed pro (with `proPackage` as its package.json) plus react and react-dom. */
+  function install(proPackage: (pkg: Record<string, unknown>) => Record<string, unknown>) {
+    const proCopy = join(project, 'pro');
+    mkdirSync(proCopy, { recursive: true });
+    cpSync(join(PRO, 'dist'), join(proCopy, 'dist'), { recursive: true });
+    const pkg = JSON.parse(readFileSync(join(PRO, 'package.json'), 'utf8')) as Record<string, unknown>;
+    writeFileSync(join(proCopy, 'package.json'), JSON.stringify(proPackage(pkg), null, 2));
+    const dependencies: Record<string, string> = { '@formrail/pro': `file:./${pack(proCopy)}` };
+    for (const name of ['react', 'react-dom', 'scheduler']) dependencies[name] = `file:./${pack(join(ROOT, 'node_modules', name))}`;
+    writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'only-pro', private: true, dependencies }, null, 2));
+    return npm(['install']);
+  }
+
+  beforeEach(() => {
+    project = realpathSync(mkdtempSync(join(tmpdir(), 'formrail-only-pro-')));
+  });
+  afterEach(() => rmSync(project, { recursive: true, force: true }));
+
+  it('the core is not installed: `npm ls @formrail/core` reports it absent, the engine entry loads', () => {
+    const result = install((pkg) => pkg);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(existsSync(join(project, 'node_modules/@formrail/pro/dist/engine.js'))).toBe(true);
+    expect(existsSync(join(project, 'node_modules/@formrail/core'))).toBe(false);
+    const ls = npm(['ls', '@formrail/core']);
+    expect(ls.stdout).toContain('(empty)');
+    expect(ls.stdout).not.toContain('@formrail/core@');
+    const load = spawnSync(process.execPath, ['--input-type=module', '-e', "const e = await import('@formrail/pro/engine'); console.log(typeof e.useFormRebase)"], {
+      cwd: project,
+      encoding: 'utf8',
+    });
+    expect(load.stdout.trim()).toBe('function');
+  });
+
+  it('negative control: without peerDependenciesMeta, npm wants the core (installs it or fails offline)', () => {
+    const result = install((pkg) => {
+      const copy = { ...pkg };
+      delete copy.peerDependenciesMeta;
+      return copy;
+    });
+    const coreAbsent = result.status === 0 && !existsSync(join(project, 'node_modules/@formrail/core'));
+    expect(coreAbsent).toBe(false);
   });
 });

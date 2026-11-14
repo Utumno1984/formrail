@@ -6,8 +6,9 @@ Summary** e **Form Rebase** devono funzionare senza `@formrail/core`, per chi us
 org npm privata, nessun licensing a runtime (§2.4).
 
 Ogni sezione numerata risponde a una delle domande del ticket. Per ciascuna riporta l'opzione
-scelta, le alternative scartate e il motivo. Le scelte che spettano a Daniele sono raccolte in
-"Decisioni aperte per Daniele" e **non sono implementate** finché lui non risponde.
+scelta, le alternative scartate e il motivo. Le tre scelte che spettavano a Daniele (Q1, Q2, Q3)
+sono raccolte in "Decisioni di Daniele": le ha prese il 14/11/2026 (1a, 2a, 3a), registrate sul
+ticket #489.
 
 Versioni verificate:
 - `react-hook-form` 7.92.0: righe citate da `node_modules/react-hook-form/dist/index.esm.mjs`;
@@ -30,8 +31,8 @@ Le righe del repo si riferiscono al branch `feat/489-pro-engines-without-core`.
 - I componenti visivi usano il core e restano dove sono:
   - `packages/pro/src/change-summary/ChangeSummary.tsx:2` (`cn`, `Text`);
   - `packages/pro/src/form-rebase/RebaseNotice.tsx:13` (`Button`, `MessageStrip`, `cn`, `composeRefs`).
-- `@formrail/core` è una peer **obbligatoria** (`packages/pro/package.json:47`): npm 7+ la
-  installa comunque, anche a chi usa solo RHF.
+- `@formrail/core` era una peer **obbligatoria** (`packages/pro/package.json:47` su main 45f2a59): npm
+  7+ la installava comunque, anche a chi usa solo RHF. Con la decisione 1a ora è opzionale.
 
 ## 1. Confine
 
@@ -45,10 +46,13 @@ dipende. Il risultato tecnico è lo stesso, ma cambia ciò che il cliente riceve
 pacchetti, due versioni da allineare, accessi da concedere su due nomi) senza un vantaggio per chi
 installa: con (a) chi usa solo RHF installa un pacchetto e importa un subpath.
 
-**Aperto**: perché (a) sia completa, `@formrail/core` deve diventare peer **opzionale**
-(`peerDependenciesMeta`). È la decisione Q1, non applicata in questa PR. Finché resta
-obbligatoria, i tipi e il runtime dell'entry dei motori sono già indipendenti dal core (verificati
-sotto), ma npm continua a installarlo.
+**Deciso (Q1 = 1a, Daniele, 14/11/2026)**: `@formrail/core` è peer **opzionale**
+(`peerDependenciesMeta` in `packages/pro/package.json`), applicato in questa PR. Chi usa solo
+`@formrail/pro/engine` non lo installa: `tests/pro-engine-no-core/no-core.test.ts` fa `npm install`
+offline del pacchetto impacchettato e verifica che `npm ls @formrail/core` lo dia assente. Come
+controllo negativo, senza `peerDependenciesMeta` npm lo vuole. Chi importa `@formrail/pro` senza core
+riceve subito "Cannot find module '@formrail/core'", sia nei tipi sia a runtime, e il README Pro
+spiega chi deve installarlo.
 
 Garanzie verificabili del confine:
 - **Sorgenti**: `packages/pro/test/engine-boundary.test.ts` percorre il grafo degli import da
@@ -131,7 +135,8 @@ banale:
 
 ## 4. Adattatori vs guida
 
-**Aperto (Q2), nessuna implementazione in questa PR.** Raccomandazione: adattatori
+**Deciso (Q2 = 2a, Daniele, 14/11/2026)**: adattatori, implementati nei ticket figli A3 (RHF) e
+A4 (TanStack), non in questa PR. Forma prevista: adattatori
 `useReactHookFormBinding(form)` / `useTanStackFormBinding(form)` in subpath dedicati
 (`@formrail/pro/react-hook-form`, `@formrail/pro/tanstack-form`). Le due librerie entrerebbero
 come peer **opzionali**, usate solo per i tipi: gli adattatori chiamano solo i metodi dell'oggetto
@@ -146,8 +151,8 @@ Motivo: le sezioni 5 e 6 mostrano che il binding corretto richiede tre cose:
 asincrona"). Lasciarla a una ricetta copiata nel codice del cliente la rende fragile e non
 aggiornabile.
 
-Alternativa: solo una guida con ricetta copiabile (file example con story). Non servono peer, ma
-la correttezza ricade sul cliente.
+Alternativa scartata (2b): solo una guida con ricetta copiabile (file example con story). Non
+servono peer, ma la correttezza ricade sul cliente.
 
 In entrambi i casi `react-hook-form` e `@tanstack/react-form` sono già `devDependencies` di
 `packages/pro`, per esempi e test. `scripts/pro-package.test.mjs` verifica che non compaiano mai
@@ -243,12 +248,13 @@ Divergenze note:
 
 ## Ticket figli proposti
 
-Da confermare con Q3:
+Deciso con Q3 = 3a (Daniele, 14/11/2026); i ticket figli A3 e A4 li crea il pianificatore:
 - **A1 + A2 (questa PR)**: entry dei motori, guard sorgenti e dist, budget del subpath
   (`packages/pro/bundle-budget.engine.json`, `scripts/bundle-budget.mjs`), contratto
-  `RebaseFormBinding`, fixture senza core.
-- **A3, integrazione RHF.** Dipende da A1+A2 e da Q2.
-  - Adattatore (o ricetta) e story `Pro/Integrations/React Hook Form`, con `argTypes`, `fn()` e
+  `RebaseFormBinding`, fixture senza core, `@formrail/core` peer opzionale.
+- **A3, integrazione RHF.** Dipende da A1+A2.
+  - Adattatore `useReactHookFormBinding` in `@formrail/pro/react-hook-form` (RHF peer opzionale,
+    solo tipi) e story `Pro/Integrations/React Hook Form`, con `argTypes`, `fn()` e
     `play`.
   - E2e e baseline visive desktop/tablet/mobile.
   - Unit test con contatore dei render: due campi modificati danno due entry, il ritorno al valore
@@ -257,17 +263,21 @@ Da confermare con Q3:
   - I casi limite della tabella marcati A3.
 - **A4, integrazione TanStack Form.** Dipende da A3 (stesso schema): gli stessi criteri.
 
-## Decisioni aperte per Daniele
+## Decisioni di Daniele
 
-- **Q1, `@formrail/core` peer opzionale?**
-  - **1a (raccomandata)**: `peerDependenciesMeta: { "@formrail/core": { optional: true } }`. Un
-    solo pacchetto, distribuzione invariata. Chi importa l'entry principale senza core riceve
-    "Cannot find module '@formrail/core'": la fixture lo verifica già come controllo negativo.
-  - **1b**: pacchetto separato `@formrail/pro-engine` (§1, alternativa (b)).
-- **Q2, integrazione con le librerie di form.**
-  - **2a (raccomandata)**: adattatori in subpath dedicati, con RHF e TanStack come peer opzionali
-    usate solo per i tipi (§4).
-  - **2b**: solo una ricetta copiabile, senza nuove peer.
-- **Q3, divisione del lavoro.**
-  - **3a (raccomandata)**: questa PR porta studio + A1 + A2; A3 e A4 diventano ticket figli.
-  - **3b**: tutto in un'unica PR.
+Prese il 14/11/2026 sulle opzioni proposte dallo studio, registrate sul ticket #489.
+
+- **Q1, `@formrail/core` peer opzionale: deciso 1a.**
+  - **1a (scelta)**: `peerDependenciesMeta: { "@formrail/core": { optional: true } }`. Un solo
+    pacchetto, distribuzione invariata. Chi importa l'entry principale senza core riceve
+    "Cannot find module '@formrail/core'": la fixture lo verifica come controllo negativo.
+    Applicata in questa PR.
+  - **1b (scartata)**: pacchetto separato `@formrail/pro-engine` (§1, alternativa (b)).
+- **Q2, integrazione con le librerie di form: deciso 2a.**
+  - **2a (scelta)**: adattatori in subpath dedicati, con RHF e TanStack come peer opzionali
+    usate solo per i tipi (§4). Implementazione nei ticket figli A3 e A4.
+  - **2b (scartata)**: solo una ricetta copiabile, senza nuove peer.
+- **Q3, divisione del lavoro: deciso 3a.**
+  - **3a (scelta)**: questa PR porta studio + A1 + A2 + peer opzionale; A3 e A4 diventano
+    ticket figli, creati dal pianificatore.
+  - **3b (scartata)**: tutto in un'unica PR.

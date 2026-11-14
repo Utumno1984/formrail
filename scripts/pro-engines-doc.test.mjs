@@ -1,5 +1,5 @@
 // Ticket #489: the study of the Pro engines boundary exists, answers every question of the ticket under its own
-// heading, lists the decisions left to Daniele, and is linked from §8 of the spec. The content is reviewed by
+// heading, records the decisions of Daniele, and is linked from §8 of the spec. The content is reviewed by
 // the critic; this guards against the file or a section disappearing.
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ export const REQUIRED_HEADINGS = [
   '## 7. Semantica di "dirty"',
   '## Casi limite del ticket: stato',
   '## Ticket figli proposti',
-  '## Decisioni aperte per Daniele',
+  '## Decisioni di Daniele',
 ];
 
 /** The headings of `REQUIRED_HEADINGS` missing from `markdown` (a heading must be a whole line). */
@@ -39,9 +39,12 @@ describe('study of the Pro engines boundary (#489)', () => {
     expect(missingHeadings(readFileSync(STUDY, 'utf8'))).toEqual([]);
   });
 
-  it('lists the three open decisions with their options', () => {
-    const open = readFileSync(STUDY, 'utf8').split('## Decisioni aperte per Daniele')[1] ?? '';
-    for (const option of ['1a', '1b', '2a', '2b', '3a', '3b']) expect(open).toContain(`**${option}`);
+  it('records the three decisions of Daniele (14/11/2026: 1a, 2a, 3a) with the options set aside', () => {
+    const decisions = readFileSync(STUDY, 'utf8').split('## Decisioni di Daniele')[1] ?? '';
+    expect(decisions).toContain('14/11/2026');
+    for (const chosen of ['1a', '2a', '3a']) expect(decisions).toContain(`**${chosen} (scelta)**`);
+    for (const discarded of ['1b', '2b', '3b']) expect(decisions).toContain(`**${discarded} (scartata)**`);
+    expect(readFileSync(STUDY, 'utf8')).not.toMatch(/\*\*Aperto/);
   });
 
   it('cites the real code (file:line)', () => {

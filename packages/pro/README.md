@@ -14,9 +14,30 @@ Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LIC
   visual builds; the public GitHub Pages deploy sets `STORYBOOK_EXCLUDE_PRO=1` and publishes Free only).
 - The engine (`computeChangeSummary`, `useChangeSummary`) works with any form state that exposes the
   current values and the saved baseline (e.g. core's `useObjectPageForm`). The components
-  (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as a
-  **peer dependency** and treated as external by the build. The peer range must be revisited when pro
-  is published.
+  (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as an **optional peer
+  dependency** and treated as external by the build. The peer range must be revisited when pro is
+  published.
+
+## Entries, and who installs `@formrail/core`
+
+| Import | What it holds | `@formrail/core` |
+|---|---|---|
+| `@formrail/pro/engine` | The engines: `computeChangeSummary`, `useChangeSummary`, `inferSegmentLabel`, `formatChangeValue`, `computeRebase`, `useFormRebase` and their types (`RebaseFormBinding`, ...) | **Not needed**: nothing in this entry imports it, not even a type |
+| `@formrail/pro` | Everything above plus the components (`ChangeSummary`, `RebaseNotice`, `VirtualListReport`, `VirtualListReportTable`) and `useFormRebase` typed for core's `useObjectPageForm` | **Required**: install it next to pro |
+
+`@formrail/core` is an **optional** peer dependency (`peerDependenciesMeta`), so npm does not install it
+by itself:
+
+- With React Hook Form, TanStack Form or a form of your own, install `@formrail/pro` and import only
+  `@formrail/pro/engine`. `npm ls @formrail/core` then reports it absent.
+- With core's Object Page or the Pro components, install both: `npm install @formrail/core @formrail/pro`.
+  Importing `@formrail/pro` without the core fails at once with "Cannot find module '@formrail/core'"
+  (at build time and in the type checker), never silently.
+
+`useFormRebase` of `@formrail/pro/engine` takes any form that keeps the `RebaseFormBinding` contract
+(`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`); core's `useObjectPageForm()` is one
+as is. Ready-made bindings for React Hook Form and TanStack Form are planned (ticket #489, child tickets);
+the study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
 
 ## Change Summary engine
 
