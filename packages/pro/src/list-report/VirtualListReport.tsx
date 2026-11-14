@@ -1,6 +1,6 @@
 import { forwardRef, useMemo, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import { Button, composeRefs, type ListReportSelection } from '@formrail/core';
-import { ListReportFrame, type ListReportFrameLabels, type ListReportFrameProps } from '@formrail/core/internal';
+import { ListReportFrame, getNumberFormat, type ListReportFrameLabels, type ListReportFrameProps } from '@formrail/core/internal';
 import { VirtualListReportTable, type VirtualListReportTableProps } from './VirtualListReportTable';
 
 /** Texts of `VirtualListReport`: those of the core floorplan plus the Pro selection action. */
@@ -8,13 +8,16 @@ export interface VirtualListReportLabels extends ListReportFrameLabels {
   /**
    * The "select every result" action of the selection bar, shown when some but not all of the results
    * are selected. Distinct from the header checkbox's `selectAllResults` on purpose (two controls, two
-   * names). Default: "Select all 100,000 results".
+   * names). Default: "Select all 100,000 results", the number formatted in the `locale` of `useListReport`
+   * (`Intl.NumberFormat`; with SSR pass `locale`). A custom function receives the raw number and formats it itself.
    */
   selectAllResultsAction: (resultCount: number) => string;
 }
 
-const DEFAULT_SELECT_ALL_ACTION = (resultCount: number): string =>
-  `Select all ${resultCount.toLocaleString('en-US')} ${resultCount === 1 ? 'result' : 'results'}`;
+const defaultSelectAllAction =
+  (fmt: (n: number) => string) =>
+  (resultCount: number): string =>
+    `Select all ${fmt(resultCount)} ${resultCount === 1 ? 'result' : 'results'}`;
 
 export type VirtualListReportProps<Row> = Omit<ListReportFrameProps<Row>, 'renderTable' | 'labels'> &
   Pick<VirtualListReportTableProps<Row>, 'virtualizeThreshold' | 'overscan' | 'handleRef'> & {
@@ -27,7 +30,7 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
   const { table } = props;
   const scroller = useRef<HTMLDivElement | null>(null);
   const mergedScrollerRef = useMemo(() => composeRefs(scrollerRef, scroller), [scrollerRef]);
-  const selectAllLabel = labels?.selectAllResultsAction ?? DEFAULT_SELECT_ALL_ACTION;
+  const selectAllLabel = labels?.selectAllResultsAction ?? defaultSelectAllAction((n) => getNumberFormat(table.locale).format(n));
 
   const renderBulkActions = (selection: ListReportSelection<Row>): ReactNode => {
     const partial = selection.selectedResultCount > 0 && selection.selectedResultCount < table.resultCount;

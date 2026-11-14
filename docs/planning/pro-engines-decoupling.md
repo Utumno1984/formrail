@@ -285,8 +285,11 @@ Divergenze note:
   ritorno al valore originale, a differenza di `isDefaultValue`).
 - **Cosa vede l'utente quando divergono**: un form "dirty" per la libreria con il riepilogo vuoto,
   o viceversa. La regola per la UI: il footer e il dirty-guard si basano su
-  `useChangeSummary().isEmpty`, non sull'`isDirty` della libreria. Così il riepilogo e il pulsante
-  "Salva" non si contraddicono mai. Va documentato nella guida degli adattatori.
+  `isEmpty && reorders.length === 0` di `useChangeSummary()`, non sull'`isDirty` della libreria e
+  non sul solo `isEmpty`. Un riordino senza modifiche di un array con `arrayIdKeys` è dirty ma non
+  dà entry: da #424 compare in `reorders` (`computeChangeSummaryResult`/`useChangeSummary`). Così il
+  riepilogo e il pulsante "Salva" non si contraddicono mai, nemmeno su un riordino puro. Va
+  documentato nella guida degli adattatori.
 - **Chiavi interne della libreria**: `useFieldArray` di RHF aggiunge un `id` solo alla lista
   `fields` restituita al render, non ai valori (`getValues`/`watch`). Quindi non compare nel
   riepilogo e non rompe `arrayIdKeys`, purché il binding legga i valori e non `fields`. Da coprire

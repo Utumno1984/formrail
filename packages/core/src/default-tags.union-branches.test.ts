@@ -10,18 +10,15 @@ import { describe, expect, it } from 'vitest';
 const SRC = import.meta.dirname;
 
 /**
- * Props whose branches deliberately describe the discriminant ("one item" / "the items"), which predate
- * #475. The Docs table already shows both texts for them: out of scope of the `@default` ticket. The
- * list can only shrink: an entry that no longer diverges fails the test.
+ * Props whose branches deliberately describe different things, with the reason. Empty since #537: every
+ * branch now carries the same text (the per-branch details live in that one text, because the docgen
+ * shows only the prose). The list can only shrink: an entry that no longer diverges fails the test.
+ *
+ * Limits of the check (it follows only the types declared in the same file): it does not follow types
+ * imported from another module, types built with `Omit<>` or generics, nor members inherited through
+ * `extends` of an interface that is a branch. Extend it if a union prop needs it.
  */
-const KNOWN_DIVERGENT: Record<string, string> = {
-  'accordion/Accordion.tsx: AccordionProps.type': 'single / multiple describe themselves',
-  'accordion/Accordion.tsx: AccordionProps.value': 'one value / many values',
-  'accordion/Accordion.tsx: AccordionProps.defaultValue': 'one value / many values',
-  'accordion/Accordion.tsx: AccordionProps.onValueChange': 'one value / many values',
-  'object-page/standard-schema.ts: StandardSchemaResult.issues': 'success branch / failure branch',
-  'typography/Text.tsx: TextProps.as': 'the `label` branch is a different element',
-};
+const KNOWN_DIVERGENT: Record<string, string> = {};
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -116,6 +113,18 @@ describe('props defined in the branches of a union: the same descriptive text in
     // The check is not blind there: a reworded branch is seen.
     expect(divergences(field.replace('`default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only.\n       * @default', 'Editable, `disabled`, `forced` or `locked`.\n       * @default'))).toContainEqual(expect.stringMatching(/^FieldStateProps\.state: /));
     expect(divergences(button.replace('Height scale (`sm` 32px', 'The scale (`sm` 32px'))).toContainEqual(expect.stringMatching(/^ButtonProps\.size: /));
+  });
+
+  it('the former known divergences are consistent, and rewording one branch is seen (#537)', () => {
+    const accordion = readFileSync(join(SRC, 'accordion/Accordion.tsx'), 'utf8');
+    const text = readFileSync(join(SRC, 'typography/Text.tsx'), 'utf8');
+    const schema = readFileSync(join(SRC, 'object-page/standard-schema.ts'), 'utf8');
+    for (const source of [accordion, text, schema]) expect(divergences(source)).toEqual([]);
+    expect(Object.keys(KNOWN_DIVERGENT)).toEqual([]);
+    // `replace` rewords the first occurrence only (one branch), so the branches differ.
+    expect(divergences(accordion.replace('/** Which items can be open:', '/** Reworded. Which items can be open:'))).toContainEqual(expect.stringMatching(/^AccordionProps\.type: /));
+    expect(divergences(text.replace('/** Element rendered:', '/** Reworded:'))).toContainEqual(expect.stringMatching(/^TextProps\.as: /));
+    expect(divergences(schema.replace('/** Present only on failure:', '/** Reworded:'))).toContainEqual(expect.stringMatching(/^StandardSchemaResult\.issues: /));
   });
 
   it('a reworded first branch is a divergence, a `@default` tag alone is not', () => {

@@ -421,6 +421,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
     rows: sortedRows,
     columns,
     getRowId,
+    locale,
     sort,
     toggleSort,
     setSort,

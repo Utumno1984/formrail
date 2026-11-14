@@ -19,6 +19,7 @@ import type { ListReportTableStatus } from './ListReportTableShell';
 import {
   actionsClass,
   countClass,
+  countWrapClass,
   countFlashClass,
   countHiddenClass,
   filterBarClass,
@@ -33,14 +34,20 @@ import {
 } from './list-report-styles';
 import type { ListReportRowActions, ListReportSelection, UseListReportReturn } from './types';
 import { useChangeFlash } from './use-change-flash';
+import { getNumberFormat } from './number-format';
 
 /** Texts of `ListReportFrame`: those of the table plus the count in the header (the count default is English). */
 export interface ListReportFrameLabels extends ListReportTableLabels {
-  /** The count next to the title. Default: `(n)`, and `(n of m)` when a pill or the search hide some of the rows. */
+  /**
+   * The count next to the title. Default: `(n)`, and `(n of m)` when a pill or the search hide some of the rows,
+   * the numbers formatted in the `locale` of `useListReport` (`Intl.NumberFormat`; with SSR pass `locale`).
+   * A custom function receives the raw numbers and formats them itself.
+   */
   count: (resultCount: number, totalCount: number) => string;
   /**
    * Text of the selection bar (with `selectable`): the selected rows among the results and the selected
-   * ones hidden by the filters. Default: "No items selected", "3 selected", "1 selected (2 hidden by filters)".
+   * ones hidden by the filters. Default: "No items selected", "3 selected", "1,234 selected (2 hidden by filters)",
+   * the numbers formatted in the `locale` of `useListReport`. A custom function receives the raw numbers and formats them itself.
    */
   selectionCount: (selectedCount: number, hiddenCount: number) => string;
   /** Button of the selection bar that empties the selection (hidden ids included). Default "Clear selection". */
@@ -49,15 +56,19 @@ export interface ListReportFrameLabels extends ListReportTableLabels {
   selectionBar: string;
 }
 
-const DEFAULT_COUNT = (resultCount: number, totalCount: number): string =>
-  resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`;
+const defaultCount =
+  (fmt: (n: number) => string) =>
+  (resultCount: number, totalCount: number): string =>
+    resultCount === totalCount ? `(${fmt(resultCount)})` : `(${fmt(resultCount)} of ${fmt(totalCount)})`;
 
-const DEFAULT_SELECTION_COUNT = (selectedCount: number, hiddenCount: number): string =>
-  hiddenCount > 0
-    ? `${selectedCount} selected (${hiddenCount} hidden by filters)`
-    : selectedCount === 0
-      ? 'No items selected'
-      : `${selectedCount} selected`;
+const defaultSelectionCount =
+  (fmt: (n: number) => string) =>
+  (selectedCount: number, hiddenCount: number): string =>
+    hiddenCount > 0
+      ? `${fmt(selectedCount)} selected (${fmt(hiddenCount)} hidden by filters)`
+      : selectedCount === 0
+        ? 'No items selected'
+        : `${fmt(selectedCount)} selected`;
 
 /** @internal The props `ListReportFrame` computed for its table, handed to `renderTable`. */
 export interface ListReportFrameTableProps<Row> {
@@ -183,7 +194,10 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
   const rootRef = useRef<HTMLDivElement | null>(null);
   const mergedRef = useMemo(() => composeRefs(ref, rootRef), [ref]);
   const { selection } = table;
-  const count = labels?.count ?? DEFAULT_COUNT;
+  // The default texts format their numbers in the locale of `useListReport`; a custom function gets raw numbers.
+  const numberFormat = getNumberFormat(table.locale);
+  const fmt = (n: number) => numberFormat.format(n);
+  const count = labels?.count ?? defaultCount(fmt);
   // The pill eases to a stronger tone when the numbers change (not at mount); the text itself just changes.
   const countChanged = useChangeFlash(`${table.resultCount}/${table.totalCount}`);
 
@@ -221,7 +235,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
           <span
             data-rop-count=""
             data-changed={countChanged ? '' : undefined}
-            className={cn(countClass, countChanged && countFlashClass, !countShown && countHiddenClass)}
+            className={cn(countClass, labels?.count && countWrapClass, countChanged && countFlashClass, !countShown && countHiddenClass)}
           >
             {count(table.resultCount, table.totalCount)}
           </span>
@@ -251,7 +265,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
             {labels?.selectionBar ?? 'Selection'}
           </span>
           <TruncatedText className={selectionCountClass} data-rop-selection-count="">
-            {(labels?.selectionCount ?? DEFAULT_SELECTION_COUNT)(selection.selectedResultCount, selection.hiddenSelectedCount)}
+            {(labels?.selectionCount ?? defaultSelectionCount(fmt))(selection.selectedResultCount, selection.hiddenSelectedCount)}
           </TruncatedText>
           {bulkActions ? <div className={selectionActionsClass}>{bulkActions(selection)}</div> : null}
           <Button

@@ -12,7 +12,7 @@ const ROWS: Item[] = Array.from({ length: 100_000 }, (_, i) => ({ id: `r${i}`, n
 const COLUMNS: ListReportColumn<Item>[] = [{ id: 'name', header: 'Name', accessor: (r) => r.name }];
 
 function Table({ count, floorplan }: { count: number; floorplan?: boolean }) {
-  const table = useListReport<Item>({ rows: ROWS.slice(0, count), columns: COLUMNS, getRowId: (r) => r.id, selectable: true });
+  const table = useListReport<Item>({ rows: ROWS.slice(0, count), columns: COLUMNS, getRowId: (r) => r.id, selectable: true, locale: 'en-US' });
   return floorplan ? <VirtualListReport title="Items" table={table} /> : <VirtualListReportTable table={table} aria-label="Items" />;
 }
 

@@ -252,6 +252,12 @@ export interface UseListReportReturn<Row> {
   columns: readonly ListReportColumn<Row>[];
   /** The `getRowId` option, handed back so a table can key its rows. */
   getRowId: (row: Row) => string;
+  /**
+   * The `locale` option, handed back (`undefined` when not given) so the floorplans format the numbers
+   * of their default texts (count, selection bar, "Select all N results") with `Intl.NumberFormat` in
+   * the same locale. With server rendering pass `locale`: the runtime default can differ between server and client.
+   */
+  locale: string | string[] | undefined;
   /** The effective sort: `null` when the requested column is missing or not sortable. */
   sort: ListReportSort;
   /** Next step of the cycle for a column; no-op for an unknown or non-sortable column. */

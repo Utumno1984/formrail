@@ -39,6 +39,7 @@ export const DOCUMENTED_IN = {
   // Pro
   ChangeSummary: ['Pro/ChangeSummary'],
   computeChangeSummary: ['Pro/ChangeSummary'],
+  computeChangeSummaryResult: ['Pro/ChangeSummary'],
   useChangeSummary: ['Pro/ChangeSummary'],
   inferSegmentLabel: ['Pro/ChangeSummary'],
   formatChangeValue: ['Pro/ChangeSummary'],

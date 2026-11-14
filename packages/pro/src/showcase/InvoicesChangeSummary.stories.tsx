@@ -17,7 +17,7 @@ const SHOWCASE_FOLDER = 'packages/pro/src/showcase';
 const SOURCES = import.meta.glob<string>(['./*.{ts,tsx}', '!./*.{test,stories}.{ts,tsx}'], { query: '?raw', import: 'default', eager: true });
 const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
   'invoice-review.tsx':
-    'The review step plugged into the Free showcase through its `reviewSave` extension point: `ChangeSummary` against the saved record. In your app, import `ChangeSummary`, `computeChangeSummary`, `formatChangeValue` and the `ChangeEntry` type from `@formrail/pro` (this file reaches them through relative imports because it lives inside the Pro package). Not public: the relative imports of the Free showcase (`../../../core/src/showcase/...`: the record page, `number-text` and `showcase-data` fixtures).',
+    'The review step plugged into the Free showcase through its `reviewSave` extension point: `ChangeSummary` against the saved record. In your app, import `ChangeSummary`, `computeChangeSummaryResult`, `formatChangeValue` and the `ChangeEntry`, `ChangeSummaryResult` and `ItemLabelContext` types from `@formrail/pro` (this file reaches them through relative imports because it lives inside the Pro package). Not public: the relative imports of the Free showcase (`../../../core/src/showcase/...`: the record page, `number-text` and `showcase-data` fixtures).',
 });
 
 /*

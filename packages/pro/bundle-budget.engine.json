@@ -3,12 +3,16 @@
   "version": 1,
   "exports": {
     "computeChangeSummary": {
-      "baseline": 2175,
-      "limit": 2393
+      "baseline": 2608,
+      "limit": 2869
+    },
+    "computeChangeSummaryResult": {
+      "baseline": 2594,
+      "limit": 2854
     },
     "computeRebase": {
-      "baseline": 3438,
-      "limit": 3782
+      "baseline": 3795,
+      "limit": 4175
     },
     "formatChangeValue": {
       "baseline": 1277,
@@ -19,12 +23,12 @@
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2357,
-      "limit": 2593
+      "baseline": 2781,
+      "limit": 3060
     },
     "useFormRebase": {
-      "baseline": 5160,
-      "limit": 5677
+      "baseline": 5524,
+      "limit": 6077
     }
   }
 }

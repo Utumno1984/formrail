@@ -241,3 +241,63 @@ test.describe('Pro/ChangeSummary', () => {
     await expectNoA11yViolations(page);
   });
 });
+
+const ROW_LABELS = 'pro-changesummary--row-labels-and-reorders';
+
+test.describe('Pro/ChangeSummary: row labels and reorders (#424)', () => {
+  test('the RowLabelsAndReorders play function passes, with rowLabels name (default) and position', async ({ page }) => {
+    await expectPlayToPass(page, ROW_LABELS);
+    await expectPlayToPass(page, ROW_LABELS, 'rowLabels:position');
+  });
+
+  test('an edit names its row; moves are listed as reorders, not as entries (aria snapshot)', async ({ page }) => {
+    await expectPlayToPass(page, ROW_LABELS);
+    await page.getByRole('textbox', { name: 'Price of Lamp' }).fill('18');
+    await page.getByRole('button', { name: 'Move Lamp up' }).click();
+    await page.getByRole('button', { name: 'Move ECO of Lamp up' }).click();
+    await expect(page.getByRole('list', { name: 'Changes' })).toMatchAriaSnapshot(`
+      - list "Changes":
+        - listitem: Line Items > Item 2 (Lamp) > Price, changed, from 15 to 18
+    `);
+    await expect(page.getByRole('list', { name: 'Reordered lists' })).toMatchAriaSnapshot(`
+      - list "Reordered lists":
+        - listitem: "Order changed: Line Items"
+        - listitem: "Order changed: Line Items > Item 2 (Lamp) > Taxes"
+    `);
+  });
+
+  test('rowLabels position: the labels go back to Item N', async ({ page }) => {
+    await expectPlayToPass(page, ROW_LABELS, 'rowLabels:position');
+    await page.getByRole('textbox', { name: 'Price of Chair' }).fill('45');
+    await page.getByRole('button', { name: 'Move ECO of Chair up' }).click();
+    await expect(page.getByRole('list', { name: 'Changes' })).toMatchAriaSnapshot(`
+      - list "Changes":
+        - listitem: Line Items > Item 2 > Price, changed, from 40 to 45
+    `);
+    await expect(page.getByRole('list', { name: 'Reordered lists' })).toMatchAriaSnapshot(`
+      - list "Reordered lists":
+        - listitem: "Order changed: Line Items > Item 2 > Taxes"
+    `);
+  });
+
+  test('EditedInvoice: the removed row and the changed row, both at position 1, carry their names', async ({ page }) => {
+    await gotoStory(page, EDITED);
+    await expect(page.getByRole('list', { name: 'Changes' })).toMatchAriaSnapshot(`
+      - list "Changes":
+        - listitem: /^Amount, changed, /
+        - listitem: /^Paid, changed, /
+        - listitem: /^Due Date, changed, /
+        - listitem: Line Items > Item 1 (Chair) > Price, changed, from 40 to 45
+        - listitem: /^Line Items > Item 2 \\(Cable\\), added, /
+        - listitem: /^Line Items > Item 1 \\(Desk\\), removed, /
+    `);
+  });
+
+  test('axe: no violations on RowLabelsAndReorders with entries and reorders', async ({ page }) => {
+    await expectPlayToPass(page, ROW_LABELS);
+    await page.getByRole('textbox', { name: 'Price of Chair' }).fill('45');
+    await page.getByRole('button', { name: 'Move Chair up' }).click();
+    await expect(page.getByRole('list', { name: 'Reordered lists' })).toBeVisible();
+    await expectNoA11yViolations(page);
+  });
+});

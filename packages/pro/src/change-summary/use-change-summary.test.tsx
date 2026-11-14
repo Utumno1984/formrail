@@ -14,7 +14,8 @@ describe('useChangeSummary', () => {
     const { result, rerender } = renderHook((props: ChangeSummaryOptions<Invoice>) => useChangeSummary(props), {
       initialProps: { values: baseline, baseline },
     });
-    expect(result.current).toEqual({ entries: [], isEmpty: true });
+    // #424: `reorders` added (part of `UseChangeSummaryReturn`).
+    expect(result.current).toEqual({ entries: [], isEmpty: true, reorders: [] });
     rerender({ values: { ...baseline, number: 'A-2' }, baseline });
     expect(result.current.isEmpty).toBe(false);
     expect(result.current.entries.map((e) => e.path)).toEqual(['number']);
