@@ -59,8 +59,13 @@ in cui arriva dipende da `skipLibCheck`:
   `@formrail/pro`.
 - **`skipLibCheck: true`**, il default dei template Vite e Next: `tsc` **passa** e i tipi del core
   diventano `any`, quindi passa anche un argomento sbagliato. L'errore arriva solo dal bundler o al
-  caricamento: `ERR_MODULE_NOT_FOUND` (`Cannot find package '@formrail/core'`) in ESM,
-  `Cannot find module '@formrail/core'` in CJS.
+  caricamento, e non sempre nomina un pacchetto mancante:
+  - Vite 8 sostituisce la peer opzionale assente con uno stub vuoto, quindi la build fallisce sul
+    primo import: `[MISSING_EXPORT] "cn" is not exported by
+    "__vite-optional-peer-dep:@formrail/core:@formrail/pro"` (verificato con Vite 8.3.5);
+  - esbuild: `Could not resolve "@formrail/core"`;
+  - Node: `ERR_MODULE_NOT_FOUND` (`Cannot find package '@formrail/core'`) in ESM,
+    `Cannot find module '@formrail/core'` in CJS.
 
 Per non dipendere dal core si importa **solo** `@formrail/pro/engine`. La fixture copre entrambi i
 casi: il consumer con `skipLibCheck: false` fallisce ai tipi; quello con `skipLibCheck: true` passa

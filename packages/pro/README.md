@@ -39,8 +39,12 @@ depends on your TypeScript setup:
   files of `@formrail/pro`.
 - With `skipLibCheck: true`, the default of the Vite and Next.js templates, `tsc` **passes**. The core
   types silently become `any`, so even a wrong argument to a core-typed API type-checks. The error then
-  comes from the bundler, or when the module loads: `ERR_MODULE_NOT_FOUND` (`Cannot find package
-  '@formrail/core'`) in ESM, `Cannot find module '@formrail/core'` in CommonJS.
+  comes from the bundler, or when the module loads, and it does not always name a missing package:
+  - Vite 8 replaces a missing optional peer with an empty stub, so the build fails on the first import
+    from it: `[MISSING_EXPORT] "cn" is not exported by "__vite-optional-peer-dep:@formrail/core:@formrail/pro"`;
+  - esbuild: `Could not resolve "@formrail/core"`;
+  - Node, ESM: `ERR_MODULE_NOT_FOUND` (`Cannot find package '@formrail/core'`); CommonJS:
+    `Cannot find module '@formrail/core'`.
 
 So without the core, import **only `@formrail/pro/engine`**, never `@formrail/pro`. Nothing in that
 entry needs the core, at runtime or in its types, whatever `skipLibCheck` is.
