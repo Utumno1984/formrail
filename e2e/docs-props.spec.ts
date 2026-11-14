@@ -133,7 +133,7 @@ async function pageFacts(page: Page, pages: { title: string; storyId: string }[]
     interface Prepared {
       component?: { __docgenInfo?: Docgen };
       subcomponents?: Record<string, { __docgenInfo?: Docgen } | undefined>;
-      argTypes: Record<string, { name?: string; description?: string; table?: { category?: string; disable?: boolean } }>;
+      argTypes: Record<string, { name?: string; description?: string; table?: { category?: string; disable?: boolean; defaultValue?: { summary?: string } } }>;
     }
     const preview = (window as unknown as { __STORYBOOK_PREVIEW__: { storyStoreValue: { loadStory: (a: { storyId: string }) => Promise<Prepared> } } }).__STORYBOOK_PREVIEW__;
     const docgen = (c: { __docgenInfo?: Docgen } | undefined) => {
@@ -159,6 +159,7 @@ async function pageFacts(page: Page, pages: { title: string; storyId: string }[]
           category: a.table?.category ?? null,
           disabled: !!a.table?.disable,
           description: a.description ?? '',
+          defaultValue: a.table?.defaultValue?.summary ?? null,
         })),
       });
     }
@@ -312,28 +313,36 @@ test.describe('Docs props tables', () => {
     }
   });
 
-  test('Button: the `size` row shows one description, true for both branches of the union (ticket #451)', async ({ page }) => {
-    // `size` is optional in the text branch (default `md`) and required in the icon branch (no default):
-    // the docgen merges the branches, so both TSDoc blocks must carry the same text, and the row must show
-    // exactly that text once (not two concatenated, not "Default `md`" next to the icon sizes).
+  test('Button: the `size` row shows one description, true for both branches of the union (ticket #451, #475)', async ({ page }) => {
+    // `size` is optional in the text branch (`@default 'md'`) and required in the icon branch (no default):
+    // the docgen merges the branches, so both TSDoc blocks must carry the same descriptive text, and the row
+    // must show exactly that text once (not two concatenated). Since #475 the default is the `@default` tag
+    // of the text branch (shown in the Default column), no longer a "Default `md`." sentence in the prose.
     const EXPECTED =
-      'Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a paragraph): the text sizes. Default `md`. ' +
-      'The square icon-only sizes (`icon-xs` 24px, `icon-sm` 32px, `icon-md` 36px) have no default: pass one explicitly, ' +
+      'Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a paragraph): the text sizes. ' +
+      'The square icon-only sizes (`icon-xs` 24px, `icon-sm` 32px, `icon-md` 36px) are never implied: pass one explicitly, ' +
       'together with `aria-label` or `aria-labelledby` (there is no visible text).';
     const { facts } = await realPage(page, 'Primitives/Button');
     const rows = facts.rows.filter((r) => r.name === 'size');
     expect(rows).toHaveLength(1);
     expect(rows[0]?.description.replace(/\s+/g, ' ')).toBe(EXPECTED);
     expect(facts.component?.props.size?.description.replace(/\s+/g, ' ')).toBe(EXPECTED);
+    // The prose no longer states the default, and the Default column shows it.
+    expect(rows[0]?.description).not.toMatch(/Default `md`/);
+    expect(rows[0]?.defaultValue).toMatch(/^"?'md'"?$/);
 
-    // Source: the TSDoc of `size` in every branch is the same text.
+    // Source: the TSDoc of `size` in every branch has the same descriptive text; the only allowed
+    // difference is the `@default` tag, on the text branch only.
     const source = readFileSync(new URL('../packages/core/src/button/Button.tsx', import.meta.url), 'utf8');
-    const blocks = [...source.matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*size\??: Button(?:Text|Icon)Size;/g)].map((m) =>
-      (m[1] ?? '').replace(/\n\s*\*/g, ' ').replace(/\s+/g, ' ').trim(),
-    );
-    expect(blocks).toHaveLength(2);
-    expect(new Set(blocks).size).toBe(1);
-    expect(blocks[0]).toBe(EXPECTED);
+    const raw = [...source.matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*size\??: Button(?:Text|Icon)Size;/g)].map((m) => m[1] ?? '');
+    expect(raw).toHaveLength(2);
+    const flat = (t: string) => t.replace(/\n\s*\*/g, ' ').replace(/\s+/g, ' ').trim();
+    const descriptive = raw.map((b) => flat(b.split(/\n\s*\*\s*@/)[0] ?? ''));
+    expect(new Set(descriptive).size).toBe(1);
+    expect(descriptive[0]).toBe(EXPECTED);
+    const tags = raw.map((b) => [...b.matchAll(/@default\s+(\S+)/g)].map((m) => m[1]));
+    expect(tags.filter((t) => t.length > 0)).toEqual([["'md'"]]);
+    expect(tags.filter((t) => t.length === 0)).toHaveLength(1);
   });
 
   test('negative: a Radix prop dropped by the docgen filter, and a TSDoc inherited from @types/react, fail the guard', async ({ page }) => {
