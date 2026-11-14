@@ -14,7 +14,7 @@ import {
 export interface DirtyGuardLabels {
   /** Dialog title (its accessible name). Default `Unsaved changes`. */
   title: string;
-  /** Dialog description (`aria-describedby`). Default `You have unsaved changes: leaving now will lose them.` */
+  /** Dialog description (`aria-describedby`). Default "You have unsaved changes: leaving now will lose them." */
   description: string;
   /** Safe action: closes the dialog and does not run the guarded action. Default `Keep editing`. */
   stay: string;

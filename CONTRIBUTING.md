@@ -70,7 +70,9 @@ The keys of a `*Labels` interface (`PaginationLabels`, `ListReportTableLabels`, 
   in the Docs; removing the prose would make the value disappear.
 - So every key states its default **in the prose**, as a value: "Default `Previous page`.". A function says what it
   returns ("Default `Page ${page}`.", "Default: `No items`, `1 item`, `N items`."). A key inherited from another
-  interface (`ListReportFrameLabels extends ListReportTableLabels`) is documented once, where it is declared.
+  interface (`ListReportFrameLabels extends ListReportTableLabels`) is documented once, where it is declared. A default
+  that is a whole sentence with punctuation goes in double quotes (`Default "You have unsaved changes: ..."`), because
+  the type reference would otherwise take it for an expression.
 - A key has **no `@default`** (it would be the mixed form, and the Docs would not show it anyway).
 
 The same CI job fails on `label-no-default` (a key whose prose states no default: a new label without its default),
