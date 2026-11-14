@@ -49,4 +49,13 @@ describe('makeSuppliers', () => {
     const roots = makeSuppliers(50).map((supplier) => supplier.name.split(' ')[0]);
     expect(roots.filter((root, index) => roots.indexOf(root) !== index)).toEqual([]);
   });
+
+  it('the buyer is at manager level or below (depth >= 2: never the CEO nor a department head)', () => {
+    const employees = new Map(makeEmployees(DEMO_REFERENCE_POOL.employees).map((employee) => [employee.id, employee]));
+    const problems = makeSuppliers(10_000)
+      .map((row) => employees.get(row.buyerId)!)
+      .filter((employee) => employee.managerId === null || employee.managerId === 'emp-1')
+      .map((employee) => `${employee.id} ${employee.title}`);
+    expect(problems).toEqual([]);
+  });
 });

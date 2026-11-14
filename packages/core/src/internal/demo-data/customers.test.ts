@@ -96,4 +96,13 @@ describe('makeCustomers', () => {
     const roots = makeCustomers(50).map((customer) => customer.name.split(' ')[0]);
     expect(roots.filter((root, index) => roots.indexOf(root) !== index)).toEqual([]);
   });
+
+  it('the account manager is at manager level or below (depth >= 2: never the CEO nor a department head)', () => {
+    const employees = new Map(makeEmployees(DEMO_REFERENCE_POOL.employees).map((employee) => [employee.id, employee]));
+    const problems = makeCustomers(10_000)
+      .map((row) => employees.get(row.accountManagerId)!)
+      .filter((employee) => employee.managerId === null || employee.managerId === 'emp-1')
+      .map((employee) => `${employee.id} ${employee.title}`);
+    expect(problems).toEqual([]);
+  });
 });
