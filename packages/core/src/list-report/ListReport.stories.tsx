@@ -316,7 +316,7 @@ export const LocaleCount: Story = {
   },
 };
 
-/** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: ['internal']`: no second Playground-like docs entry). */
+/** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: ['internal']`: hidden from the public sidebar, #296; it still inherits `autodocs`). */
 export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: ['internal'], play: undefined };
 
 /** Fixture of the e2e suite: `LocaleCountNoPlay` with a long custom `labels.count` (no `whitespace-nowrap`: it wraps). */

@@ -39,6 +39,11 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
       await expect(live).toHaveText(`${fmt(locale, FERRARI)} results`.replace(/[\u00a0\u202f]/g, ' '));
       // toHaveText folds every kind of space: the exact text (fr-FR: U+202F) is checked on the raw text.
       expect(await live.textContent()).toBe(`${fmt(locale, FERRARI)} results`);
+      // Below 1,000 the formatter changes nothing: clear the search so the announced number has a separator.
+      await page.getByRole('searchbox', { name: 'Search' }).fill('');
+      await page.keyboard.press('Enter');
+      await expect(count(page)).toHaveText(`(${fmt(locale, TOTAL)})`);
+      expect(await live.textContent()).toBe(`${fmt(locale, TOTAL)} results`);
     });
   }
 
