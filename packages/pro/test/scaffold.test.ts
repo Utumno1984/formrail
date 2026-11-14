@@ -1,6 +1,7 @@
 import * as pro from '../src/index';
 import type { UseObjectPageFormReturn } from '@formrail/core';
 import type {
+  ArrayReorder,
   ChangeEntry,
   ChangeKind,
   ChangeSummaryOptions,
@@ -25,6 +26,8 @@ describe('@formrail/pro scaffold', () => {
       'VirtualListReport',
       'VirtualListReportTable',
       'computeChangeSummary',
+      // #424: the summary with the reorders of id-keyed arrays.
+      'computeChangeSummaryResult',
       'computeRebase',
       'formatChangeValue',
       'inferSegmentLabel',
@@ -57,7 +60,8 @@ describe('public types', () => {
       beforeMissing: boolean;
       afterMissing: boolean;
     }>();
-    expectTypeOf<UseChangeSummaryReturn>().toEqualTypeOf<{ entries: ChangeEntry[]; isEmpty: boolean }>();
+    // #424: `reorders` added.
+    expectTypeOf<UseChangeSummaryReturn>().toEqualTypeOf<{ entries: ChangeEntry[]; isEmpty: boolean; reorders: ArrayReorder[] }>();
     expectTypeOf(pro.computeChangeSummary).returns.toEqualTypeOf<ChangeEntry[]>();
     expectTypeOf(pro.useChangeSummary).returns.toEqualTypeOf<UseChangeSummaryReturn>();
     expectTypeOf(pro.inferSegmentLabel).toEqualTypeOf<(segment: string) => string>();

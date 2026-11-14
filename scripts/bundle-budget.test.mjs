@@ -316,6 +316,8 @@ describe('multi-package check (#174)', () => {
       'VirtualListReport',
       'VirtualListReportTable',
       'computeChangeSummary',
+      // #424
+      'computeChangeSummaryResult',
       'computeRebase',
       'formatChangeValue',
       'inferSegmentLabel',
@@ -427,6 +429,8 @@ describe('subpath entries (#489)', () => {
     const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.engine.json'), 'utf8'));
     expect(Object.keys(budget.exports).sort()).toEqual([
       'computeChangeSummary',
+      // #424
+      'computeChangeSummaryResult',
       'computeRebase',
       'formatChangeValue',
       'inferSegmentLabel',

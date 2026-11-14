@@ -1,5 +1,5 @@
 import { inferSegmentLabel, itemLabel } from '../change-summary/infer-label';
-import type { ChangeEntry, ChangeKind, ChangeSummaryOptions } from '../change-summary/types';
+import type { ChangeEntry, ChangeKind, ChangeSummaryOptions, ItemLabelContext } from '../change-summary/types';
 import { isDev } from './is-dev';
 
 // Structural diff engine shared by `computeChangeSummary` and `computeRebase`: path navigation,
@@ -75,6 +75,8 @@ export function indexById(items: readonly unknown[], idKey: string): Map<unknown
   return map;
 }
 
+export type ItemSide = ItemLabelContext['side'];
+
 /**
  * A visited position. Linked to its parent instead of copying the segments, so a node costs O(1)
  * whatever its depth; `labelPath` is rebuilt from the chain only when an entry is emitted.
@@ -87,20 +89,75 @@ export interface DiffNode {
   path: string;
   /** Segments without array indexes, joined with '.' (key of `arrayIdKeys` / `labels`). */
   schemaPath: string;
-  /** Label of the last segment ('' at the root). */
+  /** Default label of the last segment ('' at the root, `Item N` for an array item). */
   label: string;
   /** Array item: shares the array's `schemaPath`, but the array's id key is not about it. */
   isItem: boolean;
+  /** Array item: the item, on `side` (`undefined` for any other node). */
+  item: unknown;
+  /** Array item: where `item` and `index` come from (`values` unless it is a removed item). */
+  side: ItemSide;
+  /** Array item: index of `item` in its array on `side` (`-1` for any other node). */
+  index: number;
+  /**
+   * Array item: the labels `itemLabel` already gave it, `[inner, last]` (`isLastSegment` false /
+   * true), so `itemLabel` is asked at most once per item and position in one computation. A node
+   * is labeled by the `itemLabel` of one computation only.
+   */
+  resolved: [string | undefined, string | undefined] | undefined;
 }
 
-export const ROOT: DiffNode = { parent: undefined, depth: 0, path: '', schemaPath: '', label: '', isItem: false };
+export const ROOT: DiffNode = {
+  parent: undefined,
+  depth: 0,
+  path: '',
+  schemaPath: '',
+  label: '',
+  isItem: false,
+  item: undefined,
+  side: 'values',
+  index: -1,
+  resolved: undefined,
+};
 
 const childPath = (node: DiffNode, segment: string): string => (node.depth === 0 ? segment : `${node.path}.${segment}`);
 
-export function labelPathOf(node: DiffNode): string[] {
+/** The label of one segment of a label path; `isLast` is `true` for the node the label is about. */
+export type SegmentLabel = (node: DiffNode, isLast: boolean) => string;
+
+const defaultSegmentLabel: SegmentLabel = (node) => node.label;
+
+/** Labels of the segments from the root to `node`, from `segmentLabel` (the default labels without it). */
+export function labelPathOf(node: DiffNode, segmentLabel: SegmentLabel = defaultSegmentLabel): string[] {
   const labels: string[] = [];
-  for (let n: DiffNode | undefined = node; n && n.depth > 0; n = n.parent) labels.push(n.label);
+  for (let n: DiffNode | undefined = node; n && n.depth > 0; n = n.parent) labels.push(segmentLabel(n, n === node));
   return labels.reverse();
+}
+
+export type ItemLabelOption = ChangeSummaryOptions<object>['itemLabel'];
+
+/**
+ * The label `itemLabel` gives to one array-item segment, with the rules of
+ * `ChangeSummaryOptions.itemLabel`: a non-blank string as it is; `undefined` or a blank string →
+ * `defaultLabel`; anything else → `defaultLabel` and a development warning once per `source` and
+ * `arrayPath`. An exception thrown by `itemLabel` is not caught.
+ */
+export function resolveItemLabel(
+  itemLabel: NonNullable<ItemLabelOption>,
+  source: string,
+  arrayPath: string,
+  item: unknown,
+  context: ItemLabelContext,
+): string {
+  const label: unknown = itemLabel(arrayPath, item, context);
+  if (typeof label === 'string') return label.trim() === '' ? context.defaultLabel : label;
+  if (label !== undefined) {
+    warnOnce(
+      `item-label:${source}:${arrayPath}`,
+      `[formrail/pro] ${source}: itemLabel returned a non-string for '${arrayPath}'; the default label is used.`,
+    );
+  }
+  return context.defaultLabel;
 }
 
 type Task = () => void;
@@ -108,7 +165,18 @@ type Task = () => void;
 /** Stand-in pushed into a probe: its only use is `length > 0`, so no entry is built for it. */
 const PROBE_HIT = {} as ChangeEntry;
 
-type Probe = ChangeEntry[] & { probe?: true };
+/** Where a visit writes. */
+interface Sink {
+  /** The entries; `PROBE_HIT`s for a probe. */
+  out: ChangeEntry[];
+  /** A probe only answers "is there any difference?": it builds no entry and no label. */
+  probe: boolean;
+  /**
+   * The array nodes of the reorders that are not a difference (`reorderIsChange` off), in the
+   * order of the visit; `undefined` when nobody collects them.
+   */
+  reorders: DiffNode[] | undefined;
+}
 
 export type IsEqualOption = ChangeSummaryOptions<object>['isEqual'];
 
@@ -116,12 +184,14 @@ export interface DifferOptions {
   arrayIdKeys?: Readonly<Record<string, string>> | undefined;
   labels?: Readonly<Record<string, string>> | undefined;
   isEqual?: IsEqualOption;
+  /** Names the array-item segments of the labels (`ChangeSummaryOptions.itemLabel`), lazily. */
+  itemLabel?: ItemLabelOption;
   /** Name of the public function in the development warnings. */
   source: string;
   /**
    * An id-matched array whose matched items are in a different relative order is a difference
-   * (one `changed` entry on the array node). Off for `computeChangeSummary` (a reorder gives no
-   * entry).
+   * (one `changed` entry on the array node). Off for `computeChangeSummary`: a reorder gives no
+   * entry, and goes to the `reorders` passed to `run` (when given).
    */
   reorderIsChange?: boolean;
   /**
@@ -143,6 +213,7 @@ export class Differ {
   private readonly arrayIdKeys: Readonly<Record<string, string>> | undefined;
   private readonly labels: Readonly<Record<string, string>> | undefined;
   readonly isEqual: IsEqualOption;
+  private readonly itemLabel: ItemLabelOption;
   private readonly source: string;
   private readonly reorderIsChange: boolean;
   private readonly blockWithoutIds: boolean;
@@ -151,22 +222,30 @@ export class Differ {
     this.arrayIdKeys = options.arrayIdKeys;
     this.labels = options.labels;
     this.isEqual = options.isEqual;
+    this.itemLabel = options.itemLabel;
     this.source = options.source;
     this.reorderIsChange = options.reorderIsChange ?? false;
     this.blockWithoutIds = options.blockWithoutIds ?? false;
   }
 
-  /** Appends to `out` the entries of the pair (`before` = baseline side) visited from `node`. */
-  run(before: unknown, after: unknown, out: ChangeEntry[], node: DiffNode = ROOT): void {
-    this.visit(before, after, node, out);
-    for (let task = this.pending.pop(); task; task = this.pending.pop()) task();
+  /**
+   * Appends to `out` the entries of the pair (`before` = baseline side) visited from `node`, and to
+   * `reorders` (when given) the array node of every reorder that is not an entry.
+   */
+  run(before: unknown, after: unknown, out: ChangeEntry[], node: DiffNode = ROOT, reorders?: DiffNode[]): void {
+    this.drain(before, after, node, { out, probe: false, reorders });
   }
 
-  /** `true` when the pair visited from `node` has at least one entry. */
+  /** `true` when the pair visited from `node` has at least one entry. Labels nothing. */
   differs(before: unknown, after: unknown, node: DiffNode = ROOT): boolean {
-    const probe: Probe = Object.assign([], { probe: true as const });
-    this.run(before, after, probe, node);
-    return probe.length > 0;
+    const probe: Sink = { out: [], probe: true, reorders: undefined };
+    this.drain(before, after, node, probe);
+    return probe.out.length > 0;
+  }
+
+  private drain(before: unknown, after: unknown, node: DiffNode, sink: Sink): void {
+    this.visit(before, after, node, sink);
+    for (let task = this.pending.pop(); task; task = this.pending.pop()) task();
   }
 
   /** Schedules `tasks` to run in order, before anything scheduled earlier. */
@@ -174,14 +253,30 @@ export class Differ {
     for (let i = tasks.length - 1; i >= 0; i -= 1) this.pending.push(tasks[i] as Task);
   }
 
+  /**
+   * The label path of `node`, with `itemLabel` on its item segments (`isLastSegment` only for
+   * `node` itself). The answer of `itemLabel` is kept on the item node, per position.
+   */
+  labelPath(node: DiffNode): string[] {
+    const { itemLabel, source } = this;
+    if (!itemLabel) return labelPathOf(node);
+    return labelPathOf(node, (n, isLast) => {
+      if (!n.isItem) return n.label;
+      const resolved = (n.resolved ??= [undefined, undefined]);
+      const slot = isLast ? 1 : 0;
+      return (resolved[slot] ??= resolveItemLabel(itemLabel, source, n.schemaPath, n.item, {
+        path: n.path,
+        index: n.index,
+        side: n.side,
+        isLastSegment: isLast,
+        defaultLabel: n.label,
+      }));
+    });
+  }
+
+  /** Appends to `out` (a list of real entries, never a probe) the entry of `node`. */
   emit(out: ChangeEntry[], node: DiffNode, kind: ChangeKind, before: unknown, after: unknown): void {
-    // A probe only answers "is there any difference?"; a real entry costs O(depth) (label path),
-    // which makes nested blocks O(depth^2) overall.
-    if ((out as Probe).probe) {
-      out.push(PROBE_HIT);
-      return;
-    }
-    const labelPath = labelPathOf(node);
+    const labelPath = this.labelPath(node);
     out.push({
       path: node.path,
       labelPath,
@@ -194,6 +289,13 @@ export class Differ {
     });
   }
 
+  private record(sink: Sink, node: DiffNode, kind: ChangeKind, before: unknown, after: unknown): void {
+    // A probe only answers "is there any difference?"; a real entry costs O(depth) (label path),
+    // which makes nested blocks O(depth^2) overall, and may call `itemLabel`.
+    if (sink.probe) sink.out.push(PROBE_HIT);
+    else this.emit(sink.out, node, kind, before, after);
+  }
+
   keyChild(node: DiffNode, key: string): DiffNode {
     const schemaPath = node.schemaPath === '' ? key : `${node.schemaPath}.${key}`;
     const override = this.labels && Object.hasOwn(this.labels, schemaPath) ? this.labels[schemaPath] : undefined;
@@ -204,10 +306,15 @@ export class Differ {
       schemaPath,
       label: typeof override === 'string' ? override : inferSegmentLabel(key),
       isItem: false,
+      item: undefined,
+      side: 'values',
+      index: -1,
+      resolved: undefined,
     };
   }
 
-  indexChild(node: DiffNode, index: number): DiffNode {
+  /** The node of `item`, at `index` of the array of `node` on `side`: what `itemLabel` receives. */
+  indexChild(node: DiffNode, index: number, item?: unknown, side: ItemSide = 'values'): DiffNode {
     return {
       parent: node,
       depth: node.depth + 1,
@@ -215,6 +322,10 @@ export class Differ {
       schemaPath: node.schemaPath,
       label: itemLabel(index),
       isItem: true,
+      item,
+      side,
+      index,
+      resolved: undefined,
     };
   }
 
@@ -252,12 +363,12 @@ export class Differ {
     return idKey;
   }
 
-  private visit(before: unknown, after: unknown, node: DiffNode, out: ChangeEntry[]): void {
+  private visit(before: unknown, after: unknown, node: DiffNode, sink: Sink): void {
     if (node.depth > 0 && this.isEqual) {
       const verdict = this.isEqual(exposed(before), exposed(after), node.path);
       if (verdict === true) return;
       if (verdict === false) {
-        this.emit(out, node, kindOf(before, after), before, after);
+        this.record(sink, node, kindOf(before, after), before, after);
         return;
       }
     }
@@ -272,18 +383,18 @@ export class Differ {
       // it differs from Absent like any other value.
       const items = beforeAbsent ? after : before;
       if (idKey !== undefined && Array.isArray(items) && items.length > 0) {
-        this.diffById(beforeAbsent ? [] : items, afterAbsent ? [] : items, idKey, node, out);
+        this.diffById(beforeAbsent ? [] : items, afterAbsent ? [] : items, idKey, node, sink);
         return;
       }
       // Rules 1 and 2: one atomic entry.
-      this.emit(out, node, kindOf(before, after), before, after);
+      this.record(sink, node, kindOf(before, after), before, after);
       return;
     }
 
     // Rule 3: structural comparison.
     if (isDate(before) || isDate(after)) {
       if (!isDate(before) || !isDate(after) || !sameLeaf(before.getTime(), after.getTime())) {
-        this.emit(out, node, 'changed', before, after);
+        this.record(sink, node, 'changed', before, after);
       }
       return;
     }
@@ -291,17 +402,17 @@ export class Differ {
     const afterArray = Array.isArray(after);
     if (beforeArray && afterArray) {
       this.guarded(before, after, () => {
-        if (idKey !== undefined) this.diffById(before, after, idKey, node, out);
-        else this.diffBlock(before, after, node, out);
+        if (idKey !== undefined) this.diffById(before, after, idKey, node, sink);
+        else this.diffBlock(before, after, node, sink);
       });
       return;
     }
     if (isPlainObject(before) && isPlainObject(after)) {
-      this.guarded(before, after, () => this.diffObject(before, after, node, out));
+      this.guarded(before, after, () => this.diffObject(before, after, node, sink));
       return;
     }
     // Type change, or two different non-traversable leaves.
-    this.emit(out, node, 'changed', before, after);
+    this.record(sink, node, 'changed', before, after);
   }
 
   /**
@@ -325,13 +436,13 @@ export class Differ {
     body();
   }
 
-  private diffObject(before: PlainObject, after: PlainObject, node: DiffNode, out: ChangeEntry[]): void {
+  private diffObject(before: PlainObject, after: PlainObject, node: DiffNode, sink: Sink): void {
     const tasks: Task[] = [];
     for (const key of Object.keys(after)) {
-      tasks.push(() => this.visit(own(before, key), after[key], this.keyChild(node, key), out));
+      tasks.push(() => this.visit(own(before, key), after[key], this.keyChild(node, key), sink));
     }
     for (const key of Object.keys(before)) {
-      if (!Object.hasOwn(after, key)) tasks.push(() => this.visit(before[key], MISSING, this.keyChild(node, key), out));
+      if (!Object.hasOwn(after, key)) tasks.push(() => this.visit(before[key], MISSING, this.keyChild(node, key), sink));
     }
     this.schedule(tasks);
   }
@@ -339,26 +450,32 @@ export class Differ {
   /**
    * Block comparison: one `changed` entry unless same length and every positional pair is
    * without changes (same rules). Stops at the first positional pair that differs.
+   *
+   * The positional pairs are visited as a probe, so nothing inside is labeled. The reorders found
+   * there are passed on when the block has no entry (nothing else would report them), and dropped
+   * with the probe when it has one (the block entry covers them).
    */
-  private diffBlock(before: readonly unknown[], after: readonly unknown[], node: DiffNode, out: ChangeEntry[]): void {
+  private diffBlock(before: readonly unknown[], after: readonly unknown[], node: DiffNode, sink: Sink): void {
     if (before.length !== after.length) {
-      this.emit(out, node, 'changed', before, after);
+      this.record(sink, node, 'changed', before, after);
       return;
     }
-    const probe: Probe = Object.assign([], { probe: true as const });
+    const outer = sink.reorders;
+    const probe: Sink = { out: [], probe: true, reorders: outer && [] };
     const tasks: Task[] = [];
     for (let i = 0; i < after.length; i += 1) {
       tasks.push(() => {
-        if (probe.length === 0) this.visit(before[i], after[i], this.indexChild(node, i), probe);
+        if (probe.out.length === 0) this.visit(before[i], after[i], this.indexChild(node, i, after[i]), probe);
       });
     }
     tasks.push(() => {
-      if (probe.length > 0) this.emit(out, node, 'changed', before, after);
+      if (probe.out.length > 0) this.record(sink, node, 'changed', before, after);
+      else if (outer && probe.reorders) for (const reorder of probe.reorders) outer.push(reorder);
     });
     this.schedule(tasks);
   }
 
-  private diffById(before: readonly unknown[], after: readonly unknown[], idKey: string, node: DiffNode, out: ChangeEntry[]): void {
+  private diffById(before: readonly unknown[], after: readonly unknown[], idKey: string, node: DiffNode, sink: Sink): void {
     const beforeIndex = indexById(before, idKey) ?? new Map<unknown, number>();
     const matched = new Set<number>();
     const tasks: Task[] = [];
@@ -369,18 +486,24 @@ export class Differ {
       const id = itemId(item, idKey);
       const i = id === NO_ID ? undefined : beforeIndex.get(idMapKey(id));
       if (i === undefined) {
-        tasks.push(() => this.emit(out, this.indexChild(node, j), 'added', MISSING, item));
+        tasks.push(() => this.record(sink, this.indexChild(node, j, item), 'added', MISSING, item));
       } else {
         matched.add(i);
         if (i < lastMatched) reordered = true;
         lastMatched = i;
-        tasks.push(() => this.visit(before[i], item, this.indexChild(node, j), out));
+        tasks.push(() => this.visit(before[i], item, this.indexChild(node, j, item), sink));
       }
     }
     for (let i = 0; i < before.length; i += 1) {
-      if (!matched.has(i)) tasks.push(() => this.emit(out, this.indexChild(node, i), 'removed', before[i], MISSING));
+      if (!matched.has(i)) {
+        tasks.push(() => this.record(sink, this.indexChild(node, i, before[i], 'baseline'), 'removed', before[i], MISSING));
+      }
     }
-    if (this.reorderIsChange && reordered) tasks.unshift(() => this.emit(out, node, 'changed', before, after));
+    if (reordered) {
+      // Recorded now, before the items' tasks run: an array comes before the arrays nested in its items.
+      if (this.reorderIsChange) tasks.unshift(() => this.record(sink, node, 'changed', before, after));
+      else sink.reorders?.push(node);
+    }
     this.schedule(tasks);
   }
 }

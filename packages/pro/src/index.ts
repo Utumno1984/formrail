@@ -1,14 +1,24 @@
 // Public entry of @formrail/pro.
 // The engines come from the engine entry (`@formrail/pro/engine`, #489): in the build they are imported from
 // `dist/engine.*`, never bundled a second time here, so an app that imports both entries loads them once.
-export { computeChangeSummary, useChangeSummary, inferSegmentLabel, formatChangeValue, computeRebase } from './engine';
+export {
+  computeChangeSummary,
+  computeChangeSummaryResult,
+  useChangeSummary,
+  inferSegmentLabel,
+  formatChangeValue,
+  computeRebase,
+} from './engine';
 export { ChangeSummary } from './change-summary/ChangeSummary';
 export type { ChangeSummaryProps } from './change-summary/ChangeSummary';
 export type { ChangeSummaryValueLabels, FormatChangeValueOptions } from './engine';
 export type {
+  ArrayReorder,
   ChangeEntry,
   ChangeKind,
   ChangeSummaryOptions,
+  ChangeSummaryResult,
+  ItemLabelContext,
   UseChangeSummaryReturn,
 } from './engine';
 // Typed for core's form (unchanged signature); `@formrail/pro/engine` exports the hook for any `RebaseFormBinding`.
