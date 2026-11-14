@@ -95,4 +95,28 @@ describe('useReactHookFormBinding on React 18', () => {
       else legacyUnmount(container);
     });
   });
+
+  it('legacy render, binding.reset(x) outside any batch (an async save handler): no commit shows a baseline other than the old one or x', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined); // legacy render notice, update outside act
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const seen: Seen[] = [];
+    act(() => legacyRender(<Probe seen={seen} />, container));
+    const before = seen.at(-1)!.binding.baseline;
+    const from = seen.length;
+    const x: Invoice = { supplier: 'Saved', amount: '7', notes: 'n' };
+    // Legacy mode renders synchronously on every update made outside a React batch.
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+    try {
+      seen.at(-1)!.binding.reset(x);
+    } finally {
+      (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    }
+    const after = seen.slice(from);
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.filter((s) => s.binding.baseline !== before && s.binding.baseline !== x)).toEqual([]);
+    expect(seen.at(-1)!.binding.baseline).toBe(x);
+    expect(seen.at(-1)!.binding.values).toBe(x);
+    act(() => legacyUnmount(container));
+  });
 });

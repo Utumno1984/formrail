@@ -1,6 +1,6 @@
 // `useReactHookFormBinding` (ticket #507) with a real React Hook Form: the contract of `RebaseFormBinding`, the
 // identity of the snapshots, the Change Summary against the saved baseline, the hydration after the mount.
-import type { ReactElement } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { act, fireEvent, render, renderHook } from '@testing-library/react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { useChangeSummary, useFormRebase, type RebaseFormBinding } from '../../engine';
@@ -176,6 +176,95 @@ describe('useReactHookFormBinding: Change Summary against the saved baseline', (
     harness.type('Amount', '100');
     expect(harness.current().entries).toEqual([]);
     expect(harness.current().binding.values).not.toBe(harness.current().binding.baseline);
+    harness.unmount();
+  });
+});
+
+describe('useReactHookFormBinding: baseline and values, finer rules (mutation testing of #507)', () => {
+  it('no save yet: saveError is null', () => {
+    const harness = setupInvoiceForm();
+    expect(harness.current().binding.saveError).toBeNull();
+    expect(harness.current().binding.isSaving).toBe(false);
+    harness.unmount();
+  });
+
+  it('resetDefaultValues(current values): a new baseline with the content of the values, and values is that baseline', () => {
+    const harness = setupInvoiceForm();
+    harness.type('Notes', 'kept');
+    const before = harness.current().binding.baseline;
+    act(() => harness.current().form.resetDefaultValues(harness.current().form.getValues()));
+    expect(harness.current().binding.baseline).not.toBe(before);
+    expect(harness.current().binding.baseline).toEqual({ ...SAVED, notes: 'kept' });
+    expect(harness.current().binding.values).toBe(harness.current().binding.baseline);
+    expect(harness.current().entries).toEqual([]);
+    harness.unmount();
+  });
+
+  it("the defaults object of React Hook Form changed in place (as its internals do for some late fields) is not a new baseline", () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    act(() => harness.current().rebase.rebase({ ...SAVED, amount: '150' }));
+    const { baseline } = harness.current().binding;
+    // `useController` with `shouldUnregister` writes into `control._defaultValues` with `set(...)`, same object.
+    act(() => {
+      (harness.current().form.control._defaultValues as Record<string, unknown>).notes = 'written in place';
+      harness.rerender();
+    });
+    expect(harness.current().binding.baseline).toBe(baseline);
+    expect(harness.current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['amount']);
+    harness.unmount();
+  });
+
+  it('setValues with the values it already has keeps the values object; a patch the caller mutates later does not reach the snapshot', () => {
+    const { result } = renderHook(() => useReactHookFormBinding(useForm<{ name: string; tags: string[] }>({ defaultValues: { name: 'a', tags: ['x'] } })));
+    act(() => result.current.setValues({ name: 'b' }));
+    const values = result.current.values;
+    act(() => result.current.setValues({ name: 'b', tags: ['x'] }));
+    expect(result.current.values).toBe(values);
+    const tags = ['y'];
+    act(() => result.current.setValues({ tags }));
+    tags.push('mutated by the caller');
+    expect(result.current.values.tags).toEqual(['y']);
+  });
+
+  it('a value set by a child in a passive effect at mount (before the binding subscribes) is in the snapshot', () => {
+    function Child({ form }: { form: UseFormReturn<Invoice> }) {
+      useEffect(() => form.setValue('notes', 'from a child effect'), [form]);
+      return null;
+    }
+    const errors = vi.spyOn(console, 'error');
+    const harness = setupInvoiceForm({ extra: (form) => <Child form={form} /> });
+    expect(harness.current().form.getValues('notes')).toBe('from a child effect');
+    expect(harness.current().binding.values.notes).toBe('from a child effect');
+    expect(harness.current().entries.map((entry) => entry.path)).toEqual(['notes']);
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+    harness.unmount();
+  });
+
+  it('a rebase never writes the server value into the input the user edited, not even for a moment (caret kept)', () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    harness.type('Notes', 'mine');
+    const input = harness.input('Amount');
+    const written: string[] = [];
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!;
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => setter.get!.call(input) as string,
+      set: (value: string) => {
+        written.push(value);
+        setter.set!.call(input, value);
+      },
+    });
+    input.focus();
+    input.setSelectionRange(1, 1);
+    act(() => harness.current().rebase.rebase({ ...SAVED, supplier: 'Server', amount: '150', notes: '' }));
+    expect(harness.current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['amount']);
+    expect(written.filter((value) => value !== '120')).toEqual([]);
+    expect(input.value).toBe('120');
+    expect(input.selectionStart).toBe(1);
+    expect(harness.input('Supplier').value).toBe('Server');
     harness.unmount();
   });
 });
