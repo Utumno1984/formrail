@@ -86,15 +86,40 @@ Garanzie verificabili del confine:
   caricamento.
 
 Come si evita la duplicazione con l'entry principale: `src/index.ts` riesporta i motori da
-`./engine`, e un plugin esbuild (`tsup.config.ts:14`) trasforma quell'import in un import esterno
+`./engine`, e un plugin esbuild (`tsup.config.ts:32`) trasforma quell'import in un import esterno
 di `./engine.js` / `./engine.cjs`. Così un'app che importa entrambe le entry carica i motori una
 volta sola. Lo stato di modulo, cioè i warning di sviluppo una volta per path
 (`structural-diff.ts:39`), non si duplica: lo verifica `dist.engine.test.ts` ("a development
 warning is emitted once for both entries").
 
-Lo split in chunk condivisi (`splitting`) è stato scartato. Spostava fuori da `dist/index.*` anche
-il codice dei componenti condiviso, e il test esistente `test/dist.smoke.test.ts` ("no runtime
-licensing", che legge `dist/index.*`) non avrebbe più visto quel codice.
+Gli helper senza stato che usano sia i motori sia i componenti dell'entry principale
+(`format-change-value`, `infer-label`, `use-isomorphic-layout-effect`) stanno in un terzo file,
+`dist/shared.js` / `dist/shared.cjs` (entry di sola build `src/internal/shared.ts`, elenco in
+`tsup.config.ts:14`). Lo stesso plugin fa importare quel file a ogni altro modulo, quindi entrambe
+le entry lo importano. Non è un subpath pubblico: non compare in `exports` e non ha `.d.ts`. Fa
+eccezione `is-dev`, tre righe che leggono `process.env.NODE_ENV`: ogni entry ne tiene una copia,
+perché il test esistente `dist.smoke.test.ts` ("no runtime licensing") vuole quella lettura dentro
+`dist/index.*`. `dist.engine.test.ts` ("one copy of each module") verifica, in ESM e in CJS, che
+nessun altro modulo compaia in due file della `dist`.
+
+Misura, giro 3 del critico: esbuild con minify e peer esterne, su un consumer che importa
+`ChangeSummary`, `useChangeSummary`, `RebaseNotice`, `useFormRebase`, `computeRebase` e
+`formatChangeValue` da `@formrail/pro`:
+
+| Build | raw | gzip |
+|---|---|---|
+| main prima di #489 (misura del critico) | 27.696 B | 10.013 B |
+| #489 con gli helper duplicati (d0fca20) | 30.595 B | 10.285 B |
+| #489 con `dist/shared.*` | 27.732 B | 10.052 B |
+
+Il residuo rispetto a main, +36 B raw e +39 B gzip, viene dagli import tra i tre file e dalla copia di
+`is-dev`. Un singolo export cambia di pochi byte per lo stesso motivo: da -4 a +7 B in
+`npm run bundle:check` rispetto alla baseline versionata, tutti sotto il limite.
+
+Lo split automatico in chunk condivisi (`splitting`) è stato scartato. Spostava fuori da
+`dist/index.*` anche il codice dei componenti condiviso, e il test esistente
+`test/dist.smoke.test.ts` ("no runtime licensing", che legge `dist/index.*`) non avrebbe più visto
+quel codice. Per la stessa ragione il file condiviso è uno solo, con un elenco esplicito di moduli.
 
 ## 2. Cosa entra nell'entry dei motori
 
@@ -259,7 +284,7 @@ Divergenze note:
 | `useFieldArray` e `id` interni | §7; test in A3 |
 | Chiave di primo livello rimossa dal server | Il hook passa da `reset(baseline)` + `setValues` (`use-form-rebase.ts:322-328`); con RHF `reset` rimuove la chiave, con TanStack anche; test in A3/A4 |
 | Campo non registrato / `shouldUnregister` | §7 (chiave mancante ≠ `undefined`); test in A3 |
-| Doppio import delle due entry | Fatto: un'unica copia dei motori, verificata in `dist.engine.test.ts` |
+| Doppio import delle due entry | Fatto: un'unica copia dei motori e degli helper condivisi (`dist/shared.*`, salvo `is-dev`), verificata in `dist.engine.test.ts` |
 | SSR | Fatto: `renderToString` in ambiente node in `dist.engine.test.ts`; l'unico accesso a `window` è il `typeof` di `use-isomorphic-layout-effect.ts:4` |
 
 ## Ticket figli proposti

@@ -36,6 +36,14 @@ describe('@formrail/pro/engine: import graph of the sources', () => {
     expect(files.some((file) => /ChangeSummary\.tsx$|RebaseNotice\.tsx$|list-report\//.test(file))).toBe(false);
   });
 
+  it('the build-only shared entry (dist/shared.*, imported by dist/engine.*) reaches no @formrail/core either', () => {
+    const SHARED = `${SRC}internal/shared.ts`;
+    expect(importGraph(SHARED, diskHost).files.map((file) => file.slice(SRC.length))).toEqual(
+      expect.arrayContaining(['internal/shared.ts', 'change-summary/format-change-value.ts', 'change-summary/infer-label.ts']),
+    );
+    expect(coreEdges(SHARED, diskHost)).toEqual([]);
+  });
+
   it('no module reached names @formrail/core or a subpath of it', () => {
     expect(coreEdges(ENGINE, diskHost)).toEqual([]);
   });

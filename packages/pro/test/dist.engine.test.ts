@@ -94,6 +94,42 @@ describe('dist of @formrail/pro/engine', () => {
   });
 });
 
+/** Source modules bundled into a built JS file, from the `// src/...` comment esbuild writes before each one. */
+const modulesOf = (file: string): string[] => [...new Set(readFileSync(dist(file), 'utf8').match(/^\/\/ src\/\S+$/gm) ?? [])].map((line) => line.slice(3)).sort();
+
+// The stateless helpers that the engines and the components of the main entry both use (critic round 1, point 2):
+// one copy in `dist/shared.*`, imported by both entries, so an app that uses both does not bundle them twice.
+describe.each([
+  ['ESM', 'js'],
+  ['CJS', 'cjs'],
+])('dist (%s): one copy of each module', (_format, ext) => {
+  const SHARED = ['src/change-summary/format-change-value.ts', 'src/change-summary/infer-label.ts', 'src/internal/use-isomorphic-layout-effect.ts'];
+  // A three-line `process.env.NODE_ENV` read kept in each entry (dist.smoke.test.ts pins the one of the main entry).
+  const PER_ENTRY = ['src/internal/is-dev.ts'];
+
+  it('the shared helpers are in shared.* only, and both entries import that file', () => {
+    expect(modulesOf(`shared.${ext}`)).toEqual(expect.arrayContaining(SHARED));
+    for (const entry of ['index', 'engine']) {
+      expect(modulesOf(`${entry}.${ext}`).length).toBeGreaterThan(0);
+      expect(modulesOf(`${entry}.${ext}`).filter((module) => SHARED.includes(module))).toEqual([]);
+      expect(distClosure(dist(`${entry}.${ext}`))).toContain(dist(`shared.${ext}`));
+    }
+  });
+
+  it('no module is bundled in two files, except the per-entry ones', () => {
+    const files = ['index', 'engine', 'shared'].map((entry) => `${entry}.${ext}`);
+    const owners = new Map<string, string[]>();
+    for (const file of files) for (const module of modulesOf(file)) owners.set(module, [...(owners.get(module) ?? []), file]);
+    const twice = [...owners].filter(([module, where]) => where.length > 1 && !PER_ENTRY.includes(module));
+    expect(twice).toEqual([]);
+  });
+
+  it('the default label of an unnamed key is written once in the whole dist', () => {
+    const count = ['index', 'engine', 'shared'].reduce((sum, entry) => sum + (readFileSync(dist(`${entry}.${ext}`), 'utf8').match(/\(unnamed\)/g) ?? []).length, 0);
+    expect(count).toBe(1);
+  });
+});
+
 describe('dist closure: negative cases', () => {
   let dir: string;
   beforeEach(() => {
