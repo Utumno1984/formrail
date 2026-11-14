@@ -882,6 +882,8 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
    `values`/`baseline`; il hook di Form Rebase dipende dal tipo del form del core
    (`UseObjectPageFormReturn` in `use-form-rebase.ts`), mentre `compute-rebase.ts` è puro. I
    componenti visivi usano i token e `cn` del core.
+   Studio dei confini, scelte e decisioni ancora aperte (ticket #489):
+   [`pro-engines-decoupling.md`](./pro-engines-decoupling.md).
 3. **Target: team aziendali** (ERP, gestionali, portali amministrativi). Hanno budget, sentono il
    dolore della concorrenza sui dati e accettano costi di licenza se risolvono un problema
    strutturale.
