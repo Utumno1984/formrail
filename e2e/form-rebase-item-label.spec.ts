@@ -30,6 +30,10 @@ test.describe('Pro/Patterns/Form rebase: rows named by itemLabel (#534)', () => 
     await expectPlayToPass(page, MOVED_ROW_CONFLICT);
   });
 
+  test('MovedRowConflict: the play also passes with rowLabels = position (QA)', async ({ page }) => {
+    await expectPlayToPass(page, MOVED_ROW_CONFLICT, 'rowLabels:position');
+  });
+
   test('rowLabels = name: a row removed above the conflict, the label follows the row (new index, same name)', async ({ page }) => {
     await lampConflict(page, 'rowLabels:name');
     await expect(conflictItems(page).first()).toContainText('Line items > Item 2 (Lamp) > Quantity: yours "3", server "22"');
