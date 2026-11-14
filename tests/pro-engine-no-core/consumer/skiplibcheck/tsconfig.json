@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.json",
+  // The default of the Vite and Next.js templates: declaration files are not checked.
+  "compilerOptions": { "skipLibCheck": true },
+  "include": ["main-entry-misuse.ts"]
+}

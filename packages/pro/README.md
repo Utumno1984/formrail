@@ -14,9 +14,45 @@ Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LIC
   visual builds; the public GitHub Pages deploy sets `STORYBOOK_EXCLUDE_PRO=1` and publishes Free only).
 - The engine (`computeChangeSummary`, `useChangeSummary`) works with any form state that exposes the
   current values and the saved baseline (e.g. core's `useObjectPageForm`). The components
-  (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as a
-  **peer dependency** and treated as external by the build. The peer range must be revisited when pro
-  is published.
+  (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as an **optional peer
+  dependency** and treated as external by the build. The peer range must be revisited when pro is
+  published.
+
+## Entries, and who installs `@formrail/core`
+
+| Import | What it holds | `@formrail/core` |
+|---|---|---|
+| `@formrail/pro/engine` | The engines: `computeChangeSummary`, `useChangeSummary`, `inferSegmentLabel`, `formatChangeValue`, `computeRebase`, `useFormRebase` and their types (`RebaseFormBinding`, ...) | **Not needed**: nothing in this entry imports it, not even a type |
+| `@formrail/pro` | Everything above plus the components (`ChangeSummary`, `RebaseNotice`, `VirtualListReport`, `VirtualListReportTable`) and `useFormRebase` typed for core's `useObjectPageForm` | **Required**: install it next to pro |
+
+`@formrail/core` is an **optional** peer dependency (`peerDependenciesMeta`), so npm does not install it
+by itself:
+
+- With React Hook Form, TanStack Form or a form of your own, install `@formrail/pro` and import only
+  `@formrail/pro/engine`. `npm ls @formrail/core` then reports it absent.
+- With core's Object Page or the Pro components, install both: `npm install @formrail/core @formrail/pro`.
+
+Importing `@formrail/pro` (the main entry) without the core installed fails, but **where** it fails
+depends on your TypeScript setup:
+
+- With `skipLibCheck: false`, `tsc` reports `Cannot find module '@formrail/core'` in the declaration
+  files of `@formrail/pro`.
+- With `skipLibCheck: true`, the default of the Vite and Next.js templates, `tsc` **passes**. The core
+  types silently become `any`, so even a wrong argument to a core-typed API type-checks. The error then
+  comes from the bundler, or when the module loads: `ERR_MODULE_NOT_FOUND` (`Cannot find package
+  '@formrail/core'`) in ESM, `Cannot find module '@formrail/core'` in CommonJS.
+
+So without the core, import **only `@formrail/pro/engine`**, never `@formrail/pro`. Nothing in that
+entry needs the core, at runtime or in its types, whatever `skipLibCheck` is.
+
+`@formrail/pro/engine` is a subpath export, so it resolves with `moduleResolution` `bundler`, `node16` or
+`nodenext`. The legacy `node` / `node10` resolution ignores the `exports` map and does not find it, the
+same limit as `@formrail/core/internal`.
+
+`useFormRebase` of `@formrail/pro/engine` takes any form that keeps the `RebaseFormBinding` contract
+(`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`); core's `useObjectPageForm()` is one
+as is. Ready-made bindings for React Hook Form (#507) and TanStack Form (#508) come in their own tickets.
+The study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
 
 ## Change Summary engine
 

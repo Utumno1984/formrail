@@ -3,44 +3,44 @@
   "version": 1,
   "exports": {
     "ChangeSummary": {
-      "baseline": 2031,
-      "limit": 2235
+      "baseline": 2051,
+      "limit": 2257
     },
     "RebaseNotice": {
-      "baseline": 4282,
-      "limit": 4711
+      "baseline": 4277,
+      "limit": 4705
     },
     "VirtualListReport": {
-      "baseline": 4285,
-      "limit": 4714
+      "baseline": 4281,
+      "limit": 4710
     },
     "VirtualListReportTable": {
-      "baseline": 3928,
-      "limit": 4321
+      "baseline": 3926,
+      "limit": 4319
     },
     "computeChangeSummary": {
-      "baseline": 2179,
-      "limit": 2397
+      "baseline": 2173,
+      "limit": 2391
     },
     "computeRebase": {
-      "baseline": 3443,
-      "limit": 3788
+      "baseline": 3437,
+      "limit": 3781
     },
     "formatChangeValue": {
-      "baseline": 1278,
-      "limit": 1406
+      "baseline": 1277,
+      "limit": 1405
     },
     "inferSegmentLabel": {
       "baseline": 246,
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2360,
-      "limit": 2596
+      "baseline": 2356,
+      "limit": 2592
     },
     "useFormRebase": {
-      "baseline": 4955,
-      "limit": 5451
+      "baseline": 5167,
+      "limit": 5684
     }
   }
 }

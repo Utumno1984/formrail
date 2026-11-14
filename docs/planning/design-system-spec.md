@@ -882,6 +882,11 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
    `values`/`baseline`; il hook di Form Rebase dipende dal tipo del form del core
    (`UseObjectPageFormReturn` in `use-form-rebase.ts`), mentre `compute-rebase.ts` è puro. I
    componenti visivi usano i token e `cn` del core.
+   Studio dei confini e scelte (ticket #489):
+   [`pro-engines-decoupling.md`](./pro-engines-decoupling.md). Decisioni di Daniele del 14/11/2026:
+   subpath `@formrail/pro/engine` con `@formrail/core` peer opzionale (1a), adattatori React Hook
+   Form / TanStack Form in subpath dedicati con peer opzionali (2a, ticket figli), lavoro diviso in
+   ticket figli (3a).
 3. **Target: team aziendali** (ERP, gestionali, portali amministrativi). Hanno budget, sentono il
    dolore della concorrenza sui dati e accettano costi di licenza se risolvono un problema
    strutturale.

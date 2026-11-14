@@ -1,11 +1,10 @@
 import { useCallback, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import type { UseObjectPageFormReturn } from '@formrail/core';
 import type { ChangeEntry } from '../change-summary/types';
 import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
 import { MISSING, idMapKey, isPlainObject, itemId, own, type PlainObject } from '../internal/structural-diff';
 import { arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
-import type { OpenRebaseConflict, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
+import type { OpenRebaseConflict, RebaseFormBinding, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
 import { itemLabel } from '../change-summary/infer-label';
 import { labelPathOf, type DiffNode } from '../internal/structural-diff';
 
@@ -147,7 +146,10 @@ function sameOrder(current: readonly unknown[], theirs: readonly unknown[], idKe
 
 /**
  * Applies the merge of `computeRebase` to a form of core's `useObjectPageForm`, through its public
- * API only (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`).
+ * API only (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`). The hook of
+ * `@formrail/pro` takes that form; the same hook of `@formrail/pro/engine` takes any form that keeps the
+ * contract of `RebaseFormBinding` (all this hook reads): core's form as is, or a binding of another form
+ * library, with no core package installed.
  *
  * **Applying a rebase**: in a layout effect after the render in which `rebase(incoming)` is called,
  * with the `baseline` and `values` of that render: `form.reset(incoming)` then
@@ -181,7 +183,7 @@ function sameOrder(current: readonly unknown[], theirs: readonly unknown[], idKe
  * SSR-safe: no access to `window`/`document`.
  */
 export function useFormRebase<Values extends object>(
-  form: UseObjectPageFormReturn<Values>,
+  form: RebaseFormBinding<Values>,
   options: UseFormRebaseOptions<Values> = {},
 ): UseFormRebaseReturn<Values> {
   const [state, setState] = useState<RebaseState>(EMPTY);
