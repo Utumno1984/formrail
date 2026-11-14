@@ -468,14 +468,39 @@ export function delegatedDefaults(fn, checker, seen = new Set(), depth = 0) {
  * - "the default `<div>`" (an article, then the value with no verb): it qualifies a noun ("instead of the default
  *   `<div>`" is the element `asChild` replaces, not the default of `asChild`);
  * - "defaults" glued to a word ("defaultValue", "default's").
+ * The value can also come first, marked as the default among the options: "`automatic` (default): ...",
+ * "`0` (default)", "`auto` (the default)".
+ * `hasProseDefault` (what `measure` uses) also drops a default stated for a NAMED KEY of the prop, not for the prop
+ * itself: "`anchorBar`: the name of the `<nav>` (default "Sections")" (ObjectPage.labels), "`align`: `auto`
+ * (default)", "`text`: ... (default 100%)".
  */
 const PROSE_VALUE = String.raw`(?:\x60[^\x60]+\x60|"[^"\n]*"|'[^'\n]*'|“[^”\n]*”|‘[^’\n]*’|-?\d+(?:\.\d+)?\b|(?:true|false|null|undefined)\b)`;
-export const PROSE_DEFAULT = new RegExp(
+const PROSE_STATED =
   String.raw`(?<![\x60'"“‘\w])(?:(?<!\b(?:the|a|an|its|their)\s+)defaults?(?:\s+(?:to|is|are)\s*|\s*[:=]\s*|\s+|(?=\x60))` +
-    String.raw`|\b(?:the|a|an|its|their)\s+defaults?(?:\s+(?:value\s+)?(?:is|are)\s*|\s*[:=]\s*))` +
-    PROSE_VALUE,
-  'i',
-);
+  String.raw`|\b(?:the|a|an|its|their)\s+defaults?(?:\s+(?:value\s+)?(?:is|are)\s*|\s*[:=]\s*))` +
+  `(${PROSE_VALUE})`;
+const PROSE_MARKED = `(${PROSE_VALUE})` + String.raw`\s*\((?:the\s+)?default\)`;
+export const PROSE_DEFAULT = new RegExp(`(?:${PROSE_STATED}|${PROSE_MARKED})`, 'i');
+
+/** "`key`:" opening the clause: what follows is about a key of the prop (an object, or one variant), not the prop. */
+const NAMED_KEY = /\x60[^\x60\s]+\x60\s*:/;
+
+/**
+ * The value of the first default the prose states for the prop (`"Loading"`, `` `md` ``, `1`), `undefined` when
+ * none: a `PROSE_DEFAULT` match that is not in a clause opened by a named key ("`anchorBar`: ... (default
+ * "Sections")"). A clause ends at `.`, `;`, `!` or `?` followed by a space, or at a blank line.
+ */
+export function proseDefaultOf(text) {
+  const all = new RegExp(PROSE_DEFAULT.source, 'gi');
+  for (const m of String(text).matchAll(all)) {
+    const clause = String(text).slice(0, m.index).split(/(?<=[.;!?])\s+|\n\s*\n/).at(-1);
+    if (!NAMED_KEY.test(clause)) return m[1] ?? m[2];
+  }
+  return undefined;
+}
+
+/** Whether the prose states a default of the prop (see `proseDefaultOf`). */
+export const hasProseDefault = (text) => proseDefaultOf(text) !== undefined;
 
 /**
  * Why a default is lost by the docgen (priority order, one cause per prop):
@@ -700,7 +725,9 @@ export function measure({ root = REPO_ROOT, entries = ENTRIES } = {}) {
       const literal = cmp ? cmp.literal : true;
       const where = src ? src.where : fb ? 'fallback' : 'tag';
       const union = unionCause(sf, name) === 'union';
-      const prose = PROSE_DEFAULT.test(prop.description ?? '');
+      // `proseValue`: the value the prose states (`"Loading"`), for messages and for the simulation of #475 in the tests.
+      const proseValue = proseDefaultOf(prop.description ?? '');
+      const prose = proseValue !== undefined;
       // The comparable value of the source default; `null` when it cannot be resolved to a literal.
       const lit = cmp?.node && literalNodeOf(cmp.node, checker);
       const sourceValue = lit ? normalizeDefault(lit.getText()) : null;
@@ -711,7 +738,7 @@ export function measure({ root = REPO_ROOT, entries = ENTRIES } = {}) {
       const ownValue = own ? (sourceValue ?? own.text) : null;
       const divergence = inner && innerValue !== ownValue ? { own: own.text, inner: inner.text, via: inner.via } : undefined;
       // `sourceLiteral`: the literal a constant or a fallback resolves to, for the messages (`LIMIT (= 5)`).
-      const extra = { declared, declaredTag: tag?.tag, sourceValue, sourceLiteral: lit ? lit.getText() : undefined, prose, ...(divergence ? { divergence } : {}) };
+      const extra = { declared, declaredTag: tag?.tag, sourceValue, sourceLiteral: lit ? lit.getText() : undefined, prose, ...(prose ? { proseValue } : {}), ...(divergence ? { divergence } : {}) };
       if (hasSource && emptyCol) rows.push({ prop: name, kind: 'gap', source, literal, where, union, cause: causeOf(src, fn, sf), via: src?.via, ...extra });
       else if (!hasSource && emptyCol && prose) rows.push({ prop: name, kind: 'prose-only', source: fb ? fb.text : '(prose in TSDoc)', literal: false, where: fb ? 'fallback' : 'none', cause: 'other', ...extra });
       else if (hasSource) rows.push({ prop: name, kind: 'ok', source, literal, where, union, cause: '', ...extra });
@@ -796,12 +823,11 @@ export const UNCOMPARABLE_ALLOWLIST = {
   'MessageStrip.dismissLabel': 'derived from the title: `dismissLabel ?? "Dismiss message: <title>"`',
   'MultiSelect.defaultValue': 'computed: `uniqueValues(undefined)` is the empty array, there is no literal default in the source',
   'NumberInput.step': 'computed: `normalizeStep(undefined)` is 1, there is no literal default in the source',
-  'ObjectPage.labels': 'the prose states the default of the `anchorBar` key (`labels?.anchorBar ?? "Sections"`), not of the prop',
   'ObjectPageFooter.toneLabel': 'derived from the tone: `toneLabel ?? TONE_LABEL[messageTone]`',
   'Pagination.boundaryCount': 'computed: `toInt(boundaryCount, 1, 0)` turns `undefined` into 1, there is no literal default in the source',
   'Pagination.siblingCount': 'computed: `toInt(siblingCount, 1, 0)` turns `undefined` into 1, there is no literal default in the source',
   'ProgressBar.getValueLabel': 'the default is a function reference (`defaultValueLabel`), there is no literal to compare',
-  'Skeleton.width': 'depends on `variant` (100% for `text` / `rect`, the height or 40px for `circle`: `width ?? height`)',
+  'Tabs.activationMode': RADIX,
   'VirtualListReport.onClearFilters': 'the default is a behaviour (`onClearFilters ?? clearFilters` in `ListReportFrame`), not a literal',
   'VirtualListReport.rowActionsInline': ROW_ACTIONS,
   'VirtualListReportTable.errorMessage': 'derived from `labels.error` (`ListReportTableStates`), not a literal',
