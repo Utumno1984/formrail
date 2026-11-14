@@ -1,6 +1,6 @@
 // Contact people of customers and suppliers. Every contact has its own stable id, so a list of
 // contacts can be edited (added, removed, reordered) and compared by identity, not by position.
-import { makePhone, DEMO_COUNTRIES, type DemoAddress, type DemoLanguageArea } from './geo';
+import { DEMO_COUNTRIES, phoneNumbers, type DemoAddress, type DemoLanguageArea } from './geo';
 import { personName, PERSON_NAME_SLOTS } from './people';
 import type { Rng } from './rng';
 
@@ -39,6 +39,7 @@ export function makeContacts(
   // Consecutive slots with a stride coprime with the slot count: distinct names for up to 400 contacts.
   const base = rng.int(0, PERSON_NAME_SLOTS - 1);
   const firstRole = rng.int(0, roles.length - 1);
+  const phone = phoneNumbers(address);
   const contacts: DemoContact[] = [];
   for (let k = 0; k < count; k++) {
     const person = personName(area, base + k * 157);
@@ -50,7 +51,7 @@ export function makeContacts(
         fullName: person.fullName,
         role: roles[(firstRole + k) % roles.length]!,
         email: `${person.emailLocal}@${domain}`,
-        phone: makePhone(rng, address),
+        phone: phone(rng),
         primary: k === 0,
       }),
     );

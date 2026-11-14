@@ -130,6 +130,14 @@ const CONTACT_COUNTS: readonly (readonly [number, number])[] = [
   [4, 1],
 ];
 
+/** The credit limits in each currency, minor units, computed once. */
+const CREDIT_LIMITS: Readonly<Record<DemoCurrency, readonly number[]>> = {
+  EUR: CREDIT_LIMITS_EUR.map((eur) => niceRound(convertFromEurMinor(eur * 100, 'EUR'))),
+  USD: CREDIT_LIMITS_EUR.map((eur) => niceRound(convertFromEurMinor(eur * 100, 'USD'))),
+  GBP: CREDIT_LIMITS_EUR.map((eur) => niceRound(convertFromEurMinor(eur * 100, 'GBP'))),
+  JPY: CREDIT_LIMITS_EUR.map((eur) => niceRound(convertFromEurMinor(eur * 100, 'JPY'))),
+};
+
 const SEED = hashSeed('demo-data/customers');
 const NAMES = createCompanyNameSpace('demo-data/customers/names', CUSTOMER_TRADES);
 
@@ -146,10 +154,7 @@ function makeCustomer(index: number): DemoCustomer {
   const paymentTerms = rng.weighted(TERMS_WEIGHTS);
   const currency = country.currency;
   // Two significant digits in each currency: 25,000 EUR is $27,000, £21,000, ¥4,100,000.
-  const creditLimitMinor =
-    paymentTerms === 'due-on-receipt'
-      ? 0
-      : niceRound(convertFromEurMinor(rng.pick(CREDIT_LIMITS_EUR) * 100, currency));
+  const creditLimitMinor = paymentTerms === 'due-on-receipt' ? 0 : rng.pick(CREDIT_LIMITS[currency]);
   return Object.freeze({
     id,
     code: `C-${10001 + index}`,

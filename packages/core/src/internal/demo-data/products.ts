@@ -4,7 +4,7 @@
 import type { StatusBadgeTone } from '../../status-badge/StatusBadge';
 import { CATALOG_SIZE, catalogItem, PRODUCT_CATEGORY_CODE, type DemoProductCategory, type DemoProductUnit } from './catalog';
 import { DEMO_COMPANY } from './company';
-import { convertFromEurMinor, DEMO_CURRENCIES, type DemoCurrency } from './currency';
+import { convertFromEurMinor, type DemoCurrency } from './currency';
 import { createDataset, indexFromId } from './dataset';
 import { daysAgo } from './dates';
 import { createPermutation, createRowRng, hashSeed, type Rng } from './rng';
@@ -78,18 +78,31 @@ export const PRODUCT_UNIQUE_NAMES = CATALOG_SIZE;
 /** Rounding step in minor units: 5 cents / pence, 10 yen. */
 const PRICE_STEP: Readonly<Record<DemoCurrency, number>> = { EUR: 5, USD: 5, GBP: 5, JPY: 10 };
 
+const price = (eurMinor: number, currency: DemoCurrency): number =>
+  Math.max(PRICE_STEP[currency], convertFromEurMinor(eurMinor, currency, PRICE_STEP[currency]));
+
+/** One literal with the keys in a fixed order (a hot path: no loop over dynamic keys). */
 function prices(eurMinor: number): DemoPrices {
-  const out = {} as Record<DemoCurrency, number>;
-  for (const currency of DEMO_CURRENCIES) out[currency] = Math.max(PRICE_STEP[currency], convertFromEurMinor(eurMinor, currency, PRICE_STEP[currency]));
-  return Object.freeze(out);
+  return Object.freeze({
+    EUR: price(eurMinor, 'EUR'),
+    USD: price(eurMinor, 'USD'),
+    GBP: price(eurMinor, 'GBP'),
+    JPY: price(eurMinor, 'JPY'),
+  });
 }
+
+/** Chance that each warehouse stocks a product: the headquarters' distribution center almost always. */
+const WAREHOUSES = DEMO_COMPANY.warehouses.map((warehouse) => ({
+  id: warehouse.id,
+  chance: warehouse.entityId === DEMO_COMPANY.headquarters.id ? 0.95 : 0.55,
+}));
 
 function stockLevels(rng: Rng, status: DemoProductStatus, reorderPoint: number): readonly DemoStockLevel[] {
   if (status === 'draft') return Object.freeze([]);
   const levels: DemoStockLevel[] = [];
-  for (const warehouse of DEMO_COMPANY.warehouses) {
-    // The headquarters' distribution center stocks almost everything, the others a selection.
-    if (!rng.chance(warehouse.entityId === DEMO_COMPANY.headquarters.id ? 0.95 : 0.55)) continue;
+  for (let w = 0; w < WAREHOUSES.length; w++) {
+    const warehouse = WAREHOUSES[w]!;
+    if (!rng.chance(warehouse.chance)) continue;
     const onHand =
       status === 'discontinued'
         ? rng.int(0, reorderPoint)

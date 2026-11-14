@@ -91,26 +91,33 @@ export const PERSON_NAME_SLOTS = 400;
  * below the slot count are distinct names, and distinct e-mail local parts.
  */
 export function personName(area: DemoLanguageArea, slot: number): PersonName {
-  const s = slot % PERSON_NAME_SLOTS;
-  // Built once per (area, slot) and shared: the generators call this for every row and contact.
-  const cache = (NAME_CACHE[area] ??= []);
-  let name = cache[s];
-  if (!name) {
-    const pool = PREPARED[area];
+  return NAMES[area][slot % PERSON_NAME_SLOTS]!;
+}
+
+/** Every name of every area, built once up front (9 x 400) and shared by all rows and contacts. */
+const buildNames = (pool: PreparedPool): readonly PersonName[] =>
+  Array.from({ length: PERSON_NAME_SLOTS }, (_, s) => {
     const f = s % pool.first.length;
     const l = Math.floor(s / pool.first.length) % pool.last.length;
-    name = Object.freeze({
+    return Object.freeze({
       firstName: pool.first[f]!,
       lastName: pool.last[l]!,
       fullName: `${pool.first[f]} ${pool.last[l]}`,
       emailLocal: `${pool.firstSlug[f]}.${pool.lastSlug[l]}`,
     });
-    cache[s] = name;
-  }
-  return name;
-}
+  });
 
-const NAME_CACHE: Partial<Record<DemoLanguageArea, PersonName[]>> = {};
+const NAMES: Readonly<Record<DemoLanguageArea, readonly PersonName[]>> = {
+  en: buildNames(PREPARED.en),
+  de: buildNames(PREPARED.de),
+  nl: buildNames(PREPARED.nl),
+  fr: buildNames(PREPARED.fr),
+  es: buildNames(PREPARED.es),
+  it: buildNames(PREPARED.it),
+  nordic: buildNames(PREPARED.nordic),
+  pl: buildNames(PREPARED.pl),
+  ja: buildNames(PREPARED.ja),
+};
 
 /** Every given name and surname, for tests (non-ASCII coverage, denylists). */
 export const ALL_PERSON_NAMES: readonly string[] = Object.values(POOLS).flatMap((pool) => [...pool.first, ...pool.last]);

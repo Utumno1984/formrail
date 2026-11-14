@@ -62,7 +62,12 @@ export interface DemoCountry {
   readonly line1: (rng: Rng) => string;
 }
 
-const pad = (value: number, width: number): string => String(value).padStart(width, '0');
+/** Zero-padded decimal (a hot path on 100k-row datasets: no `padStart`). */
+const pad = (value: number, width: number): string => {
+  let text = `${value}`;
+  while (text.length < width) text = `0${text}`;
+  return text;
+};
 /** A zero-padded integer in `[from, to]`. */
 const range = (from: number, to: number, width: number) => (rng: Rng) => pad(rng.int(from, to), width);
 const letters = (rng: Rng, alphabet: string, count: number): string => {
@@ -427,9 +432,29 @@ export function makeAddress(rng: Rng, code: DemoCountryCode): DemoAddress {
 
 /** A fictional phone number in the city of `address`. */
 export function makePhone(rng: Rng, address: DemoAddress): string {
-  const country = DEMO_COUNTRIES[address.country];
-  const area = PHONE_AREA.get(address.city) ?? country.cities[0]!.phoneArea;
-  if (address.country === 'US') return `+1 ${area}-555-01${pad(rng.int(0, 99), 2)}`;
-  if (address.country === 'GB') return `+44 ${area} 496 0${pad(rng.int(0, 999), 3)}`;
-  return `+${country.callingCode} ${area} 555 0${pad(rng.int(0, 999), 3)}`;
+  return phoneNumbers(address)(rng);
 }
+
+/**
+ * A phone-number source for the city of `address`: resolve it once per record, then call it per
+ * contact (the prefix is built once, the subscriber digits come from a table: a hot path).
+ */
+export function phoneNumbers(address: DemoAddress): (rng: Rng) => string {
+  let numbers = PHONE_SOURCES.get(address.city);
+  if (!numbers) {
+    const country = DEMO_COUNTRIES[address.country];
+    const area = PHONE_AREA.get(address.city) ?? country.cities[0]!.phoneArea;
+    if (address.country === 'US') {
+      const prefix = `+1 ${area}-555-01`;
+      numbers = (rng) => prefix + DIGITS_3[rng.int(0, 99)]!.slice(1);
+    } else {
+      const prefix = address.country === 'GB' ? `+44 ${area} 496 0` : `+${country.callingCode} ${area} 555 0`;
+      numbers = (rng) => prefix + DIGITS_3[rng.int(0, 999)]!;
+    }
+    PHONE_SOURCES.set(address.city, numbers);
+  }
+  return numbers;
+}
+
+const PHONE_SOURCES = new Map<string, (rng: Rng) => string>();
+const DIGITS_3: readonly string[] = Array.from({ length: 1000 }, (_, n) => pad(n, 3));

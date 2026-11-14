@@ -78,25 +78,23 @@ export function createCompanyNameSpace<Sector>(
     size += COMPANY_ROOTS[area].length * sectors.length;
   }
   const permute = createPermutation(size, seed);
-  // The strings of a slot are built once and shared by every row (and later cycle) that uses it.
-  const bases: { area: DemoLanguageArea; sector: Sector; stem: string; domain: string; website: string }[] = [];
+  // The strings of every slot are built once, up front (a few thousand), and shared by every row
+  // (and later cycle) that uses the slot.
+  const bases = Array.from({ length: size }, (_, slot) => {
+    let a = AREAS.length - 1;
+    while (offsets[a]! > slot) a--;
+    const area = AREAS[a]!;
+    const local = slot - offsets[a]!;
+    const rootIndex = Math.floor(local / sectors.length);
+    const sectorIndex = local % sectors.length;
+    const [trade, sector] = sectors[sectorIndex]!;
+    const domain = `${rootSlugs[area]![rootIndex]}-${tradeSlugs[sectorIndex]}.example`;
+    return { area, sector, stem: `${COMPANY_ROOTS[area][rootIndex]} ${trade}`, domain, website: `https://www.${domain}` };
+  });
   return {
     size,
     name(index, rng) {
-      const slot = permute(index);
-      let base = bases[slot];
-      if (!base) {
-        let a = AREAS.length - 1;
-        while (offsets[a]! > slot) a--;
-        const area = AREAS[a]!;
-        const local = slot - offsets[a]!;
-        const rootIndex = Math.floor(local / sectors.length);
-        const sectorIndex = local % sectors.length;
-        const [trade, sector] = sectors[sectorIndex]!;
-        const domain = `${rootSlugs[area]![rootIndex]}-${tradeSlugs[sectorIndex]}.example`;
-        base = { area, sector, stem: `${COMPANY_ROOTS[area][rootIndex]} ${trade}`, domain, website: `https://www.${domain}` };
-        bases[slot] = base;
-      }
+      const base = bases[permute(index)]!;
       const country = rng.weighted(AREA_COUNTRIES[base.area]);
       return {
         name: `${base.stem} ${rng.pick(LEGAL_FORMS[country])}`,

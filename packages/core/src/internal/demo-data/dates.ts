@@ -73,13 +73,10 @@ const TODAY_DAY_NUMBER = isoToDayNumber(DEMO_TODAY);
 /** The ISO date `days` days before `DEMO_TODAY` (after it when negative). */
 export function daysAgo(days: number): string {
   if (!Number.isInteger(days)) throw new RangeError(`daysAgo: days must be an integer, got ${days}`);
-  // The generators ask for a few thousand distinct days over and over: share the strings.
-  let iso = DAYS_AGO_CACHE.get(days);
-  if (iso === undefined) {
-    iso = fromDayNumber(TODAY_DAY_NUMBER - days);
-    DAYS_AGO_CACHE.set(days, iso);
-  }
-  return iso;
+  // The generators ask for the same few thousand days over and over: share the strings (a dense
+  // array preallocated to its length stays a fast array, unlike a Map or a growing sparse one).
+  if (days >= 0 && days < DAYS_AGO_CACHE.length) return (DAYS_AGO_CACHE[days] ??= fromDayNumber(TODAY_DAY_NUMBER - days));
+  return fromDayNumber(TODAY_DAY_NUMBER - days);
 }
 
-const DAYS_AGO_CACHE = new Map<number, string>();
+const DAYS_AGO_CACHE: (string | undefined)[] = new Array<string | undefined>(8000).fill(undefined);

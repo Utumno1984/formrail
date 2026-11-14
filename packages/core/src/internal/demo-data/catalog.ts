@@ -208,11 +208,10 @@ export const CATALOG_SIZE = catalogSize;
 
 /** Catalogue item `slot` (`0 <= slot < CATALOG_SIZE`). */
 export function catalogItem(slot: number): CatalogItem {
-  return (ITEM_CACHE[slot] ??= buildCatalogItem(slot));
+  const item = ITEMS[slot];
+  if (!item) throw new RangeError(`catalogItem: slot ${slot} is outside [0, ${catalogSize})`);
+  return item;
 }
-
-/** Items are built once per slot and shared (frozen) by every product row that uses them. */
-const ITEM_CACHE: CatalogItem[] = [];
 
 function buildCatalogItem(slot: number): CatalogItem {
   let t = TEMPLATES.length - 1;
@@ -238,6 +237,9 @@ function buildCatalogItem(slot: number): CatalogItem {
     basePriceEurMinor: Math.round(low + (high - low) * position),
   });
 }
+
+/** Every catalogue item, built once up front and shared (frozen) by every product row that uses it. */
+const ITEMS: readonly CatalogItem[] = Array.from({ length: catalogSize }, (_, slot) => buildCatalogItem(slot));
 
 /** Every category that has at least one template. */
 export const PRODUCT_CATEGORIES: readonly DemoProductCategory[] = Object.freeze(
