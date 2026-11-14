@@ -32,6 +32,7 @@ const PAGES_WITHOUT_COMPONENT: Record<string, string> = {
   'Floorplans/Object Page/Schema validation': 'documents useObjectPageForm({ schema }): hook options, no component of its own',
   'Floorplans/Object Page with Validation': 'a recipe assembled from the components, not a component',
   'Pro/Patterns/Form rebase': 'documents the useFormRebase hook: its options are the story controls',
+  'Pro/Integrations/React Hook Form': 'documents the useReactHookFormBinding hook (#507): its options are the story controls',
 };
 
 const CLASS_NAME = "a real prop of every component (its root's HTML attribute, merged with tailwind-merge): the story exposes it";
