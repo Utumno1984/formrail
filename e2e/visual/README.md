@@ -57,7 +57,7 @@ unknown argument is an error (exit 2), not "no orphans".
 
 Order when renaming a story: first `npm run test:visual:update` (writes the new PNGs), then the guard (lists
 the old ones to `git rm`). A renamed public story also needs its entry in the redirect map of #516
-(`.storybook/legacy-story-ids.mjs`, when it lands), so old links keep working.
+(`.storybook/legacy-story-ids.mjs`, see `CONTRIBUTING.md`), so old links keep working.
 
 ## When a check fails
 

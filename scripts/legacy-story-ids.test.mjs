@@ -3,7 +3,7 @@ import vm from 'node:vm';
 import * as espree from 'espree';
 import { describe, expect, it } from 'vitest';
 import { LEGACY_STORY_IDS, resolveLegacyStory } from '../.storybook/legacy-story-ids.mjs';
-import { LEGACY_STORY_IDS_FILE, legacyRedirectScript, withLegacyRedirect } from '../.storybook/legacy-story-redirect.mjs';
+import { LEGACY_STORY_IDS_FILE, legacyRedirectScript, stripComments, withLegacyRedirect } from '../.storybook/legacy-story-redirect.mjs';
 import { legacyIndexProblems, legacyMapProblems } from './legacy-story-ids-check.mjs';
 
 // Ticket #516: redirects of renamed story ids. A fixed map, so these cases do not depend on the real one.
@@ -41,6 +41,18 @@ describe('resolveLegacyStory', () => {
     ['manager, encoded path (lowercase %2f)', `${SB}?path=%2fdocs%2fshowcase-old--docs`, `${SB}?path=/docs/showcase-new--docs`],
     ['iframe, encoded id', `${SB}iframe.html?id=showcase%2Dold--crud&viewMode=story`, `${SB}iframe.html?id=showcase-new--crud&viewMode=story`],
     ['manager, segments after the id kept', `${SB}?path=/story/showcase-old--crud/extra`, `${SB}?path=/story/showcase-new--crud/extra`],
+    // Round 2 of the review (#535): what follows the id is re-encoded as a component, so an encoded `&`/`=`
+    // there stays inside `path` instead of becoming a new parameter (`encodeURI` would write them raw).
+    [
+      'manager, encoded & and = after the id stay encoded (no injected parameter)',
+      `${SB}?path=/story/showcase-old--crud/a%26b%3Dc&viewMode=story`,
+      `${SB}?path=/story/showcase-new--crud/a%26b%3Dc&viewMode=story`,
+    ],
+    // Storybook reads the query with URLSearchParams, for which `i%64` is `id`: rewritten, name kept as written.
+    ['iframe, encoded parameter name', `${SB}iframe.html?i%64=showcase-old--crud&viewMode=story`, `${SB}iframe.html?i%64=showcase-new--crud&viewMode=story`],
+    ['manager, encoded parameter name', `${SB}?p%61th=/story/showcase-old--crud`, `${SB}?p%61th=/story/showcase-new--crud`],
+    ['a file: URL (opened from disk)', 'file:///tmp/storybook-static/iframe.html?id=showcase-old--crud&viewMode=story', 'file:///tmp/storybook-static/iframe.html?id=showcase-new--crud&viewMode=story'],
+    ['credentials in the URL are kept', 'https://user:pw@example.com/sb/?path=/story/showcase-old--crud#h', 'https://user:pw@example.com/sb/?path=/story/showcase-new--crud#h'],
     [
       'every occurrence of the parameter is rewritten',
       `${SB}iframe.html?id=showcase-old--crud&id=showcase-old--docs`,
@@ -60,6 +72,12 @@ describe('resolveLegacyStory', () => {
     ['a hash only', `${SB}#path=/story/showcase-old--crud`],
     ['an old id in a parameter that is neither path nor id', `${SB}?args=showcase-old--crud&selectedKind=showcase-old--crud`],
     ['a path that is not a story/docs path', `${SB}?path=/settings/showcase-old--crud`],
+    // Round 2 (#535): anchored at the start and case-sensitive, like Storybook's own paths and ids.
+    ['a story path that does not start the value', `${SB}?path=/x/story/showcase-old--crud`],
+    ['an upper-case /STORY/ path', `${SB}?path=/STORY/showcase-old--crud`],
+    ['an upper-case /DOCS/ path', `${SB}?path=/DOCS/showcase-old--docs`],
+    ['an upper-case old id (iframe)', `${SB}iframe.html?id=SHOWCASE-OLD--CRUD&viewMode=story`],
+    ['an upper-case old id (manager)', `${SB}?path=/story/SHOWCASE-OLD--CRUD`],
     ['an old id as a prefix of another id', `${SB}?path=/story/showcase-old--crud-more`],
     ['Object.prototype members', `${SB}iframe.html?id=constructor&viewMode=story`],
     ['__proto__', `${SB}?path=/story/__proto__`],
@@ -152,6 +170,19 @@ describe('legacyMapProblems', () => {
     expect(legacyMapProblems({ 'a--b': 42 })).toEqual([expect.stringContaining('the target is not a story id')]);
     expect(legacyMapProblems({ 'a---b--c': 'd--e' })).toEqual([expect.stringContaining('is not a story id')]);
     expect(legacyMapProblems({ 'no-separator': 'd--e' })).toEqual([expect.stringContaining('is not a story id')]);
+    // Round 2 (#535): the whole id must match, not a prefix of it.
+    expect(legacyMapProblems({ 'a--b': 'c--d/x' })).toEqual([expect.stringContaining('the target is not a story id')]);
+    expect(legacyMapProblems({ 'a--b': 'c--d ' })).toEqual([expect.stringContaining('the target is not a story id')]);
+    expect(legacyMapProblems({ 'a--b/x': 'c--d' })).toEqual([expect.stringContaining('is not a story id')]);
+    expect(legacyMapProblems({ ' a--b': 'c--d' })).toEqual([expect.stringContaining('is not a story id')]);
+  });
+
+  it('tells a Docs id by its `--docs` suffix, not by "docs" anywhere in it', () => {
+    // A story of a component whose title contains "docs" is a story, not a Docs page.
+    expect(legacyMapProblems({ 'x--default': 'internal-docsauditwrapper--default' })).toEqual([]);
+    expect(legacyMapProblems({ 'old-docs-page--example': 'new--example' })).toEqual([]);
+    expect(legacyMapProblems({ 'x--docs-example': 'y--docs-example' })).toEqual([]);
+    expect(legacyMapProblems({ 'x--docs': 'internal-docsauditwrapper--default' })).toEqual([expect.stringContaining('Docs id must map to a Docs id')]);
   });
 
   it('rejects a Docs id mapped to a story id and the other way round', () => {
@@ -223,6 +254,30 @@ describe('the inlined head script', () => {
     expect(source).not.toMatch(/^\s*import\s/m);
     // The inlined script as a whole is ES5 too.
     expect(() => espree.parse(/<script>([\s\S]*?)<\/script>/.exec(withLegacyRedirect(''))[1], { ecmaVersion: 5 })).not.toThrow();
+  });
+
+  it('carries no comment into the pages (the source file keeps them)', () => {
+    const code = /<script>([\s\S]*?)<\/script>/.exec(withLegacyRedirect(''))[1];
+    expect(espree.parse(code, { ecmaVersion: 5, comment: true }).comments).toEqual([]);
+    expect(espree.parse(source.replace(/^export\s+/gm, ''), { ecmaVersion: 5, comment: true }).comments.length).toBeGreaterThan(5);
+  });
+
+  it('stripComments drops whole-line and block comments, keeps code (regex literals included)', () => {
+    const input = [
+      '// a line comment',
+      '/** one-line block */',
+      '/**',
+      ' * a block',
+      ' */',
+      'var A = /^\\/(story|docs)\\/([^/]+)(\\/.*)?$/;',
+      '  // indented comment',
+      '',
+      "var b = 'x'; // trailing comment stays",
+      '/* block',
+      'still block */',
+      'var c = 1;',
+    ].join('\n');
+    expect(stripComments(input)).toBe(["var A = /^\\/(story|docs)\\/([^/]+)(\\/.*)?$/;", "var b = 'x'; // trailing comment stays", 'var c = 1;'].join('\n'));
   });
 
   it('replaces an old URL in place, keeping history.state (no navigation, no new history entry)', () => {

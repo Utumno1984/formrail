@@ -45,9 +45,12 @@ function decode(raw) {
  * The URL a link to a renamed story must be replaced with, or `null` when it carries no old id.
  *
  * Only the value of the `path` (manager) and `id` (preview) query parameters changes, wherever they are
- * in the query and however they are encoded (`path=%2Fstory%2F...` is decoded to be matched); every other
- * parameter (`viewMode`, `args`, `globals`, foreign ones) and the hash are kept byte for byte, so are the
- * origin and the path prefix (`/`, `/formrail/storybook/`, `/formrail/pro/`).
+ * in the query and however they are encoded (`path=%2Fstory%2F...`, `i%64=` are decoded to be matched); every
+ * other parameter (`viewMode`, `args`, `globals`, foreign ones) and the hash are kept byte for byte, so are the
+ * origin, credentials and the path prefix (`/`, `/formrail/storybook/`, `/formrail/pro/`). Matching is exact
+ * and case-sensitive, like Storybook's ids: `/STORY/<old>`, `?id=<OLD>`, `/x/story/<old>` are left alone.
+ * Whatever follows the id in `path` is written back percent-encoded, so `%26` there never becomes a new
+ * parameter.
  *
  * @param {string} href the full URL of the page running the redirect
  * @param {Object<string, string>} [ids] the map (default `LEGACY_STORY_IDS`; the tests pass their own)
@@ -68,6 +71,8 @@ export function resolveLegacyStory(href, ids) {
   for (var i = 0; i < parts.length; i++) {
     var eq = parts[i].indexOf('=');
     if (eq === -1) continue;
+    // The name is decoded too: Storybook reads the query with URLSearchParams, for which `i%64=` IS `id=`, so
+    // an encoded name must be rewritten like a plain one (otherwise Storybook would still see the old id).
     var name = decode(parts[i].slice(0, eq));
     var value = decode(parts[i].slice(eq + 1));
     if (value === null) continue;
@@ -85,5 +90,9 @@ export function resolveLegacyStory(href, ids) {
       changed = true;
     }
   }
-  return changed ? url.origin + url.pathname + '?' + parts.join('&') + url.hash : null;
+  if (!changed) return null;
+  // Through the URL object, not `origin + pathname`: `origin` is "null" for a `file:` URL and drops `user:pw@`.
+  // The parts come from `url.search`, already serialized, so assigning them back changes nothing else.
+  url.search = '?' + parts.join('&');
+  return url.href;
 }
