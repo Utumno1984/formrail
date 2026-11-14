@@ -911,6 +911,84 @@ export function formatCheck(issues) {
   return [...issues.map((i) => `${i.component}.${i.prop} [${i.kind}] ${i.message}`), '', `Default column check: ${issues.length} problem${issues.length === 1 ? '' : 's'}`].join('\n') + '\n';
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Label interfaces (ticket #540)
+//
+// The keys of a public `*Labels` interface (`PaginationLabels`, `ListReportFrameLabels`, `RebaseNoticeLabels`, ...)
+// are not rows of any props table: a component shows them as ONE row, `labels` (type `Partial<XLabels>`), with an
+// empty Default column and no nested rows (e2e/docs-props.spec.ts, "label keys"). A `@default` on a key would be
+// published nowhere a reader of the Docs sees, so the convention is the opposite of the props': the PROSE states
+// the default of every key ("Default `Previous page`."), it is the only place, and there is no `@default`.
+
+/**
+ * Every key of the public label interfaces, once, under the interface that declares it (`ListReportLabels` is an
+ * alias of `ListReportFrameLabels`, which extends `ListReportTableLabels`: its keys are reported under those two).
+ * A public label interface is an exported type whose name ends in `Labels`. Rows: `{ iface, key, tag, prose, file }`
+ * where `tag` is the text of the `@default` / `@defaultValue` tag (`undefined` without one) and `prose` the default
+ * the description states (`proseDefaultOf`).
+ */
+export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
+  const entryFiles = entries.map((e) => resolve(root, e));
+  const program = ts.createProgram(entryFiles, docgenCompilerOptions);
+  const checker = program.getTypeChecker();
+  const rows = new Map();
+  for (const file of entryFiles) {
+    const sf = program.getSourceFile(file);
+    if (!sf) continue;
+    for (const sym of checker.getExportsOfModule(checker.getSymbolAtLocation(sf))) {
+      if (!/Labels$/.test(sym.name)) continue;
+      const target = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+      if (!(target.flags & ts.SymbolFlags.Type)) continue;
+      for (const prop of checker.getDeclaredTypeOfSymbol(target).getProperties()) {
+        for (const decl of prop.declarations ?? []) {
+          const owner = decl.parent;
+          if (!ts.isInterfaceDeclaration(owner) && !ts.isTypeLiteralNode(owner)) continue;
+          const ifaceName = ts.isInterfaceDeclaration(owner) ? owner.name.text : ts.isTypeAliasDeclaration(owner.parent) ? owner.parent.name.text : target.name;
+          if (decl.getSourceFile().fileName.includes('/node_modules/')) continue;
+          if (ts.getJSDocTags(decl).some((t) => t.tagName.text === 'internal')) continue;
+          const id = `${ifaceName}.${prop.name}`;
+          if (rows.has(id)) continue;
+          const description = ts
+            .getJSDocCommentsAndTags(decl)
+            .filter((d) => ts.isJSDoc(d))
+            .map((d) => ts.getTextOfJSDocComment(d.comment) ?? '')
+            .join('\n');
+          const tag = ts.getJSDocTags(decl).find((t) => t.tagName.text === 'default' || t.tagName.text === 'defaultValue');
+          rows.set(id, {
+            iface: ifaceName,
+            key: prop.name,
+            tag: tag ? (ts.getTextOfJSDocComment(tag.comment) ?? '').trim() : undefined,
+            tagName: tag?.tagName.text,
+            prose: proseDefaultOf(description),
+            file: relative(root, decl.getSourceFile().fileName),
+          });
+        }
+      }
+    }
+  }
+  return [...rows.values()].sort((a, b) => a.iface.localeCompare(b.iface) || a.key.localeCompare(b.key));
+}
+
+/**
+ * The guard of the label keys (`--check`): `{ component, prop, kind, message }` like `check`, empty when every key
+ * states its default in the prose and none uses a tag.
+ * - `label-mixed`: a `@default` tag and a default in the prose on the same key (the form #476 removes from props);
+ * - `label-tag`: a `@default` tag on a label key, without prose: nothing in the Docs shows it (use the prose);
+ * - `label-no-default`: no default stated in the prose ("Default `x`.", "Default: ..."): a key without a default
+ *   loses its value for the reader. A default that is a function says what it returns ("Default `(n)`").
+ */
+export function checkLabels(rows) {
+  const issues = [];
+  for (const r of rows) {
+    const push = (kind, message) => issues.push({ component: r.iface, prop: r.key, kind, message });
+    if (r.tag !== undefined && r.prose !== undefined) push('label-mixed', `\`@${r.tagName}\` and a default in the prose: label keys state the default in the prose only, remove the tag`);
+    else if (r.tag !== undefined) push('label-tag', `\`@${r.tagName}\` on a label key: the Docs show no Default column for label keys, write "Default \`x\`." in the prose instead`);
+    else if (r.prose === undefined) push('label-no-default', 'no default stated in the prose: write "Default `x`." in the description (the value, as the code has it)');
+  }
+  const order = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  return issues.sort((a, b) => order(a.component, b.component) || order(a.prop, b.prop) || order(a.kind, b.kind));
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   // `--root <dir>`: measure another package tree (the tests run the CLI on fixture packages).
   const rootAt = process.argv.indexOf('--root');
@@ -919,6 +997,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv.includes('--check')) {
     // The allowlist names props of this repository: another root has none.
     const issues = rootAt > 0 ? check(result, { allowlist: {} }) : check(result);
+    issues.push(...checkLabels(measureLabels(rootAt > 0 ? { root: resolve(process.argv[rootAt + 1]) } : {})));
     process.stdout.write(json ? JSON.stringify(issues, null, 2) + '\n' : formatCheck(issues));
     process.exitCode = issues.length ? 1 : 0;
   } else process.stdout.write(json ? JSON.stringify(result, null, 2) + '\n' : format(result));

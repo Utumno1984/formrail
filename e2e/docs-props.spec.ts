@@ -450,6 +450,54 @@ test.describe('Docs props tables', () => {
     ]);
   });
 
+  test('label keys are not rows of the props table: the default of a label is the prose of its key (#540)', async ({ page }) => {
+    // The convention of CONTRIBUTING.md ("Label interfaces"): `labels` is ONE row of the table (type `Partial<XLabels>`),
+    // with an empty Default column and no row per key, so a `@default` on a key would be shown nowhere in the Docs. The
+    // default of a key is therefore written in its prose ("Default `Clear selection`.") and nowhere else. If the docgen
+    // ever expands the keys into rows with their own Default column, this test fails: then choose (a) of #540.
+    const cases = [
+      { title: 'Floorplans/List Report', keys: ['clearSelection', 'selectionBar', 'selectionCount', 'count', 'loading', 'empty'] },
+      { title: 'Navigation/Pagination', keys: ['navigation', 'previous', 'next', 'page'] },
+      { title: 'Forms/NumberInput', keys: ['increment', 'decrement'] },
+    ];
+    for (const { title, keys } of cases) {
+      const { facts } = await realPage(page, title);
+      const labels = facts.rows.filter((r) => r.name === 'labels');
+      expect(labels, `${title}: one row "labels"`).toHaveLength(1);
+      expect(labels[0]?.defaultValue, `${title}: the Default column of "labels" is empty`).toBeNull();
+      for (const key of keys) {
+        expect(
+          facts.rows.filter((r) => r.name === key),
+          `${title}: no row for the label key "${key}"`,
+        ).toEqual([]);
+        expect(facts.component?.props[key], `${title}: the docgen has no entry for the label key "${key}"`).toBeUndefined();
+      }
+    }
+
+    // A prop (not a label key) is the other way round: `emptyLabel` of DescriptionList has its own row, and its Default
+    // column shows the value, so the prose does not repeat it.
+    const { facts: descriptionList } = await realPage(page, 'Data/DescriptionList');
+    const emptyLabel = descriptionList.rows.find((r) => r.name === 'emptyLabel');
+    expect(emptyLabel?.defaultValue).toMatch(/Not specified/);
+    expect(emptyLabel?.description).not.toMatch(/Not specified|Default/);
+
+    // Where the value of a label default is readable: the prose of the key, in the interface of the source.
+    const read = (file: string) => readFileSync(new URL(`../packages/core/src/${file}`, import.meta.url), 'utf8');
+    const frame = read('list-report/ListReportFrame.tsx');
+    expect(frame).toMatch(/Default `Clear selection`\.\s*\*\/\s*clearSelection: string;/);
+    expect(frame).toMatch(/Default `Selection`\.\s*\*\/\s*selectionBar: string;/);
+    const pagination = read('pagination/Pagination.tsx');
+    expect(pagination).toMatch(/Default `Previous page`\.\s*\*\/\s*previous\?: string;/);
+    const numberInput = read('number-input/NumberInput.tsx');
+    expect(numberInput).toMatch(/Default `Increase`\.\s*\*\/\s*increment: string;/);
+    // And no `@default` on any key of these interfaces (the mixed form the guard refuses).
+    for (const source of [frame, pagination, numberInput]) {
+      const block = /export interface \w+Labels[^{]*\{[\s\S]*?\n\}/.exec(source)?.[0] ?? '';
+      expect(block).toContain('Default');
+      expect(block).not.toContain('@default');
+    }
+  });
+
   test('negative: an HTML attribute of the component filed under "Story controls" fails the guard', async ({ page }) => {
     // Rule (b'): `title` is not in ListReportTable's docgen (an inherited HTML attribute), but it is a key
     // of its props type: a demo knob with that name may hide the attribute among the story controls.

@@ -12,17 +12,17 @@ import {
 } from '../dialog/Dialog';
 
 export interface DirtyGuardLabels {
-  /** Dialog title (its accessible name). Default "Unsaved changes". */
+  /** Dialog title (its accessible name). Default `Unsaved changes`. */
   title: string;
-  /** Dialog description (`aria-describedby`). */
+  /** Dialog description (`aria-describedby`). Default `You have unsaved changes: leaving now will lose them.` */
   description: string;
-  /** Safe action: closes the dialog and does not run the guarded action. */
+  /** Safe action: closes the dialog and does not run the guarded action. Default `Keep editing`. */
   stay: string;
-  /** Destructive action: closes the dialog and runs the guarded action. */
+  /** Destructive action: closes the dialog and runs the guarded action. Default `Leave without saving`. */
   leave: string;
   /**
    * Accessible name of the close button (X) of the dialog, used verbatim (e.g. `Close`).
-   * Optional: when absent, empty or whitespace-only the X keeps the default "Close: `<title>`".
+   * Optional: when absent, empty or whitespace-only the X keeps its own name. Default `Close: <title>`.
    */
   close?: string;
 }
