@@ -43,7 +43,10 @@ export interface MessageStripProps extends Omit<HTMLAttributes<HTMLDivElement>, 
    * @default `Dismiss message: <title>`
    */
   dismissLabel?: string;
-  /** Visually hidden tone name read before the content (colour alone is not enough). Default: English tone name. */
+  /**
+   * Visually hidden tone name read before the content (colour alone is not enough), according to the tone.
+   * @default 'Information' / 'Success' / 'Warning' / 'Error'
+   */
   toneLabel?: string;
   /**
    * Live region: `alert` for `error`, `status` for the other tones. `false` removes the role, for

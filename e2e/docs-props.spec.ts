@@ -334,15 +334,19 @@ test.describe('Docs props tables', () => {
     // Source: the TSDoc of `size` in every branch has the same descriptive text; the only allowed
     // difference is the `@default` tag, on the text branch only.
     const source = readFileSync(new URL('../packages/core/src/button/Button.tsx', import.meta.url), 'utf8');
-    const raw = [...source.matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*size\??: Button(?:Text|Icon)Size;/g)].map((m) => m[1] ?? '');
-    expect(raw).toHaveLength(2);
+    const blocks = [...source.matchAll(/\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*size\??: (Button(?:Text|Icon)Size);/g)].map((m) => ({ raw: m[1] ?? '', type: m[2] ?? '' }));
+    expect(blocks.map((b) => b.type).sort()).toEqual(['ButtonIconSize', 'ButtonTextSize']);
     const flat = (t: string) => t.replace(/\n\s*\*/g, ' ').replace(/\s+/g, ' ').trim();
-    const descriptive = raw.map((b) => flat(b.split(/\n\s*\*\s*@/)[0] ?? ''));
+    const descriptive = blocks.map((b) => flat(b.raw.split(/\n\s*\*\s*@/)[0] ?? ''));
     expect(new Set(descriptive).size).toBe(1);
     expect(descriptive[0]).toBe(EXPECTED);
-    const tags = raw.map((b) => [...b.matchAll(/@default\s+(\S+)/g)].map((m) => m[1]));
-    expect(tags.filter((t) => t.length > 0)).toEqual([["'md'"]]);
-    expect(tags.filter((t) => t.length === 0)).toHaveLength(1);
+    const tagsOf = (type: string) => {
+      const block = blocks.find((b) => b.type === type);
+      return [...(block?.raw ?? '').matchAll(/@default\s+(\S+)/g)].map((m) => m[1]);
+    };
+    // The tag is on the text branch (the one with the default) and never on the icon branch.
+    expect(tagsOf('ButtonTextSize')).toEqual(["'md'"]);
+    expect(tagsOf('ButtonIconSize')).toEqual([]);
   });
 
   test('negative: a Radix prop dropped by the docgen filter, and a TSDoc inherited from @types/react, fail the guard', async ({ page }) => {

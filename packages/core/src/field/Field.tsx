@@ -16,7 +16,7 @@ import { ValidationContext } from './ValidationContext';
 export type FieldStateProps =
   | {
       /**
-       * Editable (`default`), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only.
+       * `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only.
        * @default 'default'
        */
       state?: 'default';
