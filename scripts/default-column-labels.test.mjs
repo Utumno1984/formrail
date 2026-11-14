@@ -96,6 +96,54 @@ describe('label interfaces: the guard (#540)', { timeout: 60_000 }, () => {
     expect(kinds('export interface FooLabels {\n  /** Name. The default theme is dark. */\n  a: string;\n}')).toEqual(['FooLabels.a:label-no-default']);
   });
 
+  // Medium finding of the critic of #548: the `ts.isTypeLiteralNode(owner)` branch of `measureLabels` had no test.
+  describe('label types that are not an `interface` (type literal, Partial, intersection)', () => {
+    it('`type FooLabels = { a: string }` is read, and without a default it is reported', () => {
+      expect(kinds('export type FooLabels = {\n  /** Name. */\n  a: string;\n};')).toEqual(['FooLabels.a:label-no-default']);
+      expect(kinds('export type FooLabels = {\n  /** Name. Default `A`. */\n  a: string;\n};')).toEqual([]);
+    });
+    it('`Partial<{ ... }>` is read, under the name of the exported type', () => {
+      const code = 'export type FooLabels = Partial<{\n  /** Name. */\n  a: string;\n  /** Other. Default `B`. */\n  b: string;\n}>;';
+      expect(labelsOf(code).map((r) => `${r.iface}.${r.key}`)).toEqual(['FooLabels.a', 'FooLabels.b']);
+      expect(kinds(code)).toEqual(['FooLabels.a:label-no-default']);
+    });
+    it('an intersection `Base & { ... }` reads the keys of both: the base under its own name, the literal under the exported one', () => {
+      const code = [
+        'export interface BaseLabels {\n  /** Base. */\n  loading: string;\n}',
+        'export type FooLabels = BaseLabels & {\n  /** Own. */\n  own: string;\n};',
+      ].join('\n');
+      expect(labelsOf(code).map((r) => `${r.iface}.${r.key}`)).toEqual(['BaseLabels.loading', 'FooLabels.own']);
+      expect(kinds(code)).toEqual(['BaseLabels.loading:label-no-default', 'FooLabels.own:label-no-default']);
+    });
+    it('a literal declared under its own alias name is reported under that name, not the exported one', () => {
+      const code = 'type ShapeLabels = {\n  /** Name. */\n  a: string;\n};\nexport type FooLabels = ShapeLabels;';
+      expect(kinds(code)).toEqual(['ShapeLabels.a:label-no-default']);
+    });
+    it('a `@default` in a type literal is reported like in an interface', () => {
+      expect(kinds('export type FooLabels = {\n  /** Name. Default `A`.\n   * @default A\n   */\n  a: string;\n};')).toEqual(['FooLabels.a:label-mixed']);
+    });
+  });
+
+  describe('two label interfaces of one name (collision)', () => {
+    it('are reported as `label-collision`, naming both files, instead of the second being skipped silently', () => {
+      // One in the core entry, one in the pro entry (two `export *` of one name in one entry is a TypeScript conflict).
+      const root = fixtureRoot({ 'A.tsx': 'export interface FooLabels {\n  /** A. Default `A`. */\n  a: string;\n}' });
+      writeFileSync(join(root, 'packages/pro/src/B.ts'), 'export interface FooLabels {\n  /** A again. */\n  a: string;\n}\n');
+      writeFileSync(join(root, 'packages/pro/src/index.ts'), "export type { FooLabels } from './B';\n");
+      try {
+        const issues = checkLabels(measureLabels({ root }));
+        expect(issues.map((i) => `${i.component}.${i.prop}:${i.kind}`)).toEqual(['FooLabels.a:label-collision']);
+        expect(issues[0].message).toContain('A.tsx');
+        expect(issues[0].message).toContain('B.ts');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+    it('one declaration reached twice (an alias and the interface) is not a collision', () => {
+      expect(kinds('export interface FooLabels {\n  /** A. Default `A`. */\n  a: string;\n}\nexport type AliasLabels = FooLabels;')).toEqual([]);
+    });
+  });
+
   describe('the --check command line on label keys', { timeout: 120_000 }, () => {
     const run = (root) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/default-column-measure.mjs'), '--check', '--root', root], { encoding: 'utf8' });
     const clean = fixtureRoot({ 'Labels.tsx': 'export interface FooLabels {\n  /** Name. Default `Save`. */\n  save: string;\n}' });

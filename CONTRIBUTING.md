@@ -77,5 +77,9 @@ The keys of a `*Labels` interface (`PaginationLabels`, `ListReportTableLabels`, 
 
 The same CI job fails on `label-no-default` (a key whose prose states no default: a new label without its default),
 `label-mixed` (`@default` and prose on one key) and `label-tag` (`@default` alone). It reads the exported types whose
-name ends in `Labels`; a label type with another name is not seen. If the docgen one day expands the keys into rows with
+name ends in `Labels`; a label type with another name is not seen. Two different declarations of one interface name
+(say in core and in pro) fail as `label-collision`: rename one. Declared limits, not detected: keys of a
+`Record<'a' | 'b', string>` are not read (write an interface); an inline object type such as `ObjectPage`'s
+`labels?: { anchorBar?: string }` is not an exported `*Labels` type, so it is outside the guard (its keys state their
+default in the prose by hand). If the docgen one day expands the keys into rows with
 their own Default column, the e2e test fails and the convention flips to `@default` per key (option (a) of #540).

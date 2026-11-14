@@ -932,6 +932,8 @@ export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
   const program = ts.createProgram(entryFiles, docgenCompilerOptions);
   const checker = program.getTypeChecker();
   const rows = new Map();
+  const declOf = new Map();
+  const collisions = [];
   for (const file of entryFiles) {
     const sf = program.getSourceFile(file);
     if (!sf) continue;
@@ -947,7 +949,13 @@ export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
           if (decl.getSourceFile().fileName.includes('/node_modules/')) continue;
           if (ts.getJSDocTags(decl).some((t) => t.tagName.text === 'internal')) continue;
           const id = `${ifaceName}.${prop.name}`;
-          if (rows.has(id)) continue;
+          if (rows.has(id)) {
+            // The same declaration reached twice (an alias, an inheritance) is one key; a DIFFERENT declaration under
+            // the same name (two interfaces of one name in two files) would be skipped silently: say it.
+            if (declOf.get(id) !== decl) collisions.push({ iface: ifaceName, key: prop.name, collision: true, file: relative(root, decl.getSourceFile().fileName), otherFile: rows.get(id).file });
+            continue;
+          }
+          declOf.set(id, decl);
           const description = ts
             .getJSDocCommentsAndTags(decl)
             .filter((d) => ts.isJSDoc(d))
@@ -966,7 +974,7 @@ export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
       }
     }
   }
-  return [...rows.values()].sort((a, b) => a.iface.localeCompare(b.iface) || a.key.localeCompare(b.key));
+  return [...rows.values(), ...collisions].sort((a, b) => a.iface.localeCompare(b.iface) || a.key.localeCompare(b.key));
 }
 
 /**
@@ -974,6 +982,8 @@ export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
  * states its default in the prose and none uses a tag.
  * - `label-mixed`: a `@default` tag and a default in the prose on the same key (the form #476 removes from props);
  * - `label-tag`: a `@default` tag on a label key, without prose: nothing in the Docs shows it (use the prose);
+ * - `label-collision`: two different declarations of one interface name (in two files), where the second would be
+ *   skipped silently: rename one;
  * - `label-no-default`: no default stated in the prose ("Default `x`.", "Default: ..."): a key without a default
  *   loses its value for the reader. A default that is a function says what it returns ("Default `(n)`").
  */
@@ -981,6 +991,10 @@ export function checkLabels(rows) {
   const issues = [];
   for (const r of rows) {
     const push = (kind, message) => issues.push({ component: r.iface, prop: r.key, kind, message });
+    if (r.collision) {
+      push('label-collision', `declared in ${r.otherFile} and in ${r.file}: two label interfaces of one name are one to the guard, rename one of them`);
+      continue;
+    }
     if (r.tag !== undefined && r.prose !== undefined) push('label-mixed', `\`@${r.tagName}\` and a default in the prose: label keys state the default in the prose only, remove the tag`);
     else if (r.tag !== undefined) push('label-tag', `\`@${r.tagName}\` on a label key: the Docs show no Default column for label keys, write "Default \`x\`." in the prose instead`);
     else if (r.prose === undefined) push('label-no-default', 'no default stated in the prose: write "Default `x`." in the description (the value, as the code has it)');
