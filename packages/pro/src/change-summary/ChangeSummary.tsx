@@ -31,9 +31,9 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * build your own list on `useChangeSummary`.
    */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
-  /** Text shown when `entries` is empty. Default `No changes`. */
+  /** Text shown when `entries` is empty. */
   emptyLabel?: string;
-  /** Accessible name of the list. Default `Changes`. */
+  /** Accessible name of the list. */
   label?: string;
   /** BCP 47 locale of the default number and date formatting. Default: the runtime locale. */
   locale?: string;

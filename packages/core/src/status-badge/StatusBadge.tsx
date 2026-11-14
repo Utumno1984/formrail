@@ -58,7 +58,7 @@ function warnEmpty(): void {
 
 export interface StatusBadgeProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'role' | 'children'> {
   /**
-   * Default `neutral`. A value outside the union (untyped JS) falls back to `neutral`. `warning`
+   * A value outside the union (untyped JS) falls back to `neutral`. `warning`
    * also nudges an `<svg>` icon up by 4% of its height (see `icon`).
    */
   tone?: StatusBadgeTone;

@@ -15,10 +15,10 @@ const SIZE_CLASS: Record<SpinnerSize, string> = {
 
 export interface SpinnerProps
   extends Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'role' | 'aria-hidden' | 'aria-live' | 'aria-atomic'> {
-  /** Side of the square box, from the icon scale (`--icon-rop-*`). Default `md`. */
+  /** Side of the square box, from the icon scale (`--icon-rop-*`). */
   size?: SpinnerSize;
   /**
-   * Text announced to assistive technology (announced mode only). Default "Loading". An empty label
+   * Text announced to assistive technology (announced mode only). An empty label
    * leaves the region empty and logs an error in development.
    */
   label?: string;

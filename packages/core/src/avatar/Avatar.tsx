@@ -46,9 +46,9 @@ export interface AvatarProps
   name?: string;
   /** Image URL. While it loads, after an error, or when absent, the initials (or generic icon) show. */
   src?: string;
-  /** Default `md`. A value outside the union (untyped JS) falls back to `md`. */
+  /** A value outside the union (untyped JS) falls back to `md`. */
   size?: AvatarSize;
-  /** Default `circle`. */
+  /** Outline of the avatar. */
   shape?: AvatarShape;
   /** The name is written next to the avatar: no accessible name, `aria-hidden="true"`. */
   decorative?: boolean;

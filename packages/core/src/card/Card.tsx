@@ -26,7 +26,7 @@ const CardContext = /* @__PURE__ */ createContext<CardContextValue | null>(null)
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
   /**
-   * Root element. Default `div`. With `section` or `article` the root gets `aria-labelledby`
+   * Root element. With `section` or `article` the root gets `aria-labelledby`
    * pointing at the `CardTitle` (unless you pass your own `aria-labelledby` / `aria-label`), so the
    * landmark/article has a name; a `section` without a name is not a landmark, and in development
    * a warning says so.
@@ -91,7 +91,7 @@ export const CardHeader = /* @__PURE__ */ forwardRef<HTMLDivElement, HTMLAttribu
 );
 
 export interface CardTitleProps extends Omit<TitleProps, 'level'> {
-  /** Heading level 2-6. Default 3. */
+  /** Heading level 2-6. */
   level?: CardTitleLevel;
 }
 

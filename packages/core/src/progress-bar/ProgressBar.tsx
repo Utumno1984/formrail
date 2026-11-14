@@ -17,16 +17,16 @@ export interface ProgressBarProps extends Omit<HTMLAttributes<HTMLDivElement>, '
    * `aria-valuenow` is exposed. A value outside the range is clamped (and warned about in development).
    */
   value?: number | null;
-  /** Default 0. */
+  /** Lower end of the range. */
   min?: number;
-  /** Default 100. Must be greater than `min` (otherwise the bar is rendered indeterminate and an error is logged in development). */
+  /** Upper end of the range. Must be greater than `min` (otherwise the bar is rendered indeterminate and an error is logged in development). */
   max?: number;
   /**
    * Text for `aria-valuetext` (determinate only). Default: the rounded percentage of the range, e.g.
    * "45%". `min` is passed as the third argument.
    */
   getValueLabel?: (value: number, max: number, min: number) => string;
-  /** Default `primary`. */
+  /** Colour of the bar. */
   tone?: ProgressBarTone;
   /**
    * Optional visible label, linked to the bar with `aria-labelledby`. When present the bar is wrapped

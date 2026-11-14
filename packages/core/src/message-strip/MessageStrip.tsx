@@ -26,7 +26,7 @@ const TONE_LABEL: Record<MessageStripTone, string> = {
 const DEFAULT_DISMISS_LABEL = 'Dismiss message';
 
 export interface MessageStripProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title' | 'role'> {
-  /** Default `info`. */
+  /** Icon, colour and live role of the strip (`error` is an `alert`, the others a `status`). */
   tone?: MessageStripTone;
   /** Bold text before the content, in the same block. */
   title?: ReactNode;
@@ -50,7 +50,7 @@ export interface MessageStripProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   toneLabel?: string;
   /**
    * Live region: `alert` for `error`, `status` for the other tones. `false` removes the role, for
-   * strips already on the page at load that must not be announced. Default `true`. Changing `tone`
+   * strips already on the page at load that must not be announced. Changing `tone`
    * after mount updates the role, but some screen readers only announce a live region when it is
    * inserted (the same goes for a strip that is mounted already filled): mount a new strip to be
    * sure an error is announced.

@@ -24,7 +24,7 @@ const SIZE_CLASS: Record<IconSize, string> = {
 };
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref' | 'size'> {
-  /** Side of the square the SVG is forced into, whatever its own width/height. Default `md`. */
+  /** Side of the square the SVG is forced into, whatever its own width/height. */
   size?: IconSize;
   /**
    * Accessible name. Without it (or empty/blank) the icon is decorative: `aria-hidden`, not

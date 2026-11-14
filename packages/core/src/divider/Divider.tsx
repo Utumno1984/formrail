@@ -12,7 +12,7 @@ export interface DividerProps extends Omit<HTMLAttributes<HTMLElement>, 'role' |
    * horizontal decorative divider renders as a `<div>` instead of an `<hr>`.
    */
   decorative?: boolean;
-  /** Margin on the perpendicular axis (above/below a horizontal line, beside a vertical one). Default `md`. */
+  /** Margin on the perpendicular axis (above/below a horizontal line, beside a vertical one). */
   spacing?: DividerSpacing;
 }
 

@@ -57,9 +57,9 @@ export interface ToastLabels {
 export interface ToastProviderProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   /** Texts the toast adds itself. Default: English. */
   labels?: ToastLabels;
-  /** `KeyboardEvent.key` that moves the focus to the visible toast. Default `F8`; `null` disables it. */
+  /** `KeyboardEvent.key` that moves the focus to the visible toast; `null` disables it. */
   hotkey?: string | null;
-  /** Milliseconds a toast without an action stays. Default 5000. A toast with an action stays until closed. */
+  /** Milliseconds a toast without an action stays. A toast with an action stays until closed. */
   defaultDuration?: number;
   /** The part of the app that can call `useToast()`; the toast itself is rendered by the provider. */
   children?: ReactNode;

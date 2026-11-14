@@ -22,10 +22,10 @@ import {
 import { footerSlotClass, rootClass, scrollerClass, scrollerStyle } from './object-page-styles';
 
 export type ObjectPageProps = HTMLAttributes<HTMLDivElement> & {
-  /** Level of the header's title (1-4); the sections' titles get the next one. Default 1. */
+  /** Level of the header's title (1-4); the sections' titles get the next one. */
   headingLevel?: 1 | 2 | 3 | 4;
   /**
-   * Navigation between the sections: `anchors` (default) shows an Anchor Bar, sticky at the top of the
+   * Navigation between the sections: `anchors` shows an Anchor Bar, sticky at the top of the
    * scroller, once there are two or more sections; `none` shows nothing.
    */
   sectionNavigation?: 'anchors' | 'none';

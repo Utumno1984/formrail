@@ -60,10 +60,10 @@ export type DialogTriggerProps = ModalTriggerProps;
 export const DialogTrigger = /* @__PURE__ */ createModalTrigger('DialogTrigger', 'Dialog');
 
 export interface DialogContentProps extends ModalContentBaseProps {
-  /** Maximum width step. Default `md`. A conflicting width in `className` wins. */
+  /** Maximum width step. A conflicting width in `className` wins. */
   size?: DialogSize;
   /**
-   * Whether Escape and a click on the backdrop close the dialog. Default `true`; `false` is for
+   * Whether Escape and a click on the backdrop close the dialog; `false` is for
    * dialogs that require an explicit choice (a button must close it). While `false`, a press on the
    * backdrop also keeps the focus on the element that has it (it does not fall back to `body`).
    */
