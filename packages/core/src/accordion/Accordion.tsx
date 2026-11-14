@@ -42,7 +42,7 @@ interface AccordionBaseProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defa
 }
 
 export interface AccordionSingleProps extends AccordionBaseProps {
-  /** At most one item open at a time. */
+  /** Which items can be open: `single` (at most one item at a time) or `multiple` (any number at once). It decides the shape of `value`, `defaultValue` and `onValueChange`: a string with `single`, an array of strings with `multiple`. */
   type: 'single';
   /**
    * Whether the open item can be closed by clicking it. With `false` one item always
@@ -51,24 +51,27 @@ export interface AccordionSingleProps extends AccordionBaseProps {
    */
   collapsible?: boolean;
   /**
-   * Controlled: the `value` of the open item (`''` for none). Leave it `undefined` for uncontrolled.
-   * A value that matches no item leaves every item closed.
+   * Controlled: the `value` of the open item with `type="single"` (`''` for none), the `value`s of the open items with `type="multiple"` (an array). Leave it `undefined` for uncontrolled.
+   * With `single`, a value that matches no item leaves every item closed.
    */
   value?: string;
-  /** Initial open item when uncontrolled. */
+  /** Initial open item when uncontrolled (a string with `type="single"`), or initial open items (an array of strings with `type="multiple"`). */
   defaultValue?: string;
-  /** Called **only** for a user gesture, never when `value` changes from outside. `''` means "closed". */
+  /** Called **only** for a user gesture, never when `value` changes from outside, with the new open item (`''` for none) with `type="single"`, or the new array of open items with `type="multiple"`. */
   onValueChange?: (value: string) => void;
 }
 
 export interface AccordionMultipleProps extends AccordionBaseProps {
-  /** Any number of items open at once. */
+  /** Which items can be open: `single` (at most one item at a time) or `multiple` (any number at once). It decides the shape of `value`, `defaultValue` and `onValueChange`: a string with `single`, an array of strings with `multiple`. */
   type: 'multiple';
-  /** Controlled: the `value`s of the open items. Leave it `undefined` for uncontrolled. */
+  /**
+   * Controlled: the `value` of the open item with `type="single"` (`''` for none), the `value`s of the open items with `type="multiple"` (an array). Leave it `undefined` for uncontrolled.
+   * With `single`, a value that matches no item leaves every item closed.
+   */
   value?: string[];
-  /** Initial open items when uncontrolled. */
+  /** Initial open item when uncontrolled (a string with `type="single"`), or initial open items (an array of strings with `type="multiple"`). */
   defaultValue?: string[];
-  /** Called **only** for a user gesture, never when `value` changes from outside. */
+  /** Called **only** for a user gesture, never when `value` changes from outside, with the new open item (`''` for none) with `type="single"`, or the new array of open items with `type="multiple"`. */
   onValueChange?: (value: string[]) => void;
 }
 

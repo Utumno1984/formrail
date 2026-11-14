@@ -36,10 +36,26 @@ export function allowlistKeys(source: string): string[] {
   return [...block.matchAll(/^\s+'([A-Za-z]+\.[A-Za-z]+)':/gm)].map((m) => m[1] ?? '');
 }
 
-/** The `@default` of `prop` in the TSDoc of `file` (the `nth` documented one), as written. */
-export function readDefaultTag(source: string, prop: string, nth = 0): string | undefined {
+/**
+ * The block of `owner` (an `interface` or `type` declared at the start of a line): from its declaration
+ * to the next top-level declaration. Throws when the file has no such declaration.
+ */
+function declarationOf(source: string, owner: string): string {
+  const start = new RegExp(`^(?:export )?(?:interface|type) ${owner}\\b`, 'm').exec(source);
+  if (!start) throw new Error(`no interface or type named ${owner}`);
+  const rest = source.slice(start.index + start[0].length);
+  const next = /^(?:export |declare )?(?:interface|type|const|function|class|enum)\b/m.exec(rest);
+  return source.slice(start.index, start.index + start[0].length + (next ? next.index : rest.length));
+}
+
+/**
+ * The `@default` of `prop` in the TSDoc of `file` (the `nth` documented one), as written. With `owner`,
+ * only the declaration of that interface / type is read, so two props of the same name in one file
+ * (`Foo.size`, `Bar.size`) are not confused.
+ */
+export function readDefaultTag(source: string, prop: string, nth = 0, owner?: string): string | undefined {
   const re = new RegExp(`/\\*\\*((?:(?!\\*/)[\\s\\S])*?)\\*/\\s*${prop}\\??:`, 'g');
-  const tags = [...source.matchAll(re)].flatMap((m) => {
+  const tags = [...(owner === undefined ? source : declarationOf(source, owner)).matchAll(re)].flatMap((m) => {
     const tag = /@default\s+([^\n]*?)\s*(?:\n|$)/.exec((m[1] ?? '').replace(/\n\s*\* ?/g, '\n'));
     return tag ? [tag[1] ?? ''] : [];
   });
@@ -116,6 +132,8 @@ interface Probe {
   prop: string;
   /** With several documented declarations of `prop` in the file. */
   nth?: number;
+  /** The interface / type that declares the prop: only its block is read (two props of one name in a file stay apart). */
+  owner?: string;
   /** Throws (`expect`) when the omitted prop does not behave like the tag says. */
   check: (tag: string) => void | Promise<void>;
 }
@@ -357,8 +375,8 @@ const PROBES: Record<string, Probe> = {
       expect(tag.split(' / ').map((t) => literal(t))).toEqual(observed);
     },
   },
-  'Pagination.boundaryCount': { file: 'pagination/Pagination.tsx', prop: 'boundaryCount', nth: 0, check: (tag) => paginationDefault('boundaryCount', tag) },
-  'Pagination.siblingCount': { file: 'pagination/Pagination.tsx', prop: 'siblingCount', nth: 0, check: (tag) => paginationDefault('siblingCount', tag) },
+  'Pagination.boundaryCount': { file: 'pagination/Pagination.tsx', prop: 'boundaryCount', nth: 0, owner: 'PaginationProps', check: (tag) => paginationDefault('boundaryCount', tag) },
+  'Pagination.siblingCount': { file: 'pagination/Pagination.tsx', prop: 'siblingCount', nth: 0, owner: 'PaginationProps', check: (tag) => paginationDefault('siblingCount', tag) },
   'Tabs.activationMode': {
     file: 'tabs/Tabs.tsx',
     prop: 'activationMode',
@@ -438,7 +456,7 @@ describe('@default of the props the guard cannot compare with the source: the ta
   });
 
   it.each(Object.entries(PROBES))('%s: the @default of the TSDoc matches what the component does without the prop', async (_id, probe) => {
-    const tag = readDefaultTag(readFileSync(join(SRC, probe.file), 'utf8'), probe.prop, probe.nth);
+    const tag = readDefaultTag(readFileSync(join(SRC, probe.file), 'utf8'), probe.prop, probe.nth, probe.owner);
     expect(tag, `no @default tag for ${probe.prop} in ${probe.file}`).toBeDefined();
     await probe.check(tag ?? '');
   });
@@ -448,6 +466,12 @@ describe('@default of the props the guard cannot compare with the source: the ta
     expect(readDefaultTag(src, 'one')).toBe("'a'");
     expect(readDefaultTag(src, 'one', 1)).toBe('`x`');
     expect(readDefaultTag(src, 'two')).toBeUndefined();
+    // Anchored to the declaration: the same prop name in two interfaces of one file is not confused.
+    const two = ['interface A {', '  /**', "   * @default 'a'", '   */', '  size?: string;', '}', '', 'export interface B {', '  /**', "   * @default 'b'", '   */', '  size?: string;', '}'].join('\n');
+    expect(readDefaultTag(two, 'size')).toBe("'a'");
+    expect(readDefaultTag(two, 'size', 0, 'A')).toBe("'a'");
+    expect(readDefaultTag(two, 'size', 0, 'B')).toBe("'b'");
+    expect(() => readDefaultTag(two, 'size', 0, 'C')).toThrow(/no interface or type named C/);
     expect(literal("'a'")).toBe('a');
     expect(literal('0')).toBe(0);
     expect(literal('[]')).toEqual([]);

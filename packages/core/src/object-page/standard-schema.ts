@@ -27,11 +27,11 @@ export type StandardSchemaResult =
   | {
       /** The validated (possibly transformed) value. */
       readonly value: unknown;
-      /** Absent on success. */
+      /** Present only on failure: the problems found (the save is refused and they become field and form errors). Absent (`undefined`) on success. */
       readonly issues?: undefined;
     }
   | {
-      /** The problems found: the save is refused and they become field and form errors. */
+      /** Present only on failure: the problems found (the save is refused and they become field and form errors). Absent (`undefined`) on success. */
       readonly issues: ReadonlyArray<StandardSchemaIssue>;
     };
 
