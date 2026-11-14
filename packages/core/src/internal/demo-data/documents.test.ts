@@ -359,6 +359,14 @@ describe('makeSupportCases / getSupportCase', () => {
     expect(problems).toEqual([]);
   });
 
+  it('a case opened a day or two ago with several comments still ends before 18:00 today (tightest budget)', () => {
+    const young = makeSupportCases(100_000).filter((c) => c.commentCount >= 3 && daysBetween(c.openedOn, DEMO_TODAY) <= 2);
+    expect(young.length).toBeGreaterThan(200);
+    const now = `${DEMO_TODAY}T18:00`;
+    const late = young.filter((c) => getSupportCase(c.id)!.comments.some((comment) => comment.postedAt > now));
+    expect(late.map((c) => c.id)).toEqual([]);
+  });
+
   it('has cases without comments, and long comments (to exercise truncation)', () => {
     expect(cases.some((supportCase) => supportCase.commentCount === 0)).toBe(true);
     expect(cases.filter((supportCase) => supportCase.commentCount === 0).every((supportCase) => supportCase.status === 'new')).toBe(true);
