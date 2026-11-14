@@ -193,7 +193,7 @@ const meta: Meta<DemoArgs> = {
 export default meta;
 type Story = StoryObj<DemoArgs>;
 
-export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('VirtualListReport.example.tsx') };
+export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('VirtualListReport.example.tsx', {}, { layout: 'padded' }) };
 
 /**
  * 100,000 invoices. Controls: dataset size, threshold, overscan, row height, selection. The play function
