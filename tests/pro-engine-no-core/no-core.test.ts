@@ -86,6 +86,22 @@ describe('@formrail/pro/engine in a project without @formrail/core', () => {
     expect(JSON.parse(execFileSync(process.execPath, ['run.cjs'], { cwd: sandbox, encoding: 'utf8' }))).toEqual({ paths: ['name'], hook: 'function' });
   });
 
+  // #424: a consumer shaped differently from `lineItems` (src/contacts.ts, typechecked by the tsc test above) names
+  // its rows with `itemLabel` and reads its reorders: what the adapters of #507 and #508 get.
+  it('ESM: computeChangeSummaryResult with itemLabel on a contacts array (#424)', () => {
+    expect(JSON.parse(execFileSync(process.execPath, ['run-contacts.mjs'], { cwd: sandbox, encoding: 'utf8' }))).toEqual({
+      entries: ['Contacts > Ann > Phones > mobile > Number'],
+      reorders: ['Contacts', 'Contacts > Ann > Phones'],
+    });
+  });
+
+  it('CJS: the smoke test of #424, a pure reorder gives no entry and one reorder', () => {
+    expect(JSON.parse(execFileSync(process.execPath, ['run-contacts.cjs'], { cwd: sandbox, encoding: 'utf8' }))).toEqual({
+      entries: [],
+      reorders: [{ path: 'c', labelPath: ['C'], label: 'C' }],
+    });
+  });
+
   it('negative control: loading the main entry @formrail/pro fails there, on the missing core', () => {
     const result = run(['--input-type=module', '-e', "await import('@formrail/pro')"]);
     expect(result.status).not.toBe(0);
