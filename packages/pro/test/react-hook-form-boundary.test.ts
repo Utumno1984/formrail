@@ -62,6 +62,28 @@ describe('@formrail/pro/react-hook-form: import graph of the sources', () => {
   });
 });
 
+// The copy-paste example of the story: what a reader without the core pastes (ticket #507).
+const EXAMPLE_ALLOWED = new Set(['react', 'react-hook-form', '@formrail/pro/engine', '@formrail/pro/react-hook-form']);
+const exampleIntruders = (source: string) => moduleImports(source, '/v/x.example.tsx').filter((found) => !EXAMPLE_ALLOWED.has(found.specifier));
+
+describe('ReactHookForm.example.tsx imports only react, react-hook-form and the two Pro subpaths', () => {
+  const source = readFileSync(`${SRC}integrations/react-hook-form/ReactHookForm.example.tsx`, 'utf8');
+
+  it('nothing else, no core', () => {
+    expect(exampleIntruders(source)).toEqual([]);
+    expect(new Set(moduleImports(source, 'x.tsx').map((found) => found.specifier))).toEqual(
+      new Set(['react-hook-form', '@formrail/pro/engine', '@formrail/pro/react-hook-form']),
+    );
+  });
+
+  it.each(["import { cn } from '@formrail/core';", "import { ChangeSummary } from '@formrail/pro';", "import { z } from 'zod';"])(
+    'negative: %s is found',
+    (line) => {
+      expect(exampleIntruders(`${source}\n${line}`)).toHaveLength(1);
+    },
+  );
+});
+
 describe('react-hook-form runtime import guard: negative cases', () => {
   it.each([
     ["import { useWatch } from 'react-hook-form';"],

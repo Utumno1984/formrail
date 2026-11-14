@@ -109,6 +109,24 @@ export default tseslint.config(
     },
   },
   {
+    // The React Hook Form integration of Pro (#507): `react-hook-form` is a declared (optional) peer dependency of
+    // `@formrail/pro`, so its examples may import it too; the rest of the rule above is unchanged.
+    files: ['packages/pro/src/integrations/react-hook-form/*.example.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { regex: '^\\.', message: 'A copy-paste example imports only the public packages by name (@formrail/core, @formrail/pro), never a relative path (ticket #403).' },
+            { regex: '(^|/)internal(/|$)', message: 'A copy-paste example uses only public API: no `internal` module (ticket #403).' },
+            { regex: '^(?!(react|react-hook-form|@formrail/[\\w-]+)(/|$))[^.]', message: 'A React Hook Form example imports only `react`, `react-hook-form` and `@formrail/*` packages (ticket #507).' },
+            { regex: '^(storybook|@storybook)(/|$)', message: 'A copy-paste example is plain React code: no Storybook import (fn, args, ...) (ticket #403).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The story of a copy-paste example is `{ tags, ...exampleStory('X.example.tsx') }` and nothing else that
     // changes what is rendered (ticket #403): the spread brings the example's own `render`, and the page prints
     // that file's text. A `render`, `component`, `decorators` or `loaders` in the same object would show
