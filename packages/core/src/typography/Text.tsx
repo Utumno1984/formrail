@@ -20,13 +20,13 @@ interface TextBaseProps {
 export type TextProps = TextBaseProps &
   (
     | ({
-        /** Element rendered: `p` (default), `span`, `div` or `label`. `label` is a different element, so it also takes `htmlFor` (the id of the control it names); the other three do not. */
+        /** Element rendered: `p`, `span`, `div` or `label`. `label` is a different element, so it also takes `htmlFor` (the id of the control it names); the other three do not. */
         as?: 'p' | 'span' | 'div';
         /** Only with `as="label"`: the id of the control the label names. */
         htmlFor?: never;
       } & HTMLAttributes<HTMLElement>)
     | ({
-        /** Element rendered: `p` (default), `span`, `div` or `label`. `label` is a different element, so it also takes `htmlFor` (the id of the control it names); the other three do not. */
+        /** Element rendered: `p`, `span`, `div` or `label`. `label` is a different element, so it also takes `htmlFor` (the id of the control it names); the other three do not. */
         as: 'label';
       } & LabelHTMLAttributes<HTMLElement>)
   );
