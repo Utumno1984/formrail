@@ -80,11 +80,14 @@ for (const example of EXAMPLES) {
     });
 
     test('Docs page: margin of 16px or more at 1280, 390 and 320, the example does not overflow horizontally', async ({ page }) => {
-      test.setTimeout(3 * DOCS_RENDER_MS + 30_000);
+      // One load of the Docs page (the dominant cost: it renders every story of the file); the layout needs no reload
+      // to follow the width, so the widths are visited with setViewportSize.
+      test.setTimeout(DOCS_RENDER_MS + 30_000);
+      await page.setViewportSize({ width: 1280, height: 844 });
+      await page.goto(`/iframe.html?id=${example.docs}&viewMode=docs`);
+      await expect(page.getByRole('table', { name: 'Invoices' }).first()).toBeVisible({ timeout: DOCS_RENDER_MS });
       for (const width of [1280, 390, 320]) {
         await page.setViewportSize({ width, height: 844 });
-        await page.goto(`/iframe.html?id=${example.docs}&viewMode=docs`);
-        await expect(page.getByRole('table', { name: 'Invoices' }).first()).toBeVisible({ timeout: DOCS_RENDER_MS });
         const edges = await page.getByRole('table', { name: 'Invoices' }).first().evaluate((t) => {
           let box: HTMLElement | null = t.parentElement;
           while (box && !['auto', 'scroll'].includes(getComputedStyle(box).overflowY)) box = box.parentElement;
@@ -112,6 +115,65 @@ for (const example of EXAMPLES) {
       // 5 whole rows fit (not the 6 of the canvas); #502 allows no fewer than the 4 of before plus one.
       expect((await measure(page)).wholeRows).toBeGreaterThanOrEqual(example.docsMinRows);
     });
+  });
+}
+
+// Edge cases of the ticket: the browser's address bar (dvh) and the virtual keyboard shrink the viewport while the
+// table is scrolled: the example follows, keeps its scroll position and the focused search stays visible.
+for (const example of EXAMPLES) {
+  test(`${example.name} example 390x844: address bar / keyboard shrink keeps the scroll and the focused search visible`, async ({ page }) => {
+    await page.addInitScript(() => {
+      const target = new EventTarget();
+      let keyboard = 0;
+      const vv = Object.defineProperties(target, {
+        offsetTop: { value: 0 },
+        offsetLeft: { value: 0 },
+        pageTop: { value: 0 },
+        pageLeft: { value: 0 },
+        scale: { value: 1 },
+        height: { get: () => window.innerHeight - keyboard },
+        width: { get: () => window.innerWidth },
+      });
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+      (window as unknown as { __setKeyboard: (px: number) => void }).__setKeyboard = (px) => {
+        keyboard = px;
+        target.dispatchEvent(new Event('resize'));
+      };
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoStory(page, example.id);
+    const table = page.getByRole('table', { name: 'Invoices' });
+    await expect(table).toBeVisible();
+    expect((await measure(page)).parentHeight).toBeCloseTo(640, 0);
+    const scrollBox = () =>
+      table.evaluate((t) => {
+        let box: HTMLElement | null = t.parentElement;
+        while (box && !['auto', 'scroll'].includes(getComputedStyle(box).overflowY)) box = box.parentElement;
+        return box!.scrollTop;
+      });
+    await table.evaluate((t) => {
+      let box: HTMLElement | null = t.parentElement;
+      while (box && !['auto', 'scroll'].includes(getComputedStyle(box).overflowY)) box = box.parentElement;
+      box!.scrollTop = 120;
+    });
+    await expect.poll(scrollBox).toBeGreaterThan(0);
+    const before = await scrollBox();
+    const search = page.getByRole('searchbox', { name: 'Search' }).first();
+    await search.focus();
+    // The address bar / keyboard: the viewport gets shorter (390x500) and the visual viewport loses a keyboard's worth.
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(150));
+    await expect.poll(async () => (await measure(page)).parentHeight).toBeLessThanOrEqual(436 + 0.5);
+    expect((await measure(page)).parentHeight).toBeGreaterThanOrEqual(320 - 0.5);
+    expect(await scrollBox()).toBe(before);
+    await expect(search).toBeFocused();
+    const box = (await search.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(500 - 150);
+    // Back to the tall viewport: the height follows again.
+    await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(0));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => (await measure(page)).parentHeight).toBeCloseTo(640, 0);
   });
 }
 
