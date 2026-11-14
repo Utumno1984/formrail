@@ -48,7 +48,7 @@ function RowHeightStyle({ rowHeight }: { rowHeight: RowHeight }) {
   return rowHeight === '3rem' ? <style>{`.${REM3_CLASS} [tabindex="0"]:has(> table) { --rop-list-report-row-height: 3rem; }`}</style> : null;
 }
 
-type RowCount = 50 | 1000 | 100_000 | 200_000;
+type RowCount = 50 | 1000 | 10_000 | 100_000 | 200_000;
 type RowHeight = 'default' | '3rem';
 
 interface DemoArgs {
@@ -57,6 +57,8 @@ interface DemoArgs {
   overscan: number;
   rowHeight: RowHeight;
   selectable: boolean;
+  locale: 'en-US' | 'de-DE' | 'fr-FR';
+  onSearchQueryChange: (query: string) => void;
   onSelectedIdsChange: (ids: ReadonlySet<string>) => void;
   onApprove: (numbers: string[]) => void;
   onExport: (numbers: string[]) => void;
@@ -69,14 +71,14 @@ declare global {
   }
 }
 
-function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, onSelectedIdsChange, onApprove, onExport }: DemoArgs) {
+function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, locale, onSearchQueryChange, onSelectedIdsChange, onApprove, onExport }: DemoArgs) {
   const rows = makeDemoRows(rowCount);
   const [renderStart] = useState(() => performance.now());
   useLayoutEffect(() => {
     window.__ropVirtualMountMs = performance.now() - renderStart;
   }, [renderStart]);
   const handle = useRef<VirtualListReportTableHandle>(null);
-  const table = useListReport<DemoRow>({ rows, columns: COLUMNS, getRowId: (r) => r.id, filters: FILTERS, selectable, onSelectedIdsChange });
+  const table = useListReport<DemoRow>({ rows, columns: COLUMNS, getRowId: (r) => r.id, filters: FILTERS, selectable, locale, onSearchQueryChange, onSelectedIdsChange });
   const last = rows[rows.length - 1];
   return (
     <div style={PAGE}>
@@ -173,6 +175,12 @@ const meta: Meta<DemoArgs> = {
       description: 'Overrides `--rop-list-report-row-height` on the scroll container (consumer CSS): the pitch is re-measured.',
     }),
     selectable: storyControl({ control: 'boolean', description: 'An option of the hook, not a prop: `useListReport({ selectable })`.' }),
+    locale: storyControl({
+      control: 'select',
+      options: ['en-US', 'de-DE', 'fr-FR'],
+      description: 'An option of the hook, not a prop: `useListReport({ locale })`. Formats the numbers of the default count, selection text and "Select all N results" with `Intl.NumberFormat`.',
+    }),
+    onSearchQueryChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSearchQueryChange })`.' }),
     onSelectedIdsChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSelectedIdsChange })`.' }),
     onApprove: storyControl({ control: false, description: 'The "Approve" button of the demo\'s `bulkActions`.' }),
     onExport: storyControl({ control: false, description: 'The "Export" button of the demo\'s `bulkActions`.' }),
@@ -183,6 +191,8 @@ const meta: Meta<DemoArgs> = {
     overscan: 10,
     rowHeight: 'default',
     selectable: true,
+    locale: 'en-US',
+    onSearchQueryChange: fn(),
     onSelectedIdsChange: fn(),
     onApprove: fn(),
     onExport: fn(),
@@ -228,16 +238,47 @@ export const Default: Story = {
     await user.click(target);
     await user.keyboard('{/Shift}');
     await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(2);
-    await expect(canvas.getByText('4991 selected')).toBeInTheDocument();
+    const fmt = new Intl.NumberFormat(args.locale);
+    await expect(canvas.getByText(`${fmt.format(4991)} selected`, { normalizer: (t) => t })).toBeInTheDocument();
     await expect(canvas.queryByRole('checkbox', { name: 'Select INV-000010' })).toBeNull();
 
     // Select every result from the selection bar, then Escape empties the selection.
-    await user.click(canvas.getByRole('button', { name: `Select all ${count.toLocaleString('en-US')} results` }));
-    await expect(canvas.getByText(`${count} selected`)).toBeInTheDocument();
+    const selectAll = canvas.getByRole('button', { name: /^Select all .+ results$/ });
+    await expect(selectAll.textContent).toBe(`Select all ${fmt.format(count)} results`);
+    await user.click(selectAll);
+    await expect(canvas.getByText(`${fmt.format(count)} selected`, { normalizer: (t) => t })).toBeInTheDocument();
     await expect(canvas.getByRole('checkbox', { name: 'Select all results' })).toHaveFocus();
     await user.keyboard('{Escape}');
     await expect(canvas.getByText('No items selected')).toBeInTheDocument();
     await expect(args.onSelectedIdsChange).toHaveBeenLastCalledWith(new Set());
+  },
+};
+
+/**
+ * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 10,000 invoices. The play function
+ * types a search, checks the "n of 10,000" count in the chosen locale, selects a row, uses "Select all n results" and
+ * checks the formatted selection text. Stories and baselines always use a fixed locale.
+ */
+export const LocaleCount: Story = {
+  args: { rowCount: 10_000 },
+  argTypes: { rowCount: { control: false } },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const fmt = new Intl.NumberFormat(args.locale);
+    const heading = canvas.getByRole('heading', { name: /Invoices/ });
+    await expect(heading.textContent).toBe(`Invoices (${fmt.format(10_000)})`);
+    const search = canvas.getByRole('searchbox', { name: 'Search invoices' });
+    await userEvent.type(search, 'INV-001{Enter}');
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('INV-001');
+    await waitFor(() => expect(heading.textContent).toBe(`Invoices (${fmt.format(1000)} of ${fmt.format(10_000)})`));
+    const user = userEvent.setup();
+    await user.click(await canvas.findByRole('checkbox', { name: 'Select INV-001000' }));
+    await expect(canvas.getByText('1 selected')).toBeInTheDocument();
+    const selectAll = canvas.getByRole('button', { name: /^Select all .+ results$/ });
+    await expect(selectAll).toBeVisible();
+    await expect(selectAll.textContent).toBe(`Select all ${fmt.format(1000)} results`);
+    await user.click(selectAll);
+    await expect(canvasElement.querySelector('[data-rop-selection-count]')?.textContent).toBe(`${fmt.format(1000)} selected`);
   },
 };
 

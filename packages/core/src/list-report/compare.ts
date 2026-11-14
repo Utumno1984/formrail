@@ -1,3 +1,5 @@
+import { resolveLocales } from './number-format';
+
 type Kind = 'number' | 'date' | 'boolean' | 'string';
 
 export interface SortKey {
@@ -32,6 +34,7 @@ export function compareKeys(a: SortKey, b: SortKey, collator: Intl.Collator): nu
   return collator.compare(a.text, b.text);
 }
 
+/** An invalid tag (`en_US`, `''`) degrades to the runtime default, never an exception (spec §1.13.3). */
 export function createCollator(locale?: string | string[]): Intl.Collator {
-  return new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
+  return new Intl.Collator(resolveLocales(locale), { numeric: true, sensitivity: 'base' });
 }

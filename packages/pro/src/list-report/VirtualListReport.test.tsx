@@ -22,8 +22,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function Report({ onSelectedIdsChange, onApprove }: { onSelectedIdsChange?: (ids: ReadonlySet<string>) => void; onApprove?: (n: number) => void }) {
-  const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true, onSelectedIdsChange });
+function Report({ onSelectedIdsChange, onApprove, locale = 'en-US' }: { onSelectedIdsChange?: (ids: ReadonlySet<string>) => void; onApprove?: (n: number) => void; locale?: string | string[] }) {
+  const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true, onSelectedIdsChange, locale });
   return (
     <VirtualListReport
       title="Items"
@@ -43,7 +43,7 @@ const selectAllAction = () => document.querySelector<HTMLButtonElement>('[data-r
 describe('VirtualListReport', () => {
   it('is the core floorplan (title, count, selection bar) around the virtualized table', () => {
     render(<Report />);
-    expect(screen.getByRole('heading', { name: /Items/ })).toHaveTextContent('Items (100000)');
+    expect(screen.getByRole('heading', { name: /Items/ })).toHaveTextContent('Items (100,000)');
     const table = screen.getByRole('table', { name: 'Items' });
     expect(table).toHaveAttribute('aria-rowcount', '100001');
     expect(table.querySelectorAll('tbody > tr[aria-rowindex]').length).toBeLessThanOrEqual(31);
@@ -65,7 +65,7 @@ describe('VirtualListReport', () => {
     expect(onSelectedIdsChange.mock.calls[1]![0].size).toBe(100_000);
     expect(selectAllAction()).not.toBeVisible();
     expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: 'Select all results' }));
-    expect(screen.getByText('100000 selected')).toBeInTheDocument();
+    expect(screen.getByText('100,000 selected')).toBeInTheDocument();
   });
 
   it('the consumer bulk actions follow the Pro action and act on the selected rows', async () => {
@@ -89,6 +89,50 @@ describe('VirtualListReport', () => {
     }
     render(<Labelled />);
     expect(selectAllAction()).toHaveTextContent('All 100000');
+  });
+
+  describe('numbers of the default texts follow the locale of useListReport', () => {
+    it('en-US: grouped, and the raw number is gone from the default texts', async () => {
+      render(<Report />);
+      const user = userEvent.setup();
+      const heading = screen.getByRole('heading', { name: /Items/ });
+      expect(heading).toHaveTextContent('Items (100,000)');
+      expect(heading.textContent).not.toContain('100000');
+      await user.click(screen.getByRole('checkbox', { name: 'Select Item 3' }));
+      expect(selectAllAction()).toHaveTextContent('Select all 100,000 results');
+      await user.click(selectAllAction());
+      expect(screen.getByText('100,000 selected')).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain('100000 ');
+    });
+
+    it('de-DE: the thousands separator is a dot, in the count, the selection text and the action', async () => {
+      render(<Report locale="de-DE" />);
+      const user = userEvent.setup();
+      const heading = screen.getByRole('heading', { name: /Items/ });
+      expect(heading).toHaveTextContent('Items (100.000)');
+      expect(heading.textContent).not.toContain('100000');
+      await user.click(screen.getByRole('checkbox', { name: 'Select Item 3' }));
+      expect(selectAllAction()).toHaveTextContent('Select all 100.000 results');
+      await user.click(selectAllAction());
+      expect(screen.getByText('100.000 selected')).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain('100000');
+    });
+
+    it('custom labels still receive the raw numbers, whatever the locale', async () => {
+      const count = vi.fn((r: number, t: number) => `[${r}/${t}]`);
+      const selectionCount = vi.fn((s: number, h: number) => `sel ${s}+${h}`);
+      const action = vi.fn((n: number) => `All ${n}`);
+      function Labelled() {
+        const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true, locale: 'de-DE' });
+        return <VirtualListReport title="Items" table={table} labels={{ count, selectionCount, selectAllResultsAction: action }} />;
+      }
+      render(<Labelled />);
+      expect(screen.getByRole('heading', { name: /Items/ })).toHaveTextContent('Items [100000/100000]');
+      expect(count).toHaveBeenCalledWith(100_000, 100_000);
+      expect(selectionCount).toHaveBeenCalledWith(0, 0);
+      expect(selectAllAction()).toHaveTextContent('All 100000');
+      expect(action).toHaveBeenCalledWith(100_000);
+    });
   });
 });
 
