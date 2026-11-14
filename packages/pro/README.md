@@ -72,7 +72,8 @@ npm install @formrail/pro react-hook-form
 
 - `react-hook-form` `^7.92.0` (the version range tested), `react` / `react-dom` 18 or 19. `@formrail/core` is
   not needed. `react-hook-form` is an **optional** peer dependency of `@formrail/pro`, used for the types
-  only: nothing of the library is imported at runtime, the adapter calls the methods of your `form`.
+  only: nothing of the library is imported at runtime. The adapter calls the methods of your `form` and
+  reads two **internal** fields of its `control` (see [Internals read](#internals-read)).
 - `@formrail/pro` is `"private": true` today: it will be installed from the private npm org once that
   exists.
 - The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
@@ -104,9 +105,15 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
   and clones the defaults it receives): a new object only when the content changes, the same object across
   renders that change no value (blur, `trigger()`, a parent's state), so the summary is never stale and is not
   recomputed for nothing.
-- Hydration after the mount: `form.reset(data)`, or the `values` prop of `useForm`. The form is not dirty, no
-  summary row ever shows, no `type: 'change'` event reaches your `watch` / `subscribe` callbacks, and for
+- Hydration after the mount: `form.reset(data)`, the `values` prop of `useForm`, or `defaultValues` as an
+  async function (`defaultValues: () => api.loadInvoice(id)`). The form is not dirty, no summary row ever
+  shows (while an async `defaultValues` loads, `formState.isLoading`, `binding.baseline` is `binding.values`:
+  nothing is edited yet), no `type: 'change'` event reaches your `watch` / `subscribe` callbacks, and for
   `useFormRebase` it is a rehydration (open conflicts closed).
+- `resetField(name, { defaultValue })` replaces React Hook Form's defaults, so it is a rehydration too: it
+  closes the open conflicts, also those on other fields (the user's values stay, as edits against the new
+  baseline). Resolve the conflicts before, or call it only when none is open. `resetField(name)` without a
+  default changes no baseline.
 - When the `values` prop changes while the user has edits, React Hook Form decides: by default the new
   values replace the edits; with `resetOptions: { keepDirtyValues: true }` the edits stay. Either way the
   summary is computed against the defaults React Hook Form holds then, never against an older baseline.
@@ -116,6 +123,10 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
   `isDirty`. A field registered later without a default enters `values` (React Hook Form writes the input's
   `''`) but not the baseline, so it is listed as added. The baseline never changes because a field registers:
   the open conflicts stay open.
+- The most common way to miss it: a default declared **on the field** instead of in `useForm`, the
+  `defaultValue` of a `Controller` / `useController` (a third-party control) or the `defaultValue` attribute of
+  an `<input>` passed to `register`. React Hook Form counts it for `isDirty`, the summary does not: the field
+  shows as an "added" row on an untouched form. Move the default into `useForm({ defaultValues })`.
 
 ### Saving
 
@@ -124,11 +135,20 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
 - Call `binding.reset(saved)` **inside** the `handleSubmit` handler, before it resolves: a server update
   that came during the save is queued (`isPending`) and merged against what was saved. Resetting later, in an
   effect on `isSubmitSuccessful`, would come after the queued merge and overwrite it.
+- The user can keep typing while the save is in flight. `reset(saved)` called during the save ends it as
+  core's `save` does: `saved` becomes the baseline; a field edited since the save started keeps the typed
+  value and stays dirty (in the summary and in `dirtyFields`); every other field takes the value the server
+  stored, its normalization included, and is clean. Nothing edited meanwhile: `values` is `saved` itself.
+  "Since the save started" is measured from the values when `isSaving` turned `true`, field by field (an
+  array the user resized meanwhile is kept whole). A discard (`form.reset()`, `binding.reset()`) or a
+  rehydration during the save wins: `reset(saved)` is then a plain hydration.
 - A submit that succeeds closes the open conflicts; one that fails (handler error, validation) leaves them
   open, and a queued update is merged anyway.
 - A save that does not go through `handleSubmit` (a mutation of your data layer): pass its state,
   `useReactHookFormBinding(form, { isSaving: mutation.isPending, saveError: mutation.error })`. Each option
-  replaces its own mapping; pass both.
+  replaces its own mapping; pass both. Call `binding.reset(saved)` while `isSaving` is still `true` (in the
+  `mutationFn`, after the request, before it returns): once `isSaving` is `false`, `reset(saved)` is a
+  plain hydration and replaces what the user typed during the save.
 
 ### Server updates: `rebase`
 
@@ -159,6 +179,22 @@ Drive the save bar and the dirty guard from `useChangeSummary().isEmpty`, never 
 - a reorder of a `useFieldArray` declared in `arrayIdKeys` is no change for the summary, a change for React
   Hook Form. The ids `useFieldArray` generates for `fields` are not in the values, so they never reach the
   summary.
+
+### Internals read
+
+React Hook Form has no public API that gives its current defaults synchronously (`formState.defaultValues`
+is the state of the last render), so the adapter reads two internal fields of `form.control`:
+
+- `control._defaultValues`: the defaults React Hook Form holds, the source of `binding.baseline`. A new
+  object after every reset, the `values` prop and `resetField` with a default (a rehydration);
+- `control._options.shouldUnregister`: the `shouldUnregister` option, to keep the mounted fields on a
+  rebase.
+
+They are not part of React Hook Form's public API: a release can rename them. The tests of `@formrail/pro`
+pin both, and how they behave, against the tested version (`react-hook-form` `7.92.0`, the minimum of the
+peer range); in development a form without them gets a `console.warn` naming the field, instead of a baseline
+`{}` where every field is listed as added. If you see that warning after upgrading `react-hook-form`, stay on
+the last version that does not show it.
 
 ## Change Summary engine
 
