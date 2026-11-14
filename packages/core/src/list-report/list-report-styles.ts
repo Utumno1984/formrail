@@ -16,6 +16,9 @@ export const titleClass = 'min-w-0 [overflow-wrap:anywhere]';
 // and is switched off by `motion-reduce` (prefers-reduced-motion).
 export const countClass =
   'inline-block whitespace-nowrap rounded-rop-sm border border-rop-border bg-rop-surface-subtle px-1.5 font-normal text-rop-text-muted transition-[background-color,border-color] duration-[var(--motion-rop-feedback-duration)] ease-[var(--motion-rop-feedback-easing)] motion-reduce:transition-none';
+// A custom `labels.count` can be any length ("3.334 di 10.000 fatture visualizzate"): it wraps inside the pill
+// instead of widening the page. Only the default text (a short number between parentheses) never wraps.
+export const countWrapClass = 'whitespace-normal';
 // While the value just changed: a stronger tone, which the transition above eases in and out. With
 // reduced motion the pill keeps its resting tone (the new value simply appears).
 // (primary-subtle keeps the muted text above 4.5:1 while the flash lasts.)

@@ -69,6 +69,23 @@ describe('number formatting of the default texts', () => {
     expect(count().textContent).toBe(`(${runtime(10_000)})`);
   });
 
+  it.each([
+    ['absent', undefined],
+    ['en_US', 'en_US'],
+    ['empty string', ''],
+    ['["!!"]', ['!!']],
+    ['[]', []],
+  ])('%s: Intl.NumberFormat receives undefined, the runtime default (not a fixed locale)', (_name, locale) => {
+    const spy = vi.spyOn(Intl, 'NumberFormat');
+    try {
+      render(<Host locale={locale as Locale} />);
+      expect(spy).toHaveBeenCalled();
+      for (const call of spy.mock.calls) expect(call[0]).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('an array uses the first supported locale, as Intl does', () => {
     render(<Host locale={['de-DE', 'en-US']} />);
     expect(count()).toHaveTextContent('(10.000)');
@@ -105,6 +122,28 @@ describe('number formatting of the default texts', () => {
     expect(selectionText()).toBe('No items selected');
   });
 
+  it.each([
+    ['en-US', '1,234 selected (1,056 hidden by filters)'],
+    ['de-DE', '1.234 selected (1.056 hidden by filters)'],
+  ])('selection text with 1,000+ rows hidden by the filter (%s): the hidden number is formatted too', (locale, expected) => {
+    const rows = ROWS.slice(0, 2290);
+    function Sel() {
+      const table = useListReport<Item>({
+        rows,
+        columns: COLUMNS,
+        getRowId: (r) => r.id,
+        filters: [{ id: 'all', label: 'All' }, { id: 'lt', label: 'Low', predicate: (r) => Number(r.id.slice(1)) < 1234 }],
+        selectable: true,
+        locale,
+        defaultSelectedIds: new Set(rows.slice(0, 2290).map((r) => r.id)),
+        defaultFilter: 'lt',
+      });
+      return <ListReportFrame table={table} title="Invoices" renderTable={() => null} />;
+    }
+    render(<Sel />);
+    expect(selectionText()).toBe(expected);
+  });
+
   it('custom labels receive raw numbers; partial labels keep the formatted defaults', () => {
     const custom = vi.fn((r: number, t: number) => `[${r}/${t}]`);
     render(<Host locale="de-DE" labels={{ count: custom }} />);
@@ -126,6 +165,12 @@ describe('number formatting of the default texts', () => {
   it('the count never wraps inside the number (nowrap)', () => {
     render(<Host locale="fr-FR" />);
     expect(count()).toHaveClass('whitespace-nowrap');
+  });
+
+  it('a custom labels.count wraps (no nowrap): a long text never widens the page', () => {
+    render(<Host locale="de-DE" labels={{ count: () => 'a long custom count text' }} />);
+    expect(count()).toHaveClass('whitespace-normal');
+    expect(count()).not.toHaveClass('whitespace-nowrap');
   });
 
   it('table.locale hands the option back', () => {

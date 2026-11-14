@@ -256,8 +256,8 @@ export const Default: Story = {
 
 /**
  * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 10,000 invoices. The play function
- * types a search, checks the "n of 10,000" count in the chosen locale, selects two rows and checks the
- * formatted selection text. Stories and baselines always use a fixed locale.
+ * types a search, checks the "n of 10,000" count in the chosen locale, selects a row, uses "Select all n results" and
+ * checks the formatted selection text. Stories and baselines always use a fixed locale.
  */
 export const LocaleCount: Story = {
   args: { rowCount: 10_000 },
@@ -277,6 +277,8 @@ export const LocaleCount: Story = {
     const selectAll = canvas.getByRole('button', { name: /^Select all .+ results$/ });
     await expect(selectAll).toBeVisible();
     await expect(selectAll.textContent).toBe(`Select all ${fmt.format(1000)} results`);
+    await user.click(selectAll);
+    await expect(canvasElement.querySelector('[data-rop-selection-count]')?.textContent).toBe(`${fmt.format(1000)} selected`);
   },
 };
 

@@ -19,6 +19,7 @@ import type { ListReportTableStatus } from './ListReportTableShell';
 import {
   actionsClass,
   countClass,
+  countWrapClass,
   countFlashClass,
   countHiddenClass,
   filterBarClass,
@@ -214,7 +215,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
           <span
             data-rop-count=""
             data-changed={countChanged ? '' : undefined}
-            className={cn(countClass, countChanged && countFlashClass, !countShown && countHiddenClass)}
+            className={cn(countClass, labels?.count && countWrapClass, countChanged && countFlashClass, !countShown && countHiddenClass)}
           >
             {count(table.resultCount, table.totalCount)}
           </span>

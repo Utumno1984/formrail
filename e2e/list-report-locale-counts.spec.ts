@@ -16,9 +16,18 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
       await expectPlayToPass(page, FREE, `locale:${locale}`);
       const total = fmt(locale, TOTAL).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[\u00a0\u202f ]/g, '\\s');
       await expect(count(page)).toHaveText(new RegExp(`^\\(.+ of ${total}\\)$`));
-      await expect(page.locator('[data-rop-selection-count]')).toHaveText('1 selected');
+      await expect(page.locator('[data-rop-selection-count]')).toHaveText(/^.+ selected \(.+ hidden by filters\)$/);
     });
   }
+
+  test('a long custom labels.count wraps inside the pill: no horizontal overflow of the page at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await gotoStory(page, 'floorplans-list-report--locale-count-long-label', 'locale:de-DE;containerWidth:320');
+    await expect(count(page)).toHaveText('Showing 1200 of 1200 invoices matching the filters');
+    expect(await count(page).evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('normal');
+    expect(await count(page).evaluate((el) => el.getBoundingClientRect().width)).toBeLessThanOrEqual(320);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
 
   test('de-DE: "(1.200)" at rest; the count is a single box at 320px (no wrap inside the number)', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
@@ -63,6 +72,12 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
 });
 
 test.describe('Pro VirtualListReport: locale-formatted count and "Select all N results"', () => {
+  for (const locale of ['en-US', 'de-DE', 'fr-FR']) {
+    test(`play (search, select a row, "Select all n results", "n selected") passes in ${locale}`, async ({ page }) => {
+      await expectPlayToPass(page, 'pro-floorplans-virtual-list-report--locale-count', `locale:${locale}`);
+    });
+  }
+
   test('en-US: "(100,000)" and "Select all 100,000 results"', async ({ page }) => {
     await gotoStory(page, PRO, 'locale:en-US');
     await expect(count(page)).toHaveText('(100,000)');

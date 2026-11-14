@@ -72,6 +72,8 @@ interface ShowcaseArgs {
   defaultFilter?: string;
   defaultSearchQuery?: string;
   selectable?: boolean;
+  /** Fixture: a long custom `labels.count` (it must wrap, not overflow the page at 320px). */
+  longCountLabel?: boolean;
   /** No parent height: the report lives in the normal flow of the page. */
   flow?: boolean;
 }
@@ -99,6 +101,7 @@ function Showcase({
   onRetry,
   defaultFilter,
   defaultSearchQuery,
+  longCountLabel,
   flow,
 }: ShowcaseArgs) {
   const all = useMemo(() => makeDemoInvoices(dataset), [dataset]);
@@ -143,6 +146,7 @@ function Showcase({
           actions={<Button>New invoice</Button>}
           status={simulating ? 'loading' : status}
           onRetry={onRetry}
+          labels={longCountLabel ? { count: (shown, total) => `Showing ${shown} of ${total} invoices matching the filters` } : undefined}
         />
       </div>
     </div>
@@ -200,6 +204,7 @@ const meta: Meta<ShowcaseArgs> = {
     defaultFilter: { control: false, table: { disable: true } },
     defaultSearchQuery: { control: false, table: { disable: true } },
     flow: { control: false, table: { disable: true } },
+    longCountLabel: { control: false, table: { disable: true } },
     selectable: { control: false, table: { disable: true } },
   },
   args: {
@@ -288,8 +293,8 @@ export const Playground: Story = {
 
 /**
  * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 1,200 invoices. The play function
- * searches a supplier, checks the "n of 1,200" count in the chosen locale, selects a row and checks the
- * selection text. Stories and baselines always use a fixed locale.
+ * searches a supplier, checks the "n of 1,200" count in the chosen locale, selects all the rows from the header and
+ * checks the selection text, also with most of the selection hidden by the search. Stories and baselines always use a fixed locale.
  */
 export const LocaleCount: Story = {
   args: { dataset: 1200, selectable: true },
@@ -297,18 +302,25 @@ export const LocaleCount: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const fmt = new Intl.NumberFormat(args.locale);
+    const selectionText = () => canvasElement.querySelector('[data-rop-selection-count]')?.textContent;
     await expect(heading(canvas).textContent).toBe(`Invoices (${fmt.format(1200)})`);
+    // Select every row from the header, then narrow the list: most of the selection ends up hidden by the filter.
+    await userEvent.click(canvas.getAllByRole('checkbox')[0]!);
+    await expect(selectionText()).toBe(`${fmt.format(1200)} selected`);
     await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
     const found = makeDemoInvoices(1200).filter((r) => r.supplier.includes('Ferrari')).length;
+    await expect(1200 - found).toBeGreaterThanOrEqual(1000);
     await waitFor(() => expect(heading(canvas).textContent).toBe(`Invoices (${fmt.format(found)} of ${fmt.format(1200)})`));
-    await userEvent.click(canvas.getAllByRole('checkbox')[1]!);
-    await expect(canvas.getByText('1 selected')).toBeInTheDocument();
+    await expect(selectionText()).toBe(`${fmt.format(found)} selected (${fmt.format(1200 - found)} hidden by filters)`);
   },
 };
 
 /** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: []`: no second Playground-like docs entry). */
 export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: [], play: undefined };
+
+/** Fixture of the e2e suite: `LocaleCountNoPlay` with a long custom `labels.count` (no `whitespace-nowrap`: it wraps). */
+export const LocaleCountLongLabel: Story = { ...LocaleCountNoPlay, args: { ...LocaleCountNoPlay.args, longCountLabel: true } };
 
 /** Active filter ("To approve"): the count says "n of 200". */
 export const WithActiveFilter: Story = {
