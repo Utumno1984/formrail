@@ -23,7 +23,8 @@ Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LIC
 | Import | What it holds | `@formrail/core` |
 |---|---|---|
 | `@formrail/pro/engine` | The engines: `computeChangeSummary`, `useChangeSummary`, `inferSegmentLabel`, `formatChangeValue`, `computeRebase`, `useFormRebase` and their types (`RebaseFormBinding`, ...) | **Not needed**: nothing in this entry imports it, not even a type |
-| `@formrail/pro` | Everything above plus the components (`ChangeSummary`, `RebaseNotice`, `VirtualListReport`, `VirtualListReportTable`) and `useFormRebase` typed for core's `useObjectPageForm` | **Required**: install it next to pro |
+| `@formrail/pro/react-hook-form` | `useReactHookFormBinding`, the React Hook Form adapter (see [React Hook Form](#react-hook-form)) | **Not needed** (needs `react-hook-form`, an optional peer) |
+| `@formrail/pro` | Everything above (but the React Hook Form adapter) plus the components (`ChangeSummary`, `RebaseNotice`, `VirtualListReport`, `VirtualListReportTable`) and `useFormRebase` typed for core's `useObjectPageForm` | **Required**: install it next to pro |
 
 `@formrail/core` is an **optional** peer dependency (`peerDependenciesMeta`), so npm does not install it
 by itself:
@@ -55,8 +56,109 @@ same limit as `@formrail/core/internal`.
 
 `useFormRebase` of `@formrail/pro/engine` takes any form that keeps the `RebaseFormBinding` contract
 (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`); core's `useObjectPageForm()` is one
-as is. Ready-made bindings for React Hook Form (#507) and TanStack Form (#508) come in their own tickets.
-The study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
+as is. For React Hook Form use the ready-made binding below; one for TanStack Form (#508) comes in its own
+ticket. The study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
+
+## React Hook Form
+
+`@formrail/pro/react-hook-form` binds a React Hook Form form to the engines: the Change Summary against the
+saved baseline and the form rebase, without `@formrail/core`.
+
+### Install
+
+```sh
+npm install @formrail/pro react-hook-form
+```
+
+- `react-hook-form` `^7.92.0` (the version range tested), `react` / `react-dom` 18 or 19. `@formrail/core` is
+  not needed. `react-hook-form` is an **optional** peer dependency of `@formrail/pro`, used for the types
+  only: nothing of the library is imported at runtime, the adapter calls the methods of your `form`.
+- `@formrail/pro` is `"private": true` today: it will be installed from the private npm org once that
+  exists.
+- The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
+  `react-hook-form`; import the adapter from its subpath (`moduleResolution` `bundler`, `node16` or
+  `nodenext`).
+
+### Usage
+
+```tsx
+import { useForm } from 'react-hook-form';
+import { useChangeSummary, useFormRebase } from '@formrail/pro/engine';
+import { useReactHookFormBinding } from '@formrail/pro/react-hook-form';
+
+function InvoiceEditor({ saved }: { saved: Invoice }) {
+  const form = useForm<Invoice>({ defaultValues: saved });
+  const binding = useReactHookFormBinding(form);
+  const { entries, isEmpty } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
+  const { rebase, conflicts, keepMine, acceptTheirs, isPending } = useFormRebase(binding);
+
+  const save = form.handleSubmit(async (values) => {
+    const stored = await api.saveInvoice(values);
+    binding.reset(stored); // the stored record becomes the baseline, inside the handler
+  });
+  // ...inputs with form.register(...), the summary from `entries`, a "Save" bar shown while !isEmpty
+}
+```
+
+- `binding.values` / `binding.baseline` are immutable snapshots (React Hook Form mutates its values in place
+  and clones the defaults it receives): a new object only when the content changes, the same object across
+  renders that change no value (blur, `trigger()`, a parent's state), so the summary is never stale and is not
+  recomputed for nothing.
+- Hydration after the mount: `form.reset(data)`, or the `values` prop of `useForm`. The form is not dirty, no
+  summary row ever shows, no `type: 'change'` event reaches your `watch` / `subscribe` callbacks, and for
+  `useFormRebase` it is a rehydration (open conflicts closed).
+- When the `values` prop changes while the user has edits, React Hook Form decides: by default the new
+  values replace the edits; with `resetOptions: { keepDirtyValues: true }` the edits stay. Either way the
+  summary is computed against the defaults React Hook Form holds then, never against an older baseline.
+  For server updates during the editing, prefer `rebase(data)` (below): it keeps the edits and reports
+  the conflicts.
+- Give every field a default in `defaultValues` (`''` for an empty text input), as React Hook Form asks for
+  `isDirty`. A field registered later without a default enters `values` (React Hook Form writes the input's
+  `''`) but not the baseline, so it is listed as added. The baseline never changes because a field registers:
+  the open conflicts stay open.
+
+### Saving
+
+- `binding.isSaving` is `formState.isSubmitting`; `binding.saveError` is `null` unless the last submit failed
+  (blocked by validation, or a handler that threw: then it is `formState.errors`).
+- Call `binding.reset(saved)` **inside** the `handleSubmit` handler, before it resolves: a server update
+  that came during the save is queued (`isPending`) and merged against what was saved. Resetting later, in an
+  effect on `isSubmitSuccessful`, would come after the queued merge and overwrite it.
+- A submit that succeeds closes the open conflicts; one that fails (handler error, validation) leaves them
+  open, and a queued update is merged anyway.
+- A save that does not go through `handleSubmit` (a mutation of your data layer): pass its state,
+  `useReactHookFormBinding(form, { isSaving: mutation.isPending, saveError: mutation.error })`. Each option
+  replaces its own mapping; pass both.
+
+### Server updates: `rebase`
+
+`rebase(incoming)` merges a newer version of the record into the user's draft: the fields the user did not
+touch take the server value, the ones both changed keep the user's value and are listed in `conflicts`, to
+resolve with `keepMine(path)` / `acceptTheirs(path)`. With React Hook Form it is written as
+`reset(incoming)` then `reset(merged, { keepDefaultValues: true })`, in one batch:
+
+- no `setValue` per field: no validation run, no `type: 'change'` event, the `onChange` of a `Controller`
+  is not called, and no render ever shows the server value in a field the user edited;
+- `dirtyFields` / `isDirty` are computed against `incoming`: only the user's edits stay dirty;
+- `touchedFields`, `submitCount` and the submit flags are kept;
+- validation errors: the error of a field the rebase leaves as it was stays; the error of a field that
+  takes the server value is removed (it was about a value the field no longer has); validation runs again
+  at the next change or submit. `acceptTheirs` removes the error of the field it changes, `keepMine` keeps it.
+
+### `isEmpty`, not `formState.isDirty`
+
+Drive the save bar and the dirty guard from `useChangeSummary().isEmpty`, never from React Hook Form's
+`formState.isDirty`: the two can disagree, and the summary is what the user reads. Known divergences (study
+§7, `docs/planning/pro-engines-decoupling.md`):
+
+- an HTML input returns a string: a field hydrated with the number `10` and typed back as `10` is `'10'`, a
+  change for the summary (another type), clean or dirty for React Hook Form depending on how it is registered
+  (`valueAsNumber`);
+- with `shouldUnregister`, a field that unmounts leaves the values: for the summary it is a missing key (a
+  `removed` row), not `undefined`;
+- a reorder of a `useFieldArray` declared in `arrayIdKeys` is no change for the summary, a change for React
+  Hook Form. The ids `useFieldArray` generates for `fields` are not in the values, so they never reach the
+  summary.
 
 ## Change Summary engine
 

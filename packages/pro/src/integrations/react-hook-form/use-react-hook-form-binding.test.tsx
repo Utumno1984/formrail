@@ -180,6 +180,25 @@ describe('useReactHookFormBinding: Change Summary against the saved baseline', (
   });
 });
 
+describe("useReactHookFormBinding: React Hook Form's own form.reset() (Discard)", () => {
+  it('is a discard: values become the baseline object, the summary is empty, the rebase state is cleared', () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    harness.type('Notes', 'mine');
+    act(() => harness.current().rebase.rebase({ ...SAVED, supplier: 'Server', amount: '150' }));
+    expect(harness.current().rebase.conflicts).toHaveLength(1);
+    const { baseline } = harness.current().binding;
+    act(() => harness.current().form.reset());
+    expect(harness.current().binding.baseline).toBe(baseline);
+    expect(harness.current().binding.values).toBe(baseline);
+    expect(harness.current().entries).toEqual([]);
+    expect(harness.current().rebase.conflicts).toEqual([]);
+    expect(harness.current().rebase.applied).toEqual([]);
+    expect(harness.input('Amount').value).toBe('150');
+    harness.unmount();
+  });
+});
+
 describe('useReactHookFormBinding: hydration after the mount', () => {
   const DATA: Invoice = { supplier: 'Rossi Construction', amount: '1200', notes: 'Net 30' };
 

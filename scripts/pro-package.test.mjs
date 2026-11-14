@@ -65,6 +65,49 @@ describe('packages/pro engine entry and form libraries', () => {
   });
 });
 
+/**
+ * What the "React Hook Form" section of the Pro README must hold (#507): the parts of the text that are missing from
+ * `readme` (the section runs from its heading to the next `## ` heading).
+ */
+export function missingReactHookFormDocs(readme) {
+  const lines = readme.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trimEnd() === '## React Hook Form');
+  if (start < 0) return ['## React Hook Form'];
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+  const section = lines.slice(start, end < 0 ? undefined : end).join('\n');
+  const required = [
+    'npm install @formrail/pro react-hook-form',
+    "from '@formrail/pro/react-hook-form'",
+    "from '@formrail/pro/engine'",
+    '"private": true',
+    'binding.reset(saved)',
+    'isSaving',
+    'saveError',
+    'useChangeSummary().isEmpty',
+    'formState.isDirty',
+    'shouldUnregister',
+    'rebase(incoming)',
+  ];
+  return required.filter((text) => !section.includes(text));
+}
+
+describe('packages/pro README: the React Hook Form section (#507)', () => {
+  const readme = readFileSync(resolve(ROOT, 'packages/pro/README.md'), 'utf8');
+
+  it('has the section, with install, import paths, saving, the isEmpty rule and the rebase', () => {
+    expect(missingReactHookFormDocs(readme)).toEqual([]);
+  });
+
+  it('negative: a missing heading or a missing part is reported', () => {
+    expect(missingReactHookFormDocs(readme.replace('## React Hook Form', '## RHF'))).toEqual(['## React Hook Form']);
+    expect(missingReactHookFormDocs(readme.replace(/@formrail\/pro\/react-hook-form'/g, "x'"))).toEqual(["from '@formrail/pro/react-hook-form'"]);
+    // Text outside the section does not count.
+    expect(missingReactHookFormDocs("## React Hook Form\n\n## Next\nnpm install @formrail/pro react-hook-form")).toContain(
+      'npm install @formrail/pro react-hook-form',
+    );
+  });
+});
+
 // Ticket #507: the React Hook Form adapter `@formrail/pro/react-hook-form`.
 describe('packages/pro react-hook-form entry', () => {
   const pkg = readJson('packages/pro/package.json');
