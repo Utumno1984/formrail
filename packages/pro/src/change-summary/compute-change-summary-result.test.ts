@@ -2,7 +2,7 @@
 // `reorders` (the id-keyed arrays whose relative order changed, without any synthetic entry), from
 // `computeChangeSummaryResult`.
 import type { MockInstance } from 'vitest';
-import { Differ } from '../internal/structural-diff';
+import { Differ, ROOT } from '../internal/structural-diff';
 import { computeChangeSummary, computeChangeSummaryResult, resetChangeSummaryWarnings } from './compute-change-summary';
 import type { ChangeSummaryOptions, ItemLabelContext } from './types';
 
@@ -294,6 +294,22 @@ describe('itemLabel is lazy', () => {
       ['lineItems.0', true],
       ['lineItems.1', false],
     ]);
+  });
+
+  it('Differ.labelPath: one call per item AND position, each position with its own answer', () => {
+    // Inside one summary a node is either the last segment or an ancestor, never both; Form Rebase (#534) labels a
+    // node as a conflict and its descendants as applied entries, so the cache keeps one answer per position.
+    const itemLabel = vi.fn<ItemLabelFn>((_p, _item, { defaultLabel, isLastSegment }) => `${defaultLabel}${isLastSegment ? ' (whole)' : ' (part)'}`);
+    const differ = new Differ({ itemLabel, source: 'test' });
+    const item = { name: 'Desk' };
+    const array = differ.keyChild(ROOT, 'lineItems');
+    const node = differ.indexChild(array, 0, item);
+    const field = differ.keyChild(node, 'price');
+    expect(differ.labelPath(node)).toEqual(['Line Items', 'Item 1 (whole)']);
+    expect(differ.labelPath(field)).toEqual(['Line Items', 'Item 1 (part)', 'Price']);
+    expect(differ.labelPath(node)).toEqual(['Line Items', 'Item 1 (whole)']);
+    expect(differ.labelPath(field)).toEqual(['Line Items', 'Item 1 (part)', 'Price']);
+    expect(itemLabel.mock.calls.map(([, , c]) => c.isLastSegment)).toEqual([true, false]);
   });
 
   it('never called by the internal probes: Differ.differs and the block comparison', () => {
