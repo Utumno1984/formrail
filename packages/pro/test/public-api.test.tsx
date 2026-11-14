@@ -181,3 +181,79 @@ describe('@formrail/pro/engine: useFormRebase on a form that is not core', () =>
     expect(current().summary.isEmpty).toBe(true);
   });
 });
+
+/**
+ * The identity rules of `RebaseFormBinding` (critic round 1, point 4): what the hook reads from `values === baseline`
+ * and from a new `baseline` object, so that a binding of another form library (#507, #508) cannot get them wrong
+ * unnoticed. `handsBackBaseline` breaks the first rule (values equal in content handed back as `baseline`);
+ * `recreateBaseline` breaks the second (a new baseline object with the same content).
+ */
+function useIdentityForm({ handsBackBaseline }: { handsBackBaseline: boolean }) {
+  const [state, setState] = useState({ baseline: BASE, values: BASE });
+  const reset = useCallback((next?: Invoice) => setState((s) => ({ baseline: next ?? s.baseline, values: next ?? s.baseline })), []);
+  const setValues = useCallback(
+    (patch: Partial<Invoice>) =>
+      setState((s) => {
+        const values = { ...s.values, ...patch };
+        const sameContent = (Object.keys(values) as (keyof Invoice)[]).every((key) => values[key] === s.baseline[key]);
+        return { ...s, values: handsBackBaseline && sameContent ? s.baseline : values };
+      }),
+    [handsBackBaseline],
+  );
+  const recreateBaseline = useCallback(() => setState((s) => ({ ...s, baseline: { ...s.baseline } })), []);
+  const binding: RebaseFormBinding<Invoice> = { ...state, isSaving: false, saveError: null, reset, setValues };
+  return { binding, recreateBaseline };
+}
+
+describe('@formrail/pro/engine: identity rules of RebaseFormBinding', () => {
+  /** A rebase with one change applied (`number`) and one conflict (`amount`, user 15, server 30). */
+  function setup(handsBackBaseline = false) {
+    const view = renderHook(() => {
+      const { binding, recreateBaseline } = useIdentityForm({ handsBackBaseline });
+      return { form: binding, recreateBaseline, rebase: engine.useFormRebase(binding) };
+    });
+    const current = () => view.result.current;
+    act(() => current().form.setValues({ amount: 15, notes: 'mine' }));
+    act(() => current().rebase.rebase({ ...BASE, number: 'A-2', amount: 30 }));
+    expect(current().rebase.applied.map((entry) => entry.path)).toEqual(['number']);
+    expect(current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['amount']);
+    return current;
+  }
+
+  it('values brought back to the baseline by hand, as a new object: not a discard, applied stays', () => {
+    const current = setup();
+    act(() => current().form.setValues({ amount: 30, notes: '' }));
+    expect(current().form.values).not.toBe(current().form.baseline);
+    expect(current().form.values).toEqual(current().form.baseline);
+    // The conflict closes by itself (the field has the server value); the server change is still listed.
+    expect(current().rebase.conflicts).toEqual([]);
+    expect(current().rebase.applied.map((entry) => entry.path)).toEqual(['number']);
+  });
+
+  it('values handed back as the baseline object outside a reset: read as a discard, applied is cleared', () => {
+    const current = setup(true);
+    act(() => current().form.setValues({ amount: 30, notes: '' }));
+    expect(current().form.values).toBe(current().form.baseline);
+    expect(current().rebase.conflicts).toEqual([]);
+    expect(current().rebase.applied).toEqual([]);
+  });
+
+  it('a new baseline object with the same content is read as a rehydration: open conflicts and applied are cleared', () => {
+    const current = setup();
+    const before = current().form.baseline;
+    act(() => current().recreateBaseline());
+    expect(current().form.baseline).not.toBe(before);
+    expect(current().form.baseline).toEqual(before);
+    expect(current().form.values.amount).toBe(15);
+    expect(current().rebase.conflicts).toEqual([]);
+    expect(current().rebase.applied).toEqual([]);
+  });
+
+  it('the baseline set by the hook itself (its reset when the rebase lands) is not a rehydration', () => {
+    const current = setup();
+    // setup() checked conflicts and applied right after the hook's own reset(incoming); a later edit keeps them.
+    act(() => current().form.setValues({ notes: 'mine again' }));
+    expect(current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['amount']);
+    expect(current().rebase.applied.map((entry) => entry.path)).toEqual(['number']);
+  });
+});
