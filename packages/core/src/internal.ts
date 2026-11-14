@@ -97,6 +97,9 @@ export { ListReportFrame } from './list-report/ListReportFrame';
 /** @internal */
 export type { ListReportFrameLabels, ListReportFrameProps, ListReportFrameTableProps } from './list-report/ListReportFrame';
 
+/** @internal Memoized `Intl.NumberFormat` of a `useListReport` `locale` (invalid tags fall back to the runtime default). */
+export { getNumberFormat } from './list-report/number-format';
+
 /** @internal Memoized `resultIds`/`indexOfResult` for a range-selection gesture: see `use-list-report-result-index.ts`. */
 export { useListReportResultIndex } from './list-report/use-list-report-result-index';
 /** @internal */
