@@ -187,7 +187,9 @@ export interface ItemLabelContext {
   index: number;
   /**
    * `'values'` for a matched or added item (the item as it is now, so a name the user edited reads
-   * as edited), `'baseline'` for a removed item (the item as it was saved).
+   * as edited), `'baseline'` for a removed item (the item as it was saved). In Form Rebase: `'values'` for an
+   * item of the merged values (or of the form, for an open conflict), `'baseline'` for an item that exists only
+   * in a baseline (see `RebaseOptions.itemLabel`).
    */
   side: 'values' | 'baseline';
   /**

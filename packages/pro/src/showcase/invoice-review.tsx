@@ -69,8 +69,18 @@ export function invoiceReviewIsEqual(a: unknown, b: unknown, path: string): bool
  * for the description's own parentheses: `Repair (urgent)` must not nest inside `Item 2 (...)`. Module scope: a
  * stable identity.
  */
-export function invoiceReviewItemLabel(arrayPath: string, item: unknown, { defaultLabel, isLastSegment }: ItemLabelContext): string | undefined {
-  if (arrayPath !== 'lineItems' || isLastSegment || typeof item !== 'object' || item === null) return undefined;
+export function invoiceReviewItemLabel(arrayPath: string, item: unknown, context: ItemLabelContext): string | undefined {
+  return context.isLastSegment ? undefined : invoiceLineLabel(arrayPath, item, context);
+}
+
+/**
+ * A line named by its description, `Item 2 (Materials)`, whatever the segment: the row of a server conflict is named
+ * even when the conflict is about the whole row (removed on one side, changed on the other), because its value
+ * alone does not say which row it was. `undefined` (the default `Item N`) for any other array, or a line without a
+ * description. Module scope: a stable identity.
+ */
+export function invoiceLineLabel(arrayPath: string, item: unknown, { defaultLabel }: ItemLabelContext): string | undefined {
+  if (arrayPath !== 'lineItems' || typeof item !== 'object' || item === null) return undefined;
   const { description } = item as { description?: unknown };
   const named = typeof description === 'string' ? description.trim() : '';
   if (named === '') return undefined;

@@ -7,28 +7,28 @@
       "limit": 2869
     },
     "computeChangeSummaryResult": {
-      "baseline": 2594,
-      "limit": 2854
+      "baseline": 2595,
+      "limit": 2855
     },
     "computeRebase": {
-      "baseline": 3795,
-      "limit": 4175
+      "baseline": 3922,
+      "limit": 4315
     },
     "formatChangeValue": {
-      "baseline": 1277,
-      "limit": 1405
+      "baseline": 1278,
+      "limit": 1406
     },
     "inferSegmentLabel": {
       "baseline": 246,
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2781,
-      "limit": 3060
+      "baseline": 2782,
+      "limit": 3061
     },
     "useFormRebase": {
-      "baseline": 5524,
-      "limit": 6077
+      "baseline": 5709,
+      "limit": 6280
     }
   }
 }

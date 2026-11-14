@@ -19,16 +19,16 @@
       "limit": 4320
     },
     "computeChangeSummary": {
-      "baseline": 2606,
-      "limit": 2867
+      "baseline": 2607,
+      "limit": 2868
     },
     "computeChangeSummaryResult": {
-      "baseline": 2592,
-      "limit": 2852
+      "baseline": 2593,
+      "limit": 2853
     },
     "computeRebase": {
-      "baseline": 3797,
-      "limit": 4177
+      "baseline": 3921,
+      "limit": 4314
     },
     "formatChangeValue": {
       "baseline": 1278,
@@ -39,12 +39,12 @@
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2781,
-      "limit": 3060
+      "baseline": 2780,
+      "limit": 3059
     },
     "useFormRebase": {
-      "baseline": 5538,
-      "limit": 6092
+      "baseline": 5726,
+      "limit": 6299
     }
   }
 }

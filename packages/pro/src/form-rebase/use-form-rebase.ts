@@ -2,11 +2,20 @@ import { useCallback, useInsertionEffect, useMemo, useRef, useState } from 'reac
 import { unstable_batchedUpdates } from 'react-dom';
 import type { ChangeEntry } from '../change-summary/types';
 import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
-import { MISSING, idMapKey, isPlainObject, itemId, own, type PlainObject } from '../internal/structural-diff';
-import { arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
+import {
+  MISSING,
+  idMapKey,
+  isPlainObject,
+  itemId,
+  own,
+  resolveItemLabel,
+  type DiffNode,
+  type ItemLabelOption,
+  type PlainObject,
+} from '../internal/structural-diff';
+import { SOURCE, arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
 import type { OpenRebaseConflict, RebaseFormBinding, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
-import { itemLabel } from '../change-summary/infer-label';
-import { labelPathOf, type DiffNode } from '../internal/structural-diff';
+import { itemLabel as defaultItemLabel } from '../change-summary/infer-label';
 
 interface RebaseState {
   applied: ChangeEntry[];
@@ -92,9 +101,11 @@ function setAt(current: unknown, segments: readonly Segment[], value: unknown, t
 
 /**
  * The conflict of `record` named at its current position in `values`: every id-keyed item on the way is found
- * again by id (`Item N` and the index follow it). An item that is not there any more keeps the rebase-time path.
+ * again by id (`Item N` and the index follow it), and `itemLabel` names it as it is now in `values`. An item that is
+ * not there any more keeps the rebase-time path and labels. Never reads the labels kept on `record.node`: they are
+ * those of the rebase.
  */
-function openConflict(record: ConflictRecord, values: unknown): OpenRebaseConflict {
+function openConflict(record: ConflictRecord, values: unknown, itemLabel: ItemLabelOption): OpenRebaseConflict {
   const nodes: DiffNode[] = [];
   for (let n: DiffNode | undefined = record.node; n && n.depth > 0; n = n.parent) nodes.unshift(n);
   const parts: string[] = [];
@@ -108,8 +119,19 @@ function openConflict(record: ConflictRecord, values: unknown): OpenRebaseConfli
       if (index < 0) moved = false;
       else {
         parts.push(String(index));
-        labels.push(itemLabel(index));
         current = (current as unknown[])[index];
+        const defaultLabel = defaultItemLabel(index);
+        labels.push(
+          itemLabel
+            ? resolveItemLabel(itemLabel, SOURCE, nodes[i]!.schemaPath, current, {
+                path: parts.join('.'),
+                index,
+                side: 'values',
+                isLastSegment: i === nodes.length - 1,
+                defaultLabel,
+              })
+            : defaultLabel,
+        );
       }
     } else {
       parts.push(segment.key);
@@ -117,7 +139,7 @@ function openConflict(record: ConflictRecord, values: unknown): OpenRebaseConfli
       current = isPlainObject(current) ? own(current, segment.key) : MISSING;
     }
   }
-  const labelPath = moved ? labels : labelPathOf(record.node);
+  const labelPath = moved ? labels : record.labelPath;
   return {
     ...record.conflict,
     currentPath: moved ? parts.join('.') : record.conflict.path,
@@ -179,8 +201,9 @@ function sameOrder(current: readonly unknown[], theirs: readonly unknown[], idKe
  * `reset(baseline)` + `setValues` (the only way to remove a top-level key) and is ignored while
  * the form is saving.
  *
- * `options` are read when a rebase is applied or a conflict is checked: inline literals are fine.
- * SSR-safe: no access to `window`/`document`.
+ * `options` are read when a rebase is applied or a conflict is checked: inline literals are fine. Except
+ * `itemLabel`, also compared by identity to name the open conflicts (see `UseFormRebaseOptions.itemLabel`): pass a
+ * stable function. SSR-safe: no access to `window`/`document`.
  */
 export function useFormRebase<Values extends object>(
   form: RebaseFormBinding<Values>,
@@ -243,8 +266,8 @@ export function useFormRebase<Values extends object>(
       queuedRef.current = null;
       const { incoming } = pending;
       if (incoming !== form.baseline) {
-        const { arrayIdKeys, labels, isEqual } = optionsRef.current;
-        const { result, records } = rebaseInternal({ baseline: form.baseline, values: form.values, incoming, arrayIdKeys, labels, isEqual });
+        const { arrayIdKeys, labels, isEqual, itemLabel } = optionsRef.current;
+        const { result, records } = rebaseInternal({ baseline: form.baseline, values: form.values, incoming, arrayIdKeys, labels, isEqual, itemLabel });
         ownBaselineRef.current = { baseline: incoming };
         merged = { incoming, values: result.values };
         next = records.length === 0 && result.applied.length === 0 ? EMPTY : { applied: result.applied, records };
@@ -347,9 +370,12 @@ export function useFormRebase<Values extends object>(
     [close],
   );
 
+  // `itemLabel` by identity (as `isEqual` of `useChangeSummary`): the labels follow a new function at once.
+  const { itemLabel } = options;
   const conflicts = useMemo<OpenRebaseConflict[]>(
-    () => state.records.filter((record) => !isResolved(record, form.values)).map((record) => openConflict(record, form.values)),
-    [state.records, form.values, isResolved],
+    () =>
+      state.records.filter((record) => !isResolved(record, form.values)).map((record) => openConflict(record, form.values, itemLabel)),
+    [state.records, form.values, isResolved, itemLabel],
   );
 
   return {
