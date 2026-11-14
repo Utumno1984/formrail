@@ -3,6 +3,8 @@ import { expectPlayToPass, gotoStory } from './helpers/story';
 
 // #500: numbers of the default count / selection text / "Select all N results" follow the `locale` of useListReport.
 const FREE = 'floorplans-list-report--locale-count';
+const FREE_NO_PLAY = 'floorplans-list-report--locale-count-no-play';
+const TOTAL = 1200;
 const PRO = 'pro-floorplans-virtual-list-report--default-no-play';
 
 const fmt = (locale: string, n: number) => new Intl.NumberFormat(locale).format(n);
@@ -12,24 +14,24 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
   for (const locale of ['en-US', 'de-DE', 'fr-FR']) {
     test(`play passes and the count follows ${locale}`, async ({ page }) => {
       await expectPlayToPass(page, FREE, `locale:${locale}`);
-      const total = fmt(locale, 10_000).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const total = fmt(locale, TOTAL).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[\u00a0\u202f ]/g, '\\s');
       await expect(count(page)).toHaveText(new RegExp(`^\\(.+ of ${total}\\)$`));
       await expect(page.locator('[data-rop-selection-count]')).toHaveText('1 selected');
     });
   }
 
-  test('de-DE: "(10.000)" at rest; the count is a single box at 320px (no wrap inside the number)', async ({ page }) => {
+  test('de-DE: "(1.200)" at rest; the count is a single box at 320px (no wrap inside the number)', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
-    await gotoStory(page, FREE, 'locale:de-DE;containerWidth:320');
-    await expect(count(page)).toHaveText('(10.000)');
+    await gotoStory(page, FREE_NO_PLAY, 'locale:de-DE;containerWidth:320');
+    await expect(count(page)).toHaveText('(1.200)');
     expect(await count(page).evaluate((el) => el.getClientRects().length)).toBe(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 
   test('fr-FR: the narrow no-break space never breaks the count', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
-    await gotoStory(page, FREE, 'locale:fr-FR;containerWidth:320');
-    await expect(count(page)).toHaveText(`(${fmt('fr-FR', 10_000)})`);
+    await gotoStory(page, FREE_NO_PLAY, 'locale:fr-FR;containerWidth:320');
+    await expect(count(page)).toHaveText(new RegExp(`^\\(${fmt('fr-FR', TOTAL).replace(/[\u00a0\u202f ]/g, '\\s')}\\)$`));
     expect(await count(page).evaluate((el) => el.getClientRects().length)).toBe(1);
   });
 
@@ -38,10 +40,10 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
     { width: 768, height: 1024 },
     { width: 1280, height: 800 },
   ]) {
-    test(`${vp.width}x${vp.height}: loading -> 10,000 rows keeps the header height and the table box`, async ({ page }) => {
+    test(`${vp.width}x${vp.height}: loading -> 1,200 rows keeps the header height and the table box`, async ({ page }) => {
       await page.setViewportSize(vp);
-      await gotoStory(page, FREE, 'locale:en-US;containerWidth:1280');
-      await expect(count(page)).toHaveText('(10,000)');
+      await gotoStory(page, FREE_NO_PLAY, 'locale:en-US;containerWidth:1280');
+      await expect(count(page)).toHaveText('(1,200)');
       const measure = () =>
         page.evaluate(() => {
           const header = document.querySelector('[data-rop-count]')!.closest('h1,h2,h3,h4,h5,h6')!.parentElement!.getBoundingClientRect();

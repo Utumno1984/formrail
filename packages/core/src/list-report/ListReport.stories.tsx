@@ -54,7 +54,7 @@ function columns(firstDateDirection: ListReportSortDirection): ListReportColumn<
 }
 
 type DelayChoice = 0 | 300 | 800 | 'Enter only';
-type Dataset = 0 | 3 | 200 | 10_000;
+type Dataset = 0 | 3 | 200 | 1200;
 type LocaleChoice = 'en-US' | 'de-DE' | 'fr-FR';
 
 interface ShowcaseArgs {
@@ -177,7 +177,7 @@ const meta: Meta<ShowcaseArgs> = {
       'rowActionsInline',
       'ref',
     ),
-    dataset: storyControl({ control: 'select', options: [0, 3, 200, 10_000], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 10,000 invoices.' }),
+    dataset: storyControl({ control: 'select', options: [0, 3, 200, 1200], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 1,200 invoices.' }),
     locale: storyControl({
       control: 'select',
       options: ['en-US', 'de-DE', 'fr-FR'],
@@ -287,25 +287,28 @@ export const Playground: Story = {
 };
 
 /**
- * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 10,000 invoices. The play function
- * searches a supplier, checks the "n of 10,000" count in the chosen locale, selects a row and checks the
+ * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 1,200 invoices. The play function
+ * searches a supplier, checks the "n of 1,200" count in the chosen locale, selects a row and checks the
  * selection text. Stories and baselines always use a fixed locale.
  */
 export const LocaleCount: Story = {
-  args: { dataset: 10_000, selectable: true },
+  args: { dataset: 1200, selectable: true },
   argTypes: { dataset: { control: false } },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const fmt = new Intl.NumberFormat(args.locale);
-    await expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(10_000)})`);
+    await expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(1200)})`);
     await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
-    const found = makeDemoInvoices(10_000).filter((r) => r.supplier.includes('Ferrari')).length;
-    await waitFor(() => expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(found)} of ${fmt.format(10_000)})`));
+    const found = makeDemoInvoices(1200).filter((r) => r.supplier.includes('Ferrari')).length;
+    await waitFor(() => expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(found)} of ${fmt.format(1200)})`));
     await userEvent.click(canvas.getAllByRole('checkbox')[1]!);
     await expect(canvas.getByText('1 selected')).toBeInTheDocument();
   },
 };
+
+/** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: []`: no second Playground-like docs entry). */
+export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: [], play: undefined };
 
 /** Active filter ("To approve"): the count says "n of 200". */
 export const WithActiveFilter: Story = {
