@@ -1050,6 +1050,57 @@ describe('prose, round 3: "`x` (default)" and named keys (#474)', () => {
   });
 });
 
+// #476: the cases the critic of #474 found untested in `proseDefaultOf` (R2, R11, R4, B1). Each one kills a mutation
+// of the script (listed in the PR).
+describe('proseDefaultOf: R2, R11, R4, B1 (#476)', () => {
+  it('R2: a default inside a clause with a named key does not stop the search, the next sentence is read', () => {
+    expect(proseDefaultOf('`anchorBar`: the name (default "Sections"). Defaults to `{}`.')).toBe('`{}`');
+  });
+  it.each([
+    ['`x` (defaults to `y`).', '`y`'],
+    ['Size `sm` (default for compact tables) or `md`.', undefined],
+    ['Size `sm` (the default for compact tables) or `md`.', undefined],
+    ['Size `sm` (default) or `md`.', '`sm`'],
+  ])('R11: the closing parenthesis of "(default)" is required: %j -> %j', (text, value) => expect(proseDefaultOf(text)).toBe(value));
+  it('R4: a semicolon closes the clause, so a key before it does not hide the default after it', () => {
+    expect(proseDefaultOf('`a`: one thing; default `b`.')).toBe('`b`');
+  });
+  it('R4: ... and the key still hides a default of the same clause', () => {
+    expect(proseDefaultOf('`a`: one thing, default `b`.')).toBeUndefined();
+  });
+  it('B1: a key opens a clause only at its start: a colon after a condition is not a named key', () => {
+    expect(proseDefaultOf('When `open`: focuses the field, defaults to `false`.')).toBe('`false`');
+    expect(proseDefaultOf('Focus moves on `open`: the field, default `false`.')).toBe('`false`');
+  });
+  it('B1: a key at the start of the clause, with or without a list marker, still hides its defaults', () => {
+    expect(proseDefaultOf('`a`: width (default 100%).')).toBeUndefined();
+    expect(proseDefaultOf('Modes:\n- `a`: width (default 100%).')).toBeUndefined();
+    expect(proseDefaultOf('Modes:\n1. `a`: width (default 100%).')).toBeUndefined();
+  });
+  it('B1: each item of a list is its own clause; "- `grid` (default)" marks the value of the prop', () => {
+    expect(proseDefaultOf('Layouts:\n- `grid` (default): cards in a grid.\n- `list`: one per row.')).toBe('`grid`');
+    expect(proseDefaultOf('Layouts:\n- `list`: one per row.\n- `grid` (default): cards in a grid.')).toBe('`grid`');
+  });
+});
+
+describe('redundant prose next to a default in the source (#476)', () => {
+  const rowOf = (extra) => ({ components: [{ component: 'C', rows: [{ prop: 'p', kind: 'ok', where: 'param', source: "'md'", sourceValue: 'md', declared: undefined, prose: false, ...extra }], unresolvedDelegations: [] }] });
+  it('a default in the source and the same default in the prose, with no `@default`, is redundant: the column already shows it', () => {
+    expect(check(rowOf({ prose: true, proseValue: '`md`' })).map((i) => i.kind)).toEqual(['redundant-prose']);
+  });
+  it('no prose, no problem; and a row with prose but no default shown is the missing-default case, not this one', () => {
+    expect(check(rowOf({})).map((i) => i.kind)).toEqual([]);
+    const gap = rowOf({ kind: 'gap', prose: true, declared: undefined });
+    expect(check(gap).map((i) => i.kind)).toEqual(['missing-default']);
+  });
+  it('with `@default` and prose it is still redundant (one report, not two)', () => {
+    expect(check(rowOf({ prose: true, declared: "'md'", declaredTag: 'default' })).map((i) => i.kind)).toEqual(['redundant-prose']);
+  });
+  it('on the repository no prop repeats its default in the prose', () => {
+    expect(check(measure()).filter((i) => i.kind === 'redundant-prose')).toEqual([]);
+  }, 120_000);
+});
+
 describe('the guard, third round, on fixture packages (#474)', () => {
   const files = {
     'Inner.tsx': `export interface InP {

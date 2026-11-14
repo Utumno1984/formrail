@@ -32,6 +32,7 @@
     "test:visual:ci": "playwright test --project=\"visual-*\"",
     "changeset": "changeset",
     "changeset:check": "node scripts/check-changeset.mjs",
+    "default-column:check": "node scripts/default-column-measure.mjs --check",
     "bundle:check": "node scripts/bundle-budget.mjs check",
     "bundle:update-baseline": "node scripts/bundle-budget.mjs update-baseline"
   },
