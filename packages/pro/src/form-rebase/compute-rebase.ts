@@ -1,4 +1,4 @@
-import type { ChangeEntry } from '../change-summary/types';
+import type { ChangeEntry, ChangeKind } from '../change-summary/types';
 import {
   Differ,
   MISSING,
@@ -28,6 +28,8 @@ export interface ConflictRecord {
   orderIdKey: string | undefined;
   /** Incoming side (`MISSING` when absent); the incoming array for an order conflict. */
   theirs: unknown;
+  /** The labels of the rebase (`conflict.label` is their join): an item no longer in the values keeps them. */
+  labelPath: string[];
 }
 
 export interface RebaseComputation<Values> {
@@ -74,16 +76,26 @@ function put(target: PlainObject, key: string, value: unknown): void {
   Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
 }
 
+/** The Differ of `applied`, keeping the node of every entry: `itemLabel` names them once the items are merged. */
+class EntryDiffer extends Differ {
+  readonly nodes: DiffNode[] = [];
+
+  override emit(out: ChangeEntry[], node: DiffNode, kind: ChangeKind, before: unknown, after: unknown): void {
+    super.emit(out, node, kind, before, after);
+    this.nodes.push(node);
+  }
+}
+
 class Merger {
   readonly applied: ChangeEntry[] = [];
   readonly records: ConflictRecord[] = [];
   private readonly decide: Differ;
-  private readonly entries: Differ;
+  readonly entries: EntryDiffer;
   private readonly onStack = new Map<object, Set<object>>();
 
   constructor(options: Pick<RebaseOptions<object>, 'arrayIdKeys' | 'labels' | 'isEqual'>) {
     this.decide = decisionDiffer(options);
-    this.entries = new Differ({ ...options, source: SOURCE, blockWithoutIds: true });
+    this.entries = new EntryDiffer({ ...options, source: SOURCE, blockWithoutIds: true });
   }
 
   /** Merged value of one node (`MISSING` when absent from the result). */
@@ -147,10 +159,11 @@ class Merger {
     theirs: unknown,
     order: { idKey: string; base: unknown[]; mine: unknown[]; theirs: unknown[] } | undefined,
   ): void {
+    const labelPath = labelPathOf(node);
     this.records.push({
       conflict: {
         path: node.path,
-        label: labelPathOf(node).join(' > '),
+        label: labelPath.join(' > '),
         base: order ? order.base : exposed(base),
         mine: order ? order.mine : exposed(mine),
         theirs: order ? order.theirs : exposed(theirs),
@@ -162,6 +175,7 @@ class Merger {
       segments,
       orderIdKey: order?.idKey,
       theirs,
+      labelPath,
     });
   }
 
@@ -241,29 +255,30 @@ class Merger {
       const m = mineIndex.get(key);
       const t = theirsIndex.get(key);
       const b = baseIndex.get(key);
+      // `itemLabel` gets the item of the result (`child.item`), set once it is merged: labels are named at the end.
       const child = this.decide.indexChild(node, index);
       const baseItem = b === undefined ? MISSING : baseItems[b];
+      let item: unknown;
       if (m !== undefined && t !== undefined) {
-        const item = mine[m];
-        out.push(this.merge(baseItem, item, theirs[t], child, [...segments, { idKey, id: itemId(item, idKey) }]));
+        item = this.merge(baseItem, mine[m], theirs[t], child, [...segments, { idKey, id: itemId(mine[m], idKey) }]);
       } else if (m !== undefined) {
-        const item = mine[m];
+        item = mine[m];
         if (b !== undefined) this.conflict(child, [...segments, { idKey, id: itemId(item, idKey) }], baseItem, item, MISSING, undefined);
-        out.push(item);
       } else {
-        const item = theirs[t as number];
+        item = theirs[t as number];
         this.entries.emit(this.applied, child, 'added', MISSING, item);
-        out.push(item);
       }
+      child.item = item;
+      out.push(item);
     }
     for (let b = 0; b < baseItems.length; b += 1) {
       const key = baseKeys[b];
       if (removedByTheirs.has(key)) {
-        this.entries.emit(this.applied, this.decide.indexChild(node, b), 'removed', baseItems[b], MISSING);
+        this.entries.emit(this.applied, this.decide.indexChild(node, b, baseItems[b], 'baseline'), 'removed', baseItems[b], MISSING);
       } else if (removedByMineConflicts.has(key)) {
         const t = theirsIndex.get(key) as number;
         const item = theirs[t];
-        this.conflict(this.decide.indexChild(node, t), [...segments, { idKey, id: itemId(item, idKey) }], baseItems[b], MISSING, item, undefined);
+        this.conflict(this.decide.indexChild(node, t, item, 'baseline'), [...segments, { idKey, id: itemId(item, idKey) }], baseItems[b], MISSING, item, undefined);
       }
     }
     return out;
@@ -272,9 +287,21 @@ class Merger {
 
 /** `computeRebase` plus the conflict records `useFormRebase` keeps. */
 export function rebaseInternal<Values extends object>(options: RebaseOptions<Values>): RebaseComputation<Values> {
-  const { baseline, values, incoming, arrayIdKeys, labels, isEqual } = options;
+  const { baseline, values, incoming, arrayIdKeys, labels, isEqual, itemLabel } = options;
   const merger = new Merger({ arrayIdKeys, labels, isEqual });
   const merged = merger.merge(baseline, values, incoming, ROOT, []) as Values;
+  if (itemLabel) {
+    // Named after the merge, on nodes of this computation only (each one asks `itemLabel` once per slot).
+    const labeler = new Differ({ itemLabel, source: SOURCE });
+    merger.applied.forEach((entry, i) => {
+      entry.labelPath = labeler.labelPath(merger.entries.nodes[i] as DiffNode);
+      entry.label = entry.labelPath.join(' > ');
+    });
+    for (const record of merger.records) {
+      record.labelPath = labeler.labelPath(record.node);
+      record.conflict.label = record.labelPath.join(' > ');
+    }
+  }
   return {
     result: { values: merged, baseline: incoming, applied: merger.applied, conflicts: merger.records.map((r) => r.conflict) },
     records: merger.records,
