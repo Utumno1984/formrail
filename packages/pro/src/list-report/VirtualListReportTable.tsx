@@ -46,12 +46,16 @@ export interface VirtualListReportTableHandle {
 
 export type VirtualListReportTableProps<Row> = ListReportTableProps<Row> & {
   /**
-   * Number of results from which the rows are virtualized. Default 200. Below it (and with no rows,
+   * Number of results from which the rows are virtualized. Below it (and with no rows,
    * and in the loading/empty/no-results/error states) nothing is virtualized: the DOM is the one of
    * the Free `ListReportTable` and no scroll listener or ResizeObserver is attached.
+   * @default 200
    */
   virtualizeThreshold?: number;
-  /** Rows mounted above and below the visible area when virtualized. Default 10. */
+  /**
+   * Rows mounted above and below the visible area when virtualized.
+   * @default 10
+   */
   overscan?: number;
   /** Imperative API (`scrollToRowId`). The `ref` stays the scroll container, as in the Free table. */
   handleRef?: Ref<VirtualListReportTableHandle>;
