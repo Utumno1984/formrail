@@ -15,19 +15,22 @@ import { ValidationContext } from './ValidationContext';
  */
 export type FieldStateProps =
   | {
-      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. Default `default`. */
+      /**
+       * Editable (`default`), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only.
+       * @default 'default'
+       */
       state?: 'default';
       /** Why the field is not editable, read by assistive technology through `aria-describedby`. Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`. */
       stateReason?: never;
     }
   | {
-      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. Default `default`. */
+      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. */
       state: 'disabled';
       /** Why the field is not editable, read by assistive technology through `aria-describedby`. Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`. */
       stateReason?: ReactNode;
     }
   | {
-      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. Default `default`. */
+      /** `default` (editable), `disabled`, `forced` (value decided by a business rule) or `locked` (not editable: permissions, record status). `forced` and `locked` are focusable but read-only. */
       state: 'forced' | 'locked';
       /** Why the field is not editable, read by assistive technology through `aria-describedby`. Required with `forced` and `locked`, optional with `disabled`, not allowed with `default`. */
       stateReason: ReactNode;
@@ -53,13 +56,17 @@ export type FieldProps = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'>
      * even if blank; the message is rendered only when it has content (blank: `console.error` in dev).
      */
     error?: ReactNode;
-    /** Marks the field as required: a visual marker next to the label (not part of the accessible name) and `aria-required` on the control. Default `false`. */
+    /**
+     * Marks the field as required: a visual marker next to the label (not part of the accessible name) and `aria-required` on the control.
+     * @default false
+     */
     required?: boolean;
     /**
-     * Default `true`: the Field always reserves one caption line for its error, even with no
+     * The Field always reserves one caption line for its error, even with no
      * error and whatever reason or help it shows, so a one-line error appearing later moves
      * nothing below it (a wrapped error still grows it). Set `false` for a Field that never shows
      * an error (e.g. a search box) or sits inline and must not take that room.
+     * @default true
      */
     reserveMessageSpace?: boolean;
     /**

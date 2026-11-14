@@ -66,15 +66,24 @@ export interface ComboboxProps extends Omit<
    * whatever the new value is (an option that has just arrived, one that does not exist, `undefined`).
    */
   onValueChange?: (value: string | undefined) => void;
-  /** Shown in the open list when nothing matches. Default `No results`. */
+  /**
+   * Shown in the open list when nothing matches.
+   * @default 'No results'
+   */
   emptyLabel?: string;
   /** Shown in the input when `value` matches no option. Default: the raw value. */
   unknownValueLabel?: string;
   /** Replaces the default filter (case- and diacritics-insensitive substring match on the label). */
   filter?: (options: readonly ComboboxOption[], inputValue: string) => readonly ComboboxOption[];
-  /** Emptying the text and leaving the field clears the selection. Default: the selection stays. */
+  /**
+   * Emptying the text and leaving the field clears the selection; otherwise the selection stays.
+   * @default false
+   */
   clearOnEmpty?: boolean;
-  /** Height scale. Default `md`. */
+  /**
+   * Height scale.
+   * @default 'md'
+   */
   size?: ComboboxSize;
 }
 

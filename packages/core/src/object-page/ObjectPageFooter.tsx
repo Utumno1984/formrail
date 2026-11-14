@@ -51,7 +51,10 @@ export type ObjectPageFooterProps = Omit<HTMLAttributes<HTMLDivElement>, 'childr
   message?: ReactNode;
   /** Icon and colour of the message. Default `info`. */
   messageTone?: ObjectPageFooterTone;
-  /** Visually hidden tone name read before the message. Default: "Error" / "Success" / "Information". */
+  /**
+   * Visually hidden tone name read before the message: "Error" / "Success" / "Information" according to the tone.
+   * @default 'Error' / 'Success' / 'Information'
+   */
   toneLabel?: string;
   /** Accessible name of the footer's `region`. Default "Save actions". */
   label?: string;

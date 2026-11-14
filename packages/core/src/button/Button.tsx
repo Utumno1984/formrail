@@ -95,7 +95,10 @@ type IconElement = ReactElement<SVGProps<SVGSVGElement>>;
 // the same TSDoc: an HTML declaration would add its generic text to theirs in the props table.
 interface ButtonBaseProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'aria-label' | 'aria-labelledby'> {
-  /** Visual emphasis. Default `secondary`. */
+  /**
+   * Visual emphasis.
+   * @default 'secondary'
+   */
   variant?: ButtonVariant;
   /**
    * Renders the single child element (e.g. an `<a href>`) instead of a `<button>`, merging classes,
@@ -103,6 +106,7 @@ interface ButtonBaseProps
    * is not defaulted in this mode (an explicit one is passed on); `disabled` becomes
    * `aria-disabled="true"` + `tabIndex=-1` + a blocked click, since only `<button>` has a native one.
    * The `href` of a disabled link stays, so middle-click / "open in new tab" still navigate.
+   * @default false
    */
   asChild?: boolean;
   /** An `<svg>` shown before the label, sized by `size`. Decorative: never part of the name. */
@@ -137,9 +141,10 @@ export type ButtonProps = ButtonBaseProps &
     | {
         /**
          * Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a
-         * paragraph): the text sizes. Default `md`. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
-         * 32px, `icon-md` 36px) have no default: pass one explicitly, together with `aria-label` or
+         * paragraph): the text sizes. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
+         * 32px, `icon-md` 36px) are never implied: pass one explicitly, together with `aria-label` or
          * `aria-labelledby` (there is no visible text).
+         * @default 'md'
          */
         size?: ButtonTextSize;
         /** Accessible name. Required with the `icon-*` sizes (this or `aria-labelledby`): they have no visible text. */
@@ -150,8 +155,8 @@ export type ButtonProps = ButtonBaseProps &
     | ({
         /**
          * Height scale (`sm` 32px, `md` 36px, `lg` 44px) or `inline` (one text line, for use inside a
-         * paragraph): the text sizes. Default `md`. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
-         * 32px, `icon-md` 36px) have no default: pass one explicitly, together with `aria-label` or
+         * paragraph): the text sizes. The square icon-only sizes (`icon-xs` 24px, `icon-sm`
+         * 32px, `icon-md` 36px) are never implied: pass one explicitly, together with `aria-label` or
          * `aria-labelledby` (there is no visible text).
          */
         size: ButtonIconSize;

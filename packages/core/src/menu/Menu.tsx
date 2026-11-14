@@ -225,32 +225,63 @@ type RadixMenuContentProps = ComponentPropsWithoutRef<typeof RadixMenu.Content>;
 // is `useReturnFocus`'s), and the props table shows the TSDoc of the declaration (ticket #401).
 export interface MenuContentProps extends Omit<RadixMenuContentProps, 'asChild' | 'forceMount'> {
   /**
-   * Arrow-key navigation wraps from the last item to the first and back (default `true`). With
-   * `false` it stops at the first / last item. (Radix's own default is `false`; this component
-   * has always wrapped, so `true` is kept.)
+   * Arrow-key navigation wraps from the last item to the first and back. With
+   * `false` it stops at the first / last item. (Radix itself does not wrap, `false`; this
+   * component has always wrapped, so `true` is kept.)
+   * @default true
    */
   loop?: boolean;
-  /** The side of the trigger the menu opens on. Default `bottom`. */
+  /**
+   * The side of the trigger the menu opens on.
+   * @default 'bottom'
+   */
   side?: 'top' | 'right' | 'bottom' | 'left';
-  /** Alignment of the menu against the trigger. Default `start`. */
+  /**
+   * Alignment of the menu against the trigger.
+   * @default 'start'
+   */
   align?: 'start' | 'center' | 'end';
-  /** Distance in px between the trigger and the menu. Default `4`. */
+  /**
+   * Distance in px between the trigger and the menu.
+   * @default 4
+   */
   sideOffset?: RadixMenuContentProps['sideOffset'];
-  /** Offset in px from the `align` edge (`start` / `end`); ignored with `center`. Default `0`. */
+  /**
+   * Offset in px from the `align` edge (`start` / `end`); ignored with `center`.
+   * @default 0
+   */
   alignOffset?: RadixMenuContentProps['alignOffset'];
-  /** Whether the menu flips side or shifts to stay inside the collision boundary. Default `true`. */
+  /**
+   * Whether the menu flips side or shifts to stay inside the collision boundary.
+   * @default true
+   */
   avoidCollisions?: RadixMenuContentProps['avoidCollisions'];
   /** The element(s) the menu stays inside when `avoidCollisions` is on. Default: the viewport. */
   collisionBoundary?: RadixMenuContentProps['collisionBoundary'];
-  /** Distance in px kept from the collision boundary edges (a number, or one per side). Default `8`. */
+  /**
+   * Distance in px kept from the collision boundary edges (a number, or one per side).
+   * @default 8
+   */
   collisionPadding?: RadixMenuContentProps['collisionPadding'];
-  /** Padding in px between an arrow and the menu's corners. The menu draws no arrow, so it has no effect unless you add one. Default `0`. */
+  /**
+   * Padding in px between an arrow and the menu's corners. The menu draws no arrow, so it has no effect unless you add one.
+   * @default 0
+   */
   arrowPadding?: RadixMenuContentProps['arrowPadding'];
-  /** `partial` keeps the menu in the boundary on the align axis even when the trigger leaves it; `always` also keeps it when the trigger is fully out. Default `partial`. */
+  /**
+   * `partial` keeps the menu in the boundary on the align axis even when the trigger leaves it; `always` also keeps it when the trigger is fully out.
+   * @default 'partial'
+   */
   sticky?: RadixMenuContentProps['sticky'];
-  /** Hides the menu when the trigger is fully clipped out of view (e.g. scrolled away). Default `false`. */
+  /**
+   * Hides the menu when the trigger is fully clipped out of view (e.g. scrolled away).
+   * @default false
+   */
   hideWhenDetached?: RadixMenuContentProps['hideWhenDetached'];
-  /** `always` recomputes the position on every animation frame (for a trigger that moves without a scroll or resize); `optimized` only on layout changes. Default `optimized`. */
+  /**
+   * `always` recomputes the position on every animation frame (for a trigger that moves without a scroll or resize); `optimized` only on layout changes.
+   * @default 'optimized'
+   */
   updatePositionStrategy?: RadixMenuContentProps['updatePositionStrategy'];
   /** Called on Escape, before the menu closes. Call `event.preventDefault()` to keep it open. */
   onEscapeKeyDown?: RadixMenuContentProps['onEscapeKeyDown'];
@@ -394,9 +425,15 @@ export interface MenuItemProps extends Omit<ComponentPropsWithoutRef<typeof Radi
    * becomes `true` while the menu is open).
    */
   onSelect?: (event: Event) => void;
-  /** `danger`: a destructive action; marked with a bar besides the colour. Name the action in the text ("Delete…"). */
+  /**
+   * `danger`: a destructive action; marked with a bar besides the colour. Name the action in the text ("Delete…").
+   * @default 'default'
+   */
   tone?: MenuItemTone;
-  /** Skipped by arrow keys and typeahead, and never calls `onSelect`. Default `false`. */
+  /**
+   * Skipped by arrow keys and typeahead, and never calls `onSelect`.
+   * @default false
+   */
   disabled?: boolean;
   /** The text typeahead matches for this item. Default: the item's text content (set it when the content is not plain text). */
   textValue?: string;

@@ -39,19 +39,24 @@ export interface TabsProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defaul
    * Enter/Space in `manual`). Never called when `value` changes from outside.
    */
   onValueChange?: (value: string) => void;
-  /** Direction of the arrow keys (and `aria-orientation`). Default `horizontal`. */
+  /**
+   * Direction of the arrow keys (and `aria-orientation`).
+   * @default 'horizontal'
+   */
   orientation?: TabsOrientation;
   /** Text direction; left/right arrows are swapped in `rtl`. Default: inherited from the document. */
   dir?: 'ltr' | 'rtl';
   /**
-   * `automatic` (default): moving focus with the arrows selects the tab. `manual`: the arrows only
+   * `automatic`: moving focus with the arrows selects the tab. `manual`: the arrows only
    * move focus; Enter or Space selects.
+   * @default 'automatic'
    */
   activationMode?: TabsActivationMode;
   /**
    * Keep inactive panels mounted (with the `hidden` attribute), so their state (e.g. a typed
-   * value) survives a tab change. Default `false` (inactive panels are unmounted). Can be
+   * value) survives a tab change; inactive panels are unmounted otherwise. Can be
    * overridden per `TabsContent`.
+   * @default false
    */
   keepMounted?: boolean;
 }

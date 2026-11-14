@@ -72,7 +72,10 @@ export interface MultiSelectProps extends Omit<
    * selected", like `[]`. Omit the prop to leave it uncontrolled. Duplicates are shown once.
    */
   value?: readonly string[] | undefined;
-  /** Initial value of the uncontrolled MultiSelect. Default `[]`. */
+  /**
+   * Initial value of the uncontrolled MultiSelect.
+   * @default []
+   */
   defaultValue?: readonly string[];
   /**
    * Called once per user gesture (a pick or un-pick in the list, Backspace on an empty text, a chip's
@@ -85,7 +88,10 @@ export interface MultiSelectProps extends Omit<
   filter?: (options: readonly MultiSelectOption[], inputValue: string) => readonly MultiSelectOption[];
   /** Chip text of a value that matches no option. Default: the raw value. */
   unknownValueLabel?: (value: string) => string;
-  /** Height of an empty field (the field grows when the chips wrap). Default `md`. */
+  /**
+   * Height of an empty field (the field grows when the chips wrap).
+   * @default 'md'
+   */
   size?: MultiSelectSize;
   /** Texts of the chips, the list and the announcements (partial: the rest keeps the English defaults). */
   labels?: Partial<MultiSelectLabels>;
