@@ -50,9 +50,25 @@ installa: con (a) chi usa solo RHF installa un pacchetto e importa un subpath.
 (`peerDependenciesMeta` in `packages/pro/package.json`), applicato in questa PR. Chi usa solo
 `@formrail/pro/engine` non lo installa: `tests/pro-engine-no-core/no-core.test.ts` fa `npm install`
 offline del pacchetto impacchettato e verifica che `npm ls @formrail/core` lo dia assente. Come
-controllo negativo, senza `peerDependenciesMeta` npm lo vuole. Chi importa `@formrail/pro` senza core
-riceve subito "Cannot find module '@formrail/core'", sia nei tipi sia a runtime, e il README Pro
-spiega chi deve installarlo.
+controllo negativo, senza `peerDependenciesMeta` npm lo vuole. Il README Pro spiega chi deve
+installarlo.
+
+Chi importa `@formrail/pro`, l'entry principale, senza core installato riceve un errore, ma il punto
+in cui arriva dipende da `skipLibCheck`:
+- **`skipLibCheck: false`**: `tsc` segnala `Cannot find module '@formrail/core'` nei `.d.ts` di
+  `@formrail/pro`.
+- **`skipLibCheck: true`**, il default dei template Vite e Next: `tsc` **passa** e i tipi del core
+  diventano `any`, quindi passa anche un argomento sbagliato. L'errore arriva solo dal bundler o al
+  caricamento: `ERR_MODULE_NOT_FOUND` (`Cannot find package '@formrail/core'`) in ESM,
+  `Cannot find module '@formrail/core'` in CJS.
+
+Per non dipendere dal core si importa **solo** `@formrail/pro/engine`. La fixture copre entrambi i
+casi: il consumer con `skipLibCheck: false` fallisce ai tipi; quello con `skipLibCheck: true` passa
+`tsc` e fallisce al caricamento con l'errore esplicito.
+
+Il subpath richiede `moduleResolution` `bundler`, `node16` o `nodenext`: con `node`/`node10` la mappa
+`exports` è ignorata e `@formrail/pro/engine` non si risolve. È lo stesso limite di
+`@formrail/core/internal`.
 
 Garanzie verificabili del confine:
 - **Sorgenti**: `packages/pro/test/engine-boundary.test.ts` percorre il grafo degli import da
@@ -252,7 +268,7 @@ Deciso con Q3 = 3a (Daniele, 14/11/2026); i ticket figli A3 e A4 li crea il pian
 - **A1 + A2 (questa PR)**: entry dei motori, guard sorgenti e dist, budget del subpath
   (`packages/pro/bundle-budget.engine.json`, `scripts/bundle-budget.mjs`), contratto
   `RebaseFormBinding`, fixture senza core, `@formrail/core` peer opzionale.
-- **A3, integrazione RHF.** Dipende da A1+A2.
+- **A3, integrazione RHF (#507).** Dipende da A1+A2.
   - Adattatore `useReactHookFormBinding` in `@formrail/pro/react-hook-form` (RHF peer opzionale,
     solo tipi) e story `Pro/Integrations/React Hook Form`, con `argTypes`, `fn()` e
     `play`.
@@ -261,7 +277,7 @@ Deciso con Q3 = 3a (Daniele, 14/11/2026); i ticket figli A3 e A4 li crea il pian
     originale toglie l'entry, l'aggiornamento del server su un altro campo, conflitto con
     `keepMine`/`acceptTheirs`, baseline asincrona senza eco.
   - I casi limite della tabella marcati A3.
-- **A4, integrazione TanStack Form.** Dipende da A3 (stesso schema): gli stessi criteri.
+- **A4, integrazione TanStack Form (#508).** Dipende da A3 (stesso schema): gli stessi criteri.
 
 ## Decisioni di Daniele
 
@@ -269,8 +285,9 @@ Prese il 14/11/2026 sulle opzioni proposte dallo studio, registrate sul ticket #
 
 - **Q1, `@formrail/core` peer opzionale: deciso 1a.**
   - **1a (scelta)**: `peerDependenciesMeta: { "@formrail/core": { optional: true } }`. Un solo
-    pacchetto, distribuzione invariata. Chi importa l'entry principale senza core riceve
-    "Cannot find module '@formrail/core'": la fixture lo verifica come controllo negativo.
+    pacchetto, distribuzione invariata. Chi importa l'entry principale senza core riceve un errore:
+    da `tsc` solo con `skipLibCheck: false`, altrimenti dal bundler o al caricamento (§1). La
+    fixture verifica entrambi i casi.
     Applicata in questa PR.
   - **1b (scartata)**: pacchetto separato `@formrail/pro-engine` (§1, alternativa (b)).
 - **Q2, integrazione con le librerie di form: deciso 2a.**

@@ -93,6 +93,30 @@ describe('@formrail/pro/engine in a project without @formrail/core', () => {
   });
 });
 
+// What the README says about the main entry without the core under `skipLibCheck: true` (the default of the Vite
+// and Next.js templates): `tsc` passes, core types turn into `any` (a wrong argument passes too), and the error
+// comes when the module loads, explicitly. If any of this changes, the README and the study must change with it.
+describe('main entry without @formrail/core, skipLibCheck: true (documented behaviour)', () => {
+  it('tsc passes, even with a wrong argument to a core-typed API', () => {
+    const result = spawnSync(process.execPath, [TSC, '--noEmit', '-p', 'skiplibcheck/tsconfig.json'], { cwd: sandbox, encoding: 'utf8' });
+    expect(result.stdout + result.stderr).toBe('');
+    expect(result.status).toBe(0);
+  });
+
+  it('ESM: loading fails with ERR_MODULE_NOT_FOUND on @formrail/core', () => {
+    const result = run(['--input-type=module', '-e', "await import('@formrail/pro')"]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('ERR_MODULE_NOT_FOUND');
+    expect(result.stderr).toContain("Cannot find package '@formrail/core'");
+  });
+
+  it('CJS: loading fails with Cannot find module @formrail/core', () => {
+    const result = run(['-e', "require('@formrail/pro')"]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("Cannot find module '@formrail/core'");
+  });
+});
+
 // Smoke test 1 of the ticket: `npm install` of the packed @formrail/pro in a project that does not ask for the
 // core leaves the core out, because it is an optional peer (`peerDependenciesMeta`). Offline, from local
 // tarballs only (react, react-dom and scheduler packed from the monorepo copies): no registry access.

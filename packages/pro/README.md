@@ -31,13 +31,28 @@ by itself:
 - With React Hook Form, TanStack Form or a form of your own, install `@formrail/pro` and import only
   `@formrail/pro/engine`. `npm ls @formrail/core` then reports it absent.
 - With core's Object Page or the Pro components, install both: `npm install @formrail/core @formrail/pro`.
-  Importing `@formrail/pro` without the core fails at once with "Cannot find module '@formrail/core'"
-  (at build time and in the type checker), never silently.
+
+Importing `@formrail/pro` (the main entry) without the core installed fails, but **where** it fails
+depends on your TypeScript setup:
+
+- With `skipLibCheck: false`, `tsc` reports `Cannot find module '@formrail/core'` in the declaration
+  files of `@formrail/pro`.
+- With `skipLibCheck: true`, the default of the Vite and Next.js templates, `tsc` **passes**. The core
+  types silently become `any`, so even a wrong argument to a core-typed API type-checks. The error then
+  comes from the bundler, or when the module loads: `ERR_MODULE_NOT_FOUND` (`Cannot find package
+  '@formrail/core'`) in ESM, `Cannot find module '@formrail/core'` in CommonJS.
+
+So without the core, import **only `@formrail/pro/engine`**, never `@formrail/pro`. Nothing in that
+entry needs the core, at runtime or in its types, whatever `skipLibCheck` is.
+
+`@formrail/pro/engine` is a subpath export, so it resolves with `moduleResolution` `bundler`, `node16` or
+`nodenext`. The legacy `node` / `node10` resolution ignores the `exports` map and does not find it, the
+same limit as `@formrail/core/internal`.
 
 `useFormRebase` of `@formrail/pro/engine` takes any form that keeps the `RebaseFormBinding` contract
 (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`); core's `useObjectPageForm()` is one
-as is. Ready-made bindings for React Hook Form and TanStack Form are planned (ticket #489, child tickets);
-the study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
+as is. Ready-made bindings for React Hook Form (#507) and TanStack Form (#508) come in their own tickets.
+The study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
 
 ## Change Summary engine
 
