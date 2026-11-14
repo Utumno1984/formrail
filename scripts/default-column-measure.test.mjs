@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
-import { PROSE_DEFAULT, REPO_ROOT, UNCOMPARABLE_ALLOWLIST, causeOf, check, destructuringDefaults, findComponentFunction, formatCheck, isLiteralInitializer, literalNodeOf, measure, normalizeDefault } from './default-column-measure.mjs';
+import { PROSE_DEFAULT, REPO_ROOT, UNCOMPARABLE_ALLOWLIST, causeOf, check, destructuringDefaults, findComponentFunction, formatCheck, isLiteralInitializer, literalNodeOf, measure, normalizeDefault, proseDefaultOf } from './default-column-measure.mjs';
 
 // Tests of the measure for the empty Default column (ticket #460). The helpers are pure and tested on
 // snippets; `measure` runs the real docgen on small fixture packages (one case per file) and on the repo.
@@ -1022,6 +1022,130 @@ describe('the guard, second round, on fixture packages (#474)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------------------
+// #474, third round (critic, 2nd rejection): "`x` (default)" prose, the default of a named key, and one fixture per
+// mutation that survived round 2 (N2, N5, N8, N12, N13 of the critic's script).
+
+describe('prose, round 3: "`x` (default)" and named keys (#474)', () => {
+  it.each([
+    ['`automatic` (default): moving focus with the arrows selects the tab.', '`automatic`'],
+    ['whole number ≥ 0). `0` (default): the menu alone.', '`0`'],
+    ['label. `auto` (the default): decided by a container query.', '`auto`'],
+    ['Navigation between the sections: `anchors` (default) shows an Anchor Bar.', '`anchors`'],
+    ['Accessible name. Default "Loading".', '"Loading"'],
+  ])('%j states %j', (text, value) => {
+    expect(PROSE_DEFAULT.test(text)).toBe(true);
+    expect(proseDefaultOf(text)).toBe(value);
+  });
+  it.each([
+    'Texts for assistive technology. `anchorBar`: the name of the Anchor Bar\'s `<nav>` (default "Sections").',
+    '`align`: `auto` (default) scrolls the minimum.',
+    '`text`: width of the block (default 100% of the container). `rect`: default 100%.',
+    'How subscribers hear about it: right away (default) or in a microtask.',
+  ])('%j states no default of the prop', (text) => expect(proseDefaultOf(text)).toBeUndefined());
+  it('a named key in an earlier sentence does not hide a default of the prop', () => {
+    expect(proseDefaultOf('`summary`: a row of totals. Default `default`; an unknown value acts as `default`.')).toBe('`default`');
+  });
+});
+
+describe('the guard, third round, on fixture packages (#474)', () => {
+  const files = {
+    'Inner.tsx': `export interface InP {
+        /** x. */ a?: string;
+        /** x. */ b?: string;
+      }
+      export function Inner({ a = 'ia', b = 'ib' }: InP) { return <i>{a}{b}</i>; }`,
+    // Point 1: "\`x\` (default)" with no default in the source (the prop goes to a third-party component).
+    'Marked.tsx': `export interface P {
+        /** \`automatic\` (default): the arrows select. \`manual\`: Enter selects. */
+        mode?: 'automatic' | 'manual';
+      }
+      export function Marked({ mode }: P) { return <i data-mode={mode} />; }`,
+    // Point 2: the default of a named key; then the same prop with a (wrong) @default for the whole prop.
+    'Keyed.tsx': `export interface P {
+        /** Texts. \`anchorBar\`: the name of the \`<nav>\` (default "Sections"). */
+        labels?: { anchorBar?: string };
+      }
+      export function Keyed({ labels }: P) { return <nav aria-label={labels?.anchorBar ?? 'Sections'} />; }
+      export interface WP {
+        /**
+         * Texts. \`anchorBar\`: the name of the \`<nav>\`.
+         * @default "Sections"
+         */
+        labels?: { anchorBar?: string };
+      }
+      export function KeyedWrong({ labels }: WP) { return <nav aria-label={labels?.anchorBar ?? 'Sections'} />; }`,
+    // N2: two spreads, the first carries \`a\`, the second (the rest) does not: \`a\` still reaches Inner.
+    'TwoSpreads.tsx': `import { Inner, type InP } from './Inner';
+      export function TwoSpreads(props: InP) { const { a, ...rest } = props; return <><Inner {...props} {...rest} /><span>{a}</span></>; }`,
+    // N8: a key of the rest that the rest does not carry is not the prop.
+    'RestKey.tsx': `import { Inner, type InP } from './Inner';
+      export function RestKey(props: InP) { const { a, ...rest } = props; const { a: x } = rest as InP; return <><Inner a={x} /><span>{a}</span></>; }`,
+    // N13: a body destructuring of the rest of a body destructuring.
+    'RestOfRest.tsx': `export interface P {
+        /** x. */
+        a?: string;
+        /**
+         * x.
+         * @default 'lg'
+         */
+        b?: string;
+      }
+      export function RestOfRest(props: P) { const { a, ...rest } = props; const { b = 'md' } = rest; return <i>{a}{b}</i>; }`,
+    // N5 and N12: \`x || false\` and \`x ?? undefined\` are not fallbacks.
+    'NotFallbacks.tsx': `export interface P {
+        /**
+         * x.
+         * @default true
+         */
+        flag?: boolean;
+        /**
+         * x.
+         * @default 'md'
+         */
+        size?: string;
+      }
+      export function OrFalse({ flag }: P) { return <i data-on={String(flag || false)} />; }
+      export function OrUndefined({ size }: P) { return <i data-size={size ?? undefined} />; }`,
+  };
+  const root = fixtureRoot(files);
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const result = measure({ root, entries: ['packages/core/src/index.ts'] });
+  const issues = check(result, { allowlist: {} });
+  const kinds = (component, prop) => issuesOf(issues, component).filter((i) => i.prop === prop).map((i) => i.kind);
+  const row = (c, p) => rowIn(result, c, p);
+
+  it('point 1: "`automatic` (default)" with no source default is prose-only (missing), and its value is read', () => {
+    expect(row('Marked', 'mode')).toMatchObject({ kind: 'prose-only', proseValue: '`automatic`' });
+    expect(kinds('Marked', 'mode')).toEqual(['missing-default']);
+  });
+  it('point 2: the default of a named key is not a default of the prop: no row, no issue', () => {
+    expect(row('Keyed', 'labels')).toBeUndefined();
+    expect(issuesOf(issues, 'Keyed')).toEqual([]);
+  });
+  it('point 2: a `@default` written on the prop for the default of its key is flagged', () => {
+    expect(kinds('KeyedWrong', 'labels')).toEqual(['unverified-default']);
+  });
+  it('N2: a key carried by one spread and not by a later one still reaches the child', () => {
+    expect(row('TwoSpreads', 'a')).toMatchObject({ kind: 'gap', cause: 'delegated', source: "'ia'" });
+  });
+  it('N8: a key read from a rest that does not carry it is not the prop', () => {
+    expect(row('RestKey', 'a')).toBeUndefined();
+  });
+  it('N13: a body destructuring of the rest of another body destructuring is read and compared', () => {
+    expect(row('RestOfRest', 'b')).toMatchObject({ where: 'body', sourceValue: 'md' });
+    expect(kinds('RestOfRest', 'b')).toEqual(['mismatch']);
+  });
+  it('N5: `prop || false` is not a fallback (no default to compare: unverified, not a mismatch)', () => {
+    expect(row('OrFalse', 'flag').where).toBe('tag');
+    expect(kinds('OrFalse', 'flag')).toEqual(['unverified-default']);
+  });
+  it('N12: `prop ?? undefined` is not a fallback (unverified, not a mismatch against `undefined`)', () => {
+    expect(row('OrUndefined', 'size').where).toBe('tag');
+    expect(kinds('OrUndefined', 'size')).toEqual(['unverified-default']);
+  });
+});
+
 describe('the --check command line', { timeout: 120_000 }, () => {
   const run = (root) => spawnSync(process.execPath, [join(REPO_ROOT, 'scripts/default-column-measure.mjs'), '--check', '--root', root], { encoding: 'utf8' });
   const clean = fixtureRoot({ 'Clean.tsx': `export interface P { /** x. */ size?: 'sm' | 'md'; }\nexport function Clean({ size = 'md' }: P) { return <i>{size}</i>; }` });
@@ -1072,15 +1196,23 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     expect([...new Set(check(result).map((i) => i.kind))]).toEqual(['missing-default']);
   });
   it('round 2: every default the script cannot compare is in the allowlist, so #475 can add `@default` without being blocked', () => {
-    // Simulate #475: a `@default` on every prop the guard reports as missing (written as the source value when there
-    // is one), the prose removed.
+    // Simulate #475: a `@default` on every prop the guard reports as missing, with the value #475 would write: the
+    // source literal for a source default, the value the prose states for a prose-only one (round 3: no placeholder);
+    // the prose removed.
     const missing = new Set(check(result).filter((i) => i.kind === 'missing-default').map((i) => `${i.component}.${i.prop}`));
+    const valueOf = (r) => (r.kind === 'prose-only' ? r.proseValue : r.sourceLiteral ?? r.source);
     const tagged = {
       components: result.components.map((c) => ({
         ...c,
-        rows: c.rows.map((r) => (missing.has(`${c.component}.${r.prop}`) ? { ...r, kind: 'ok', declared: r.sourceLiteral ?? r.source, declaredTag: 'default', prose: false } : r)),
+        rows: c.rows.map((r) => (missing.has(`${c.component}.${r.prop}`) ? { ...r, kind: 'ok', declared: valueOf(r), declaredTag: 'default', prose: false } : r)),
       })),
     };
+    const written = tagged.components.flatMap((c) => c.rows.filter((r) => missing.has(`${c.component}.${r.prop}`)).map((r) => r.declared));
+    expect(written.length).toBe(missing.size);
+    for (const v of written) {
+      expect(v, 'every simulated @default is a real value').toBeTypeOf('string');
+      expect(v).not.toContain('prose in TSDoc');
+    }
     expect(check(tagged)).toEqual([]);
     // Without the allowlist each of them would be an error: the entries are exactly the props that cannot be compared
     // (plus ProgressBar.getValueLabel, whose column the docgen already fills).
@@ -1088,12 +1220,30 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     expect(blocked).toEqual(Object.keys(UNCOMPARABLE_ALLOWLIST).filter((id) => id !== 'ProgressBar.getValueLabel').sort());
   });
   it('round 2: defaults stated in quotes are found (prose-only), and "with `default`" / "the default `<div>`" are not', () => {
-    for (const id of ['MessageStrip.dismissLabel', 'ObjectPageFooter.toneLabel', 'ObjectPage.labels']) {
+    for (const id of ['MessageStrip.dismissLabel', 'ObjectPageFooter.toneLabel']) {
       const [c, p] = id.split('.');
       expect(rowIn(result, c, p), id).toMatchObject({ kind: 'prose-only' });
     }
     expect(rowIn(result, 'Field', 'stateReason')).toBeUndefined();
     expect(rowIn(result, 'DialogContent', 'asChild')).toBeUndefined();
+  });
+  // Round 3: this assertion was "ObjectPage.labels is prose-only" in round 2 (a test of this PR, never merged): the
+  // critic showed it is the default of the `anchorBar` key, so the expectation is inverted, not dropped.
+  it('round 3: the default of a named key ("`anchorBar`: ... (default "Sections")") is not a default of the prop', () => {
+    expect(rowIn(result, 'ObjectPage', 'labels')).toBeUndefined();
+    expect(rowIn(result, 'Skeleton', 'width')).toBeUndefined();
+    expect('ObjectPage.labels' in UNCOMPARABLE_ALLOWLIST).toBe(false);
+  });
+  it('round 3: #475 cannot publish `@default "Sections"` on ObjectPage.labels without the guard saying so', () => {
+    const wrong = { components: [{ component: 'ObjectPage', rows: [{ prop: 'labels', kind: 'ok', where: 'tag', source: '@default "Sections"', declared: '"Sections"', declaredTag: 'default', sourceValue: null, prose: false }], unresolvedDelegations: [] }] };
+    expect(check(wrong).filter((i) => i.component === 'ObjectPage').map((i) => i.kind)).toEqual(['unverified-default']);
+  });
+  it('round 3: "`x` (default)" is read: Tabs.activationMode is prose-only, and the other props written that way have `prose`', () => {
+    expect(rowIn(result, 'Tabs', 'activationMode')).toMatchObject({ kind: 'prose-only', proseValue: '`automatic`' });
+    for (const id of ['ConfirmDialog.tone', 'DescriptionList.layout', 'ObjectPage.sectionNavigation']) {
+      const [c, p] = id.split('.');
+      expect(rowIn(result, c, p), id).toMatchObject({ prose: true });
+    }
   });
   it('round 2: a @default added next to `Default "Loading"` / `Default 1.` prose is redundant', () => {
     for (const id of ['Spinner.label', 'ObjectPageFooter.label', 'ObjectPage.headingLevel']) {
