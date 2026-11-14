@@ -33,11 +33,14 @@ export const tableClass = 'min-h-0 flex-1';
 // Selection bar (only with `selection.enabled`): always mounted, below the bar of pills and search, above the table.
 // Its height never depends on the selection: the count is one truncated line whose basis is zero (its
 // length never moves the actions), the "clear" button keeps its box while hidden and the bulk actions are
-// always rendered. Wide: count, actions, "clear" on one line. Narrow (below 640px): the count on its own
-// line, then the actions and "clear" at the end — two lines at 0 and at n alike. DOM order = visual order.
+// always rendered. Wide: count, actions, "clear" on one line. Narrow (below 640px) with `bulkActions`: the
+// count on its own line, then the actions and "clear" at the end — two lines at 0 and at n alike. Narrow
+// without `bulkActions` (`data-rop-bulk-actions="false"`, decided at render): count and "clear" on one
+// line, the count yields. DOM order = visual order.
 export const selectionBarClass =
-  'flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-rop-md border border-rop-border bg-rop-surface-subtle ' +
-  'px-3 py-1 sm:flex-nowrap';
-export const selectionCountClass = 'min-w-0 basis-full text-rop-text sm:flex-1 sm:basis-0';
+  'group flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-rop-md border border-rop-border bg-rop-surface-subtle ' +
+  'px-3 py-1 data-[rop-bulk-actions=false]:flex-nowrap sm:flex-nowrap';
+export const selectionCountClass =
+  'min-w-0 basis-full text-rop-text group-data-[rop-bulk-actions=false]:flex-1 group-data-[rop-bulk-actions=false]:basis-0 sm:flex-1 sm:basis-0';
 export const selectionActionsClass = 'flex min-w-0 flex-wrap items-center gap-2';
-export const selectionClearClass = 'ms-auto shrink-0';
+export const selectionClearClass = 'ms-auto shrink-0 whitespace-nowrap';

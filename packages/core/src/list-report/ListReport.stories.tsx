@@ -1004,6 +1004,10 @@ interface SelectionArgs {
   onExport: (numbers: string[]) => void;
   /** Fixture: not in Controls. */
   defaultFilter?: string;
+  /** Whether the selection bar gets bulk actions. Default true. */
+  withBulkActions?: boolean;
+  /** Width of the demo container (px). Default 1100. */
+  containerWidth?: number;
 }
 
 function SelectionReport({
@@ -1014,6 +1018,8 @@ function SelectionReport({
   onApprove,
   onExport,
   defaultFilter,
+  withBulkActions = true,
+  containerWidth = 1100,
 }: SelectionArgs) {
   // Controlled: the parent owns the set and applies what the hook reports (a new Set every time).
   const [parentIds, setParentIds] = useState<ReadonlySet<string>>(PRESELECTED[preselected]);
@@ -1039,13 +1045,15 @@ function SelectionReport({
           Parent state: <output data-testid="parent-state">{parentIds.size} ids</output>
         </p>
       ) : null}
-      <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
+      <div style={{ width: containerWidth, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
         <ListReport
           title="Invoices"
           table={table}
           filtersLabel="Filters"
           searchLabel="Search"
-          bulkActions={(selection) => (
+          bulkActions={
+            withBulkActions
+              ? (selection) => (
             <>
               <Button size="sm" variant="primary" disabled={selection.selectedResultCount === 0} onClick={() => onApprove(numbers())}>
                 Approve
@@ -1054,7 +1062,9 @@ function SelectionReport({
                 Export
               </Button>
             </>
-          )}
+              )
+              : undefined
+          }
         />
       </div>
     </div>
@@ -1133,6 +1143,48 @@ export const Selection: StoryObj<SelectionArgs> = {
     await expect(allBox(canvas)).toHaveFocus();
     await expect(canvas.getByRole('button', { name: 'Approve' })).toBeDisabled();
   },
+};
+
+/**
+ * `Selection` without bulk actions: below 640px the count and "Clear selection" share one line and the
+ * bar keeps the same box at 0 and at n selected. The `withBulkActions` Control adds the bulk actions back (two
+ * lines below 640px, as before); `containerWidth` narrows the demo container. The play function selects
+ * three invoices, checks the count and that "Clear selection" shows up, that the bar did not move, then
+ * clears and checks that the focus is on the header checkbox.
+ */
+export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
+  ...Selection,
+  tags: ['visual'],
+  argTypes: {
+    ...SELECTION_ARG_TYPES,
+    withBulkActions: { control: 'boolean', description: 'Pass `bulkActions` to the frame (Approve, Export)' },
+    containerWidth: { control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Width of the demo container (px)' },
+  },
+  args: { ...SELECTION_ARGS, withBulkActions: false, containerWidth: 1100 },
+  play: async ({ args, canvasElement }) => {
+    if (!args.selectable || args.preselected !== 'none') return;
+    const canvas = within(canvasElement);
+    await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
+    const before = selectionBar(canvas).getBoundingClientRect();
+    for (const row of SCENARIO) await userEvent.click(rowBox(canvas, row.number));
+    await expect(selectionBar(canvas)).toHaveTextContent('3 selected');
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(3);
+    const clear = canvas.getByRole('button', { name: 'Clear selection' });
+    await expect(clear).toBeVisible();
+    const after = selectionBar(canvas).getBoundingClientRect();
+    await expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(0.5);
+    await expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(0.5);
+    await userEvent.click(clear);
+    await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
+    await expect(allBox(canvas)).toHaveFocus();
+  },
+};
+
+/** Fixture of the e2e suite: `SelectionWithoutBulkActions` without the play function. */
+export const SelectionWithoutBulkActionsNoPlay: StoryObj<SelectionArgs> = {
+  ...SelectionWithoutBulkActions,
+  tags: ['internal'],
+  play: undefined,
 };
 
 /** Fixture of the e2e suite: `Selection` without the play function. */
