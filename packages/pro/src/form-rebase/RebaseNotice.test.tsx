@@ -644,35 +644,156 @@ describe('<RebaseNotice />: focus not obscured (WCAG 2.4.11, #470): a field bein
   });
 });
 
+describe('<RebaseNotice />: what covers the top of the container (#470, round 2)', () => {
+  const rect = (top: number, height: number) =>
+    ({ top, bottom: top + height, left: 0, right: 100, width: 100, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+  const STRIP = 80;
+  const BAR = 30;
+  const SECOND_BAR = 20;
+
+  /**
+   * The notice right above the container. A sticky bar (with a search field in it) is stuck at the top of the
+   * container, optionally a second sticky bar under it. "Gap field" sits 4px under the bar once the notice is there:
+   * in view and not covered, but its focus ring (drawn outside it) would be.
+   */
+  function Page({ conflicts, stacked }: { conflicts: RebaseConflict[]; stacked: boolean }) {
+    const ref = useRef<HTMLDivElement>(null);
+    return (
+      <div>
+        <div data-notice-row="">
+          <RebaseNotice {...props({ conflicts, scrollContainerRef: ref })} />
+        </div>
+        <div data-page="">
+          <div data-scroller="" ref={ref} style={{ overflowY: 'auto', height: 200 }}>
+            <nav data-bar="" style={{ position: 'sticky', top: 0 }}>
+              <a href="#gap">Bar link</a>
+              <input aria-label="Search" />
+            </nav>
+            {stacked ? (
+              <div data-second-bar="" style={{ position: 'sticky', top: BAR }}>
+                <span>Second bar</span>
+              </div>
+            ) : null}
+            <input aria-label="Top field" />
+            <input aria-label="Gap field" id="gap" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function setup(stacked: boolean) {
+    const view = render(<Page conflicts={[]} stacked={stacked} />);
+    const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+    const top = () => (document.querySelector('.rop-pro-rebase-notice') ? STRIP : 0);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.matches('[data-page]')) return rect(top(), 400);
+      if (this === scroller) return rect(top(), 200);
+      if (this.matches('[data-bar]')) return rect(top(), BAR);
+      if (this.matches('[data-bar] a')) return rect(top(), BAR);
+      if (this.matches('[aria-label="Search"]')) return rect(top() + 5, 20);
+      if (this.matches('[data-second-bar], [data-second-bar] span')) return rect(top() + BAR, SECOND_BAR);
+      if (this.matches('[aria-label="Top field"]')) return rect(top() + 70 - scroller.scrollTop, 20);
+      // 4px under the bar once the notice is there and the container compensated it (scrollTop = STRIP).
+      if (this.matches('[aria-label="Gap field"]')) return rect(top() + BAR + 4 - scroller.scrollTop + STRIP, 20);
+      return rect(0, 0);
+    });
+    Element.prototype.scrollIntoView = vi.fn(function (this: HTMLElement) {
+      scroller.scrollTop -= scroller.getBoundingClientRect().top - this.getBoundingClientRect().top;
+    });
+    const link = document.querySelector<HTMLElement>('[data-bar] a')!;
+    const second = document.querySelector<HTMLElement>('[data-second-bar] span');
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: vi.fn((_x: number, y: number) => {
+        if (y < top() + BAR) return link;
+        if (second && y < top() + BAR + SECOND_BAR) return second;
+        return scroller;
+      }),
+    });
+    window.dispatchEvent(new Event('resize'));
+    return { view, scroller };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+  });
+
+  it('a field being typed in INSIDE the sticky bar (a search field): the bar does not cover its own field, nothing moves', () => {
+    const { view, scroller } = setup(false);
+    const search = screen.getByRole('textbox', { name: 'Search' });
+    search.focus();
+    view.rerender(<Page conflicts={[DUE]} stacked={false} />);
+    expect(scroller.scrollTop).toBe(STRIP);
+    expect(search).toHaveFocus();
+  });
+
+  it('two sticky bars stacked at the top: the field lands below BOTH, with 8px of room', () => {
+    const { view, scroller } = setup(true);
+    const field = screen.getByRole('textbox', { name: 'Top field' });
+    field.focus();
+    view.rerender(<Page conflicts={[DUE]} stacked />);
+    expect(field.getBoundingClientRect().top).toBe(STRIP + BAR + SECOND_BAR + 8);
+    // Compensated to 80, brought to the container's top (70), then 58px more to clear both bars.
+    expect(scroller.scrollTop).toBe(12);
+  });
+
+  it('a field just under the bar (4px): in view and uncovered, but its focus ring would be: it moves down to 8px of room', () => {
+    const { view, scroller } = setup(false);
+    const field = screen.getByRole('textbox', { name: 'Gap field' });
+    field.focus();
+    view.rerender(<Page conflicts={[DUE]} stacked={false} />);
+    expect(field.getBoundingClientRect().top).toBe(STRIP + BAR + 8);
+    expect(scroller.scrollTop).toBe(STRIP - 4);
+  });
+});
+
 describe('<RebaseNotice />: the box it sits in resized from outside (#470)', () => {
   const rect = (top: number, height: number) =>
     ({ top, bottom: top + height, left: 0, right: 0, width: 0, height, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
 
-  it('outside the container: a scroll position the browser clamped in the relayout (no scroll event yet) is not counted twice', () => {
-    function Page({ conflicts }: { conflicts: RebaseConflict[] }) {
+  /**
+   * The recommended placement (the notice right above the container), with a real scroll range: the frame is 400px
+   * tall, the notice row takes `height.strip` of it, the container the rest, its content is 620px tall. So its
+   * maximum scroll position is 300 with an 80px strip, 270 with a 50px one (the browser clamps to it).
+   */
+  function outsideFixture() {
+    const height = { strip: 80 };
+    function Page({ conflicts, onKeepMine }: { conflicts: RebaseConflict[]; onKeepMine?: (path: string) => void }) {
       const ref = useRef<HTMLDivElement>(null);
       return (
         <div>
           <div data-notice-row="">
-            <RebaseNotice {...props({ conflicts, scrollContainerRef: ref })} />
+            <RebaseNotice {...props({ conflicts, scrollContainerRef: ref, ...(onKeepMine ? { onKeepMine } : {}) })} />
           </div>
           <div data-page="">
-            <div data-scroller="" ref={ref} style={{ overflowY: 'auto', height: 200 }}>
+            <div data-scroller="" ref={ref} style={{ overflowY: 'auto' }}>
+              <button type="button">Top action</button>
               <input aria-label="Due date" />
             </div>
           </div>
         </div>
       );
     }
+    const row = () => (document.querySelector('.rop-pro-rebase-notice') ? height.strip : 0);
+    const install = (scroller: HTMLElement) => {
+      Object.defineProperty(scroller, 'clientHeight', { configurable: true, get: () => 400 - row() });
+      Object.defineProperty(scroller, 'scrollHeight', { configurable: true, get: () => 620 });
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        if (this.matches('[data-page]')) return rect(row(), 400 - row());
+        if (this === scroller) return rect(row(), 400 - row());
+        return rect(0, 0);
+      });
+    };
+    return { height, Page, install };
+  }
+
+  it('outside the container: a scroll position the browser clamped in the relayout (no scroll event yet) is not counted twice', () => {
+    const { height, Page, install } = outsideFixture();
     const view = render(<Page conflicts={[DUE]} />);
     const scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
-    const height = { strip: 80 };
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const row = document.querySelector('.rop-pro-rebase-notice') ? height.strip : 0;
-      if (this.matches('[data-page]')) return rect(row, 400);
-      if (this === scroller) return rect(row, 200);
-      return rect(0, 0);
-    });
+    install(scroller);
     try {
       // At the bottom of the content (scrollTop 300): recorded there.
       scroller.scrollTop = 300;
@@ -684,6 +805,61 @@ describe('<RebaseNotice />: the box it sits in resized from outside (#470)', () 
       view.rerender(<Page conflicts={[NOTES]} />);
       // 300 - 30, not 270 - 30: the content in view does not move.
       expect(scroller.scrollTop).toBe(270);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  /** A notice whose "Keep mine" closes the conflict, shrinks the strip by 30px and then runs `also` in the same task. */
+  function KeepMineHarness({ Page, height, also }: { Page: ReturnType<typeof outsideFixture>['Page']; height: { strip: number }; also: () => void }) {
+    const [conflicts, setConflicts] = useState([DUE, NOTES]);
+    return (
+      <Page
+        conflicts={conflicts}
+        onKeepMine={(path) => {
+          height.strip = 50;
+          setConflicts((list) => list.filter((c) => c.path !== path));
+          also();
+        }}
+      />
+    );
+  }
+
+  it('a callback that scrolls the container in the same task (no scroll event yet): that scroll is kept, only the notice is compensated', async () => {
+    const { height, Page, install } = outsideFixture();
+    let scroller: HTMLElement | null = null;
+    render(<KeepMineHarness Page={Page} height={height} also={() => void (scroller!.scrollTop += 120)} />);
+    scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+    install(scroller);
+    try {
+      scroller.scrollTop = 100;
+      window.dispatchEvent(new Event('resize'));
+      await userEvent.click(screen.getByRole('button', { name: 'Keep mine for Due date' }));
+      // 100 + 120 (the callback's scroll) - 30 (the notice got shorter), not 100 - 30.
+      expect(scroller.scrollTop).toBe(190);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('a callback that moves the focus to a control higher up (the browser scrolls to it), from the end of the content: the focus is not scrolled away again', async () => {
+    const { height, Page, install } = outsideFixture();
+    let scroller: HTMLElement | null = null;
+    const moveFocus = () => {
+      screen.getByRole('button', { name: 'Top action' }).focus();
+      // What the browser does when the focus goes to a control out of view: it scrolls the container to it.
+      scroller!.scrollTop = 40;
+    };
+    render(<KeepMineHarness Page={Page} height={height} also={moveFocus} />);
+    scroller = document.querySelector<HTMLElement>('[data-scroller]')!;
+    install(scroller);
+    try {
+      scroller.scrollTop = 300;
+      window.dispatchEvent(new Event('resize'));
+      await userEvent.click(screen.getByRole('button', { name: 'Keep mine for Due date' }));
+      expect(screen.getByRole('button', { name: 'Top action' })).toHaveFocus();
+      // 40 - 30 from where the browser put it, not 300 - 30 (back at the end, the focused control out of view).
+      expect(scroller.scrollTop).toBe(10);
     } finally {
       vi.restoreAllMocks();
     }

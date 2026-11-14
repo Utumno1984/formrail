@@ -253,10 +253,12 @@ function reveal(active: HTMLElement, container: Element): void {
  * **Focus not obscured** (WCAG 2.4.11): a control the user types in that was in that strip is scrolled back into
  * view, below whatever the container keeps stuck at its top (a sticky Anchor Bar); the content moves by the least
  * that shows it. Any other focused control (a header button, also when reached with the keyboard) may scroll out of
- * view with the strip, and the content does not move for it: SC 2.4.11 applies when a component receives the focus,
- * and that control received it fully visible (an update never moves the focus; the next control the user moves to
- * is scrolled into view by the browser). A field being typed in is kept in view because the user has no next step
- * that would bring it back.
+ * view with the strip, and the content does not move for it. SC 2.4.11 is about a focused component hidden by
+ * author-created content: that control leaves the view by a scroll of its container, it is not covered by anything
+ * (the notice sits above the container, never over it), and it received the focus fully visible (SC 2.4.11 applies
+ * when a component receives the focus). The update itself does not move the focus; a choice in the notice may, to a
+ * live element, with `preventScroll`. The next control the user moves to is scrolled into view by the browser. A
+ * field being typed in is kept in view because the user has no next step that would bring it back.
  *
  * **Focus**: when a choice removes the element that had the focus, the focus goes to the same choice of
  * the conflict that takes its place (the next one, else the previous one), else to `focusTargetFor(conflict)`
@@ -354,18 +356,22 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
       const delta = held.element.getBoundingClientRect().top - held.top;
       if (delta !== 0) {
         const container = containerRef.current?.current ?? scrollerOf(live);
-        // Outside the container (right above it), the container grows or shrinks by `delta` at its top, and the
-        // browser may already have clamped its scroll position in that relayout (at the bottom of the content, a
-        // taller container scrolls up by itself, #470): the position comes from the record, not from now. Inside it,
-        // the follower's own move already includes any such clamp.
-        const base = held.container === container && !container.contains(held.element) ? held.scrollTop : container.scrollTop;
-        container.scrollTop = base + delta;
+        // From where the container is NOW: a scroll made since the last record in the same task (a callback that
+        // scrolls, or moves the focus and the browser scrolls to it) is kept. One exception, outside the container
+        // (right above it): the container grew at its top, and at the end of the content the browser already pulled
+        // its position back to the new maximum in that relayout (#470). Then the position comes from the record.
+        // Inside the container, the follower's own move already includes any such clamp.
+        const outside = held.container === container && !container.contains(held.element);
+        const max = container.scrollHeight - container.clientHeight;
+        const clamped = outside && held.scrollTop > max && Math.abs(container.scrollTop - max) < 1;
+        container.scrollTop = (clamped ? held.scrollTop : container.scrollTop) + delta;
         // A control the user is typing in that was in the top strip of the container, now covered, is brought back
         // into view, below what the container keeps stuck at its top (a sticky Anchor Bar: #470, it was left under
         // it). Any other control (a header button, even reached with the keyboard) may scroll out of view and the
-        // content does not move for it. WCAG 2.4.11 (#470): the criterion holds when a component RECEIVES the focus;
-        // this button received it fully visible, an update never moves the focus, and the next control the user
-        // moves to is scrolled into view by the browser. A field being typed in has no "next": it is kept in view.
+        // content does not move for it. WCAG 2.4.11 (#470) is about a focused component hidden by author-created
+        // content: this button leaves the view by a scroll, it is not covered by anything, and it received the focus
+        // fully visible. The update does not move the focus (a choice in the notice may, with `preventScroll`); the
+        // next control the user moves to is scrolled into view by the browser. A field being typed in has no "next".
         const active = live.ownerDocument.activeElement;
         if (active instanceof HTMLElement && container !== active && container.contains(active) && active.matches(TYPING_TARGET)) {
           reveal(active, container);
