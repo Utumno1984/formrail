@@ -146,7 +146,7 @@ Vedi `packages/pro/src/engine.ts`.
 ## 3. `useFormRebase` generico
 
 **Scelta: un contratto strutturale minimo**, `RebaseFormBinding<Values>`
-(`packages/pro/src/form-rebase/types.ts:156`). Campi: `baseline`, `values`, `isSaving`,
+(`packages/pro/src/form-rebase/types.ts:165`). Campi: `baseline`, `values`, `isSaving`,
 `saveError`, `reset`, `setValues`.
 
 Il contratto documentato:
@@ -175,7 +175,17 @@ banale:
   a `reset`, il binding deve esporre l'oggetto passato, non il clone, altrimenti il hook scambia il
   proprio reset per una reidratazione e azzera i conflitti.
 - **Rilevamento di "scartato"**: `form.values === form.baseline` (`:231`). Dopo un `reset()` il
-  binding deve restituire come `values` lo stesso oggetto della baseline.
+  binding deve restituire come `values` lo stesso oggetto della baseline, e **solo** dopo un reset:
+  se restituisce la baseline anche quando l'utente riporta a mano i valori al contenuto della
+  baseline, il hook legge quel gesto come uno scarto e azzera `applied` e i conflitti aperti.
+- **Reidratazione per identità**: una baseline nuova non impostata dal hook (`rehydrated`, `:230`)
+  chiude i conflitti aperti. Un binding che ricrea la baseline con lo stesso contenuto (a ogni
+  render, o clonando quella della libreria) li chiuderebbe subito.
+- Le due regole sono nel TSDoc di `RebaseFormBinding` e fissate da
+  `packages/pro/test/public-api.test.tsx` ("identity rules of RebaseFormBinding"), con un binding
+  `useState` che le rispetta come controllo. Resta aperto per #507 il campo registrato dopo il
+  mount con un conflitto aperto: il contratto offre solo `reset` o una baseline nuova, che chiudono
+  entrambi i conflitti (osservazione del critico, giro 1).
 - In più, `useChangeSummary` memoizza per identità di `values`/`baseline`
   (`use-change-summary.ts:37-40`): un oggetto mutato sul posto produrrebbe un riepilogo stantio.
 
