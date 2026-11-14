@@ -151,6 +151,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:visual:ci
+      # Baseline PNGs left behind by a renamed/removed story (#517). Reuses the storybook-static/ that the
+      # webServer of the step above just built (no extra build); runs even if a screenshot failed.
+      - run: npm run test:visual:orphans
+        if: success() || failure()
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
