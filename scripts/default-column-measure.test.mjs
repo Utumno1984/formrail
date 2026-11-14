@@ -220,7 +220,8 @@ describe('measure on the repository', { timeout: 60_000 }, () => {
   const result = measure();
   it('finds the known case: Button.size has a default in the source and an empty column', () => {
     const button = result.components.find((c) => c.component === 'Button');
-    expect(button.rows.find((r) => r.prop === 'size')).toMatchObject({ kind: 'gap', source: "'md'" });
+    // #475: the column is now filled by a `@default` that matches the source (was `kind: 'gap'`).
+    expect(button.rows.find((r) => r.prop === 'size')).toMatchObject({ kind: 'ok', where: 'body', source: "'md'", declared: "'md'" });
   });
   it('covers core and Pro components and every wrapper shape', () => {
     const files = result.components.map((c) => c.file);
@@ -230,12 +231,13 @@ describe('measure on the repository', { timeout: 60_000 }, () => {
   });
   it('finds the known false negative and the known delegations', () => {
     const rowOf = (component, prop) => result.components.find((c) => c.component === component)?.rows.find((r) => r.prop === prop);
-    expect(rowOf('Accordion', 'collapsible')).toMatchObject({ kind: 'gap', cause: 'body-destructuring' });
-    expect(rowOf('Tooltip', 'side')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'TooltipInternal' });
-    expect(rowOf('ConfirmDialog', 'tone')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ConfirmDialogBase' });
-    expect(rowOf('Dialog', 'defaultOpen')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ModalRoot' });
-    expect(rowOf('ListReport', 'titleLevel')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ListReportFrame' });
-    expect(rowOf('ListReportTable', 'status')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'ListReportTableShell' });
+    // #475: every one of these now has a `@default` equal to the source default (was `kind: 'gap'` with a cause).
+    expect(rowOf('Accordion', 'collapsible')).toMatchObject({ kind: 'ok', where: 'body', declared: 'true' });
+    expect(rowOf('Tooltip', 'side')).toMatchObject({ kind: 'ok', where: 'delegated', declared: "'top'" });
+    expect(rowOf('ConfirmDialog', 'tone')).toMatchObject({ kind: 'ok', where: 'delegated', declared: "'danger'" });
+    expect(rowOf('Dialog', 'defaultOpen')).toMatchObject({ kind: 'ok', where: 'delegated', declared: 'false' });
+    expect(rowOf('ListReport', 'titleLevel')).toMatchObject({ kind: 'ok', where: 'delegated', declared: '2' });
+    expect(rowOf('ListReportTable', 'status')).toMatchObject({ kind: 'ok', where: 'delegated', declared: "'ready'" });
   });
   it('is deterministic', () => {
     expect(measure()).toEqual(result);
@@ -1179,12 +1181,17 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     const r2 = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
     expect(r1.status).toBe(1);
     expect(r1.stdout).toBe(r2.stdout);
-    expect(r1.stdout).toContain('Button.size [missing-default]');
+    // #475 documented the core components; what is left is Pro (#476), the same four missing defaults.
+    expect(r1.stdout).toContain('VirtualListReport.overscan [missing-default]');
+    expect(r1.stdout).not.toContain('Button.size');
+    const left = r1.stdout.split('\n').filter((l) => /\[[a-z-]+\]/.test(l)).map((l) => l.split('.')[0]);
+    expect([...new Set(left)]).toEqual(['VirtualListReport', 'VirtualListReportTable']);
   });
   it('ListReport and VirtualListReport get status and loadingRowCount through the renderTable render prop', () => {
     for (const comp of ['ListReport', 'VirtualListReport']) {
       for (const prop of ['status', 'loadingRowCount']) {
-        expect(rowIn(result, comp, prop), `${comp}.${prop}`).toMatchObject({ kind: 'gap', cause: 'delegated' });
+        // #475: the source default is still found through the render prop, and now matches the `@default` (was a gap).
+        expect(rowIn(result, comp, prop), `${comp}.${prop}`).toMatchObject({ kind: 'ok', where: 'delegated' });
       }
     }
   });
@@ -1222,7 +1229,8 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
   it('round 2: defaults stated in quotes are found (prose-only), and "with `default`" / "the default `<div>`" are not', () => {
     for (const id of ['MessageStrip.dismissLabel', 'ObjectPageFooter.toneLabel']) {
       const [c, p] = id.split('.');
-      expect(rowIn(result, c, p), id).toMatchObject({ kind: 'prose-only' });
+      // #475: documented with `@default` and the prose removed (was `prose-only`): the value is still the one stated.
+      expect(rowIn(result, c, p), id).toMatchObject({ kind: 'ok', declaredTag: 'default', prose: false, sourceValue: null });
     }
     expect(rowIn(result, 'Field', 'stateReason')).toBeUndefined();
     expect(rowIn(result, 'DialogContent', 'asChild')).toBeUndefined();
@@ -1239,8 +1247,10 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     expect(check(wrong).filter((i) => i.component === 'ObjectPage').map((i) => i.kind)).toEqual(['unverified-default']);
   });
   it('round 3: "`x` (default)" is read: Tabs.activationMode is prose-only, and the other props written that way have `prose`', () => {
-    expect(rowIn(result, 'Tabs', 'activationMode')).toMatchObject({ kind: 'prose-only', proseValue: '`automatic`' });
-    for (const id of ['ConfirmDialog.tone', 'DescriptionList.layout', 'ObjectPage.sectionNavigation']) {
+    // #475: Tabs.activationMode and ConfirmDialog.tone now have `@default` and no prose (were `prose-only` / `prose`).
+    expect(rowIn(result, 'Tabs', 'activationMode')).toMatchObject({ kind: 'ok', declared: "'automatic'", prose: false });
+    expect(rowIn(result, 'ConfirmDialog', 'tone')).toMatchObject({ kind: 'ok', declared: "'danger'", prose: false });
+    for (const id of ['DescriptionList.layout', 'ObjectPage.sectionNavigation']) {
       const [c, p] = id.split('.');
       expect(rowIn(result, c, p), id).toMatchObject({ prose: true });
     }
@@ -1255,6 +1265,6 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     }
   });
   it('round 2: `useCombobox({ clearOnEmpty })` is followed (object literal argument)', () => {
-    expect(rowIn(result, 'Combobox', 'clearOnEmpty')).toMatchObject({ kind: 'gap', cause: 'delegated', via: 'useCombobox', source: 'false' });
+    expect(rowIn(result, 'Combobox', 'clearOnEmpty')).toMatchObject({ kind: 'ok', where: 'delegated', source: 'false', declared: 'false' });
   });
 });

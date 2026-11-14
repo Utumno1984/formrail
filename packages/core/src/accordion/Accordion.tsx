@@ -27,11 +27,17 @@ export type AccordionHeadingLevel = 2 | 3 | 4 | 5 | 6;
 interface AccordionBaseProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defaultValue' | 'dir' | 'onChange' | 'value'> {
   /** Blocks every item. */
   disabled?: boolean;
-  /** Arrow keys used between triggers. Default `vertical` (up / down). */
+  /**
+   * Arrow keys used between triggers.
+   * @default 'vertical'
+   */
   orientation?: 'vertical' | 'horizontal';
   /** Text direction (matters for `orientation="horizontal"`). Default: inherited from the document. */
   dir?: 'ltr' | 'rtl';
-  /** Level of the heading that wraps each trigger (2–6). Default `3`. */
+  /**
+   * Level of the heading that wraps each trigger (2–6).
+   * @default 3
+   */
   headingLevel?: AccordionHeadingLevel;
 }
 
@@ -39,8 +45,9 @@ export interface AccordionSingleProps extends AccordionBaseProps {
   /** At most one item open at a time. */
   type: 'single';
   /**
-   * Whether the open item can be closed by clicking it. Default `true`. With `false` one item always
+   * Whether the open item can be closed by clicking it. With `false` one item always
    * stays open once opened: clicking it does nothing and does not call `onValueChange`.
+   * @default true
    */
   collapsible?: boolean;
   /**

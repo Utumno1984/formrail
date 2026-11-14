@@ -80,32 +80,51 @@ export interface ListReportFrameTableProps<Row> {
 export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'title'> & {
   /** Heading of the report. Its text (and only its text) is the accessible name of the table. */
   title: ReactNode;
-  /** Heading level of the title. Default 2 (the page's own `h1` sits above the report). */
+  /**
+   * Heading level of the title.
+   * @default 2
+   */
   titleLevel?: TitleLevel;
   /** What `useListReport` returned. */
   table: UseListReportReturn<Row>;
   /** Buttons next to the title (below it on a narrow screen). */
   actions?: ReactNode;
-  /** Passed to `renderTable` as is. */
+  /**
+   * Passed to `renderTable` as is.
+   * @default 'ready'
+   */
   status?: ListReportTableStatus;
   /** Passed to `renderTable` as is. */
   errorMessage?: ReactNode;
   /** Passed to `renderTable` as is. */
   onRetry?: () => void;
   /**
-   * The "clear filters" button of the "no results" state. Default: `table.clearFilters()` and the
-   * focus on the search box (or, without one, on the first pill). Passing it replaces that default.
+   * The "clear filters" button of the "no results" state. Without it, it clears the
+   * filters and puts the focus on the search box (or, without one, on the first pill). Passing it replaces that default.
+   * @default `table.clearFilters()` and focus on the search box
    */
   onClearFilters?: () => void;
-  /** Passed to `renderTable` as is. */
+  /**
+   * Passed to `renderTable` as is.
+   * @default 5
+   */
   loadingRowCount?: number;
   /** Texts of the table (passed as is) and of the count. */
   labels?: Partial<ListReportFrameLabels>;
-  /** Accessible name of the group of pills (see `ListReportFilterBar`). */
+  /**
+   * Accessible name of the group of pills (see `ListReportFilterBar`).
+   * @default 'Filters'
+   */
   filtersLabel?: string;
-  /** Accessible name of the search box (see `ListReportFilterBar`). */
+  /**
+   * Accessible name of the search box (see `ListReportFilterBar`).
+   * @default 'Search'
+   */
   searchLabel?: string;
-  /** Renders the search box. Default `true`. Without it and without `filters` there is no bar at all. */
+  /**
+   * Renders the search box. Without it and without `filters` there is no bar at all.
+   * @default true
+   */
   showSearch?: boolean;
   /**
    * Ref of the element that scrolls: the table's container (`overflow: auto`), the one the rendered
@@ -126,8 +145,9 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   rowActions?: ListReportRowActions<Row>;
   /**
    * How many actions with an `icon` are inline buttons when the table's container is at least 40rem
-   * wide (see `ListReportTable`'s `rowActionsInline`). Default 0. Passed to `renderTable` as is; never
+   * wide (see `ListReportTable`'s `rowActionsInline`). Passed to `renderTable` as is; never
    * reaches the DOM.
+   * @default 0
    */
   rowActionsInline?: number;
   /** Renders the table from the props the floorplan computed for it (ref, id, status, labels, …). */

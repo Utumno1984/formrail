@@ -91,7 +91,10 @@ export interface CollapsibleProps extends Omit<ComponentPropsWithoutRef<'div'>, 
    * Changing it from outside opens / closes the panel without calling `onOpenChange`.
    */
   open?: boolean;
-  /** Initial state when uncontrolled. Default `false`. */
+  /**
+   * Initial state when uncontrolled.
+   * @default false
+   */
   defaultOpen?: boolean;
   /** Called with the new state **only** for a user gesture (click, Enter, Space). */
   onOpenChange?: (open: boolean) => void;
