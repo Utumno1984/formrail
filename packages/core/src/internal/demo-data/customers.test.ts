@@ -91,4 +91,9 @@ describe('makeCustomers', () => {
     expect(new Set(customers.map((customer) => customer.name)).size).toBe(customers.length);
     expect(new Set(customers.map((customer) => customer.website)).size).toBe(customers.length);
   });
+
+  it('never repeats a name root within the first 50 rows (what a showcase list shows)', () => {
+    const roots = makeCustomers(50).map((customer) => customer.name.split(' ')[0]);
+    expect(roots.filter((root, index) => roots.indexOf(root) !== index)).toEqual([]);
+  });
 });

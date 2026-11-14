@@ -66,13 +66,17 @@ export interface CompanyName<Sector> {
 }
 
 /**
- * A company-name space over `sectors` (each with the trade word used in the name). The slot of row
- * `i` comes from a pseudo-random bijection, so the first {@link CompanyNameSpace.size} rows of a
- * dataset all have different root + trade combinations (hence different names and domains); later rows
+ * A company-name space over `sectors` (each with the trade word used in the name). Row `i` is a pure
+ * function of `i`: with `R` roots, the rows are taken in blocks of `R`; within a block every root
+ * appears exactly once (in a pseudo-random order), and each block shifts the trade of every root by
+ * one. So the first `R` rows (77) never repeat a root, and the first {@link CompanyNameSpace.size}
+ * rows (`R` x trades) never repeat a root + trade combination (hence a name or a domain); later rows
  * cycle through the same names again, as a large real register would hold namesakes.
  */
 export interface CompanyNameSpace<Sector> {
   readonly size: number;
+  /** Number of rows with all-distinct roots (the number of roots). */
+  readonly distinctRoots: number;
   name(index: number, rng: Rng): CompanyName<Sector>;
 }
 
@@ -81,32 +85,36 @@ export function createCompanyNameSpace<Sector>(
   sectors: readonly (readonly [trade: string, sector: Sector])[],
 ): CompanyNameSpace<Sector> {
   const tradeSlugs = sectors.map(([trade]) => toAsciiSlug(trade, '-'));
-  const rootSlugs = Object.fromEntries(AREAS.map((area) => [area, COMPANY_ROOTS[area].map((root) => toAsciiSlug(root, '-'))]));
-  // Cumulative slot offsets: area `a` owns roots(a) x sectors consecutive slots.
-  const offsets: number[] = [];
-  let size = 0;
-  for (const area of AREAS) {
-    offsets.push(size);
-    size += COMPANY_ROOTS[area].length * sectors.length;
-  }
-  const permute = createPermutation(size, seed);
-  // The strings of every slot are built once, up front (a few thousand), and shared by every row
-  // (and later cycle) that uses the slot.
+  const roots = AREAS.flatMap((area) => COMPANY_ROOTS[area].map((root) => ({ area, root, slug: toAsciiSlug(root, '-') })));
+  const rootCount = roots.length;
+  const tradeCount = sectors.length;
+  const size = rootCount * tradeCount;
+  const rootOrder = createPermutation(rootCount, `${seed}/roots`);
+  const tradeOffset = createPermutation(tradeCount, `${seed}/trades`);
+  // The strings of every root x trade are built once, up front (a few thousand), and shared by every
+  // row (and later cycle) that uses them. Index: root * tradeCount + trade.
   const bases = Array.from({ length: size }, (_, slot) => {
-    let a = AREAS.length - 1;
-    while (offsets[a]! > slot) a--;
-    const area = AREAS[a]!;
-    const local = slot - offsets[a]!;
-    const rootIndex = Math.floor(local / sectors.length);
-    const sectorIndex = local % sectors.length;
-    const [trade, sector] = sectors[sectorIndex]!;
-    const domain = `${rootSlugs[area]![rootIndex]}-${tradeSlugs[sectorIndex]}.example`;
-    return { area, choices: AREA_CHOICES.get(area)!, sector, stem: `${COMPANY_ROOTS[area][rootIndex]} ${trade}`, domain, website: `https://www.${domain}` };
+    const { area, root, slug } = roots[Math.floor(slot / tradeCount)]!;
+    const tradeIndex = slot % tradeCount;
+    const [trade, sector] = sectors[tradeIndex]!;
+    const domain = `${slug}-${tradeSlugs[tradeIndex]}.example`;
+    return { area, choices: AREA_CHOICES.get(area)!, sector, stem: `${root} ${trade}`, domain, website: `https://www.${domain}` };
   });
+  const slotOf = (index: number): number => {
+    const i = index % size;
+    const position = i % rootCount;
+    const block = Math.floor(i / rootCount);
+    // Within a block the roots are a permutation; the trade of a root moves by one per block, so a
+    // root never meets the same trade twice before every trade has been used (block < tradeCount).
+    const root = rootOrder(position);
+    const trade = (tradeOffset(root % tradeCount) + Math.floor(root / tradeCount) + block) % tradeCount;
+    return root * tradeCount + trade;
+  };
   return {
     size,
+    distinctRoots: rootCount,
     name(index, rng) {
-      const base = bases[permute(index)]!;
+      const base = bases[slotOf(index)]!;
       const choice = rng.weighted(base.choices);
       return {
         name: `${base.stem} ${rng.pick(choice.forms)}`,

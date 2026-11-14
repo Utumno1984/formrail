@@ -44,4 +44,9 @@ describe('makeSuppliers', () => {
     expect(new Set(suppliers.map((supplier) => supplier.name)).size).toBe(suppliers.length);
     expect(new Set(suppliers.map((supplier) => supplier.website)).size).toBe(suppliers.length);
   });
+
+  it('never repeats a name root within the first 50 rows (what a showcase list shows)', () => {
+    const roots = makeSuppliers(50).map((supplier) => supplier.name.split(' ')[0]);
+    expect(roots.filter((root, index) => roots.indexOf(root) !== index)).toEqual([]);
+  });
 });
