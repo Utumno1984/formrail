@@ -12,13 +12,20 @@ import { useReactHookFormBinding } from './use-react-hook-form-binding';
 function contractForm(toBinding: (form: UseFormReturn<ContractInvoice>) => RebaseFormBinding<ContractInvoice>): UseContractForm {
   return function useContractForm(initial: ContractInvoice): ContractForm {
     const form = useForm<ContractInvoice>({ defaultValues: initial });
+    const binding = toBinding(form);
     return {
-      binding: toBinding(form),
+      binding,
       editName: (name) => form.setValue('name', name, { shouldDirty: true, shouldTouch: true }),
       editCity: (city) => form.setValue('supplier.city', city, { shouldDirty: true, shouldTouch: true }),
-      startSave: () => {
+      startSave: (respond) => {
         const gate = deferred();
-        const done = form.handleSubmit(() => gate.promise)().catch(() => undefined);
+        // The documented pattern: `binding.reset(stored)` inside the handler, before it resolves.
+        const done = form
+          .handleSubmit(async (sent) => {
+            await gate.promise;
+            if (respond) binding.reset(respond(sent));
+          })()
+          .catch(() => undefined);
         return {
           settle: async (error) => {
             if (error === null) gate.resolve();
@@ -380,6 +387,51 @@ describe('useReactHookFormBinding: hydration after the mount', () => {
     expect(kept.current().binding.values).toEqual({ ...next, notes: 'mine' });
     expect(kept.current().entries.map((entry) => [entry.path, entry.before, entry.after])).toEqual([['notes', '', 'mine']]);
     kept.unmount();
+  });
+
+  it('async defaultValues (QA #507, point 2): while loading the form is hydrating, never edited; then the defaults arrive as a rehydration', async () => {
+    let resolve!: (data: Invoice) => void;
+    const loading = new Promise<Invoice>((done) => (resolve = done));
+    const harness = setupInvoiceForm({ useFormProps: { defaultValues: () => loading } });
+    const types: unknown[] = [];
+    const watched = harness.current().form.watch((_values, info) => types.push(info.type));
+    // Committed renders while loading: React Hook Form has no defaults yet (`{}`), the inputs wrote their `''`.
+    expect(harness.current().form.formState.isLoading).toBe(true);
+    expect(harness.current().form.getValues()).toEqual(EMPTY);
+    const whileLoading = harness.commits.length;
+    expect(whileLoading).toBeGreaterThan(0);
+    for (const commit of harness.commits) {
+      expect(commit.entries).toEqual([]);
+      expect(commit.values).toBe(commit.baseline);
+      expect(commit.isDirty).toBe(false);
+    }
+    // A rerender while loading (a parent's state): still nothing.
+    harness.rerender({ useFormProps: { defaultValues: () => loading } });
+    expect(harness.last().entries).toEqual([]);
+
+    await act(async () => {
+      resolve(DATA);
+      await loading;
+    });
+    expect(harness.current().form.formState.isLoading).toBe(false);
+    const { binding, entries, form } = harness.current();
+    expect(binding.baseline).toEqual(DATA);
+    expect(binding.values).toBe(binding.baseline);
+    expect(entries).toEqual([]);
+    expect(form.formState.isDirty).toBe(false);
+    expect(harness.input('Supplier').value).toBe('Rossi Construction');
+    for (const commit of harness.commits) expect(commit.entries).toEqual([]);
+    expect(harness.commits.slice(whileLoading).some((commit) => commit.baseline.supplier === 'Rossi Construction')).toBe(true);
+    expect(types).not.toContain('change');
+
+    // After the load the form behaves as usual: an edit is an entry, a rebase keeps it.
+    harness.type('Amount', '1300');
+    expect(harness.current().entries.map((entry) => entry.path)).toEqual(['amount']);
+    act(() => harness.current().rebase.rebase({ ...DATA, supplier: 'Rossi Ltd' }));
+    expect(harness.current().binding.values).toEqual({ ...DATA, supplier: 'Rossi Ltd', amount: '1300' });
+    expect(harness.current().rebase.conflicts).toEqual([]);
+    watched.unsubscribe();
+    harness.unmount();
   });
 });
 

@@ -1,16 +1,19 @@
-import { useMemo, useState, useSyncExternalStore } from 'react';
-// Types only (decision 2a of #489): the adapter calls the methods of the `form` object it receives and never
-// imports React Hook Form at runtime, so `react-hook-form` is an optional peer of `@formrail/pro`.
+import { useInsertionEffect, useMemo, useState, useSyncExternalStore } from 'react';
+// Types only (decision 2a of #489): the adapter calls the methods of the `form` object it receives (and reads two
+// internal fields of its `control`, see `warnOnMissingInternals`) and never imports React Hook Form at runtime, so
+// `react-hook-form` is an optional peer of `@formrail/pro`.
 import type { FieldValues, KeepStateOptions, UseFormReturn } from 'react-hook-form';
 import type { RebaseFormBinding } from '../../form-rebase/types';
+import { isDev } from '../../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../../internal/use-isomorphic-layout-effect';
-import { fieldErrorPaths, sameContent, samePathValue, snapshotOf } from './snapshot';
+import { fieldErrorPaths, keepEditsSince, sameContent, samePathValue, snapshotOf } from './snapshot';
 
 /** Options of {@link useReactHookFormBinding}. */
 export interface UseReactHookFormBindingOptions {
   /**
    * `true` while a save is in flight, when the save does not go through `handleSubmit` (for example the
-   * `isPending` of a mutation). A rebase is queued while it is `true`.
+   * `isPending` of a mutation). A rebase is queued while it is `true`. Call `binding.reset(saved)` before it
+   * turns `false`: during the save it keeps what the user typed meanwhile, after it it is a plain hydration.
    * @default formState.isSubmitting
    */
   isSaving?: boolean;
@@ -66,10 +69,18 @@ class BindingStore<Values extends FieldValues> {
    * back their value. Closed at the next microtask.
    */
   private run: { before: Values; removed: Map<string, { type: string; message?: string }> } | null = null;
+  /** `isSaving` as of the last commit (see `observeSaving`). */
+  private saving = false;
+  /**
+   * The values when the save in flight started (`isSaving` turned `true`), `null` when no save is in flight or
+   * when a reset or a rehydration happened since (the reset wins: the save's result is then a plain hydration).
+   */
+  private sent: Values | null = null;
 
   constructor(form: AnyForm<Values>) {
     this.form = form;
     this.control = form.control;
+    warnOnMissingInternals(form.control);
     this.defaults = form.control._defaultValues;
     const baseline = snapshotOf<unknown>(this.defaults ?? {}) as Values;
     // Equal content: the form starts as after a reset (`values === baseline`).
@@ -80,7 +91,7 @@ class BindingStore<Values extends FieldValues> {
     this.listeners.add(listener);
     // `watch(callback)` receives every value event of the form, with its field name (none for `reset` and
     // `setValues` of the whole form). It registers no form-state proxy and does not mark the form mounted.
-    const subscription = this.form.watch((_values, info) => this.sync(info));
+    const subscription = this.form.watch((_, info) => this.sync(info));
     return () => {
       subscription.unsubscribe();
       this.listeners.delete(listener);
@@ -124,8 +135,22 @@ class BindingStore<Values extends FieldValues> {
     let values = snapshotOf(form.getValues(), prev.values);
     const wholeForm = event !== undefined && event.name === undefined;
     if ((wholeForm || baseline !== prev.baseline) && values !== baseline && sameContent(values, baseline)) values = baseline;
+    // A discard (`form.reset()`) or a rehydration (`form.reset(data)`) during a save: the reset wins, the save's
+    // result is then a plain hydration. (With `handleSubmit` React Hook Form also ends `isSubmitting` there; a save
+    // of your own, through the `isSaving` option, does not.)
+    if (wholeForm && values === baseline) this.sent = null;
     this.commit({ baseline, values }, notify);
   }
+
+  /**
+   * Called at each commit with the binding's `isSaving` (before any layout effect, so before the rebase engine
+   * reads it): when a save starts, the values are kept as the values sent, for the `reset(saved)` that ends it.
+   */
+  observeSaving = (saving: boolean): void => {
+    if (saving === this.saving) return;
+    this.saving = saving;
+    this.sent = saving ? this.state.values : null;
+  };
 
   private commit(next: Snapshot<Values>, notify = true): void {
     if (next.baseline === this.state.baseline && next.values === this.state.values) return;
@@ -191,10 +216,18 @@ class BindingStore<Values extends FieldValues> {
 
   reset = (next?: Values): void => {
     const run = this.beginRun();
+    const { sent } = this;
+    this.sent = null;
     const target = next ?? this.state.baseline;
+    // During a save, `reset(saved)` ends it: the fields edited since the save started keep the typed value (dirty
+    // against `saved`), the others take what the server stored. Nothing edited meanwhile: `values` is `saved`.
+    const values = next !== undefined && sent !== null ? keepEditsSince(sent, this.state.values, next) : target;
     // `reset()` keeps React Hook Form's defaults (the baseline does not change).
     this.writeValues(target, next === undefined);
-    this.commit({ baseline: target, values: target });
+    // Same synchronous run as a rebase: the fields re-register at the next render with the final values, so the
+    // DOM of a field being typed in never shows `saved`.
+    if (values !== target) this.writeValues(values, true);
+    this.commit({ baseline: target, values });
     this.clearStaleErrors(run);
   };
 
@@ -230,7 +263,8 @@ class BindingStore<Values extends FieldValues> {
  * another object.
  *
  * **`reset(b)` / `setValues(patch)`** (what the rebase calls): `reset(b)` makes `baseline` and `values` the
- * object `b` itself (React Hook Form gets a copy and makes it its defaults); `setValues` writes the merged
+ * object `b` itself (React Hook Form gets a copy and makes it its defaults; during a save, see "Saving");
+ * `setValues` writes the merged
  * values with `reset(merged, { keepDefaultValues: true })`, so `dirtyFields` and `isDirty` are computed
  * against the baseline, with no `setValue` per field (no validation, no `type: 'change'` event). Both keep
  * `touchedFields`, `submitCount` and the submit flags. An error stays on a field whose value they did not
@@ -240,11 +274,19 @@ class BindingStore<Values extends FieldValues> {
  * **Saving**: `isSaving` is `formState.isSubmitting`; `saveError` is `null` unless the last submit failed
  * (validation, or a handler that threw). To save through `handleSubmit`, call `binding.reset(saved)` in the
  * handler before it resolves: a rebase queued meanwhile is then merged against what was saved. A save that
- * does not go through `handleSubmit` passes `isSaving` and `saveError` (see the options).
+ * does not go through `handleSubmit` passes `isSaving` and `saveError` (see the options). While a save is in
+ * flight, `reset(saved)` ends it as core's `save` does: `saved` is the baseline, the fields edited since
+ * `isSaving` turned `true` keep the typed value (dirty), the others take what the server stored (clean);
+ * `values` is `saved` itself when nothing was edited meanwhile. A discard or a rehydration during the save wins
+ * (`reset(saved)` is then a plain hydration).
+ *
+ * **Hydration**: `form.reset(data)`, the `values` prop, or an async `defaultValues`: while it loads
+ * (`formState.isLoading`), `baseline` is `values` (nothing is edited yet).
  *
  * Every field must have a default in `defaultValues` (`''` for an empty text input), as React Hook Form needs
- * for `isDirty`: a field registered without one enters `values` but not `baseline` and is listed as added.
- * The baseline never changes because a field registers, so the open conflicts stay open.
+ * for `isDirty`: a field registered without one enters `values` but not `baseline` and is listed as added
+ * (also with a default declared on the field: the `defaultValue` of a `Controller`). The baseline never
+ * changes because a field registers, so the open conflicts stay open.
  *
  * SSR-safe: no access to `window`/`document`.
  */
@@ -260,7 +302,7 @@ export function useReactHookFormBinding<Values extends FieldValues>(
     store = new BindingStore(form);
     setOwned(store);
   }
-  const { baseline, values } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   // After the refs of the inputs (children first): a field registered in this commit is read before paint.
   useIsomorphicLayoutEffect(store.resync);
 
@@ -271,9 +313,47 @@ export function useReactHookFormBinding<Values extends FieldValues>(
     const { isSubmitted, isSubmitSuccessful } = form.formState;
     saveError = isSubmitted && !isSubmitSuccessful ? form.formState.errors : null;
   }
+  // Before every layout effect of the commit (the rebase engine reads `isSaving` in one, also in a child).
+  useInsertionEffect(() => store.observeSaving(isSaving), [store, isSaving]);
+
+  // `defaultValues` as an async function: until it resolves the form is hydrating, not edited. React Hook Form
+  // has no defaults yet (`{}`) while the inputs already wrote their `''`: the baseline is the values themselves
+  // (nothing dirty, no row), and the resolved defaults arrive as a rehydration.
+  const isLoading = form.formState.isLoading;
+  const values = snapshot.values;
+  const baseline = isLoading ? values : snapshot.baseline;
 
   return useMemo(
     () => ({ baseline, values, isSaving, saveError, reset: store.reset, setValues: store.setValues }),
     [baseline, values, isSaving, saveError, store],
+  );
+}
+
+/** The controls already warned about (one warning per form). */
+const warnedControls = new WeakSet<object>();
+
+/**
+ * The adapter reads two internal fields of React Hook Form's `control`, which no public API exposes synchronously:
+ * `_defaultValues` (the defaults React Hook Form holds, replaced by every reset: the baseline) and
+ * `_options.shouldUnregister`. In development, a `control` without them (another major, a renamed field) gets a
+ * clear warning instead of a silent baseline `{}` where every field is listed as added.
+ */
+function warnOnMissingInternals(control: unknown): void {
+  if (!isDev() || typeof control !== 'object' || control === null || warnedControls.has(control)) return;
+  const { _defaultValues: defaults, _options: options } = control as { _defaultValues?: unknown; _options?: unknown };
+  const problems: string[] = [];
+  if (typeof defaults !== 'object' || defaults === null) problems.push('`control._defaultValues` is not an object');
+  if (typeof options !== 'object' || options === null) problems.push('`control._options` is not an object');
+  else {
+    const { shouldUnregister } = options as { shouldUnregister?: unknown };
+    if (shouldUnregister !== undefined && typeof shouldUnregister !== 'boolean') {
+      problems.push('`control._options.shouldUnregister` is not a boolean');
+    }
+  }
+  if (problems.length === 0) return;
+  warnedControls.add(control);
+  console.warn(
+    `[formrail] useReactHookFormBinding: ${problems.join('; ')}. The adapter reads these internal fields of React Hook Form ` +
+      '(tested with react-hook-form ^7.92.0): without them the baseline is `{}` and every field is listed as added.',
   );
 }

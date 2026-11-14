@@ -1,5 +1,5 @@
 // The pure snapshot helpers of the React Hook Form adapter (ticket #507).
-import { fieldErrorPaths, isPlainRecord, sameContent, samePathValue, snapshotOf, valueAtPath } from './snapshot';
+import { fieldErrorPaths, isPlainRecord, keepEditsSince, sameContent, samePathValue, snapshotOf, valueAtPath } from './snapshot';
 
 describe('snapshotOf', () => {
   it('copies plain objects, arrays and dates: nothing of the source is in the result', () => {
@@ -140,5 +140,68 @@ describe('fieldErrorPaths', () => {
     expect(isPlainRecord([])).toBe(false);
     expect(isPlainRecord(new Date())).toBe(false);
     expect(isPlainRecord(null)).toBe(false);
+  });
+});
+
+describe('keepEditsSince (a save that settles while the user kept typing)', () => {
+  const sent = { supplier: 'rossi', amount: '1300', notes: '', lines: [{ qty: 1 }, { qty: 2 }] };
+
+  it('nothing edited since the save started: the returned object itself, normalization included', () => {
+    const returned = { supplier: 'Rossi', amount: '1300.00', notes: '', lines: [{ qty: 1 }, { qty: 2 }] };
+    expect(keepEditsSince(sent, { ...sent }, returned)).toBe(returned);
+    expect(keepEditsSince(sent, sent, returned)).toBe(returned);
+  });
+
+  it('a field edited meanwhile keeps the typed value; the untouched ones take the server value', () => {
+    const current = { ...sent, notes: 'typed during save' };
+    const returned = { supplier: 'Rossi', amount: '1300.00', notes: '', lines: sent.lines };
+    const merged = keepEditsSince(sent, current, returned);
+    expect(merged).toEqual({ supplier: 'Rossi', amount: '1300.00', notes: 'typed during save', lines: sent.lines });
+    expect(merged).not.toBe(returned);
+    // Nothing mutated.
+    expect(returned.notes).toBe('');
+    expect(current.supplier).toBe('rossi');
+  });
+
+  it('a field the server normalized and the user edited meanwhile keeps the typed value', () => {
+    const current = { ...sent, supplier: 'rossi spa' };
+    const returned = { ...sent, supplier: 'Rossi' };
+    expect(keepEditsSince(sent, current, returned)).toEqual({ ...sent, supplier: 'rossi spa' });
+  });
+
+  it('a field edited and typed back to the sent value counts as untouched (content, not gestures)', () => {
+    const returned = { ...sent, supplier: 'Rossi' };
+    expect(keepEditsSince(sent, { ...sent, supplier: 'rossi' }, returned)).toBe(returned);
+  });
+
+  it('descends into arrays of the same length: one item edited, the others take the server value', () => {
+    const current = { ...sent, lines: [{ qty: 1 }, { qty: 5 }] };
+    const returned = { ...sent, lines: [{ qty: 10 }, { qty: 2 }] };
+    expect(keepEditsSince(sent, current, returned).lines).toEqual([{ qty: 10 }, { qty: 5 }]);
+  });
+
+  it('an array resized meanwhile (by the user or by the server) keeps the user array whole', () => {
+    const current = { ...sent, lines: [{ qty: 1 }, { qty: 2 }, { qty: 3 }] };
+    const returned = { ...sent, lines: [{ qty: 10 }, { qty: 2 }] };
+    expect(keepEditsSince(sent, current, returned).lines).toEqual([{ qty: 1 }, { qty: 2 }, { qty: 3 }]);
+    const shorter = { ...sent, lines: [{ qty: 1 }] };
+    expect(keepEditsSince(sent, { ...sent, lines: [{ qty: 1 }, { qty: 7 }] }, shorter).lines).toEqual([{ qty: 1 }, { qty: 7 }]);
+  });
+
+  it('keys: removed by the user stays removed, added by the user stays, not returned is dropped unless edited', () => {
+    type Bag = Record<string, number>;
+    const base: Bag = { a: 1, b: 2, c: 3 };
+    // `b` removed by the user (a field unregistered), `d` added by the user, `a` edited.
+    expect(keepEditsSince<Bag>(base, { a: 9, c: 3, d: 4 }, { a: 1, b: 20, c: 30, e: 5 })).toEqual({ a: 9, c: 30, e: 5, d: 4 });
+    // `c` not returned by the server: dropped when untouched, kept when edited.
+    expect(keepEditsSince<Bag>(base, { a: 1, b: 2, c: 3 }, { a: 1, b: 2 })).toEqual({ a: 1, b: 2 });
+    expect(keepEditsSince<Bag>(base, { a: 1, b: 2, c: 8 }, { a: 1, b: 2 })).toEqual({ a: 1, b: 2, c: 8 });
+  });
+
+  it('nested objects: only the edited leaf is kept; dates and NaN compared by content', () => {
+    const s = { supplier: { name: 'r', city: 'turin' }, at: new Date(5), n: Number.NaN };
+    const current = { supplier: { name: 'r', city: 'milan' }, at: new Date(5), n: Number.NaN };
+    const returned = { supplier: { name: 'R', city: 'Turin' }, at: new Date(6), n: 1 };
+    expect(keepEditsSince(s, current, returned)).toEqual({ supplier: { name: 'R', city: 'milan' }, at: new Date(6), n: 1 });
   });
 });

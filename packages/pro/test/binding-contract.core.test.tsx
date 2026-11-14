@@ -9,9 +9,13 @@ function useCoreContractForm(initial: ContractInvoice): ContractForm {
     binding: form,
     editName: (name) => form.setValue('name', name),
     editCity: (city) => form.setValue('supplier', { ...form.values.supplier, city }),
-    startSave: () => {
+    startSave: (respond) => {
       const gate = deferred();
-      const done = form.save(() => gate.promise);
+      // The documented pattern: the handler returns the stored record (or nothing: the sent values are stored).
+      const done = form.save(async (sent) => {
+        await gate.promise;
+        return respond?.(sent);
+      });
       return {
         settle: async (error) => {
           if (error === null) gate.resolve();

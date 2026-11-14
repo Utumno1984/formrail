@@ -21,8 +21,12 @@ export interface ContractForm {
   editName: (name: string) => void;
   /** A user edit of a nested field (the libraries that mutate their values in place do it here). */
   editCity: (city: string) => void;
-  /** Starts a save through the form's own mechanism; `settle(null)` makes it succeed, `settle(error)` fail. */
-  startSave: () => { settle: (error: unknown) => Promise<void> };
+  /**
+   * Starts a save through the form's own mechanism, in its documented pattern; `settle(null)` makes it succeed,
+   * `settle(error)` fail. `respond`, when given, is the server: it receives the values sent and returns the
+   * record it stored (a normalization), which the save makes the new baseline.
+   */
+  startSave: (respond?: (sent: ContractInvoice) => ContractInvoice) => { settle: (error: unknown) => Promise<void> };
 }
 
 /** A hook that renders the form under test, initialized with `initial`. */
@@ -189,6 +193,51 @@ export const CONTRACT_CHECKS: ContractCheck[] = [
         await act(() => save.settle(null));
         expect(form.current().binding.isSaving).toBe(false);
         expect(form.current().binding.saveError).toBeNull();
+      }),
+  },
+  {
+    name: 'a save with no edit meanwhile: values and baseline become what the server stored (normalized), the form is clean',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('  acme ltd '));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => ({ ...sent, name: 'Acme Ltd' }));
+        });
+        await act(() => save.settle(null));
+        const stored = { ...CONTRACT_INITIAL, name: 'Acme Ltd' };
+        expect(form.current().binding.baseline).toEqual(stored);
+        expect(form.current().binding.values).toEqual(stored);
+      }),
+  },
+  {
+    name: 'a field edited while saving keeps the typed value and stays dirty against the new baseline',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('Acme Ltd'));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => copy(sent));
+        });
+        act(() => form.current().editCity('Milan'));
+        await act(() => save.settle(null));
+        expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
+        expect(form.current().binding.values).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd', supplier: { city: 'Milan', tags: ['a'] } });
+      }),
+  },
+  {
+    name: 'a field the server normalized and the user edited while saving keeps the typed value',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('acme ltd'));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => ({ ...sent, name: 'Acme Ltd' }));
+        });
+        act(() => form.current().editName('acme ltd co'));
+        await act(() => save.settle(null));
+        expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
+        expect(form.current().binding.values).toEqual({ ...CONTRACT_INITIAL, name: 'acme ltd co' });
       }),
   },
 ];

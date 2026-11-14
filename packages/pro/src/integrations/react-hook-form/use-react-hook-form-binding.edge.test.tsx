@@ -2,7 +2,7 @@
 // a key removed by the server, number vs string, StrictMode, a field registered after the mount with a conflict open.
 import { StrictMode, useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { useFieldArray, useForm, type UseFieldArrayReturn, type UseFormReturn } from 'react-hook-form';
+import { useController, useFieldArray, useForm, type Control, type UseFieldArrayReturn, type UseFormReturn } from 'react-hook-form';
 import { useChangeSummary, useFormRebase, type ChangeEntry, type RebaseFormBinding, type UseFormRebaseReturn } from '../../engine';
 import { SAVED, setupInvoiceForm, type Invoice } from '../../../test/rhf-harness';
 import { useReactHookFormBinding } from './use-react-hook-form-binding';
@@ -278,5 +278,59 @@ describe('a field registered after the mount while a conflict is open (#505 red 
       ['added', 'reference'],
     ]);
     undeclared.unmount();
+  });
+});
+
+describe('documented limits (QA #507, points 3 and 4)', () => {
+  type WithRef = Invoice & { reference?: string };
+
+  function RefField({ control }: { control: Control<WithRef> }) {
+    const { field } = useController({ control, name: 'reference', defaultValue: 'R-1' });
+    return <input aria-label="Reference" {...field} value={field.value ?? ''} />;
+  }
+
+  function setupWithController(defaultValues: WithRef) {
+    let probe!: { form: UseFormReturn<WithRef>; entries: ChangeEntry[] };
+    function Form() {
+      const form = useForm<WithRef>({ defaultValues });
+      const binding = useReactHookFormBinding(form);
+      const { entries } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
+      probe = { form, entries };
+      return (
+        <form>
+          <input aria-label="Amount" {...form.register('amount')} />
+          <RefField control={form.control} />
+        </form>
+      );
+    }
+    const view = render(<Form />);
+    return { probe: () => probe, unmount: view.unmount };
+  }
+
+  it('a Controller with its own defaultValue, absent from useForm defaultValues: listed as added (README); declared there: no entry', () => {
+    const own = setupWithController(SAVED);
+    // React Hook Form writes the default into its defaults in place: clean for `isDirty`, not for the summary.
+    expect(own.probe().form.formState.isDirty).toBe(false);
+    expect(own.probe().entries.map((entry) => [entry.kind, entry.path])).toEqual([['added', 'reference']]);
+    own.unmount();
+
+    // The documented fix: the default in `useForm({ defaultValues })`.
+    const declared = setupWithController({ ...SAVED, reference: 'R-1' });
+    expect(declared.probe().entries).toEqual([]);
+    expect((screen.getByLabelText('Reference') as HTMLInputElement).value).toBe('R-1');
+    declared.unmount();
+  });
+
+  it('resetField(anotherField, { defaultValue }) is a rehydration: it closes the open conflicts (README)', () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    act(() => harness.current().rebase.rebase({ ...SAVED, amount: '150' }));
+    expect(harness.current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['amount']);
+    act(() => harness.current().form.resetField('notes', { defaultValue: 'x' }));
+    expect(harness.current().rebase.conflicts).toEqual([]);
+    // The user's value is still there, as a plain edit against the new baseline.
+    expect(harness.current().binding.values.amount).toBe('120');
+    expect(harness.current().entries.map((entry) => entry.path)).toEqual(['amount']);
+    harness.unmount();
   });
 });

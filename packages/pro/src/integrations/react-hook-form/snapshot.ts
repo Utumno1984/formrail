@@ -88,6 +88,49 @@ function snap(source: unknown, previous: unknown, copy: boolean): unknown {
 }
 
 /**
+ * The values after a save that returned `returned`, while the form went from `sent` (its values when the save
+ * started) to `current` (the user kept typing): every field the user edited since `sent` keeps its `current`
+ * value, every other one takes `returned` (what the server stored, its normalization included). Descends into
+ * plain objects, and into arrays whose length is the same in the three trees; anywhere else an edited value is
+ * kept whole (an array the user resized keeps all of its items). A key the user removed since `sent` stays
+ * removed, a key the user added stays; a key the server did not return is dropped unless the user edited it.
+ * Content is compared with the rules of {@link snapshotOf}. Returns `returned` itself when the result has its
+ * content (nothing edited since `sent`: the form shows what the server stored and is clean). Never mutates its
+ * arguments; the result shares their subtrees (all three are immutable snapshots or handed over as such).
+ */
+export function keepEditsSince<T>(sent: T, current: T, returned: T): T {
+  const merged = mergeEdits(sent, current, returned);
+  return sameContent(merged, returned) ? returned : (merged as T);
+}
+
+function mergeEdits(sent: unknown, current: unknown, returned: unknown): unknown {
+  if (sameContent(current, sent)) return returned;
+  if (Array.isArray(sent) && Array.isArray(current) && Array.isArray(returned)) {
+    if (sent.length !== current.length || current.length !== returned.length) return current;
+    return current.map((item: unknown, index) => mergeEdits(sent[index], item, returned[index]));
+  }
+  if (isPlainRecord(sent) && isPlainRecord(current) && isPlainRecord(returned)) {
+    const out: Container = Object.getPrototypeOf(returned) === null ? (Object.create(null) as Container) : {};
+    for (const key of keysOf(returned)) {
+      if (!hasOwn(current, key)) {
+        // Removed by the user since the save started: stays removed. Never there: the server's value.
+        if (!hasOwn(sent, key)) define(out, key, returned[key]);
+        continue;
+      }
+      define(out, key, hasOwn(sent, key) ? mergeEdits(sent[key], current[key], returned[key]) : current[key]);
+    }
+    for (const key of keysOf(current)) {
+      if (hasOwn(returned, key)) continue;
+      // Not returned by the server: dropped, unless the user edited (or added) it since the save started.
+      if (hasOwn(sent, key) && sameContent(current[key], sent[key])) continue;
+      define(out, key, current[key]);
+    }
+    return out;
+  }
+  return current;
+}
+
+/**
  * The value at a dot path (`lines.0.qty`) of a plain object/array tree: `{ found: false }` when a step is
  * missing (a missing key is not `undefined`).
  */
