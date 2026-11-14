@@ -37,11 +37,15 @@ export interface ConfirmDialogProps {
    * generic "OK" / "Confirm". A blank string logs a `console.error` in development.
    */
   confirmLabel: RequiredLabel;
-  /** The cancel button's label. Default "Cancel". */
+  /**
+   * The cancel button's label.
+   * @default 'Cancel'
+   */
   cancelLabel?: ReactNode;
   /**
-   * `danger` (default): the confirm button is a `danger` Button and the initial focus is on Cancel,
+   * `danger`: the confirm button is a `danger` Button and the initial focus is on Cancel,
    * the safe choice. `default`: a `primary` confirm button, which also receives the initial focus.
+   * @default 'danger'
    */
   tone?: ConfirmDialogTone;
   /**

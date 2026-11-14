@@ -821,6 +821,7 @@ export const UNCOMPARABLE_ALLOWLIST = {
   'MenuContent.updatePositionStrategy': RADIX,
   'MenuItem.disabled': RADIX,
   'MessageStrip.dismissLabel': 'derived from the title: `dismissLabel ?? "Dismiss message: <title>"`',
+  'MessageStrip.toneLabel': 'derived from the tone: `toneLabel ?? TONE_LABEL[tone]`',
   'MultiSelect.defaultValue': 'computed: `uniqueValues(undefined)` is the empty array, there is no literal default in the source',
   'NumberInput.step': 'computed: `normalizeStep(undefined)` is 1, there is no literal default in the source',
   'ObjectPageFooter.toneLabel': 'derived from the tone: `toneLabel ?? TONE_LABEL[messageTone]`',

@@ -64,7 +64,10 @@ function useModalContext(part: string, root: string): ModalContextValue {
 export interface ModalRootProps {
   /** Controlled open state. With it, the panel behaves the same whoever sets it (trigger, button, effect). */
   open?: boolean;
-  /** Initial state when uncontrolled. A panel mounted open has no opener to return the focus to. */
+  /**
+   * Initial state when uncontrolled. A panel mounted open has no opener to return the focus to.
+   * @default false
+   */
   defaultOpen?: boolean;
   /** Called with the requested state (Escape, backdrop, close button, trigger). */
   onOpenChange?: (open: boolean) => void;
@@ -467,7 +470,10 @@ export const ModalHeader = /* @__PURE__ */ forwardRef<HTMLDivElement, HTMLAttrib
 });
 
 export interface ModalTitleProps extends ComponentPropsWithoutRef<typeof RadixDialog.Title> {
-  /** Hides the title visually; it stays in the accessible name of the panel. */
+  /**
+   * Hides the title visually; it stays in the accessible name of the panel.
+   * @default false
+   */
   visuallyHidden?: boolean;
   /** Renders your single child element instead of the default `<h2>`, with the title's props merged onto it. */
   asChild?: boolean;

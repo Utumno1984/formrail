@@ -101,7 +101,8 @@ export interface DescriptionListItemProps extends Omit<HTMLAttributes<HTMLDivEle
    * non-item element between an item and a summary removes it, and a `hidden` normal item inside a
    * run of summaries adds one. To drop the separator of one item use the important modifier
    * (`className="border-0! pt-0!"`): the rule is a sibling-dependent variant, which a plain
-   * `border-0` does not beat. Default `default`; an unknown value acts as `default`.
+   * `border-0` does not beat. An unknown value acts as `default`.
+   * @default 'default'
    */
   variant?: DescriptionListItemVariant;
 }

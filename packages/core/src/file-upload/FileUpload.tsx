@@ -75,7 +75,10 @@ export interface FileUploadProps
    * files. Empty: no filter.
    */
   accept?: string;
-  /** Allow several files; they are added to the current ones (a file with the same name, size and last-modified date is not added twice). Default `false`: a new file replaces the current one. */
+  /**
+   * Allow several files; they are added to the current ones (a file with the same name, size and last-modified date is not added twice). Without it a new file replaces the current one.
+   * @default false
+   */
   multiple?: boolean;
   /** Maximum number of files in the list. When it is reached the button stays active and new files are rejected as `count`. */
   maxFiles?: number;

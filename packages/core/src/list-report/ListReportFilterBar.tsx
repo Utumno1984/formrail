@@ -30,15 +30,30 @@ import type { UseListReportReturn } from './types';
 export type ListReportFilterBarProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   /** What `useListReport` returned: the bar only renders it and calls its setters. */
   table: UseListReportReturn<Row>;
-  /** Accessible name of the group of pills. Default "Filters". */
+  /**
+   * Accessible name of the group of pills.
+   * @default 'Filters'
+   */
   filtersLabel?: string;
-  /** Accessible name of the search box (visually hidden). Default "Search". */
+  /**
+   * Accessible name of the search box (visually hidden).
+   * @default 'Search'
+   */
   searchLabel?: string;
-  /** Placeholder of the search box. Default: `searchLabel`. */
+  /**
+   * Placeholder of the search box.
+   * @default `searchLabel`
+   */
   searchPlaceholder?: string;
-  /** Accessible name of the button that clears the search. Default "Clear search". */
+  /**
+   * Accessible name of the button that clears the search.
+   * @default 'Clear search'
+   */
   clearSearchLabel?: string;
-  /** Renders the search box. Default `true`. */
+  /**
+   * Renders the search box.
+   * @default true
+   */
   showSearch?: boolean;
 };
 
