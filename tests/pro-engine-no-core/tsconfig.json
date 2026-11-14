@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vitest/globals"]
+  },
+  // `consumer/` is typechecked inside the sandbox by the test, against the built package and without the core.
+  "include": ["*.ts"]
+}

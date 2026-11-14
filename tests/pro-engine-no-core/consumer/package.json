@@ -1,0 +1,5 @@
+{
+  "name": "no-core-consumer",
+  "private": true,
+  "type": "module"
+}

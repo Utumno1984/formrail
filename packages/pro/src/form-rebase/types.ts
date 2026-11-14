@@ -139,6 +139,44 @@ export interface RebaseResult<Values> {
   conflicts: RebaseConflict[];
 }
 
+/**
+ * The part of a form that `useFormRebase` reads and drives. Core's `useObjectPageForm()` return value is
+ * one as is (no cast, no wrapper); a form of another library (React Hook Form, TanStack Form) needs a
+ * binding that keeps this contract:
+ *
+ * - `baseline` and `values` are snapshots, never mutated in place: a new object whenever the content
+ *   changes, the same object while it does not. The hook compares them by identity.
+ * - `reset(newBaseline)` makes both `baseline` and `values` the object passed (the same reference, from the
+ *   next render on); `reset()` makes `values` the current `baseline`. Neither is a user edit.
+ * - `values === baseline` (the same object) **only after a `reset`**. The hook reads that identity as a
+ *   discard and clears the open conflicts and `applied`, as after `reset()`. When the user brings the
+ *   values back to the baseline content by hand (typing the old value again), `values` must stay a
+ *   different object: a binding that hands back `baseline` for values equal in content turns that
+ *   gesture into a discard.
+ * - A new `baseline` object that the hook did not set itself (through its own `reset`) is read as a
+ *   rehydration: the open conflicts and `applied` are cleared. So `baseline` changes identity only when it
+ *   really changes (hydration, save, `reset`), never because the binding re-creates an object with the
+ *   same content (on every render, or by cloning what the form library returns).
+ * - `setValues(patch)` merges the top-level keys of `patch` into `values` (shallow, like `Object.assign`).
+ *   Called right after `reset(newBaseline)` in the same batch, it applies on top of that reset, and no
+ *   render shows the values of the reset alone.
+ * - `isSaving` is `true` while a save is in flight; `saveError` is `null` when the last save did not fail.
+ */
+export interface RebaseFormBinding<Values extends object> {
+  /** Last saved or hydrated version (the base of the merge). */
+  baseline: Values;
+  /** The user's current values. */
+  values: Values;
+  /** `true` while a save is in flight: a rebase is then queued. */
+  isSaving: boolean;
+  /** Error of the last save, `null` when there is none (a save that settles with `null` clears the conflicts). */
+  saveError: unknown;
+  /** `reset(newBaseline)` hydrates (baseline and values become `newBaseline`); `reset()` discards the edits. */
+  reset: (newBaseline?: Values) => void;
+  /** Shallow merge of top-level fields into `values`. */
+  setValues: (patch: Partial<Values>) => void;
+}
+
 /** Options of `useFormRebase` (the merge options of {@link RebaseOptions}). */
 export interface UseFormRebaseOptions<Values extends object> {
   /** Same as `RebaseOptions.arrayIdKeys`: the key that identifies the items of an array, per array path. */
