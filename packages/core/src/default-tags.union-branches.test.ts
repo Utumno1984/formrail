@@ -115,6 +115,18 @@ describe('props defined in the branches of a union: the same descriptive text in
     expect(divergences(button.replace('Height scale (`sm` 32px', 'The scale (`sm` 32px'))).toContainEqual(expect.stringMatching(/^ButtonProps\.size: /));
   });
 
+  it('the former known divergences are consistent, and rewording one branch is seen (#537)', () => {
+    const accordion = readFileSync(join(SRC, 'accordion/Accordion.tsx'), 'utf8');
+    const text = readFileSync(join(SRC, 'typography/Text.tsx'), 'utf8');
+    const schema = readFileSync(join(SRC, 'object-page/standard-schema.ts'), 'utf8');
+    for (const source of [accordion, text, schema]) expect(divergences(source)).toEqual([]);
+    expect(Object.keys(KNOWN_DIVERGENT)).toEqual([]);
+    // `replace` rewords the first occurrence only (one branch), so the branches differ.
+    expect(divergences(accordion.replace('/** Which items can be open:', '/** Reworded. Which items can be open:'))).toContainEqual(expect.stringMatching(/^AccordionProps\.type: /));
+    expect(divergences(text.replace('/** Element rendered:', '/** Reworded:'))).toContainEqual(expect.stringMatching(/^TextProps\.as: /));
+    expect(divergences(schema.replace('/** Present only on failure:', '/** Reworded:'))).toContainEqual(expect.stringMatching(/^StandardSchemaResult\.issues: /));
+  });
+
   it('a reworded first branch is a divergence, a `@default` tag alone is not', () => {
     const reworded = lines(
       'export type S =',
