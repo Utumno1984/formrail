@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEMO_COMPANY } from '../src/internal/demo-data/company';
 import { collectDeclaredPaths, findMissingPaths } from './helpers/package-paths';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -122,6 +123,23 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
       .map((f) => readFileSync(join(distDir, f), 'utf8'))
       .join('\n');
     expect(bundled).not.toMatch(/from ['"]zod|require\(['"]zod|@standard-schema\/spec/);
+  });
+
+  // The demo universe (`src/internal/demo-data/`, ticket #513) feeds stories, examples and tests only:
+  // no published file may carry it. The name is read from the module, not repeated here.
+  it('no published file carries the demo universe (DEMO_COMPANY, the company name or its domain)', () => {
+    const word = DEMO_COMPANY.name.split(' ')[0]!;
+    const offenders: string[] = [];
+    for (const entry of readdirSync(distDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const name = join(entry.parentPath, entry.name).slice(distDir.length + 1);
+      const text = readFileSync(join(distDir, name), 'utf8');
+      if (text.includes('DEMO_COMPANY')) offenders.push(`${name}: DEMO_COMPANY`);
+      if (text.toLowerCase().includes(word.toLowerCase())) offenders.push(`${name}: ${word}`);
+      if (text.includes('demo-data')) offenders.push(`${name}: demo-data`);
+    }
+    expect(word.length).toBeGreaterThan(3);
+    expect(offenders).toEqual([]);
   });
 
   it('no non-test, non-story module under src imports zod', () => {
