@@ -31,3 +31,26 @@ describe('packages/pro publication guard', () => {
     expect(readJson('.changeset/config.json').access).toBe('public');
   });
 });
+
+// Ticket #489: the engine entry `@formrail/pro/engine` and the form libraries it integrates with.
+describe('packages/pro engine entry and form libraries', () => {
+  const pkg = readJson('packages/pro/package.json');
+  const FORM_LIBRARIES = ['react-hook-form', '@tanstack/react-form'];
+
+  it('exports ./engine for import and require, each with its declaration file', () => {
+    expect(pkg.exports['./engine']).toEqual({
+      import: { types: './dist/engine.d.ts', default: './dist/engine.js' },
+      require: { types: './dist/engine.d.cts', default: './dist/engine.cjs' },
+    });
+  });
+
+  it.each(FORM_LIBRARIES)('%s is never a runtime dependency: devDependency, or an optional peer', (name) => {
+    expect(pkg.dependencies?.[name]).toBeUndefined();
+    if (pkg.peerDependencies?.[name] !== undefined) expect(pkg.peerDependenciesMeta?.[name]?.optional).toBe(true);
+    expect(pkg.devDependencies?.[name] ?? pkg.peerDependencies?.[name]).toBeDefined();
+  });
+
+  it('has no runtime dependency at all (react, react-dom and the core are peers)', () => {
+    expect(pkg.dependencies ?? {}).toEqual({});
+  });
+});

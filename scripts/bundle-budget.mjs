@@ -3,6 +3,8 @@
 // packages/pro) we bundle a stub that imports only that export from <package>/dist (esbuild,
 // minified, tree-shaken) and measure its gzip size, then compare it with the versioned baseline in
 // <package>/bundle-budget.json.
+// A package can also budget a subpath entry of its `exports` map (`@formrail/pro/engine`, ticket #489): measured
+// from the file that subpath resolves to, against its own baseline file (`bundle-budget.engine.json`).
 // `check` NEVER writes a baseline; only `update-baseline` does, run locally and committed.
 // Without `--package <dir>`, `check` covers every budgeted package and fails if any one fails;
 // `update-baseline` writes the baseline of `--package <dir>` (default: packages/core).
@@ -16,6 +18,43 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_PACKAGE = resolve(ROOT, 'packages/core');
 /** Packages whose public exports have a versioned budget; `check` covers all of them by default. */
 export const BUDGETED_PACKAGES = ['packages/core', 'packages/pro'].map((dir) => resolve(ROOT, dir));
+/** Subpath entries budgeted besides the main entry `.`, per package (absolute dir -> subpaths). */
+export const BUDGETED_SUBPATHS = { [resolve(ROOT, 'packages/pro')]: ['./engine'] };
+
+/** Baseline file of `subpath` (`.` -> bundle-budget.json, `./engine` -> bundle-budget.engine.json). */
+export function budgetFileName(subpath) {
+  if (subpath === '.') return 'bundle-budget.json';
+  const name = subpath.replace(/^\.\//, '');
+  if (!/^[a-z0-9-]+$/.test(name)) throw new Error(`unsupported budgeted subpath ${JSON.stringify(subpath)}`);
+  return `bundle-budget.${name}.json`;
+}
+
+/**
+ * The ESM file a subpath of `packageDir` resolves to, read from the `exports` map of its package.json
+ * (`import.default`, or a plain string): the file a consumer's bundler loads, not a guessed name.
+ */
+export function subpathFile(packageDir, subpath) {
+  const pkgPath = resolve(packageDir, 'package.json');
+  if (!existsSync(pkgPath)) throw new Error(`${displayPath(pkgPath)} not found: cannot resolve the subpath ${subpath}`);
+  const target = JSON.parse(readFileSync(pkgPath, 'utf8')).exports?.[subpath];
+  const file = typeof target === 'string' ? target : target?.import?.default ?? target?.import ?? target?.default;
+  if (typeof file !== 'string' || !file.endsWith('.js')) {
+    throw new Error(`${displayPath(pkgPath)}: the exports map has no ESM file for ${subpath}`);
+  }
+  return resolve(packageDir, file);
+}
+
+/** The budgeted entries of `packageDir`: the main entry `.` (dist/index.js) and its budgeted subpaths. */
+export function budgetEntries(packageDir, subpaths = BUDGETED_SUBPATHS[resolve(packageDir)] ?? []) {
+  return [
+    { subpath: '.', distEntry: resolve(packageDir, 'dist/index.js'), budgetPath: resolve(packageDir, budgetFileName('.')) },
+    ...subpaths.map((subpath) => ({
+      subpath,
+      distEntry: subpathFile(packageDir, subpath),
+      budgetPath: resolve(packageDir, budgetFileName(subpath)),
+    })),
+  ];
+}
 
 /** Path shown in messages: relative to the repo root when inside it, absolute otherwise. */
 export function displayPath(path) {
@@ -183,10 +222,7 @@ export function buildBaseline(measured) {
   };
 }
 
-export async function runCheck({
-  packageDir = DEFAULT_PACKAGE,
-  budgetPath = resolve(packageDir, 'bundle-budget.json'),
-} = {}) {
+async function checkEntry(packageDir, distEntry, budgetPath) {
   if (!existsSync(budgetPath)) {
     return {
       ok: false,
@@ -195,8 +231,29 @@ export async function runCheck({
     };
   }
   const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
-  const measured = await measureAll(resolve(packageDir, 'dist/index.js'));
+  const measured = await measureAll(distEntry);
   return compareBudget(measured, budget, displayPath(budgetPath), updateCommand(packageDir));
+}
+
+/**
+ * Checks the main entry of `packageDir` against `budgetPath` and each budgeted subpath against its own baseline
+ * file; the lines and errors of a subpath are prefixed with it (`./engine: computeRebase: measured ...`).
+ */
+export async function runCheck({
+  packageDir = DEFAULT_PACKAGE,
+  budgetPath = resolve(packageDir, 'bundle-budget.json'),
+  subpaths,
+} = {}) {
+  const merged = { ok: true, errors: [], lines: [] };
+  for (const entry of budgetEntries(packageDir, subpaths)) {
+    const isMain = entry.subpath === '.';
+    const result = await checkEntry(packageDir, entry.distEntry, isMain ? budgetPath : entry.budgetPath);
+    const prefix = isMain ? '' : `${entry.subpath}: `;
+    merged.ok = merged.ok && result.ok;
+    merged.lines.push(...result.lines.map((line) => prefix + line));
+    merged.errors.push(...result.errors.map((error) => prefix + error));
+  }
+  return merged;
 }
 
 /**
@@ -216,13 +273,23 @@ export async function runCheckAll({ packageDirs = BUDGETED_PACKAGES } = {}) {
   return merged;
 }
 
+/**
+ * Writes the baseline of the main entry (`budgetPath`) and of each budgeted subpath (its own file). Returns the
+ * sizes of the main entry, plus those of each subpath under `<subpath>:<name>` keys.
+ */
 export async function runUpdate({
   packageDir = DEFAULT_PACKAGE,
   budgetPath = resolve(packageDir, 'bundle-budget.json'),
+  subpaths,
 } = {}) {
-  const measured = await measureAll(resolve(packageDir, 'dist/index.js'));
-  writeFileSync(budgetPath, `${JSON.stringify(buildBaseline(measured), null, 2)}\n`);
-  return measured;
+  const all = Object.create(null);
+  for (const entry of budgetEntries(packageDir, subpaths)) {
+    const isMain = entry.subpath === '.';
+    const measured = await measureAll(entry.distEntry);
+    writeFileSync(isMain ? budgetPath : entry.budgetPath, `${JSON.stringify(buildBaseline(measured), null, 2)}\n`);
+    for (const [name, size] of Object.entries(measured)) all[isMain ? name : `${entry.subpath}:${name}`] = size;
+  }
+  return all;
 }
 
 /** Message printed after `update-baseline`: names the baseline file really written. */
@@ -244,7 +311,7 @@ async function main() {
   } else if (command === 'update-baseline') {
     const measured = await runUpdate(opts);
     for (const [name, size] of Object.entries(measured)) console.log(`${name}: ${size} B`);
-    console.log(updatedMessage(resolve(opts.packageDir ?? DEFAULT_PACKAGE, 'bundle-budget.json')));
+    for (const entry of budgetEntries(opts.packageDir ?? DEFAULT_PACKAGE)) console.log(updatedMessage(entry.budgetPath));
   } else {
     console.error('Usage: bundle-budget.mjs <check|update-baseline> [--package <dir>]');
     process.exit(2);

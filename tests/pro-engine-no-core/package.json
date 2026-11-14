@@ -1,0 +1,13 @@
+{
+  "name": "@formrail/test-pro-engine-no-core",
+  "private": true,
+  "type": "module",
+  "description": "Ticket #489: a project with react, react-dom, react-hook-form and @formrail/pro but WITHOUT @formrail/core typechecks and runs against @formrail/pro/engine. The test copies consumer/ and the built @formrail/pro into a sandbox outside the monorepo (no @formrail/core anywhere on the resolution path).",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "react-hook-form": "^7.92.0"
+  }
+}

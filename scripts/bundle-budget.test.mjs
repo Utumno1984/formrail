@@ -6,6 +6,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   BUDGETED_PACKAGES,
+  BUDGETED_SUBPATHS,
+  budgetFileName,
   bundleExport,
   buildBaseline,
   compareBudget,
@@ -14,6 +16,7 @@ import {
   runCheck,
   runCheckAll,
   runUpdate,
+  subpathFile,
   updateCommand,
   updatedMessage,
 } from './bundle-budget.mjs';
@@ -397,5 +400,83 @@ describe('multi-package check (#174)', () => {
     expect(r.errors[0]).toBe(
       'x: public export without a budget. Add it explicitly with `npm run bundle:update-baseline -- --package packages/pro` and commit packages/pro/bundle-budget.json.',
     );
+  });
+});
+
+describe('subpath entries (#489)', () => {
+  let dir;
+  const pkg = (exportsMap) =>
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'fixture', type: 'module', exports: exportsMap }));
+  const ENGINE_EXPORTS = { '.': { import: { default: './dist/index.js' } }, './engine': { import: { default: './dist/engine.js' } } };
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'budget-subpath-'));
+    mkdirSync(join(dir, 'dist'));
+    writeFileSync(join(dir, 'dist/index.js'), 'export const main = () => 1;\n');
+    writeFileSync(join(dir, 'dist/engine.js'), 'export const engine = () => 2;\n');
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('budgets @formrail/pro/engine, with its own baseline file', () => {
+    expect(BUDGETED_SUBPATHS).toEqual({ [resolve(ROOT, 'packages/pro')]: ['./engine'] });
+    expect(budgetFileName('.')).toBe('bundle-budget.json');
+    expect(budgetFileName('./engine')).toBe('bundle-budget.engine.json');
+    expect(() => budgetFileName('./a/../b')).toThrow(/unsupported/);
+  });
+
+  it('the committed engine baseline has one valid entry per export of @formrail/pro/engine', () => {
+    const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.engine.json'), 'utf8'));
+    expect(Object.keys(budget.exports).sort()).toEqual([
+      'computeChangeSummary',
+      'computeRebase',
+      'formatChangeValue',
+      'inferSegmentLabel',
+      'useChangeSummary',
+      'useFormRebase',
+    ]);
+    const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
+    expect(compareBudget(measured, budget).ok).toBe(true);
+  });
+
+  it('measures the file the exports map names for the subpath, not a guessed one', () => {
+    pkg({ './engine': { import: { types: './dist/x.d.ts', default: './dist/elsewhere.js' } } });
+    expect(subpathFile(dir, './engine')).toBe(join(dir, 'dist/elsewhere.js'));
+    pkg({ './engine': './dist/plain.js' });
+    expect(subpathFile(dir, './engine')).toBe(join(dir, 'dist/plain.js'));
+  });
+
+  it('a subpath missing from the exports map (or without package.json) fails, never skipped', () => {
+    expect(() => subpathFile(dir, './engine')).toThrow(/package\.json not found/);
+    pkg({ '.': './dist/index.js' });
+    expect(() => subpathFile(dir, './engine')).toThrow(/no ESM file for \.\/engine/);
+  });
+
+  it('update writes one baseline per entry; check passes, with the subpath lines prefixed', async () => {
+    pkg(ENGINE_EXPORTS);
+    const measured = await runUpdate({ packageDir: dir, subpaths: ['./engine'] });
+    expect(Object.keys(measured).sort()).toEqual(['./engine:engine', 'main']);
+    expect(Object.keys(JSON.parse(readFileSync(join(dir, 'bundle-budget.json'), 'utf8')).exports)).toEqual(['main']);
+    expect(Object.keys(JSON.parse(readFileSync(join(dir, 'bundle-budget.engine.json'), 'utf8')).exports)).toEqual(['engine']);
+    const result = await runCheck({ packageDir: dir, subpaths: ['./engine'] });
+    expect(result.ok).toBe(true);
+    expect(result.lines.map((line) => line.replace(/: measured .*/, ''))).toEqual(['main', './engine: engine']);
+  });
+
+  it('an engine export over its limit fails the check, naming the subpath', async () => {
+    pkg(ENGINE_EXPORTS);
+    await runUpdate({ packageDir: dir, subpaths: ['./engine'] });
+    const bloat = Array.from({ length: 300 }, (_, i) => i.toString(36)).join('');
+    writeFileSync(join(dir, 'dist/engine.js'), `export const engine = () => "${bloat}";\n`);
+    const result = await runCheck({ packageDir: dir, subpaths: ['./engine'] });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toMatch(/^\.\/engine: engine: measured .* OVER LIMIT$/);
+  });
+
+  it('a missing subpath baseline fails the check and names its file', async () => {
+    pkg(ENGINE_EXPORTS);
+    await runUpdate({ packageDir: dir });
+    const result = await runCheck({ packageDir: dir, subpaths: ['./engine'] });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatch(/bundle-budget\.engine\.json not found/);
   });
 });
