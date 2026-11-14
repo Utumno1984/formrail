@@ -349,6 +349,21 @@ describe('InvoiceEditor: the story-only useAddons extension point (#384)', () =>
     warn.mockRestore();
   });
 
+  it('#470: an addon that reads scrollerRef.current during its render gets null before the first commit (no ReferenceError), the scroller after it', async () => {
+    const store = createInvoiceStore();
+    const record = await store.get('inv-2');
+    const seen: (HTMLElement | null)[] = [];
+    const useReadingAddons: UseInvoiceEditorAddons = ({ scrollerRef }) => {
+      seen.push(scrollerRef.current);
+      return {};
+    };
+    const view = render(<InvoiceEditor store={store} record={record} onBack={vi.fn()} focusTitleOnMount={false} useAddons={useReadingAddons} />);
+    expect(seen[0]).toBeNull();
+    view.rerender(<InvoiceEditor store={store} record={record} onBack={vi.fn()} focusTitleOnMount={false} useAddons={useReadingAddons} />);
+    expect(seen.at(-1)).toBe(document.querySelector('[data-object-page-scroller]'));
+    expect(seen.at(-1)).not.toBeNull();
+  });
+
   it('a creation (no record) never calls the addon hook', () => {
     const addon = vi.fn(() => ({}));
     render(<InvoiceEditor store={createInvoiceStore()} record={null} onBack={vi.fn()} focusTitleOnMount={false} today="2026-11-09" useAddons={addon} />);

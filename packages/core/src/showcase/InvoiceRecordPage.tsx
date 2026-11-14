@@ -32,6 +32,7 @@ import {
   type LineValues,
 } from './invoice-lines';
 import { InvoiceNotFoundError, type InvoiceDraft, type InvoiceStore, type StoredInvoice } from './invoice-store';
+import { NOTICE_CAP_VAR, useNoticeCap } from './notice-cap';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from './showcase-data';
 
 export interface InvoiceRecordPageProps {
@@ -436,6 +437,9 @@ export function InvoiceEditor({
       console.warn('[showcase] InvoiceEditor: useAddons changed after the mount; the hook of the mount is kept (remount the editor with a `key` to change it).');
     }
   }, [useAddonsProp]);
+  // Declared BEFORE the getter below and the addons hook (#470): an addon that reads `scrollerRef.current` during
+  // its render gets `null` before the first commit, never a ReferenceError (temporal dead zone of a later `const`).
+  const frameRef = useRef<HTMLDivElement>(null);
   // The ObjectPage scroller, read from the DOM (the page does not expose it): a stable ref-like object.
   const [scrollerRef] = useState<RefObject<HTMLElement | null>>(() => ({
     get current() {
@@ -445,7 +449,9 @@ export function InvoiceEditor({
   const addons = useAddons({ form, record: record as StoredInvoice, store, toValues, scrollerRef });
   const reviewSave = addons.reviewSave ?? reviewSaveProp;
   const help = addons.fieldHelp;
-  const frameRef = useRef<HTMLDivElement>(null);
+  // #470: the notice row's cap follows the room really left to edit (short screens, the virtual keyboard).
+  const noticeRef = useRef<HTMLDivElement>(null);
+  useNoticeCap(frameRef, noticeRef);
   useFocusFirstInvalidField({ containerRef: frameRef, fieldErrors: form.fieldErrors });
   useEffect(() => {
     if (focusTitleOnMount) frameRef.current?.querySelector('h1')?.focus();
@@ -554,8 +560,9 @@ export function InvoiceEditor({
       }}
     >
       {addons.notice === undefined ? null : (
-        // At most 40% of the height: the page below keeps room to edit; a longer notice scrolls on its own.
-        <div data-editor-notice="" style={{ minWidth: 0, maxHeight: '40vh', overflowY: 'auto' }}>
+        // At most 40% of the visible height, lowered so that the page below keeps room to edit (see notice-cap.ts,
+        // #470: short screens and the virtual keyboard); a longer notice scrolls on its own.
+        <div ref={noticeRef} data-editor-notice="" style={{ minWidth: 0, maxHeight: `var(${NOTICE_CAP_VAR}, 40vh)`, overflowY: 'auto' }}>
           {addons.notice}
         </div>
       )}

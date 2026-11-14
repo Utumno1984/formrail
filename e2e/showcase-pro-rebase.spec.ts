@@ -260,6 +260,68 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(page.getByRole('textbox', { name: 'Line 3 quantity' })).toHaveCount(0);
   });
 
+  /** The server removes the line at `index` of the stored invoice (another user's edit). */
+  const serverRemovesLine = (page: Page, id: string, index: number) =>
+    page.evaluate(
+      ({ id, index }) =>
+        void (window as unknown as ShowcaseWindow).__ropShowcaseStore!.updateFromServer(id, (r) => ({ ...r, lineItems: r.lineItems.filter((_, i) => i !== index) })),
+      { id, index },
+    );
+
+  // #470: after "Use server value" on a line the server removed, that line is gone and the conflict's position names
+  // the line that took its place: the focus goes there (next line, else previous one, else "Add line"), never <body>.
+  test('"Use server value" on line 1, which the server removed: the focus goes to the description of the line that took its place', async ({ page }) => {
+    const record = await openRecord(page, RECORD_WITH_LINES);
+    await page.getByRole('textbox', { name: 'Line 1 quantity' }).fill('8');
+    await serverRemovesLine(page, record.id, 0);
+    await expect(conflicts(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^Use server value for Line items > Item 1 / }).click();
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    const heir = page.getByRole('textbox', { name: 'Line 1 description' });
+    await expect(heir).toHaveValue(record.lineItems[1]!.description);
+    await expect(heir).toBeFocused();
+  });
+
+  test('"Use server value" with the keyboard on the LAST line, which the server removed: the focus goes to the description of the previous line', async ({ page }) => {
+    const record = await openRecord(page, RECORD_WITH_LINES);
+    await page.getByRole('textbox', { name: 'Line 3 quantity' }).fill('8');
+    await serverRemovesLine(page, record.id, 2);
+    await expect(conflicts(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^Use server value for Line items > Item 3 / }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Line 3 description' })).toHaveCount(0);
+    const previous = page.getByRole('textbox', { name: 'Line 2 description' });
+    await expect(previous).toHaveValue(record.lineItems[1]!.description);
+    await expect(previous).toBeFocused();
+  });
+
+  test('"Use server value" on line 2 of an invoice with two lines, which the server removed: the focus goes to the description of line 1', async ({ page }) => {
+    const record = await openRecord(page, 'FT-2026-0002');
+    expect(record.lineItems).toHaveLength(2);
+    await page.getByRole('textbox', { name: 'Line 2 quantity' }).fill('8');
+    await serverRemovesLine(page, record.id, 1);
+    await expect(conflicts(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^Use server value for Line items > Item 2 / }).click();
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Line 2 description' })).toHaveCount(0);
+    const first = page.getByRole('textbox', { name: 'Line 1 description' });
+    await expect(first).toHaveValue(record.lineItems[0]!.description);
+    await expect(first).toBeFocused();
+  });
+
+  test('"Use server value" on the ONLY line, which the server removed: the focus goes to "Add line"', async ({ page }) => {
+    const record = await openRecord(page);
+    expect(record.lineItems).toHaveLength(1);
+    await page.getByRole('textbox', { name: 'Line 1 quantity' }).fill('8');
+    await serverRemovesLine(page, record.id, 0);
+    await expect(conflicts(page)).toHaveCount(1);
+    await page.getByRole('button', { name: /^Use server value for Line items > Item 1 / }).click();
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(page.getByText('No line items')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add line' })).toBeFocused();
+  });
+
   test('a conflict on a line follows the line by id: moved down, a line removed above it, a line added', async ({ page }) => {
     const record = await openRecord(page, RECORD_WITH_LINES);
     const quantity = (n: number) => page.getByRole('textbox', { name: `Line ${n} quantity` });
@@ -467,5 +529,348 @@ test.describe('Pro showcase: no visible field moves when the notice appears or g
       page.locator('[data-object-page-scroller]').boundingBox(),
     ]);
     expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(scrollerBox!.y + 1);
+  });
+});
+
+/** Geometry of the focused element against the page's scroller and its sticky Anchor Bar, and a hit test on it. */
+interface FocusSpot {
+  /** What has the focus: its accessible text, for the messages. */
+  label: string;
+  top: number;
+  bottom: number;
+  scrollerTop: number;
+  scrollerBottom: number;
+  barBottom: number;
+  /** The bottom of what the user sees: the visual viewport (above the virtual keyboard). */
+  visibleBottom: number;
+  /** The point at the middle of the element hits the element itself: nothing covers it. */
+  uncovered: boolean;
+  focusVisible: boolean;
+}
+const focusSpot = (page: Page): Promise<FocusSpot> =>
+  page.evaluate(() => {
+    const el = document.activeElement as HTMLElement;
+    const r = el.getBoundingClientRect();
+    const scroller = document.querySelector('[data-object-page-scroller]')!.getBoundingClientRect();
+    const bar = document.querySelector('[data-object-page-scroller] > nav')!.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    const vv = window.visualViewport;
+    return {
+      label: el.getAttribute('aria-label') ?? el.textContent ?? el.tagName,
+      top: r.top,
+      bottom: r.bottom,
+      scrollerTop: scroller.top,
+      scrollerBottom: scroller.bottom,
+      barBottom: bar.bottom,
+      visibleBottom: vv ? vv.offsetTop + vv.height : window.innerHeight,
+      uncovered: !!hit && (hit === el || el.contains(hit)),
+      focusVisible: el.matches(':focus-visible'),
+    };
+  });
+
+/** The focused element is whole in the visible part of the scroller, below the Anchor Bar, and nothing covers it. */
+function expectFocusInView(spot: FocusSpot): void {
+  expect(spot.top, `${spot.label}: below the Anchor Bar`).toBeGreaterThanOrEqual(spot.barBottom);
+  expect(spot.bottom, `${spot.label}: above the bottom of the scroller`).toBeLessThanOrEqual(spot.scrollerBottom);
+  expect(spot.bottom, `${spot.label}: above the keyboard`).toBeLessThanOrEqual(spot.visibleBottom);
+  expect(spot.uncovered, `${spot.label}: not covered`).toBe(true);
+}
+
+type FieldSpot = { index: number; top: number; visible: boolean };
+/** Every field of the page's scroller: its top and whether it is whole inside the scroller's visible box. */
+const fieldSpots = (page: Page): Promise<FieldSpot[]> =>
+  page.evaluate(() => {
+    const scroller = document.querySelector('[data-object-page-scroller]')!;
+    const box = scroller.getBoundingClientRect();
+    return [...scroller.querySelectorAll('input, [role="combobox"]')].map((el, index) => {
+      const r = el.getBoundingClientRect();
+      return { index, top: r.top, visible: r.top >= box.top && r.bottom <= box.bottom };
+    });
+  });
+
+/** The fields visible both times did not move by more than 1px; returns how many were compared. */
+function expectFieldsStill(before: FieldSpot[], after: FieldSpot[]): number {
+  const pairs = before.filter((b) => b.visible && after[b.index]?.visible);
+  for (const b of pairs) expect(Math.abs(after[b.index]!.top - b.top), `field #${b.index}`).toBeLessThanOrEqual(1);
+  return pairs.length;
+}
+
+test.describe('Pro showcase: a scroll made in the same task as a choice in the notice is kept (#470, round 2) @engines', () => {
+  /** Two conflicts (Due date and Notes): the notice gets shorter when one of them is closed. */
+  async function twoConflicts(page: Page): Promise<void> {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    await notes(page).fill('Mine');
+    await serverPatch(page, record.id, { dueDate: '2026-03-12', notes: 'Theirs' });
+    await expect(conflicts(page)).toHaveCount(2);
+  }
+  const rowHeight = (page: Page) => page.locator('[data-editor-notice]').evaluate((el) => el.getBoundingClientRect().height);
+
+  test('the page is scrolled by 120px and "Keep mine" is pressed in the same task: the 120px are kept, only the notice is compensated', async ({ page }) => {
+    await twoConflicts(page);
+    // Nothing focused (a field being typed in would be kept in view, which is another rule).
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.locator('[data-object-page-scroller]').evaluate((el) => void (el.scrollTop = 300));
+    const rowBefore = await rowHeight(page);
+    // One task: a scroll (its event comes a frame later), then the click that closes a conflict.
+    await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('[data-object-page-scroller]')!;
+      scroller.scrollTop += 120;
+      document.querySelector<HTMLElement>('[aria-label="Keep mine for Due date"]')!.click();
+    });
+    await expect(conflicts(page)).toHaveCount(1);
+    const rowAfter = await rowHeight(page);
+    expect(rowAfter).toBeLessThan(rowBefore - 1);
+    const scrollTop = await page.locator('[data-object-page-scroller]').evaluate((el) => el.scrollTop);
+    expect(Math.abs(scrollTop - (300 + 120 + rowAfter - rowBefore))).toBeLessThanOrEqual(1);
+  });
+
+  test('from the end of the content, a listener of "Keep mine" moves the focus to "Back to list" (the browser scrolls to it): the focus stays in view', async ({ page }) => {
+    await twoConflicts(page);
+    await page.locator('[data-object-page-scroller]').evaluate((el) => void (el.scrollTop = el.scrollHeight));
+    // A callback that moves the focus itself (the documented "a callback that moves the focus itself wins").
+    await page.evaluate(() => {
+      const back = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Back to list')!;
+      document.querySelector('[aria-label="Keep mine for Due date"]')!.addEventListener('click', () => back.focus());
+    });
+    await page.getByRole('button', { name: 'Keep mine for Due date' }).click();
+    await expect(conflicts(page)).toHaveCount(1);
+    const back = page.getByRole('button', { name: 'Back to list' });
+    await expect(back).toBeFocused();
+    const spot = await focusSpot(page);
+    expect(spot.top, 'Back to list: not above the scroller').toBeGreaterThanOrEqual(spot.scrollerTop);
+    expect(spot.bottom, 'Back to list: not below the scroller').toBeLessThanOrEqual(spot.scrollerBottom);
+  });
+});
+
+test.describe('Pro showcase: focus not obscured by the notice (WCAG 2.4.11, #470) @engines', () => {
+  for (const [name, viewport] of [
+    ['desktop', { width: 1280, height: 800 }],
+    ['phone', { width: 390, height: 500 }],
+  ] as const) {
+    test(`${name}: "Simulate server update" reached with the keyboard and pressed with Enter: no visible field moves, the focus stays; the next Tab lands on a control in view`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await openRecord(page);
+      await dueDate(page).fill('2026-03-05');
+      // Keyboard navigation to the button (Tab from the previous header action): its focus indicator is shown, and
+      // it was whole in view when it received the focus (what SC 2.4.11 asks).
+      await page.getByRole('button', { name: 'Delete' }).focus();
+      await page.keyboard.press('Tab');
+      const simulate = page.getByRole('button', { name: 'Simulate server update' });
+      await expect(simulate).toBeFocused();
+      const received = await focusSpot(page);
+      expect(received.focusVisible).toBe(true);
+      expectFocusInView(received);
+      const before = await fieldSpots(page);
+      // The header is at the top of the scroller: in the strip the notice takes. The documented choice (#470): the
+      // content does not move for a control that is not a typing field, the focus is not moved.
+      await page.keyboard.press('Enter');
+      await expect(conflicts(page)).toHaveCount(1);
+      await expect(simulate).toBeFocused();
+      expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
+      // The next control the keyboard reaches is scrolled into view by the browser: not entirely hidden (SC 2.4.11,
+      // Minimum). The browser's own focus scrolling ignores the sticky Anchor Bar, so the control may end partly
+      // under it (an Object Page behaviour, with or without the notice: reported on #470, not changed here).
+      await page.keyboard.press('Tab');
+      await expect(simulate).not.toBeFocused();
+      const next = await focusSpot(page);
+      expect(next.bottom, `${next.label}: partly below the Anchor Bar`).toBeGreaterThan(next.barBottom);
+      expect(next.top, `${next.label}: partly above the bottom of the scroller`).toBeLessThan(next.scrollerBottom);
+    });
+
+    test(`${name}: "Simulate server update" clicked with the mouse (no focus indicator): no visible field moves`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await openRecord(page);
+      await dueDate(page).fill('2026-03-05');
+      const focused = () => page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80));
+      const simulate = page.getByRole('button', { name: 'Simulate server update' });
+      // Where the pointer will press it (the click itself would scroll it into view first).
+      await simulate.scrollIntoViewIfNeeded();
+      const before = await fieldSpots(page);
+      await simulate.click();
+      await expect(conflicts(page)).toHaveCount(1);
+      // A pointer press shows no focus indicator (WebKit does not even focus a clicked button).
+      expect(await page.evaluate(() => !!document.activeElement?.matches('button:focus-visible'))).toBe(false);
+      expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
+      const atShown = await focused();
+      const record = (await stored(page))!;
+      const shown = await fieldSpots(page);
+      await serverPatch(page, record.id, { dueDate: '2026-03-05' });
+      await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+      expect(expectFieldsStill(shown, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
+      expect(await focused()).toBe(atShown);
+    });
+  }
+
+  test('a field being typed in, right under the Anchor Bar: the notice appears, the field is brought back below the bar (it was hidden under it before #470)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    // The Due date right under the Anchor Bar: in the strip the notice takes from the top of the scroller.
+    await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('[data-object-page-scroller]')!;
+      const bar = scroller.querySelector('nav')!.getBoundingClientRect();
+      const input = scroller.querySelector('[data-rop-name="dueDate"]')!;
+      scroller.scrollTop += input.getBoundingClientRect().top - (bar.bottom + 12);
+    });
+    await dueDate(page).focus();
+    expectFocusInView(await focusSpot(page));
+    await serverPatch(page, record.id, { dueDate: '2026-03-12' });
+    await expect(conflicts(page)).toHaveCount(1);
+    await expect(dueDate(page)).toBeFocused();
+    expectFocusInView(await focusSpot(page));
+  });
+});
+
+// The virtual keyboard is simulated by replacing `window.visualViewport`, chromium only like every other keyboard
+// test of the repository (e2e/field.spec.ts, e2e/showcase-line-items.spec.ts): desktop Firefox and WebKit have no
+// virtual keyboard. The case without a keyboard is tagged on its own and runs in the three engines.
+test.describe('Pro showcase at 390x500: the notice leaves the editor room, also with the virtual keyboard (#470)', () => {
+  // 10rem: the minimum height the page's scroller keeps visible under the notice (notice-cap.ts).
+  const EDITOR_MIN = 160;
+  // 3rem: the least the notice keeps.
+  const NOTICE_MIN = 48;
+  // The repository's stand-in for a keyboard: 45% of the height.
+  const KEYBOARD = 225;
+  type KeyboardWindow = { __setKeyboard: (px: number) => void };
+  const setKeyboard = (page: Page, px: number) => page.evaluate((n) => (window as unknown as KeyboardWindow).__setKeyboard(n), px);
+
+  test.use({ viewport: { width: 390, height: 500 } });
+  test.beforeEach(async ({ page }) => {
+    // Same stand-in for the visual viewport as e2e/showcase-line-items.spec.ts: the keyboard shrinks it from the bottom.
+    await page.addInitScript(() => {
+      const target = new EventTarget();
+      let keyboard = 0;
+      const vv = Object.defineProperties(target, {
+        offsetTop: { value: 0 },
+        offsetLeft: { value: 0 },
+        pageTop: { value: 0 },
+        pageLeft: { value: 0 },
+        scale: { value: 1 },
+        height: { get: () => window.innerHeight - keyboard },
+        width: { get: () => window.innerWidth },
+      });
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+      (window as unknown as KeyboardWindow).__setKeyboard = (px) => {
+        keyboard = px;
+        target.dispatchEvent(new Event('resize'));
+      };
+    });
+  });
+
+  const LONG_MINE = 'Checked by the finance team: the transport costs are included, as agreed in the framework contract.';
+  const LONG_THEIRS = 'Approved by the purchasing desk after a call with the supplier; the delivery notes are attached.';
+
+  /** Four of my edits: Due date, Amount, the line's description and Notes (two long texts). */
+  async function editFour(page: Page): Promise<Stored> {
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    await page.getByRole('textbox', { name: 'Amount (EUR)' }).fill('1234.56');
+    await page.getByRole('textbox', { name: 'Line 1 description' }).fill(`${LONG_MINE} (line)`);
+    await notes(page).fill(LONG_MINE);
+    return record;
+  }
+  /** The server changes the same four fields: four conflicts, the notice far taller than the screen. */
+  async function fourConflicts(page: Page, record: Stored): Promise<void> {
+    await serverPatch(page, record.id, {
+      dueDate: '2026-03-12',
+      amount: 999.99,
+      notes: LONG_THEIRS,
+      lineItems: record.lineItems.map((line, i) => (i === 0 ? { ...line, description: `${LONG_THEIRS} (line)` } : line)),
+    });
+    await expect(conflicts(page)).toHaveCount(4);
+  }
+  const noticeRow = (page: Page): Locator => page.locator('[data-editor-notice]');
+  const heightOf = (locator: Locator): Promise<number> => locator.evaluate((el) => el.getBoundingClientRect().height);
+  /** The part of the page's scroller the user sees: under the notice, above the footer and the keyboard. */
+  const visibleScroller = (page: Page): Promise<number> =>
+    page.evaluate(() => {
+      const box = document.querySelector('[data-object-page-scroller]')!.getBoundingClientRect();
+      const vv = window.visualViewport!;
+      return Math.min(box.bottom, vv.offsetTop + vv.height) - box.top;
+    });
+  const blur = (page: Page) => page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  /** Puts Notes near the bottom of the scroller, where the keyboard will cover it, and focuses it. */
+  async function focusNotesLow(page: Page): Promise<void> {
+    await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>('[data-object-page-scroller]')!;
+      const field = scroller.querySelector('[data-rop-name="notes"]')!;
+      scroller.scrollTop += field.getBoundingClientRect().bottom - (scroller.getBoundingClientRect().bottom - 8);
+    });
+    await notes(page).focus();
+  }
+
+  test('no keyboard: four long conflicts appear, the notice is capped and scrolls on its own, the scroller keeps 10rem, no visible field moves @engines', async ({ page }) => {
+    const record = await editFour(page);
+    await blur(page);
+    const before = await fieldSpots(page);
+    await fourConflicts(page, record);
+    expect(await visibleScroller(page)).toBeGreaterThanOrEqual(EDITOR_MIN);
+    // At most 40% of the 500px editor; the strip inside is far taller and scrolls in its row.
+    expect(await heightOf(noticeRow(page))).toBeLessThanOrEqual(200);
+    expect(await noticeRow(page).evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+    expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
+  });
+
+  test('keyboard open on Notes, then four long conflicts: the notice keeps 3rem, the scroller 10rem above the keyboard, Notes stays visible and does not move', async ({ page }) => {
+    const record = await editFour(page);
+    await focusNotesLow(page);
+    await setKeyboard(page, KEYBOARD);
+    await expect.poll(async () => (await focusSpot(page)).bottom).toBeLessThanOrEqual(500 - KEYBOARD);
+    expectFocusInView(await focusSpot(page));
+    const before = await fieldSpots(page);
+    const notesTop = await top(notes(page));
+
+    await fourConflicts(page, record);
+    expect(Math.abs((await heightOf(noticeRow(page))) - NOTICE_MIN)).toBeLessThanOrEqual(1);
+    expect(await visibleScroller(page)).toBeGreaterThanOrEqual(EDITOR_MIN);
+    await expect(notes(page)).toBeFocused();
+    expectFocusInView(await focusSpot(page));
+    expect(Math.abs((await top(notes(page))) - notesTop)).toBeLessThanOrEqual(1);
+    expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
+    // The page never scrolls as a whole (one scroller).
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
+  test('four long conflicts, then the keyboard opens on Notes: the notice shrinks to 3rem, Notes ends above the keyboard, uncovered; closing it gives the room back', async ({ page }) => {
+    const record = await editFour(page);
+    await blur(page);
+    await fourConflicts(page, record);
+    expect(await heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
+    await focusNotesLow(page);
+    await setKeyboard(page, KEYBOARD);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeLessThanOrEqual(NOTICE_MIN + 1);
+    await expect.poll(async () => (await focusSpot(page)).bottom).toBeLessThanOrEqual(500 - KEYBOARD);
+    await expect(notes(page)).toBeFocused();
+    expectFocusInView(await focusSpot(page));
+    expect(await visibleScroller(page)).toBeGreaterThanOrEqual(EDITOR_MIN);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+    // The keyboard goes away: the notice takes its 40% again.
+    await setKeyboard(page, 0);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
+    expect(await visibleScroller(page)).toBeGreaterThanOrEqual(EDITOR_MIN);
+  });
+
+  test('the notice row capped then released by the keyboard, then three conflicts closed by the server: no visible field moves (no stale position)', async ({ page }) => {
+    const record = await editFour(page);
+    await blur(page);
+    await fourConflicts(page, record);
+    await focusNotesLow(page);
+    await setKeyboard(page, KEYBOARD);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeLessThanOrEqual(NOTICE_MIN + 1);
+    await setKeyboard(page, 0);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
+    await blur(page);
+    const before = await fieldSpots(page);
+    const rowBefore = await heightOf(noticeRow(page));
+    // A new update: the server changes the Status only. The conflicts of the previous one are gone ("1 field was
+    // updated."), the notice is shorter than its cap: it renders, and must scroll by its own change only.
+    await serverPatch(page, record.id, { status: NEXT_STATUS[record.status] });
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(notice(page)).toContainText('1 field was updated.');
+    expect(await heightOf(noticeRow(page))).toBeLessThan(rowBefore - 1);
+    expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
   });
 });
