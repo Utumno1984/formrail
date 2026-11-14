@@ -68,8 +68,9 @@ export interface NumberInputProps extends Omit<
   /** Upper limit. */
   max?: number;
   /**
-   * Amount of an arrow key or stepper press (PageUp/PageDown: × 10). Default `1`; a value ≤ 0 or
+   * Amount of an arrow key or stepper press (PageUp/PageDown: × 10). A value ≤ 0 or
    * not finite falls back to `1` (development warning). Typed values are never rounded to it.
+   * @default 1
    */
   step?: number;
   /**
@@ -80,7 +81,10 @@ export interface NumberInputProps extends Omit<
   locale?: string;
   /** Accessible names of the stepper buttons. */
   labels?: Partial<NumberInputLabels>;
-  /** Height scale. Default `md`. */
+  /**
+   * Height scale.
+   * @default 'md'
+   */
   size?: NumberInputSize;
 }
 

@@ -36,13 +36,17 @@ export interface MessageStripProps extends Omit<HTMLAttributes<HTMLDivElement>, 
    */
   onDismiss?: () => void;
   /**
-   * Accessible name of the close button. Default: "Dismiss message: `<title>`", so strips with
+   * Accessible name of the close button: "Dismiss message: `<title>`", so strips with
    * different titles get different names ("Dismiss message" alone when there is no title text).
    * The text is read from the `title` node itself: a title produced by a component that renders
    * its text on its own (e.g. a translation component) has none, so pass `dismissLabel` then.
+   * @default `Dismiss message: <title>`
    */
   dismissLabel?: string;
-  /** Visually hidden tone name read before the content (colour alone is not enough). Default: English tone name. */
+  /**
+   * Visually hidden tone name read before the content (colour alone is not enough), according to the tone.
+   * @default 'Information' / 'Success' / 'Warning' / 'Error'
+   */
   toneLabel?: string;
   /**
    * Live region: `alert` for `error`, `status` for the other tones. `false` removes the role, for

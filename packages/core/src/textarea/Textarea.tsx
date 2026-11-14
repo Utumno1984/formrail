@@ -19,7 +19,8 @@ import { computeAutoHeight, readLineHeight } from './auto-height';
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   /**
    * The height follows the content: never below `rows`, never above `maxRows` (then the content
-   * scrolls inside the control). The manual resize handle is off. Default `false`.
+   * scrolls inside the control). The manual resize handle is off.
+   * @default false
    */
   autoResize?: boolean;
   /** Maximum number of rows with `autoResize`; ignored without it. Below `rows`, `rows` wins. */

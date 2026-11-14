@@ -80,16 +80,20 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   maxHeight?: number | string;
   /**
    * `loading` keeps the rows it has (or shows `loadingRowCount` skeleton rows when there are none);
-   * `error` replaces the body with an error strip. Default `ready`.
+   * `error` replaces the body with an error strip.
+   * @default 'ready'
    */
   status?: ListReportTableStatus;
   /**
    * Skeleton rows while loading without rows, and the minimum height of the body in every state
-   * (`loadingRowCount x row height`), so that loading, empty, error and data share one footprint.
-   * Default 5; with 0 the body is one row tall.
+   * (`loadingRowCount x row height`), so that loading, empty, error and data share one footprint. With 0 the body is one row tall.
+   * @default 5
    */
   loadingRowCount?: number;
-  /** Content of the error strip. Default: `labels.error`. */
+  /**
+   * Content of the error strip.
+   * @default `labels.error`
+   */
   errorMessage?: ReactNode;
   /**
    * Adds a retry button to the error strip. The focus stays on it while the error stays; when the
@@ -115,7 +119,7 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   rowActions?: ListReportRowActions<Row>;
   /**
    * How many actions with an `icon` are inline buttons when the table's container is at least 40rem
-   * wide. Default 0.
+   * wide.
    *
    * With `n` > 0 the first `n` actions with an `icon` of every row are icon buttons in the actions
    * column (a `Tooltip` with the label on hover/keyboard focus, named `labels.rowAction(label,
@@ -138,6 +142,7 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    *   or a stretched flex/grid item), not from the table; in a shrink-to-fit parent it collapses.
    *
    * A negative or fractional value is floored to a whole number ≥ 0 (reported in development).
+   * @default 0
    */
   rowActionsInline?: number;
 } & TableName;

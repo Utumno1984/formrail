@@ -24,6 +24,8 @@ export interface ArgTypeRow {
   category: string | null;
   disabled: boolean;
   description: string;
+  /** The text of the Default column (`table.defaultValue.summary`); `null` when it is empty. */
+  defaultValue?: string | null;
 }
 
 /** What a public Docs page puts in its props table. */

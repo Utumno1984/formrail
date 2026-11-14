@@ -36,11 +36,20 @@ export interface PaginationProps extends Omit<HTMLAttributes<HTMLElement>, 'chil
    * outside never calls it, not even to "fix" an out-of-range `page`.
    */
   onPageChange?: (page: number) => void;
-  /** Pages shown on each side of the current one. Default 1. */
+  /**
+   * Pages shown on each side of the current one.
+   * @default 1
+   */
   siblingCount?: number;
-  /** Pages always shown at each end. Default 1. */
+  /**
+   * Pages always shown at each end.
+   * @default 1
+   */
   boundaryCount?: number;
-  /** Disables every button (e.g. while loading) without changing the size. */
+  /**
+   * Disables every button (e.g. while loading) without changing the size.
+   * @default false
+   */
   disabled?: boolean;
   /** Texts for localization. */
   labels?: PaginationLabels;

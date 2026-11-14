@@ -99,7 +99,10 @@ export interface DatePickerProps
   weekStartsOn?: Weekday | undefined;
   /** Texts, merged with the English defaults. */
   labels?: Partial<DatePickerLabels> | undefined;
-  /** Height of the input and of the button. Default `md`. */
+  /**
+   * Height of the input and of the button.
+   * @default 'md'
+   */
   size?: DatePickerSize | undefined;
 }
 

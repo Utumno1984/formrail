@@ -18,14 +18,15 @@ const lookup = createExampleLookup(sources);
  * component (its only exported function) and prints the file's text verbatim as "Show code". `type: 'code'`:
  * the text as written, never a JSX synthesized from the rendered tree. Spread it into the story and write the
  * tags next to it: `export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('X.example.tsx') }`.
+ * `extra.layout` overrides the meta's layout for this story only (the `docs.source` is kept).
  * The e2e guard checks that the printed text is the file `<stories file>.example.tsx` on disk.
  */
-export function exampleStory(file: string, props: object = {}) {
+export function exampleStory(file: string, props: object = {}, extra: { layout?: 'padded' | 'centered' | 'fullscreen' } = {}) {
   const { component: Example, code } = lookup(file);
   // Marked, so the audit can tell this render from one written (or assigned) over it.
   const render = Object.assign(() => createElement(Example, props), { [EXAMPLE_RENDER_MARK]: true });
   return {
-    parameters: { docs: { source: { code, language: 'tsx', type: 'code' as const } } },
+    parameters: { ...extra, docs: { source: { code, language: 'tsx', type: 'code' as const } } },
     render,
   };
 }

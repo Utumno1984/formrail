@@ -65,12 +65,16 @@ export interface SelectProps
   /** Shown in the trigger when `value` matches no option. Default: the raw value. */
   unknownValueLabel?: ReactNode;
   /**
-   * Shown in the open list when `options` is empty. Default `No options`.
+   * Shown in the open list when `options` is empty.
    * Rendered inside a disabled `role="option"`: it must not contain interactive or focusable elements,
    * which axe reports as `nested-interactive`.
+   * @default 'No options'
    */
   emptyLabel?: ReactNode;
-  /** Height scale. Default `md`. */
+  /**
+   * Height scale.
+   * @default 'md'
+   */
   size?: SelectSize;
 }
 

@@ -43,7 +43,10 @@ export interface RadioGroupProps
    * while the group is `forced`/`locked`/disabled.
    */
   onValueChange?: (value: string) => void;
-  /** Layout of the items. Also exposed as `aria-orientation`. Default `vertical`. */
+  /**
+   * Layout of the items. Also exposed as `aria-orientation`.
+   * @default 'vertical'
+   */
   orientation?: RadioGroupOrientation;
   /** Disables every item. A disabled `Field` does the same. */
   disabled?: boolean;

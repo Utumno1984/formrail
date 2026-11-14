@@ -69,11 +69,20 @@ export interface TooltipProps {
    * opens and the trigger gets no `aria-describedby`. Plain, non-interactive content only.
    */
   content?: ReactNode;
-  /** Preferred side; flips to the opposite one when it would leave the viewport. Default `top`. */
+  /**
+   * Preferred side; flips to the opposite one when it would leave the viewport.
+   * @default 'top'
+   */
   side?: TooltipSide;
-  /** Alignment along that side. Default `center`. */
+  /**
+   * Alignment along that side.
+   * @default 'center'
+   */
   align?: TooltipAlign;
-  /** Distance from the trigger in px. Default `6`. */
+  /**
+   * Distance from the trigger in px.
+   * @default 6
+   */
   sideOffset?: number;
   /** Hover delay in ms for this tooltip; defaults to the provider's (`500` without one). */
   delayDuration?: number;
@@ -92,6 +101,7 @@ export interface TooltipProps {
    * lost), and the span is `inline-flex`, which can change the child's layout (a `w-full` or
    * `flex-1` child no longer fills its parent). The span has no role of its own: the reason is
    * announced as its description, the disabled control inside keeps its name.
+   * @default false
    */
   disabledTriggerFocusable?: boolean;
   /**
