@@ -196,7 +196,7 @@ function LiveHost({ locale, labels, rows = ROWS }: { locale?: Locale; labels?: L
     <>
       <button onClick={() => setStatus('ready')}>ready</button>
       <span data-rop-count>{`(${getNumberFormat(table.locale).format(table.resultCount)})`}</span>
-      <ListReportTableShell table={table} status={status} labels={labels} renderBody={() => null} />
+      <ListReportTableShell caption="Invoices" table={table} status={status} labels={labels} renderBody={() => null} />
     </>
   );
 }
