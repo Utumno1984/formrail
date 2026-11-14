@@ -4,4 +4,4 @@
 // (With the core installed, or with `skipLibCheck: false`, this file fails to typecheck.)
 import { useFormRebase } from '@formrail/pro';
 
-export const misuse = () => useFormRebase('not a form');
+export const useMisuse = () => useFormRebase('not a form');
