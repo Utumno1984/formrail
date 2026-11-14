@@ -43,6 +43,17 @@ Writing baselines outside the container is blocked: the Docker script sets `VISU
 A missing baseline is a **failure** (in CI and locally): baselines are created only by
 `test:visual:update`, never implicitly.
 
+## Renaming a story tagged `visual`: remove the old PNGs
+
+Baselines are named after the story id (`<id>.png`, in each `visual-*` folder). When a story changes id,
+`test:visual:update` writes the new PNG and leaves the old one: a dead file that looks like coverage.
+`npm run test:visual:orphans` (a step of the `visual` CI job, after the screenshots, on the Storybook it
+built) fails listing every PNG with no `visual` story or `visual-docs` page of that id, and prints the
+`git rm ...` to remove them. Locally, run it after `npm run build-storybook`. The filter is the one of
+`visual.spec.ts` (`visual-stories.mjs`); the PNGs of `landing.spec.ts` (`landing`, `teams`, `privacy`) are known
+explicitly. It reads the complete build (Free + Pro stories); a story left out of it must be passed with
+another `--index <path>/index.json` (several are merged). A missing index is an error, not "no orphans".
+
 ## When a check fails
 
 Failing screenshots produce `*-expected.png`, `*-actual.png` and `*-diff.png` in `test-results/`

@@ -28,6 +28,7 @@
     "test:site": "playwright test --config playwright.site.config.ts",
     "test:visual": "node scripts/visual-docker.mjs",
     "test:visual:update": "node scripts/visual-docker.mjs --update",
+    "test:visual:orphans": "node scripts/visual-orphans.mjs",
     "test:visual:ci": "playwright test --project=\"visual-*\"",
     "changeset": "changeset",
     "changeset:check": "node scripts/check-changeset.mjs",
