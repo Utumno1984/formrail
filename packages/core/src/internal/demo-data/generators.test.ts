@@ -138,6 +138,25 @@ describe.each(CASES)('$name', (c) => {
     expect(fresh[c.exportName]!(200)).toEqual(c.make(200));
   });
 
+  // The row cache makes any same-module comparison between two n tautological (the rows of the small
+  // n ARE the rows of the large one). Two fresh module graphs, each built from scratch with one n,
+  // in both orders, catch a row that depends on n or on module state (QA of PR #536).
+  it.each([
+    ['large n first', [5000, 200]],
+    ['small n first', [200, 5000]],
+  ] as const)('the first 200 rows do not depend on n, in fresh modules (%s)', async (_, [first, second]) => {
+    const load = async () => {
+      vi.resetModules();
+      return (await import(c.modulePath)) as Record<string, (n: number) => readonly Row[]>;
+    };
+    const a = await load();
+    const rowsA = a[c.exportName]!(first).slice(0, 200);
+    const b = await load();
+    const rowsB = b[c.exportName]!(second).slice(0, 200);
+    expect(rowsA).toHaveLength(200);
+    expect(JSON.stringify(rowsA)).toBe(JSON.stringify(rowsB));
+  });
+
   it('does not let a caller alter the cache: arrays and records are deeply frozen', () => {
     const list = c.make(30);
     expect(Object.isFrozen(list)).toBe(true);
