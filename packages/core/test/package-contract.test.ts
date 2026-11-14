@@ -142,6 +142,23 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
     expect(offenders).toEqual([]);
   });
 
+  // Ticket #514 extends the same guarantee to the transactional documents: no order number (`SO-2026-…`,
+  // `PO-…`, `INV-…`, `CS-…` as generated) and no generator or label name reaches a published file.
+  it('no published file carries the demo documents (generators, status labels, document numbers)', () => {
+    const names = /makeSalesOrders|getSalesOrder|makePurchaseOrders|getPurchaseOrder|makeInvoices|getInvoice\b|makeSupportCases|getSupportCase|SALES_ORDER_STATUS|PURCHASE_ORDER_STATUS|INVOICE_STATUS|SUPPORT_CASE_/;
+    const numbers = /\b(SO|PO|INV)-\d{4}-\d{5}\b|\bCS-\d{5}\b/;
+    expect(names.test('makeSalesOrders(1)') && numbers.test('SO-2026-10001') && numbers.test('CS-10003')).toBe(true);
+    const offenders: string[] = [];
+    for (const entry of readdirSync(distDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const name = join(entry.parentPath, entry.name).slice(distDir.length + 1);
+      const text = readFileSync(join(distDir, name), 'utf8');
+      if (names.test(text)) offenders.push(`${name}: generator or label name`);
+      if (numbers.test(text)) offenders.push(`${name}: document number`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('no non-test, non-story module under src imports zod', () => {
     const offenders: string[] = [];
     const walk = (dir: string) => {
