@@ -417,10 +417,20 @@ describe('subpath entries (#489)', () => {
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
   it('budgets @formrail/pro/engine, with its own baseline file', () => {
-    expect(BUDGETED_SUBPATHS).toEqual({ [resolve(ROOT, 'packages/pro')]: ['./engine'] });
+    // `./react-hook-form` added by #507 (the React Hook Form adapter): an addition to the exact list of the subpaths.
+    expect(BUDGETED_SUBPATHS).toEqual({ [resolve(ROOT, 'packages/pro')]: ['./engine', './react-hook-form'] });
     expect(budgetFileName('.')).toBe('bundle-budget.json');
     expect(budgetFileName('./engine')).toBe('bundle-budget.engine.json');
     expect(() => budgetFileName('./a/../b')).toThrow(/unsupported/);
+  });
+
+  it('budgets @formrail/pro/react-hook-form (#507), with its own committed baseline: one valid entry, the adapter', () => {
+    expect(budgetFileName('./react-hook-form')).toBe('bundle-budget.react-hook-form.json');
+    expect(subpathFile(resolve(ROOT, 'packages/pro'), './react-hook-form')).toBe(resolve(ROOT, 'packages/pro/dist/react-hook-form.js'));
+    const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.react-hook-form.json'), 'utf8'));
+    expect(Object.keys(budget.exports)).toEqual(['useReactHookFormBinding']);
+    const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
+    expect(compareBudget(measured, budget).ok).toBe(true);
   });
 
   it('the committed engine baseline has one valid entry per export of @formrail/pro/engine', () => {

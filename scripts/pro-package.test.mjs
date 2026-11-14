@@ -64,3 +64,31 @@ describe('packages/pro engine entry and form libraries', () => {
     expect(pkg.dependencies ?? {}).toEqual({});
   });
 });
+
+// Ticket #507: the React Hook Form adapter `@formrail/pro/react-hook-form`.
+describe('packages/pro react-hook-form entry', () => {
+  const pkg = readJson('packages/pro/package.json');
+  const lock = readJson('package-lock.json');
+
+  it('exports ./react-hook-form for import and require, each with its declaration file', () => {
+    expect(pkg.exports['./react-hook-form']).toEqual({
+      import: { types: './dist/react-hook-form.d.ts', default: './dist/react-hook-form.js' },
+      require: { types: './dist/react-hook-form.d.cts', default: './dist/react-hook-form.cjs' },
+    });
+  });
+
+  it('react-hook-form is an OPTIONAL peer and a devDependency, never a dependency', () => {
+    expect(pkg.peerDependencies['react-hook-form']).toBeDefined();
+    expect(pkg.peerDependenciesMeta['react-hook-form']).toEqual({ optional: true });
+    expect(pkg.devDependencies['react-hook-form']).toBeDefined();
+    expect(pkg.dependencies?.['react-hook-form']).toBeUndefined();
+  });
+
+  it('the peer range is the tested one: the devDependency range, whose floor is the version the lockfile installs', () => {
+    const peer = pkg.peerDependencies['react-hook-form'];
+    expect(peer).toBe(pkg.devDependencies['react-hook-form']);
+    const floor = /^\^(\d+\.\d+\.\d+)$/.exec(peer)?.[1];
+    expect(floor).toBeDefined();
+    expect(lock.packages['node_modules/react-hook-form'].version).toBe(floor);
+  });
+});
