@@ -24,8 +24,8 @@ const define = (target: Container, key: string, value: unknown): void => {
 /**
  * An immutable copy of `source` that reuses `previous` (or any of its subtrees) wherever the content is the
  * same, so an unchanged value keeps its identity and a changed one gets new objects only on the path of the
- * change. The content is compared with the rules the engines use for leaves: `Object.is` (`NaN` equals
- * `NaN`, `0` and `-0` differ), `Date`s by `getTime()`; plain objects (own enumerable keys, missing key and
+ * change. Leaves are compared with `Object.is` (`NaN` equals `NaN`; `0` and `-0` differ, stricter than the
+ * engines, so a snapshot is never staler than the form), `Date`s by `getTime()`; plain objects (own enumerable keys, missing key and
  * `undefined` differ) and arrays are compared item by item. Any other object (`Map`, `Set`, `File`, a class
  * instance) is a leaf kept by reference: the snapshot never copies it.
  *
@@ -39,7 +39,7 @@ export function snapshotOf<T>(source: T, previous?: unknown): T {
 
 /** `true` when `a` and `b` have the same content, with the rules of {@link snapshotOf}. */
 export function sameContent(a: unknown, b: unknown): boolean {
-  return snap(a, b, false) === b;
+  return Object.is(snap(a, b, false), b);
 }
 
 /**
@@ -61,9 +61,9 @@ function snap(source: unknown, previous: unknown, copy: boolean): unknown {
     let same = prev !== undefined && prev.length === source.length;
     for (let i = 0; i < source.length; i += 1) {
       const item = snap(source[i], prev?.[i], copy);
-      if (!copy && item !== prev?.[i]) return source;
+      if (!copy && !Object.is(item, prev?.[i])) return source;
       items[i] = item;
-      if (same && item !== prev![i]) same = false;
+      if (same && !Object.is(item, prev![i])) same = false;
     }
     if (same) return prev;
     return copy ? items : source;
@@ -77,9 +77,9 @@ function snap(source: unknown, previous: unknown, copy: boolean): unknown {
       const prevChild = prev !== undefined && hasOwn(prev, key) ? prev[key] : undefined;
       if (prev !== undefined && !hasOwn(prev, key)) same = false;
       const child = snap(source[key], prevChild, copy);
-      if (!copy && (!same || child !== prevChild)) return source;
+      if (!copy && (!same || !Object.is(child, prevChild))) return source;
       define(out, key, child);
-      if (same && child !== prevChild) same = false;
+      if (same && !Object.is(child, prevChild)) same = false;
     }
     if (same) return prev;
     return copy ? out : source;
