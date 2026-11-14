@@ -457,7 +457,7 @@ test.describe('Docs props tables', () => {
     // ever expands the keys into rows with their own Default column, this test fails: then choose (a) of #540.
     const cases = [
       { title: 'Floorplans/List Report', keys: ['clearSelection', 'selectionBar', 'selectionCount', 'count', 'loading', 'empty'] },
-      { title: 'Navigation/Pagination', keys: ['navigation', 'previous', 'next', 'page'] },
+      { title: 'Navigation/Pagination', keys: ['navigation', 'previous', 'next'] }, // `page` is also a real prop of Pagination (the current page): not a label row
       { title: 'Forms/NumberInput', keys: ['increment', 'decrement'] },
     ];
     for (const { title, keys } of cases) {
