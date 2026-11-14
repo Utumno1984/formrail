@@ -31,6 +31,7 @@ import type {
   VirtualListReportTableProps,
 } from '../src/index';
 import type { RebaseFormBinding } from '../src/engine';
+import { EXPECTED_WITH_OPTIONS, EXPECTED_WITHOUT_OPTIONS, SCENARIO_OPTIONS, runOptionsScenario } from './rebase-options-scenario';
 
 // Vitest runs in packages/pro (jsdom: `import.meta.url` is not a file URL here).
 const SRC = resolve(process.cwd(), 'src');
@@ -110,6 +111,12 @@ describe('main entry @formrail/pro', () => {
     act(() => result.current.rebase.rebase({ name: 'Acme Inc' }));
     expect(result.current.form.values).toEqual({ name: 'Acme Inc' });
     expect(result.current.form.isDirty).toBe(false);
+  });
+
+  it('useFormRebase passes its options to the engine: arrayIdKeys, isEqual and labels change the merge', () => {
+    // Control: the scenario without options has a conflict each option removes or renames.
+    expect(runOptionsScenario(useObjectPageForm, main.useFormRebase)).toEqual(EXPECTED_WITHOUT_OPTIONS);
+    expect(runOptionsScenario(useObjectPageForm, main.useFormRebase, SCENARIO_OPTIONS)).toEqual(EXPECTED_WITH_OPTIONS);
   });
 });
 
