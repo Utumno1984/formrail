@@ -417,8 +417,7 @@ const PHONE_AREA = new Map(COUNTRY_LIST.flatMap((country) => country.cities.map(
 const UNITS = ['Unit 4', 'Unit 12B', 'Building C', 'Hall 3', 'Gate 2', 'Floor 5', 'Dock 7'];
 
 /** A postal address in `country`. */
-export function makeAddress(rng: Rng, code: DemoCountryCode): DemoAddress {
-  const country = DEMO_COUNTRIES[code];
+export function makeAddress(rng: Rng, country: DemoCountry): DemoAddress {
   const where = rng.pick(country.cities);
   return Object.freeze({
     line1: country.line1(rng),
@@ -426,7 +425,7 @@ export function makeAddress(rng: Rng, code: DemoCountryCode): DemoAddress {
     postalCode: where.postal(rng),
     city: where.name,
     region: where.region,
-    country: code,
+    country: country.code,
   });
 }
 

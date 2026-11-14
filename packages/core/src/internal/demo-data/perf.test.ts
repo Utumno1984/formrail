@@ -4,7 +4,9 @@
 // and supplier reference pools are built inside the measured call too), and the numbers are those of
 // plain Node, not of Vitest's module runner (which turns every cross-module call into a property
 // read on a namespace object and slows this code several times over). Budget: 500 ms per call on
-// the CI runner (ticket #513); the PR records the numbers measured when the budget was set.
+// the CI runner (ticket #513); the PR records the numbers measured when the budget was set. The file
+// runs as its own Vitest project after all the others (see vitest.config.ts), so the parallel test
+// files do not steal the CPU from the measurement.
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -45,7 +47,10 @@ function timeInFreshProcess(generator: string, n: number): number {
   `;
   const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' });
   expect(result.status, result.stderr).toBe(0);
-  return (JSON.parse(result.stdout) as { elapsed: number }).elapsed;
+  const { elapsed } = JSON.parse(result.stdout) as { elapsed: number };
+  // Printed on purpose: the CI log is where the budget's margin is read (see the PR of #513).
+  console.info(`demo-data perf: ${generator}(${n}) took ${elapsed.toFixed(0)} ms (budget ${BUDGET_MS} ms)`);
+  return elapsed;
 }
 
 describe('demo-data performance (plain Node, fresh process)', () => {

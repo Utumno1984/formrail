@@ -94,6 +94,11 @@ export function personName(area: DemoLanguageArea, slot: number): PersonName {
   return NAMES[area][slot % PERSON_NAME_SLOTS]!;
 }
 
+/** All {@link PERSON_NAME_SLOTS} names of `area`, by slot (resolve once, then index: a hot path). */
+export function personNamesOf(area: DemoLanguageArea): readonly PersonName[] {
+  return NAMES[area];
+}
+
 /** Every name of every area, built once up front (9 x 400) and shared by all rows and contacts. */
 const buildNames = (pool: PreparedPool): readonly PersonName[] =>
   Array.from({ length: PERSON_NAME_SLOTS }, (_, s) => {

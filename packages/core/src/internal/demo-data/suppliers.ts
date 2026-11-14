@@ -7,7 +7,7 @@ import type { DemoCurrency } from './currency';
 import { createDataset, DEMO_REFERENCE_POOL, indexFromId } from './dataset';
 import { daysAgo } from './dates';
 import { pickBuyerId } from './employees';
-import { DEMO_COUNTRIES, makeAddress, type DemoAddress, type DemoCountryCode } from './geo';
+import { makeAddress, type DemoAddress, type DemoCountryCode } from './geo';
 import { createCompanyNameSpace } from './organizations';
 import { createRowRng, hashSeed, type Rng } from './rng';
 import type { DemoPaymentTerms } from './terms';
@@ -110,7 +110,8 @@ function makeSupplier(index: number): DemoSupplier {
   const rng = createRowRng(SEED, index);
   const id = `sup-${index + 1}`;
   const company = NAMES.name(index, rng);
-  const address = makeAddress(rng, company.country);
+  const country = company.countryInfo;
+  const address = makeAddress(rng, country);
   return Object.freeze({
     id,
     code: `V-${20001 + index}`,
@@ -119,9 +120,9 @@ function makeSupplier(index: number): DemoSupplier {
     status: rng.weighted(STATUS_WEIGHTS),
     country: company.country,
     address,
-    contacts: makeContacts(rng, id, company.domain, address, CONTACT_ROLES, CONTACT_COUNTS),
+    contacts: makeContacts(rng, id, company.domain, address, country.area, CONTACT_ROLES, CONTACT_COUNTS),
     website: company.website,
-    currency: DEMO_COUNTRIES[company.country].currency,
+    currency: country.currency,
     paymentTerms: rng.weighted(TERMS_WEIGHTS),
     leadTimeDays: company.country === 'JP' || company.country === 'US' ? rng.int(14, 42) : rng.int(3, 21),
     buyerId: pickBuyerId(rng),

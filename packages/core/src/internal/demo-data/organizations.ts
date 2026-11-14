@@ -2,7 +2,7 @@
 // language area, an English trade word and the legal form of the country, e.g. "Grünfeld Bearings
 // GmbH". The roots are invented on purpose and checked against a denylist of well-known sample brands;
 // the surnames of the legacy invoice fixture are never used as company names (both enforced by tests).
-import { AREA_COUNTRIES, type DemoCountryCode, type DemoLanguageArea } from './geo';
+import { AREA_COUNTRIES, DEMO_COUNTRIES, type DemoCountry, type DemoCountryCode, type DemoLanguageArea } from './geo';
 import { createPermutation, type Rng } from './rng';
 import { toAsciiSlug } from './text';
 
@@ -41,11 +41,23 @@ const LEGAL_FORMS: Readonly<Record<DemoCountryCode, readonly string[]>> = {
 
 const AREAS = Object.keys(COMPANY_ROOTS) as DemoLanguageArea[];
 
+interface CountryChoice {
+  readonly info: DemoCountry;
+  readonly forms: readonly string[];
+}
+
+/** Per area: the weighted countries, each with its country record and legal forms (hot path: no keyed lookups). */
+const AREA_CHOICES = new Map<DemoLanguageArea, readonly (readonly [CountryChoice, number])[]>(
+  AREAS.map((area) => [area, AREA_COUNTRIES[area].map(([code, weight]) => [{ info: DEMO_COUNTRIES[code], forms: LEGAL_FORMS[code] }, weight] as const)]),
+);
+
 /** A generated company identity. */
 export interface CompanyName<Sector> {
   readonly name: string;
   readonly area: DemoLanguageArea;
   readonly country: DemoCountryCode;
+  /** The country record of `country` (saves a keyed lookup per row). */
+  readonly countryInfo: DemoCountry;
   readonly sector: Sector;
   /** `<root>-<trade>.example` host name (RFC 2606 reserved top-level domain). */
   readonly domain: string;
@@ -89,17 +101,18 @@ export function createCompanyNameSpace<Sector>(
     const sectorIndex = local % sectors.length;
     const [trade, sector] = sectors[sectorIndex]!;
     const domain = `${rootSlugs[area]![rootIndex]}-${tradeSlugs[sectorIndex]}.example`;
-    return { area, sector, stem: `${COMPANY_ROOTS[area][rootIndex]} ${trade}`, domain, website: `https://www.${domain}` };
+    return { area, choices: AREA_CHOICES.get(area)!, sector, stem: `${COMPANY_ROOTS[area][rootIndex]} ${trade}`, domain, website: `https://www.${domain}` };
   });
   return {
     size,
     name(index, rng) {
       const base = bases[permute(index)]!;
-      const country = rng.weighted(AREA_COUNTRIES[base.area]);
+      const choice = rng.weighted(base.choices);
       return {
-        name: `${base.stem} ${rng.pick(LEGAL_FORMS[country])}`,
+        name: `${base.stem} ${rng.pick(choice.forms)}`,
         area: base.area,
-        country,
+        country: choice.info.code,
+        countryInfo: choice.info,
         sector: base.sector,
         domain: base.domain,
         website: base.website,

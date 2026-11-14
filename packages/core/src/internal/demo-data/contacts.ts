@@ -1,7 +1,7 @@
 // Contact people of customers and suppliers. Every contact has its own stable id, so a list of
 // contacts can be edited (added, removed, reordered) and compared by identity, not by position.
-import { DEMO_COUNTRIES, phoneNumbers, type DemoAddress, type DemoLanguageArea } from './geo';
-import { personName, PERSON_NAME_SLOTS } from './people';
+import { phoneNumbers, type DemoAddress, type DemoLanguageArea } from './geo';
+import { personNamesOf, PERSON_NAME_SLOTS } from './people';
 import type { Rng } from './rng';
 
 export interface DemoContact {
@@ -19,6 +19,9 @@ export interface DemoContact {
   readonly primary: boolean;
 }
 
+/** `-con-1` ... : the id suffixes, built once. */
+const CONTACT_SUFFIX: readonly string[] = Array.from({ length: 16 }, (_, k) => `-con-${k + 1}`);
+
 /** Most contacts share the language area of the company's country; a few come from elsewhere. */
 const OTHER_AREAS: readonly DemoLanguageArea[] = ['en', 'de', 'nl', 'fr', 'es', 'it', 'nordic', 'pl', 'ja'];
 
@@ -31,30 +34,32 @@ export function makeContacts(
   ownerId: string,
   domain: string,
   address: DemoAddress,
+  /** The language area of the company's country. */
+  localArea: DemoLanguageArea,
   roles: readonly string[],
   counts: readonly (readonly [number, number])[],
 ): readonly DemoContact[] {
   const count = rng.weighted(counts);
-  const area = rng.chance(0.9) ? DEMO_COUNTRIES[address.country].area : rng.pick(OTHER_AREAS);
+  const area = rng.chance(0.9) ? localArea : rng.pick(OTHER_AREAS);
   // Consecutive slots with a stride coprime with the slot count: distinct names for up to 400 contacts.
   const base = rng.int(0, PERSON_NAME_SLOTS - 1);
   const firstRole = rng.int(0, roles.length - 1);
   const phone = phoneNumbers(address);
-  const contacts: DemoContact[] = [];
+  const names = personNamesOf(area);
+  const at = `@${domain}`;
+  const contacts = new Array<DemoContact>(count);
   for (let k = 0; k < count; k++) {
-    const person = personName(area, base + k * 157);
-    contacts.push(
-      Object.freeze({
-        id: `${ownerId}-con-${k + 1}`,
-        firstName: person.firstName,
-        lastName: person.lastName,
-        fullName: person.fullName,
-        role: roles[(firstRole + k) % roles.length]!,
-        email: `${person.emailLocal}@${domain}`,
-        phone: phone(rng),
-        primary: k === 0,
-      }),
-    );
+    const person = names[(base + k * 157) % PERSON_NAME_SLOTS]!;
+    contacts[k] = Object.freeze({
+      id: ownerId + CONTACT_SUFFIX[k]!,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      fullName: person.fullName,
+      role: roles[(firstRole + k) % roles.length]!,
+      email: person.emailLocal + at,
+      phone: phone(rng),
+      primary: k === 0,
+    });
   }
   return Object.freeze(contacts);
 }

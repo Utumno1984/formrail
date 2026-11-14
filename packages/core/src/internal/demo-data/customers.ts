@@ -7,7 +7,7 @@ import { convertFromEurMinor, type DemoCurrency } from './currency';
 import { createDataset, indexFromId } from './dataset';
 import { daysAgo } from './dates';
 import { pickAccountManagerId } from './employees';
-import { DEMO_COUNTRIES, makeAddress, type DemoAddress, type DemoCountryCode } from './geo';
+import { makeAddress, type DemoAddress, type DemoCountryCode } from './geo';
 import { createCompanyNameSpace } from './organizations';
 import { createRowRng, hashSeed } from './rng';
 import type { DemoPaymentTerms } from './terms';
@@ -123,10 +123,11 @@ const TERMS_WEIGHTS: readonly (readonly [DemoPaymentTerms, number])[] = [
   ['net-45', 15],
   ['net-60', 15],
 ];
+// Mostly one or two contacts (about 1.75 on average), up to four.
 const CONTACT_COUNTS: readonly (readonly [number, number])[] = [
-  [1, 3],
-  [2, 4],
-  [3, 2],
+  [1, 10],
+  [2, 6],
+  [3, 3],
   [4, 1],
 ];
 
@@ -148,8 +149,8 @@ function makeCustomer(index: number): DemoCustomer {
   const rng = createRowRng(SEED, index);
   const id = `cus-${index + 1}`;
   const company = NAMES.name(index, rng);
-  const country = DEMO_COUNTRIES[company.country];
-  const billingAddress = makeAddress(rng, company.country);
+  const country = company.countryInfo;
+  const billingAddress = makeAddress(rng, country);
   const status = rng.weighted(STATUS_WEIGHTS);
   const paymentTerms = rng.weighted(TERMS_WEIGHTS);
   const currency = country.currency;
@@ -163,7 +164,7 @@ function makeCustomer(index: number): DemoCustomer {
     status,
     country: company.country,
     billingAddress,
-    contacts: makeContacts(rng, id, company.domain, billingAddress, CONTACT_ROLES, CONTACT_COUNTS),
+    contacts: makeContacts(rng, id, company.domain, billingAddress, country.area, CONTACT_ROLES, CONTACT_COUNTS),
     website: company.website,
     currency,
     paymentTerms,
