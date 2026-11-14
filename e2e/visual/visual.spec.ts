@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { expectPlayToPass } from '../helpers/story';
+import { visualEntries } from './visual-stories.mjs';
 
 // One test per story tagged `visual` in Storybook's index.json, generated at load time:
 // nothing is listed by hand and an untagged story is never photographed.
@@ -33,11 +34,8 @@ function loadIndex(): Record<string, IndexEntry> {
   }
 }
 
-const visualStories = Object.values(loadIndex()).filter(
-  // Autodocs entries inherit the `visual` tag of their stories, but are not photographed: a Docs page opts in
-  // explicitly with `visual-docs` (the Introduction).
-  (e) => (e.type === 'docs' ? e.tags?.includes('visual-docs') : e.tags?.includes('visual')),
-);
+// The filter lives in visual-stories.mjs, shared with scripts/visual-orphans.mjs (#517).
+const visualStories: IndexEntry[] = visualEntries(loadIndex());
 
 if (visualStories.length === 0) {
   throw new Error('visual: no story is tagged "visual" in index.json (the gate would pass vacuously)');
