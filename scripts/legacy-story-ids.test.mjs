@@ -320,6 +320,29 @@ describe('the inlined head script', () => {
       expect(stripComments('var a = 1; /* t */ // u\nvar b = 2; // v')).toBe('var a = 1; /* t */ // u\nvar b = 2; // v');
     });
 
+    it('keeps a comment that follows a single character of code on its line', () => {
+      const code = 'if (a) {\n}/* d */\n;// c\nvar a = 1\n+/**/+a;';
+      expect(stripComments(code)).toBe(code);
+    });
+
+    it('counts lines as JavaScript does: U+2028 and U+2029 end a line, so the blank line of a following template stays', () => {
+      for (const terminator of [' ', ' ']) {
+        const code = `var s = "a${terminator}b";\nvar t = \`x\n\ny\`;`;
+        expect(stripComments(code)).toBe(code);
+      }
+    });
+
+    it('takes a lone \\r as a line end: a `//` after it is a whole-line comment and goes', () => {
+      expect(stripComments('var a = 1;\r// c\rvar b = 2;')).toBe('var a = 1;\rvar b = 2;');
+      expect(stripComments('var a = 1;   // c var b = 2;')).toBe('var a = 1; var b = 2;');
+    });
+
+    it('keeps the line terminators as written (CRLF included) and adds no `\\r` after the last line', () => {
+      expect(stripComments('// c\r\nvar a = 1;\r\n\r\n/* d */\r\nvar b = 2;\r\n')).toBe('var a = 1;\r\nvar b = 2;');
+      expect(stripComments('var a = 1;\r\n// c')).toBe('var a = 1;');
+      expect(stripComments('var a = 1;\r\nvar b = 2;')).toBe('var a = 1;\r\nvar b = 2;');
+    });
+
     it('accepts `export` and throws a clear error on a source that does not parse', () => {
       expect(stripComments('// c\nexport function f() {}')).toBe('export function f() {}');
       expect(() => stripComments('var a = ;\n// c')).toThrow(/stripComments: the source does not parse/);

@@ -32,7 +32,7 @@ export const LEGACY_STORY_IDS_FILE = fileURLToPath(new URL('./legacy-story-ids.m
  * its first line: whole-line `//` comments, block comments of any length, and the `// note` that follows
  * the closing `*\/` of a block. A comment after code (`var b = 1; // note`) stays, as it always has.
  * Lines left blank by the removal, and blank lines between statements, are dropped; the blank lines
- * inside a multi-line string or template are kept as they are. The remaining lines are not re-indented.
+ * inside a multi-line string or template are kept as they are. The remaining lines are not re-indented. Lines end as JavaScript says (`\n`, `\r\n`, a lone `\r`, U+2028, U+2029) and keep the terminator they were written with.
  *
  * @param {string} source JavaScript, parsed as an ES module (`export` is accepted)
  * @returns {string}
@@ -45,10 +45,20 @@ export function stripComments(source) {
   } catch (cause) {
     throw new Error(`stripComments: the source does not parse (${cause instanceof Error ? cause.message : cause}), refusing to guess where the comments are.`, { cause });
   }
+  // Lines are counted as JavaScript (and espree) count them: \n, \r\n, a lone \r, U+2028, U+2029.
+  const lines = [];
+  const lineStarts = [];
+  const pieces = source.split(/(\r\n|[\n\r\u2028\u2029])/);
+  for (let i = 0, position = 0; i < pieces.length; i += 2) {
+    const end = pieces[i + 1] ?? '';
+    lines.push({ start: position, text: pieces[i], end });
+    lineStarts.push(position);
+    position += pieces[i].length + end.length;
+  }
   const removed = new Array(source.length).fill(false);
   for (const comment of parsed.comments) {
     const [start, end] = comment.range;
-    const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+    const lineStart = lineStarts.filter((position) => position <= start).pop();
     let before = '';
     for (let i = lineStart; i < start; i++) if (!removed[i]) before += source[i];
     if (before.trim() !== '') continue;
@@ -60,15 +70,14 @@ export function stripComments(source) {
     if (token.loc.end.line > token.loc.start.line) for (let n = token.loc.start.line + 1; n <= token.loc.end.line; n++) literalLines.add(n);
   }
   const kept = [];
-  let offset = 0;
-  source.split('\n').forEach((line, index) => {
+  lines.forEach((line, index) => {
     let text = '';
-    for (let i = 0; i < line.length; i++) if (!removed[offset + i]) text += line[i];
-    offset += line.length + 1;
+    for (let i = 0; i < line.text.length; i++) if (!removed[line.start + i]) text += line.text[i];
     if (text.trim() === '' && !literalLines.has(index + 1)) return;
-    kept.push(text);
+    kept.push({ text, end: line.end });
   });
-  return kept.join('\n');
+  // Each kept line brings its own terminator, as written; the last one has none (nothing follows it).
+  return kept.map((line, index) => (index < kept.length - 1 ? line.text + line.end : line.text)).join('');
 }
 
 /**
