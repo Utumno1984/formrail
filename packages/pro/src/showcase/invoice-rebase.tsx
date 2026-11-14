@@ -23,9 +23,8 @@ import {
   ORDER_ALSO_NOTE,
   ORDER_ONLY_DESCRIPTION,
   REVIEW_LOCALE,
-  invoiceReviewEntries,
+  invoiceReview,
   invoiceReviewIsEqual,
-  lineOrderChanged,
   renderInvoiceReviewValue,
   reviewDescription,
   invoiceSaveReview,
@@ -93,7 +92,7 @@ const NOTICE_MARGIN = { margin: '12px 16px' } as const;
 const LINE_ROW = /^lineItems\.(\d+)(?=\.|$)/;
 
 /**
- * `Line items > Item 2` alone is ambiguous (see `nameLine` in invoice-review.tsx): the row's description is added.
+ * `Line items > Item 2` alone is ambiguous (see `invoiceReviewItemLabel` in invoice-review.tsx): the row's description is added.
  * The row is the one at the conflict's CURRENT position (`currentPath`, found again by id after the user moved,
  * removed or added lines), never the index of the rebase; a row the user removed is read from the server's
  * version (the baseline), at the server's index. Built on `labelPath` (one label per segment), never on a split
@@ -141,16 +140,16 @@ function useReview(source: ReviewSource) {
 /** The description of the review, recomputed when the form changes under the dialog. */
 function ReviewDescription({ source }: { source: ReviewSource }) {
   const { context } = useReview(source);
-  const entries = invoiceReviewEntries(context);
+  const { entries, reorders } = invoiceReview(context);
   if (entries.length > 0) return <>{reviewDescription(entries.length)}</>;
-  return <>{lineOrderChanged(context.values, context.baseline) ? ORDER_ONLY_DESCRIPTION : 'Nothing left to save.'}</>;
+  return <>{reorders.length > 0 ? ORDER_ONLY_DESCRIPTION : 'Nothing left to save.'}</>;
 }
 
 /** The body of the review: the conflicts the save would overwrite, then the changes (as in #377). */
 function ReviewBody({ source }: { source: ReviewSource }) {
   const { context, conflicts } = useReview(source);
-  const entries = invoiceReviewEntries(context);
-  const reordered = lineOrderChanged(context.values, context.baseline);
+  const { entries, reorders } = invoiceReview(context);
+  const reordered = reorders.length > 0;
   return (
     <div style={{ display: 'grid', gap: 12 }}>
       {conflicts.length > 0 ? (

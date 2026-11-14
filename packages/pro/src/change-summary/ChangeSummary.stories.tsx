@@ -9,10 +9,11 @@ import { formatChangeValue } from './format-change-value';
 import { inferSegmentLabel } from './infer-label';
 import { computeChangeSummary } from './compute-change-summary';
 import { useChangeSummary } from './use-change-summary';
-import type { ChangeEntry } from './types';
+import type { ChangeEntry, ChangeSummaryOptions } from './types';
 
 type Locale = 'en-US' | 'en-GB' | 'de-DE';
 type TimeZone = 'UTC' | 'Europe/Rome' | 'America/New_York';
+type RowLabels = 'position' | 'name';
 
 interface DemoArgs {
   emptyLabel: string;
@@ -25,6 +26,8 @@ interface DemoArgs {
   onSave: (values: unknown) => void;
   /** Wired to Actions: called only when the user presses "Discard". */
   onDiscard: () => void;
+  /** Story-only, `RowLabelsAndReorders`: `name` passes an `itemLabel`, `position` passes none. */
+  rowLabels?: RowLabels;
 }
 
 const meta: Meta<DemoArgs> = {
@@ -94,6 +97,17 @@ const BASELINE: InvoiceValues = {
 };
 
 const ARRAY_ID_KEYS = { lineItems: 'id' } as const;
+
+/**
+ * `ChangeSummaryOptions.itemLabel` of the stories, at module scope so `useChangeSummary` keeps its result between
+ * renders (compared by identity, like `isEqual`). A row is named by its description, a tax by its code:
+ * `Item 2 (Chair)`, `Item 1 (VAT)`; a blank name returns `undefined`, which keeps `Item N`.
+ */
+const nameRows: NonNullable<ChangeSummaryOptions<object>['itemLabel']> = (arrayPath, item, { defaultLabel }) => {
+  const field = arrayPath === 'lineItems' ? 'description' : arrayPath === 'lineItems.taxes' ? 'code' : undefined;
+  const name = field !== undefined && typeof item === 'object' && item !== null ? (item as Record<string, unknown>)[field] : undefined;
+  return typeof name === 'string' && name.trim() !== '' ? `${defaultLabel} (${name.trim()})` : undefined;
+};
 
 function PaidCheckbox({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
   const control = useFieldControl();
@@ -365,6 +379,215 @@ export const NoValueStates: Story = {
 };
 
 // ---------------------------------------------------------------------------------------------
+// Row labels and reorders (#424): `itemLabel` names the rows (and the taxes inside them) while the
+// engine still holds them; `reorders` (from `useChangeSummary`, or `computeChangeSummaryResult` for
+// the pure function) lists the id-keyed arrays whose order changed, without adding any entry.
+// ---------------------------------------------------------------------------------------------
+
+interface Tax {
+  code: string;
+  rate: number;
+}
+
+interface TaxedLine {
+  id: string;
+  description: string;
+  /** Text, as an input gives it. */
+  price: string;
+  taxes: Tax[];
+}
+
+interface TaxedInvoice {
+  lineItems: TaxedLine[];
+}
+
+const TAXED_BASELINE: TaxedInvoice = {
+  lineItems: [
+    { id: 'line-1', description: 'Desk', price: '60', taxes: [{ code: 'VAT', rate: 22 }, { code: 'ECO', rate: 1 }] },
+    { id: 'line-2', description: 'Chair', price: '40', taxes: [{ code: 'VAT', rate: 22 }, { code: 'ECO', rate: 2 }] },
+    { id: 'line-3', description: 'Lamp', price: '15', taxes: [{ code: 'VAT', rate: 10 }, { code: 'ECO', rate: 1 }] },
+  ],
+};
+
+const NESTED_ARRAY_ID_KEYS = { lineItems: 'id', 'lineItems.taxes': 'code' } as const;
+
+/** `items` with the item at `index` swapped with the one before it. */
+function movedUp<T>(items: readonly T[], index: number): T[] {
+  const next = [...items];
+  [next[index - 1], next[index]] = [next[index] as T, next[index - 1] as T];
+  return next;
+}
+
+function RowLabelsDemo({ emptyLabel, label, locale, timeZone, onSave, onDiscard, rowLabels = 'name' }: DemoArgs) {
+  const form = useObjectPageForm<TaxedInvoice>({ baseline: TAXED_BASELINE });
+  const lines = form.values.lineItems;
+  const { entries, reorders } = useChangeSummary({
+    values: form.values,
+    baseline: form.baseline,
+    arrayIdKeys: NESTED_ARRAY_ID_KEYS,
+    itemLabel: rowLabels === 'name' ? nameRows : undefined,
+  });
+
+  const setLines = (lineItems: TaxedLine[]) => form.setValue('lineItems', lineItems);
+  const update = (id: string, patch: Partial<TaxedLine>) =>
+    setLines(lines.map((line) => (line.id === id ? { ...line, ...patch } : line)));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
+      <ul
+        aria-label="Line items"
+        style={{ display: 'flex', flexDirection: 'column', gap: 12, listStyle: 'none', margin: 0, padding: 0 }}
+      >
+        {lines.map((line, index) => (
+          <li key={line.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 8 }}>
+              <Field label={`Price of ${line.description}`} name={`lineItems.${index}.price`}>
+                <Input
+                  inputMode="decimal"
+                  value={line.price}
+                  onChange={(event) => update(line.id, { price: event.target.value })}
+                />
+              </Field>
+              <Button variant="secondary" size="sm" onClick={() => setLines(movedUp(lines, index))} disabled={index === 0}>
+                {`Move ${line.description} up`}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setLines(lines.filter((l) => l.id !== line.id))}>
+                {`Remove ${line.description}`}
+              </Button>
+            </div>
+            <ul
+              aria-label={`Taxes of ${line.description}`}
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 8, listStyle: 'none', margin: 0, padding: 0 }}
+            >
+              {line.taxes.map((tax, taxIndex) => (
+                <li key={tax.code} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Text as="span">{`${tax.code} ${tax.rate}%`}</Text>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => update(line.id, { taxes: movedUp(line.taxes, taxIndex) })}
+                    disabled={taxIndex === 0}
+                  >
+                    {`Move ${tax.code} of ${line.description} up`}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <Button variant="primary" onClick={() => void form.save((v) => onSave(v))}>
+          Save
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            form.reset();
+            onDiscard();
+          }}
+        >
+          Discard
+        </Button>
+      </div>
+      <ChangeSummary entries={entries} emptyLabel={emptyLabel} label={label} locale={locale} timeZone={timeZone} />
+      {/* `<ChangeSummary />` renders the entries only: the reorders get markup of their own. */}
+      {reorders.length > 0 ? (
+        <ul aria-label="Reordered lists" style={{ margin: 0, paddingInlineStart: 20 }}>
+          {reorders.map((reorder) => (
+            <li key={reorder.path}>
+              <Text as="span">{`Order changed: ${reorder.label}`}</Text>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * `itemLabel` and `reorders` (`useChangeSummary`; `computeChangeSummaryResult` is the same as a pure function) in
+ * a real editor: three saved rows ("Desk", "Chair", "Lamp"), each with two taxes matched by `code`
+ * (`arrayIdKeys: { lineItems: 'id', 'lineItems.taxes': 'code' }`). An entry names its row
+ * (`Line Items > Item 2 (Chair) > Price`), and moving a row or a tax is listed under "Reordered lists"
+ * (`Order changed: Line Items`) instead of becoming an entry. With the `rowLabels` Control on `position` the labels
+ * go back to `Item N`. The play function checks, in order: the empty state, a changed price of "Chair", "Chair"
+ * moved up (a reorder; its entry follows it to `Item 1`), a tax moved inside "Desk" (a nested reorder named after
+ * its row), "Desk" removed (its entry and the one of "Chair", both at position 1, told apart; both reorders gone)
+ * and "Discard" (empty again, `onDiscard` called once).
+ */
+export const RowLabelsAndReorders: Story = {
+  args: { rowLabels: 'name' },
+  argTypes: {
+    rowLabels: storyControl({
+      control: 'radio',
+      options: ['position', 'name'],
+      description:
+        '`name` passes an `itemLabel` that names a row by its description and a tax by its code; `position` passes none (`Item N`).',
+    }),
+  },
+  // No `renderValue` in this demo: the value format control would change nothing.
+  parameters: { controls: { exclude: ['valueFormat'] } },
+  render: (args) => <RowLabelsDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    /** `Item N (name)` with `rowLabels: 'name'`, `Item N` with `position`. */
+    const row = (n: number, name: string) => (args.rowLabels === 'position' ? `Item ${n}` : `Item ${n} (${name})`);
+    const summary = () => canvas.queryByRole('list', { name: args.label });
+    const entryTexts = () =>
+      within(summary() as HTMLElement)
+        .getAllByRole('listitem')
+        .map((li) => readText(li));
+    const reordered = () => canvas.queryByRole('list', { name: 'Reordered lists' });
+    const reorderTexts = () =>
+      within(reordered() as HTMLElement)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent);
+
+    // 1. Nothing changed: the empty text, no list, no reorder.
+    await expect(canvas.getByText(args.emptyLabel)).toBeVisible();
+    await expect(summary()).toBeNull();
+    await expect(reordered()).toBeNull();
+
+    // 2. The price of "Chair" (the second row) changed: the entry names the row.
+    const chairPrice = canvas.getByRole('textbox', { name: 'Price of Chair' });
+    await userEvent.clear(chairPrice);
+    await userEvent.type(chairPrice, '45');
+    await waitFor(() => expect(entryTexts()).toEqual([`Line Items > ${row(2, 'Chair')} > Price, changed, from 40 to 45`]));
+    await expect(reordered()).toBeNull();
+
+    // 3. "Chair" moved up: a reorder, not one more entry; the entry follows the row to its new position.
+    await userEvent.click(canvas.getByRole('button', { name: 'Move Chair up' }));
+    await waitFor(() => expect(reorderTexts()).toEqual(['Order changed: Line Items']));
+    await expect(entryTexts()).toEqual([`Line Items > ${row(1, 'Chair')} > Price, changed, from 40 to 45`]);
+
+    // 4. A tax moved inside "Desk" (now the second row): a nested reorder, named after its row.
+    await userEvent.click(canvas.getByRole('button', { name: 'Move ECO of Desk up' }));
+    await waitFor(() =>
+      expect(reorderTexts()).toEqual(['Order changed: Line Items', `Order changed: Line Items > ${row(2, 'Desk')} > Taxes`]),
+    );
+    await expect(entryTexts()).toHaveLength(1);
+
+    // 5. "Desk" removed: its entry (position 1 in the saved list) and the entry of "Chair" (position 1 now) are
+    // told apart by name. Both reorders are gone: the nested one with its row, the top-level one because "Chair"
+    // and "Lamp" are back in their saved relative order.
+    await userEvent.click(canvas.getByRole('button', { name: 'Remove Desk' }));
+    await waitFor(() => expect(reordered()).toBeNull());
+    const [chair, desk, ...rest] = entryTexts();
+    await expect(chair).toBe(`Line Items > ${row(1, 'Chair')} > Price, changed, from 40 to 45`);
+    await expect(desk?.startsWith(`Line Items > ${row(1, 'Desk')}, removed, `)).toBe(true);
+    await expect(rest).toEqual([]);
+
+    // 6. Discard: empty again, no reorder, onDiscard called exactly once.
+    await userEvent.click(canvas.getByRole('button', { name: 'Discard' }));
+    await expect(canvas.getByText(args.emptyLabel)).toBeVisible();
+    await expect(summary()).toBeNull();
+    await expect(reordered()).toBeNull();
+    await expect(args.onDiscard).toHaveBeenCalledTimes(1);
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
 // Static stories (visual regression). Fixed dates at noon UTC, locale and time zone explicit.
 // ---------------------------------------------------------------------------------------------
 
@@ -483,18 +706,27 @@ const editedValues: InvoiceValues = {
   paid: true,
   dueDate: new Date('2026-04-01T12:00:00Z'),
   lineItems: [
-    { id: 'line-2', description: 'Chair', price: 40 },
+    { id: 'line-2', description: 'Chair', price: 45 },
     { id: 'line-3', description: 'Cable', price: 10 },
   ],
 };
 
-/** The summary of an edited invoice: a changed amount, due date and flag, an added and a removed line. */
+/**
+ * The summary of an edited invoice: a changed amount, due date and flag, a changed, an added and a removed line.
+ * The lines are named by `itemLabel`: "Desk" (removed, position 1 in the saved list) and "Chair" (changed, position
+ * 1 now) would both read `Item 1` without it.
+ */
 export const EditedInvoice: Story = {
   tags: ['visual'],
   parameters: FIXED_FORMAT,
   render: (args) => (
     <ChangeSummary
-      entries={computeChangeSummary({ values: editedValues, baseline: editedBaseline, arrayIdKeys: ARRAY_ID_KEYS })}
+      entries={computeChangeSummary({
+        values: editedValues,
+        baseline: editedBaseline,
+        arrayIdKeys: ARRAY_ID_KEYS,
+        itemLabel: nameRows,
+      })}
       {...fixed(args)}
     />
   ),

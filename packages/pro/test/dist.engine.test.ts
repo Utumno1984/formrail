@@ -22,7 +22,16 @@ const cjsEngine = require(dist('engine.cjs')) as Engine;
 const cjsIndex = require(dist('index.cjs')) as Index;
 
 const ENGINE_FILES = ['engine.js', 'engine.cjs', 'engine.d.ts', 'engine.d.cts'];
-const ENGINE_EXPORTS = ['computeChangeSummary', 'computeRebase', 'formatChangeValue', 'inferSegmentLabel', 'useChangeSummary', 'useFormRebase'];
+const ENGINE_EXPORTS = [
+  'computeChangeSummary',
+  // #424
+  'computeChangeSummaryResult',
+  'computeRebase',
+  'formatChangeValue',
+  'inferSegmentLabel',
+  'useChangeSummary',
+  'useFormRebase',
+];
 
 describe('dist of @formrail/pro/engine', () => {
   it.each(ENGINE_FILES)('%s and the chunks it reaches never name @formrail/core', (file) => {

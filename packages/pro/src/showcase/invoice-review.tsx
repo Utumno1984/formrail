@@ -13,9 +13,9 @@ import {
 import { sameNumberText } from '../../../core/src/showcase/number-text';
 import { STATUS_LABEL } from '../../../core/src/showcase/showcase-data';
 import { ChangeSummary } from '../change-summary/ChangeSummary';
-import { computeChangeSummary } from '../change-summary/compute-change-summary';
+import { computeChangeSummaryResult } from '../change-summary/compute-change-summary';
 import { formatChangeValue } from '../change-summary/format-change-value';
-import type { ChangeEntry } from '../change-summary/types';
+import type { ChangeEntry, ChangeSummaryResult, ItemLabelContext } from '../change-summary/types';
 
 /** Fixed in the story, so the texts (and the visual baselines) do not depend on the machine. */
 export const REVIEW_LOCALE = 'en-US';
@@ -32,8 +32,9 @@ export const INVOICE_REVIEW_LABELS: Readonly<Record<keyof InvoiceValues, string>
 
 /**
  * The review identifies the line items by `id` (never by position), so the entries of a row survive the removal
- * of another one. Labels: `labels` fixes the names that the default inference gets wrong, and `nameLine` adds the
- * description of the row to `Item N` (the bare position is ambiguous between a removed and a changed row).
+ * of another one. Labels: `labels` fixes the names that the default inference gets wrong, and
+ * {@link invoiceReviewItemLabel} adds the description of the row to `Item N` (the bare position is ambiguous
+ * between a removed and a changed row).
  */
 export const INVOICE_REVIEW_ARRAY_ID_KEYS = { lineItems: 'id' } as const;
 export const INVOICE_REVIEW_PATH_LABELS: Readonly<Record<string, string>> = {
@@ -61,17 +62,42 @@ export function invoiceReviewIsEqual(a: unknown, b: unknown, path: string): bool
 }
 
 /**
+ * `Item N` alone is ambiguous: the index is the row's position in the new list, except for a removed row (its
+ * position in the saved one), so "Item 1" can be two different rows in the same review. The description of the
+ * row as it is now makes it unmistakable: `Line items > Item 1 (Transport) > Quantity`. Only for the entries of one
+ * field of a row (`!isLastSegment`): an added or removed row already shows its description as its value. Brackets
+ * for the description's own parentheses: `Repair (urgent)` must not nest inside `Item 2 (...)`. Module scope: a
+ * stable identity.
+ */
+export function invoiceReviewItemLabel(arrayPath: string, item: unknown, { defaultLabel, isLastSegment }: ItemLabelContext): string | undefined {
+  if (arrayPath !== 'lineItems' || isLastSegment || typeof item !== 'object' || item === null) return undefined;
+  const { description } = item as { description?: unknown };
+  const named = typeof description === 'string' ? description.trim() : '';
+  if (named === '') return undefined;
+  return `${defaultLabel} (${named.replaceAll('(', '[').replaceAll(')', ']')})`;
+}
+
+/**
+ * The review of a save, from ONE run of the engine: the entries (rows named by {@link invoiceReviewItemLabel}) and
+ * the reorders (`lineItems` when the lines present on both sides changed their relative order).
+ */
+export function invoiceReview({ values, baseline }: InvoiceSaveReviewContext): ChangeSummaryResult {
+  return computeChangeSummaryResult<InvoiceReviewValues>({
+    values,
+    baseline,
+    arrayIdKeys: INVOICE_REVIEW_ARRAY_ID_KEYS,
+    labels: INVOICE_REVIEW_PATH_LABELS,
+    isEqual: invoiceReviewIsEqual,
+    itemLabel: invoiceReviewItemLabel,
+  });
+}
+
+/**
  * True when the lines present on both sides are not in the same relative order: a reorder, whatever else
- * changed (an added or removed line does not count as a reorder).
+ * changed (an added or removed line does not count as a reorder). The engine's `reorders`.
  */
 export function lineOrderChanged(values: InvoiceReviewValues, baseline: InvoiceReviewValues): boolean {
-  const before = baseline.lineItems.map((l) => l.id);
-  const after = values.lineItems.map((l) => l.id);
-  const inAfter = new Set(after);
-  const common = new Set(before.filter((id) => inAfter.has(id)));
-  const a = before.filter((id) => common.has(id));
-  const b = after.filter((id) => common.has(id));
-  return a.some((id, i) => id !== b[i]);
+  return invoiceReview({ values, baseline }).reorders.length > 0;
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -149,38 +175,8 @@ export function renderInvoiceReviewValue(value: unknown, entry: ChangeEntry): Re
 }
 
 /** The entries of a review: the changes between the saved baseline and the values about to be saved. */
-export function invoiceReviewEntries({ values, baseline }: InvoiceSaveReviewContext): ChangeEntry[] {
-  const entries = computeChangeSummary<InvoiceReviewValues>({
-    values,
-    baseline,
-    arrayIdKeys: INVOICE_REVIEW_ARRAY_ID_KEYS,
-    labels: INVOICE_REVIEW_PATH_LABELS,
-    isEqual: invoiceReviewIsEqual,
-  });
-  return entries.map((entry) => nameLine(entry, values));
-}
-
-// Only the entries of one field of a row: an added/removed row already shows its description as its value.
-const LINE_INDEX = /^lineItems\.(\d+)\./;
-
-/**
- * `Item N` alone is ambiguous: the index is the row's position in the new list, except for a removed row (its
- * position in the saved one), so "Item 1" can be two different rows in the same review. The description of the
- * row (from the new values) makes it unmistakable:
- * `Line items > Item 1 (Transport) > Quantity`.
- */
-function nameLine(entry: ChangeEntry, values: InvoiceReviewValues): ChangeEntry {
-  const match = LINE_INDEX.exec(entry.path);
-  if (!match) return entry;
-  const index = Number(match[1]);
-  // `values`, not the baseline: diffById reports a removed row only as a whole row, which LINE_INDEX never matches.
-  const row = values.lineItems[index];
-  const description = row?.description.trim();
-  if (!description || entry.labelPath[1] === undefined) return entry;
-  // Brackets for the description's own parentheses: `Repair (urgent)` must not nest inside `Item 2 (...)`.
-  const named = description.replaceAll('(', '[').replaceAll(')', ']');
-  const labelPath = entry.labelPath.map((segment, i) => (i === 1 ? `${segment} (${named})` : segment));
-  return { ...entry, labelPath, label: labelPath.join(' > ') };
+export function invoiceReviewEntries(context: InvoiceSaveReviewContext): ChangeEntry[] {
+  return invoiceReview(context).entries;
 }
 
 /** `1 change will be saved.`, `3 changes will be saved.` */
@@ -197,8 +193,8 @@ export const ORDER_ALSO_NOTE = 'The order of the line items also changed.';
  * Computed once, when Save is pressed: the form cannot change under a modal.
  */
 export function invoiceSaveReview(context: InvoiceSaveReviewContext): InvoiceSaveReview | null {
-  const entries = invoiceReviewEntries(context);
-  const reordered = lineOrderChanged(context.values, context.baseline);
+  const { entries, reorders } = invoiceReview(context);
+  const reordered = reorders.length > 0;
   if (entries.length === 0 && !reordered) return null;
   return {
     title: 'Review changes',
