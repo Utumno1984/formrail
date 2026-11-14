@@ -60,12 +60,12 @@ export type SheetTriggerProps = ModalTriggerProps;
 export const SheetTrigger = /* @__PURE__ */ createModalTrigger('SheetTrigger', 'Sheet');
 
 export interface SheetContentProps extends ModalContentBaseProps {
-  /** The edge the panel is attached to. Default `right`. Can change while the sheet is open. */
+  /** The edge the panel is attached to. Can change while the sheet is open. */
   side?: SheetSide;
-  /** Width step. Default `md`. A conflicting width in `className` wins. */
+  /** Width step. A conflicting width in `className` wins. */
   size?: SheetSize;
   /**
-   * Whether Escape and a click on the backdrop close the sheet. Default `true`. While `false`, a press
+   * Whether Escape and a click on the backdrop close the sheet. While `false`, a press
    * on the backdrop also keeps the focus on the element that has it (it does not fall back to `body`).
    */
   dismissible?: boolean;

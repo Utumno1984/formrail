@@ -29,7 +29,7 @@ const DescriptionListContext = /* @__PURE__ */ createContext<DescriptionListCont
 export interface DescriptionListProps extends HTMLAttributes<HTMLDListElement> {
   /**
    * `inline`: value to the side of the label, in one shared column. `stacked`: value under the
-   * label. `auto` (default): decided by a CSS container query on the content width of the `<dl>`
+   * label. `auto`: decided by a CSS container query on the content width of the `<dl>`
    * itself (so a `className`/`style` that changes its width is taken into account; padding would
    * too, but see the note on padding below),
    * not of the window: inline from `--container-rop-description-list` (24rem) up, stacked below
@@ -51,7 +51,7 @@ export interface DescriptionListProps extends HTMLAttributes<HTMLDListElement> {
   layout?: DescriptionListLayout;
   /** Visually hidden text read in place of an empty value. Default (English): "Not specified". */
   emptyLabel?: string;
-  /** Visible stand-in for an empty value (hidden from assistive technology). Default `—`. */
+  /** Visible stand-in for an empty value (hidden from assistive technology). */
   emptyPlaceholder?: ReactNode;
 }
 

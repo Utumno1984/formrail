@@ -109,6 +109,21 @@ jobs:
       # Read-only check against the committed baseline; CI never rewrites it.
       - run: npm run bundle:check
 
+  # Every public prop with a default has it in the Default column of the Docs, with a `@default` that matches the
+  # source, and no prose repeating it (#474, #476). Reads the sources only; the build gives it the types of core.
+  default-column:
+    name: default column
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run default-column:check
+
   e2e:
     name: e2e
     runs-on: ubuntu-24.04

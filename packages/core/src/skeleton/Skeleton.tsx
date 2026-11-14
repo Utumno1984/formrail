@@ -29,12 +29,12 @@ const FONT_SIZE_CLASS: Record<SkeletonTextVariant, string> = {
 };
 
 export interface SkeletonProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'role' | 'tabIndex'> {
-  /** Default `text`. */
+  /** Shape of the placeholder. */
   variant?: SkeletonVariant;
-  /** `text` only: the typographic step whose line height (and bar size) each line takes. Default `body`. */
+  /** `text` only: the typographic step whose line height (and bar size) each line takes. */
   textVariant?: SkeletonTextVariant;
   /**
-   * `text` only: number of lines (default 1); the last one is shorter. Fractions are rounded down;
+   * `text` only: number of lines; the last one is shorter. Fractions are rounded down;
    * `0`, a negative or a non-finite value renders nothing (no node, `ref` stays null).
    */
   lines?: number;

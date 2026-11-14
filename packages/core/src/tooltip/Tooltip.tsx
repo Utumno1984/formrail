@@ -36,9 +36,9 @@ const CONTENT =
 const ProviderPresent = /* @__PURE__ */ createContext(false);
 
 export interface TooltipProviderProps {
-  /** Hover delay in ms before a tooltip opens. Default `500`. */
+  /** Hover delay in ms before a tooltip opens. */
   delayDuration?: number;
-  /** Time in ms after a close during which the next tooltip opens with no delay. Default `300`. */
+  /** Time in ms after a close during which the next tooltip opens with no delay. */
   skipDelayDuration?: number;
   /** The part of the app whose tooltips share these delays (usually the whole app). */
   children?: ReactNode;

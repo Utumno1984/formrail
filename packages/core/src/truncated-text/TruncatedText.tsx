@@ -21,7 +21,7 @@ export interface TruncatedTextProps extends Omit<HTMLAttributes<HTMLElement>, 'c
    * first); with `children` that carry no text and no `tooltipContent`, there is no tooltip.
    */
   tooltipContent?: ReactNode;
-  /** Element to render. Default `span`. */
+  /** Element to render. */
   as?: 'span' | 'div';
 }
 

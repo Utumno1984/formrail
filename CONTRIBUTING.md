@@ -32,3 +32,20 @@ Every PR that touches `packages/*` needs a changeset (`npx changeset`, see
 - In CI `retries: 1`: a flaky test that passes on the second attempt is reported as **flaky but green**.
   Check the report for tests marked flaky instead of trusting the colour alone.
 - Tests tagged `@touch` only run in the `chromium-touch` Playwright project.
+
+## The Default column of the props tables
+
+Every public prop that has a default shows it in the **Default** column of the Docs, written as a `@default` tag in
+its TSDoc. The CI job `default column` (`npm run default-column:check`, after `npm run build`) fails the PR when:
+
+- a prop has a default in the source and no `@default`, or the tag differs from the source value;
+- the prose of the description repeats the default ("Default `md`.", "`auto` (default): ...") next to a default the
+  column already shows: say it once, in the column. A prop whose default is a behaviour, not a value, gets a
+  `@default` stating the effective value (see `UNCOMPARABLE_ALLOWLIST` in `scripts/default-column-measure.mjs`; an
+  entry there needs a reason and a test that reads the tag and compares it with the behaviour).
+
+Known limit: the guard sees a default written in the destructuring of the props (parameter or body) or reached through
+a delegation to an internal component. A new `prop ?? <literal>` fallback in the body with no `@default` is **not**
+reported (today the only one is `FileUpload.defaultValue ?? []`): when you add one, write the `@default` yourself.
+The prose reader (`proseDefaultOf`) takes a default stated in a sentence of its own for the prop; one stated in a
+sentence that opens with a named key ("`anchorBar`: ... (default "Sections")") belongs to the key, not to the prop.

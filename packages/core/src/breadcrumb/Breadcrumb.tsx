@@ -20,9 +20,9 @@ export type BreadcrumbSeparator = 'chevron' | 'slash';
 const SeparatorContext = /* @__PURE__ */ createContext<BreadcrumbSeparator>('chevron');
 
 export interface BreadcrumbProps extends HTMLAttributes<HTMLElement> {
-  /** Decorative separator between items. Default `chevron` (mirrored in RTL). */
+  /** Decorative separator between items (the chevron is mirrored in RTL). */
   separator?: BreadcrumbSeparator;
-  /** Accessible name of the navigation landmark. Default "Breadcrumb" (pass your own for another language). */
+  /** Accessible name of the navigation landmark (pass your own for another language). */
   'aria-label'?: string;
 }
 

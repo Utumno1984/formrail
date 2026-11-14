@@ -14,7 +14,7 @@
 //
 // Usage:  node scripts/default-column-measure.mjs [--json]            (the measure)
 //         node scripts/default-column-measure.mjs --check [--json]   (the guard: exit 1 on gaps or incoherences;
-//                                                                     not wired to CI yet, that is ticket #476)
+//                                                                     runs in CI, job `default-column`, ticket #476)
 // Deterministic: sorted output, no timestamps, no machine paths.
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -482,18 +482,26 @@ const PROSE_STATED =
 const PROSE_MARKED = `(${PROSE_VALUE})` + String.raw`\s*\((?:the\s+)?default\)`;
 export const PROSE_DEFAULT = new RegExp(`(?:${PROSE_STATED}|${PROSE_MARKED})`, 'i');
 
-/** "`key`:" opening the clause: what follows is about a key of the prop (an object, or one variant), not the prop. */
-const NAMED_KEY = /\x60[^\x60\s]+\x60\s*:/;
+/**
+ * "`key`:" OPENING the clause (after an optional list marker): what follows is about a key of the prop (an object,
+ * or one variant), not the prop. Anchored at the start of the clause on purpose: "When `open`: focuses the field,
+ * defaults to `false`." is a default of the prop, the colon there only closes a condition.
+ */
+const NAMED_KEY = /^\s*(?:(?:[-*+]|\d+[.)])\s+)?\x60[^\x60\s]+\x60\s*:/;
+/** Where a clause ends: `.`, `;`, `!` or `?` and a space, a blank line, or the next item of a list. */
+const CLAUSE_END = /(?<=[.;!?])\s+|\n\s*\n|\n(?=\s*(?:[-*+]|\d+[.)])\s)/;
 
 /**
  * The value of the first default the prose states for the prop (`"Loading"`, `` `md` ``, `1`), `undefined` when
  * none: a `PROSE_DEFAULT` match that is not in a clause opened by a named key ("`anchorBar`: ... (default
- * "Sections")"). A clause ends at `.`, `;`, `!` or `?` followed by a space, or at a blank line.
+ * "Sections")"). A clause ends at `.`, `;`, `!` or `?` followed by a space, at a blank line, or before the next
+ * item of a list. Declared limit: a key that opens a clause of its own sentence is recognised, a key in the middle
+ * of a sentence is not (see `NAMED_KEY`).
  */
 export function proseDefaultOf(text) {
   const all = new RegExp(PROSE_DEFAULT.source, 'gi');
   for (const m of String(text).matchAll(all)) {
-    const clause = String(text).slice(0, m.index).split(/(?<=[.;!?])\s+|\n\s*\n/).at(-1);
+    const clause = String(text).slice(0, m.index).split(CLAUSE_END).at(-1);
     if (!NAMED_KEY.test(clause)) return m[1] ?? m[2];
   }
   return undefined;
@@ -844,7 +852,8 @@ const SOURCE_WHERE = new Set(['param', 'body', 'delegated', 'fallback']);
  * - `missing-default`: a default in the source (or only in prose) and no `@default` / Default in the docgen;
  * - `mismatch`: `@default X` and a different default `Y` in the source (after normalisation; a constant or a
  *   fallback is shown with the literal it resolves to);
- * - `redundant-prose`: a `@default` and the same information repeated in the prose;
+ * - `redundant-prose`: a default shown in the Default column (a `@default`, or a default in the source) and the same
+ *   information repeated in the prose;
  * - `empty-default`: a `@default` tag without a value;
  * - `wrong-tag`: `@defaultValue`, which the docgen does not read (the Default column stays empty): use `@default`;
  * - `unread-tag`: a `@default` the docgen did not show (the Default column is empty although the tag is there,
@@ -873,6 +882,8 @@ export function check({ components }, { allowlist = UNCOMPARABLE_ALLOWLIST } = {
       const uncomparable = r.sourceValue === null && (inSource || tagValued || r.prose);
       if (uncomparable) needed.add(id);
       if (r.divergence) push(c.component, r.prop, 'divergent-default', `public default ${flat(r.divergence.own)}, ${r.divergence.via} defaults it to ${flat(r.divergence.inner)} (the public one wins)`);
+      // #476: a default in the source (so the Default column is filled) and the same default repeated in the prose.
+      if (r.declared === undefined && r.kind === 'ok' && r.prose) push(c.component, r.prop, 'redundant-prose', 'the Default column already shows the default and the prose repeats it: remove the prose');
       if (r.declared === undefined) continue;
       if (r.declaredTag === 'defaultValue') push(c.component, r.prop, 'wrong-tag', '`@defaultValue` is not read by the docgen (the Default column stays empty): write `@default`');
       else if (r.kind === 'gap' && tagValued) push(c.component, r.prop, 'unread-tag', `\`@default ${flat(r.declared)}\` is not shown by the docgen (the Default column is empty): put the tag on the declaration of the prop the docgen documents`);

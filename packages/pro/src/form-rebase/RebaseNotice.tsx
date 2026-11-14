@@ -94,7 +94,7 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
   onKeepMine: (path: string) => void;
   /** "Use all server values" (shown from two conflicts up): typically `useFormRebase().acceptAllTheirs`. */
   onAcceptAllTheirs: () => void;
-  /** `useFormRebase().isPending`: an update is waiting for a save in flight. Default `false`. */
+  /** `useFormRebase().isPending`: an update is waiting for a save in flight. */
   pending?: boolean;
   /** Overrides of the texts, merged with {@link DEFAULT_REBASE_NOTICE_LABELS}. */
   labels?: Partial<RebaseNoticeLabels>;

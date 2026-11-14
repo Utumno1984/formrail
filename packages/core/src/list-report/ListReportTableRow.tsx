@@ -46,7 +46,7 @@ export interface ListReportTableRowProps<Row> {
   rowActions?: ListReportRowActions<Row>;
   /**
    * `ListReportTableBodyContext.rowActionsInline` (a whole number ≥ 0): how many actions with an `icon`
-   * are inline buttons when the table's container is wide. Default `0` (the menu alone, as before).
+   * are inline buttons when the table's container is wide; with `0` only the menu is shown, as before.
    * Never rendered to the DOM.
    */
   rowActionsInline?: number;

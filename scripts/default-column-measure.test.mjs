@@ -1050,6 +1050,57 @@ describe('prose, round 3: "`x` (default)" and named keys (#474)', () => {
   });
 });
 
+// #476: the cases the critic of #474 found untested in `proseDefaultOf` (R2, R11, R4, B1). Each one kills a mutation
+// of the script (listed in the PR).
+describe('proseDefaultOf: R2, R11, R4, B1 (#476)', () => {
+  it('R2: a default inside a clause with a named key does not stop the search, the next sentence is read', () => {
+    expect(proseDefaultOf('`anchorBar`: the name (default "Sections"). Defaults to `{}`.')).toBe('`{}`');
+  });
+  it.each([
+    ['`x` (defaults to `y`).', '`y`'],
+    ['Size `sm` (default for compact tables) or `md`.', undefined],
+    ['Size `sm` (the default for compact tables) or `md`.', undefined],
+    ['Size `sm` (default) or `md`.', '`sm`'],
+  ])('R11: the closing parenthesis of "(default)" is required: %j -> %j', (text, value) => expect(proseDefaultOf(text)).toBe(value));
+  it('R4: a semicolon closes the clause, so a key before it does not hide the default after it', () => {
+    expect(proseDefaultOf('`a`: one thing; default `b`.')).toBe('`b`');
+  });
+  it('R4: ... and the key still hides a default of the same clause', () => {
+    expect(proseDefaultOf('`a`: one thing, default `b`.')).toBeUndefined();
+  });
+  it('B1: a key opens a clause only at its start: a colon after a condition is not a named key', () => {
+    expect(proseDefaultOf('When `open`: focuses the field, defaults to `false`.')).toBe('`false`');
+    expect(proseDefaultOf('Focus moves on `open`: the field, default `false`.')).toBe('`false`');
+  });
+  it('B1: a key at the start of the clause, with or without a list marker, still hides its defaults', () => {
+    expect(proseDefaultOf('`a`: width (default 100%).')).toBeUndefined();
+    expect(proseDefaultOf('Modes:\n- `a`: width (default 100%).')).toBeUndefined();
+    expect(proseDefaultOf('Modes:\n1. `a`: width (default 100%).')).toBeUndefined();
+  });
+  it('B1: each item of a list is its own clause; "- `grid` (default)" marks the value of the prop', () => {
+    expect(proseDefaultOf('Layouts:\n- `grid` (default): cards in a grid.\n- `list`: one per row.')).toBe('`grid`');
+    expect(proseDefaultOf('Layouts:\n- `list`: one per row.\n- `grid` (default): cards in a grid.')).toBe('`grid`');
+  });
+});
+
+describe('redundant prose next to a default in the source (#476)', () => {
+  const rowOf = (extra) => ({ components: [{ component: 'C', rows: [{ prop: 'p', kind: 'ok', where: 'param', source: "'md'", sourceValue: 'md', declared: undefined, prose: false, ...extra }], unresolvedDelegations: [] }] });
+  it('a default in the source and the same default in the prose, with no `@default`, is redundant: the column already shows it', () => {
+    expect(check(rowOf({ prose: true, proseValue: '`md`' }), { allowlist: {} }).map((i) => i.kind)).toEqual(['redundant-prose']);
+  });
+  it('no prose, no problem; and a row with prose but no default shown is the missing-default case, not this one', () => {
+    expect(check(rowOf({}), { allowlist: {} }).map((i) => i.kind)).toEqual([]);
+    const gap = rowOf({ kind: 'gap', prose: true, declared: undefined });
+    expect(check(gap, { allowlist: {} }).map((i) => i.kind)).toEqual(['missing-default']);
+  });
+  it('with `@default` and prose it is still redundant (one report, not two)', () => {
+    expect(check(rowOf({ prose: true, declared: "'md'", declaredTag: 'default' }), { allowlist: {} }).map((i) => i.kind)).toEqual(['redundant-prose']);
+  });
+  it('on the repository no prop repeats its default in the prose', () => {
+    expect(check(measure()).filter((i) => i.kind === 'redundant-prose')).toEqual([]);
+  }, 120_000);
+});
+
 describe('the guard, third round, on fixture packages (#474)', () => {
   const files = {
     'Inner.tsx': `export interface InP {
@@ -1176,16 +1227,16 @@ describe('the --check command line', { timeout: 120_000 }, () => {
 describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
   const result = measure();
   const script = join(REPO_ROOT, 'scripts/default-column-measure.mjs');
-  it('exits non-zero while #475/#476 have not documented the props, with a sorted, repeatable list', () => {
+  // #476: was "exits non-zero while #475/#476 have not documented the props" (exit 1, the four Pro `missing-default`).
+  // Same CLI run on the repository, the expectation moves with the state: the Pro props have their `@default`.
+  it('passes on the repository once #476 documented the Pro props, with a sorted, repeatable output', () => {
     const r1 = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
     const r2 = spawnSync(process.execPath, [script, '--check'], { encoding: 'utf8' });
-    expect(r1.status).toBe(1);
+    expect(r1.status).toBe(0);
     expect(r1.stdout).toBe(r2.stdout);
-    // #475 documented the core components; what is left is Pro (#476), the same four missing defaults.
-    expect(r1.stdout).toContain('VirtualListReport.overscan [missing-default]');
+    expect(r1.stdout).toBe('Default column check: OK\n');
+    expect(r1.stdout).not.toContain('VirtualListReport');
     expect(r1.stdout).not.toContain('Button.size');
-    const left = r1.stdout.split('\n').filter((l) => /\[[a-z-]+\]/.test(l)).map((l) => l.split('.')[0]);
-    expect([...new Set(left)]).toEqual(['VirtualListReport', 'VirtualListReportTable']);
   });
   it('ListReport and VirtualListReport get status and loadingRowCount through the renderTable render prop', () => {
     for (const comp of ['ListReport', 'VirtualListReport']) {
@@ -1199,8 +1250,9 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     const kinds = ['unresolved-delegation', 'divergent-default', 'stale-allowlist', 'mismatch', 'redundant-prose', 'empty-default', 'non-literal'];
     expect(check(result).filter((i) => kinds.includes(i.kind))).toEqual([]);
   });
-  it('round 2: only missing defaults are left, none of the new kinds', () => {
-    expect([...new Set(check(result).map((i) => i.kind))]).toEqual(['missing-default']);
+  // #476: was `['missing-default']` (the four Pro props). Nothing is left, of any kind: the set of kinds is empty.
+  it('round 2: no problem of any kind is left (not even a missing default)', () => {
+    expect([...new Set(check(result).map((i) => i.kind))]).toEqual([]);
   });
   it('round 2: every default the script cannot compare is in the allowlist, so #475 can add `@default` without being blocked', () => {
     // Simulate #475: a `@default` on every prop the guard reports as missing, with the value #475 would write: the
@@ -1250,18 +1302,43 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     // #475: Tabs.activationMode and ConfirmDialog.tone now have `@default` and no prose (were `prose-only` / `prose`).
     expect(rowIn(result, 'Tabs', 'activationMode')).toMatchObject({ kind: 'ok', declared: "'automatic'", prose: false });
     expect(rowIn(result, 'ConfirmDialog', 'tone')).toMatchObject({ kind: 'ok', declared: "'danger'", prose: false });
+    // #476: the "`x` (default)" sentence of these two was removed from the source (the Default column shows the value),
+    // so the real rows have no prose any more (was `prose: true`). The reading of that form stays pinned on the
+    // sentences as they were written, copied before the removal (synthetic rows, same texts).
     for (const id of ['DescriptionList.layout', 'ObjectPage.sectionNavigation']) {
       const [c, p] = id.split('.');
-      expect(rowIn(result, c, p), id).toMatchObject({ prose: true });
+      expect(rowIn(result, c, p), id).toMatchObject({ kind: 'ok', prose: false });
+    }
+    const sentences = [
+      ['DescriptionList.layout', "`inline`: value to the side of the label, in one shared column. `stacked`: value under the label. `auto` (default): decided by a CSS container query on the content width of the `<dl>` itself", '`auto`', "'auto'"],
+      ['ObjectPage.sectionNavigation', 'Navigation between the sections: `anchors` (default) shows an Anchor Bar, sticky at the top of the scroller, once there are two or more sections; `none` shows nothing.', '`anchors`', "'anchors'"],
+    ];
+    for (const [id, text, value, source] of sentences) {
+      const [c, p] = id.split('.');
+      expect(PROSE_DEFAULT.test(text), id).toBe(true);
+      expect(proseDefaultOf(text), id).toBe(value);
+      const row = { prop: p, kind: 'ok', where: 'param', source, sourceValue: source.slice(1, -1), declared: undefined, prose: proseDefaultOf(text) !== undefined, proseValue: proseDefaultOf(text) };
+      expect(check({ components: [{ component: c, rows: [row], unresolvedDelegations: [] }] }, { allowlist: {} }).map((i) => i.kind), id).toEqual(['redundant-prose']);
     }
   });
   it('round 2: a @default added next to `Default "Loading"` / `Default 1.` prose is redundant', () => {
-    for (const id of ['Spinner.label', 'ObjectPageFooter.label', 'ObjectPage.headingLevel']) {
+    // #476: the three real rows no longer carry the prose (was `prose: true` on each, read from the repository).
+    // The same three forms are pinned on the sentences as they were written, copied before the removal: a quoted
+    // value ("Loading"), a quoted value after an apostrophe-bearing sentence ("Save actions"), a bare number (1).
+    const sentences = [
+      ['Spinner.label', 'Text announced to assistive technology (announced mode only). Default "Loading". An empty label leaves the region empty and logs an error in development.', "'Loading'"],
+      ['ObjectPageFooter.label', "Accessible name of the footer's `region`. Default \"Save actions\".", "'Save actions'"],
+      ['ObjectPage.headingLevel', "Level of the header's title (1-4); the sections' titles get the next one. Default 1.", '1'],
+    ];
+    for (const [id, text, source] of sentences) {
       const [c, p] = id.split('.');
-      const r = rowIn(result, c, p);
-      expect(r, id).toMatchObject({ prose: true });
-      const withTag = { components: [{ component: c, rows: [{ ...r, declared: r.sourceLiteral ?? r.source, declaredTag: 'default' }], unresolvedDelegations: [] }] };
+      expect(rowIn(result, c, p), id).toMatchObject({ prose: false });
+      expect(proseDefaultOf(text), id).toBeDefined();
+      const r = { prop: p, kind: 'ok', where: 'param', source, sourceValue: normalizeDefault(source), literal: true, prose: true, proseValue: proseDefaultOf(text) };
+      const withTag = { components: [{ component: c, rows: [{ ...r, declared: source, declaredTag: 'default' }], unresolvedDelegations: [] }] };
       expect(check(withTag, { allowlist: {} }).map((i) => i.kind), id).toEqual(['redundant-prose']);
+      // without the tag the column already shows the source default: still redundant (#476)
+      expect(check({ components: [{ component: c, rows: [r], unresolvedDelegations: [] }] }, { allowlist: {} }).map((i) => i.kind), id).toEqual(['redundant-prose']);
     }
   });
   it('round 2: `useCombobox({ clearOnEmpty })` is followed (object literal argument)', () => {
