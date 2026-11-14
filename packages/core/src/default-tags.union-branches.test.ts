@@ -10,18 +10,15 @@ import { describe, expect, it } from 'vitest';
 const SRC = import.meta.dirname;
 
 /**
- * Props whose branches deliberately describe the discriminant ("one item" / "the items"), which predate
- * #475. The Docs table already shows both texts for them: out of scope of the `@default` ticket. The
- * list can only shrink: an entry that no longer diverges fails the test.
+ * Props whose branches deliberately describe different things, with the reason. Empty since #537: every
+ * branch now carries the same text (the per-branch details live in that one text, because the docgen
+ * shows only the prose). The list can only shrink: an entry that no longer diverges fails the test.
+ *
+ * Limits of the check (it follows only the types declared in the same file): it does not follow types
+ * imported from another module, types built with `Omit<>` or generics, nor members inherited through
+ * `extends` of an interface that is a branch. Extend it if a union prop needs it.
  */
-const KNOWN_DIVERGENT: Record<string, string> = {
-  'accordion/Accordion.tsx: AccordionProps.type': 'single / multiple describe themselves',
-  'accordion/Accordion.tsx: AccordionProps.value': 'one value / many values',
-  'accordion/Accordion.tsx: AccordionProps.defaultValue': 'one value / many values',
-  'accordion/Accordion.tsx: AccordionProps.onValueChange': 'one value / many values',
-  'object-page/standard-schema.ts: StandardSchemaResult.issues': 'success branch / failure branch',
-  'typography/Text.tsx: TextProps.as': 'the `label` branch is a different element',
-};
+const KNOWN_DIVERGENT: Record<string, string> = {};
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

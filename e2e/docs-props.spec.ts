@@ -349,6 +349,36 @@ test.describe('Docs props tables', () => {
     expect(tagsOf('ButtonIconSize')).toEqual([]);
   });
 
+  test('Accordion and Text: the props of a union show one description, not the branches joined (ticket #537)', async ({ page }) => {
+    // The docgen merges the branches of a union: with different texts the row shows them twice. Each prop
+    // now has one text, the same in every branch, with the per-branch details inside it.
+    const accordion = (await realPage(page, 'Navigation/Accordion')).facts;
+    const text = (await realPage(page, 'Foundations/Typography')).facts;
+    const once = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+    const flat = (t: string | undefined) => (t ?? '').replace(/\s+/g, ' ').trim();
+    const checks: { facts: DocsPageFacts; prop: string; mustHave: string[] }[] = [
+      { facts: accordion, prop: 'type', mustHave: ['`single` (at most one item at a time)', '`multiple` (any number at once)'] },
+      { facts: accordion, prop: 'value', mustHave: ['Controlled:', '`type="single"`', '`type="multiple"`'] },
+      { facts: accordion, prop: 'defaultValue', mustHave: ['Initial open item', '`type="multiple"`'] },
+      { facts: accordion, prop: 'onValueChange', mustHave: ['Called **only** for a user gesture', '`type="single"`', '`type="multiple"`'] },
+      { facts: text, prop: 'as', mustHave: ['Element rendered:', '`label` is a different element', '`htmlFor`'] },
+    ];
+    for (const { facts, prop, mustHave } of checks) {
+      const rows = facts.rows.filter((r) => r.name === prop);
+      expect(rows, `${facts.title}.${prop}`).toHaveLength(1);
+      const docgen = flat(facts.component?.props[prop]?.description);
+      expect(docgen, `${facts.title}.${prop} has no description`).not.toBe('');
+      expect(flat(rows[0]?.description), `${facts.title}.${prop}`).toBe(docgen);
+      for (const phrase of mustHave) expect(once(docgen, phrase), `${facts.title}.${prop}: "${phrase}" must appear once`).toBe(1);
+    }
+    // The first sentence of each text is not repeated (the joined-branches symptom).
+    for (const { facts, prop } of checks) {
+      const description = flat(facts.component?.props[prop]?.description);
+      const first = description.split(/(?<=[.:])\s/)[0] ?? '';
+      expect(once(description, first), `${facts.title}.${prop}: first sentence repeated`).toBe(1);
+    }
+  });
+
   test('negative: a Radix prop dropped by the docgen filter, and a TSDoc inherited from @types/react, fail the guard', async ({ page }) => {
     // T1: the Radix props a component passes through (here MenuContent's `sideOffset` and MenuItem's
     // `textValue`) must stay in the docgen.
