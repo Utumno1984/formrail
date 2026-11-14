@@ -32,6 +32,8 @@ test.describe('renamed story ids: complete build (#516)', () => {
     await page.goto(`/?path=/story/${PROBE.story.old}`);
     // The very first history call of the page is the redirect, with the exact new URL.
     expect((await historyCalls(page))[0]).toEqual(['replaceState', `${baseURL}/?path=/story/${PROBE.story.new}`]);
+    // Rewritten in place: the document is the one loaded with the old URL, there was no second load.
+    expect(await initialHref(page)).toBe(`${baseURL}/?path=/story/${PROBE.story.old}`);
     await expectManagerOn(page, `/story/${PROBE.story.new}`, PROBE.story.new);
     const preview = page.frameLocator('#storybook-preview-iframe');
     await expect(preview.getByTestId('legacy-redirect-target')).toHaveText('Legacy redirect target');
@@ -47,7 +49,9 @@ test.describe('renamed story ids: complete build (#516)', () => {
     expect(page.url()).toBe(origin);
     await expectManagerOn(page, `/story/${ORIGIN}`, ORIGIN);
     await page.goForward();
-    expect(new URL(page.url()).searchParams.get('path')).toBe(`/story/${PROBE.story.new}`);
+    // Polled: the traversal may commit after goForward() resolves (seen once in 40 runs).
+    await expectManagerOn(page, `/story/${PROBE.story.new}`, PROBE.story.new);
+    expect(page.url()).not.toContain(PROBE.story.old);
   });
 
   test('manager: an old ?path=/docs/ lands on the new Docs page', async ({ page }) => {
@@ -72,6 +76,7 @@ test.describe('renamed story ids: complete build (#516)', () => {
     const query = `viewMode=story&args=label:Redirected&globals=outline:!true`;
     await page.goto(`/iframe.html?id=${PROBE.story.old}&${query}`);
     expect((await historyCalls(page))[0]).toEqual(['replaceState', `${baseURL}/iframe.html?id=${PROBE.story.new}&${query}`]);
+    expect(await initialHref(page)).toBe(`${baseURL}/iframe.html?id=${PROBE.story.old}&${query}`);
     await expect(page.getByTestId('legacy-redirect-target')).toHaveText('Redirected', { timeout: 30_000 });
     await expect(page.locator('body.sb-show-errordisplay')).toHaveCount(0);
     expect(new URL(page.url()).searchParams.get('id')).toBe(PROBE.story.new);

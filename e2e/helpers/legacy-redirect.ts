@@ -15,20 +15,17 @@ export const PROBE = {
 } as const;
 
 interface HistoryWindow extends Window {
-  __ropInitialHref?: string;
   __ropHistoryCalls?: Array<[method: string, url: string | null]>;
 }
 
 /**
- * Records, in every frame, the URL the document was loaded with and every `pushState`/`replaceState`
- * (resolved to an absolute URL), from before the page's own scripts run: so a test can tell the redirect's
- * own `replaceState` (the first call, from the head) from Storybook's later ones, and prove that a preview
- * frame was loaded straight with the new id.
+ * Records, in every frame, every `pushState`/`replaceState` (resolved to an absolute URL), from before the
+ * page's own scripts run: so a test can tell the redirect's own `replaceState` (the first call, from the
+ * head) from Storybook's later ones.
  */
 export async function recordHistory(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const w = window as HistoryWindow;
-    w.__ropInitialHref = location.href;
     w.__ropHistoryCalls = [];
     for (const method of ['pushState', 'replaceState'] as const) {
       const original = history[method].bind(history);
@@ -46,6 +43,12 @@ export function historyCalls(target: Evaluable): Promise<Array<[string, string |
   return target.evaluate(() => (window as HistoryWindow).__ropHistoryCalls ?? []);
 }
 
+/**
+ * The URL the document was LOADED with (its Navigation Timing entry), which `history.replaceState` does not
+ * change: the old URL for a page the redirect rewrote in place, the new one for a preview frame the manager
+ * loaded straight with the new id. Not an init-script marker: Chromium may reuse a frame's initial
+ * `about:blank` window for its first same-origin document, and a marker set there would read "about:blank".
+ */
 export function initialHref(target: Evaluable): Promise<string | undefined> {
-  return target.evaluate(() => (window as HistoryWindow).__ropInitialHref);
+  return target.evaluate(() => (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.name);
 }
