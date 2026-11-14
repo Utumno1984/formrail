@@ -281,6 +281,76 @@ describe('a field registered after the mount while a conflict is open (#505 red 
   });
 });
 
+describe('a save that settles while the user edited a row and the server reordered the rows (QA #507 round 2, point 2)', () => {
+  function setupSavingOrder(arrayIdKeys: Record<string, string> | undefined) {
+    let probe!: { form: UseFormReturn<Order>; binding: RebaseFormBinding<Order>; entries: ChangeEntry[] };
+    function OrderForm() {
+      const form = useForm<Order>({ defaultValues: ORDER });
+      const lines = useFieldArray({ control: form.control, name: 'lineItems' });
+      const binding = useReactHookFormBinding(form, arrayIdKeys ? { arrayIdKeys } : {});
+      const { entries } = useChangeSummary({ values: binding.values, baseline: binding.baseline, arrayIdKeys: { lineItems: 'id' } });
+      probe = { form, binding, entries };
+      return (
+        <form>
+          {lines.fields.map((field, index) => (
+            <input key={field.id} aria-label={`Description ${index + 1}`} {...form.register(`lineItems.${index}.description`)} />
+          ))}
+        </form>
+      );
+    }
+    const view = render(<OrderForm />);
+    return { probe: () => probe, unmount: view.unmount };
+  }
+
+  /** Saves through handleSubmit; during the save the user edits row 2 (L2); the server returns the rows reordered. */
+  async function saveWhileEditingRow2(order: ReturnType<typeof setupSavingOrder>) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let done!: Promise<void>;
+    await act(async () => {
+      done = order.probe().form.handleSubmit(async (sent) => {
+        await gate;
+        const [l1, l2, l3] = sent.lineItems;
+        order.probe().binding.reset({ ...sent, lineItems: [{ ...l3!, description: 'ROUTER' }, l1!, l2!] });
+      })();
+    });
+    fireEvent.input(screen.getByLabelText('Description 2'), { target: { value: 'Switch 24 ports' } });
+    await act(async () => {
+      release();
+      await done;
+    });
+  }
+
+  it('with arrayIdKeys: the edit stays on its row (L2), the rows take the server order and normalization', async () => {
+    const order = setupSavingOrder({ lineItems: 'id' });
+    await saveWhileEditingRow2(order);
+    const { binding, entries } = order.probe();
+    expect(binding.values.lineItems.map((line) => [line.id, line.description])).toEqual([
+      ['L3', 'ROUTER'],
+      ['L1', 'Cable'],
+      ['L2', 'Switch 24 ports'],
+    ]);
+    expect(binding.baseline.lineItems.map((line) => line.id)).toEqual(['L3', 'L1', 'L2']);
+    expect(summary(entries)).toEqual([['changed', 'lineItems.2.description']]);
+    expect((screen.getByLabelText('Description 1') as HTMLInputElement).value).toBe('ROUTER');
+    expect((screen.getByLabelText('Description 3') as HTMLInputElement).value).toBe('Switch 24 ports');
+    order.unmount();
+  });
+
+  it('without arrayIdKeys: the edited array is kept whole (no edit lands on another row)', async () => {
+    const order = setupSavingOrder(undefined);
+    await saveWhileEditingRow2(order);
+    const { binding } = order.probe();
+    expect(binding.values.lineItems.map((line) => [line.id, line.description])).toEqual([
+      ['L1', 'Cable'],
+      ['L2', 'Switch 24 ports'],
+      ['L3', 'Router'],
+    ]);
+    expect(binding.baseline.lineItems.map((line) => line.id)).toEqual(['L3', 'L1', 'L2']);
+    order.unmount();
+  });
+});
+
 describe('documented limits (QA #507, points 3 and 4)', () => {
   type WithRef = Invoice & { reference?: string };
 

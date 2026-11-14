@@ -4,7 +4,7 @@
 // that breaks a rule and expect it to fail (the suite is not blind).
 import { act, renderHook } from '@testing-library/react';
 import { expect } from 'vitest';
-import type { RebaseFormBinding } from '../src/engine';
+import { useFormRebase, type RebaseFormBinding, type UseFormRebaseReturn } from '../src/engine';
 
 export interface ContractInvoice {
   name: string;
@@ -32,13 +32,13 @@ export interface ContractForm {
 /** A hook that renders the form under test, initialized with `initial`. */
 export type UseContractForm = (initial: ContractInvoice) => ContractForm;
 
-/** Renders `use` and records the binding of every render. */
+/** Renders `use` (with the rebase engine on its binding) and records the binding of every render. */
 function mount(use: UseContractForm) {
   const renders: RebaseFormBinding<ContractInvoice>[] = [];
   const view = renderHook(() => {
     const form = use(CONTRACT_INITIAL);
     renders.push(form.binding);
-    return form;
+    return { ...form, rebase: useFormRebase(form.binding) as UseFormRebaseReturn<ContractInvoice> };
   });
   return { current: () => view.result.current, renders, rerender: () => view.rerender(), unmount: () => view.unmount() };
 }
@@ -238,6 +238,47 @@ export const CONTRACT_CHECKS: ContractCheck[] = [
         await act(() => save.settle(null));
         expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
         expect(form.current().binding.values).toEqual({ ...CONTRACT_INITIAL, name: 'acme ltd co' });
+      }),
+  },
+  {
+    name: 'setValues during a save keeps the save in flight; an edit made after it survives the save',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('Acme Ltd'));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => copy(sent));
+        });
+        // Back to the baseline by code, then a user edit on another field.
+        act(() => form.current().binding.setValues({ name: 'Acme' }));
+        expect(form.current().binding.isSaving).toBe(true);
+        act(() => form.current().editCity('Milan'));
+        expect(form.current().binding.isSaving).toBe(true);
+        await act(() => save.settle(null));
+        expect(form.current().binding.isSaving).toBe(false);
+        expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
+        expect(form.current().binding.values).toEqual({ ...CONTRACT_INITIAL, supplier: { city: 'Milan', tags: ['a'] } });
+      }),
+  },
+  {
+    name: 'acceptTheirs during a save keeps the save in flight, the accepted value and an edit made after it',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('Mine'));
+        act(() => form.current().rebase.rebase({ ...CONTRACT_INITIAL, name: 'Theirs', amount: 11 }));
+        expect(form.current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['name']);
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => copy(sent));
+        });
+        act(() => form.current().rebase.acceptTheirs('name'));
+        expect(form.current().binding.isSaving).toBe(true);
+        act(() => form.current().editCity('Milan'));
+        await act(() => save.settle(null));
+        expect(form.current().binding.isSaving).toBe(false);
+        // Saved: what was sent ("Mine"); kept: the accepted server value and the edit made during the save.
+        expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Mine', amount: 11 });
+        expect(form.current().binding.values).toEqual({ name: 'Theirs', amount: 11, supplier: { city: 'Milan', tags: ['a'] } });
       }),
   },
 ];

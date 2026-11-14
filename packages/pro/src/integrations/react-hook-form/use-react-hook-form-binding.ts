@@ -24,6 +24,13 @@ export interface UseReactHookFormBindingOptions {
    * @default formState.isSubmitted && !formState.isSubmitSuccessful ? formState.errors : null
    */
   saveError?: unknown;
+  /**
+   * Identity key per array, keyed by a path without indexes (`{ lineItems: 'id' }`): pass the same `arrayIdKeys`
+   * as to `useChangeSummary` / `useFormRebase`. Read when a save settles while the user kept typing: the rows
+   * of an array edited meanwhile are matched by id, so a reorder by the server never moves an edit to another
+   * row. Without it (or with a row without id), an array edited during the save is kept whole.
+   */
+  arrayIdKeys?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -71,6 +78,8 @@ class BindingStore<Values extends FieldValues> {
   private run: { before: Values; removed: Map<string, { type: string; message?: string }> } | null = null;
   /** `isSaving` as of the last commit (see `observeSaving`). */
   private saving = false;
+  /** The `arrayIdKeys` option as of the last commit. */
+  arrayIdKeys: Readonly<Record<string, string>> | undefined = undefined;
   /**
    * The values when the save in flight started (`isSaving` turned `true`), `null` when no save is in flight or
    * when a reset or a rehydration happened since (the reset wins: the save's result is then a plain hydration).
@@ -158,17 +167,33 @@ class BindingStore<Values extends FieldValues> {
     if (notify) for (const listener of this.listeners) listener();
   }
 
-  /** Writes `values` to React Hook Form, as defaults too unless `keepDefaults`, keeping the interaction state. */
-  private writeValues(values: Values, keepDefaults: boolean): void {
+  /**
+   * Writes `values` to React Hook Form and `defaults` as its defaults (`null`: its defaults stay), keeping the
+   * interaction state (touched fields, errors, submit count and flags).
+   */
+  private write(values: Values, defaults: Values | null): void {
     const { form } = this;
     this.busy += 1;
     try {
-      form.reset(values, {
-        ...KEEP_INTERACTION,
-        keepDefaultValues: keepDefaults,
+      if (this.saving && keepsEveryKey(form.getValues(), values)) {
+        // During a save, never React Hook Form's `reset`: it always sets `isSubmitting` to `false`, and the
+        // `handleSubmit` in flight, seeing a reset, skips its own end (no `isSubmitting: false`, `isSubmitted`,
+        // submit count). The save would end for the binding at the first `setValues` (an `acceptTheirs`) and its
+        // real end would never be seen. `setValues` writes the values in place (a copy: React Hook Form keeps the
+        // objects it receives and mutates them later; no field re-registers, the DOM of a field being typed in
+        // gets the value it already has); `resetDefaultValues` writes the defaults and recomputes `dirtyFields`
+        // and `isDirty` against them. Neither touches the submit state.
+        form.setValues(snapshotOf(values) as never);
+        form.resetDefaultValues((defaults ?? form.control._defaultValues) as never);
+      } else {
+        // Outside a save, or when a top-level key must go (`setValues` only adds and replaces keys).
         // With `shouldUnregister`, a reset keeps only the values of the mounted fields it is told to keep.
-        keepFieldsRef: form.control._options.shouldUnregister === true,
-      });
+        const keep = { ...KEEP_INTERACTION, keepFieldsRef: form.control._options.shouldUnregister === true };
+        form.reset(defaults ?? values, { ...keep, keepDefaultValues: defaults === null });
+        // Same synchronous run as a rebase: the fields re-register at the next render with the final values, so the
+        // DOM of a field being typed in never shows `defaults`.
+        if (defaults !== null && values !== defaults) form.reset(values, { ...keep, keepDefaultValues: true });
+      }
     } finally {
       this.busy -= 1;
     }
@@ -221,12 +246,9 @@ class BindingStore<Values extends FieldValues> {
     const target = next ?? this.state.baseline;
     // During a save, `reset(saved)` ends it: the fields edited since the save started keep the typed value (dirty
     // against `saved`), the others take what the server stored. Nothing edited meanwhile: `values` is `saved`.
-    const values = next !== undefined && sent !== null ? keepEditsSince(sent, this.state.values, next) : target;
+    const values = next !== undefined && sent !== null ? keepEditsSince(sent, this.state.values, next, this.arrayIdKeys) : target;
     // `reset()` keeps React Hook Form's defaults (the baseline does not change).
-    this.writeValues(target, next === undefined);
-    // Same synchronous run as a rebase: the fields re-register at the next render with the final values, so the
-    // DOM of a field being typed in never shows `saved`.
-    if (values !== target) this.writeValues(values, true);
+    this.write(values, next === undefined ? null : target);
     this.commit({ baseline: target, values });
     this.clearStaleErrors(run);
   };
@@ -236,7 +258,7 @@ class BindingStore<Values extends FieldValues> {
     const merged = { ...this.state.values, ...patch } as Values;
     const values = snapshotOf(merged, this.state.values);
     if (values !== this.state.values) {
-      this.writeValues(merged, true);
+      this.write(merged, null);
       this.commit({ baseline: this.state.baseline, values });
     }
     this.clearStaleErrors(run);
@@ -315,6 +337,10 @@ export function useReactHookFormBinding<Values extends FieldValues>(
   }
   // Before every layout effect of the commit (the rebase engine reads `isSaving` in one, also in a child).
   useInsertionEffect(() => store.observeSaving(isSaving), [store, isSaving]);
+  const { arrayIdKeys } = options;
+  useInsertionEffect(() => {
+    store.arrayIdKeys = arrayIdKeys;
+  }, [store, arrayIdKeys]);
 
   // `defaultValues` as an async function: until it resolves the form is hydrating, not edited. React Hook Form
   // has no defaults yet (`{}`) while the inputs already wrote their `''`: the baseline is the values themselves
@@ -327,6 +353,11 @@ export function useReactHookFormBinding<Values extends FieldValues>(
     () => ({ baseline, values, isSaving, saveError, reset: store.reset, setValues: store.setValues }),
     [baseline, values, isSaving, saveError, store],
   );
+}
+
+/** `true` when every top-level key of `current` is also in `next` (a write that removes none). */
+function keepsEveryKey(current: object, next: object): boolean {
+  return Object.keys(current).every((key) => Object.prototype.hasOwnProperty.call(next, key));
 }
 
 /** The controls already warned about (one warning per form). */

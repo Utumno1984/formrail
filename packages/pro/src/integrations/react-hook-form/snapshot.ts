@@ -91,23 +91,31 @@ function snap(source: unknown, previous: unknown, copy: boolean): unknown {
  * The values after a save that returned `returned`, while the form went from `sent` (its values when the save
  * started) to `current` (the user kept typing): every field the user edited since `sent` keeps its `current`
  * value, every other one takes `returned` (what the server stored, its normalization included). Descends into
- * plain objects, and into arrays whose length is the same in the three trees; anywhere else an edited value is
- * kept whole (an array the user resized keeps all of its items). A key the user removed since `sent` stays
- * removed, a key the user added stays; a key the server did not return is dropped unless the user edited it.
- * Content is compared with the rules of {@link snapshotOf}. Returns `returned` itself when the result has its
- * content (nothing edited since `sent`: the form shows what the server stored and is clean). Never mutates its
- * arguments; the result shares their subtrees (all three are immutable snapshots or handed over as such).
+ * plain objects. An array edited since `sent` is matched row by row only when `arrayIdKeys` declares its id key
+ * (the same option, with the same paths without indexes, as the engines: `{ lineItems: 'id' }`): the rows are
+ * paired by id, never by position, so a reorder by the server never moves an edit to another row. The order is
+ * the server's, unless the user reordered the rows since `sent` (then the user's); rows the user added since
+ * `sent` stay (after the others), rows the user removed stay removed, rows the server added come in, rows the
+ * server dropped go unless the user edited them. Without an id key, or when a row of one of the three arrays has
+ * no id (`undefined`/`null`, or is not an object) or two rows share one, an array edited since `sent` is kept
+ * whole. A key the user removed since `sent` stays removed, a key the user added stays; a key the server did not
+ * return is dropped unless the user edited it. Content is compared with the rules of {@link snapshotOf}. Returns
+ * `returned` itself when the result has its content (nothing edited since `sent`: the form shows what the
+ * server stored and is clean). Never mutates its arguments; the result shares their subtrees (all three are
+ * immutable snapshots or handed over as such).
  */
-export function keepEditsSince<T>(sent: T, current: T, returned: T): T {
-  const merged = mergeEdits(sent, current, returned);
+export function keepEditsSince<T>(sent: T, current: T, returned: T, arrayIdKeys?: Readonly<Record<string, string>>): T {
+  const merged = mergeEdits(sent, current, returned, '', arrayIdKeys);
   return sameContent(merged, returned) ? returned : (merged as T);
 }
 
-function mergeEdits(sent: unknown, current: unknown, returned: unknown): unknown {
+type IdKeys = Readonly<Record<string, string>> | undefined;
+
+function mergeEdits(sent: unknown, current: unknown, returned: unknown, schemaPath: string, idKeys: IdKeys): unknown {
   if (sameContent(current, sent)) return returned;
   if (Array.isArray(sent) && Array.isArray(current) && Array.isArray(returned)) {
-    if (sent.length !== current.length || current.length !== returned.length) return current;
-    return current.map((item: unknown, index) => mergeEdits(sent[index], item, returned[index]));
+    const idKey = idKeys !== undefined && schemaPath !== '' && Object.hasOwn(idKeys, schemaPath) ? idKeys[schemaPath] : undefined;
+    return typeof idKey === 'string' ? mergeRowsById(sent, current, returned, idKey, schemaPath, idKeys) : current;
   }
   if (isPlainRecord(sent) && isPlainRecord(current) && isPlainRecord(returned)) {
     const out: Container = Object.getPrototypeOf(returned) === null ? (Object.create(null) as Container) : {};
@@ -117,7 +125,8 @@ function mergeEdits(sent: unknown, current: unknown, returned: unknown): unknown
         if (!hasOwn(sent, key)) define(out, key, returned[key]);
         continue;
       }
-      define(out, key, hasOwn(sent, key) ? mergeEdits(sent[key], current[key], returned[key]) : current[key]);
+      const child = schemaPath === '' ? key : `${schemaPath}.${key}`;
+      define(out, key, hasOwn(sent, key) ? mergeEdits(sent[key], current[key], returned[key], child, idKeys) : current[key]);
     }
     for (const key of keysOf(current)) {
       if (hasOwn(returned, key)) continue;
@@ -128,6 +137,48 @@ function mergeEdits(sent: unknown, current: unknown, returned: unknown): unknown
     return out;
   }
   return current;
+}
+
+/** The rows of `rows` by id, in their order; `null` when a row has no id or two rows share one. */
+function rowsById(rows: readonly unknown[], idKey: string): Map<unknown, unknown> | null {
+  const byId = new Map<unknown, unknown>();
+  for (const row of rows) {
+    if (!isPlainRecord(row) || !hasOwn(row, idKey)) return null;
+    const id = row[idKey];
+    if (id === undefined || id === null || byId.has(id)) return null;
+    byId.set(id, row);
+  }
+  return byId;
+}
+
+function mergeRowsById(sent: unknown[], current: unknown[], returned: unknown[], idKey: string, schemaPath: string, idKeys: IdKeys): unknown {
+  const bySent = rowsById(sent, idKey);
+  const byCurrent = rowsById(current, idKey);
+  const byReturned = rowsById(returned, idKey);
+  if (bySent === null || byCurrent === null || byReturned === null) return current;
+  // The user reordered the rows kept since the save started: the user's order; otherwise the server's.
+  const keptInSentOrder = [...bySent.keys()].filter((id) => byCurrent.has(id));
+  const keptInUserOrder = [...byCurrent.keys()].filter((id) => bySent.has(id));
+  const reordered = keptInSentOrder.some((id, index) => !Object.is(id, keptInUserOrder[index]));
+  const out: unknown[] = [];
+  const placed = new Set<unknown>();
+  const place = (id: unknown): void => {
+    if (placed.has(id)) return;
+    placed.add(id);
+    const mine = byCurrent.get(id);
+    if (byCurrent.has(id) && byReturned.has(id)) {
+      out.push(bySent.has(id) ? mergeEdits(bySent.get(id), mine, byReturned.get(id), schemaPath, idKeys) : mine);
+    } else if (byReturned.has(id)) {
+      // Removed by the user since the save started: stays removed. Added by the server: comes in.
+      if (!bySent.has(id)) out.push(byReturned.get(id));
+    } else if (!bySent.has(id) || !sameContent(mine, bySent.get(id))) {
+      // Dropped by the server: goes, unless the user added or edited it since the save started.
+      out.push(mine);
+    }
+  };
+  for (const id of (reordered ? byCurrent : byReturned).keys()) place(id);
+  for (const id of (reordered ? byReturned : byCurrent).keys()) place(id);
+  return out;
 }
 
 /**

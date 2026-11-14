@@ -76,6 +76,8 @@ describe('the shared contract suite is not blind', () => {
       'reset(b) makes baseline and values the object b itself, from the next render',
       'reset() makes values the current baseline object',
       'setValues(patch) right after reset(b) in the same batch applies on top of it, with no render of the reset alone',
+      // The engine tells its own rebase by the identity of the baseline: with a copy, the conflict closes at once.
+      'acceptTheirs during a save keeps the save in flight, the accepted value and an edit made after it',
     ]);
   });
 

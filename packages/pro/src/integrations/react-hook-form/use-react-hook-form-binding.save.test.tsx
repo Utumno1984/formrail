@@ -199,6 +199,120 @@ describe('useReactHookFormBinding: typing while a handleSubmit save is in flight
   });
 });
 
+describe('useReactHookFormBinding: writes of the binding during a handleSubmit save (QA #507 round 2, point 1)', () => {
+  it("acceptTheirs during the save (the tester's case B): the save stays in flight to its real end, the accepted value and the edit typed after it stay", async () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '999');
+    act(() => harness.current().rebase.rebase({ ...SAVED, amount: '200' }));
+    expect(harness.current().rebase.conflicts.map((conflict) => conflict.path)).toEqual(['amount']);
+    const save = await startSave(harness);
+    act(() => harness.current().rebase.acceptTheirs('amount'));
+    // Still saving, for the binding and for React Hook Form.
+    expect(harness.current().binding.isSaving).toBe(true);
+    expect(harness.current().form.formState.isSubmitting).toBe(true);
+    expect(harness.input('Amount').value).toBe('200');
+    harness.type('Notes', 'typed during save');
+    expect(harness.current().binding.isSaving).toBe(true);
+    await save.settle();
+
+    const { binding, entries, form } = harness.current();
+    expect(binding.isSaving).toBe(false);
+    // The end of the submit is React Hook Form's own: submitted, successful, counted.
+    expect(form.formState.isSubmitting).toBe(false);
+    expect(form.formState.isSubmitted).toBe(true);
+    expect(form.formState.isSubmitSuccessful).toBe(true);
+    expect(form.formState.submitCount).toBe(1);
+    expect(binding.saveError).toBeNull();
+    expect(binding.baseline).toEqual({ ...SAVED, amount: '999' });
+    expect(binding.values).toEqual({ ...SAVED, amount: '200', notes: 'typed during save' });
+    expect(paths(entries)).toEqual(['changed:amount', 'changed:notes']);
+    expect(form.formState.dirtyFields).toEqual({ amount: true, notes: true });
+    expect(harness.input('Amount').value).toBe('200');
+    expect(harness.input('Notes').value).toBe('typed during save');
+    harness.unmount();
+  });
+
+  it('binding.setValues during the save: written in place (the field being typed in keeps its value in every commit), dirtyFields recomputed', async () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    const save = await startSave(harness);
+    harness.type('Notes', 'typing');
+    const from = harness.commits.length;
+    act(() => harness.current().binding.setValues({ supplier: 'Acme Corp Ltd' }));
+    expect(harness.current().binding.isSaving).toBe(true);
+    expect(harness.input('Supplier').value).toBe('Acme Corp Ltd');
+    expect(harness.current().form.formState.dirtyFields).toEqual({ supplier: true, amount: true, notes: true });
+    for (const commit of harness.commits.slice(from)) expect(commit.dom.notes).toBe('typing');
+    await save.settle();
+    expect(harness.current().binding.baseline).toEqual({ ...SAVED, amount: '120' });
+    expect(paths(harness.current().entries)).toEqual(['changed:supplier', 'changed:notes']);
+    expect(harness.current().form.formState.dirtyFields).toEqual({ supplier: true, notes: true });
+    harness.unmount();
+  });
+
+  it('reset(saved) during the save: isSaving stays true until the handler really ends, then the queued update merges', async () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    let release!: () => void;
+    const after = new Promise<void>((resolve) => (release = resolve));
+    let done!: Promise<void>;
+    await act(async () => {
+      done = harness.current().form.handleSubmit(async (sent) => {
+        harness.current().binding.reset({ ...sent });
+        // Work of the handler after the reset (an audit call, a toast).
+        await after;
+      })();
+    });
+    expect(harness.current().binding.baseline).toEqual({ ...SAVED, amount: '120' });
+    expect(harness.current().binding.isSaving).toBe(true);
+    act(() => harness.current().rebase.rebase({ ...SAVED, amount: '120', supplier: 'Acme Corp Ltd' }));
+    expect(harness.current().rebase.isPending).toBe(true);
+    await act(async () => {
+      release();
+      await done;
+    });
+    expect(harness.current().binding.isSaving).toBe(false);
+    expect(harness.current().form.formState.submitCount).toBe(1);
+    expect(harness.current().binding.values).toEqual({ ...SAVED, amount: '120', supplier: 'Acme Corp Ltd' });
+    expect(harness.current().rebase.isPending).toBe(false);
+    harness.unmount();
+  });
+
+  it('a handler that fails after a write of the binding: the save still ends, as failed', async () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    act(() => harness.current().rebase.rebase({ ...SAVED, amount: '150' }));
+    const save = await startSave(harness);
+    act(() => harness.current().rebase.keepMine('amount'));
+    act(() => harness.current().binding.setValues({ notes: 'by code' }));
+    expect(harness.current().binding.isSaving).toBe(true);
+    await save.settle(new Error('offline'));
+    expect(harness.current().binding.isSaving).toBe(false);
+    expect(harness.current().form.formState.isSubmitSuccessful).toBe(false);
+    expect(harness.current().binding.saveError).not.toBeNull();
+    expect(harness.current().binding.values).toEqual({ ...SAVED, amount: '120', notes: 'by code' });
+    harness.unmount();
+  });
+
+  it('documented edge: a stored record without a key the form has (no input) is written with a reset, which ends the submit', async () => {
+    // `reference` has no input: only a reset can remove it from React Hook Form's values.
+    const withReference = { ...SAVED, reference: 'R-1' } as Invoice;
+    const harness = setupInvoiceForm({ useFormProps: { defaultValues: withReference } });
+    harness.type('Amount', '120');
+    const save = await startSave(harness, (sent) => {
+      const rest: Record<string, unknown> = { ...sent };
+      delete rest.reference;
+      return rest as Invoice;
+    });
+    await save.settle();
+    expect(Object.hasOwn(harness.current().binding.values, 'reference')).toBe(false);
+    expect(Object.hasOwn(harness.current().form.getValues(), 'reference')).toBe(false);
+    expect(harness.current().binding.values).toBe(harness.current().binding.baseline);
+    expect(harness.current().binding.isSaving).toBe(false);
+    harness.unmount();
+  });
+});
+
 describe('useReactHookFormBinding: a save of your own (the isSaving option)', () => {
   interface Probe {
     form: UseFormReturn<Invoice>;

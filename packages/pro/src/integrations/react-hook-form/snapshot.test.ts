@@ -174,10 +174,72 @@ describe('keepEditsSince (a save that settles while the user kept typing)', () =
     expect(keepEditsSince(sent, { ...sent, supplier: 'rossi' }, returned)).toBe(returned);
   });
 
-  it('descends into arrays of the same length: one item edited, the others take the server value', () => {
+  it('without an id key an edited array is kept whole, also with the same length (rows are never paired by position)', () => {
     const current = { ...sent, lines: [{ qty: 1 }, { qty: 5 }] };
     const returned = { ...sent, lines: [{ qty: 10 }, { qty: 2 }] };
-    expect(keepEditsSince(sent, current, returned).lines).toEqual([{ qty: 10 }, { qty: 5 }]);
+    expect(keepEditsSince(sent, current, returned).lines).toEqual([{ qty: 1 }, { qty: 5 }]);
+    // Not edited: the server's array (its reorder included).
+    expect(keepEditsSince(sent, { ...sent }, { ...sent, lines: [{ qty: 2 }, { qty: 1 }] }).lines).toEqual([{ qty: 2 }, { qty: 1 }]);
+  });
+
+  describe('with arrayIdKeys: rows matched by id', () => {
+    type Row = { id: string; desc: string; qty: number };
+    type Order = { number: string; lines: Row[] };
+    const ids = { lines: 'id' };
+    const A: Row = { id: 'A', desc: 'cable', qty: 1 };
+    const B: Row = { id: 'B', desc: 'switch', qty: 2 };
+    const C: Row = { id: 'C', desc: 'router', qty: 3 };
+    const order: Order = { number: 'PO-1', lines: [A, B, C] };
+
+    it('the server reorders the rows (same length) while the user edits one: the edit stays on its row, in the server order', () => {
+      const current = { ...order, lines: [A, { ...B, qty: 20 }, C] };
+      const returned = { ...order, lines: [{ ...C, desc: 'Router' }, A, B] };
+      expect(keepEditsSince(order, current, returned, ids).lines).toEqual([{ ...C, desc: 'Router' }, A, { ...B, qty: 20 }]);
+      // Without the id key the edited array is kept whole: no edit lands on another row either.
+      expect(keepEditsSince(order, current, returned).lines).toEqual(current.lines);
+    });
+
+    it('inside a matched row only the edited field is kept; the others take the server value', () => {
+      const current = { ...order, lines: [A, { ...B, qty: 20 }, C] };
+      const returned = { ...order, lines: [A, { ...B, desc: 'Switch' }, C] };
+      expect(keepEditsSince(order, current, returned, ids).lines).toEqual([A, { ...B, desc: 'Switch', qty: 20 }, C]);
+    });
+
+    it('the user reordered the rows: the user order; rows added by the user stay, removed stay removed', () => {
+      const D: Row = { id: 'D', desc: 'mine', qty: 4 };
+      // The user moved C first, removed A and added D; the server normalized B and added E.
+      const E: Row = { id: 'E', desc: 'theirs', qty: 5 };
+      const current = { ...order, lines: [C, B, D] };
+      const returned = { ...order, lines: [A, { ...B, desc: 'Switch' }, C, E] };
+      expect(keepEditsSince(order, current, returned, ids).lines).toEqual([C, { ...B, desc: 'Switch' }, D, E]);
+    });
+
+    it('a row the server dropped goes, unless the user edited it during the save', () => {
+      const returned = { ...order, lines: [A, B] };
+      expect(keepEditsSince(order, { ...order, lines: [A, { ...B, qty: 9 }, C] }, returned, ids).lines).toEqual([A, { ...B, qty: 9 }]);
+      expect(keepEditsSince(order, { ...order, lines: [A, B, { ...C, qty: 9 }] }, returned, ids).lines).toEqual([A, B, { ...C, qty: 9 }]);
+    });
+
+    it('a row without id, or two rows with the same id, in any of the three: the edited array is kept whole', () => {
+      const current = { ...order, lines: [A, { ...B, qty: 20 }, C] };
+      const reordered = { ...order, lines: [C, A, B] };
+      const noId = { ...order, lines: [C, A, { ...B, id: undefined as unknown as string }] };
+      expect(keepEditsSince(order, current, noId, ids).lines).toEqual(current.lines);
+      const duplicate = { ...order, lines: [C, A, { ...B, id: 'A' }] };
+      expect(keepEditsSince(order, current, duplicate, ids).lines).toEqual(current.lines);
+      expect(keepEditsSince(order, current, reordered, ids).lines).toEqual([C, A, { ...B, qty: 20 }]);
+    });
+
+    it('nested arrays use their own path (lines.taxes)', () => {
+      type Taxed = { lines: { id: string; taxes: { code: string; rate: number }[] }[] };
+      const s: Taxed = { lines: [{ id: 'A', taxes: [{ code: 'V', rate: 22 }, { code: 'X', rate: 0 }] }] };
+      const current: Taxed = { lines: [{ id: 'A', taxes: [{ code: 'V', rate: 10 }, { code: 'X', rate: 0 }] }] };
+      const returned: Taxed = { lines: [{ id: 'A', taxes: [{ code: 'X', rate: 1 }, { code: 'V', rate: 22 }] }] };
+      expect(keepEditsSince(s, current, returned, { lines: 'id', 'lines.taxes': 'code' }).lines[0]!.taxes).toEqual([
+        { code: 'X', rate: 1 },
+        { code: 'V', rate: 10 },
+      ]);
+    });
   });
 
   it('an array resized meanwhile (by the user or by the server) keeps the user array whole', () => {
