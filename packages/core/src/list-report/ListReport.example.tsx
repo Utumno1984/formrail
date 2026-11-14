@@ -13,6 +13,12 @@ const invoices: Invoice[] = [
   { id: 'INV-0143', customer: 'Bianchi & Associates', amount: 380, status: 'approved' },
   { id: 'INV-0144', customer: 'Verdi Industrial Supplies', amount: 9200, status: 'pending' },
   { id: 'INV-0145', customer: 'Gialli Transport', amount: 74.9, status: 'approved' },
+  { id: 'INV-0146', customer: 'Neri Logistics', amount: 2310, status: 'pending' },
+  { id: 'INV-0147', customer: 'Russo Electrical', amount: 645.25, status: 'approved' },
+  { id: 'INV-0148', customer: 'Ferrari Office Supplies', amount: 118.4, status: 'pending' },
+  { id: 'INV-0149', customer: 'Esposito Catering', amount: 905, status: 'approved' },
+  { id: 'INV-0150', customer: 'Romano Packaging', amount: 3480.75, status: 'pending' },
+  { id: 'INV-0151', customer: 'Colombo Printing', amount: 56.2, status: 'approved' },
 ];
 
 const filters: ListReportFilter<Invoice>[] = [
