@@ -239,12 +239,14 @@ export const Default: Story = {
     await user.keyboard('{/Shift}');
     await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(2);
     const fmt = new Intl.NumberFormat(args.locale);
-    await expect(canvas.getByText(`${fmt.format(4991)} selected`)).toBeInTheDocument();
+    await expect(canvas.getByText(`${fmt.format(4991)} selected`, { normalizer: (t) => t })).toBeInTheDocument();
     await expect(canvas.queryByRole('checkbox', { name: 'Select INV-000010' })).toBeNull();
 
     // Select every result from the selection bar, then Escape empties the selection.
-    await user.click(canvas.getByRole('button', { name: `Select all ${fmt.format(count)} results` }));
-    await expect(canvas.getByText(`${fmt.format(count)} selected`)).toBeInTheDocument();
+    const selectAll = canvas.getByRole('button', { name: /^Select all .+ results$/ });
+    await expect(selectAll.textContent).toBe(`Select all ${fmt.format(count)} results`);
+    await user.click(selectAll);
+    await expect(canvas.getByText(`${fmt.format(count)} selected`, { normalizer: (t) => t })).toBeInTheDocument();
     await expect(canvas.getByRole('checkbox', { name: 'Select all results' })).toHaveFocus();
     await user.keyboard('{Escape}');
     await expect(canvas.getByText('No items selected')).toBeInTheDocument();
@@ -264,15 +266,17 @@ export const LocaleCount: Story = {
     const canvas = within(canvasElement);
     const fmt = new Intl.NumberFormat(args.locale);
     const heading = canvas.getByRole('heading', { name: /Invoices/ });
-    await expect(heading).toHaveTextContent(`Invoices (${fmt.format(10_000)})`);
+    await expect(heading.textContent).toBe(`Invoices (${fmt.format(10_000)})`);
     const search = canvas.getByRole('searchbox', { name: 'Search invoices' });
     await userEvent.type(search, 'INV-001{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('INV-001');
-    await waitFor(() => expect(heading).toHaveTextContent(`Invoices (${fmt.format(1000)} of ${fmt.format(10_000)})`));
+    await waitFor(() => expect(heading.textContent).toBe(`Invoices (${fmt.format(1000)} of ${fmt.format(10_000)})`));
     const user = userEvent.setup();
     await user.click(await canvas.findByRole('checkbox', { name: 'Select INV-001000' }));
     await expect(canvas.getByText('1 selected')).toBeInTheDocument();
-    await expect(canvas.getByRole('button', { name: `Select all ${fmt.format(1000)} results` })).toBeVisible();
+    const selectAll = canvas.getByRole('button', { name: /^Select all .+ results$/ });
+    await expect(selectAll).toBeVisible();
+    await expect(selectAll.textContent).toBe(`Select all ${fmt.format(1000)} results`);
   },
 };
 

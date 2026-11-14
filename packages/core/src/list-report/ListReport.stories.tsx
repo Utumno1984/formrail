@@ -297,11 +297,11 @@ export const LocaleCount: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const fmt = new Intl.NumberFormat(args.locale);
-    await expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(1200)})`);
+    await expect(heading(canvas).textContent).toBe(`Invoices (${fmt.format(1200)})`);
     await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
     const found = makeDemoInvoices(1200).filter((r) => r.supplier.includes('Ferrari')).length;
-    await waitFor(() => expect(heading(canvas)).toHaveTextContent(`Invoices (${fmt.format(found)} of ${fmt.format(1200)})`));
+    await waitFor(() => expect(heading(canvas).textContent).toBe(`Invoices (${fmt.format(found)} of ${fmt.format(1200)})`));
     await userEvent.click(canvas.getAllByRole('checkbox')[1]!);
     await expect(canvas.getByText('1 selected')).toBeInTheDocument();
   },
