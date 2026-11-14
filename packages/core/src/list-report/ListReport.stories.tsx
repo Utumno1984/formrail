@@ -216,7 +216,7 @@ const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row
  */
 export const Example: Story = {
   tags: ['example', '!visual'],
-  ...exampleStory('ListReport.example.tsx'),
+  ...exampleStory('ListReport.example.tsx', {}, { layout: 'padded' }),
 };
 
 /**

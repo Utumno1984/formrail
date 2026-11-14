@@ -41,8 +41,11 @@ export function InvoiceList() {
 
   // The floorplan (title, actions, filter bar, table) fills a parent with a bounded height: the page itself
   // never scrolls, the table does. In a flex or grid layout, give its cell `min-height: 0`.
+  // The height follows the viewport (at least 20rem, at most 40rem, always 4rem short of the viewport so the page
+  // can still be scrolled by a touch that starts outside the example). `maxHeight` repeats it in `dvh`, which
+  // follows a phone's address bar; a browser without `dvh` drops that line and keeps the `vh` height.
   return (
-    <div style={{ height: 420 }}>
+    <div style={{ height: 'clamp(20rem, calc(100vh - 4rem), 40rem)', maxHeight: 'clamp(20rem, calc(100dvh - 4rem), 40rem)' }}>
       <ListReport title="Invoices" table={table} actions={<Button variant="primary">New invoice</Button>} />
     </div>
   );
