@@ -94,3 +94,13 @@ export function referencePages(env = process.env) {
 export function referenceFixtures(env = process.env) {
   return proEdition(env) || excludePro(env) ? [] : ['./fixtures/*.mdx'];
 }
+
+/**
+ * The landing story of the redirect probe `internal-legacy-redirect-probe--default` (ticket #516, see
+ * legacy-story-ids.mjs): Free and complete builds, like the `Internal/*` stories of packages/core, never the Pro
+ * demo, which carries no internal fixture. The Pro demo is probed by `internal-legacy-redirect-probe--pro`,
+ * which lands on a public Pro story instead.
+ */
+export function legacyRedirectFixtures(env = process.env) {
+  return proEdition(env) ? [] : ['./LegacyRedirectTarget.stories.tsx'];
+}

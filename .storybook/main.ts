@@ -3,11 +3,13 @@ import tailwindcss from '@tailwindcss/vite';
 import type { StorybookConfig } from '@storybook/react-vite';
 import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter, docgenRelativePaths } from './docgen.ts';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
-import { introductionPages, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
+import { introductionPages, legacyRedirectFixtures, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
 import { withTypeReference } from './type-reference-plugin.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
 import { exampleSourcesPlugin } from './example-sources-plugin.mjs';
+// @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
+import { withLegacyRedirect } from './legacy-story-redirect.mjs';
 
 const config: StorybookConfig = {
   // Props tables: react-docgen-typescript, not Storybook's default react-docgen (ticket #401).
@@ -47,7 +49,21 @@ const config: StorybookConfig = {
   },
   // Core always; packages/pro unless STORYBOOK_EXCLUDE_PRO is set (Free deploy); only packages/pro with
   // STORYBOOK_EDITION=pro (Pro demo deploy). See story-globs.mjs.
-  stories: [...(storyGlobs() as string[]), ...(introductionPages() as string[]), ...(referencePages() as string[]), ...(referenceFixtures() as string[])],
+  // `legacyRedirectFixtures`: the landing story of a redirect probe of legacy-story-ids.mjs (ticket #516), Free
+  // and complete builds only.
+  stories: [
+    ...(storyGlobs() as string[]),
+    ...(introductionPages() as string[]),
+    ...(referencePages() as string[]),
+    ...(referenceFixtures() as string[]),
+    ...(legacyRedirectFixtures() as string[]),
+  ],
+  // Renamed story ids (ticket #516): the map of legacy-story-ids.mjs, inlined at the very top of both heads,
+  // rewrites an old `?path=` (manager) or `?id=` (preview) with `history.replaceState` before Storybook reads
+  // the URL. See legacy-story-redirect.mjs. `head` is what Storybook built from manager-head.html /
+  // preview-head.html; it follows, unchanged.
+  managerHead: (head?: string) => withLegacyRedirect(head) as string,
+  previewHead: (head?: string) => withLegacyRedirect(head) as string,
   // Docs tab (autodocs, MDX pages): addon-docs is a separate package since Storybook 9.
   addons: ['@storybook/addon-docs'],
   // Favicon for the manager (see manager-head.html).
