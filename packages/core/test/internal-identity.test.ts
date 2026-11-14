@@ -54,6 +54,7 @@ describe('`@formrail/core/internal` shares its modules with the public entry (no
       'ListReportTableShell',
       'ListReportFrame',
       'useListReportResultIndex',
+      'getNumberFormat',
     ];
     for (const name of expected) {
       expect(internalEsm, `missing export ${name}`).toHaveProperty(name);
