@@ -183,9 +183,12 @@ banale:
   render, o clonando quella della libreria) li chiuderebbe subito.
 - Le due regole sono nel TSDoc di `RebaseFormBinding` e fissate da
   `packages/pro/test/public-api.test.tsx` ("identity rules of RebaseFormBinding"), con un binding
-  `useState` che le rispetta come controllo. Resta aperto per #507 il campo registrato dopo il
-  mount con un conflitto aperto: il contratto offre solo `reset` o una baseline nuova, che chiudono
-  entrambi i conflitti (osservazione del critico, giro 1).
+  `useState` che le rispetta come controllo. Il campo registrato dopo il mount con un conflitto
+  aperto (osservazione del critico, giro 1) è chiuso in #507 con una regola dell'adattatore, senza
+  canale nel contratto: la baseline del binding RHF cambia solo quando RHF sostituisce l'oggetto dei
+  default, mai per una registrazione, quindi i conflitti restano aperti. Un campo senza default
+  entra solo nei valori ed è "added" (README Pro, sezione "React Hook Form"; test con RHF reale in
+  `use-react-hook-form-binding.edge.test.tsx`).
 - In più, `useChangeSummary` memoizza per identità di `values`/`baseline`
   (`use-change-summary.ts:37-40`): un oggetto mutato sul posto produrrebbe un riepilogo stantio.
 
