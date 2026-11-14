@@ -1,22 +1,28 @@
-// Company names of the demo universe (customers and suppliers): a coined, place-like root from a
-// language area, an English trade word and the legal form of the country, e.g. "Grünfeld Bearings
-// GmbH". The roots are invented on purpose and checked against a denylist of well-known sample brands;
-// the surnames of the legacy invoice fixture are never used as company names (both enforced by tests).
+// Company names of the demo universe (customers and suppliers): a coined root from a language area,
+// an English trade word and the legal form of the country, e.g. "Dornelfeld Bearings GmbH".
+//
+// How the roots were chosen (QA of PR #536): real place names make plausible but REAL companies
+// ("Marlow Foods", "Oakhurst Dairy", "Lindeboom Brewing" all exist), so every root is coined: two
+// morphemes typical of the language joined into a form that is not a dictionary word nor, as far as a
+// manual check could tell, a town, river or brand. A coined word can still collide with something
+// obscure, so `content.test.ts` keeps a denylist of the real roots and combinations found so far and
+// checks the generated names against it; extend it when a new collision is reported.
+// The surnames of the legacy invoice fixture are never used as company names (also enforced there).
 import { AREA_COUNTRIES, DEMO_COUNTRIES, type DemoCountry, type DemoCountryCode, type DemoLanguageArea } from './geo';
 import { createPermutation, type Rng } from './rng';
 import { toAsciiSlug } from './text';
 
-/** Company-name roots by language area; their counts set how often each area appears. */
+/** Coined company-name roots by language area; their counts set how often each area appears. */
 export const COMPANY_ROOTS: Readonly<Record<DemoLanguageArea, readonly string[]>> = {
-  en: ['Brightwater', 'Ashford', 'Kingsbridge', 'Redmoor', 'Hollowell', 'Fairlight', 'Stonebrook', 'Marlow', 'Thornbury', 'Westcliff', 'Oakhurst', 'Whitcombe', 'Elmstead', 'Calder', 'Penrose', 'Larkfield'],
-  de: ['Grünfeld', 'Altmühl', 'Brennwald', 'Falkenau', 'Lindenhof', 'Steinbach', 'Weißach', 'Rabenstein', 'Eichwerk', 'Hohenfels', 'Mühlberg', 'Talheim', 'Schönau', 'Feldkamp'],
-  nl: ['Zuiderhaven', 'Kortenaer', 'Lindeboom', 'Waalkant', 'Hoogland', 'Meerburg', 'Vlietland', 'Eikelaar'],
-  fr: ['Clairval', 'Montrésor', 'Valbonne', 'Beaulieu', 'Hautecour', 'Chênevert', 'Roncelles', 'Belcastel'],
-  es: ['Montesol', 'Valdeluz', 'Peñalara', 'Castellar', 'Riosur', 'Torralba'],
-  it: ['Montecalvo', 'Belfiore', 'Rivalta', 'Pianalto', 'Torrebruna', 'Colleverde'],
-  nordic: ['Nordvik', 'Østby', 'Fjellstad', 'Ålund', 'Strandvik', 'Bergholm', 'Søndervang', 'Kvarnström'],
-  pl: ['Wierzbno', 'Zielonka', 'Brzozów', 'Łąkowo', 'Sosnowa'],
-  ja: ['Kawasemi', 'Shiranami', 'Yamabuki', 'Takigawa', 'Sakuragi', 'Kazeoka'],
+  en: ['Brennick', 'Callowfen', 'Dunmarrow', 'Elsworne', 'Farrowdyke', 'Glenquarry', 'Hathermoor', 'Kestrelby', 'Lowenbray', 'Merrowstone', 'Norrowcroft', 'Pellingstow', 'Quillenbrook', 'Rossenmarch', 'Tamberleigh', 'Wyndercombe'],
+  de: ['Dornelfeld', 'Erlenschütt', 'Falkenzirn', 'Grünbrecht', 'Haselwende', 'Kieferstedt', 'Lärchenhub', 'Moorbrandt', 'Querlinghof', 'Rauhenstedt', 'Schwertling', 'Tannrüdel', 'Wolkenrieth', 'Zwerchfeld'],
+  nl: ['Brakkevliet', 'Dorrenhaven', 'Eemsterbroek', 'Grevelkamp', 'Hoevenstrand', 'Kuilerdijk', 'Molentrecht', 'Veenderloo'],
+  fr: ['Aubrevelle', 'Beaucrozat', 'Châtelvorne', 'Fontanérac', 'Marvesnil', 'Montclérac', 'Rouvellac', 'Valmérane'],
+  es: ['Alcorvena', 'Benaguril', 'Castronela', 'Miravedra', 'Peñascura', 'Valdorrena'],
+  it: ['Borgavella', 'Castelmirto', 'Montesandra', 'Pievarossa', 'Roccavelma', 'Valfiorita'],
+  nordic: ['Bjørkenvik', 'Eskjøvang', 'Fjordeby', 'Gräsvalla', 'Holmskjær', 'Lindrøvik', 'Sjöbrandt', 'Tjärnskog'],
+  pl: ['Brzozolin', 'Grabnowiecz', 'Jaworzyczek', 'Łąkomirz', 'Sosnorzew'],
+  ja: ['Kazenagi', 'Mizuhoshi', 'Tokinoha', 'Yumesaka', 'Sorakane', 'Hikarimine'],
 };
 
 /** Legal forms by country (English renderings where the local one is not used abroad). */

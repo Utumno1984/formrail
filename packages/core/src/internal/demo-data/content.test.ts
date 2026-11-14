@@ -5,12 +5,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEMO_COMPANY } from './company';
-import { makeCustomers } from './customers';
+import { CUSTOMER_UNIQUE_NAMES, makeCustomers } from './customers';
 import { makeEmployees } from './employees';
 import { COMPANY_ROOTS } from './organizations';
-import { ALL_PERSON_NAMES } from './people';
+import { ALL_PERSON_NAMES, personNamesOf } from './people';
 import { makeProducts } from './products';
-import { makeSuppliers } from './suppliers';
+import { makeSuppliers, SUPPLIER_UNIQUE_NAMES } from './suppliers';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const SOURCES = readdirSync(DIR)
@@ -50,6 +50,20 @@ const DENYLIST = [
   'Hooli',
   'Soylent',
   'Wonka',
+];
+
+/**
+ * Real companies that generated names used to match (QA of PR #536), and the real place names that
+ * produced them or could again. The roots are now coined; this list keeps them from coming back.
+ * Extend it whenever a generated name turns out to be a real company.
+ */
+const REAL_COMPANY_NAMES = ['Lindeboom Brewing', 'Marlow Foods', 'Oakhurst Dairy', 'Schönau Energy', 'Belfiore Dairy'];
+const REAL_PLACE_ROOTS = [
+  'Marlow', 'Oakhurst', 'Calder', 'Beaulieu', 'Schönau', 'Lindeboom', 'Ashford', 'Kingsbridge', 'Thornbury',
+  'Westcliff', 'Elmstead', 'Penrose', 'Larkfield', 'Fairlight', 'Brightwater', 'Steinbach', 'Falkenau', 'Lindenhof',
+  'Rabenstein', 'Hohenfels', 'Mühlberg', 'Talheim', 'Altmühl', 'Hoogland', 'Valbonne', 'Montrésor', 'Belcastel',
+  'Valdeluz', 'Peñalara', 'Castellar', 'Torralba', 'Torrebruna', 'Colleverde', 'Rivalta', 'Montecalvo', 'Belfiore',
+  'Zielonka', 'Brzozów', 'Takigawa', 'Nordvik', 'Strandvik',
 ];
 
 /** Surnames of the legacy invoice fixture (`internal/demo-invoices.ts`): never a company name again. */
@@ -126,5 +140,26 @@ describe('demo content', () => {
     expect(/(?!\p{Script=Latin})\p{L}/u.test('Osaka 大阪')).toBe(true);
     // Several countries among the first customers.
     expect(new Set(makeCustomers(200).map((customer) => customer.country)).size).toBeGreaterThanOrEqual(10);
+  });
+
+  it('generates no name of a real company, and no root that is a real place name found so far', () => {
+    const companies = [
+      ...makeCustomers(CUSTOMER_UNIQUE_NAMES).map((customer) => customer.name),
+      ...makeSuppliers(SUPPLIER_UNIQUE_NAMES).map((supplier) => supplier.name),
+    ];
+    expect(companies.filter((name) => REAL_COMPANY_NAMES.some((real) => name.startsWith(real)))).toEqual([]);
+    const roots = Object.values(COMPANY_ROOTS).flat();
+    expect(roots.filter((root) => REAL_PLACE_ROOTS.includes(root))).toEqual([]);
+    expect(companies.filter((name) => REAL_PLACE_ROOTS.some((root) => word(root).test(name)))).toEqual([]);
+  });
+
+  it('gives Polish women the feminine form of -ski / -cki surnames', () => {
+    const names = personNamesOf('pl');
+    // A feminine given name (-a) with a masculine -ski, or a masculine one with a feminine -ska.
+    const disagreeing = names.filter(({ firstName, lastName }) =>
+      firstName.endsWith('a') ? /(sk|ck|dzk)i$/.test(lastName) : /(sk|ck|dzk)a$/.test(lastName),
+    );
+    expect(disagreeing.map((name) => name.fullName)).toEqual([]);
+    expect(names.some(({ lastName }) => lastName.endsWith('ska'))).toBe(true);
   });
 });
