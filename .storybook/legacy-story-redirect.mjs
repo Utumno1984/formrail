@@ -18,31 +18,56 @@
 // URL leaves no history entry (Back goes to the page before it, never to the old id).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import * as espree from 'espree';
 
 export const LEGACY_STORY_IDS_FILE = fileURLToPath(new URL('./legacy-story-ids.mjs', import.meta.url));
 
 /**
- * The source without its comments, which are for the people reading the file, not for every page that
- * carries it: whole-line `//` comments and block comments that start a line (`/*`, `/**`), up to the line
- * that closes them. Code lines never start with `//` or `/*` in that file; a comment written after code on
- * the same line would stay, and the unit test that parses the inlined script for comments would catch it.
+ * The source without the comments that stand on their own, which are for the people reading the file, not
+ * for every page that carries it. The comments come from the parser (espree, `comment: true`), by
+ * position, so a string, a regex or a template containing `//` or `/*` is never touched, and code written
+ * on the same line as a comment stays (`/** doc *\/ var x = 1;` gives ` var x = 1;`).
+ *
+ * A comment is removed when nothing but whitespace (or an already removed comment) comes before it on
+ * its first line: whole-line `//` comments, block comments of any length, and the `// note` that follows
+ * the closing `*\/` of a block. A comment after code (`var b = 1; // note`) stays, as it always has.
+ * Lines left blank by the removal, and blank lines between statements, are dropped; the blank lines
+ * inside a multi-line string or template are kept as they are. The remaining lines are not re-indented.
+ *
+ * @param {string} source JavaScript, parsed as an ES module (`export` is accepted)
+ * @returns {string}
+ * @throws {Error} when the source does not parse: nothing is stripped on a guess
  */
 export function stripComments(source) {
-  const kept = [];
-  let inBlock = false;
-  for (const line of source.split('\n')) {
-    const trimmed = line.trim();
-    if (inBlock) {
-      if (trimmed.includes('*/')) inBlock = false;
-      continue;
-    }
-    if (trimmed.startsWith('/*')) {
-      inBlock = !trimmed.includes('*/', 2);
-      continue;
-    }
-    if (trimmed.startsWith('//') || trimmed === '') continue;
-    kept.push(line);
+  let parsed;
+  try {
+    parsed = espree.parse(source, { ecmaVersion: 'latest', sourceType: 'module', comment: true, tokens: true, range: true, loc: true });
+  } catch (cause) {
+    throw new Error(`stripComments: the source does not parse (${cause instanceof Error ? cause.message : cause}), refusing to guess where the comments are.`, { cause });
   }
+  const removed = new Array(source.length).fill(false);
+  for (const comment of parsed.comments) {
+    const [start, end] = comment.range;
+    const lineStart = source.lastIndexOf('\n', start - 1) + 1;
+    let before = '';
+    for (let i = lineStart; i < start; i++) if (!removed[i]) before += source[i];
+    if (before.trim() !== '') continue;
+    removed.fill(true, start, end);
+  }
+  // Lines that continue a multi-line string or template are content, not layout.
+  const literalLines = new Set();
+  for (const token of parsed.tokens) {
+    if (token.loc.end.line > token.loc.start.line) for (let n = token.loc.start.line + 1; n <= token.loc.end.line; n++) literalLines.add(n);
+  }
+  const kept = [];
+  let offset = 0;
+  source.split('\n').forEach((line, index) => {
+    let text = '';
+    for (let i = 0; i < line.length; i++) if (!removed[offset + i]) text += line[i];
+    offset += line.length + 1;
+    if (text.trim() === '' && !literalLines.has(index + 1)) return;
+    kept.push(text);
+  });
   return kept.join('\n');
 }
 

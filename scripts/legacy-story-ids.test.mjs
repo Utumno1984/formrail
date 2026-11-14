@@ -280,6 +280,59 @@ describe('the inlined head script', () => {
     expect(stripComments(input)).toBe(["var A = /^\\/(story|docs)\\/([^/]+)(\\/.*)?$/;", "var b = 'x'; // trailing comment stays", 'var c = 1;'].join('\n'));
   });
 
+  describe('stripComments, by position (round 3 of #516)', () => {
+    const tokens = (code) => espree.tokenize(code, { ecmaVersion: 'latest', sourceType: 'module' }).map((t) => `${t.type}:${t.value}`);
+
+    it('keeps the code of the line a block comment closes on, and drops a `// note` after the closing', () => {
+      expect(stripComments('/* a\nb */ // note\nvar y = 1;')).toBe('var y = 1;');
+    });
+
+    it('treats `/*/` as an opening: the code after it is inside the comment, the code after the closing is kept', () => {
+      expect(stripComments('/*/\nvar y = 1;\n*/\nvar z = 2;')).toBe('var z = 2;');
+    });
+
+    it('keeps the code that follows a one-line block comment', () => {
+      expect(stripComments('/** x */ var x = 1;').trim()).toBe('var x = 1;');
+      expect(stripComments('/** x */var x = 1;')).toBe('var x = 1;');
+      expect(stripComments('var a = 1;\n/**/var b = 2;')).toBe('var a = 1;\nvar b = 2;');
+    });
+
+    it('keeps the code that follows the closing of a block comment', () => {
+      expect(stripComments('/*\n * x\n */ var x = 1;\nvar y = 2;').trim()).toBe('var x = 1;\nvar y = 2;');
+      expect(tokens(stripComments('/* a\n*/ var x = 1;'))).toEqual(tokens('var x = 1;'));
+    });
+
+    it('does not read a `//` or a `/*` inside a string, a regex or a template as a comment', () => {
+      const code = [
+        "var a = 'http://example.com'; var b = \"/* not a comment */\";",
+        'var c = /\\/\\/|\\/\\*/;',
+        'var d = `x // y /* z */ ${1}`;',
+        'var e = "a" + /*inline*/ "b";',
+      ].join('\n');
+      expect(stripComments(code)).toBe(code);
+    });
+
+    it('keeps the blank lines inside a multi-line template, drops the other blank lines', () => {
+      expect(stripComments('var a = `x\n\ny`;\n\n// c\nvar b = 1;')).toBe('var a = `x\n\ny`;\nvar b = 1;');
+    });
+
+    it('keeps a comment that follows code on its line (as it always has)', () => {
+      expect(stripComments('var a = 1; /* t */ // u\nvar b = 2; // v')).toBe('var a = 1; /* t */ // u\nvar b = 2; // v');
+    });
+
+    it('accepts `export` and throws a clear error on a source that does not parse', () => {
+      expect(stripComments('// c\nexport function f() {}')).toBe('export function f() {}');
+      expect(() => stripComments('var a = ;\n// c')).toThrow(/stripComments: the source does not parse/);
+      expect(() => stripComments('var s = "/*";\n/* never closed')).toThrow(/does not parse/);
+    });
+
+    it('the real source gives the tokens of the source, with no comment left', () => {
+      const code = stripComments(source);
+      expect(tokens(code)).toEqual(tokens(source));
+      expect(espree.parse(code, { ecmaVersion: 'latest', sourceType: 'module', comment: true }).comments).toEqual([]);
+    });
+  });
+
   it('replaces an old URL in place, keeping history.state (no navigation, no new history entry)', () => {
     const { calls, errors } = run(`${SB}?path=/story/internal-legacy-redirect-probe--default&globals=a:b#h`);
     expect(calls).toEqual([[{ kept: true }, '', `${SB}?path=/story/internal-legacyredirecttarget--default&globals=a:b#h`]]);
