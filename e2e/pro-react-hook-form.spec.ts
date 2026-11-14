@@ -78,6 +78,34 @@ test.describe('Pro/Integrations/React Hook Form', () => {
     await expect(field(page, 'Notes')).toHaveValue('typed during save');
   });
 
+  test('"Accept server value" during "Saving…" then typing: the save stays in flight to its end, both changes stay (QA #507 round 2)', async ({ page }) => {
+    await expectPlayToPass(page, PLAYGROUND, 'saveDelay:2000');
+    await page.getByRole('button', { name: 'Discard' }).click();
+    await field(page, 'Amount').fill('999');
+    await page.getByRole('button', { name: 'Simulate server update' }).click();
+    const accept = page.getByRole('button', { name: 'Accept server value for Amount' });
+    await expect(accept).toBeVisible();
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    await accept.click();
+    // Still saving after the accept: the indicator does not go away halfway.
+    await expect(page.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    const accepted = await field(page, 'Amount').inputValue();
+    expect(accepted).not.toBe('999');
+    await field(page, 'Notes').fill('typed during save');
+    await expect(page.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+
+    // The save ends (the button is back): 999 was saved; the accepted value and the note are unsaved changes.
+    await expect(page.getByRole('button', { name: 'Save' })).toBeVisible({ timeout: 5_000 });
+    await expect(field(page, 'Amount')).toHaveValue(accepted);
+    await expect(field(page, 'Notes')).toHaveValue('typed during save');
+    await expect(page.getByRole('status')).toHaveText('Unsaved changes');
+    await expect(summaryRows(page)).toHaveCount(2);
+    await expect(summaryRows(page).nth(0)).toHaveText(`Amount: "999" → "${accepted}"`);
+    await expect(summaryRows(page).nth(1)).toHaveText('Notes: "" → "typed during save"');
+    await expect(conflictsList(page).getByRole('listitem')).toHaveCount(0);
+  });
+
   test('accept the server value: the field takes it, the conflict and its summary row go', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND);
     await field(page, 'Amount').fill('175');
