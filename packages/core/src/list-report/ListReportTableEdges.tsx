@@ -28,7 +28,7 @@ interface ListReportTableEdgesProps {
  * renders the layer while the table overflows sideways (nothing before the first measure, on the
  * server, nor when every column fits) and re-renders on its own, never the rows.
  */
-const ListReportTableEdgesImpl = forwardRef<OverflowEdgesSink, ListReportTableEdgesProps>(function ListReportTableEdges(
+const ListReportTableEdgesImpl = /* @__PURE__ */ forwardRef<OverflowEdgesSink, ListReportTableEdgesProps>(function ListReportTableEdges(
   { rowActionsWidth, inlineCount },
   ref,
 ) {
