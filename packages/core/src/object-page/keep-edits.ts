@@ -4,8 +4,11 @@
 // contract suite (`packages/pro/test/binding-contract.ts`) runs on both through their public APIs and keeps
 // them aligned. Internal: not exported by the public index.
 //
-// One known and accepted difference: content is compared with `deepEqual` (equal.ts), where `0` equals `-0`;
-// the adapter compares leaves with `Object.is`, where they differ. No contract check depends on it.
+// Known and accepted differences from the adapter, none of which a contract check depends on:
+// - content is compared with `deepEqual` (equal.ts), where `0` equals `-0`; the adapter compares leaves with
+//   `Object.is`, where they differ;
+// - identity: when the result has the content of `current`, the core returns `current` itself (the form keeps
+//   its `values` object); the adapter returns a new object with that content. The content is the same.
 import { deepEqual, isPlainObject } from './equal';
 
 type Container = Record<string, unknown>;
