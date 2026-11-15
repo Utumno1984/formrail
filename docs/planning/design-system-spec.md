@@ -430,6 +430,9 @@ verifica che almeno un test esistente fallisca. Una mutazione sopravvissuta e no
 come test mancante: PR respinta.
 
 **Ambito.** Sono motori oggi: `object-page/equal.ts`, `object-page/field-errors.ts`,
+`object-page/keep-edits.ts` (la regola campo per campo del `save` con modifiche durante il
+salvataggio, #545: guardie su forma degli array, `hasOwn` su `sent`/`current`, ritorno di
+`returned` a contenuto uguale, confronto con `deepEqual` e mai con `isEqual`),
 `list-report/compare.ts`, la logica di ordinamento/filtro/commit della ricerca in
 `list-report/use-list-report.ts`, il parsing in `list-report/use-list-report-url-state.ts` e
 `use-list-report-scroll-restoration.ts`, `combobox/filter.ts` con `internal/normalize-text.ts`, la

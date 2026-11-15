@@ -1,6 +1,7 @@
 const isDate = (value: unknown): value is Date => Object.prototype.toString.call(value) === '[object Date]';
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+/** A plain object: `{}` or `Object.create(null)` (never an array, a `Date`, a `Map` or a class instance). */
+export const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   if (typeof value !== 'object' || value === null) return false;
   const proto = Object.getPrototypeOf(value) as unknown;
   return proto === Object.prototype || proto === null;

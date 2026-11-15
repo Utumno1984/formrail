@@ -183,11 +183,43 @@ test.describe('Showcase/Invoices: RecordPage', () => {
     await bar(page).getByRole('button', { name: 'Save' }).click();
     await notes(page).fill('typed during the save');
     await expect.poll(() => storeAmount(page, 'inv-2')).toBe(50.12);
-    // The form was edited meanwhile: it keeps the typed values (amount included) and stays dirty
-    // against the new baseline (the normalized record); it is not overwritten by the server value.
-    await expect(amount(page)).toHaveValue('50.123');
+    // #545: decided field by field. Notes, edited meanwhile, keeps the typed value and stays dirty against the
+    // new baseline (the normalized record); Amount, not touched during the save, shows the server value.
+    await expect(amount(page)).toHaveValue('50.12');
     await expect(notes(page)).toHaveValue('typed during the save');
     await expect(bar(page)).toBeVisible();
+  });
+
+  test('#545: only the field edited during the save is dirty: clearing it back hides the save bar', async ({ page }) => {
+    await open(page, 'saveDelayMs:800');
+    const originalNotes = await notes(page).inputValue();
+    await amount(page).fill('50.123');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await notes(page).fill('typed during the save');
+    await expect.poll(() => storeAmount(page, 'inv-2')).toBe(50.12);
+    await expect(amount(page)).toHaveValue('50.12');
+    await expect(bar(page)).toBeVisible();
+    // Amount took the stored value: once Notes is back to the stored one, nothing is dirty.
+    await notes(page).fill(originalNotes);
+    await expect(bar(page)).toBeHidden();
+    await expect(amount(page)).toHaveValue('50.12');
+  });
+
+  test('#545: Discard while a save is in flight with edits made meanwhile: the reset wins over the merge', async ({ page }) => {
+    await open(page, 'saveDelayMs:1500');
+    const originalAmount = await amount(page).inputValue();
+    const originalNotes = await notes(page).inputValue();
+    await amount(page).fill('50.123');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await notes(page).fill('typed during the save');
+    await bar(page).getByRole('button', { name: 'Discard' }).click();
+    await expect(amount(page)).toHaveValue(originalAmount);
+    await expect(notes(page)).toHaveValue(originalNotes);
+    // The save finishes later: neither the stored amount nor the typed notes come back.
+    await expect.poll(() => storeAmount(page, 'inv-2')).toBe(50.12);
+    await expect(amount(page)).toHaveValue(originalAmount);
+    await expect(notes(page)).toHaveValue(originalNotes);
+    await expect(bar(page)).toBeHidden();
   });
 
   test('Back to list: clean calls onBack at once, dirty asks (English), Keep editing stays, Discard changes leaves', async ({
