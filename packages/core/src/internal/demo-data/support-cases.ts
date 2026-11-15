@@ -326,7 +326,7 @@ const TOPICS: readonly Topic[] = [
 // message before it: an answer to a question, a yes to a proposal, or (after a message that asks
 // nothing) a reminder, never on the same day. See `planMoves`.
 type CustomerMove = 'open' | 'answer' | 'accept' | 'chase';
-type EmployeeMove = 'ack' | 'ask' | 'propose' | 'progress' | 'resolve';
+export type EmployeeMove = 'ack' | 'ask' | 'propose' | 'progress' | 'resolve';
 
 /** What the customer says after each employee move: the employee's message decides it. */
 const REPLY_TO: Readonly<Record<Exclude<EmployeeMove, 'resolve'>, CustomerMove>> = {
@@ -485,9 +485,10 @@ function isWeekend(age: number): boolean {
  * nothing (`ack`, `progress`) is followed by a reminder of the customer on a later day, so there are at
  * most `maxChases` of them before the last message. The question is asked once, before any proposal;
  * there is one proposal at most. A `pending` case keeps its proposal (or its question) for the last
- * message, which waits for the customer; `resolved` and `closed` end with the resolution.
+ * message, which waits for the customer; `resolved` and `closed` end with the resolution. Exported for
+ * its own test only (not part of the demo-data index).
  */
-function planMoves(rng: Rng, status: DemoSupportCaseStatus, employees: number, maxChases: number): EmployeeMove[] {
+export function planMoves(rng: Rng, status: DemoSupportCaseStatus, employees: number, maxChases: number): EmployeeMove[] {
   const endsWithEmployee = !LAST_IS_CUSTOMER[status];
   const free = endsWithEmployee ? employees - 1 : employees;
   const moves: EmployeeMove[] = [];

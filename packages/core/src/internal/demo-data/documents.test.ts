@@ -694,6 +694,20 @@ describe('makeSupportCases / getSupportCase', () => {
         expect(ongoing).toBeGreaterThan(1000);
       });
 
+      it('a message that asks the customer something neither promises to write again nor says it is waiting', () => {
+        const problems: string[] = [];
+        let questions = 0;
+        for (const thread of all) {
+          for (const comment of thread.comments) {
+            if (comment.authorKind !== 'employee' || !asks(comment.text)) continue;
+            questions++;
+            if (WAITING.test(comment.text)) problems.push(`${comment.id}: "${comment.text}"`);
+          }
+        }
+        expect(problems).toEqual([]);
+        expect(questions).toBeGreaterThan(3000);
+      });
+
       it('a closed case says so in its last sentence, and only there: nothing follows the closing sentence', () => {
         const problems: string[] = [];
         for (const thread of all) {
