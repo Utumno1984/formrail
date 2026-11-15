@@ -58,6 +58,8 @@ interface DemoArgs {
   rowHeight: RowHeight;
   selectable: boolean;
   locale: 'en-US' | 'de-DE' | 'fr-FR';
+  /** Width of the box around the report (px, capped to the viewport). */
+  boxWidth: number;
   onSearchQueryChange: (query: string) => void;
   onSelectedIdsChange: (ids: ReadonlySet<string>) => void;
   onApprove: (numbers: string[]) => void;
@@ -71,7 +73,7 @@ declare global {
   }
 }
 
-function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, locale, onSearchQueryChange, onSelectedIdsChange, onApprove, onExport }: DemoArgs) {
+function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, locale, boxWidth, onSearchQueryChange, onSelectedIdsChange, onApprove, onExport }: DemoArgs) {
   const rows = makeDemoRows(rowCount);
   const [renderStart] = useState(() => performance.now());
   useLayoutEffect(() => {
@@ -83,7 +85,7 @@ function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, 
   return (
     <div style={PAGE}>
       <RowHeightStyle rowHeight={rowHeight} />
-      <div style={BOX}>
+      <div style={boxWidth === BOX.width ? BOX : { ...BOX, width: boxWidth }}>
         <VirtualListReport
           title="Invoices"
           table={table}
@@ -180,6 +182,10 @@ const meta: Meta<DemoArgs> = {
       options: ['en-US', 'de-DE', 'fr-FR'],
       description: 'An option of the hook, not a prop: `useListReport({ locale })`. Formats the numbers of the default count, selection text and "Select all N results" with `Intl.NumberFormat`.',
     }),
+    boxWidth: storyControl({
+      control: { type: 'range', min: 320, max: 1100, step: 10 },
+      description: 'Width of the box around the report (px, capped to the viewport). Narrower than the columns, the table scrolls sideways and a shade marks each edge that hides columns.',
+    }),
     onSearchQueryChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSearchQueryChange })`.' }),
     onSelectedIdsChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSelectedIdsChange })`.' }),
     onApprove: storyControl({ control: false, description: 'The "Approve" button of the demo\'s `bulkActions`.' }),
@@ -192,6 +198,7 @@ const meta: Meta<DemoArgs> = {
     rowHeight: 'default',
     selectable: true,
     locale: 'en-US',
+    boxWidth: 1100,
     onSearchQueryChange: fn(),
     onSelectedIdsChange: fn(),
     onApprove: fn(),
@@ -360,6 +367,48 @@ export const VisualSelection: Story = {
     await expect(canvas.getByText('5 selected')).toBeInTheDocument();
     // Leave the focus off the rows: no focus ring in the picture.
     (document.activeElement as HTMLElement | null)?.blur();
+  },
+};
+
+/**
+ * Columns hidden sideways, 10,000 rows in a 360px box: the play function scrolls to the middle of the
+ * dataset (end shade alone), then sideways just enough to bring a row's checkbox under the start shade:
+ * the point under the shade is still the checkbox, a click selects the row (`onSelectedIdsChange` in
+ * Actions); scrolled to the end, only the start shade is left.
+ */
+export const ColumnsHiddenSideways: Story = {
+  args: { rowCount: 10_000, boxWidth: 360 },
+  play: async ({ args, canvasElement }) => {
+    // Written for a box narrower than the columns, with a selection column.
+    if (args.boxWidth > 400 || !args.selectable || args.rowCount !== 10_000) return;
+    const scroller = scrollerOf(canvasElement);
+    const shade = (edge: 'start' | 'end') => scroller.querySelector(`[data-rop-overflow-edge="${edge}"]`) as HTMLElement;
+    const table = within(canvasElement).getByRole('table', { name: 'Invoices' });
+    const pitch = (table.querySelector('tbody > tr[aria-rowindex]') as HTMLElement).getBoundingClientRect().height;
+    await scrollTable(canvasElement, 5_000 * pitch);
+    const box = await waitFor(() => within(scroller).getByRole('checkbox', { name: 'Select INV-005003' }));
+    await expect(scroller).toHaveAttribute('data-rop-overflow-end');
+    await expect(scroller).not.toHaveAttribute('data-rop-overflow-start');
+
+    const centreX = () => box.getBoundingClientRect().left + box.getBoundingClientRect().width / 2;
+    scroller.scrollLeft = Math.round(centreX() - scroller.getBoundingClientRect().left - 4);
+    await waitFor(() => expect(scroller).toHaveAttribute('data-rop-overflow-start'));
+    await waitFor(() => expect(getComputedStyle(shade('start')).opacity).toBe('1'));
+    const x = centreX();
+    const y = box.getBoundingClientRect().top + box.getBoundingClientRect().height / 2;
+    const shadeBox = shade('start').getBoundingClientRect();
+    await expect(x).toBeGreaterThanOrEqual(shadeBox.left);
+    await expect(x).toBeLessThanOrEqual(shadeBox.right);
+    const hit = canvasElement.ownerDocument.elementFromPoint(x, y);
+    await expect(hit === box || box.contains(hit)).toBe(true);
+    await userEvent.click(box);
+    await expect(box).toBeChecked();
+    await expect(box.closest('tr')).toHaveAttribute('data-selected');
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(1);
+
+    scroller.scrollLeft = scroller.scrollWidth;
+    await waitFor(() => expect(scroller).not.toHaveAttribute('data-rop-overflow-end'));
+    await expect(scroller).toHaveAttribute('data-rop-overflow-start');
   },
 };
 

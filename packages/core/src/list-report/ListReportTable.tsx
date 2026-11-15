@@ -49,6 +49,13 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   else, or a row mutated in place, keeps what is on screen: see `ListReportColumn.cell` for what to do.
  * - One scroller: the container (`forwardRef`) scrolls both ways and the header sticks to its top.
  *   Size it with the parent (flex) or with `maxHeight`. It is a tab stop so the keyboard can scroll.
+ * - Columns hidden sideways: while the table is wider than its container, a translucent shade is drawn
+ *   on each inline edge past which columns are hidden (at the end at first, at both ends in the middle,
+ *   at the start at the end; mirrored with `dir="rtl"`), above the sticky header and below every
+ *   overlay. It takes no click and is hidden from assistive technology; with row actions the end one is
+ *   drawn before their sticky column. The state is also on the container, as a styling hook:
+ *   `data-rop-overflow-start` / `data-rop-overflow-end` (present or absent), measured on the client only
+ *   (never on the server) and updated on scroll and on resize. Within 1px an edge counts as in view.
  * - Every row has the height of `--rop-list-report-row-height`.
  * - States: `status="loading"` shows `loadingRowCount` skeleton rows (or keeps the rows it has),
  *   `"error"` replaces the body with an error strip, and a `ready` table without visible rows says

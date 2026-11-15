@@ -140,3 +140,35 @@ export const rowActionsTriggerSlotClass = 'flex w-[calc(var(--rop-list-report-ro
 export const rowActionsInlineIconClass = 'inline-flex [&>svg]:size-(--icon-rop-md)';
 // A danger action inline: the danger colour on the ghost button (and its pressed shade).
 export const rowActionsInlineDangerClass = 'text-rop-error not-disabled:not-aria-disabled:active:text-rop-error-active';
+
+// Edge shades (`ListReportTableEdges`): a layer after the table, inside the scroller, rendered only while
+// the table overflows sideways. Sticky at the bottom and at the inline start of the scrollport, as wide
+// as it and 0px tall: it adds no scrollable size. On the sticky level of the overlay scale and after the
+// table in the tree, so it is painted above the sticky header and the opaque cells, and below every
+// overlay (menus, tooltips, modals are on higher levels). It never takes a pointer event. The colour is
+// the text colour at a low alpha, resolved on the layer: a scoped theme (a dark surface with a light
+// text) gets a light shade. Translucent, so a focus indicator under it stays in sight.
+export const edgeLayerClass =
+  'pointer-events-none sticky start-0 bottom-0 z-rop-sticky h-0 ' +
+  '[--rop-list-report-edge-color:color-mix(in_srgb,var(--color-rop-text)_24%,transparent)]';
+// Each shade hangs from the layer, as tall as the scrollport (`--rop-list-report-edge-height`, measured)
+// and moved down past a table shorter than the scrollport (`--rop-list-report-edge-bottom`, 0 or
+// negative). Out of view and fully transparent until the scroller has the attribute of its edge; the
+// change fades with the feedback motion tokens, and at once under reduced motion. In forced colours the
+// gradient is dropped by the browser: a line in the text colour on the outer side carries the signal.
+// The end shade stops at the start of the sticky row actions column (`--rop-list-report-edge-end`,
+// its width, 0 without it), so it never covers the "…" button.
+export const edgeShadowStartClass =
+  'absolute start-0 bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 invisible opacity-0 ' +
+  'bg-[linear-gradient(to_right,var(--rop-list-report-edge-color),transparent)] ' +
+  '[&:dir(rtl)]:bg-[linear-gradient(to_left,var(--rop-list-report-edge-color),transparent)] ' +
+  'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
+  'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-s-2 forced-colors:border-[CanvasText] ' +
+  '[&:is([data-rop-overflow-start]>*>*)]:visible [&:is([data-rop-overflow-start]>*>*)]:opacity-100';
+export const edgeShadowEndClass =
+  'absolute end-(--rop-list-report-edge-end) bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 invisible opacity-0 ' +
+  'bg-[linear-gradient(to_left,var(--rop-list-report-edge-color),transparent)] ' +
+  '[&:dir(rtl)]:bg-[linear-gradient(to_right,var(--rop-list-report-edge-color),transparent)] ' +
+  'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
+  'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-e-2 forced-colors:border-[CanvasText] ' +
+  '[&:is([data-rop-overflow-end]>*>*)]:visible [&:is([data-rop-overflow-end]>*>*)]:opacity-100';

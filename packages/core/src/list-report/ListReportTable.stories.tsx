@@ -218,7 +218,9 @@ export const Example: Story = {
  * filter that excludes everything); switch them and the header and the minimum body do not move.
  * `onSortChange`, `onRetry` and `onClearFilters` show up in Actions. The play function clicks "Amount"
  * twice and checks that the rows are in descending order, that the header says so and that exactly
- * two sort changes were notified.
+ * two sort changes were notified. Then it narrows the box to 360px: the columns no longer fit, the
+ * scroller gets `data-rop-overflow-end` and the end shade shows; scrolled to the end, only the start
+ * shade is left (mirrored with `dir: rtl`). It then puts the width and the scroll back.
  */
 export const Playground: Story = {
   tags: ['playground'],
@@ -244,7 +246,7 @@ export const Playground: Story = {
       </div>
     );
   },
-  play: async ({ args, canvasElement }) => {
+  play: async ({ args, canvasElement, id }) => {
     // The sort scenario is written for the default configuration (40 rows, ready): with another
     // `status` or `dataset` (picked in Controls or by a test) there is nothing to sort.
     if (args.status !== 'ready' || args.dataset !== '40 rows') return;
@@ -263,6 +265,31 @@ export const Playground: Story = {
     await expect(args.onSortChange).toHaveBeenCalledTimes(2);
     await expect(args.onSortChange).toHaveBeenNthCalledWith(1, { columnId: 'amount', direction: 'asc' });
     await expect(args.onSortChange).toHaveBeenNthCalledWith(2, { columnId: 'amount', direction: 'desc' });
+
+    // Columns hidden sideways: only from a box wide enough for every column (the default 900px).
+    const scroller = canvas.getByTestId('scroller');
+    if (scroller.scrollWidth > scroller.clientWidth + 1) return;
+    const shade = (edge: 'start' | 'end') => scroller.querySelector(`[data-rop-overflow-edge="${edge}"]`) as HTMLElement | null;
+    await expect(scroller).not.toHaveAttribute('data-rop-overflow-end');
+    await expect(shade('end')).toBeNull();
+    setArgs(id, { containerWidth: 360 });
+    await waitFor(() => expect(scroller).toHaveAttribute('data-rop-overflow-end'));
+    await expect(scroller).not.toHaveAttribute('data-rop-overflow-start');
+    await waitFor(() => expect(getComputedStyle(shade('end')!).opacity).toBe('1'));
+    await expect(getComputedStyle(shade('start')!).visibility).toBe('hidden');
+    // To the end of the scroll, whatever the direction (`scrollLeft` is negative in rtl).
+    const towardsEnd = getComputedStyle(scroller).direction === 'rtl' ? -1 : 1;
+    scroller.scrollLeft = towardsEnd * scroller.scrollWidth;
+    await waitFor(() => expect(scroller).not.toHaveAttribute('data-rop-overflow-end'));
+    await expect(scroller).toHaveAttribute('data-rop-overflow-start');
+    await waitFor(() => expect(getComputedStyle(shade('start')!).opacity).toBe('1'));
+    await waitFor(() => expect(getComputedStyle(shade('end')!).visibility).toBe('hidden'));
+    // Back to the configuration of the story.
+    scroller.scrollLeft = 0;
+    setArgs(id, { containerWidth: args.containerWidth });
+    await waitFor(() => expect(scroller).not.toHaveAttribute('data-rop-overflow-start'));
+    await waitFor(() => expect(shade('start')).toBeNull());
+    await expect(args.onSortChange).toHaveBeenCalledTimes(2);
   },
 };
 
