@@ -14,7 +14,8 @@ import { PAYMENT_TERMS_DAYS } from './terms';
 
 /**
  * `issued`: sent, not yet due; `paid`; `overdue`: unpaid and due before `DEMO_TODAY` (computed against
- * the demo date, never the clock); `disputed`: the customer contests it, whatever the due date.
+ * the demo date, never the clock); `disputed`: the customer contests it, whatever the due date. An
+ * archived customer only has `paid` invoices (an archived account has no open document).
  */
 export type DemoInvoiceStatus = 'issued' | 'paid' | 'overdue' | 'disputed';
 
@@ -79,9 +80,10 @@ function makeInvoice(index: number): DemoInvoice {
   const termsDays = PAYMENT_TERMS_DAYS[customer.paymentTerms];
   const dueAge = issueAge - termsDays;
   const pastDue = dueAge > 0;
-  // Paid: more often when already past the due date; disputed: a few, any time.
+  // Paid: more often when already past the due date; disputed: a few, any time. An archived account has
+  // no open document, so every invoice of an archived customer is paid.
   const roll = rng.next();
-  const paid = roll < (pastDue ? 0.55 : 0.25);
+  const paid = customer.status === 'archived' || roll < (pastDue ? 0.55 : 0.25);
   const disputed = !paid && roll > (pastDue ? 0.92 : 0.96);
   const status: DemoInvoiceStatus = paid ? 'paid' : disputed ? 'disputed' : pastDue ? 'overdue' : 'issued';
   const paidAge = paid ? issueAge - rng.int(0, Math.min(issueAge, termsDays + 15)) : -1;

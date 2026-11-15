@@ -328,6 +328,15 @@ describe('makeInvoices / getInvoice', () => {
     expect(invoices.filter((invoice) => invoice.status === 'disputed').length).toBeGreaterThan(50);
   });
 
+  it('an archived customer has no open invoice (issued, overdue, disputed): only paid ones', () => {
+    const archived = invoices.filter((invoice) => customerById.get(invoice.customerId)!.status === 'archived');
+    expect(archived.length).toBeGreaterThan(50);
+    expect(archived.filter((invoice) => invoice.status !== 'paid').map((invoice) => `${invoice.id}: ${invoice.status}`)).toEqual([]);
+    // ... while the other customers still have every status.
+    const others = new Set(invoices.filter((invoice) => customerById.get(invoice.customerId)!.status !== 'archived').map((invoice) => invoice.status));
+    expect(others).toEqual(new Set(Object.keys(INVOICE_STATUS_LABEL)));
+  });
+
   it('has at least one overdue invoice in the first 20, and every status in the first 50', () => {
     expect(makeInvoices(20).some((invoice) => invoice.status === 'overdue')).toBe(true);
     expect(new Set(makeInvoices(50).map((invoice) => invoice.status))).toEqual(new Set(Object.keys(INVOICE_STATUS_LABEL)));
