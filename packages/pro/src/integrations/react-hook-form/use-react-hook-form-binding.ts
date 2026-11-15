@@ -565,10 +565,10 @@ export function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schem
   if (Array.isArray(base) && Array.isArray(theirs) && Array.isArray(mine) && sameRows(base, theirs, schemaPath, idKeys)) {
     const idKey = idKeyOf(idKeys, schemaPath);
     // Linear in the rows, as this runs at each value event of the app while a write waits. The binding kept the rows
-    // of `base` (no id key, or the same ids in the same order): index by index. Otherwise the index of each id in
-    // `base`, built once (the first row with an id wins). `base` and `theirs` hold the same rows, and with an id key
-    // every row of `base` is a plain record with its id (see `sameRows`), so a row of the binding without id matches
-    // none.
+    // of `base` (no id key, or the same ids in the same order): index by index, each row with the row at its own
+    // index. Otherwise the index of each id in `base`, built once (on this path only, with duplicate ids in `base`
+    // the first row with that id is the match). `base` and `theirs` hold the same rows, and with an id key every row
+    // of `base` is a plain record with its id (see `sameRows`), so a row of the binding without id matches none.
     let indexOf: Map<unknown, number> | null = null;
     if (idKey !== undefined && !sameRows(base, mine, schemaPath, idKeys)) {
       indexOf = new Map();

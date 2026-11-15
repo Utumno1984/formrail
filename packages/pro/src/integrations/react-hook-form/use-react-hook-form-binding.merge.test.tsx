@@ -138,6 +138,37 @@ describe('useReactHookFormBinding: the binding changes the shape of an array, th
     order.unmount();
   });
 
+  it('the binding replaces row 2 by a row with another id at the same index, the app writes row 2: the write goes with the replaced row', () => {
+    const order = setupOrder();
+    const replacement: Line = { id: 99, qty: '99', note: 'new' };
+    act(() => {
+      order.current().binding.setValues({ ...ORDER, lines: [L1, replacement] });
+      order.current().form.setValue('lines.1.qty', 'app');
+    });
+    // Matched by id: the app wrote the row with id 2, which the binding removed. The row now at that index is
+    // another row, and keeps the binding's values.
+    expectEverywhere(order, { supplier: 'Acme', lines: [L1, replacement] });
+    expect(order.input('Note 2').value).toBe('new');
+    order.unmount();
+  });
+
+  it('a row of the binding that is not a record (null), the app writes another row: no error, the binding row stays as it is', () => {
+    const order = setupOrder();
+    act(() => {
+      order.current().binding.setValues({ ...ORDER, lines: [L1, null as unknown as Line] });
+      order.current().form.setValue('lines.0.qty', 'app');
+    });
+    // The app's write on row 1 is kept, and the binding's row 2 is not matched to any row (it has no id).
+    const { binding, form } = order.current();
+    expect(form.getValues().lines[0]).toEqual({ ...L1, qty: 'app' });
+    expect(binding.values.lines[0]).toEqual({ ...L1, qty: 'app' });
+    expect(form.getValues().lines).toHaveLength(2);
+    // What React Hook Form keeps for a `null` row of a field array is its own business (it may normalize it): the
+    // binding shows the same thing.
+    expect(binding.values.lines[1]).toEqual(form.getValues().lines[1]);
+    order.unmount();
+  });
+
   it("both change the shape (the binding adds a row, then the app removes one): the app's array, the binding's write elsewhere stays", () => {
     const order = setupOrder();
     act(() => {
