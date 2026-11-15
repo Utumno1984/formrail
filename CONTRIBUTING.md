@@ -83,3 +83,26 @@ name ends in `Labels`; a label type with another name is not seen. Two different
 `labels?: { anchorBar?: string }` is not an exported `*Labels` type, so it is outside the guard (its keys state their
 default in the prose by hand). If the docgen one day expands the keys into rows with
 their own Default column, the e2e test fails and the convention flips to `@default` per key (option (a) of #540).
+
+The guard checks that the prose states a default, not that it is **true**: the unit tests do (#549).
+`packages/core/src/label-defaults.test.tsx` (core keys) and `packages/pro/src/label-defaults.test.tsx` (Pro keys)
+take every key the guard reads (`measureLabels`) and compare **every value** its prose states with the value of the
+code, through the generic `checkLabelDefaults` of `packages/core/test/label-defaults.ts`. Each file lists one or more
+**sources** per interface in `labelSources()`: the component's `DEFAULT_LABELS` (exported from its module with
+`@internal`, never from the package entry), or the texts read from a rendering when the default is not in a constant.
+A function key is called with the placeholders of its prose (`Select <row label>` is `selectRow('<row label>')`) or,
+when the prose is an example ("Default `1 item selected`"), with the arguments given in `examples`
+(`{ selectedCount: { args: [1] } }`).
+
+A prose that **lists** several values (the quoted values after the default, joined by `,`, `and`, `or` or `/`:
+"Default `Information`, `Success`, `Warning` and `Error`, by tone.", "Default: `No items`, `1 item`, `N items`.") is
+compared value by value, in order and in number (`proseDefaultsOf` of the guard reads the list; the list ends at the
+first text that is not a separator and a quoted value, so "the number formatted in the `locale`" is not a value). The
+source gives one example per value (`{ items: [{ args: [0] }, { args: [1] }, { args: ['N'] }] }`), an object of texts
+compared member by member (`ToastLabels.tones` against `TONE_LABEL`), or an array of rendered texts, one per state
+("No items selected", "3 selected", "1,234 selected (2 hidden by filters)"). A list the source cannot give in full
+(one text, one example, an array of another length) fails: it never passes on its first value. Prose outside that list
+(an example in the description, "e.g. `Close`", a sentence after `;`) is not compared.
+
+A new interface or key without a source fails ("no source of the real value"); a key that really cannot be verified goes
+in `LABEL_EXCEPTIONS`, with the reason (empty today).

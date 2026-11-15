@@ -39,7 +39,8 @@ export interface FileUploadLabels {
   required: string;
 }
 
-const DEFAULT_LABELS: FileUploadLabels = {
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_LABELS: FileUploadLabels = {
   chooseFiles: 'Choose files',
   dropHint: 'or drop files here',
   remove: (name) => `Remove ${name}`,

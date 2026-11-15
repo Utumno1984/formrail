@@ -40,7 +40,8 @@ export interface NumberInputLabels {
   decrement: string;
 }
 
-const DEFAULT_LABELS: NumberInputLabels = { increment: 'Increase', decrement: 'Decrease' };
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_LABELS: NumberInputLabels = { increment: 'Increase', decrement: 'Decrease' };
 
 export interface NumberInputProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>,

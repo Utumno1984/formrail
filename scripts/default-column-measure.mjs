@@ -507,6 +507,35 @@ export function proseDefaultOf(text) {
   return undefined;
 }
 
+/** A quoted value (the only kind read after the first one of a list: a bare number or word there is prose). */
+const QUOTED_VALUE = String.raw`(?:\x60[^\x60]+\x60|"[^"\n]*"|'[^'\n]*'|“[^”\n]*”|‘[^’\n]*’)`;
+/** The next value of a list: a separator (`,`, `, and`, `, or`, `/`, `and`, `or`) and a quoted value. */
+const LIST_NEXT = new RegExp(String.raw`^\s*(?:,\s*(?:(?:and|or)\s+)?|\/|(?:and|or)\s)\s*(${QUOTED_VALUE})`);
+
+/**
+ * Every value of the default the prose states (#549), in order: the one of `proseDefaultOf` and the quoted values
+ * that follow it as a list ("Default `Information`, `Success`, `Warning` and `Error`, by tone." gives four,
+ * "Default `1 item selected` / `${n} items selected`." two, "Default: \"1 result\", \"10,000 results\", the number
+ * formatted in the `locale`..." two: the list ends at the first text that is not a separator and a quoted value).
+ * `[]` when the prose states no default. Read by the value check of the label keys, not by `checkLabels`.
+ */
+export function proseDefaultsOf(text) {
+  const all = new RegExp(PROSE_DEFAULT.source, 'gi');
+  const source = String(text);
+  for (const m of source.matchAll(all)) {
+    const clause = source.slice(0, m.index).split(CLAUSE_END).at(-1);
+    if (NAMED_KEY.test(clause)) continue;
+    const values = [m[1] ?? m[2]];
+    let rest = source.slice(m.index + m[0].length);
+    for (let next = LIST_NEXT.exec(rest); next; next = LIST_NEXT.exec(rest)) {
+      values.push(next[1]);
+      rest = rest.slice(next[0].length);
+    }
+    return values;
+  }
+  return [];
+}
+
 /** Whether the prose states a default of the prop (see `proseDefaultOf`). */
 export const hasProseDefault = (text) => proseDefaultOf(text) !== undefined;
 
@@ -925,7 +954,8 @@ export function formatCheck(issues) {
  * alias of `ListReportFrameLabels`, which extends `ListReportTableLabels`: its keys are reported under those two).
  * A public label interface is an exported type whose name ends in `Labels`. Rows: `{ iface, key, tag, prose, file }`
  * where `tag` is the text of the `@default` / `@defaultValue` tag (`undefined` without one) and `prose` the default
- * the description states (`proseDefaultOf`).
+ * the description states (`proseDefaultOf`); `proseValues` is every value of that default when the prose lists more
+ * than one (`proseDefaultsOf`, `[prose]` for a single value, `[]` for none).
  */
 export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
   const entryFiles = entries.map((e) => resolve(root, e));
@@ -968,6 +998,9 @@ export function measureLabels({ root = REPO_ROOT, entries = ENTRIES } = {}) {
             tag: tag ? (ts.getTextOfJSDocComment(tag.comment) ?? '').trim() : undefined,
             tagName: tag?.tagName.text,
             prose: proseDefaultOf(description),
+            // Every value of a list ("`No items`, `1 item`, `N items`"), for the value check of #549; `checkLabels`
+            // reads `prose` only.
+            proseValues: proseDefaultsOf(description),
             file: relative(root, decl.getSourceFile().fileName),
           });
         }

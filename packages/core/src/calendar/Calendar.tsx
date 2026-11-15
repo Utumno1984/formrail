@@ -50,7 +50,8 @@ export interface CalendarLabels {
   nextMonth: string;
 }
 
-const DEFAULT_LABELS: CalendarLabels = { previousMonth: 'Previous month', nextMonth: 'Next month' };
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_LABELS: CalendarLabels = { previousMonth: 'Previous month', nextMonth: 'Next month' };
 
 export interface CalendarProps
   extends Omit<HTMLAttributes<HTMLDivElement>, 'defaultValue' | 'onChange' | 'children' | 'role' | 'aria-readonly' | 'aria-required' | 'aria-invalid'> {

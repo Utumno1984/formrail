@@ -55,7 +55,8 @@ export interface MultiSelectLabels {
   selectedCount: (count: number) => string;
 }
 
-const DEFAULT_LABELS: MultiSelectLabels = {
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_LABELS: MultiSelectLabels = {
   emptyLabel: 'No results',
   removeValue: (label) => `Remove ${label}`,
   selectedCount: (count) => (count === 1 ? '1 item selected' : `${count} items selected`),
