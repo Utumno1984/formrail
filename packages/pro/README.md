@@ -200,10 +200,19 @@ discard) is written to React Hook Form once, at the end of the synchronous run, 
 - a write of yours in the same run, after the binding's (`form.setValue`, a `Controller`, `form.reset`, for
   example a timestamp set right after `binding.reset(saved)` in the `handleSubmit` handler), comes later in
   call order and wins: on the fields it changes it is kept, in `form.getValues()`, in `binding.values` and in
-  the DOM; on the others the binding's write stands. A reset with new defaults (`form.reset(data)`, the
-  `values` prop, `resetDefaultValues`) replaces the binding's write whole. React Hook Form sends no event for
-  a write that leaves a field as it already was, so there the binding's value stands; a `useFieldArray`
-  operation that adds or removes rows of an array the binding also wrote keeps the app's array;
+  the DOM; on the others the binding's write stands, rows the binding added, removed or reordered included:
+  your writes in the fields of its rows stay on the row you wrote them in (matched by id with `arrayIdKeys`,
+  by index without), and a write in a row the binding removed goes with that row. A reset with new defaults
+  (`form.reset(data)`, the `values` prop, `resetDefaultValues`) replaces the binding's write whole. React
+  Hook Form sends no event for a write that leaves a field as it already was, so there the binding's value
+  stands; a `useFieldArray` operation of yours that adds, removes or reorders rows of an array the binding
+  also wrote keeps your array whole, also when the binding changed its rows too (without `arrayIdKeys` a
+  reorder keeps the length, so the rows are merged by index: pass `arrayIdKeys` for rows the user can
+  reorder);
+- a write of yours made before `binding.reset` / `binding.setValues` in the same run (a `useFieldArray`
+  `append` or `remove` included) is what the binding writes on top of: `setValues` keeps it on the fields its
+  patch does not name, `reset(record)` (outside a save, see "Saving") and a `setValues` of that field come
+  later and replace it;
 - only a top-level key that must go (a record that omits it) is written with React Hook Form's `reset`
   (keeping the mounted fields with `shouldUnregister`): the rows then remount, and during a save the submit
   ends there;
