@@ -147,6 +147,33 @@ export default tseslint.config(
     },
   },
   {
+    // The demo universe (`packages/core/src/internal/demo-data`, ticket #513) is for stories, tests, the showcase
+    // and examples' fixtures only (ticket #515): a library file that imports it would ship fictitious data in the
+    // published bundle. Allowed: stories, tests, `showcase/` and `internal/demo-data/` itself. The `*.example.tsx`
+    // files are ignored here because their own rule above already bans any relative or `internal` import.
+    // Written as `no-restricted-syntax` (not `no-restricted-imports`) so it does not replace the `patterns` of the
+    // blocks above, which configure `no-restricted-imports` for the same files; it also sees `export ... from`
+    // and `import()`.
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    ignores: [
+      '**/*.stories.tsx',
+      '**/*.test.{ts,tsx}',
+      '**/*.example.tsx',
+      '**/showcase/**',
+      '**/internal/demo-data/**',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['ImportDeclaration', 'ExportAllDeclaration', 'ExportNamedDeclaration', 'ImportExpression'].map((node) => ({
+          selector: `${node}[source.value=/(^|\\/)demo-data(\\/|$)/]`,
+          message:
+            'Library code must not import `internal/demo-data`: the demo universe is for stories, tests and showcases only and would end up in the published bundle (ticket #515, CONTRIBUTING.md, section "Demo data").',
+        })),
+      ],
+    },
+  },
+  {
     files: ['**/*.cjs'],
     languageOptions: { sourceType: 'commonjs' },
     rules: { '@typescript-eslint/no-require-imports': 'off' },

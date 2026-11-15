@@ -106,3 +106,51 @@ compared member by member (`ToastLabels.tones` against `TONE_LABEL`), or an arra
 
 A new interface or key without a source fails ("no source of the real value"); a key that really cannot be verified goes
 in `LABEL_EXCEPTIONS`, with the reason (empty today).
+
+## Demo data
+
+Stories, examples, tests and e2e scenarios need believable data. Epic #512 moves them from a single domain
+(supplier invoices, "Rossi Construction Ltd", `FT-2026-0001`) to a shared, multi-domain demo universe.
+
+**Where the fixtures are.** `packages/core/src/internal/demo-data/`: one fictional company with its staff, customers,
+suppliers, products, sales and purchase orders, support cases and documents, generated deterministically
+(`makeCustomers(n)`, `makeEmployees(n)`, ...; the contract is at the top of `index.ts`). It is story-only: not exported
+by `src/index.ts` nor by the `/internal` facade, never in `dist`. Library code (`packages/*/src`, outside stories, tests,
+`showcase/` and `internal/demo-data/` itself) must not import it: ESLint fails the build (ticket #515).
+
+**Which domain for which story.**
+
+| Family of components | Recommended domains |
+| --- | --- |
+| List Report and tables | sales orders, products / stock, employees, support tickets |
+| Virtual List Report (Pro) | product catalogue or stock movements (100k rows) |
+| Object Page and forms | customer, employee, purchase order |
+| Confirm dialogs | destructive actions on different records ("Archive customer", "Cancel purchase order") |
+| Toast, MessageStrip | outcomes of operations from several domains |
+| DatePicker | delivery date, hire date |
+| FileUpload | attachments of a support ticket, supplier documents |
+| Change Summary and Form Rebase (Pro) | at least two domains with a different shape |
+
+**Rules.**
+
+- **No domain is the default.** Pick the domain that fits the component, not the one of the story you copied.
+  Supplier invoices are one allowed domain among the others, never the default.
+- **Balance inside a family.** A family of stories (the stories of one component, or of one Docs page) does not use the
+  same domain in more than a third of its stories. The reviewer checks it; there is no automatic check, because a regex
+  cannot tell a fitting use from a lazy one.
+- **Copy-paste examples (`*.example.tsx`)** have short inline data, in the same universe (same company, same formats:
+  currency, dates, names), because they cannot import internal modules: what the reader copies must run in their project.
+- **English only** in every visible string of a story or fixture.
+
+**The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
+`npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a
+ratchet: it counts them per file (supplier names of the old fixtures, surnames such as `Rossi`, `Acme`, `Northwind`,
+the `FT-2026-` prefix, imports of `demo-invoices` and `demo-rows`; case-insensitive, whole words, comments included) in
+`packages/*/src`, `e2e`, `.storybook`, `site-root` and the READMEs, and compares the count with
+[`scripts/legacy-demo-data.baseline.json`](scripts/legacy-demo-data.baseline.json). `.changeset/*.md` and
+`CHANGELOG.md` are history and are not scanned.
+
+- A file outside the baseline with a legacy string, or a count that grows, fails: use another domain.
+- A count that goes down passes and suggests `npm run legacy-demo:update`; commit the new baseline.
+- `legacy-demo:update` only lowers: it never raises a count nor adds a file. A renamed file shows up as a new one:
+  `update` accepts it only if the total does not grow, so the occurrences just move.
