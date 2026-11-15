@@ -902,6 +902,8 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
 **Non toccato dalle decisioni**: la distribuzione resta come da §2.4 (org npm privata, nessun
 licensing a runtime).
 
+**Dati demo di stories ed esempi** (epic #512, ticket #515): regola sul dominio e guard a cricchetto sui dati legacy in `CONTRIBUTING.md`, sezione "Demo data".
+
 ### Proposte della sessione di pianificazione (non decise da Daniele)
 
 Il pianificatore può usarle come orientamento, ma non come vincoli. Una proposta diventa vincolante

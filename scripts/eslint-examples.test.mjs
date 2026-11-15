@@ -19,7 +19,7 @@ const importOf = (specifier) => `import * as x from '${specifier}';\nexport { x 
 
 // The first lint loads the whole config (typescript-eslint, plugins): seconds, not milliseconds.
 describe('lint: what a copy-paste example may import (#403)', { timeout: 60_000 }, () => {
-  it.each(['zod', 'react-dom', 'react-dom/client', './sibling', '../other', '@formrail/core/internal', 'storybook/test', '@storybook/react-vite'])(
+  it.each(['zod', 'react-dom', 'react-dom/client', './sibling', '../other', '@formrail/core/internal', 'storybook/test', '@storybook/react-vite', '../internal/demo-data', '../../../core/src/internal/demo-data/customers'])(
     '%s is rejected',
     async (specifier) => {
       expect((await messages(EXAMPLE, importOf(specifier), 'no-restricted-imports')).length).toBeGreaterThanOrEqual(1);
