@@ -56,6 +56,8 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   drawn before their sticky column. The state is also on the container, as a styling hook:
  *   `data-rop-overflow-start` / `data-rop-overflow-end` (present or absent), measured on the client only
  *   (never on the server) and updated on scroll and on resize. Within 1px an edge counts as in view.
+ *   The shades are laid out in the container's content box: a `padding` given to the container moves
+ *   them inwards by that padding (keep the container without padding, pad its parent instead).
  * - Every row has the height of `--rop-list-report-row-height`.
  * - States: `status="loading"` shows `loadingRowCount` skeleton rows (or keeps the rows it has),
  *   `"error"` replaces the body with an error strip, and a `ready` table without visible rows says

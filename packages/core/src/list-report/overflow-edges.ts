@@ -22,11 +22,11 @@ export interface OverflowEdges {
 export function overflowEdges(fromStart: number, scrollWidth: number, clientWidth: number): OverflowEdges {
   const max = scrollWidth - clientWidth;
   if (!(max > OVERFLOW_EDGE_TOLERANCE_PX)) return { overflow: false, start: false, end: false };
-  // Clamped: an overscroll (rubber band on touch) never reads as a hidden edge on the other side.
-  const offset = Math.min(Math.max(fromStart, 0), max);
+  // An overscroll (rubber band on touch) needs no clamp: past the start `fromStart` is negative (start
+  // false, end true), past the end it is above `max` (start true, end false).
   return {
     overflow: true,
-    start: offset > OVERFLOW_EDGE_TOLERANCE_PX,
-    end: max - offset > OVERFLOW_EDGE_TOLERANCE_PX,
+    start: fromStart > OVERFLOW_EDGE_TOLERANCE_PX,
+    end: max - fromStart > OVERFLOW_EDGE_TOLERANCE_PX,
   };
 }
