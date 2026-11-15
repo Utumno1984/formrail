@@ -78,3 +78,43 @@ export {
   type DemoProductStatus,
   type DemoStockLevel,
 } from './products';
+export { discountMinor, lineTotalMinor, type DemoOrderLine } from './order-lines';
+export {
+  SALES_ORDER_STATUS_LABEL,
+  SALES_ORDER_STATUS_TONE,
+  getSalesOrder,
+  makeSalesOrders,
+  type DemoSalesOrder,
+  type DemoSalesOrderDetail,
+  type DemoSalesOrderStatus,
+} from './sales-orders';
+export {
+  PURCHASE_ORDER_STATUS_LABEL,
+  PURCHASE_ORDER_STATUS_TONE,
+  getPurchaseOrder,
+  makePurchaseOrders,
+  type DemoPurchaseOrder,
+  type DemoPurchaseOrderDetail,
+  type DemoPurchaseOrderStatus,
+} from './purchase-orders';
+export {
+  INVOICE_STATUS_LABEL,
+  INVOICE_STATUS_TONE,
+  getInvoice,
+  makeInvoices,
+  type DemoInvoice,
+  type DemoInvoiceStatus,
+} from './invoices';
+export {
+  SUPPORT_CASE_PRIORITY_LABEL,
+  SUPPORT_CASE_PRIORITY_TONE,
+  SUPPORT_CASE_STATUS_LABEL,
+  SUPPORT_CASE_STATUS_TONE,
+  getSupportCase,
+  makeSupportCases,
+  type DemoCaseComment,
+  type DemoSupportCase,
+  type DemoSupportCaseDetail,
+  type DemoSupportCasePriority,
+  type DemoSupportCaseStatus,
+} from './support-cases';

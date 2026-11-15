@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEMO_COMPANY } from '../src/internal/demo-data/company';
+import { getSupportCase, makeInvoices, makePurchaseOrders, makeSalesOrders, makeSupportCases, SUPPORT_CASE_STATUS_LABEL } from '../src/internal/demo-data/index';
 import { collectDeclaredPaths, findMissingPaths } from './helpers/package-paths';
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -139,6 +140,41 @@ describe('package.json contract (requires a prior `npm run build`)', () => {
       if (text.includes('demo-data')) offenders.push(`${name}: demo-data`);
     }
     expect(word.length).toBeGreaterThan(3);
+    expect(offenders).toEqual([]);
+  });
+
+  // Ticket #514 extends the same guarantee to the transactional documents. The boundary itself is
+  // guaranteed by the test above, on the string `demo-data` (it is in the seeds, `hashSeed('demo-data/...')`,
+  // and in the source maps of every module of the universe). This test adds what can be checked without
+  // trusting names that a minifier would rename: the TEXT the generators produce, taken from the
+  // generators themselves (a document number, a status label, the sentences of a comment).
+  it('no published file carries the demo documents (names, document numbers, generated texts)', () => {
+    const names = /makeSalesOrders|getSalesOrder|makePurchaseOrders|getPurchaseOrder|makeInvoices|getInvoice\b|makeSupportCases|getSupportCase|SALES_ORDER_STATUS|PURCHASE_ORDER_STATUS|INVOICE_STATUS|SUPPORT_CASE_/;
+    const numbers = /\b(SO|PO|INV)-\d{4}-\d{9}\b|\bCS-\d{5}\b/;
+    const generated = [
+      makeSalesOrders(1)[0]!.number,
+      makePurchaseOrders(1)[0]!.number,
+      makeInvoices(1)[0]!.number,
+      makeSupportCases(1)[0]!.number,
+      SUPPORT_CASE_STATUS_LABEL.pending,
+      // Sentences of the first comments that do not carry a SKU (the SKU is substituted at run time).
+      ...Array.from({ length: 60 }, (_, i) => getSupportCase(`cs-${i + 1}`)!.comments)
+        .flat()
+        .flatMap((comment) => comment.text.split(/(?<=[.?]) /))
+        .filter((sentence) => sentence.length > 20 && !/[A-Z]{3}-\d{5}/.test(sentence)),
+    ];
+    // The checks are not vacuous: they match what the generators produce.
+    expect(names.test('makeSalesOrders(1)') && numbers.test(makeSalesOrders(1)[0]!.number) && numbers.test(makeSupportCases(1)[0]!.number)).toBe(true);
+    expect(generated.length).toBeGreaterThan(30);
+    const offenders: string[] = [];
+    for (const entry of readdirSync(distDir, { recursive: true, withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const name = join(entry.parentPath, entry.name).slice(distDir.length + 1);
+      const text = readFileSync(join(distDir, name), 'utf8');
+      if (names.test(text)) offenders.push(`${name}: generator or label name`);
+      if (numbers.test(text)) offenders.push(`${name}: document number`);
+      for (const literal of generated) if (text.includes(literal)) offenders.push(`${name}: "${literal}"`);
+    }
     expect(offenders).toEqual([]);
   });
 

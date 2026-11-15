@@ -45,6 +45,19 @@ describe('makeProducts', () => {
     expect(outOfStock).toBeGreaterThan(0);
   });
 
+  // Note BASSA of the #513 review: the mutation `int(0, reorderPoint)` -> `int(1, ...)` for discontinued
+  // products survived, because no golden showed a discontinued product out of stock. These counts do.
+  it('golden: stock levels of the first 1,000 products, by status, in stock or at zero', () => {
+    const counts: Record<string, number> = {};
+    for (const product of makeProducts(1000)) {
+      for (const level of product.stock) {
+        const key = `${product.status}:${level.onHand === 0 ? 'zero' : 'in stock'}`;
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+    }
+    expect(counts).toEqual({ 'active:in stock': 2455, 'active:zero': 211, 'discontinued:in stock': 296, 'discontinued:zero': 25 });
+  });
+
   it('names a preferred supplier of the same category within the supplier reference pool (n = 10,000)', () => {
     const suppliers = new Map(makeSuppliers(DEMO_REFERENCE_POOL.suppliers).map((supplier) => [supplier.id, supplier]));
     const problems = makeProducts(10_000)

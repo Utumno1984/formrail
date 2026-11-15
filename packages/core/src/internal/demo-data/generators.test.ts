@@ -8,12 +8,24 @@ import {
   getEmployee,
   getProduct,
   getSupplier,
+  getInvoice,
+  getPurchaseOrder,
+  getSalesOrder,
+  getSupportCase,
+  INVOICE_STATUS_LABEL,
   makeCustomers,
   makeEmployees,
+  makeInvoices,
   makeProducts,
+  makePurchaseOrders,
+  makeSalesOrders,
   makeSuppliers,
+  makeSupportCases,
   PRODUCT_STATUS_LABEL,
+  PURCHASE_ORDER_STATUS_LABEL,
+  SALES_ORDER_STATUS_LABEL,
   SUPPLIER_STATUS_LABEL,
+  SUPPORT_CASE_STATUS_LABEL,
 } from './index';
 
 interface Row {
@@ -34,6 +46,11 @@ interface Case {
   dateKeys: readonly string[];
   /** Rows within which every status appears. */
   statusWindow: number;
+  /**
+   * Transactional documents (ticket #514): `get…(id)` returns the row plus this key (the lazily
+   * generated lines or comments), not the list row itself.
+   */
+  detailKey?: 'lines' | 'comments';
 }
 
 const CASES: Case[] = [
@@ -91,6 +108,61 @@ const CASES: Case[] = [
     dateKeys: ['createdOn'],
     statusWindow: 50,
   },
+  {
+    name: 'makeSalesOrders',
+    make: makeSalesOrders,
+    get: getSalesOrder,
+    modulePath: './sales-orders',
+    exportName: 'makeSalesOrders',
+    idPattern: /^so-[1-9]\d*$/,
+    code: (row) => (row as ReturnType<typeof makeSalesOrders>[number]).number,
+    codePattern: /^SO-\d{4}-\d{5,}$/,
+    statuses: Object.keys(SALES_ORDER_STATUS_LABEL),
+    dateKeys: ['orderDate'],
+    statusWindow: 50,
+    detailKey: 'lines',
+  },
+  {
+    name: 'makePurchaseOrders',
+    make: makePurchaseOrders,
+    get: getPurchaseOrder,
+    modulePath: './purchase-orders',
+    exportName: 'makePurchaseOrders',
+    idPattern: /^po-[1-9]\d*$/,
+    code: (row) => (row as ReturnType<typeof makePurchaseOrders>[number]).number,
+    codePattern: /^PO-\d{4}-\d{5,}$/,
+    statuses: Object.keys(PURCHASE_ORDER_STATUS_LABEL),
+    dateKeys: ['orderDate'],
+    statusWindow: 50,
+    detailKey: 'lines',
+  },
+  {
+    name: 'makeInvoices',
+    make: makeInvoices,
+    get: getInvoice,
+    modulePath: './invoices',
+    exportName: 'makeInvoices',
+    idPattern: /^inv-[1-9]\d*$/,
+    code: (row) => (row as ReturnType<typeof makeInvoices>[number]).number,
+    codePattern: /^INV-\d{4}-\d{5,}$/,
+    statuses: Object.keys(INVOICE_STATUS_LABEL),
+    dateKeys: ['issueDate'],
+    statusWindow: 50,
+  },
+  {
+    name: 'makeSupportCases',
+    make: makeSupportCases,
+    get: getSupportCase,
+    modulePath: './support-cases',
+    exportName: 'makeSupportCases',
+    idPattern: /^cs-[1-9]\d*$/,
+    code: (row) => (row as ReturnType<typeof makeSupportCases>[number]).number,
+    codePattern: /^CS-\d{5,}$/,
+    statuses: Object.keys(SUPPORT_CASE_STATUS_LABEL),
+    dateKeys: ['openedOn'],
+    statusWindow: 50,
+    detailKey: 'comments',
+  },
 ];
 
 const TODAY = isoToDayNumber(DEMO_TODAY);
@@ -100,6 +172,14 @@ function expectDeepFrozen(value: unknown, path = 'record'): void {
   if (value === null || typeof value !== 'object') return;
   expect(Object.isFrozen(value), `${path} is frozen`).toBe(true);
   for (const [key, child] of Object.entries(value)) expectDeepFrozen(child, `${path}.${key}`);
+}
+
+/** The list row inside a detail record (the record itself for domains without a detail). */
+function withoutDetail(c: Case, record: Row | undefined): Row | undefined {
+  if (!record || !c.detailKey) return record;
+  const row: Record<string, unknown> = { ...record };
+  delete row[c.detailKey];
+  return row as unknown as Row;
 }
 
 describe.each(CASES)('$name', (c) => {
@@ -134,7 +214,7 @@ describe.each(CASES)('$name', (c) => {
     const getName = `get${c.exportName.slice('make'.length, -1)}`;
     const getById = fresh[getName] as unknown as (id: string) => Row | undefined;
     const lateFirst = getById(c.make(200)[150]!.id);
-    expect(lateFirst).toEqual(c.make(200)[150]);
+    expect(withoutDetail(c, lateFirst)).toEqual(c.make(200)[150]);
     expect(fresh[c.exportName]!(200)).toEqual(c.make(200));
   });
 
@@ -200,7 +280,11 @@ describe.each(CASES)('$name', (c) => {
 
   it('resolves ids to the same records, and malformed ids to undefined', () => {
     const rows = c.make(100);
-    for (const row of rows) expect(c.get(row.id)).toBe(row);
+    // A document's detail is its row plus the lazily generated lines / comments, so not the same object.
+    for (const row of rows) {
+      if (c.detailKey) expect(withoutDetail(c, c.get(row.id))).toEqual(row);
+      else expect(c.get(row.id)).toBe(row);
+    }
     for (const bad of ['', 'x-1', `${rows[0]!.id.split('-')[0]}-0`, `${rows[0]!.id.split('-')[0]}-01`, `${rows[0]!.id.split('-')[0]}-1.5`]) {
       expect(c.get(bad)).toBeUndefined();
     }

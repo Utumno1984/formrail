@@ -210,21 +210,23 @@ export function getEmployee(id: string): DemoEmployee | undefined {
   return index < 0 ? undefined : employees.at(index);
 }
 
-let poolIndex: { sales: Map<string, number[]>; buyers: number[] } | undefined;
+let poolIndex: { sales: Map<string, number[]>; buyers: number[]; agents: number[] } | undefined;
 
 /** Sales staff (by entity) and buyers among the first `DEMO_REFERENCE_POOL.employees` employees. */
-function referencePool(): { sales: Map<string, number[]>; buyers: number[] } {
+function referencePool(): { sales: Map<string, number[]>; buyers: number[]; agents: number[] } {
   if (!poolIndex) {
     const sales = new Map<string, number[]>(DEMO_LEGAL_ENTITIES.map((entity) => [entity.id, []]));
     const buyers: number[] = [];
+    const agents: number[] = [];
     for (let i = 0; i < DEMO_REFERENCE_POOL.employees; i++) {
       const depth = depthOf(i);
       if (depth < 2) continue;
       const department = departmentOf(i);
       if (department === 'sales') sales.get(entityOf(i, depth))!.push(i);
       else if (department === 'procurement') buyers.push(i);
+      else if (department === 'customer-service' && employees.at(i).status !== 'inactive') agents.push(i);
     }
-    poolIndex = { sales, buyers };
+    poolIndex = { sales, buyers, agents };
   }
   return poolIndex;
 }
@@ -243,4 +245,12 @@ export function pickAccountManagerId(rng: Rng, entityId: string): string {
 /** A buyer (procurement, manager level or below) among the first `DEMO_REFERENCE_POOL.employees` rows. */
 export function pickBuyerId(rng: Rng): string {
   return `emp-${rng.pick(referencePool().buyers) + 1}`;
+}
+
+/**
+ * A customer service employee (manager level or below, never one who has left) among the first
+ * `DEMO_REFERENCE_POOL.employees` rows: who a support case is assigned to.
+ */
+export function pickSupportAgentId(rng: Rng): string {
+  return `emp-${rng.pick(referencePool().agents) + 1}`;
 }
