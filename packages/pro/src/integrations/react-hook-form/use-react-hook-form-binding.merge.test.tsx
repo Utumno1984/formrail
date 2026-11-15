@@ -147,3 +147,98 @@ describe('useReactHookFormBinding: the binding changes the shape of an array, th
     order.unmount();
   });
 });
+
+describe('useReactHookFormBinding: a useFieldArray operation of the app before a write of the binding, in the same run', () => {
+  it("append, then binding.setValues on another field: the appended row stays (the critic's note)", () => {
+    const order = setupOrder();
+    act(() => {
+      order.current().append(L3);
+      order.current().binding.setValues({ supplier: 'Server' });
+    });
+    expectEverywhere(order, { supplier: 'Server', lines: [L1, L2, L3] });
+    expect(paths(order.current().entries)).toEqual(['lines.2', 'supplier']);
+    order.unmount();
+  });
+
+  it('remove, then binding.setValues on another field: the row stays removed', () => {
+    const order = setupOrder();
+    act(() => {
+      order.current().remove(0);
+      order.current().binding.setValues({ supplier: 'Server' });
+    });
+    expectEverywhere(order, { supplier: 'Server', lines: [L2] });
+    order.unmount();
+  });
+
+  it('append, then binding.reset(record): the reset came last, the record wins whole', () => {
+    const order = setupOrder();
+    const record = { ...ORDER, supplier: 'Server' };
+    act(() => {
+      order.current().append(L3);
+      order.current().binding.reset(record);
+    });
+    expectEverywhere(order, record);
+    expect(order.current().binding.baseline).toBe(record);
+    expect(order.current().entries).toEqual([]);
+    order.unmount();
+  });
+
+  it('append, then binding.setValues of the array: the binding wrote the array last, its rows win', () => {
+    const order = setupOrder();
+    act(() => {
+      order.current().append(L3);
+      order.current().binding.setValues({ lines: [{ ...L1, qty: 'server' }] });
+    });
+    expectEverywhere(order, { supplier: 'Acme', lines: [{ ...L1, qty: 'server' }] });
+    order.unmount();
+  });
+
+  it('between two writes of the binding: setValues, append, setValues of the array: the last write (the binding) wins', () => {
+    const order = setupOrder();
+    act(() => {
+      order.current().binding.setValues({ supplier: 'Server' });
+      order.current().append(L3);
+      order.current().binding.setValues({ lines: [L2, L3] });
+    });
+    expectEverywhere(order, { supplier: 'Server', lines: [L2, L3] });
+    order.unmount();
+  });
+
+  it('during a save of your own, append then binding.reset(saved): the row appended during the save is an edit, it stays (dirty)', () => {
+    const order = setupOrder({ ownSave: true });
+    act(() => order.current().setSaving(true));
+    const saved = { ...ORDER, supplier: 'ACME' };
+    act(() => {
+      order.current().append(L3);
+      order.current().binding.reset(saved);
+    });
+    act(() => order.current().setSaving(false));
+    expectEverywhere(order, { supplier: 'ACME', lines: [L1, L2, L3] });
+    expect(order.current().binding.baseline).toBe(saved);
+    expect(paths(order.current().entries)).toEqual(['lines.2']);
+    order.unmount();
+  });
+
+  it('remove, then binding.setValues on another field: the error of the row that moved up stays on it', () => {
+    const order = setupOrder();
+    act(() => order.current().form.setError('lines.1.qty', { type: 'manual', message: 'Qty of row 2' }));
+    act(() => {
+      order.current().remove(0);
+      order.current().binding.setValues({ supplier: 'Server' });
+    });
+    expectEverywhere(order, { supplier: 'Server', lines: [L2] });
+    expect(order.current().form.getFieldState('lines.0.qty').error?.message).toBe('Qty of row 2');
+    order.unmount();
+  });
+
+  it('between two writes of the binding: setValues, append, setValues of another field: the appended row stays', () => {
+    const order = setupOrder();
+    act(() => {
+      order.current().binding.setValues({ supplier: 'Server' });
+      order.current().append(L3);
+      order.current().binding.setValues({ extra: 'x' });
+    });
+    expectEverywhere(order, { supplier: 'Server', lines: [L1, L2, L3], extra: 'x' });
+    order.unmount();
+  });
+});

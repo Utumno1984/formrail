@@ -330,7 +330,22 @@ class BindingStore<Values extends FieldValues> {
     if (stale.length > 0) form.clearErrors(stale as never);
   }
 
+  /**
+   * Before a write of the binding: the snapshots take the writes of the app that sent no value event (a
+   * `useFieldArray` `append` / `remove` made earlier in the run), so the binding writes on top of them instead of
+   * undoing them; a `reset` or a `setValues` of the same array still comes later in call order, and wins.
+   */
+  private catchUp(): void {
+    const { pending } = this;
+    if (pending === null) this.sync();
+    else if (!sameContent(this.form.getValues(), pending.base)) {
+      this.absorb(pending);
+      this.commit({ baseline: this.state.baseline, values: snapshotOf(pending.values, this.state.values) });
+    }
+  }
+
   reset = (next?: Values): void => {
+    this.catchUp();
     const run = this.beginRun();
     const { sent } = this;
     this.sent = null;
@@ -347,6 +362,7 @@ class BindingStore<Values extends FieldValues> {
   };
 
   setValues = (patch: Partial<Values>): void => {
+    this.catchUp();
     const run = this.beginRun();
     const merged = { ...this.state.values, ...patch } as Values;
     const values = snapshotOf(merged, this.state.values);
