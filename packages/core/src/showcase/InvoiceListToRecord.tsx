@@ -25,7 +25,7 @@ import type { DemoInvoice } from '../internal/demo-invoices';
 import type { ListReportRowActions, ListReportSelection } from '../list-report/types';
 import { InvoiceRecordPage } from './InvoiceRecordPage';
 import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
-import { createInvoiceApi } from './invoice-api';
+import { createRecordApi } from './record-api';
 import { createInvoiceStore, type InvoiceStore, type SaveOutcome, type StoredInvoice } from './invoice-store';
 import { isLeaving, leaveRoute, openRecord, readRecord, recordHref, subscribeRoute } from './showcase-router';
 
@@ -264,7 +264,7 @@ export function InvoiceListToRecord({
   // A save outlives the page that started it (leave with "Leave anyway" while it runs). Reads wait for the
   // saves in flight, so a list or a re-opened record never shows (and a later save never builds on) a value
   // older than the one the server is about to hold: no stale echo can overwrite a fresher save.
-  const api = useMemo<InvoiceStore>(() => createInvoiceApi(store, delays), [store]);
+  const api = useMemo<InvoiceStore>(() => createRecordApi(store, delays), [store]);
   useEffect(() => {
     window.__ropShowcaseStore = store;
     return () => {
