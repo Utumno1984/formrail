@@ -29,7 +29,7 @@ const SCANNED = [
 const EXCLUDED = [/^\.changeset\//, /(^|\/)CHANGELOG\.md$/];
 const TEXT_EXT = /\.(?:[cm]?[jt]sx?|mdx?|json|css|html|txt|ya?ml)$/i;
 
-// The names of DEMO_SUPPLIERS (core demo-invoices.ts) and of the suppliers of demo-rows.ts (pro), and the surnames.
+// The whole names of DEMO_SUPPLIERS (core demo-invoices.ts) and of the suppliers of demo-rows.ts (pro). Bare surnames are not searched.
 const CORE_SUPPLIERS = [
   'Rossi Construction Ltd', 'Bianchi Supplies', 'Verdi Installations', 'Neri Transport', 'Gialli Office',
   'Esposito Services', 'Ferrari Mechanics', 'Romano Logistics', 'Colombo Computing', 'Ricci Furnishings',
@@ -40,17 +40,16 @@ const PRO_SUPPLIERS = [
   'Harbor Services', 'Ironworks Mechanics', 'Riverside Logistics', 'Pinecone Computing', 'Oakline Furniture',
   'Seaside Energy', 'Summit Consulting',
 ];
-const SURNAMES = CORE_SUPPLIERS.map((name) => name.split(' ')[0]);
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-// A word boundary that also holds for accented letters and digits: `Rossini` is not `Rossi`.
+// A word boundary that also holds for accented letters and digits: `Acmeda` is not `Acme`.
 const NOT_BEFORE = '(?<![\\p{L}\\p{N}_])';
 const NOT_AFTER = '(?![\\p{L}\\p{N}_])';
 const word = (s) => `${NOT_BEFORE}${escape(s)}${NOT_AFTER}`;
 
 /** Each term has a label and a regex source. Case-insensitive: `acme` counts as `ACME`. */
 export const LEGACY_TERMS = [
-  ...[...CORE_SUPPLIERS, ...PRO_SUPPLIERS, ...SURNAMES, 'Acme', 'Northwind'].map((s) => ({ label: s, source: word(s) })),
+  ...[...CORE_SUPPLIERS, ...PRO_SUPPLIERS, 'Acme', 'Northwind'].map((s) => ({ label: s, source: word(s) })),
   { label: 'FT-2026-', source: `${NOT_BEFORE}FT-2026-` },
   // The import of the modules (`from '../internal/demo-invoices'`, `import('./demo-rows')`): the specifier counts.
   { label: 'import of demo-invoices', source: `(?<=['"\`])[^'"\`\\n]*/demo-invoices(?:\\.[jt]sx?)?(?=['"\`])` },

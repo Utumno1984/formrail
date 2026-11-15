@@ -144,7 +144,7 @@ by `src/index.ts` nor by the `/internal` facade, never in `dist`. Library code (
 
 **The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
 `npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a
-ratchet: it counts them per file (supplier names of the old fixtures, surnames such as `Rossi`, `Acme`, `Northwind`,
+ratchet: it counts them per file (the whole supplier names of the old fixtures such as `Rossi Construction Ltd`, `Acme`, `Northwind`,
 the `FT-2026-` prefix, imports of `demo-invoices` and `demo-rows`; case-insensitive, whole words, comments included) in
 `packages/*/src`, `e2e`, `.storybook`, `site-root` and the READMEs, and compares the count with
 [`scripts/legacy-demo-data.baseline.json`](scripts/legacy-demo-data.baseline.json). `.changeset/*.md` and

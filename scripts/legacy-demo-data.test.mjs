@@ -32,8 +32,8 @@ describe('findOccurrences', () => {
     ["import { makeDemoInvoices } from '../internal/demo-invoices';", 1],
     ["import { makeDemoRows } from './demo-rows';", 1],
     ["const m = await import('../internal/demo-invoices.ts');", 1],
-    ['Rossi and Rossi', 2],
-    ["'Rossi', 'Verdi'", 2],
+    ['Acme and Acme', 2],
+    ["'Acme', 'Northwind'", 2],
   ])('%s -> %i', (text, n) => {
     expect(findOccurrences(text)).toHaveLength(n);
   });
@@ -45,6 +45,10 @@ describe('findOccurrences', () => {
     'Acmeda',
     'Pacme',
     'Ferraris',
+    'Northwinds',
+    // A bare surname is not legacy: only the whole supplier names are (decision on #515)
+    'Rossi',
+    'Verdi and Ferrari',
     'FT-2025-0001',
     'a demo-invoices note',
     "import { x } from '../internal/demo-data';",
@@ -55,7 +59,7 @@ describe('findOccurrences', () => {
   });
 
   it('counts across lines and is not stateful between calls', () => {
-    const text = 'Rossi\nVerdi\nAcme';
+    const text = 'Acme\nNorthwind\nFT-2026-01';
     expect(findOccurrences(text)).toHaveLength(3);
     expect(findOccurrences(text)).toHaveLength(3);
   });
@@ -92,7 +96,7 @@ describe('isScanned', () => {
       '.changeset/x.md': 'The Rossi Construction Ltd rows',
       'CHANGELOG.md': 'Acme',
       'packages/core/CHANGELOG.md': 'FT-2026-0001',
-      'packages/core/src/a.stories.tsx': 'Rossi',
+      'packages/core/src/a.stories.tsx': 'Acme',
     };
     expect(Object.keys(foundOf(files))).toEqual(['packages/core/src/a.stories.tsx']);
   });
@@ -102,12 +106,12 @@ describe('compareLegacy', () => {
   const baseline = base({ 'packages/core/src/a.stories.tsx': 2, 'e2e/b.spec.ts': 1 });
 
   it('passes when nothing changed', () => {
-    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Rossi, Verdi', 'e2e/b.spec.ts': 'Acme' });
+    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Acme, Northwind', 'e2e/b.spec.ts': 'Acme' });
     expect(compareLegacy(found, baseline)).toEqual({ ok: true, errors: [], notes: [] });
   });
 
   it('a new file with a legacy string fails, naming the file, the string and the CONTRIBUTING section', () => {
-    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Rossi, Verdi', 'e2e/b.spec.ts': 'Acme', 'packages/core/src/new.stories.tsx': "const s = 'Rossi Construction Ltd';" });
+    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Acme, Northwind', 'e2e/b.spec.ts': 'Acme', 'packages/core/src/new.stories.tsx': "const s = 'Rossi Construction Ltd';" });
     const r = compareLegacy(found, baseline);
     expect(r.ok).toBe(false);
     expect(r.errors).toHaveLength(1);
@@ -126,7 +130,7 @@ describe('compareLegacy', () => {
   });
 
   it('a file in the baseline whose count grows fails', () => {
-    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Rossi, Verdi, Bianchi', 'e2e/b.spec.ts': 'Acme' });
+    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Acme, Northwind, Bianchi Supplies', 'e2e/b.spec.ts': 'Acme' });
     const r = compareLegacy(found, baseline);
     expect(r.ok).toBe(false);
     expect(r.errors[0]).toContain('packages/core/src/a.stories.tsx');
@@ -136,7 +140,7 @@ describe('compareLegacy', () => {
   });
 
   it('a lower count passes and suggests the update', () => {
-    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Rossi', 'e2e/b.spec.ts': 'Acme' });
+    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Acme', 'e2e/b.spec.ts': 'Acme' });
     const r = compareLegacy(found, baseline);
     expect(r.ok).toBe(true);
     expect(r.notes).toHaveLength(1);
@@ -145,7 +149,7 @@ describe('compareLegacy', () => {
   });
 
   it('a baseline file that no longer exists is not an error: the note says to drop the entry', () => {
-    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Rossi, Verdi' });
+    const found = foundOf({ 'packages/core/src/a.stories.tsx': 'Acme, Northwind' });
     const r = compareLegacy(found, baseline);
     expect(r.ok).toBe(true);
     expect(r.notes[0]).toContain('e2e/b.spec.ts');
@@ -162,7 +166,7 @@ describe('compareLegacy', () => {
 });
 
 describe('updateBaseline: it can only go down', () => {
-  const at = (files) => foundOf(Object.fromEntries(Object.entries(files).map(([p, n]) => [`packages/core/src/${p}`, 'Rossi '.repeat(n)])));
+  const at = (files) => foundOf(Object.fromEntries(Object.entries(files).map(([p, n]) => [`packages/core/src/${p}`, 'Acme '.repeat(n)])));
   const ratchet = base({ 'packages/core/src/a.ts': 2, 'packages/core/src/b.ts': 3, 'packages/core/src/gone.ts': 1 });
 
   it('lowers a count and drops the file that no longer exists', () => {
@@ -263,7 +267,7 @@ describe('the CLI, on a scratch repository', () => {
   });
 
   it('check passes with a lower count and suggests the update, which then lowers the baseline', () => {
-    const dir = scratch({ 'packages/core/src/a.stories.tsx': "const s = 'Rossi';\n" }, { 'packages/core/src/a.stories.tsx': 2 });
+    const dir = scratch({ 'packages/core/src/a.stories.tsx': "const s = 'Acme';\n" }, { 'packages/core/src/a.stories.tsx': 2 });
     try {
       const passed = run(dir, 'check');
       expect(passed.code).toBe(0);
@@ -278,7 +282,7 @@ describe('the CLI, on a scratch repository', () => {
   });
 
   it('update after a rename keeps the total', () => {
-    const dir = scratch({ 'packages/core/src/renamed.stories.tsx': "const s = 'Rossi';\n" }, { 'packages/core/src/old.stories.tsx': 1 });
+    const dir = scratch({ 'packages/core/src/renamed.stories.tsx': "const s = 'Acme';\n" }, { 'packages/core/src/old.stories.tsx': 1 });
     try {
       expect(run(dir, 'check').code).toBe(1);
       expect(run(dir, 'update').code).toBe(0);
