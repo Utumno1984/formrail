@@ -384,7 +384,10 @@ class BindingStore<Values extends FieldValues> {
  * `type: 'change'` event, no remount of the `useFieldArray` rows, the field being typed in is not rewritten),
  * then `resetDefaultValues` (`dirtyFields` and `isDirty` against the baseline). Only a top-level key that must
  * go is written with `reset`. A write of the app made after them in the same run (`form.setValue`, a `Controller`,
- * a `useFieldArray` operation, `form.reset`) wins on what it changes. Both keep `touchedFields`, `submitCount` and the submit flags. An error stays on a
+ * a `useFieldArray` operation, `form.reset`) wins on what it changes: rows the binding added, removed or reordered
+ * stay, with the app's writes on the row they were made on; an array whose rows the app added, removed or reordered
+ * is the app's. A write of the app made before them is what they write on top of (an `append` stays where they do
+ * not write). Both keep `touchedFields`, `submitCount` and the submit flags. An error stays on a
  * field whose value they did not change; the error of a field that took another value is removed (validation
  * runs again at the next change or submit).
  *
@@ -474,14 +477,20 @@ function rowIds(rows: unknown[], idKey: string): unknown[] | null {
 
 type IdKeys = Readonly<Record<string, string>> | undefined;
 
+/** The id key of the rows of the array at `schemaPath`, `undefined` when none is given. */
+function idKeyOf(idKeys: IdKeys, schemaPath: string): string | undefined {
+  const idKey = idKeys !== undefined && Object.hasOwn(idKeys, schemaPath) ? idKeys[schemaPath] : undefined;
+  return typeof idKey === 'string' ? idKey : undefined;
+}
+
 /**
  * `true` when the arrays `a` and `b` have the same length and, with an id key for `schemaPath`, the same ids in
  * the same order: the same rows, compared index by index.
  */
 function sameRows(a: unknown[], b: unknown[], schemaPath: string, idKeys: IdKeys): boolean {
   if (a.length !== b.length) return false;
-  const idKey = idKeys !== undefined && Object.hasOwn(idKeys, schemaPath) ? idKeys[schemaPath] : undefined;
-  if (typeof idKey !== 'string') return true;
+  const idKey = idKeyOf(idKeys, schemaPath);
+  if (idKey === undefined) return true;
   const before = rowIds(a, idKey);
   const after = rowIds(b, idKey);
   return before !== null && after !== null && before.every((id, index) => Object.is(id, after[index]));
@@ -515,9 +524,12 @@ function writeChanges(
 
 /**
  * The binding's pending write `mine` with the writes of the app made since `base` on top (`theirs`: React Hook
- * Form now): where `theirs` differs from `base` it wins, elsewhere `mine` stays. As deep as `writeChanges` goes
- * (plain objects; arrays whose rows stay the same, see `sameRows`); anywhere else `theirs` whole (the app changed
- * the shape of an array the binding also wrote: the app's array). Never mutates its arguments.
+ * Form now): where `theirs` differs from `base` it wins, elsewhere `mine` stays. Into plain objects, and into an
+ * array whose rows the app left the same (see `sameRows`: it wrote fields of its rows): the binding's rows,
+ * rows added or reordered by the binding included, each with the app's writes on the row it matches (by id with
+ * an id key, a row without id matching none; by index without one); a row the binding removed drops the app's
+ * writes on it. An array whose shape the app changed (rows added, removed or reordered by the app, whatever the
+ * binding wrote there): the app's array whole. Never mutates its arguments.
  */
 function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schemaPath: string, idKeys: IdKeys): unknown {
   if (sameContent(theirs, base)) return mine;
@@ -533,8 +545,16 @@ function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schemaPath: 
     for (const key of Object.keys(base)) if (!Object.hasOwn(theirs, key)) delete out[key];
     return out;
   }
-  if (Array.isArray(base) && Array.isArray(theirs) && Array.isArray(mine) && sameRows(base, theirs, schemaPath, idKeys) && sameRows(base, mine, schemaPath, idKeys)) {
-    return theirs.map((item: unknown, index) => adoptWrites(base[index], item, mine[index], schemaPath, idKeys));
+  if (Array.isArray(base) && Array.isArray(theirs) && Array.isArray(mine) && sameRows(base, theirs, schemaPath, idKeys)) {
+    const idKey = idKeyOf(idKeys, schemaPath);
+    return mine.map((row: unknown, index) => {
+      const id = idKey === undefined || !isPlainRecord(row) ? undefined : row[idKey];
+      // `base` and `theirs` hold the same rows, and with an id key every row of `base` has its id (see `sameRows`), so
+      // a row of the binding without id matches none. No match (-1, or an index past `base`): `base[at]` and
+      // `theirs[at]` are both `undefined`, so the binding's row stays as it is.
+      const at = idKey === undefined ? index : base.findIndex((item) => isPlainRecord(item) && Object.is(item[idKey], id));
+      return adoptWrites(base[at], theirs[at], row, schemaPath, idKeys);
+    });
   }
   return theirs;
 }
