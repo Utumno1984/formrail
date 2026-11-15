@@ -41,8 +41,8 @@ const props = (over: Partial<InvoiceCrudProps> = {}): InvoiceCrudProps => ({
   saveDelayMs: 0,
   today: '2026-11-09',
   onNavigate: vi.fn(),
-  reviewSave: invoiceSaveReview,
-  useAddons: invoiceRebaseAddons(options),
+  // Per module since #519 (were the `reviewSave` and `useAddons` props).
+  addons: { invoices: { reviewSave: invoiceSaveReview, useAddons: invoiceRebaseAddons(options) } },
   ...over,
 });
 
@@ -181,7 +181,7 @@ describe('Invoices with Change Summary: server updates (#384)', () => {
   }, 20_000);
 
   it('the Free showcase (no useAddons) has no "Simulate server update" and ignores server changes', async () => {
-    render(<InvoiceCrud {...props({ useAddons: undefined })} />);
+    render(<InvoiceCrud {...props({ addons: { invoices: { reviewSave: invoiceSaveReview, useAddons: undefined } } })} />);
     const record = await open();
     expect(screen.queryByRole('button', { name: 'Simulate server update' })).toBeNull();
     await serverUpdate('inv-1', serverChangeOf('due-date'));

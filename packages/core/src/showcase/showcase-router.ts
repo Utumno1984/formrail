@@ -13,12 +13,37 @@
 //   - leaving = `history.back()` when this entry was pushed by the list (exact restoration, and Forward
 //     reopens the page), otherwise (deep link) a `replaceState` to the list URL of the same module;
 //   - the list restores its scroll by itself (`useListReportScrollRestoration`, keyed on the list's own
-//     parameters: no route parameter is one of them).
+//     parameters: no route parameter is one of them);
+//   - since #519 the list parameters (pill, search, sort) and the saved scroll are per module, never shared:
+//     the default module keeps `filter`/`q`/`sort`, any other one has them under its name (`tasks.filter`, see
+//     `listParamPrefix`), so two modules in one iframe each come back to their own list;
+//   - since #519 the modules are ONE static list (`showcase-modules.ts`) read by the parsing AND by the writing:
+//     opening a page of a module that is not there throws, it never writes a URL read back as another list.
 import { updateSearch } from '../list-report/use-list-report-url-state';
+import { SHOWCASE_MODULES } from './showcase-modules';
 
-/** The modules the router knows, the default one first: it is the one whose URLs carry no `module` parameter. */
-export const SHOWCASE_MODULES: readonly [string, ...string[]] = ['invoices'];
+export { SHOWCASE_MODULES };
 export const DEFAULT_MODULE: string = SHOWCASE_MODULES[0];
+
+/** Whether `module` is one of the registered modules (`SHOWCASE_MODULES`). */
+export const isShowcaseModule = (module: string): boolean => SHOWCASE_MODULES.includes(module);
+
+/**
+ * Throws for a module that is not registered: a URL written for it would be read back as the list of the default
+ * module (`parseRoute`). A programming error of the showcase, so it fails loudly instead of navigating somewhere else.
+ */
+export function assertShowcaseModule(module: string): void {
+  if (!isShowcaseModule(module)) {
+    throw new Error(`[showcase] unknown module "${module}": add it to SHOWCASE_MODULES (showcase-modules.ts).`);
+  }
+}
+
+/**
+ * The `prefix` of a module's list parameters and saved scroll (`useListReportUrlState`,
+ * `useListReportScrollRestoration`): none for the default module (its URLs are the ones of before #519), the
+ * module name for any other (`tasks.filter`, `tasks.q`, `tasks.sort`), so no two modules share them.
+ */
+export const listParamPrefix = (module: string): string | undefined => (module === DEFAULT_MODULE ? undefined : module);
 
 export type Route = { module: string } & ({ kind: 'list' } | { kind: 'record'; id: string } | { kind: 'create' });
 
@@ -89,10 +114,17 @@ const stateObject = (): Record<string, unknown> => {
 const routeUrl = (route: Route): string =>
   `${window.location.pathname}${routeSearch(window.location.search, route)}${window.location.hash}`;
 
-/** The href of a record: the current list parameters plus `record=<id>` (and `module` when not the default). */
-export const recordHref = (id: string, module: string = DEFAULT_MODULE): string => routeUrl({ module, kind: 'record', id });
+/**
+ * The href of a record: the current list parameters plus `record=<id>` (and `module` when not the default).
+ * Throws for a module that is not registered (`assertShowcaseModule`).
+ */
+export const recordHref = (id: string, module: string = DEFAULT_MODULE): string => {
+  assertShowcaseModule(module);
+  return routeUrl({ module, kind: 'record', id });
+};
 
 function open(route: Route): void {
+  assertShowcaseModule(route.module); // before anything is written: no URL, no history entry, no report
   if (routeKey(readRoute()) === routeKey(route)) return; // a double click leaves ONE history entry
   window.history.pushState({ ...stateObject(), [FROM_LIST]: true }, '', routeUrl(route));
   notifyRoute();

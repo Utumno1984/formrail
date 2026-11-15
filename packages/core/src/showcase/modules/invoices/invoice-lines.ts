@@ -1,7 +1,7 @@
 // Story-only: the invoice line items as the form sees them (text as typed) and the rules on them. Not exported
 // by the package.
-import type { StoredLineItem } from './invoice-store';
-import { DECIMAL, INTEGER, MAX_PLAIN_NUMBER, isPlainPositive, isTooLarge, sameNumberText } from './number-text';
+import type { StoredLineItem } from '../../invoice-store';
+import { DECIMAL, INTEGER, MAX_PLAIN_NUMBER, isPlainPositive, isTooLarge, sameNumberText } from '../../number-text';
 
 /** A line in the form: quantity and unit price are text as typed, like the invoice `amount`. */
 export interface LineValues {
