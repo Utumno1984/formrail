@@ -5,7 +5,7 @@ import type { DemoProductCategory } from './catalog';
 import type { DemoCurrency } from './currency';
 import { createDataset, DEMO_REFERENCE_POOL, indexFromId } from './dataset';
 import { daysAgo, daysBetween, DEMO_TODAY } from './dates';
-import { ageCache, buildLines, drawLines, poolIndexes, type DemoOrderLine, type LineSource } from './order-lines';
+import { ageCache, buildLines, documentNumber, drawLines, poolIndexes, type DemoOrderLine, type LineSource } from './order-lines';
 import { createRowRng, hashSeed } from './rng';
 import { makeSuppliers } from './suppliers';
 
@@ -14,7 +14,7 @@ export type DemoPurchaseOrderStatus = 'draft' | 'sent' | 'received' | 'closed';
 export interface DemoPurchaseOrder {
   /** Stable id, e.g. `po-12`. */
   readonly id: string;
-  /** `PO-<year of the order date>-<sequence>`, e.g. `PO-2026-10012`. */
+  /** `PO-<year>-<day of year><row>` (see `documentNumber`): sorting by number sorts by order date. */
   readonly number: string;
   /** An `active` supplier among the first `DEMO_REFERENCE_POOL.suppliers`. */
   readonly supplierId: string;
@@ -134,7 +134,7 @@ function makePurchaseOrder(index: number): DemoPurchaseOrder {
   const id = `po-${index + 1}`;
   return Object.freeze({
     id,
-    number: `PO-${orderDate.slice(0, 4)}-${10001 + index}`,
+    number: documentNumber('PO', orderDate, index),
     supplierId: supplier.id,
     currency: supplier.currency,
     status,

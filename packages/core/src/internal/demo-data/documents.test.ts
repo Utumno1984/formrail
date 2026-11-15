@@ -42,6 +42,27 @@ const productById = new Map(products.map((p) => [p.id, p]));
 const employeeById = new Map(employees.map((e) => [e.id, e]));
 const TONES = new Set(['neutral', 'info', 'success', 'warning', 'error']);
 
+/** Independent check of `<prefix>-<year>-<day of year, 3 digits><row, 6 digits>` against the row id and the date. */
+function numberProblem(prefix: string, number: string, isoDate: string, id: string): string | null {
+  const match = /^([A-Z]+)-(\d{4})-(\d{3})(\d{6})$/.exec(number);
+  if (!match) return `${id}: number ${number}`;
+  const year = isoDate.slice(0, 4);
+  const dayOfYear = daysBetween(`${year}-01-01`, isoDate) + 1;
+  const row = Number(id.slice(id.indexOf('-') + 1));
+  return match[1] === prefix && match[2] === year && Number(match[3]) === dayOfYear && Number(match[4]) === row ? null : `${id}: number ${number} for ${isoDate}`;
+}
+
+/** Sorting by number (as text) must sort by date: no document is numbered before an earlier one. */
+function chronologyProblems(rows: readonly { number: string; id: string }[], dateOf: (row: never) => string): string[] {
+  const sorted = [...rows].sort((a, b) => (a.number < b.number ? -1 : a.number > b.number ? 1 : 0));
+  const problems: string[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i - 1]!.number === sorted[i]!.number) problems.push(`${sorted[i]!.id}: duplicate number`);
+    if (dateOf(sorted[i - 1] as never) > dateOf(sorted[i] as never)) problems.push(`${sorted[i]!.number} is dated before ${sorted[i - 1]!.number}`);
+  }
+  return problems;
+}
+
 const sum = (values: readonly number[]) => values.reduce((a, b) => a + b, 0);
 
 describe('status labels and tones', () => {
@@ -99,7 +120,8 @@ describe('makeSalesOrders / getSalesOrder', () => {
       }
       if (order.currency !== customer.currency) problems.push(`${order.id}: currency`);
       if (order.accountManagerId !== customer.accountManagerId || !employeeById.has(order.accountManagerId)) problems.push(`${order.id}: manager`);
-      if (order.number !== `SO-${order.orderDate.slice(0, 4)}-${10001 + Number(order.id.slice(3)) - 1}`) problems.push(`${order.id}: number ${order.number}`);
+      const numberIssue = numberProblem('SO', order.number, order.orderDate, order.id);
+      if (numberIssue) problems.push(numberIssue);
       numbers.add(order.number);
       if (!(order.status in SALES_ORDER_STATUS_LABEL)) problems.push(`${order.id}: status`);
       const sinceOrder = daysBetween(order.orderDate, DEMO_TODAY);
@@ -139,6 +161,21 @@ describe('makeSalesOrders / getSalesOrder', () => {
     expect(orders.filter((order) => order.lineCount >= 12).length).toBeGreaterThan(300);
     expect(makeSalesOrders(50).some((order) => order.lineCount >= 12)).toBe(true);
     expect(makeSalesOrders(50).some((order) => order.lineCount === 1)).toBe(true);
+  });
+
+  it('numbers follow the order date: sorting by number sorts by date', () => {
+    expect(chronologyProblems(orders, (o: (typeof orders)[number]) => o.orderDate)).toEqual([]);
+  });
+
+  it('an archived customer has no open order (draft, confirmed, shipped), but may have old invoiced or cancelled ones', () => {
+    const many = makeSalesOrders(20_000);
+    const archived = many.filter((order) => customerById.get(order.customerId)!.status === 'archived');
+    expect(archived.length).toBeGreaterThan(50);
+    expect(archived.filter((order) => ['draft', 'confirmed', 'shipped'].includes(order.status)).map((order) => order.id)).toEqual([]);
+  });
+
+  it('an invoiced order has been delivered at least 5 days ago (its invoice can follow it)', () => {
+    for (const order of orders.filter((o) => o.status === 'invoiced')) expect(daysBetween(order.requestedDeliveryDate, DEMO_TODAY)).toBeGreaterThanOrEqual(5);
   });
 
   it('shows every status within the first 50 rows', () => {
@@ -185,7 +222,8 @@ describe('makePurchaseOrders / getPurchaseOrder', () => {
       if (supplier.status !== 'active') problems.push(`${order.id}: supplier ${supplier.status}`);
       if (order.currency !== supplier.currency) problems.push(`${order.id}: currency`);
       if (order.buyerId !== supplier.buyerId || !employeeById.has(order.buyerId)) problems.push(`${order.id}: buyer`);
-      if (order.number !== `PO-${order.orderDate.slice(0, 4)}-${10001 + Number(order.id.slice(3)) - 1}`) problems.push(`${order.id}: number`);
+      const numberIssue = numberProblem('PO', order.number, order.orderDate, order.id);
+      if (numberIssue) problems.push(numberIssue);
       numbers.add(order.number);
       if (daysBetween(order.orderDate, DEMO_TODAY) < 0) problems.push(`${order.id}: order in the future`);
       if (daysBetween(supplier.createdOn, order.orderDate) < 0) problems.push(`${order.id}: before the supplier existed`);
@@ -208,6 +246,10 @@ describe('makePurchaseOrders / getPurchaseOrder', () => {
       for (const line of detail.lines) if (productById.get(line.productId)?.category !== supplier.category) problems.push(`${line.id}: category`);
     }
     expect(problems).toEqual([]);
+  });
+
+  it('numbers follow the order date: sorting by number sorts by date', () => {
+    expect(chronologyProblems(orders, (o: (typeof orders)[number]) => o.orderDate)).toEqual([]);
   });
 
   it('shows every status within the first 50 rows, and has one-line and long orders', () => {
@@ -260,9 +302,12 @@ describe('makeInvoices / getInvoice', () => {
     for (const invoice of invoices) {
       const customer = customerById.get(invoice.customerId)!;
       if (daysBetween(invoice.issueDate, invoice.dueDate) !== PAYMENT_TERMS_DAYS[customer.paymentTerms]) problems.push(`${invoice.id}: terms`);
-      if (daysBetween(orderById.get(invoice.salesOrderId)!.orderDate, invoice.issueDate) < 2) problems.push(`${invoice.id}: issued too early`);
+      // Invoiced when the goods go out: the requested delivery date or up to five days after it.
+      const sinceDelivery = daysBetween(orderById.get(invoice.salesOrderId)!.requestedDeliveryDate, invoice.issueDate);
+      if (sinceDelivery < 0 || sinceDelivery > 5) problems.push(`${invoice.id}: issued ${sinceDelivery} days after the delivery date`);
       if (daysBetween(invoice.issueDate, DEMO_TODAY) < 0) problems.push(`${invoice.id}: issued in the future`);
-      if (invoice.number !== `INV-${invoice.issueDate.slice(0, 4)}-${10001 + Number(invoice.id.slice(4)) - 1}`) problems.push(`${invoice.id}: number`);
+      const numberIssue = numberProblem('INV', invoice.number, invoice.issueDate, invoice.id);
+      if (numberIssue) problems.push(numberIssue);
     }
     expect(problems).toEqual([]);
   });
@@ -300,6 +345,10 @@ describe('makeInvoices / getInvoice', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('numbers follow the issue date: sorting by number sorts by date (EU invoice numbering)', () => {
+    expect(chronologyProblems(invoices, (i: (typeof invoices)[number]) => i.issueDate)).toEqual([]);
   });
 
   it('getInvoice resolves ids', () => {
@@ -373,6 +422,139 @@ describe('makeSupportCases / getSupportCase', () => {
     const lengths = cases.slice(0, 1500).flatMap((supportCase) => getSupportCase(supportCase.id)!.comments.map((comment) => comment.text.length));
     expect(Math.max(...lengths)).toBeGreaterThan(400);
     expect(Math.min(...lengths)).toBeLessThan(200);
+  });
+
+  it('an archived customer has only closed cases', () => {
+    const many = makeSupportCases(20_000);
+    const archived = many.filter((c) => customerById.get(c.customerId)!.status === 'archived');
+    expect(archived.length).toBeGreaterThan(50);
+    expect(archived.filter((c) => c.status !== 'closed').map((c) => c.id)).toEqual([]);
+  });
+
+  describe('threads', () => {
+    const SENTENCE_END = /(?<=\.|\?) /;
+    const threads = cases.slice(0, 3000).map((supportCase) => getSupportCase(supportCase.id)!);
+    const withComments = threads.filter((thread) => thread.comments.length > 0);
+    // What each subject's opening message must talk about.
+    const OPENING_KEYWORD: readonly (readonly [RegExp, RegExp])[] = [
+      [/^Wrong quantity/, /quantity|units/],
+      [/^Damaged packaging/, /damaged/],
+      [/^Certificate of conformity/, /certificate of conformity/],
+      [/^Delivery of .* is late/, /promised/],
+      [/^Quotation request/, /quotation/],
+      [/^Invoice price/, /price/],
+      [/^Return request/, /return/],
+      [/^Technical data sheet/, /data sheet/],
+      [/^Substitute/, /equivalent/],
+    ];
+
+    it('never repeats a sentence within a message (10,000 cases)', () => {
+      const repeats: string[] = [];
+      for (const supportCase of cases) {
+        for (const comment of getSupportCase(supportCase.id)!.comments) {
+          const sentences = comment.text.split(SENTENCE_END);
+          if (new Set(sentences).size !== sentences.length) repeats.push(comment.id);
+        }
+      }
+      expect(repeats).toEqual([]);
+    });
+
+    it('long messages exist (6 sentences or more); the others have 3 at most', () => {
+      const counts = withComments.flatMap((thread) => thread.comments.map((comment) => comment.text.split(SENTENCE_END).length));
+      expect(Math.max(...counts)).toBeGreaterThanOrEqual(7);
+      expect(counts.filter((n) => n >= 4 && n <= 5).length).toBe(0);
+    });
+
+    it('opens with the customer, never with a thanks, about the product and the subject of the case', () => {
+      const problems: string[] = [];
+      for (const thread of withComments) {
+        const [first] = thread.comments;
+        const sku = productById.get(thread.productId)!.sku;
+        if (first!.authorKind !== 'customer') problems.push(`${thread.id}: opens with the employee`);
+        if (/^thank/i.test(first!.text) || /thank|solves it/i.test(first!.text.split(SENTENCE_END)[0]!)) problems.push(`${thread.id}: opens with thanks`);
+        if (!first!.text.includes(sku)) problems.push(`${thread.id}: opening does not name ${sku}`);
+        const keyword = OPENING_KEYWORD.find(([subject]) => subject.test(thread.subject));
+        if (!keyword || !keyword[1].test(first!.text)) problems.push(`${thread.id}: opening does not match "${thread.subject}"`);
+      }
+      expect(problems).toEqual([]);
+    });
+
+    it('alternates customer and employee, and ends with whoever the status waits for', () => {
+      const problems: string[] = [];
+      for (const thread of withComments) {
+        thread.comments.forEach((comment, k) => {
+          if (k > 0 && comment.authorKind === thread.comments[k - 1]!.authorKind) problems.push(`${comment.id}: same author twice in a row`);
+        });
+        const last = thread.comments[thread.comments.length - 1]!;
+        // new and open wait for the employee; pending waits for the customer; resolved and closed end with the solution.
+        const expected = thread.status === 'new' || thread.status === 'open' ? 'customer' : 'employee';
+        if (last.authorKind !== expected) problems.push(`${thread.id}: ${thread.status} ends with the ${last.authorKind}`);
+      }
+      expect(problems).toEqual([]);
+      expect(withComments.filter((thread) => thread.status === 'pending').length).toBeGreaterThan(100);
+    });
+
+    it('has one contact of the customer per thread', () => {
+      for (const thread of withComments) {
+        const contacts = new Set(thread.comments.filter((comment) => comment.authorKind === 'customer').map((comment) => comment.authorId));
+        expect(contacts.size).toBe(1);
+      }
+      // ... and not always the same position in the list of contacts.
+      const positions = new Set(withComments.map((thread) => customerById.get(thread.customerId)!.contacts.findIndex((c) => c.id === thread.comments[0]!.authorId)));
+      expect(positions.size).toBeGreaterThan(1);
+    });
+
+    it('a solution ends resolved and closed threads, a closed one says so, and the first answer of a long thread does not solve it', () => {
+      for (const thread of withComments) {
+        const sku = productById.get(thread.productId)!.sku;
+        const employeeComments = thread.comments.filter((comment) => comment.authorKind === 'employee');
+        if (thread.status === 'resolved' || thread.status === 'closed') {
+          expect(employeeComments[employeeComments.length - 1]!.text).toContain(sku);
+        }
+        if (thread.status === 'closed') expect(thread.comments[thread.comments.length - 1]!.text).toContain('I am closing this case');
+        else expect(thread.comments.some((comment) => comment.text.includes('I am closing this case'))).toBe(false);
+        // Nobody thanks for a solution before there is one.
+        if (thread.comments.length >= 4) expect(thread.comments[1]!.text).not.toMatch(/credit note has been issued|I am closing/);
+      }
+    });
+
+    it('comments are written in working hours (08:00-17:59), the opening one on the day the case was opened', () => {
+      const outside: string[] = [];
+      for (const thread of withComments) {
+        expect(thread.comments[0]!.postedAt.slice(0, 10)).toBe(thread.openedOn);
+        for (const comment of thread.comments) {
+          const hour = Number(comment.postedAt.slice(11, 13));
+          if (hour < 8 || hour >= 18) outside.push(`${comment.id} at ${comment.postedAt}`);
+        }
+      }
+      expect(outside).toEqual([]);
+    });
+
+    it('has comments in every working hour (not a thread frozen at one time of day) and most threads span several days', () => {
+      const hours = new Set(withComments.flatMap((thread) => thread.comments.map((comment) => Number(comment.postedAt.slice(11, 13)))));
+      expect([...hours].sort((a, b) => a - b)).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+      const multiDay = withComments.filter((thread) => thread.comments.length >= 3 && thread.comments[thread.comments.length - 1]!.postedAt.slice(0, 10) !== thread.openedOn);
+      expect(multiDay.length).toBeGreaterThan(100);
+    });
+
+    it('commentCount has the parity of its status: 0 or 1 (new), odd (open), even (pending, resolved, closed)', () => {
+      const problems: string[] = [];
+      for (const supportCase of cases) {
+        const odd = supportCase.commentCount % 2 === 1;
+        if (supportCase.status === 'open' && !odd) problems.push(`${supportCase.id}: open with ${supportCase.commentCount}`);
+        if ((supportCase.status === 'pending' || supportCase.status === 'resolved' || supportCase.status === 'closed') && (odd || supportCase.commentCount < 2)) {
+          problems.push(`${supportCase.id}: ${supportCase.status} with ${supportCase.commentCount}`);
+        }
+        if (supportCase.status === 'new' && supportCase.commentCount > 1) problems.push(`${supportCase.id}: new with ${supportCase.commentCount}`);
+      }
+      expect(problems).toEqual([]);
+    });
+  });
+
+  it('has a new case that is assigned and one that is not, among the first rows', () => {
+    const fresh = makeSupportCases(100).filter((supportCase) => supportCase.status === 'new');
+    expect(fresh.some((supportCase) => supportCase.assigneeId !== null)).toBe(true);
+    expect(fresh.some((supportCase) => supportCase.assigneeId === null)).toBe(true);
   });
 
   it('has unassigned cases (new ones only) and the customer writes first in every thread', () => {

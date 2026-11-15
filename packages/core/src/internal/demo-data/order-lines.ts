@@ -133,3 +133,25 @@ export function ageCache(list: readonly { readonly createdOn: string }[], daysFr
     return age;
   };
 }
+
+const DAYS_BEFORE_MONTH = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+/** Day of the year (1-366) of an ISO date `yyyy-mm-dd`, read from the string (no date parsing: a hot path). */
+export function dayOfYear(iso: string): number {
+  const year = Number(iso.slice(0, 4));
+  const month = Number(iso.slice(5, 7));
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return DAYS_BEFORE_MONTH[month - 1]! + (leap && month > 2 ? 1 : 0) + Number(iso.slice(8, 10));
+}
+
+/**
+ * A document number that orders chronologically: `<prefix>-<year>-<day of the year, 3 digits><row, 6
+ * digits>`, e.g. `INV-2026-287000012`. Sorting the numbers as text sorts the documents by date (ties
+ * by row), and the row keeps every number unique whatever the other rows are (row `i` must not depend
+ * on `n`, so a running counter per year is not available). A real system would count 1, 2, 3...
+ */
+export function documentNumber(prefix: string, isoDate: string, index: number): string {
+  const day = dayOfYear(isoDate);
+  const row = index + 1;
+  return `${prefix}-${isoDate.slice(0, 4)}-${day < 10 ? '00' : day < 100 ? '0' : ''}${day}${'000000'.slice(String(row).length)}${row}`;
+}

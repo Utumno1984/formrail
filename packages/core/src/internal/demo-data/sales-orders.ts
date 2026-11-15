@@ -6,7 +6,7 @@ import { makeCustomers } from './customers';
 import type { DemoCurrency } from './currency';
 import { createDataset, DEMO_REFERENCE_POOL, indexFromId } from './dataset';
 import { daysAgo, daysBetween, DEMO_TODAY } from './dates';
-import { ageCache, buildLines, drawLines, poolIndexes, type DemoOrderLine, type LineSource } from './order-lines';
+import { ageCache, buildLines, documentNumber, drawLines, poolIndexes, type DemoOrderLine, type LineSource } from './order-lines';
 import { createRowRng, hashSeed } from './rng';
 
 export type DemoSalesOrderStatus = 'draft' | 'confirmed' | 'shipped' | 'invoiced' | 'cancelled';
@@ -14,7 +14,7 @@ export type DemoSalesOrderStatus = 'draft' | 'confirmed' | 'shipped' | 'invoiced
 export interface DemoSalesOrder {
   /** Stable id, e.g. `so-12`. */
   readonly id: string;
-  /** `SO-<year of the order date>-<sequence>`, e.g. `SO-2026-10012`. Unique: the sequence follows the row. */
+  /** `SO-<year>-<day of year><row>` (see `documentNumber`): sorting by number sorts by order date. Unique. */
   readonly number: string;
   /** A customer among the first `DEMO_REFERENCE_POOL.customers`. */
   readonly customerId: string;
@@ -27,7 +27,10 @@ export interface DemoSalesOrder {
   readonly accountManagerId: string;
   /** ISO date, never before the customer's `createdOn`, never after `DEMO_TODAY`. */
   readonly orderDate: string;
-  /** ISO date the customer asked for delivery: 7 to 45 days after `orderDate`. */
+  /**
+   * ISO date the customer asked for delivery: 7 to 45 days after `orderDate`; for an `invoiced` order
+   * (already delivered) at least 5 days before `DEMO_TODAY`, so its invoice can follow it.
+   */
   readonly requestedDeliveryDate: string;
   /** How many lines `getSalesOrder(id).lines` has (1 to 18). */
   readonly lineCount: number;
@@ -121,6 +124,7 @@ const lineSource = (): LineSource =>
     discounts: DISCOUNTS,
   });
 
+let nonArchived: readonly number[] | undefined;
 let customerAge: ((index: number) => number) | undefined;
 
 /** The status of row `index`, computable without building the row (invoices scan for `invoiced` ones). */
@@ -128,10 +132,16 @@ export function salesOrderStatusAt(index: number): DemoSalesOrderStatus {
   return createRowRng(STATUS_SEED, index).weighted(STATUS_WEIGHTS);
 }
 
-// Facts the invoices need about a row (its customer's row and its age in days), kept as numbers when the
+// Facts the invoices need about a row (its customer's row and its delivery age in days), kept as numbers when the
 // row is built: no id to parse and no date to parse again, which a 100,000-invoice list would repeat.
 const customerIndexes: number[] = [];
-const orderAges: number[] = [];
+const deliveryAges: number[] = [];
+
+/** Days from the requested delivery date of row `index` to `DEMO_TODAY` (negative: still to come). */
+export function salesOrderDeliveryAgeAt(index: number): number {
+  salesOrders.at(index);
+  return deliveryAges[index]!;
+}
 
 /** Index into `makeCustomers(DEMO_REFERENCE_POOL.customers)` of the customer of row `index` (built on demand). */
 export function salesOrderCustomerIndexAt(index: number): number {
@@ -139,18 +149,15 @@ export function salesOrderCustomerIndexAt(index: number): number {
   return customerIndexes[index]!;
 }
 
-/** Days from the order date of row `index` to `DEMO_TODAY` (built on demand). */
-export function salesOrderAgeAt(index: number): number {
-  salesOrders.at(index);
-  return orderAges[index]!;
-}
-
 function makeSalesOrder(index: number): DemoSalesOrder {
   const customers = makeCustomers(DEMO_REFERENCE_POOL.customers);
   customerAge ??= ageCache(customers, (createdOn) => daysBetween(createdOn, DEMO_TODAY));
   const status = salesOrderStatusAt(index);
   const rng = createRowRng(SEED, index);
-  const customerIndex = rng.int(0, customers.length - 1);
+  // An archived account has no open document: draft, confirmed and shipped orders go to the others.
+  const open = status === 'draft' || status === 'confirmed' || status === 'shipped';
+  nonArchived ??= customers.flatMap((c, i) => (c.status === 'archived' ? [] : [i]));
+  const customerIndex = open ? nonArchived[rng.int(0, nonArchived.length - 1)]! : rng.int(0, customers.length - 1);
   const customer = customers[customerIndex]!;
   const [youngest, oldest] =
     status === 'invoiced' && rng.chance(RECENT_INVOICED_CHANCE) ? RECENT_INVOICED_AGE : ORDER_AGE[status];
@@ -158,15 +165,17 @@ function makeSalesOrder(index: number): DemoSalesOrder {
   const oldestAllowed = Math.min(oldest, customerAge(customerIndex));
   const age = rng.int(Math.min(youngest, oldestAllowed), oldestAllowed);
   customerIndexes[index] = customerIndex;
-  orderAges[index] = age;
   const orderDate = daysAgo(age);
   const lineCount = rng.weighted(LINE_COUNTS);
   const customerReference = `REQ-${rng.int(10000, 99999)}`;
-  const requestedDeliveryDate = daysAgo(age - rng.int(7, 45));
+  // An invoiced order has been delivered by now: delivery at least 5 days ago, so the invoice can follow.
+  const deliveryAge = age - rng.int(7, status === 'invoiced' ? Math.min(45, age - 5) : 45);
+  deliveryAges[index] = deliveryAge;
+  const requestedDeliveryDate = daysAgo(deliveryAge);
   const id = `so-${index + 1}`;
   return Object.freeze({
     id,
-    number: `SO-${orderDate.slice(0, 4)}-${10001 + index}`,
+    number: documentNumber('SO', orderDate, index),
     customerId: customer.id,
     currency: customer.currency,
     status,

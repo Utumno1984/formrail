@@ -8,7 +8,8 @@ import type { DemoCurrency } from './currency';
 import { createDataset, DEMO_REFERENCE_POOL, indexFromId } from './dataset';
 import { daysAgo } from './dates';
 import { createRowRng, hashSeed } from './rng';
-import { salesOrderAgeAt, salesOrderAt, salesOrderCustomerIndexAt, salesOrderStatusAt } from './sales-orders';
+import { documentNumber } from './order-lines';
+import { salesOrderAt, salesOrderDeliveryAgeAt, salesOrderCustomerIndexAt, salesOrderStatusAt } from './sales-orders';
 import { PAYMENT_TERMS_DAYS } from './terms';
 
 /**
@@ -20,7 +21,7 @@ export type DemoInvoiceStatus = 'issued' | 'paid' | 'overdue' | 'disputed';
 export interface DemoInvoice {
   /** Stable id, e.g. `inv-12`. */
   readonly id: string;
-  /** `INV-<year of the issue date>-<sequence>`, e.g. `INV-2026-10012`. */
+  /** `INV-<year>-<day of year><row>` (see `documentNumber`): numbers rise with the issue date, as EU invoice numbering requires. */
   readonly number: string;
   /** The `invoiced` sales order this invoice bills (a row of `makeSalesOrders`). */
   readonly salesOrderId: string;
@@ -29,7 +30,7 @@ export interface DemoInvoice {
   /** The currency of the order. */
   readonly currency: DemoCurrency;
   readonly status: DemoInvoiceStatus;
-  /** ISO date, after the order date, never after `DEMO_TODAY`. */
+  /** ISO date: the requested delivery date of the order or up to 5 days after it; never after `DEMO_TODAY`. */
   readonly issueDate: string;
   /** `issueDate` plus the customer's payment terms. */
   readonly dueDate: string;
@@ -71,9 +72,10 @@ function makeInvoice(index: number): DemoInvoice {
   const order = salesOrderAt(orderIndex);
   const customer = makeCustomers(DEMO_REFERENCE_POOL.customers)[salesOrderCustomerIndexAt(orderIndex)]!;
   const rng = createRowRng(SEED, index);
-  const orderAge = salesOrderAgeAt(orderIndex);
-  // Invoiced two days to three weeks after the order, never in the future.
-  const issueAge = orderAge - rng.int(2, Math.min(20, orderAge));
+  // Invoiced when the goods go out: on the requested delivery date or up to five days later (the order
+  // is invoiced, hence already delivered: its delivery is at least 5 days back), never in the future.
+  const deliveryAge = salesOrderDeliveryAgeAt(orderIndex);
+  const issueAge = deliveryAge - rng.int(0, Math.min(5, deliveryAge));
   const termsDays = PAYMENT_TERMS_DAYS[customer.paymentTerms];
   const dueAge = issueAge - termsDays;
   const pastDue = dueAge > 0;
@@ -86,7 +88,7 @@ function makeInvoice(index: number): DemoInvoice {
   const issueDate = daysAgo(issueAge);
   return Object.freeze({
     id: `inv-${index + 1}`,
-    number: `INV-${issueDate.slice(0, 4)}-${10001 + index}`,
+    number: documentNumber('INV', issueDate, index),
     salesOrderId: order.id,
     customerId: order.customerId,
     currency: order.currency,
