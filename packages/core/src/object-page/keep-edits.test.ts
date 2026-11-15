@@ -24,16 +24,16 @@ describe('keepEditsSince (core): a save that settles while the user kept typing'
   });
 
   it('the ticket example: the untouched normalized field takes the server value, the edited one stays', () => {
-    const s = { name: ' acme ', amount: 10 };
-    const returned = { name: 'Acme', amount: 10 };
+    const s = { name: ' orbit ', amount: 10 };
+    const returned = { name: 'Orbit', amount: 10 };
     const merged = keepEditsSince(s, { ...s, amount: 99 }, returned);
-    expect(merged).toEqual({ name: 'Acme', amount: 99 });
+    expect(merged).toEqual({ name: 'Orbit', amount: 99 });
     expect(merged).not.toBe(returned);
   });
 
   it('a field the server normalized and the user edited meanwhile keeps the typed value', () => {
-    const s = { name: ' acme ', amount: 10 };
-    expect(keepEditsSince(s, { ...s, name: 'acme co' }, { name: 'Acme', amount: 10 })).toEqual({ name: 'acme co', amount: 10 });
+    const s = { name: ' orbit ', amount: 10 };
+    expect(keepEditsSince(s, { ...s, name: 'orbit co' }, { name: 'Orbit', amount: 10 })).toEqual({ name: 'orbit co', amount: 10 });
   });
 
   it('a field edited and typed back to the sent value counts as untouched (content, not gestures)', () => {

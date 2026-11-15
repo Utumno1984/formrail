@@ -19,7 +19,7 @@ type Invoice = {
 };
 
 const BASE: Invoice = {
-  name: 'ACME',
+  name: 'ORBIT',
   amount: 10,
   notes: null,
   supplier: { name: 'rossi', city: 'turin' },
@@ -78,10 +78,10 @@ function controlledSave(result: Form) {
 describe('useObjectPageForm: save decides field by field on the edits made while saving (#545)', () => {
   it('the untouched field normalized by the server takes its value (clean); the field edited meanwhile stays dirty', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('amount', 99));
-    const returned: Invoice = { ...save.sent(), name: 'Acme', amount: 10 };
+    const returned: Invoice = { ...save.sent(), name: 'Orbit', amount: 10 };
     expect(await save.resolve(returned)).toBe(true);
     expect(result.current.baseline).toBe(returned);
     expect(result.current.values).toEqual({ ...returned, amount: 99 });
@@ -93,20 +93,20 @@ describe('useObjectPageForm: save decides field by field on the edits made while
 
   it('the field the server normalized and the user edited meanwhile keeps the typed value', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
-    act(() => result.current.setValue('name', 'acme co'));
-    await save.resolve({ ...save.sent(), name: 'Acme' });
-    expect(result.current.values.name).toBe('acme co');
-    expect(result.current.baseline.name).toBe('Acme');
+    act(() => result.current.setValue('name', 'orbit co'));
+    await save.resolve({ ...save.sent(), name: 'Orbit' });
+    expect(result.current.values.name).toBe('orbit co');
+    expect(result.current.baseline.name).toBe('Orbit');
     expect(result.current.isDirty).toBe(true);
   });
 
   it('nothing edited meanwhile: values is the returned object itself, the form is clean', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
-    const returned: Invoice = { ...save.sent(), name: 'Acme' };
+    const returned: Invoice = { ...save.sent(), name: 'Orbit' };
     await save.resolve(returned);
     expect(result.current.values).toBe(returned);
     expect(result.current.baseline).toBe(returned);
@@ -115,12 +115,12 @@ describe('useObjectPageForm: save decides field by field on the edits made while
 
   it('a field edited and brought back to the sent value counts as untouched: values is the returned object', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('amount', 99));
     act(() => result.current.setValue('amount', 10));
     expect(result.current.values).not.toBe(save.sent());
-    const returned: Invoice = { ...save.sent(), name: 'Acme' };
+    const returned: Invoice = { ...save.sent(), name: 'Orbit' };
     await save.resolve(returned);
     expect(result.current.values).toBe(returned);
     expect(result.current.isDirty).toBe(false);
@@ -128,10 +128,10 @@ describe('useObjectPageForm: save decides field by field on the edits made while
 
   it('an edit that matches what the server returns: values is the returned object, the form is clean', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
-    act(() => result.current.setValue('name', 'Acme'));
-    const returned: Invoice = { ...save.sent(), name: 'Acme' };
+    act(() => result.current.setValue('name', 'Orbit'));
+    const returned: Invoice = { ...save.sent(), name: 'Orbit' };
     await save.resolve(returned);
     expect(result.current.values).toBe(returned);
     expect(result.current.isDirty).toBe(false);
@@ -202,22 +202,22 @@ describe('useObjectPageForm: save decides field by field on the edits made while
 
   it("absent values are distinct: null typed and cleared to '' is an edit and keeps ''", async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('notes', 'a'));
     act(() => result.current.setValue('notes', ''));
-    await save.resolve({ ...save.sent(), name: 'Acme' });
+    await save.resolve({ ...save.sent(), name: 'Orbit' });
     expect(result.current.values.notes).toBe('');
-    expect(result.current.values.name).toBe('Acme');
+    expect(result.current.values.name).toBe('Orbit');
     expect(result.current.isDirty).toBe(true);
   });
 
   it('a permissive isEqual does not influence the field-by-field decision (deepEqual decides)', async () => {
     const { result } = setup({ isEqual: () => true });
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('amount', 99));
-    const returned: Invoice = { ...save.sent(), name: 'Acme' };
+    const returned: Invoice = { ...save.sent(), name: 'Orbit' };
     await save.resolve(returned);
     expect(result.current.values).not.toBe(returned);
     expect(result.current.values).toEqual({ ...returned, amount: 99 });
@@ -225,30 +225,30 @@ describe('useObjectPageForm: save decides field by field on the edits made while
 
   it('a strict isEqual does not influence it either: nothing edited gives the returned object', async () => {
     const { result } = setup({ isEqual: () => false });
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('supplier', { ...result.current.values.supplier }));
-    const returned: Invoice = { ...save.sent(), name: 'Acme' };
+    const returned: Invoice = { ...save.sent(), name: 'Orbit' };
     await save.resolve(returned);
     expect(result.current.values).toBe(returned);
   });
 
   it('a reset(x) during the save wins over the merge, also with edits made meanwhile', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('amount', 99));
     const hydrated: Invoice = { ...BASE, name: 'Hydrated' };
     act(() => result.current.reset(hydrated));
     act(() => result.current.setValue('notes', 'after the reset'));
-    await save.resolve({ ...save.sent(), name: 'Acme' });
+    await save.resolve({ ...save.sent(), name: 'Orbit' });
     expect(result.current.baseline).toBe(hydrated);
     expect(result.current.values).toEqual({ ...hydrated, notes: 'after the reset' });
   });
 
   it('a reset() during the save, then a failure: no merge, no saveError', async () => {
     const { result } = setup();
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('amount', 99));
     act(() => result.current.reset());
@@ -298,10 +298,10 @@ describe('useObjectPageForm: save decides field by field on the edits made while
     });
     expect(result.current.fieldErrors).toEqual({ name: 'Required' });
     act(() => result.current.setValue('amount', 3));
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('notes', 'typed'));
-    await save.resolve({ ...save.sent(), name: 'Acme' });
+    await save.resolve({ ...save.sent(), name: 'Orbit' });
     expect(result.current.fieldErrors).toEqual({});
     expect(result.current.formErrors).toEqual([]);
     expect(result.current.saveError).toBeNull();
@@ -309,10 +309,10 @@ describe('useObjectPageForm: save decides field by field on the edits made while
 
   it('works the same under StrictMode', async () => {
     const { result } = setup(undefined, true);
-    act(() => result.current.setValue('name', ' acme '));
+    act(() => result.current.setValue('name', ' orbit '));
     const save = controlledSave(result);
     act(() => result.current.setValue('amount', 99));
-    const returned: Invoice = { ...save.sent(), name: 'Acme' };
+    const returned: Invoice = { ...save.sent(), name: 'Orbit' };
     await save.resolve(returned);
     expect(result.current.baseline).toBe(returned);
     expect(result.current.values).toEqual({ ...returned, amount: 99 });
