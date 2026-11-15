@@ -318,3 +318,62 @@ describe('useObjectPageForm: save decides field by field on the edits made while
     expect(result.current.values).toEqual({ ...returned, amount: 99 });
   });
 });
+
+describe('useObjectPageForm: save field by field, a nested object and null (#545, absent values)', () => {
+  type Contact = { name: string; address: { street: string; city: string } | null };
+
+  /** A save of `baseline` after editing `name`; `during` runs while it is in flight; `respond` is the server. */
+  async function saveWith(
+    baseline: Contact,
+    during: (form: UseObjectPageFormReturn<Contact>) => void,
+    respond: (sent: Contact) => Contact,
+  ) {
+    const view = renderHook(() => useObjectPageForm<Contact>({ baseline }));
+    act(() => view.result.current.setValue('name', ' orbit '));
+    let resolve!: (value: Contact) => void;
+    let sent!: Contact;
+    let done!: Promise<boolean>;
+    act(() => {
+      done = view.result.current.save(
+        (values) =>
+          new Promise<Contact>((res) => {
+            sent = values;
+            resolve = res;
+          }),
+      );
+    });
+    act(() => during(view.result.current));
+    let ok = false;
+    await act(async () => {
+      resolve(respond(sent));
+      ok = await done;
+    });
+    return { ok, form: view.result };
+  }
+
+  it('a nested object cleared to null during the save stays null; the other fields take the server value', async () => {
+    const { ok, form } = await saveWith(
+      { name: 'x', address: { street: 'oak rd', city: 'york' } },
+      (f) => f.setValue('address', null),
+      (sent) => ({ ...sent, name: 'Orbit', address: { street: 'Oak Rd', city: 'York' } }),
+    );
+    expect(ok).toBe(true);
+    expect(form.current.values.address).toBeNull();
+    expect(form.current.values.name).toBe('Orbit');
+    expect(form.current.baseline.address).toEqual({ street: 'Oak Rd', city: 'York' });
+    expect(form.current.isDirty).toBe(true);
+  });
+
+  it('a null field filled in with an object during the save is the user object whole (same identity)', async () => {
+    const mine = { street: 'elm st', city: 'leeds' };
+    const { ok, form } = await saveWith(
+      { name: 'x', address: null },
+      (f) => f.setValue('address', mine),
+      (sent) => ({ ...sent, name: 'Orbit', address: { street: 'Elm St', city: 'Leeds' } }),
+    );
+    expect(ok).toBe(true);
+    expect(form.current.values.address).toBe(mine);
+    expect(form.current.values.name).toBe('Orbit');
+    expect(form.current.isDirty).toBe(true);
+  });
+});

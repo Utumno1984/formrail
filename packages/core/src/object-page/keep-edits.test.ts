@@ -125,6 +125,50 @@ describe('keepEditsSince (core): a save that settles while the user kept typing'
     const dropped = keepEditsSince<Bag>(base, { a: 9, b: 2, c: 3 }, { a: 1, b: 2 });
     expect(dropped).toEqual({ a: 9, b: 2 });
     expect(Object.hasOwn(dropped, 'c')).toBe(false);
+    // Set again meanwhile with a NEW value of the same content (an echo, e.g. a date picker or a cloned object):
+    // content, not identity, so it is still untouched and dropped; the form is not made dirty by the echo.
+    type Dated = { a: number; due?: Date; meta?: { tag: string } };
+    const dated: Dated = { a: 1, due: new Date(1000), meta: { tag: 'x' } };
+    const echoed = keepEditsSince<Dated>(dated, { a: 9, due: new Date(1000), meta: { tag: 'x' } }, { a: 1 });
+    expect(echoed).toEqual({ a: 9 });
+    expect(Object.hasOwn(echoed, 'due')).toBe(false);
+    expect(Object.hasOwn(echoed, 'meta')).toBe(false);
+  });
+
+  it('keys named after members of Object.prototype (constructor, toString) are own data keys (hasOwn, not `in`)', () => {
+    type Bag = Record<string, unknown>;
+    // Removed by the user since the save started: stays removed.
+    const removed = keepEditsSince<Bag>({ a: 1, constructor: 'x' }, { a: 2 }, { a: 1, constructor: 'x' });
+    expect(Object.hasOwn(removed, 'constructor')).toBe(false);
+    expect(removed.a).toBe(2);
+    // Added by the user: stays, with the user's value.
+    const added = keepEditsSince<Bag>({ a: 1 }, { a: 2, toString: 'mine' }, { a: 1 });
+    expect(Object.getOwnPropertyDescriptor(added, 'toString')?.value).toBe('mine');
+    // Untouched and not returned by the server: dropped.
+    const dropped = keepEditsSince<Bag>({ a: 1, toString: 'x' }, { a: 2, toString: 'x' }, { a: 1 });
+    expect(Object.hasOwn(dropped, 'toString')).toBe(false);
+    // Returned by the server and never there: the server's value.
+    const fromServer = keepEditsSince<Bag>({ a: 1 }, { a: 2 }, { a: 1, constructor: 'srv' });
+    expect(Object.getOwnPropertyDescriptor(fromServer, 'constructor')?.value).toBe('srv');
+    expect(fromServer.a).toBe(2);
+  });
+
+  it('the prototype of the result comes from the returned object, not from the current one', () => {
+    type Bag = Record<string, unknown>;
+    const nullProto = Object.assign(Object.create(null) as Bag, { a: 1, b: 'B' });
+    const fromNull = keepEditsSince<Bag>({ a: 1, b: 'b' }, { a: 2, b: 'b' }, nullProto);
+    expect(Object.getPrototypeOf(fromNull)).toBeNull();
+    expect({ ...fromNull }).toEqual({ a: 2, b: 'B' });
+    const make = (entries: Bag) => Object.assign(Object.create(null) as Bag, entries);
+    const plain = keepEditsSince<Bag>(make({ a: 1, b: 'b' }), make({ a: 2, b: 'b' }), { a: 1, b: 'B' });
+    expect(Object.getPrototypeOf(plain)).toBe(Object.prototype);
+  });
+
+  it('the key order follows the returned object, then the keys only the user has', () => {
+    type Bag = Record<string, number>;
+    const out = keepEditsSince<Bag>({ a: 1, b: 1, c: 1 }, { c: 1, b: 1, a: 2, d: 4 }, { a: 1, b: 1, c: 2 });
+    expect(Object.keys(out)).toEqual(['a', 'b', 'c', 'd']);
+    expect(out).toEqual({ a: 2, b: 1, c: 2, d: 4 });
   });
 
   it('a key added by the user with the value undefined stays undefined, also when the server returns a value', () => {
