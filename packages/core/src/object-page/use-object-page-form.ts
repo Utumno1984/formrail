@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import { isDev } from '../internal/is-dev';
 import { deepEqual } from './equal';
+import { keepEditsSince } from './keep-edits';
 import { invalidPaths, withoutPaths } from './field-errors';
 import type { FieldErrors } from './field-errors';
 import { issuesToErrors } from './standard-schema';
@@ -107,15 +108,36 @@ export interface UseObjectPageFormReturn<Values extends object> {
   reset: (newBaseline?: Values) => void;
   /**
    * Runs `handler(values)` once. On success the new baseline is the value returned by the handler
-   * (when it is an object) or else the values that were sent; fields edited while saving stay dirty.
-   * If the values were not edited meanwhile they also become the returned baseline (the form shows
-   * what the server stored and is clean). A handler that throws synchronously or rejects sets
-   * `saveError`; values and baseline are untouched. Resolves `true` on success, `false` on error or
-   * when a save is already in flight (the handler is not called again). A save whose form was
-   * `reset` in the meantime resolves `true` when the handler succeeded and `false` when it failed,
-   * and changes no state other than `isSaving` (neither a baseline nor a `saveError`). Whether the
-   * values were edited meanwhile is decided with the default structural comparison, never with
-   * `isEqual`. Stable identity.
+   * (when it is an object: what the server stored, normalization included) or else the values that
+   * were sent. The values are then decided **field by field**, because the user may keep typing
+   * while the save is in flight:
+   *
+   * - a field edited since the save started keeps the typed value and stays dirty against the new
+   *   baseline (also when the server normalized that same field: the typed value wins);
+   * - every other field takes the value of the new baseline and is clean (a trim or a rounding of
+   *   the server shows up in the form). A field typed and brought back to the sent value counts as
+   *   not edited;
+   * - when nothing differs from the new baseline (nothing edited meanwhile, or edits that match
+   *   what the server returned), `values` is the returned object itself and `isDirty` is `false`.
+   *
+   * The rule descends into plain objects, so in a nested object replaced by `setValue` only the
+   * leaves whose content changed count as edited. An array edited while saving is kept whole (the
+   * user's), also when it has the same length: rows are never paired by position, so a reorder by
+   * the server can never move an edit to another row; an array not edited takes the server's. A
+   * `Map`, a `Set`, a `Date` or a class instance is a single value, never descended into (so a
+   * returned class instance keeps all the current values when anything was edited). Keys: one
+   * removed by the user while saving stays removed, one added stays, one the server did not return
+   * is dropped unless the user edited or added it. "Edited" is decided with the default structural comparison described
+   * in `isDirty` (`''`, `null`, `undefined` and a missing key all differ), **never with
+   * `isEqual`**. With a handler that returns nothing, the baseline is what was sent and the values
+   * are the current ones.
+   *
+   * A handler that throws synchronously or rejects sets `saveError`; values and baseline are
+   * untouched (the next save compares with what it sends itself). Resolves `true` on success,
+   * `false` on error or when a save is already in flight (the handler is not called again). A save
+   * whose form was `reset` in the meantime resolves `true` when the handler succeeded and `false`
+   * when it failed, and changes no state other than `isSaving` (neither a baseline nor values nor a
+   * `saveError`): the reset wins. Stable identity.
    */
   save: (handler: (values: Values) => Promise<Values | void> | Values | void) => Promise<boolean>;
   /** `true` from the call to `save` until its handler settles. */
@@ -429,8 +451,8 @@ export function useObjectPageForm<Values extends object>(
         }
       }
       const current = stateRef.current;
-      const untouched = current.values === sent || deepEqual(current.values, sent);
-      commit({ baseline, values: untouched ? baseline : current.values });
+      // Field by field: the edits made since `sent` stay, the other fields take the stored values.
+      commit({ baseline, values: current.values === sent ? baseline : keepEditsSince(sent, current.values, baseline) });
       setErrors(NO_SCHEMA_ERRORS);
       clearSaveError();
       return true;

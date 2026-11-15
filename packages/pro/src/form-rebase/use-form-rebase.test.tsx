@@ -473,6 +473,26 @@ describe('useFormRebase: during a save', () => {
     expect(h().rebase.conflicts.map((c) => c.path)).toEqual(['number']);
   });
 
+  it('a field the server normalized and the user did not touch meanwhile: the queued rebase applies it with no conflict (#545)', async () => {
+    const { h } = setup();
+    act(() => h().form.setValue('amount', 12.345));
+    const save = controlledSave(h().form);
+    // Edited while saving: another field.
+    act(() => h().form.setValue('notes', 'mine'));
+    const incoming: Invoice = { ...BASE, amount: 13 };
+    act(() => h().rebase.rebase(incoming));
+    expect(h().rebase.isPending).toBe(true);
+    // The server stores the amount normalized (rounded to cents).
+    const stored: Invoice = { ...BASE, amount: 12.35 };
+    await save.resolve(stored);
+    expect(h().rebase.isPending).toBe(false);
+    // Before #545 the typed 12.345 stayed against the stored 12.35, a spurious conflict on `amount`.
+    expect(h().rebase.conflicts).toEqual([]);
+    expect(h().rebase.applied.map((entry) => entry.path)).toEqual(['amount']);
+    expect(h().form.baseline).toBe(incoming);
+    expect(h().form.values).toEqual({ ...BASE, amount: 13, notes: 'mine' });
+  });
+
   it('acceptTheirs on a top-level key removed by the server is ignored while saving', async () => {
     const { h } = setup(undefined, { ...BASE, extra: 'base' });
     act(() => h().form.setValue('extra', 'mine'));
