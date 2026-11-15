@@ -16,6 +16,7 @@ import { hasContent, textOf } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
+import { ListReportTableEdges } from './ListReportTableEdges';
 import { ListReportTableHead } from './ListReportTableHead';
 import {
   DEFAULT_LABELS,
@@ -42,6 +43,7 @@ import {
   tableClass,
 } from './list-report-table-styles';
 import type { ListReportRowActions, UseListReportReturn } from './types';
+import { useOverflowEdges, type OverflowEdgesSink } from './use-overflow-edges';
 
 export type ListReportTableStatus = 'ready' | 'loading' | 'error';
 
@@ -231,6 +233,10 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   const labels = { ...DEFAULT_LABELS, resultCount: defaultResultCount((n) => getNumberFormat(table.locale).format(n)), ...labelOverrides };
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mergedRef = useMemo(() => composeRefs(ref, containerRef), [ref]);
+  // Shades on the inline edges that hide columns: the state is written on the container, the layer
+  // re-renders alone (never this Shell, never the rows).
+  const edgesRef = useRef<OverflowEdgesSink | null>(null);
+  useOverflowEdges(containerRef, edgesRef);
 
   const minRows = wholeRows(loadingRowCount);
   const hasRows = table.rows.length > 0;
@@ -392,6 +398,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
           ) : null}
         </tbody>
       </table>
+      <ListReportTableEdges ref={edgesRef} rowActionsWidth={hasRowActions ? rowActionsWidth : undefined} inlineCount={inlineCount} />
     </div>
     {/* Always mounted (a live region inserted already filled is not announced), empty until a state changes.
         A sibling after the container, not a child: inside the `aria-busy` element its changes may be withheld. */}
