@@ -60,8 +60,9 @@ describe('selection bar layout variant (#499)', () => {
     expect(selectionBarClass).not.toContain('data-[rop-bulk-actions=false]:flex-nowrap');
     expect(selectionBarClass).toContain('flex-wrap');
     expect(selectionBarClass).toContain('sm:flex-nowrap');
-    expect(selectionCountClass).toContain('group-data-[rop-bulk-actions=false]:min-w-[8ch]');
-    expect(selectionCountClass).toContain('sm:min-w-0');
+    // The minimum only below 640px (`max-sm:`): from 640px the computed min-width is 0 (e2e on the real DOM).
+    expect(selectionCountClass).toContain('max-sm:group-data-[rop-bulk-actions=false]:min-w-[8ch]');
+    expect(selectionCountClass).not.toContain('sm:min-w-0');
     expect(selectionCountClass).toContain('group-data-[rop-bulk-actions=false]:flex-1');
     expect(selectionCountClass).toContain('basis-full');
     expect(selectionClearClass).toContain('whitespace-nowrap');

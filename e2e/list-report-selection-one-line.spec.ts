@@ -327,3 +327,37 @@ test.describe('#509 minimum width of the count', () => {
     await expectNoHorizontalOverflow(bar(page));
   });
 });
+
+// #509 review: the minimum of 8ch is below 640px only; from 640px the computed min-width is 0 as before.
+test.describe('#509 no minimum from 640px', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('1280px viewport, narrow container (320px) and a long label: min-width of the count is 0, Clear stays inside the bar', async ({ page }) => {
+    await gotoStory(page, NO_BULK, 'containerWidth:320;longClearLabel:!true');
+    await expect(bar(page)).toContainText('No items selected');
+    expect(await minCount(page)).toBe(0);
+    const inside = async (): Promise<void> => {
+      const b = await box(bar(page));
+      const k = await box(longClear(page));
+      expect(k.x).toBeGreaterThanOrEqual(b.x - 0.5);
+      expect(k.x + k.width).toBeLessThanOrEqual(b.x + b.width + 0.5);
+    };
+    await inside();
+    await pickDom(page, 3);
+    await expect(bar(page)).toContainText('3 selected');
+    expect(await minCount(page)).toBe(0);
+    await inside();
+  });
+
+  test('computed min-width of the count: 0 at 1280px and at 640px, above 0 at 639px', async ({ page }) => {
+    await gotoStory(page, NO_BULK);
+    for (const [w, positive] of [
+      [1280, false],
+      [640, false],
+      [639, true],
+    ] as const) {
+      await page.setViewportSize({ width: w, height: 800 });
+      expect((await minCount(page)) > 0, `width ${w}`).toBe(positive);
+    }
+  });
+});
