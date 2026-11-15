@@ -234,7 +234,7 @@ const TOPICS: readonly Topic[] = [
       ],
     },
     solutions: [
-      { propose: 'The carrier can deliver {sku} on Tuesday morning.', resolve: 'The shipment of {sku} was delivered and the carrier confirmed the receipt.' },
+      { propose: 'The carrier can deliver {sku} on the next working day, in the morning.', resolve: 'The shipment of {sku} was delivered and the carrier confirmed the receipt.' },
       { propose: 'I can send {sku} again by express courier, at our cost.', resolve: 'The goods of {sku} were sent by express courier and have arrived at your site.' },
     ],
   },
@@ -355,7 +355,7 @@ const EMPLOYEE_PROGRESS: Readonly<Record<'answer' | 'accept' | 'chase', readonly
   accept: ['Thank you for the confirmation, I am arranging it now.', 'Thank you, I have started it and will confirm when it is done.'],
   chase: [
     'I am sorry for the wait, I am still working on it.',
-    'I have raised the priority of this case and expect an answer within two working days.',
+    'I have raised the priority of this case with my colleagues.',
     'I am still waiting for an answer from my colleagues and will come back to you.',
   ],
 };
@@ -552,8 +552,8 @@ function pickFresh(rng: Rng, pool: readonly string[], used: ReadonlySet<string>)
 
 /**
  * A message: `main` and some sentences of `details` not used yet in the thread (a partial shuffle: no
- * sentence twice), before `main` when it is a question (`mainLast`, so the question ends the message),
- * after it otherwise, then `ending`. Now and then a long one (5 to 7 extra sentences) when the pool has them.
+ * sentence twice; a thanks last among them), before `main` when it is a question (`mainLast`, so the
+ * question ends the message), after it otherwise, then `ending`. Now and then a long one (5 to 7 extra sentences) when the pool has them.
  */
 function compose(rng: Rng, used: Set<string>, main: string, details: readonly string[], mainLast: boolean, ending?: string): string {
   const pool = details.filter((sentence) => !used.has(sentence));
@@ -569,7 +569,9 @@ function compose(rng: Rng, used: Set<string>, main: string, details: readonly st
     used.add(sentence);
   }
   used.add(main);
-  const parts = mainLast ? [...picked, main] : [main, ...picked];
+  // Thanks come last, as people write them ("Thank you in advance...", "Thank you for contacting us.").
+  const extras = [...picked.filter((sentence) => !sentence.startsWith('Thank you')), ...picked.filter((sentence) => sentence.startsWith('Thank you'))];
+  const parts = mainLast ? [...extras, main] : [main, ...extras];
   if (ending !== undefined) parts.push(ending);
   return parts.join(' ');
 }

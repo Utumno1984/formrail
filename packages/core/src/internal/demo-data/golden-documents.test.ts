@@ -373,7 +373,7 @@ describe('demo-data golden values: documents', () => {
             "authorName": "Anouk de Vries",
             "id": "cs-2-cmt-6",
             "postedAt": "2026-09-10T14:42",
-            "text": "The goods of FAS-10333 were sent by express courier and have arrived at your site. I have updated the records of your account. Your account manager has been informed of the solution. Please keep the case number for your records. Thank you for contacting us. The service team works from Monday to Friday. A colleague has double-checked the solution. The solution is recorded in the history of this case.",
+            "text": "The goods of FAS-10333 were sent by express courier and have arrived at your site. I have updated the records of your account. Your account manager has been informed of the solution. Please keep the case number for your records. The service team works from Monday to Friday. A colleague has double-checked the solution. The solution is recorded in the history of this case. Thank you for contacting us.",
           },
         ],
         "customerId": "cus-976",

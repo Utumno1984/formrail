@@ -732,6 +732,42 @@ describe('makeSupportCases / getSupportCase', () => {
         expect(customerThanks).toBeGreaterThan(100);
       });
 
+      it('a reminder never asks for news the employee has already dated, and no text names a day of the week', () => {
+        const TIMEFRAME = /\bwithin\b|\btomorrow\b|next working day|\bdays?\b/;
+        const WEEKDAY = /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/;
+        const problems: string[] = [];
+        let reminders = 0;
+        for (const thread of all) {
+          thread.comments.forEach((comment, k) => {
+            // "from Monday to Friday" (the hours of the service team) is the one allowed use: it holds any day.
+            if (WEEKDAY.test(comment.text.replace('from Monday to Friday', ''))) problems.push(`${comment.id}: "${comment.text}"`);
+            if (!isReminder(thread, k)) return;
+            reminders++;
+            const previous = thread.comments[k - 1]!.text;
+            if (TIMEFRAME.test(previous)) problems.push(`${comment.id}: "${comment.text}" after "${previous}"`);
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(reminders).toBeGreaterThan(1000);
+      });
+
+      it('a thanks added to a message comes last (only the closing sentence may follow it)', () => {
+        const problems: string[] = [];
+        let thanks = 0;
+        for (const thread of all) {
+          for (const comment of thread.comments) {
+            const parts = sentences(comment.text);
+            parts.forEach((sentence, i) => {
+              if (i === 0 || !sentence.startsWith('Thank you')) return;
+              thanks++;
+              if (parts.slice(i + 1).some((after) => !after.startsWith('Thank you') && after !== CLOSING)) problems.push(`${comment.id}: "${comment.text}"`);
+            });
+          }
+        }
+        expect(problems).toEqual([]);
+        expect(thanks).toBeGreaterThan(500);
+      });
+
       it('an apology for the wait, or a "still", only answers a reminder', () => {
         const problems: string[] = [];
         let apologies = 0;
