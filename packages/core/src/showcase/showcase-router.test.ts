@@ -139,6 +139,13 @@ describe('the router on the window (#518): the invoices keep their URLs', () => 
     expect(readRecord(DEFAULT_MODULE)).toBe('inv-4');
   });
 
+  it('readCreate answers for one module: with `?create=1` only the default module is creating', () => {
+    window.history.replaceState(null, '', '/iframe.html?create=1');
+    expect(readCreate('tasks')).toBe(false);
+    expect(readCreate()).toBe(true);
+    expect(readCreate(DEFAULT_MODULE)).toBe(true);
+  });
+
   it('opening a record from an unknown module drops the stray `module`; a deep link leaves to the list URL with no route parameter', () => {
     window.history.replaceState(null, '', '/iframe.html?module=nope&q=x');
     openRecord('inv-2');

@@ -182,6 +182,37 @@ describe('createRecordStore (#518): writes in flight', () => {
     expect(store.snapshot().map((t) => t.id)).toEqual(['task-1', 'task-3']);
   });
 
+  it('a save that fails on the network for a record also removed on the server is the network error, not the not-found', async () => {
+    const held = gate();
+    const store = makeStore({ saveDelayMs: held.promise, saveOutcome: 'error' });
+    const saving = store.save({ ...SEED[1]!, title: 'Mine' });
+    const failed = expect(saving).rejects.toBeInstanceOf(RecordNetworkError);
+    await store.removeFromServer('task-2');
+    held.open();
+    await failed;
+    await expect(saving).rejects.not.toBeInstanceOf(RecordNotFoundError);
+    expect(store.snapshot().map((t) => t.id)).toEqual(['task-1', 'task-3']);
+  });
+
+  it('a create reads saveOutcome when it is called: configure() during the create in flight does not change its outcome', async () => {
+    const held = gate();
+    const store = makeStore({ saveDelayMs: held.promise });
+    const creating = store.create({ title: 'Ship it', estimate: 1, done: false });
+    store.configure({ saveOutcome: 'error' });
+    held.open();
+    expect(await creating).toMatchObject({ id: 'task-4', title: 'Ship it' });
+    expect(store.snapshot().map((t) => t.id)).toEqual(['task-1', 'task-2', 'task-3', 'task-4']);
+
+    const later = gate();
+    store.configure({ saveDelayMs: later.promise, saveOutcome: 'error' });
+    const failing = store.create({ title: 'Never stored', estimate: 1, done: false });
+    const failed = expect(failing).rejects.toBeInstanceOf(RecordNetworkError);
+    store.configure({ saveOutcome: 'success' });
+    later.open();
+    await failed;
+    expect(store.snapshot().map((t) => t.id)).toEqual(['task-1', 'task-2', 'task-3', 'task-4']);
+  });
+
   it('error-once belongs to one store: the first error of one module is not used up by another', async () => {
     const tasks = makeStore({ loadOutcome: 'error-once' });
     const others = makeStore({ loadOutcome: 'error-once' });

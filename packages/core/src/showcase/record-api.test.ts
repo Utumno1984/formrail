@@ -93,6 +93,18 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     await expect(api.list()).resolves.toEqual(SEED);
   });
 
+  it('a list asked while a deleteMany is in flight waits for it and does not show the deleted records', async () => {
+    const held = gate();
+    const { api } = setup({ saveDelayMs: held.promise });
+    const deleting = api.deleteMany(['c-1', 'c-2']);
+    const listing = watch(api.list());
+    await flush();
+    expect(listing.settled).toBe(false);
+    held.open();
+    await deleting;
+    expect(await listing.promise).toEqual([]);
+  });
+
   it('a read waits for the writes of its own store only (one module never waits for another)', async () => {
     const held = gate();
     const contacts = setup({ saveDelayMs: held.promise });
