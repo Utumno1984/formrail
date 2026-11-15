@@ -133,7 +133,10 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
 ### Saving
 
 - `binding.isSaving` is `formState.isSubmitting`; `binding.saveError` is `null` unless the last submit failed
-  (blocked by validation, or a handler that threw: then it is `formState.errors`).
+  (blocked by validation, or a handler that threw before `binding.reset(saved)`: then it is
+  `formState.errors`). A submit that `binding.reset(saved)` ended has saved: its `saveError` is `null` even if a
+  validation error appeared while the server was saving (the user kept typing). That error stays on its field,
+  and blocks the next submit as usual.
 - Call `binding.reset(saved)` **inside** the `handleSubmit` handler, before it resolves: a server update
   that came during the save is queued (`isPending`) and merged against what was saved. Resetting later, in an
   effect on `isSubmitSuccessful`, would come after the queued merge and overwrite it.
@@ -148,12 +151,11 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
   them). Without an id key, or with a row without id, an array edited during the save is kept whole. A
   discard (`form.reset()`, `binding.reset()`) or a rehydration during the save wins: `reset(saved)` is then a
   plain hydration.
-- What the binding writes during a save (`reset(saved)`, `setValues`, `acceptTheirs` / `keepMine` of the
-  rebase) goes through React Hook Form's `setValues` and `resetDefaultValues`, never through its `reset`,
-  which would end `isSubmitting` and make `handleSubmit` skip its own end. So `isSaving` stays `true` until
-  the handler really returns, and `isSubmitted`, `isSubmitSuccessful` and `submitCount` are React Hook
-  Form's. One exception: a `reset(saved)` whose record lacks a top-level key that the form holds without an
-  input (only a reset can remove a key) is written with a reset and ends the submit there.
+- What the binding writes during a save (see "How the binding writes" below) never goes through React Hook
+  Form's `reset`, which would end `isSubmitting` and make `handleSubmit` skip its own end. So `isSaving`
+  stays `true` until the handler really returns, and `isSubmitted`, `isSubmitSuccessful` and `submitCount`
+  are React Hook Form's. One exception: a `reset(saved)` whose record omits a top-level key the form holds
+  (any such key: only a reset can remove one) is written with a reset, and ends the submit there.
 - One submit at a time: keep the submit button disabled while `isSaving` (as the examples do). A second
   `handleSubmit` started while the first is in flight shares its start: the first `reset(saved)` ends the
   tracking, and what the user types during the second one is not kept by its `reset(saved)`.
@@ -173,12 +175,29 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
 
 `rebase(incoming)` merges a newer version of the record into the user's draft: the fields the user did not
 touch take the server value, the ones both changed keep the user's value and are listed in `conflicts`, to
-resolve with `keepMine(path)` / `acceptTheirs(path)`. With React Hook Form it is written as
-`reset(incoming)` then `reset(merged, { keepDefaultValues: true })`, in one batch:
+resolve with `keepMine(path)` / `acceptTheirs(path)`. The engine calls `binding.reset(incoming)` then
+`binding.setValues(merged)` in one batch.
 
-- no `setValue` per field: no validation run, no `type: 'change'` event, the `onChange` of a `Controller`
-  is not called, and no render ever shows the server value in a field the user edited;
-- `dirtyFields` / `isDirty` are computed against `incoming`: only the user's edits stay dirty;
+### How the binding writes
+
+What `binding.reset` / `binding.setValues` change (a rebase, `acceptTheirs` / `keepMine`, `reset(saved)`, a
+discard) is written to React Hook Form once, at the end of the synchronous run, without its `reset`:
+`setValue` on each field whose value changes, and only those, then `resetDefaultValues` with the baseline.
+
+- the rows of a `useFieldArray` are not remounted: the input the user is typing in stays the same node,
+  keeps the focus (on mobile, the keyboard stays open) and its caret, since a field the binding does not
+  change is never written. React Hook Form re-creates the rows only when the array itself changes shape:
+  rows added, removed, or reordered by id (`arrayIdKeys`); the focus then never stays on a node that shows
+  another row;
+- no validation run, no `type: 'change'` event, the `onChange` of a `Controller` is not called, and no render
+  ever shows the server value in a field the user edited;
+- `dirtyFields` / `isDirty` are computed against the baseline (`incoming` for a rebase): only the user's
+  edits stay dirty;
+- the write happens at the end of the synchronous run (before the next render is painted): in the same
+  function, right after `binding.reset(...)`, read `binding.values`, not `form.getValues()`;
+- only a top-level key that must go (a record that omits it) is written with React Hook Form's `reset`
+  (keeping the mounted fields with `shouldUnregister`): the rows then remount, and during a save the submit
+  ends there;
 - `touchedFields`, `submitCount` and the submit flags are kept;
 - validation errors: the error of a field the rebase leaves as it was stays; the error of a field that
   takes the server value is removed (it was about a value the field no longer has); validation runs again
@@ -206,8 +225,8 @@ is the state of the last render), so the adapter reads two internal fields of `f
 
 - `control._defaultValues`: the defaults React Hook Form holds, the source of `binding.baseline`. A new
   object after every reset, the `values` prop and `resetField` with a default (a rehydration);
-- `control._options.shouldUnregister`: the `shouldUnregister` option, to keep the mounted fields on a
-  rebase.
+- `control._options.shouldUnregister`: the `shouldUnregister` option, to keep the mounted fields when a
+  write has to go through `reset` (a top-level key to remove).
 
 They are not part of React Hook Form's public API: a release can rename them. The tests of `@formrail/pro`
 pin both, and how they behave, against the tested version (`react-hook-form` `7.92.0`, the minimum of the

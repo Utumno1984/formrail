@@ -326,24 +326,26 @@ class BindingStore<Values extends FieldValues> {
  * another object.
  *
  * **`reset(b)` / `setValues(patch)`** (what the rebase calls): `reset(b)` makes `baseline` and `values` the
- * object `b` itself (React Hook Form gets a copy and makes it its defaults; during a save, see "Saving");
- * `setValues` writes the merged
- * values with `reset(merged, { keepDefaultValues: true })`, so `dirtyFields` and `isDirty` are computed
- * against the baseline, with no `setValue` per field (no validation, no `type: 'change'` event). Both keep
- * `touchedFields`, `submitCount` and the submit flags. An error stays on a field whose value they did not
- * change; the error of a field that took another value is removed (validation runs again at the next change
- * or submit).
+ * object `b` itself (React Hook Form gets a copy as its defaults; during a save, see "Saving"); `setValues`
+ * merges the top-level keys of `patch`. What they change is written to React Hook Form once, at the end of the
+ * synchronous run, without its `reset`: `setValue` on each changed field only (no validation, no
+ * `type: 'change'` event, no remount of the `useFieldArray` rows, the field being typed in is not rewritten),
+ * then `resetDefaultValues` (`dirtyFields` and `isDirty` against the baseline). Only a top-level key that must
+ * go is written with `reset`. Both keep `touchedFields`, `submitCount` and the submit flags. An error stays on a
+ * field whose value they did not change; the error of a field that took another value is removed (validation
+ * runs again at the next change or submit).
  *
  * **Saving**: `isSaving` is `formState.isSubmitting`; `saveError` is `null` unless the last submit failed
- * (validation, or a handler that threw). To save through `handleSubmit`, call `binding.reset(saved)` in the
+ * (validation, or a handler that threw before `reset(saved)`: a submit ended by `reset(saved)` has saved, also
+ * when a validation error appeared meanwhile). To save through `handleSubmit`, call `binding.reset(saved)` in the
  * handler before it resolves: a rebase queued meanwhile is then merged against what was saved. A save that
  * does not go through `handleSubmit` passes `isSaving` and `saveError` (see the options). While a save is in
  * flight, `reset(saved)` ends it as core's `save` does: `saved` is the baseline, the fields edited since
  * `isSaving` turned `true` keep the typed value (dirty), the others take what the server stored (clean);
  * `values` is `saved` itself when nothing was edited meanwhile; the rows of an array are matched by id with the
  * `arrayIdKeys` option (otherwise an array edited meanwhile is kept whole). A discard or a rehydration during the
- * save wins (`reset(saved)` is then a plain hydration). During a save the binding writes with React Hook Form's
- * `setValues` / `resetDefaultValues`, never `reset`, so `isSaving` stays `true` until the handler returns.
+ * save wins (`reset(saved)` is then a plain hydration). Since the binding never writes with React Hook Form's
+ * `reset` (but for a top-level key that must go), `isSaving` stays `true` until the handler returns.
  *
  * **Hydration**: `form.reset(data)`, the `values` prop, or an async `defaultValues`: while it loads
  * (`formState.isLoading`), `baseline` is `values` (nothing is edited yet).
