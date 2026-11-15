@@ -545,6 +545,244 @@ describe('makeSupportCases / getSupportCase', () => {
       expect(multiDay.length).toBeGreaterThan(100);
     });
 
+    // The conversation read as a person would (ticket #514, round 3), checked on 10,000 cases from the
+    // texts alone: a question ends with "?", a reminder is a customer message whose first sentence is one.
+    describe('conversation (10,000 cases)', () => {
+      const all = cases.map((supportCase) => getSupportCase(supportCase.id)!).filter((thread) => thread.comments.length > 0);
+      const sentences = (text: string): string[] => text.split(SENTENCE_END);
+      const asks = (text: string): boolean => text.includes('?');
+      const isReminder = (thread: (typeof all)[number], k: number): boolean => k > 0 && thread.comments[k]!.authorKind === 'customer' && sentences(thread.comments[k]!.text)[0]!.endsWith('?');
+      /** The question that closes a proposal ("I can ... . Is that fine for you?"). */
+      const CONFIRM = /(Is that fine for you|Shall I go ahead|Would that work for you)\?$/;
+      const ACCEPT = /^(Yes\b|That works)/;
+      /** Everything in the generator that promises, takes charge or waits: none of it may close a resolved case. */
+      const WAITING = /\bI will\b|\bwill (confirm|come back|write)\b|as soon as|waiting for|until it is solved|\bI am (checking|looking|preparing|getting|comparing|working|arranging)\b|at any time|I have started|\bstill\b/;
+      const CLOSING = 'I am closing this case, please open a new one if you need anything else.';
+      /** What a solution consists of: the resolution must carry the same ones as the proposal it follows. */
+      const SOLUTION_WORDS = [
+        'separate shipment',
+        'credit note',
+        'replacement',
+        'all the batches',
+        'quality department',
+        'carrier',
+        'express courier',
+        'volume discount',
+        'two shipments',
+        'cancel',
+        'return label',
+        'collect',
+        'safety data sheet',
+        'installation instructions',
+        'another supplier',
+        'sample',
+      ];
+      const solutionWords = (text: string): string => SOLUTION_WORDS.filter((word) => text.includes(word)).join(', ');
+      const STOP_WORDS = new Set(['could', 'would', 'which', 'about', 'there', 'their', 'these', 'other']);
+      const words = (text: string, sku: string): Set<string> =>
+        new Set(
+          text
+            .replaceAll(sku, ' ')
+            .toLowerCase()
+            .split(/[^a-z]+/)
+            .filter((word) => word.length >= 5 && !STOP_WORDS.has(word)),
+        );
+
+      it('a customer follow-up that answers a request comes right after an employee question; a reminder only after a message that asks nothing', () => {
+        const problems: string[] = [];
+        let answers = 0;
+        let reminders = 0;
+        for (const thread of all) {
+          thread.comments.forEach((comment, k) => {
+            if (k === 0 || comment.authorKind !== 'customer') return;
+            const previous = thread.comments[k - 1]!;
+            if (isReminder(thread, k)) {
+              reminders++;
+              if (asks(previous.text)) problems.push(`${comment.id}: a reminder instead of an answer to "${previous.text}"`);
+            } else {
+              answers++;
+              if (!asks(previous.text)) problems.push(`${comment.id}: "${comment.text}" answers "${previous.text}", which asks nothing`);
+            }
+            if (/you asked for/.test(comment.text) && !asks(previous.text)) problems.push(`${comment.id}: delivers what nobody asked for`);
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(answers).toBeGreaterThan(1000);
+        expect(reminders).toBeGreaterThan(1000);
+      });
+
+      it('an answer is about the question: both name the product and share a word; a yes answers a proposal and nothing else', () => {
+        const problems: string[] = [];
+        let yes = 0;
+        for (const thread of all) {
+          const sku = productById.get(thread.productId)!.sku;
+          thread.comments.forEach((comment, k) => {
+            if (k === 0 || comment.authorKind !== 'customer' || isReminder(thread, k)) return;
+            const question = sentences(thread.comments[k - 1]!.text).at(-1)!;
+            const first = sentences(comment.text)[0]!;
+            if (CONFIRM.test(question)) {
+              yes++;
+              if (!ACCEPT.test(first)) problems.push(`${comment.id}: "${first}" after the proposal "${question}"`);
+            } else {
+              if (ACCEPT.test(first)) problems.push(`${comment.id}: a yes to "${question}", which proposes nothing`);
+              if (!question.includes(sku) || !first.includes(sku)) problems.push(`${comment.id}: "${first}" / "${question}" do not name ${sku}`);
+              const shared = [...words(first, sku)].filter((word) => words(question, sku).has(word));
+              if (shared.length === 0) problems.push(`${comment.id}: "${first}" shares nothing with "${question}"`);
+            }
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(yes).toBeGreaterThan(500);
+      });
+
+      it('a reminder is posted on a later day than the message it follows up', () => {
+        const problems: string[] = [];
+        for (const thread of all) {
+          thread.comments.forEach((comment, k) => {
+            if (isReminder(thread, k) && comment.postedAt.slice(0, 10) <= thread.comments[k - 1]!.postedAt.slice(0, 10)) {
+              problems.push(`${comment.id}: ${comment.postedAt} after ${thread.comments[k - 1]!.postedAt}`);
+            }
+          });
+        }
+        expect(problems).toEqual([]);
+      });
+
+      it('the last message of a resolved or closed case only reports the solution: no promise, no waiting, no question', () => {
+        const problems: string[] = [];
+        let finals = 0;
+        let ongoing = 0;
+        for (const thread of all) {
+          const done = thread.status === 'resolved' || thread.status === 'closed';
+          thread.comments.forEach((comment, k) => {
+            const last = k === thread.comments.length - 1;
+            if (comment.authorKind !== 'employee') return;
+            if (done && last) {
+              finals++;
+              if (WAITING.test(comment.text)) problems.push(`${comment.id}: "${comment.text}"`);
+              if (asks(comment.text)) problems.push(`${comment.id}: asks "${comment.text}"`);
+            } else if (WAITING.test(comment.text)) {
+              ongoing++;
+            }
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(finals).toBeGreaterThan(3000);
+        // The pattern is not dead: the same phrases are common while a case is being worked on.
+        expect(ongoing).toBeGreaterThan(1000);
+      });
+
+      it('a closed case says so in its last sentence, and only there: nothing follows the closing sentence', () => {
+        const problems: string[] = [];
+        for (const thread of all) {
+          const mentions = thread.comments.filter((comment) => comment.text.includes('I am closing this case'));
+          const last = thread.comments[thread.comments.length - 1]!;
+          if (thread.status !== 'closed') {
+            if (mentions.length > 0) problems.push(`${thread.id}: ${thread.status} says it is closing`);
+          } else if (mentions.length !== 1 || !last.text.endsWith(CLOSING)) {
+            problems.push(`${thread.id}: "${last.text}"`);
+          }
+        }
+        expect(problems).toEqual([]);
+      });
+
+      it('thanks follow something to thank for: the employee thanks for an answer or a yes, the customer for a proposal', () => {
+        const problems: string[] = [];
+        let employeeThanks = 0;
+        let customerThanks = 0;
+        for (const thread of all) {
+          thread.comments.forEach((comment, k) => {
+            if (k === 0) return;
+            const previous = thread.comments[k - 1]!;
+            if (comment.authorKind === 'employee') {
+              // Thanking the customer for writing in is always possible, so that one sentence is left out.
+              if (!/thank/i.test(comment.text.replace('Thank you for contacting us.', ''))) return;
+              employeeThanks++;
+              if (k - 1 === 0 || isReminder(thread, k - 1)) problems.push(`${comment.id}: "${comment.text}" after "${previous.text}"`);
+            } else if (/thank/i.test(comment.text)) {
+              customerThanks++;
+              if (!CONFIRM.test(sentences(previous.text).at(-1)!)) problems.push(`${comment.id}: "${comment.text}" after "${previous.text}"`);
+            }
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(employeeThanks).toBeGreaterThan(500);
+        expect(customerThanks).toBeGreaterThan(100);
+      });
+
+      it('an apology for the wait, or a "still", only answers a reminder', () => {
+        const problems: string[] = [];
+        let apologies = 0;
+        for (const thread of all) {
+          thread.comments.forEach((comment, k) => {
+            if (comment.authorKind !== 'employee' || !/sorry for the wait|\bstill\b|raised the priority/.test(comment.text)) return;
+            apologies++;
+            if (!isReminder(thread, k - 1)) problems.push(`${comment.id}: "${comment.text}" after "${thread.comments[k - 1]!.text}"`);
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(apologies).toBeGreaterThan(300);
+      });
+
+      it('an attachment is mentioned only by the message that carries it, and the customer attaches only what was asked for', () => {
+        const problems: string[] = [];
+        let customerAttachments = 0;
+        for (const thread of all) {
+          thread.comments.forEach((comment, k) => {
+            if (comment.authorKind === 'customer') {
+              if (!/attach|photo/i.test(comment.text)) return;
+              customerAttachments++;
+              const previous = k === 0 ? '' : thread.comments[k - 1]!.text;
+              if (!/send me .*\?/.test(previous)) problems.push(`${comment.id}: "${comment.text}" after "${previous}"`);
+              return;
+            }
+            for (const sentence of sentences(comment.text)) {
+              // The employee never refers back to the customer's photos or files: a photo only in a request ...
+              if (/photo/i.test(sentence) && !sentence.endsWith('?')) problems.push(`${comment.id}: "${sentence}"`);
+              // ... and a file only in the message it comes with.
+              if (/attach/i.test(sentence) && !sentence.includes('attached to this message')) problems.push(`${comment.id}: "${sentence}"`);
+            }
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(customerAttachments).toBeGreaterThan(300);
+      });
+
+      it('the question comes before the proposal, each at most once, and the resolution is the one proposed', () => {
+        const problems: string[] = [];
+        let proposedAndResolved = 0;
+        for (const thread of all) {
+          const employee = thread.comments.filter((comment) => comment.authorKind === 'employee');
+          const proposals = employee.filter((comment) => CONFIRM.test(comment.text));
+          const questions = employee.filter((comment) => asks(comment.text) && !CONFIRM.test(comment.text));
+          if (proposals.length > 1 || questions.length > 1) problems.push(`${thread.id}: ${questions.length} questions, ${proposals.length} proposals`);
+          if (proposals.length === 1 && questions.length === 1 && proposals[0]!.postedAt < questions[0]!.postedAt) problems.push(`${thread.id}: asks after proposing`);
+          if (thread.status !== 'resolved' && thread.status !== 'closed') continue;
+          const resolution = solutionWords(thread.comments[thread.comments.length - 1]!.text);
+          if (resolution === '') problems.push(`${thread.id}: the last message carries no solution`);
+          if (proposals.length === 1) {
+            proposedAndResolved++;
+            if (solutionWords(proposals[0]!.text) !== resolution) problems.push(`${thread.id}: proposed "${solutionWords(proposals[0]!.text)}", resolved "${resolution}"`);
+          }
+        }
+        expect(problems).toEqual([]);
+        expect(proposedAndResolved).toBeGreaterThan(500);
+      });
+
+      it('never repeats a sentence within a thread', () => {
+        const problems: string[] = [];
+        for (const thread of all) {
+          const seen = new Set<string>();
+          for (const comment of thread.comments) {
+            for (const sentence of sentences(comment.text)) {
+              if (seen.has(sentence)) problems.push(`${comment.id}: "${sentence}"`);
+              seen.add(sentence);
+            }
+          }
+        }
+        expect(problems).toEqual([]);
+      });
+    });
+
     it('commentCount has the parity of its status: 0 or 1 (new), odd (open), even (pending, resolved, closed)', () => {
       const problems: string[] = [];
       for (const supportCase of cases) {
