@@ -15,7 +15,7 @@ test.describe('Pro/Integrations/TanStack Form', () => {
     await expectPlayToPass(page, PLAYGROUND);
   });
 
-  test('with an asynchronous hydration, "Unsaved changes" and summary rows never show while loading, then "No changes"', async ({ page }) => {
+  test('with an asynchronous hydration, "Unsaved changes" and summary rows never show while loading', async ({ page }) => {
     // The preview frame itself, without waiting for the play (it waits for the hydration, then edits).
     await page.goto(`/iframe.html?id=${PLAYGROUND}&viewMode=story&args=hydrationDelay:1500`);
     await expect(page.getByRole('status')).toBeAttached();
@@ -35,8 +35,11 @@ test.describe('Pro/Integrations/TanStack Form', () => {
     expect(loading.length).toBeGreaterThan(5);
     expect(loading.filter((state) => state.status.includes('Unsaved changes') || state.rows > 0)).toEqual([]);
     expect(loading.some((state) => state.status.includes('Loading'))).toBe(true);
-    await expect(page.getByRole('status')).toHaveText('All saved');
-    await expect(page.getByText('No changes')).toBeVisible();
+  });
+
+  test('with an asynchronous hydration the play passes: after the load the summary says "No changes"', async ({ page }) => {
+    // Step 1 of the play waits for the record, then checks "All saved" and "No changes" before any edit.
+    await expectPlayToPass(page, PLAYGROUND, 'hydrationDelay:1500');
   });
 
   // The tests below start where the play ends: Supplier "Lumen Parts (updated)" and Amount 150 saved on the server,
