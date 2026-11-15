@@ -110,6 +110,9 @@ async function shadeRamp(page: Page, edge: 'start' | 'end') {
   return { image, onLeft, outer: onLeft ? left! : right!, inner: onLeft ? right! : left! };
 }
 
+/** The invoice button of the first data row (the data has arrived: skeleton rows hold no button). */
+const firstRowButton = (page: Page): Locator => scroller(page).locator('tbody tr:not([aria-hidden])').first().getByRole('button').first();
+
 async function waitForRows(page: Page): Promise<void> {
   await expect(scroller(page).locator('tbody tr').nth(3)).toBeVisible();
 }
@@ -386,12 +389,12 @@ test.describe('List Report: edge shades (Free)', () => {
   test('restored scroll position (useListReportScrollRestoration): the start shade is there with no gesture', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await gotoStory(page, 'floorplans-list-report--scroll-restoration-no-play', 'loadDelayMs:300');
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+    await expect(firstRowButton(page)).toBeVisible();
     await scrollFromStart(page, 150);
     await expect.poll(() => scroller(page).evaluate((el) => el.scrollLeft)).toBe(150);
     await page.waitForTimeout(300);
     await page.reload();
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+    await expect(firstRowButton(page)).toBeVisible();
     await expect.poll(() => scroller(page).evaluate((el) => el.scrollLeft)).toBe(150);
     await expectEdges(page, true, true);
   });
