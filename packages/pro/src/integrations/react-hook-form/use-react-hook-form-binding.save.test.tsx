@@ -304,11 +304,81 @@ describe('useReactHookFormBinding: writes of the binding during a handleSubmit s
       delete rest.reference;
       return rest as Invoice;
     });
+    // A field edited during the save: React Hook Form must end with it too (second reset), not with `saved`.
+    harness.type('Notes', 'typed during save');
     await save.settle();
-    expect(Object.hasOwn(harness.current().binding.values, 'reference')).toBe(false);
-    expect(Object.hasOwn(harness.current().form.getValues(), 'reference')).toBe(false);
-    expect(harness.current().binding.values).toBe(harness.current().binding.baseline);
-    expect(harness.current().binding.isSaving).toBe(false);
+    const { binding, form } = harness.current();
+    expect(Object.hasOwn(binding.values, 'reference')).toBe(false);
+    expect(Object.hasOwn(form.getValues(), 'reference')).toBe(false);
+    expect(binding.baseline).toEqual({ ...SAVED, amount: '120' });
+    expect(binding.values).toEqual({ ...SAVED, amount: '120', notes: 'typed during save' });
+    expect(form.getValues()).toEqual(binding.values);
+    expect(harness.input('Notes').value).toBe('typed during save');
+    expect(paths(harness.current().entries)).toEqual(['changed:notes']);
+    expect(binding.isSaving).toBe(false);
+    harness.unmount();
+  });
+});
+
+describe('useReactHookFormBinding: saveError of a save that succeeded while a validation error appeared (critic round 1, point 1)', () => {
+  const required = { notes: { required: 'Notes are required' } };
+
+  it('default mode, second save: the user empties a required field during it, the server stores: saveError null, the error stays on the field', async () => {
+    const harness = setupInvoiceForm({ rules: required, useFormProps: { defaultValues: { ...SAVED, notes: 'n' } } });
+    harness.type('Amount', '120');
+    const first = await startSave(harness);
+    await first.settle();
+    expect(harness.current().binding.saveError).toBeNull();
+    harness.type('Amount', '130');
+    const second = await startSave(harness);
+    // After a submit React Hook Form re-validates on change (`reValidateMode: 'onChange'`).
+    await act(async () => {
+      harness.type('Notes', '');
+    });
+    expect(harness.current().form.getFieldState('notes').error?.message).toBe('Notes are required');
+    await second.settle();
+    const { binding, form } = harness.current();
+    expect(form.formState.isSubmitSuccessful).toBe(false);
+    expect(binding.saveError).toBeNull();
+    expect(binding.baseline).toEqual({ ...SAVED, amount: '130', notes: 'n' });
+    expect(form.getFieldState('notes').error?.message).toBe('Notes are required');
+    harness.unmount();
+  });
+
+  it("mode 'onChange', first save: the same", async () => {
+    const harness = setupInvoiceForm({ rules: required, useFormProps: { defaultValues: { ...SAVED, notes: 'n' }, mode: 'onChange' } });
+    harness.type('Amount', '130');
+    const save = await startSave(harness);
+    await act(async () => {
+      harness.type('Notes', '');
+    });
+    await save.settle();
+    expect(harness.current().binding.saveError).toBeNull();
+    expect(harness.current().form.getFieldState('notes').error?.message).toBe('Notes are required');
+    harness.unmount();
+  });
+
+  it('the next submit blocked by that error, or a handler that fails, is still reported', async () => {
+    const harness = setupInvoiceForm({ rules: required, useFormProps: { defaultValues: { ...SAVED, notes: 'n' }, mode: 'onChange' } });
+    harness.type('Amount', '130');
+    const save = await startSave(harness);
+    await act(async () => {
+      harness.type('Notes', '');
+    });
+    await save.settle();
+    expect(harness.current().binding.saveError).toBeNull();
+    // Blocked by validation: the handler never runs, nothing saved.
+    await act(async () => {
+      await harness.current().form.handleSubmit(() => undefined)();
+    });
+    expect(harness.current().binding.saveError).toEqual(expect.objectContaining({ notes: expect.objectContaining({ message: 'Notes are required' }) }));
+    // Fixed, then a handler that fails before `reset(saved)`.
+    await act(async () => {
+      harness.type('Notes', 'ok');
+    });
+    const failing = await startSave(harness);
+    await failing.settle(new Error('offline'));
+    expect(harness.current().binding.saveError).not.toBeNull();
     harness.unmount();
   });
 });

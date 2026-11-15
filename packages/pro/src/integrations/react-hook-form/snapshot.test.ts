@@ -230,6 +230,16 @@ describe('keepEditsSince (a save that settles while the user kept typing)', () =
       expect(keepEditsSince(order, current, reordered, ids).lines).toEqual([C, A, { ...B, qty: 20 }]);
     });
 
+    it('a new row without id sent, removed by the user during the save, the server assigns ids: the user array whole', () => {
+      // Only the sent rows lack an id (the guard on the sent side): the rows cannot be paired with the sent ones.
+      const fresh = { desc: 'new', qty: 9 } as unknown as Row;
+      const sentOrder = { ...order, lines: [A, B, fresh] };
+      const current = { ...order, lines: [A, { ...B, qty: 20 }] };
+      const returned = { ...order, lines: [A, B, { id: 'N', desc: 'new', qty: 9 }] };
+      expect(() => keepEditsSince(sentOrder, current, returned, ids)).not.toThrow();
+      expect(keepEditsSince(sentOrder, current, returned, ids).lines).toEqual(current.lines);
+    });
+
     it('nested arrays use their own path (lines.taxes)', () => {
       type Taxed = { lines: { id: string; taxes: { code: string; rate: number }[] }[] };
       const s: Taxed = { lines: [{ id: 'A', taxes: [{ code: 'V', rate: 22 }, { code: 'X', rate: 0 }] }] };

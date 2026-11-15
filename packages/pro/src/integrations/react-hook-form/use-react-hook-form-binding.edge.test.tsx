@@ -201,15 +201,19 @@ describe('StrictMode', () => {
     expect(harness.last().values).toBe(first.values);
     expect(harness.last().baseline).toBe(first.baseline);
     harness.type('Amount', '120');
-    const reset = vi.spyOn(harness.current().form, 'reset');
+    const { form } = harness.current();
+    const reset = vi.spyOn(form, 'reset');
+    const setValue = vi.spyOn(form, 'setValue');
+    const resetDefaultValues = vi.spyOn(form, 'resetDefaultValues');
     act(() => harness.current().rebase.rebase({ ...SAVED, supplier: 'Acme Corp Ltd' }));
-    // One rebase: `reset(incoming)` then `reset(merged, { keepDefaultValues: true })`, once.
-    expect(reset).toHaveBeenCalledTimes(2);
-    expect(reset.mock.calls[0]![1]).toMatchObject({ keepDefaultValues: false });
-    expect(reset.mock.calls[1]![1]).toMatchObject({ keepDefaultValues: true });
+    // One rebase, written once (critic round 1, point 2: no `reset`): the changed field, then the new defaults.
+    expect(reset).not.toHaveBeenCalled();
+    expect(setValue.mock.calls).toEqual([['supplier', 'Acme Corp Ltd']]);
+    expect(resetDefaultValues).toHaveBeenCalledTimes(1);
+    expect(resetDefaultValues.mock.calls[0]![0]).toEqual({ ...SAVED, supplier: 'Acme Corp Ltd' });
     expect(harness.current().binding.values).toEqual({ ...SAVED, supplier: 'Acme Corp Ltd', amount: '120' });
     expect(harness.current().entries.map((entry) => entry.path)).toEqual(['amount']);
-    reset.mockRestore();
+    vi.restoreAllMocks();
     harness.unmount();
   });
 
@@ -348,6 +352,24 @@ describe('a save that settles while the user edited a row and the server reorder
     ]);
     expect(binding.baseline.lineItems.map((line) => line.id)).toEqual(['L3', 'L1', 'L2']);
     order.unmount();
+  });
+});
+
+describe('a rebase written with a reset (a top-level key to remove) on a shouldUnregister form (critic round 1, point 3)', () => {
+  it("the user's edit stays in React Hook Form and in the DOM: the mounted fields are kept (keepFieldsRef)", () => {
+    const harness = setupInvoiceForm({ useFormProps: { defaultValues: SAVED, shouldUnregister: true } });
+    harness.type('Amount', '120');
+    // The server drops `notes`: only a reset removes a top-level key.
+    const incoming = { supplier: 'Acme Corp Ltd', amount: SAVED.amount } as Invoice;
+    act(() => harness.current().rebase.rebase(incoming));
+    const { binding, form } = harness.current();
+    expect(binding.baseline).toBe(incoming);
+    expect(binding.values.amount).toBe('120');
+    expect(binding.values.supplier).toBe('Acme Corp Ltd');
+    expect(form.getValues().amount).toBe('120');
+    expect(harness.input('Amount').value).toBe('120');
+    expect(harness.input('Supplier').value).toBe('Acme Corp Ltd');
+    harness.unmount();
   });
 });
 

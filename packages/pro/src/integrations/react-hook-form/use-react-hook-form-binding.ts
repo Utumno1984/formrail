@@ -6,7 +6,7 @@ import type { FieldValues, KeepStateOptions, UseFormReturn } from 'react-hook-fo
 import type { RebaseFormBinding } from '../../form-rebase/types';
 import { isDev } from '../../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../../internal/use-isomorphic-layout-effect';
-import { fieldErrorPaths, keepEditsSince, sameContent, samePathValue, snapshotOf } from './snapshot';
+import { fieldErrorPaths, isPlainRecord, keepEditsSince, sameContent, samePathValue, snapshotOf } from './snapshot';
 
 /** Options of {@link useReactHookFormBinding}. */
 export interface UseReactHookFormBindingOptions {
@@ -85,6 +85,18 @@ class BindingStore<Values extends FieldValues> {
    * when a reset or a rehydration happened since (the reset wins: the save's result is then a plain hydration).
    */
   private sent: Values | null = null;
+  /** `formState.submitCount` as of the last commit. */
+  submitCount = 0;
+  /**
+   * The `submitCount` before the submit that `reset(saved)` ended (`-1`: none): that submit, once counted, saved
+   * (see `saveErrorOf`).
+   */
+  private savedAt = -1;
+  /**
+   * The write to React Hook Form of the current synchronous run, not done yet (see `write`): the values, and the
+   * defaults (`null`: React Hook Form's stay).
+   */
+  private pending: { values: Values; defaults: Values | null } | null = null;
 
   constructor(form: AnyForm<Values>) {
     this.form = form;
@@ -121,8 +133,20 @@ class BindingStore<Values extends FieldValues> {
    * event (the ref callback of its input), and the snapshots must not wait for the next keystroke to show it.
    */
   resync = (): void => {
+    this.flush();
     this.sync();
   };
+
+  /**
+   * The default `saveError`: React Hook Form's errors when the last submit was not successful, `null` when it
+   * succeeded or when `reset(saved)` ended it. React Hook Form decides `isSubmitSuccessful` at the end of the
+   * submit from the errors of that moment: a validation error the user caused while the server was saving
+   * (typing during the save) would report a save that succeeded as failed. The errors stay on their fields.
+   */
+  saveErrorOf(formState: { isSubmitted: boolean; isSubmitSuccessful: boolean; submitCount: number; errors: unknown }): unknown {
+    if (!formState.isSubmitted || formState.isSubmitSuccessful) return null;
+    return this.savedAt === formState.submitCount - 1 ? null : formState.errors;
+  }
 
   /**
    * Re-reads the defaults and the values of the form. A new defaults object (a reset, the `values` prop,
@@ -132,7 +156,8 @@ class BindingStore<Values extends FieldValues> {
    * when the baseline was replaced by values of the same content (a hydration), never after a field edit.
    */
   private sync(event?: RhfEvent, notify = true): void {
-    if (this.busy > 0) return;
+    // A write of the binding not done yet: React Hook Form still holds the values before it.
+    if (this.busy > 0 || this.pending !== null) return;
     const { form } = this;
     const prev = this.state;
     let baseline = prev.baseline;
@@ -168,37 +193,51 @@ class BindingStore<Values extends FieldValues> {
   }
 
   /**
-   * Writes `values` to React Hook Form and `defaults` as its defaults (`null`: its defaults stay), keeping the
-   * interaction state (touched fields, errors, submit count and flags).
+   * Schedules the write of `values` to React Hook Form, and of `defaults` as its defaults (`null`: they stay, or
+   * those of an earlier write of the same run). The write happens once, at the end of the synchronous run (the
+   * binding's layout effect or a microtask, whichever comes first), with the last values: a rebase is
+   * `reset(incoming)` then `setValues(merged)`, and writing `incoming` first would put the server value in the
+   * field the user is typing in, then the user's value back (the caret jumps to the end).
    */
   private write(values: Values, defaults: Values | null): void {
+    const pending = this.pending;
+    this.pending = { values, defaults: defaults ?? pending?.defaults ?? null };
+    if (pending === null) queueMicrotask(this.flush);
+  }
+
+  /**
+   * The pending write, keeping the interaction state (touched fields, errors, submit count and flags). Never
+   * React Hook Form's `reset` when it can be avoided: a reset regenerates the ids of every `useFieldArray` row
+   * (new React keys: the rows remount, the focus is lost), always sets `isSubmitting` to `false`, and makes the
+   * `handleSubmit` in flight skip its own end. Instead, `setValue` on each changed leaf only (no event of type
+   * `change`, no validation, no `onChange` of a `Controller`; a field the binding does not change is not
+   * written, so the field being typed in keeps its caret), then `resetDefaultValues` with the defaults, which
+   * recomputes `dirtyFields` and `isDirty`. A reset only when a top-level key must go (only a reset removes one).
+   */
+  flush = (): void => {
+    const pending = this.pending;
+    if (pending === null) return;
+    this.pending = null;
     const { form } = this;
+    const { values, defaults } = pending;
     this.busy += 1;
     try {
-      if (this.saving && keepsEveryKey(form.getValues(), values)) {
-        // During a save, never React Hook Form's `reset`: it always sets `isSubmitting` to `false`, and the
-        // `handleSubmit` in flight, seeing a reset, skips its own end (no `isSubmitting: false`, `isSubmitted`,
-        // submit count). The save would end for the binding at the first `setValues` (an `acceptTheirs`) and its
-        // real end would never be seen. `setValues` writes the values in place (a copy: React Hook Form keeps the
-        // objects it receives and mutates them later; no field re-registers, the DOM of a field being typed in
-        // gets the value it already has); `resetDefaultValues` writes the defaults and recomputes `dirtyFields`
-        // and `isDirty` against them. Neither touches the submit state.
-        form.setValues(snapshotOf(values) as never);
+      const current = form.getValues();
+      if (keepsEveryKey(current, values)) {
+        writeChanges((path, value) => form.setValue(path as never, value as never), '', '', current, values, this.arrayIdKeys);
         form.resetDefaultValues((defaults ?? form.control._defaultValues) as never);
       } else {
-        // Outside a save, or when a top-level key must go (`setValues` only adds and replaces keys).
         // With `shouldUnregister`, a reset keeps only the values of the mounted fields it is told to keep.
         const keep = { ...KEEP_INTERACTION, keepFieldsRef: form.control._options.shouldUnregister === true };
         form.reset(defaults ?? values, { ...keep, keepDefaultValues: defaults === null });
-        // Same synchronous run as a rebase: the fields re-register at the next render with the final values, so the
-        // DOM of a field being typed in never shows `defaults`.
+        // In the same call: the fields re-register at the next render with the final values.
         if (defaults !== null && values !== defaults) form.reset(values, { ...keep, keepDefaultValues: true });
       }
     } finally {
       this.busy -= 1;
     }
     this.defaults = form.control._defaultValues;
-  }
+  };
 
   private beginRun(): NonNullable<BindingStore<Values>['run']> {
     if (this.run === null) {
@@ -243,6 +282,8 @@ class BindingStore<Values extends FieldValues> {
     const run = this.beginRun();
     const { sent } = this;
     this.sent = null;
+    // `reset(saved)` during a submit ends it as saved, whatever errors React Hook Form sees at its end.
+    if (next !== undefined && this.saving) this.savedAt = this.submitCount;
     const target = next ?? this.state.baseline;
     // During a save, `reset(saved)` ends it: the fields edited since the save started keep the typed value (dirty
     // against `saved`), the others take what the server stored. Nothing edited meanwhile: `values` is `saved`.
@@ -332,13 +373,17 @@ export function useReactHookFormBinding<Values extends FieldValues>(
 
   // Read only when not replaced: reading `formState` subscribes the form's component to that key.
   const isSaving = options.isSaving ?? form.formState.isSubmitting;
+  const { submitCount } = form.formState;
   let saveError = options.saveError;
   if (saveError === undefined) {
     const { isSubmitted, isSubmitSuccessful } = form.formState;
-    saveError = isSubmitted && !isSubmitSuccessful ? form.formState.errors : null;
+    saveError = store.saveErrorOf({ isSubmitted, isSubmitSuccessful, submitCount, get errors() { return form.formState.errors; } });
   }
   // Before every layout effect of the commit (the rebase engine reads `isSaving` in one, also in a child).
   useInsertionEffect(() => store.observeSaving(isSaving), [store, isSaving]);
+  useInsertionEffect(() => {
+    store.submitCount = submitCount;
+  }, [store, submitCount]);
   const { arrayIdKeys } = options;
   useInsertionEffect(() => {
     store.arrayIdKeys = arrayIdKeys;
@@ -360,6 +405,50 @@ export function useReactHookFormBinding<Values extends FieldValues>(
 /** `true` when every top-level key of `current` is also in `next` (a write that removes none). */
 function keepsEveryKey(current: object, next: object): boolean {
   return Object.keys(current).every((key) => Object.prototype.hasOwnProperty.call(next, key));
+}
+
+const join = (path: string, segment: string): string => (path === '' ? segment : `${path}.${segment}`);
+
+/** The ids of the rows of `rows`, in order, or `null` when a row has none. */
+function rowIds(rows: unknown[], idKey: string): unknown[] | null {
+  const ids: unknown[] = [];
+  for (const row of rows) {
+    const id = isPlainRecord(row) ? row[idKey] : undefined;
+    if (id === undefined || id === null) return null;
+    ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * `setValue` (a copy, by React Hook Form) on each path where `next` differs from `current`, as deep as possible:
+ * into plain objects that keep all their keys, into arrays that keep their length and, with an id key, the same
+ * ids in the same order. Anywhere else the whole value is written (an array whose rows were added, removed or
+ * reordered: React Hook Form re-creates its rows, as it must). `schemaPath` is `path` without the indexes.
+ */
+function writeChanges(
+  setValue: (path: string, value: unknown) => void,
+  path: string,
+  schemaPath: string,
+  current: unknown,
+  next: unknown,
+  idKeys: Readonly<Record<string, string>> | undefined,
+): void {
+  if (sameContent(current, next)) return;
+  if (isPlainRecord(current) && isPlainRecord(next) && Object.keys(current).every((key) => Object.hasOwn(next, key))) {
+    for (const key of Object.keys(next)) writeChanges(setValue, join(path, key), join(schemaPath, key), current[key], next[key], idKeys);
+    return;
+  }
+  if (Array.isArray(current) && Array.isArray(next) && current.length === next.length) {
+    const idKey = idKeys !== undefined && Object.hasOwn(idKeys, schemaPath) ? idKeys[schemaPath] : undefined;
+    const before = typeof idKey === 'string' ? rowIds(current, idKey) : [];
+    const after = typeof idKey === 'string' ? rowIds(next, idKey) : [];
+    if (before !== null && after !== null && before.every((id, index) => Object.is(id, after[index]))) {
+      next.forEach((item: unknown, index) => writeChanges(setValue, join(path, String(index)), schemaPath, current[index], item, idKeys));
+      return;
+    }
+  }
+  setValue(path, next);
 }
 
 /** The controls already warned about (one warning per form). */

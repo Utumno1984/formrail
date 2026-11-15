@@ -27,6 +27,11 @@ export interface ContractForm {
    * record it stored (a normalization), which the save makes the new baseline.
    */
   startSave: (respond?: (sent: ContractInvoice) => ContractInvoice) => { settle: (error: unknown) => Promise<void> };
+  /**
+   * A validation error appears on a field while the user edits, the way the library validates as the user types
+   * (a form without live validation, as core's, validates only on save: nothing to do).
+   */
+  showValidationError: () => void;
 }
 
 /** A hook that renders the form under test, initialized with `initial`. */
@@ -238,6 +243,23 @@ export const CONTRACT_CHECKS: ContractCheck[] = [
         await act(() => save.settle(null));
         expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
         expect(form.current().binding.values).toEqual({ ...CONTRACT_INITIAL, name: 'acme ltd co' });
+      }),
+  },
+  {
+    name: 'a validation error that appears during a save the server stores does not make saveError non-null',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('Acme Ltd'));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => copy(sent));
+        });
+        act(() => form.current().editCity('Milan'));
+        act(() => form.current().showValidationError());
+        await act(() => save.settle(null));
+        expect(form.current().binding.isSaving).toBe(false);
+        expect(form.current().binding.saveError).toBeNull();
+        expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
       }),
   },
   {
