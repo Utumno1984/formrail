@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
 // #500: numbers of the default count / selection text / "Select all N results" follow the `locale` of useListReport.
@@ -8,6 +9,8 @@ const TOTAL = 1200;
 const PRO = 'pro-floorplans-virtual-list-report--default-no-play';
 
 const fmt = (locale: string, n: number) => new Intl.NumberFormat(locale).format(n);
+const FERRARI = makeDemoInvoices(TOTAL).filter((r) => r.supplier.includes('Ferrari')).length;
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const count = (page: Page) => page.locator('[data-rop-count]');
 
 test.describe('Free ListReport: locale-formatted count and selection text', () => {
@@ -16,7 +19,31 @@ test.describe('Free ListReport: locale-formatted count and selection text', () =
       await expectPlayToPass(page, FREE, `locale:${locale}`);
       const total = fmt(locale, TOTAL).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/[\u00a0\u202f ]/g, '\\s');
       await expect(count(page)).toHaveText(new RegExp(`^\\(.+ of ${total}\\)$`));
-      await expect(page.locator('[data-rop-selection-count]')).toHaveText(/^.+ selected \(.+ hidden by filters\)$/);
+      const selection = page.locator('[data-rop-selection-count]');
+      await expect(selection).toHaveText(
+        new RegExp(`^${escape(fmt(locale, FERRARI))} selected \\(${escape(fmt(locale, TOTAL - FERRARI))} hidden by filters\\)$`.replace(/[\u00a0\u202f]/g, '\\s')),
+      );
+      // The regex accepts any space: the exact characters of Intl are checked on the raw text.
+      expect(await selection.textContent()).toBe(`${fmt(locale, FERRARI)} selected (${fmt(locale, TOTAL - FERRARI)} hidden by filters)`);
+    });
+  }
+
+  for (const locale of ['en-US', 'de-DE', 'fr-FR']) {
+    test(`the live region announces the number of results in ${locale}, the same number as the visible count`, async ({ page }) => {
+      await gotoStory(page, FREE_NO_PLAY, `locale:${locale}`);
+      await expect(count(page)).toHaveText(`(${fmt(locale, TOTAL)})`);
+      await page.getByRole('searchbox', { name: 'Search' }).fill('Ferrari');
+      await page.keyboard.press('Enter');
+      await expect(count(page)).toHaveText(`(${fmt(locale, FERRARI)} of ${fmt(locale, TOTAL)})`);
+      const live = page.locator('[aria-live="polite"]');
+      await expect(live).toHaveText(`${fmt(locale, FERRARI)} results`.replace(/[\u00a0\u202f]/g, ' '));
+      // toHaveText folds every kind of space: the exact text (fr-FR: U+202F) is checked on the raw text.
+      expect(await live.textContent()).toBe(`${fmt(locale, FERRARI)} results`);
+      // Below 1,000 the formatter changes nothing: clear the search so the announced number has a separator.
+      await page.getByRole('searchbox', { name: 'Search' }).fill('');
+      await page.keyboard.press('Enter');
+      await expect(count(page)).toHaveText(`(${fmt(locale, TOTAL)})`);
+      expect(await live.textContent()).toBe(`${fmt(locale, TOTAL)} results`);
     });
   }
 

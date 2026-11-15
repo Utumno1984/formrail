@@ -1,8 +1,9 @@
-import { act } from 'react';
+import { act, useState, type ReactElement } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ListReportTableShell } from './ListReportTableShell';
 import { ListReportFrame, type ListReportFrameProps } from './ListReportFrame';
 import { getNumberFormat, resolveLocales } from './number-format';
 import type { ListReportColumn, ListReportFilter } from './types';
@@ -184,6 +185,116 @@ describe('number formatting of the default texts', () => {
     cleanup();
     render(<Probe />);
     expect(seen).toBeUndefined();
+  });
+});
+
+// The live region of the table: filled on a change of state, never at mount. Loading -> ready announces the count.
+function LiveHost({ locale, labels, rows = ROWS }: { locale?: Locale; labels?: ListReportFrameProps<Item>['labels']; rows?: Item[] }) {
+  const table = useListReport<Item>({ rows, columns: COLUMNS, getRowId: (r) => r.id, locale });
+  const [status, setStatus] = useState<'loading' | 'ready'>('loading');
+  return (
+    <>
+      <button onClick={() => setStatus('ready')}>ready</button>
+      <span data-rop-count>{`(${getNumberFormat(table.locale).format(table.resultCount)})`}</span>
+      <ListReportTableShell caption="Invoices" table={table} status={status} labels={labels} renderBody={() => null} />
+    </>
+  );
+}
+const live = () => document.querySelector('[aria-live="polite"]') as HTMLElement;
+const announceReady = (ui: ReactElement) => {
+  render(ui);
+  expect(live().textContent).toBe('');
+  fireEvent.click(screen.getByText('ready'));
+  return live().textContent;
+};
+
+describe('the default announcement of the results (live region)', () => {
+  it('en-US "10,000 results"; de-DE "10.000 results"; fr-FR the characters of Intl, unnormalized', () => {
+    expect(announceReady(<LiveHost locale="en-US" />)).toBe('10,000 results');
+    cleanup();
+    expect(announceReady(<LiveHost locale="de-DE" />)).toBe('10.000 results');
+    cleanup();
+    expect(announceReady(<LiveHost locale="fr-FR" />)).toBe(`${new Intl.NumberFormat('fr-FR').format(10_000)} results`);
+    expect(live().textContent).toContain('\u202f');
+  });
+
+  it('one result stays "1 result"; 0 results announces the no-data state, unchanged', () => {
+    expect(announceReady(<LiveHost locale="de-DE" rows={ROWS.slice(0, 1)} />)).toBe('1 result');
+    cleanup();
+    expect(announceReady(<LiveHost locale="de-DE" rows={[]} />)).toBe('No data');
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['en_US', 'en_US'],
+    ['empty string', ''],
+    ['["!!"]', ['!!']],
+  ])('%s: Intl.NumberFormat receives undefined, the runtime default; navigator.language is not read', (_name, locale) => {
+    const lang = vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE');
+    const spy = vi.spyOn(Intl, 'NumberFormat');
+    try {
+      expect(announceReady(<LiveHost locale={locale as Locale} />)).toBe(`${runtime(10_000)} results`);
+      expect(spy).toHaveBeenCalled();
+      for (const call of spy.mock.calls) expect(call[0]).toBeUndefined();
+      expect(lang).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      lang.mockRestore();
+    }
+  });
+
+  it('an array uses the first supported locale', () => {
+    expect(announceReady(<LiveHost locale={['de-DE', 'en-US']} />)).toBe('10.000 results');
+  });
+
+  it('ar-EG and one million: no exception, the number of Intl', () => {
+    const rows = Array.from({ length: 1_000_000 }, (_, i) => ({ id: `r${i}`, name: '', some: true }));
+    expect(announceReady(<LiveHost locale="ar-EG" rows={rows} />)).toBe(`${new Intl.NumberFormat('ar-EG').format(1_000_000)} results`);
+  });
+
+  it('a custom labels.resultCount receives the raw number and its text is announced as is', () => {
+    const custom = vi.fn((n: number) => `found ${n}`);
+    expect(announceReady(<LiveHost locale="de-DE" labels={{ resultCount: custom }} />)).toBe('found 10000');
+    expect(custom).toHaveBeenCalledWith(10_000);
+  });
+
+  it('partial labels (no resultCount) keep the formatted default', () => {
+    expect(announceReady(<LiveHost locale="de-DE" labels={{ retry: 'Again' }} />)).toBe('10.000 results');
+  });
+
+  it('same formatted number as the visible count', () => {
+    const text = announceReady(<LiveHost locale="fr-FR" />);
+    expect(`(${text!.replace(' results', '')})`).toBe(count().textContent);
+  });
+
+  it('a locale change with the same results announces nothing new', () => {
+    const { rerender } = render(<LiveHost locale="en-US" />);
+    fireEvent.click(screen.getByText('ready'));
+    expect(live().textContent).toBe('10,000 results');
+    rerender(<LiveHost locale="de-DE" />);
+    expect(live().textContent).toBe('10,000 results');
+  });
+});
+
+describe('default selection text without hidden rows', () => {
+  it('"n selected" is formatted (en-US, de-DE)', () => {
+    const rows = ROWS.slice(0, 1500);
+    function Sel({ locale }: { locale: string }) {
+      const table = useListReport<Item>({
+        rows,
+        columns: COLUMNS,
+        getRowId: (r) => r.id,
+        selectable: true,
+        locale,
+        defaultSelectedIds: new Set(rows.slice(0, 1234).map((r) => r.id)),
+      });
+      return <ListReportFrame table={table} title="Invoices" renderTable={() => null} />;
+    }
+    render(<Sel locale="en-US" />);
+    expect(selectionText()).toBe('1,234 selected');
+    cleanup();
+    render(<Sel locale="de-DE" />);
+    expect(selectionText()).toBe('1.234 selected');
   });
 });
 
