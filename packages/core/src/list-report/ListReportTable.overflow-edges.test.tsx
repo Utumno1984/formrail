@@ -363,17 +363,39 @@ describe('ListReportTable: shades on the inline edges that hide columns', () => 
     expect(el.hasAttribute('data-rop-overflow-end')).toBe(false);
   });
 
-  it('the direction of each gradient is a custom property of the layer, from the measured direction', () => {
+  it('the direction is CSS alone: a `dir` changed after the mount at scrollLeft 0 leaves the layer as it was, with nothing about the direction in it', () => {
     mock = mockLayout(WIDE);
-    const { unmount } = render(<Host />);
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-start-to')).toBe('to right');
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-end-to')).toBe('to left');
-    unmount();
-    render(<Host dir="rtl" />);
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-start-to')).toBe('to left');
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-end-to')).toBe('to right');
-    // No direction selector anywhere in the classes of the shades.
-    for (const shade of layer()!.children) expect(shade.className).not.toMatch(/dir\(|rtl:/);
+    const { rerender } = render(<Host />);
+    const html = layer()!.outerHTML;
+    // No direction in the layer's style (no custom property set from a measured direction).
+    expect(layer()!.getAttribute('style')).not.toMatch(/to (left|right)|rtl|ltr/);
+    for (const edge of ['start', 'end'] as const) {
+      const classes = layer()!.querySelector(`[data-rop-overflow-edge="${edge}"]`)!.className.split(' ');
+      // A 12px box clipping a `::before` twice as wide, half outside the box on its outer side by a
+      // logical inset, with a symmetric gradient: the full colour in its middle, on the outer edge.
+      expect(classes).toEqual(expect.arrayContaining(['w-3', 'overflow-hidden', 'before:absolute', 'before:w-6', `before:-${edge}-3`]));
+      expect(classes).toContain('before:bg-[linear-gradient(to_right,transparent,var(--rop-list-report-edge-color),transparent)]');
+      // No direction selector and no physical side anywhere.
+      for (const cls of classes) {
+        expect(cls).not.toMatch(/dir\(|lang\(|rtl:|ltr:/);
+        expect(cls).not.toMatch(/^(?:[\w-]+:)*-?(?:left|right|[mp][lr]|border-[lr]|rounded-[lr])(?:-|$)/);
+      }
+    }
+    // `dir` changed after the mount, nothing scrolled (no `scroll` event, no resize): the layer is the
+    // same node with the same markup, and the start still reads as the start.
+    const node = layer();
+    rerender(<Host dir="rtl" />);
+    expect(scroller().getAttribute('dir')).toBe('rtl');
+    expect(layer()).toBe(node);
+    expect(layer()!.outerHTML).toBe(html);
+    expect(edges()).toEqual({ start: false, end: true });
+    scrollLeftTo(-250);
+    expect(edges()).toEqual({ start: true, end: true });
+    // And back to ltr: a browser clamps -250 into the new range, which is a `scroll` event.
+    rerender(<Host dir="ltr" />);
+    scrollLeftTo(0);
+    expect(edges()).toEqual({ start: false, end: true });
+    expect(layer()!.outerHTML).toBe(html);
   });
 });
 

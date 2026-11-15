@@ -11,14 +11,13 @@ export const OVERFLOW_END_ATTR = 'data-rop-overflow-end';
  * Where the edge layer must draw its shades, in px, or `null` when nothing overflows sideways (no
  * layer at all). `height` is the scrollport's (`clientHeight`); `bottom` moves the shades down from
  * the layer, which sits right after the table: a table shorter than the scrollport leaves room below
- * it that the shades cover too (0 when the table fills it). `rtl` is the container's computed
- * direction: the gradients follow it through a custom property set by the layer, never through a
- * `:dir()` selector (a build may lower it to a `:lang()` list, and Safari before 16.4 lacks it).
+ * it that the shades cover too (0 when the table fills it). Nothing about the direction: the shades
+ * follow the resolved direction in CSS alone (see `edgeShadowStartClass`), so a `dir` changed after the
+ * mount needs no measure.
  */
 export interface OverflowEdgesGeometry {
   height: number;
   bottom: number;
-  rtl: boolean;
 }
 
 export interface OverflowEdgesSink {
@@ -45,7 +44,6 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
     let end = false;
     let overflow = false;
     let lastLeft: number | undefined;
-    let rtl = false;
     let geometry: OverflowEdgesGeometry | null = null;
 
     const measureGeometry = (): OverflowEdgesGeometry | null => {
@@ -54,17 +52,19 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       const table = el.firstElementChild;
       const tableHeight = table ? table.getBoundingClientRect().height : height;
       // Floored: the shades must never reach past the scrollport and make it scroll.
-      return { height, bottom: -Math.max(0, Math.floor(height - tableHeight)), rtl };
+      return { height, bottom: -Math.max(0, Math.floor(height - tableHeight)) };
     };
     const publish = (next: OverflowEdgesGeometry | null) => {
-      if (next === geometry || (next && geometry && next.height === geometry.height && next.bottom === geometry.bottom && next.rtl === geometry.rtl)) return;
+      if (next === geometry || (next && geometry && next.height === geometry.height && next.bottom === geometry.bottom)) return;
       geometry = next;
       sinkRef.current?.setGeometry(next);
     };
     const measure = (resized: boolean) => {
-      const nextRtl = getComputedStyle(el).direction === 'rtl';
-      const directionChanged = nextRtl !== rtl;
-      rtl = nextRtl;
+      // The direction only says how to read `scrollLeft` (negative in rtl), not where the shades go (CSS).
+      // A change of direction after the mount needs no measure of its own: a `scrollLeft` it leaves
+      // unchanged can only be 0, the start in both directions; one it moves (clamped to the new range)
+      // fires a `scroll` event.
+      const rtl = getComputedStyle(el).direction === 'rtl';
       const edges = overflowEdges(scrollFromStart(el, rtl), el.scrollWidth, el.clientWidth);
       if (edges.start !== start) {
         start = edges.start;
@@ -76,7 +76,7 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       }
       const overflowChanged = edges.overflow !== overflow;
       overflow = edges.overflow;
-      if (resized || overflowChanged || directionChanged) publish(measureGeometry());
+      if (resized || overflowChanged) publish(measureGeometry());
     };
     const onScroll = () => {
       const left = el.scrollLeft;

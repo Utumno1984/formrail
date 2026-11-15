@@ -51,9 +51,10 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   Size it with the parent (flex) or with `maxHeight`. It is a tab stop so the keyboard can scroll.
  * - Columns hidden sideways: while the table is wider than its container, a translucent shade is drawn
  *   on each inline edge past which columns are hidden (at the end at first, at both ends in the middle,
- *   at the start at the end; mirrored with `dir="rtl"`), above the sticky header and below every
- *   overlay. It takes no click and is hidden from assistive technology; with row actions the end one is
- *   drawn before their sticky column. The state is also on the container, as a styling hook:
+ *   at the start at the end; mirrored in rtl, from `dir` or from the `direction` property, also when it
+ *   changes after the mount), above the sticky header and below every overlay. It takes no click and
+ *   is hidden from assistive technology; with row actions the end one is drawn before their sticky
+ *   column. The state is also on the container, as a styling hook:
  *   `data-rop-overflow-start` / `data-rop-overflow-end` (present or absent), measured on the client only
  *   (never on the server) and updated on scroll and on resize. Within 1px an edge counts as in view.
  *   The shades are laid out in the container's content box: a `padding` given to the container moves
