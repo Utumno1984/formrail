@@ -136,7 +136,9 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
   (blocked by validation, or a handler that threw before `binding.reset(saved)`: then it is
   `formState.errors`). A submit that `binding.reset(saved)` ended has saved: its `saveError` is `null` even if a
   validation error appeared while the server was saving (the user kept typing). That error stays on its field,
-  and blocks the next submit as usual.
+  and blocks the next submit as usual. This holds for that one submit: the next one, also after a
+  `form.reset()`, `form.reset(data)` or a change of the `values` prop (React Hook Form sets `submitCount`
+  back to 0, as in its "reset on `isSubmitSuccessful`" pattern), is reported as it ends.
 - Call `binding.reset(saved)` **inside** the `handleSubmit` handler, before it resolves: a server update
   that came during the save is queued (`isPending`) and merged against what was saved. Resetting later, in an
   effect on `isSubmitSuccessful`, would come after the queued merge and overwrite it.
@@ -195,6 +197,13 @@ discard) is written to React Hook Form once, at the end of the synchronous run, 
   edits stay dirty;
 - the write happens at the end of the synchronous run (before the next render is painted): in the same
   function, right after `binding.reset(...)`, read `binding.values`, not `form.getValues()`;
+- a write of yours in the same run, after the binding's (`form.setValue`, a `Controller`, `form.reset`, for
+  example a timestamp set right after `binding.reset(saved)` in the `handleSubmit` handler), comes later in
+  call order and wins: on the fields it changes it is kept, in `form.getValues()`, in `binding.values` and in
+  the DOM; on the others the binding's write stands. A reset with new defaults (`form.reset(data)`, the
+  `values` prop, `resetDefaultValues`) replaces the binding's write whole. React Hook Form sends no event for
+  a write that leaves a field as it already was, so there the binding's value stands; a `useFieldArray`
+  operation that adds or removes rows of an array the binding also wrote keeps the app's array;
 - only a top-level key that must go (a record that omits it) is written with React Hook Form's `reset`
   (keeping the mounted fields with `shouldUnregister`): the rows then remount, and during a save the submit
   ends there;
