@@ -78,9 +78,10 @@ async function shadeBox(page: Page, edge: 'start' | 'end') {
 }
 
 /**
- * Where the full colour of a shade is: its computed `background-image`, and the luminance of the first
- * and last pixel column of the shade in a screenshot taken with the table hidden (the shade then lies on
- * the plain page background). `outer` is the column on the scroller's edge, `inner` the one 12px inside.
+ * Where the full colour of a shade is: the computed `background-image` of its `::before` and the inset
+ * of that `::before` on the shade's outer side, and the luminance of the first and last pixel column of
+ * the shade in a screenshot taken with the table hidden (the shade then lies on the plain page
+ * background). `outer` is the column on the scroller's edge, `inner` the one 12px inside.
  */
 async function shadeRamp(page: Page, edge: 'start' | 'end') {
   const shade = scroller(page).locator(`[data-rop-overflow-edge="${edge}"]`);
@@ -106,8 +107,60 @@ async function shadeRamp(page: Page, edge: 'start' | 'end') {
   }, png.toString('base64'));
   // The shade on the left half of the scroller has its outer side on the left.
   const onLeft = box.x + box.width / 2 < area.x + area.width / 2;
-  const image = await shade.evaluate((el) => getComputedStyle(el).backgroundImage);
-  return { image, onLeft, outer: onLeft ? left! : right!, inner: onLeft ? right! : left! };
+  const before = await shade.evaluate((el) => {
+    const b = getComputedStyle(el, '::before');
+    return { image: b.backgroundImage, left: b.left, right: b.right, width: b.width };
+  });
+  return {
+    image: before.image,
+    width: before.width,
+    outerInset: onLeft ? before.left : before.right,
+    onLeft,
+    outer: onLeft ? left! : right!,
+    inner: onLeft ? right! : left!,
+  };
+}
+
+/**
+ * The full colour of the shade is on the scroller's outer edge, the way the CSS puts it there whatever
+ * the direction: a symmetric gradient (transparent, full colour, transparent) on a `::before` twice as
+ * wide as the shade, half of it past the shade's outer side (the clipped half); and the pixels say so.
+ */
+function expectFullColourOutside(ramp: Awaited<ReturnType<typeof shadeRamp>>, label: string): void {
+  expect(ramp.image, `${label}: symmetric gradient`).toMatch(/^linear-gradient\(to right, rgba\(0, 0, 0, 0\), .+, rgba\(0, 0, 0, 0\)\)$/);
+  expect(ramp.width, `${label}: ::before twice as wide as the shade`).toBe('24px');
+  expect(ramp.outerInset, `${label}: half of it past the outer side`).toBe('-12px');
+  expect(ramp.outer, `${label}: darker on the outer edge`).toBeLessThan(ramp.inner - 20);
+}
+
+/**
+ * Both shades, the hidden one too: a test style shows them (the attributes, and so what a scroll would
+ * measure, are left alone), then each must be on its side with the full colour on the outer edge.
+ */
+async function expectBothShadesOutside(page: Page, dir: 'ltr' | 'rtl', label: string): Promise<void> {
+  const reveal = await page.addStyleTag({
+    content: '[data-rop-overflow-edge] { visibility: visible !important; opacity: 1 !important; transition: none !important; }',
+  });
+  for (const edge of ['start', 'end'] as const) {
+    const ramp = await shadeRamp(page, edge);
+    // The start shade is on the left in ltr, on the right in rtl; the end one opposite.
+    expect(ramp.onLeft, `${label} ${edge}: side`).toBe((edge === 'start') === (dir === 'ltr'));
+    expectFullColourOutside(ramp, `${label} ${edge}`);
+  }
+  await reveal.evaluate((el) => (el as Element).remove());
+}
+
+/** What the Controls panel does: new args for the story on screen, re-rendered in place. */
+async function updateArgs(page: Page, storyId: string, updatedArgs: Record<string, unknown>): Promise<void> {
+  await page.evaluate(
+    ({ id, args }) => {
+      (window as unknown as { __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void } }).__STORYBOOK_ADDONS_CHANNEL__.emit('updateStoryArgs', {
+        storyId: id,
+        updatedArgs: args,
+      });
+    },
+    { id: storyId, args: updatedArgs },
+  );
 }
 
 /** The invoice button of the first data row (the data has arrived: skeleton rows hold no button). */
@@ -379,10 +432,47 @@ test.describe('List Report: edge shades (Free)', () => {
         const ramp = await shadeRamp(page, edge);
         // The start shade is on the left in ltr, on the right in rtl; the end one opposite.
         expect(ramp.onLeft, `${dir} ${edge}: side`).toBe((edge === 'start') === (dir === 'ltr'));
-        // A gradient from the outer edge inwards: "to right" from the left edge, "to left" from the right one.
-        expect(ramp.image, `${dir} ${edge}: gradient`).toMatch(ramp.onLeft ? /^linear-gradient\(to right, / : /^linear-gradient\(to left, /);
-        expect(ramp.outer, `${dir} ${edge}: darker on the outer edge`).toBeLessThan(ramp.inner - 20);
+        expectFullColourOutside(ramp, `${dir} ${edge}`);
       }
+    });
+  }
+
+  // The direction changed after the mount with `scrollLeft` at 0, the start in both directions: no
+  // `scroll` event, no resize, nothing for script to measure. The shades follow in CSS alone. The node
+  // that scrolls is the same one (a remount would measure again and hide a stale direction).
+  const runtime = [
+    { from: 'ltr', to: 'rtl', how: 'the dir prop (Controls)' },
+    { from: 'rtl', to: 'ltr', how: 'the dir prop (Controls)' },
+    { from: 'ltr', to: 'rtl', how: 'the direction property of a stylesheet' },
+  ] as const;
+  for (const { from, to, how } of runtime) {
+    test(`${from} -> ${to} at runtime with scrollLeft 0, by ${how}: each shade on its side, the full colour on the outer edge`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, PLAYGROUND, `containerWidth:360;dir:${from};status:loading`);
+      await expectEdges(page, false, true);
+      await expectBothShadesOutside(page, from, `before (${from})`);
+      await scroller(page).evaluate((el) => {
+        const w = window as unknown as { __ropScrolls: number };
+        w.__ropScrolls = 0;
+        el.addEventListener('scroll', () => (w.__ropScrolls += 1));
+        (el as HTMLElement & { __ropSameNode?: boolean }).__ropSameNode = true;
+      });
+      if (how === 'the dir prop (Controls)') await updateArgs(page, PLAYGROUND, { dir: to });
+      else await page.addStyleTag({ content: `#storybook-root [tabindex="0"]:has(> table) { direction: ${to} !important; }` });
+      await expect.poll(() => scroller(page).evaluate((el) => getComputedStyle(el).direction)).toBe(to);
+      const after = await scroller(page).evaluate((el) => ({
+        dir: el.getAttribute('dir'),
+        sameNode: (el as HTMLElement & { __ropSameNode?: boolean }).__ropSameNode === true,
+        scrollLeft: el.scrollLeft,
+        scrolls: (window as unknown as { __ropScrolls: number }).__ropScrolls,
+      }));
+      expect(after).toEqual({ dir: how === 'the dir prop (Controls)' ? to : from, sameNode: true, scrollLeft: 0, scrolls: 0 });
+      await expectEdges(page, false, true);
+      await expectBothShadesOutside(page, to, `after (${from} -> ${to})`);
+      // As shown, with no test style: the end shade alone, on the end side of the new direction.
+      const end = await shadeRamp(page, 'end');
+      expect(end.onLeft, 'end shade after the change: side').toBe(to === 'rtl');
+      expectFullColourOutside(end, 'end shade after the change');
     });
   }
 
@@ -426,7 +516,7 @@ test.describe('List Report: edge shades (Free)', () => {
     await page.setViewportSize(PHONE);
     await gotoStory(page, FLOORPLAN);
     await waitForRows(page);
-    const image = () => scroller(page).evaluate((el) => getComputedStyle(el.querySelector('[data-rop-overflow-edge="end"]')!).backgroundImage);
+    const image = () => scroller(page).evaluate((el) => getComputedStyle(el.querySelector('[data-rop-overflow-edge="end"]')!, '::before').backgroundImage);
     const light = await image();
     expect(light).toMatch(/gradient/);
     expect(light).not.toMatch(/rgba\(0, 0, 0, 0\), rgba\(0, 0, 0, 0\)/);
@@ -462,7 +552,7 @@ test.describe('List Report: edge shades (Free)', () => {
     for (const edge of ['start', 'end'] as const) {
       const ramp = await shadeRamp(page, edge);
       expect(ramp.onLeft, `rtl story ${edge}: side`).toBe(edge === 'end');
-      expect(ramp.outer, `rtl story ${edge}: darker on the outer edge`).toBeLessThan(ramp.inner - 20);
+      expectFullColourOutside(ramp, `rtl story ${edge}`);
     }
   });
 
