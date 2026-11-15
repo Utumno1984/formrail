@@ -424,7 +424,7 @@ describe('useObjectPageForm: save', () => {
     expect(result.current.isDirty).toBe(true);
   });
 
-  it('keeps the latest edits even when the handler returns a normalized baseline', async () => {
+  it('keeps the latest edits when the handler returns a normalized baseline; the untouched fields take the server value', async () => {
     const { result } = setup();
     act(() => result.current.setValue('name', 'Sent'));
     const gate = deferred<Invoice>();
@@ -438,7 +438,7 @@ describe('useObjectPageForm: save', () => {
       await outcome;
     });
     expect(result.current.baseline).toEqual({ name: 'SENT', amount: 10 });
-    expect(result.current.values).toEqual({ name: 'Sent', amount: 99 });
+    expect(result.current.values).toEqual({ name: 'SENT', amount: 99 });
     expect(result.current.isDirty).toBe(true);
   });
 

@@ -142,8 +142,9 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
 - Call `binding.reset(saved)` **inside** the `handleSubmit` handler, before it resolves: a server update
   that came during the save is queued (`isPending`) and merged against what was saved. Resetting later, in an
   effect on `isSubmitSuccessful`, would come after the queued merge and overwrite it.
-- The user can keep typing while the save is in flight. `reset(saved)` called during the save ends it as
-  core's `save` does: `saved` becomes the baseline; a field edited since the save started keeps the typed
+- The user can keep typing while the save is in flight. `reset(saved)` called during the save ends it with
+  the same field-by-field rule as core's `save` (`useObjectPageForm`, which has no id key: there an array
+  edited during the save is always kept whole, as here without `arrayIdKeys`): `saved` becomes the baseline; a field edited since the save started keeps the typed
   value and stays dirty (in the summary and in `dirtyFields`); every other field takes the value the server
   stored, its normalization included, and is clean. Nothing edited meanwhile: `values` is `saved` itself.
   "Since the save started" is measured from the values when `isSaving` turned `true`, field by field. The

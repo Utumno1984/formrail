@@ -251,6 +251,28 @@ export const CONTRACT_CHECKS: ContractCheck[] = [
       }),
   },
   {
+    // Ticket #545: decided field by field, not for the whole form (core aligned on the adapter of #507).
+    name: 'a field the server normalized and the user did not touch while saving takes the server value (clean); the edit made meanwhile stays',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('  acme ltd '));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        const stored = { ...CONTRACT_INITIAL, name: 'Acme Ltd' };
+        await act(async () => {
+          save = form.current().startSave((sent) => ({ ...copy(sent), name: 'Acme Ltd' }));
+        });
+        act(() => form.current().editCity('Milan'));
+        await act(() => save.settle(null));
+        const { baseline, values } = form.current().binding;
+        expect(baseline).toEqual(stored);
+        expect(values.name).toBe('Acme Ltd');
+        expect(values.supplier.city).toBe('Milan');
+        // The only difference from the baseline is the edit made during the save.
+        expect({ ...values, supplier: { ...values.supplier, city: baseline.supplier.city } }).toEqual(baseline);
+        expect(values).toEqual({ ...stored, supplier: { city: 'Milan', tags: ['a'] } });
+      }),
+  },
+  {
     name: 'a validation error that appears during a save the server stores does not make saveError non-null',
     run: (use) =>
       withForm(use, async (form) => {
