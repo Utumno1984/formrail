@@ -2,9 +2,10 @@
 // the app made in the same synchronous run (`adoptWrites`), on the shape of an array and on keys that come and go, and
 // the cases of the round that no other test pinned (each one fails if the line it guards is changed).
 import { useState } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useFieldArray, useForm, type UseFormReturn } from 'react-hook-form';
 import { useChangeSummary, type ChangeEntry, type RebaseFormBinding } from '../../engine';
+import { SAVED, setupInvoiceForm } from '../../../test/rhf-harness';
 import { useReactHookFormBinding } from './use-react-hook-form-binding';
 
 type Line = { id: number; qty: string; note: string };
@@ -240,5 +241,127 @@ describe('useReactHookFormBinding: a useFieldArray operation of the app before a
     });
     expectEverywhere(order, { supplier: 'Server', lines: [L1, L2, L3], extra: 'x' });
     order.unmount();
+  });
+});
+
+describe('useReactHookFormBinding: keys that come and go while a write of the binding waits (critic round 5, M17 M18 M26)', () => {
+  it('binding.reset(a record without a key) then form.setValue on another field: the key is gone, not left undefined', () => {
+    const order = setupOrder({ defaults: { ...ORDER, extra: 'e' } });
+    act(() => {
+      order.current().binding.reset(ORDER);
+      order.current().form.setValue('supplier', 'app');
+    });
+    const { binding, form } = order.current();
+    expect(Object.hasOwn(form.getValues(), 'extra')).toBe(false);
+    expect(Object.hasOwn(binding.values, 'extra')).toBe(false);
+    expect(form.getValues()).toEqual({ ...ORDER, supplier: 'app' });
+    expect(paths(order.current().entries)).toEqual(['supplier']);
+    order.unmount();
+  });
+
+  it('binding.setValues then form.unregister of a key: the key stays removed, the write of the binding stays', () => {
+    const order = setupOrder({ defaults: { ...ORDER, extra: 'e' } });
+    act(() => {
+      order.current().binding.setValues({ supplier: 'Server' });
+      order.current().form.unregister('extra');
+    });
+    const { binding, form } = order.current();
+    expect(Object.hasOwn(form.getValues(), 'extra')).toBe(false);
+    expect(Object.hasOwn(binding.values, 'extra')).toBe(false);
+    expect(form.getValues().supplier).toBe('Server');
+    expect(binding.values.supplier).toBe('Server');
+    order.unmount();
+  });
+
+  it('binding.reset(a record whose nested object lacks a key): the nested key is gone from React Hook Form too', () => {
+    const order = setupOrder({ defaults: { ...ORDER, address: { city: 'Turin', zip: '10100' } } });
+    const record: Order = { ...ORDER, address: { city: 'Milan' } };
+    act(() => order.current().binding.reset(record));
+    const { binding, entries, form } = order.current();
+    expect(form.getValues().address).toEqual({ city: 'Milan' });
+    expect(Object.hasOwn(form.getValues().address!, 'zip')).toBe(false);
+    expect(binding.values).toEqual(record);
+    expect(binding.baseline).toBe(record);
+    expect(entries).toEqual([]);
+    order.unmount();
+  });
+});
+
+describe('useReactHookFormBinding: rows without arrayIdKeys (critic round 5, M24)', () => {
+  it('the binding writes a field of row 1 while the user types in row 2: the rows keep their nodes and the focus stays', () => {
+    const order = setupOrder({ idKeys: false });
+    const qty2 = order.input('Qty 2');
+    const qty1 = order.input('Qty 1');
+    qty2.focus();
+    fireEvent.input(qty2, { target: { value: '22' } });
+    act(() => {
+      order.current().binding.setValues({ supplier: 'Server', lines: [{ ...L1, qty: 'server' }, { ...L2, qty: '22' }] });
+    });
+    expect(order.input('Qty 1')).toBe(qty1);
+    expect(order.input('Qty 2')).toBe(qty2);
+    expect(document.activeElement).toBe(qty2);
+    expect(qty1.value).toBe('server');
+    expect(qty2.value).toBe('22');
+    order.unmount();
+  });
+});
+
+describe('useReactHookFormBinding: several writes of the binding and of the app in one run (critic round 5, M29 M09)', () => {
+  it('two binding.reset in the same run: React Hook Form ends with the defaults of the second (dirtyFields against it)', () => {
+    const harness = setupInvoiceForm();
+    const first = { ...SAVED, supplier: 'First' };
+    const second = { ...SAVED, supplier: 'Second' };
+    act(() => {
+      harness.current().binding.reset(first);
+      harness.current().binding.reset(second);
+    });
+    const { binding, entries, form } = harness.current();
+    expect(form.control._defaultValues).toEqual(second);
+    expect(form.getValues()).toEqual(second);
+    expect(form.formState.isDirty).toBe(false);
+    expect(form.formState.dirtyFields).toEqual({});
+    expect(binding.baseline).toBe(second);
+    expect(binding.values).toBe(second);
+    expect(entries).toEqual([]);
+    expect(harness.input('Supplier').value).toBe('Second');
+    harness.unmount();
+  });
+
+  it('binding.reset(x), form.resetDefaultValues(d) (no value event), binding.setValues(p): the values are x with p, the baseline d', () => {
+    const harness = setupInvoiceForm();
+    const defaults = { ...SAVED, supplier: 'Defaults of the app' };
+    act(() => {
+      harness.current().binding.reset({ ...SAVED, supplier: 'Server' });
+      harness.current().form.resetDefaultValues(defaults);
+      harness.current().binding.setValues({ amount: '2' });
+    });
+    const expected = { ...SAVED, supplier: 'Server', amount: '2' };
+    const { binding, form } = harness.current();
+    expect(form.getValues()).toEqual(expected);
+    expect(binding.values).toEqual(expected);
+    expect(binding.baseline).toEqual(defaults);
+    expect(form.control._defaultValues).toEqual(defaults);
+    expect(harness.input('Supplier').value).toBe('Server');
+    expect(harness.input('Amount').value).toBe('2');
+    harness.unmount();
+  });
+
+  it('binding.reset, form.reset(data), binding.setValues, form.setValue: the last two writes both stay, measured from data', () => {
+    const harness = setupInvoiceForm();
+    const data = { supplier: 'Reloaded', amount: '1', notes: '' };
+    act(() => {
+      harness.current().binding.reset({ ...SAVED, supplier: 'Server' });
+      harness.current().form.reset(data);
+      harness.current().binding.setValues({ amount: '2' });
+      harness.current().form.setValue('notes', 'app');
+    });
+    const expected = { supplier: 'Reloaded', amount: '2', notes: 'app' };
+    const { binding, form } = harness.current();
+    expect(form.getValues()).toEqual(expected);
+    expect(binding.values).toEqual(expected);
+    expect(binding.baseline).toEqual(data);
+    expect(harness.input('Amount').value).toBe('2');
+    expect(harness.input('Notes').value).toBe('app');
+    harness.unmount();
   });
 });

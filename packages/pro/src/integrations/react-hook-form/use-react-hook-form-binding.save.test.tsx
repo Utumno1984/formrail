@@ -663,3 +663,41 @@ async function startSaveWithoutReset(harness: Harness) {
     },
   };
 }
+
+describe('useReactHookFormBinding: a discard of the binding during a handleSubmit save (critic round 5, M05)', () => {
+  it('binding.reset() (no record) while the submit is in flight, then the handler fails: the save is reported as failed', async () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let done!: Promise<void>;
+    // The submit starts in its own act: the render with `isSubmitting` is committed before the handler goes on.
+    await act(async () => {
+      done = harness
+        .current()
+        .form.handleSubmit(async () => {
+          await gate;
+          // A discard, not a save result: it must not mark the submit as saved.
+          harness.current().binding.reset();
+          throw new Error('500 from server');
+        })()
+        .catch(() => undefined);
+    });
+    expect(harness.current().binding.isSaving).toBe(true);
+    await act(async () => {
+      release();
+      await done;
+    });
+    const { binding, form } = harness.current();
+    expect(form.formState.isSubmitted).toBe(true);
+    expect(form.formState.isSubmitSuccessful).toBe(false);
+    expect(binding.isSaving).toBe(false);
+    expect(binding.saveError).not.toBeNull();
+    // The discard itself took effect: the form is back at its baseline.
+    expect(binding.values).toEqual(SAVED);
+    expect(harness.input('Amount').value).toBe('100');
+    harness.unmount();
+  });
+});
