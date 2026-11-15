@@ -130,4 +130,33 @@ describe('useTanStackFormBinding on React 18', () => {
     expect(seen.at(-1)!.form.state.values).toBe(x);
     act(() => legacyUnmount(container));
   });
+
+  // Legacy mode renders synchronously inside the store notification of TanStack Form's `baseStore.setState`, while the
+  // binding is still writing: the binding must not read that half-done write back (its `busy` guard), or a commit
+  // would show the new values against the old baseline, a summary row for every field of `x`. Two saves in a row: the
+  // guard holds for every write, not only for the first one.
+  it('legacy render, binding.reset(x) then reset(y) outside any batch: no commit shows new values against the old baseline (no row)', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined); // legacy render notice, update outside act
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const seen: Seen[] = [];
+    act(() => legacyRender(<Probe seen={seen} onFieldChange={() => undefined} />, container));
+    const x: Invoice = { supplier: 'Saved', amount: '7', notes: 'n' };
+    const y: Invoice = { supplier: 'Saved again', amount: '8', notes: 'm' };
+    for (const record of [x, y]) {
+      const from = seen.length;
+      (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+      try {
+        seen.at(-1)!.binding.reset(record);
+      } finally {
+        (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+      }
+      const after = seen.slice(from);
+      expect(after.length).toBeGreaterThan(0);
+      expect(after.filter((s) => s.entries.length > 0).map((s) => s.entries)).toEqual([]);
+      expect(after.filter((s) => s.binding.values !== s.binding.baseline)).toEqual([]);
+      expect(seen.at(-1)!.binding.values).toBe(record);
+    }
+    act(() => legacyUnmount(container));
+  });
 });
