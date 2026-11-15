@@ -36,7 +36,7 @@ export interface RecordSectionsProps<T extends { id: string }, V extends object>
 export interface RecordModuleList<T extends { id: string }> {
   /** Every column is sortable (the URL accepts a sort on any of them). */
   columns: readonly ListReportColumn<T>[];
-  /** The pills; the first one is the default (no `filter` parameter in the URL). */
+  /** The pills; the first one is the default (no pill parameter in the URL). */
   filters: readonly ListReportFilter<T>[];
   /** The id of the column whose cell becomes the link to the record page (its text: `recordName`). */
   linkColumn: string;

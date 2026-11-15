@@ -15,7 +15,7 @@
 //   - the list restores its scroll by itself (`useListReportScrollRestoration`, keyed on the list's own
 //     parameters: no route parameter is one of them);
 //   - since #519 the list parameters (pill, search, sort) and the saved scroll are per module, never shared:
-//     the default module keeps `filter`/`q`/`sort`, any other one has them under its name (`tasks.filter`, see
+//     the default module keeps the plain parameter names, any other one has them under its name (`tasks.q`, see
 //     `listParamPrefix`), so two modules in one iframe each come back to their own list;
 //   - since #519 the modules are ONE static list (`showcase-modules.ts`) read by the parsing AND by the writing:
 //     opening a page of a module that is not there throws, it never writes a URL read back as another list.
@@ -41,7 +41,7 @@ export function assertShowcaseModule(module: string): void {
 /**
  * The `prefix` of a module's list parameters and saved scroll (`useListReportUrlState`,
  * `useListReportScrollRestoration`): none for the default module (its URLs are the ones of before #519), the
- * module name for any other (`tasks.filter`, `tasks.q`, `tasks.sort`), so no two modules share them.
+ * module name for any other (`tasks.q`, `tasks.sort` and the pill), so no two modules share them.
  */
 export const listParamPrefix = (module: string): string | undefined => (module === DEFAULT_MODULE ? undefined : module);
 
