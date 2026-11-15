@@ -83,3 +83,14 @@ name ends in `Labels`; a label type with another name is not seen. Two different
 `labels?: { anchorBar?: string }` is not an exported `*Labels` type, so it is outside the guard (its keys state their
 default in the prose by hand). If the docgen one day expands the keys into rows with
 their own Default column, the e2e test fails and the convention flips to `@default` per key (option (a) of #540).
+
+The guard checks that the prose states a default, not that it is **true**: the unit tests do (#549).
+`packages/core/src/label-defaults.test.tsx` (core keys) and `packages/pro/src/label-defaults.test.tsx` (Pro keys)
+take every key the guard reads (`measureLabels`) and compare the value of its prose with the value of the code, through
+the generic `checkLabelDefaults` of `packages/core/test/label-defaults.ts`. Each file lists one **source** per
+interface in `labelSources()`: the component's `DEFAULT_LABELS` (exported from its
+module with `@internal`, never from the package entry), or the texts read from a rendering when the default is not in a
+constant. A function key is called with the placeholders of its prose (`Select <row label>` is
+`selectRow('<row label>')`) or, when the prose is an example ("Default `1 item selected`"), with the arguments given in
+`examples` (`{ selectedCount: { args: [1] } }`). A new interface or key without a source fails ("no source of the real
+value"); a key that really cannot be verified goes in `LABEL_EXCEPTIONS`, with the reason (empty today).
