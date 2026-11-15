@@ -147,6 +147,11 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    * Bulk actions of the selection bar (with `useListReport({ selectable: true })`): rendered at 0 selected
    * too, so they decide themselves whether to be disabled (`selection.selectedResultCount === 0`). Act on
    * `selection.getSelectedRows()`: only the selected rows the user can see. Never reaches the DOM.
+   *
+   * The presence of the prop decides the layout of the bar below 640px, not what it returns: without it the
+   * count and "Clear selection" share one line (the count yields down to a minimum width of 8ch, then the bar wraps
+   * to two lines; from 640px there is no minimum); with it, even a function that returns `null`, the count has its own line and the actions
+   * and "Clear selection" are below it.
    */
   bulkActions?: (selection: ListReportSelection<Row>) => ReactNode;
   /**

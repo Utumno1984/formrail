@@ -39,11 +39,15 @@ export const tableClass = 'min-h-0 flex-1';
 // always rendered. Wide: count, actions, "clear" on one line. Narrow (below 640px) with `bulkActions`: the
 // count on its own line, then the actions and "clear" at the end — two lines at 0 and at n alike. Narrow
 // without `bulkActions` (`data-rop-bulk-actions="false"`, decided at render): count and "clear" on one
-// line, the count yields. DOM order = visual order.
+// line while there is room, the count yields down to a minimum of 8ch (about "3 selecte", the digits plus
+// the start of the word: enough to read the number even when truncated; `max-sm:` so that from 640px the
+// minimum is 0 as before #509); below that the bar wraps to two lines (count, then "clear" at the end). The wrap depends only on the width, the text size and the label
+// of "clear" (hidden, it keeps its box), never on the selection. DOM order = visual order.
 export const selectionBarClass =
   'group flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-rop-md border border-rop-border bg-rop-surface-subtle ' +
-  'px-3 py-1 data-[rop-bulk-actions=false]:flex-nowrap sm:flex-nowrap';
+  'px-3 py-1 sm:flex-nowrap';
 export const selectionCountClass =
-  'min-w-0 basis-full text-rop-text group-data-[rop-bulk-actions=false]:flex-1 group-data-[rop-bulk-actions=false]:basis-0 sm:flex-1 sm:basis-0';
+  'min-w-0 basis-full text-rop-text max-sm:group-data-[rop-bulk-actions=false]:min-w-[8ch] group-data-[rop-bulk-actions=false]:flex-1 ' +
+  'group-data-[rop-bulk-actions=false]:basis-0 sm:flex-1 sm:basis-0';
 export const selectionActionsClass = 'flex min-w-0 flex-wrap items-center gap-2';
 export const selectionClearClass = 'ms-auto shrink-0 whitespace-nowrap';

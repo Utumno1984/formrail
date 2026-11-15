@@ -1056,6 +1056,8 @@ interface SelectionArgs {
   defaultFilter?: string;
   /** Whether the selection bar gets bulk actions. Default true. */
   withBulkActions?: boolean;
+  /** Replaces `labels.clearSelection` with a long text (a localized label can be much longer than the default). */
+  longClearLabel?: boolean;
   /** Width of the demo container (px). Default 1100. */
   containerWidth?: number;
 }
@@ -1069,6 +1071,7 @@ function SelectionReport({
   onExport,
   defaultFilter,
   withBulkActions = true,
+  longClearLabel = false,
   containerWidth = 1100,
 }: SelectionArgs) {
   // Controlled: the parent owns the set and applies what the hook reports (a new Set every time).
@@ -1101,6 +1104,7 @@ function SelectionReport({
           table={table}
           filtersLabel="Filters"
           searchLabel="Search"
+          labels={longClearLabel ? { clearSelection: 'Remove every invoice from the selection' } : undefined}
           bulkActions={
             withBulkActions
               ? (selection) => (
@@ -1133,6 +1137,7 @@ const SELECTION_ARG_TYPES = {
   onApprove: { control: false },
   onExport: { control: false },
   defaultFilter: HIDDEN,
+  longClearLabel: HIDDEN,
   ...{ status: HIDDEN, dataset: HIDDEN, searchCommitDelay: HIDDEN, firstSortDirection: HIDDEN, containerWidth: HIDDEN, onRetry: HIDDEN },
   ...{ onSortChange: HIDDEN, onFilterChange: HIDDEN, onSearchQueryChange: HIDDEN },
 } as const;
@@ -1208,9 +1213,10 @@ export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
   argTypes: {
     ...SELECTION_ARG_TYPES,
     withBulkActions: { control: 'boolean', description: 'Pass `bulkActions` to the frame (Approve, Export)' },
+    longClearLabel: { control: 'boolean', description: 'A long `labels.clearSelection`: the bar wraps to two lines instead of squeezing the count' },
     containerWidth: { control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Width of the demo container (px)' },
   },
-  args: { ...SELECTION_ARGS, withBulkActions: false, containerWidth: 1100 },
+  args: { ...SELECTION_ARGS, withBulkActions: false, longClearLabel: false, containerWidth: 1100 },
   play: async ({ args, canvasElement }) => {
     if (!args.selectable || args.preselected !== 'none') return;
     const canvas = within(canvasElement);
@@ -1224,6 +1230,15 @@ export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
     const after = selectionBar(canvas).getBoundingClientRect();
     await expect(Math.abs(after.height - before.height)).toBeLessThanOrEqual(0.5);
     await expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(0.5);
+    await expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(0.5);
+    await expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(0.5);
+    // Below 640px the count is never squeezed under its minimum (8ch), whatever the width or the text size;
+    // from 640px there is no minimum.
+    const countEl = canvasElement.querySelector<HTMLElement>('[data-rop-selection-count]')!;
+    const minWidth = parseFloat(getComputedStyle(countEl).minWidth);
+    if (window.innerWidth < 640) await expect(minWidth).toBeGreaterThan(0);
+    else await expect(minWidth).toBe(0);
+    await expect(countEl.getBoundingClientRect().width).toBeGreaterThanOrEqual(minWidth - 0.5);
     await userEvent.click(clear);
     await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
     await expect(allBox(canvas)).toHaveFocus();
