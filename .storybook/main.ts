@@ -97,6 +97,9 @@ const config: StorybookConfig = {
         { find: /^@formrail\/core\/internal$/, replacement: fileURLToPath(new URL('../packages/core/src/internal.ts', import.meta.url)) },
         // The copy-paste examples of the Pro pages import `@formrail/pro` by name, as a consumer would (#403).
         { find: /^@formrail\/pro$/, replacement: fileURLToPath(new URL('../packages/pro/src/index.ts', import.meta.url)) },
+        // The subpath entries (#507): the React Hook Form example imports the engines and the adapter by name.
+        { find: /^@formrail\/pro\/engine$/, replacement: fileURLToPath(new URL('../packages/pro/src/engine.ts', import.meta.url)) },
+        { find: /^@formrail\/pro\/react-hook-form$/, replacement: fileURLToPath(new URL('../packages/pro/src/react-hook-form.ts', import.meta.url)) },
         { find: /^@formrail\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
         ...(Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : Object.entries(viteConfig.resolve?.alias ?? {}).map(([find, replacement]) => ({ find, replacement }))),
       ],

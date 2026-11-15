@@ -15,7 +15,7 @@ const notPublic = PRO_DEMO_NOT_PUBLIC as string[];
 
 test.describe('Pro copy-paste examples per build (#447)', () => {
   test('the scan is not vacuous: every Pro page has an example; every folder is public since #384 (Form rebase)', () => {
-    expect(examples.map((example) => example.folder).sort()).toEqual(['change-summary', 'form-rebase', 'form-rebase', 'list-report']);
+    expect(examples.map((example) => example.folder).sort()).toEqual(['change-summary', 'form-rebase', 'form-rebase', 'integrations', 'list-report']);
     expect(notPublic).toEqual([]);
   });
 

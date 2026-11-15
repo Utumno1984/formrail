@@ -32,6 +32,16 @@
         "default": "./dist/engine.cjs"
       }
     },
+    "./react-hook-form": {
+      "import": {
+        "types": "./dist/react-hook-form.d.ts",
+        "default": "./dist/react-hook-form.js"
+      },
+      "require": {
+        "types": "./dist/react-hook-form.d.cts",
+        "default": "./dist/react-hook-form.cjs"
+      }
+    },
     "./styles.css": "./dist/styles.css",
     "./package.json": "./package.json"
   },
@@ -46,10 +56,14 @@
   "peerDependencies": {
     "@formrail/core": "0.1.0",
     "react": "^18.0.0 || ^19.0.0",
-    "react-dom": "^18.0.0 || ^19.0.0"
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "react-hook-form": "^7.92.0"
   },
   "peerDependenciesMeta": {
     "@formrail/core": {
+      "optional": true
+    },
+    "react-hook-form": {
       "optional": true
     }
   },

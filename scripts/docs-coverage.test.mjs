@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toId } from 'storybook/internal/csf';
@@ -9,6 +11,8 @@ import {
   collectPages,
   docsId,
   docsLinks,
+  entrySources,
+  packageRuntimeExports,
   parseStoriesFile,
   runtimeExports,
   undocumentedExports,
@@ -18,8 +22,10 @@ import {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (path) => readFileSync(resolve(ROOT, path), 'utf8');
 
-const coreExports = runtimeExports(read('packages/core/src/index.ts'));
-const proExports = runtimeExports(read('packages/pro/src/index.ts'));
+// Every public entry (#507): `index.ts` and the code subpaths of the `exports` map (`@formrail/pro/engine`,
+// `@formrail/pro/react-hook-form`, `@formrail/core/internal` when it has a dist entry).
+const coreExports = packageRuntimeExports(ROOT, 'packages/core');
+const proExports = packageRuntimeExports(ROOT, 'packages/pro');
 // The reference pages generated from the TSDoc (#402) are public Docs pages of core too.
 const REFERENCE_PAGES = readdirSync(resolve(ROOT, '.storybook/reference'))
   .filter((name) => name.endsWith('.mdx'))
@@ -69,6 +75,56 @@ describe('docs coverage of the public API', () => {
 
   it('the e2e audit fixtures (autodocs + internal) are not public pages', () => {
     expect(corePages.map((p) => p.id).filter((id) => id.startsWith('internal-'))).toEqual([]);
+  });
+});
+
+describe('docs coverage: the entries of a package (#507)', () => {
+  it('reads the subpath entries of pro, not only index.ts', () => {
+    expect(entrySources(ROOT, 'packages/pro').map((file) => file.slice(ROOT.length + 1)).sort()).toEqual([
+      'packages/pro/src/engine.ts',
+      'packages/pro/src/index.ts',
+      'packages/pro/src/react-hook-form.ts',
+    ]);
+    expect(proExports).toContain('useReactHookFormBinding');
+    // Core's `./internal` facade is not public API: not read.
+    expect(entrySources(ROOT, 'packages/core').map((file) => file.slice(ROOT.length + 1))).toEqual(['packages/core/src/index.ts']);
+    expect(runtimeExports(read('packages/pro/src/index.ts'))).not.toContain('useReactHookFormBinding');
+  });
+
+  describe('on a synthetic package', () => {
+    let root;
+    const write = (path, text) => {
+      mkdirSync(join(root, path, '..'), { recursive: true });
+      writeFileSync(join(root, path), text);
+    };
+    beforeEach(() => {
+      root = mkdtempSync(join(tmpdir(), 'docs-coverage-'));
+      write(
+        'pkg/package.json',
+        JSON.stringify({
+          exports: {
+            '.': { import: { default: './dist/index.js' } },
+            './extra': { import: { types: './dist/extra.d.ts', default: './dist/extra.js' } },
+            './styles.css': './dist/styles.css',
+          },
+        }),
+      );
+      write('pkg/src/index.ts', "export { Documented } from './a';");
+      write('pkg/src/extra.ts', "export { useHidden } from './b';\nexport type { Ignored } from './b';");
+    });
+    afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+    it('an undocumented export of a subpath entry is reported', () => {
+      const names = packageRuntimeExports(root, 'pkg');
+      expect(names).toEqual(['Documented', 'useHidden']);
+      const pages = [{ title: 'A', id: 'a--docs', components: ['Documented'], source: 'Documented' }];
+      expect(undocumentedExports(names, pages, {})).toEqual([expect.stringContaining('useHidden: exported but not documented')]);
+    });
+
+    it('a code subpath whose source is missing fails, it is never skipped', () => {
+      rmSync(join(root, 'pkg/src/extra.ts'));
+      expect(() => entrySources(root, 'pkg')).toThrow(/\.\/extra has no source/);
+    });
   });
 });
 

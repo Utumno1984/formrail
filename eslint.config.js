@@ -109,6 +109,24 @@ export default tseslint.config(
     },
   },
   {
+    // The React Hook Form integration of Pro (#507): `react-hook-form` is a declared (optional) peer dependency of
+    // `@formrail/pro`, so its examples may import it too; the rest of the rule above is unchanged.
+    files: ['packages/pro/src/integrations/react-hook-form/*.example.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { regex: '^\\.', message: 'A copy-paste example imports only the public packages by name (@formrail/core, @formrail/pro), never a relative path (ticket #403).' },
+            { regex: '(^|/)internal(/|$)', message: 'A copy-paste example uses only public API: no `internal` module (ticket #403).' },
+            { regex: '^(?!(react|react-hook-form|@formrail/[\\w-]+)(/|$))[^.]', message: 'A React Hook Form example imports only `react`, `react-hook-form` and `@formrail/*` packages (ticket #507).' },
+            { regex: '^(storybook|@storybook)(/|$)', message: 'A copy-paste example is plain React code: no Storybook import (fn, args, ...) (ticket #403).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The story of a copy-paste example is `{ tags, ...exampleStory('X.example.tsx') }` and nothing else that
     // changes what is rendered (ticket #403): the spread brings the example's own `render`, and the page prints
     // that file's text. A `render`, `component`, `decorators` or `loaders` in the same object would show
@@ -124,6 +142,33 @@ export default tseslint.config(
           selector: `ObjectExpression:has(SpreadElement > CallExpression[callee.name='exampleStory']) > Property[${key}=/^(render|component|decorators|loaders)$/]`,
           message:
             'A story built with `...exampleStory(...)` renders the example file itself: no `render`, `component`, `decorators` or `loaders` next to the spread, or the page would show something other than the code printed under it (ticket #403).',
+        })),
+      ],
+    },
+  },
+  {
+    // The demo universe (`packages/core/src/internal/demo-data`, ticket #513) is for stories, tests, the showcase
+    // and examples' fixtures only (ticket #515): a library file that imports it would ship fictitious data in the
+    // published bundle. Allowed: stories, tests, `showcase/` and `internal/demo-data/` itself. The `*.example.tsx`
+    // files are ignored here because their own rule above already bans any relative or `internal` import.
+    // Written as `no-restricted-syntax` (not `no-restricted-imports`) so it does not replace the `patterns` of the
+    // blocks above, which configure `no-restricted-imports` for the same files; it also sees `export ... from`
+    // and `import()`.
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    ignores: [
+      '**/*.stories.tsx',
+      '**/*.test.{ts,tsx}',
+      '**/*.example.tsx',
+      '**/showcase/**',
+      '**/internal/demo-data/**',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...['ImportDeclaration', 'ExportAllDeclaration', 'ExportNamedDeclaration', 'ImportExpression'].map((node) => ({
+          selector: `${node}[source.value=/(^|\\/)demo-data(\\/|$)/]`,
+          message:
+            'Library code must not import `internal/demo-data`: the demo universe is for stories, tests and showcases only and would end up in the published bundle (ticket #515, CONTRIBUTING.md, section "Demo data").',
         })),
       ],
     },

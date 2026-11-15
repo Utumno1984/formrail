@@ -47,13 +47,15 @@ const oneCopyPerModule: Plugin = {
 export default defineConfig({
   // `engine` (#489): `@formrail/pro/engine`, the engines without `@formrail/core`. `shared`: the stateless
   // helpers of both entries, imported by them only (not a public subpath, so no declarations).
-  entry: { index: 'src/index.ts', engine: 'src/engine.ts', shared: 'src/internal/shared.ts' },
+  // `react-hook-form` (#507): `@formrail/pro/react-hook-form`, the React Hook Form adapter (types of
+  // `react-hook-form` only, an optional peer: external, and never imported at runtime).
+  entry: { index: 'src/index.ts', engine: 'src/engine.ts', 'react-hook-form': 'src/react-hook-form.ts', shared: 'src/internal/shared.ts' },
   format: ['esm', 'cjs'],
-  dts: { entry: { index: 'src/index.ts', engine: 'src/engine.ts' } },
+  dts: { entry: { index: 'src/index.ts', engine: 'src/engine.ts', 'react-hook-form': 'src/react-hook-form.ts' } },
   clean: true,
   sourcemap: true,
   target: 'es2022',
-  external: ['react', 'react-dom', 'react/jsx-runtime', '@formrail/core', '@formrail/core/internal'],
+  external: ['react', 'react-dom', 'react/jsx-runtime', '@formrail/core', '@formrail/core/internal', 'react-hook-form'],
   esbuildPlugins: [oneCopyPerModule],
   // No automatic shared chunks (tsup splits ESM by default): they would move most of the code out of
   // `dist/index.js`. The files shared between the entries are the explicit ones above.

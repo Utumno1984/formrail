@@ -19,7 +19,7 @@ const importOf = (specifier) => `import * as x from '${specifier}';\nexport { x 
 
 // The first lint loads the whole config (typescript-eslint, plugins): seconds, not milliseconds.
 describe('lint: what a copy-paste example may import (#403)', { timeout: 60_000 }, () => {
-  it.each(['zod', 'react-dom', 'react-dom/client', './sibling', '../other', '@formrail/core/internal', 'storybook/test', '@storybook/react-vite'])(
+  it.each(['zod', 'react-dom', 'react-dom/client', './sibling', '../other', '@formrail/core/internal', 'storybook/test', '@storybook/react-vite', '../internal/demo-data', '../../../core/src/internal/demo-data/customers'])(
     '%s is rejected',
     async (specifier) => {
       expect((await messages(EXAMPLE, importOf(specifier), 'no-restricted-imports')).length).toBeGreaterThanOrEqual(1);
@@ -32,6 +32,21 @@ describe('lint: what a copy-paste example may import (#403)', { timeout: 60_000 
 
   it('the rule applies to Pro examples too', async () => {
     expect((await messages('packages/pro/src/x/Some.example.tsx', importOf('zod'), 'no-restricted-imports')).length).toBe(1);
+  });
+
+  // #507: react-hook-form (an optional peer of pro) is allowed in the examples of the React Hook Form integration only.
+  const RHF_EXAMPLE = 'packages/pro/src/integrations/react-hook-form/Some.example.tsx';
+  it.each(['react-hook-form', 'react', '@formrail/pro/engine', '@formrail/pro/react-hook-form'])('%s is allowed in a React Hook Form example', async (specifier) => {
+    expect(await messages(RHF_EXAMPLE, importOf(specifier), 'no-restricted-imports')).toEqual([]);
+  });
+
+  it.each(['zod', './sibling', '@formrail/core/internal', 'storybook/test', '@tanstack/react-form'])('%s is still rejected in a React Hook Form example', async (specifier) => {
+    expect((await messages(RHF_EXAMPLE, importOf(specifier), 'no-restricted-imports')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('react-hook-form stays rejected in the other examples', async () => {
+    expect((await messages(EXAMPLE, importOf('react-hook-form'), 'no-restricted-imports')).length).toBe(1);
+    expect((await messages('packages/pro/src/form-rebase/Some.example.tsx', importOf('react-hook-form'), 'no-restricted-imports')).length).toBe(1);
   });
 });
 
