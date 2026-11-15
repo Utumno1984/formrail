@@ -1503,6 +1503,8 @@ interface RowActionsArgs {
   onDelete: (id: string) => void;
   /** Fixture: ids selected at mount. Not in Controls. */
   preselectedIds?: readonly string[];
+  /** `useListReport({ onSelectedIdsChange })`: wired by the stories that check a selection gesture. */
+  onSelectedIdsChange?: (ids: ReadonlySet<string>) => void;
   /** Fixture: the invoices of this status have no "Delete" at all (fewer actions than the others). Not in Controls. */
   withoutDeleteFor?: DisabledFor;
   /** Fixture: `status` of the report. Not in Controls. */
@@ -1522,6 +1524,7 @@ function RowActionsReport({
   preselectedIds,
   withoutDeleteFor = 'none',
   status,
+  onSelectedIdsChange,
 }: RowActionsArgs) {
   const [rows, setRows] = useState<readonly DemoInvoice[]>(ROW_ACTION_ROWS);
   const table = useListReport<DemoInvoice>({
@@ -1531,6 +1534,7 @@ function RowActionsReport({
     filters: URL_FILTERS,
     selectable,
     defaultSelectedIds: preselectedIds ? new Set(preselectedIds) : undefined,
+    onSelectedIdsChange,
   });
   const [confirm, confirmDialog] = useConfirmDialog();
   // Memoized with what it reads: the rows are memoized, a stable function that read other values
@@ -1816,4 +1820,70 @@ export const RowActionsMenuOpen: StoryObj<RowActionsArgs> = {
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
   },
+};
+
+/**
+ * Columns hidden sideways: the 30rem box is narrower than the columns, so the table scrolls inside it
+ * and a shade marks each inline edge past which columns are hidden (the end one stops before the sticky
+ * actions column). The play function checks the end shade alone at the start, then scrolls the table
+ * just enough to bring the first row's checkbox under the start shade: the point under the shade is
+ * still the checkbox (the shade takes no pointer event), a click selects the row and
+ * `onSelectedIdsChange` reports it. Controls: those of the row actions (`containerWidth: wide` shows
+ * every column on a wide viewport, and then no shade).
+ */
+export const ColumnsHiddenSideways: StoryObj<RowActionsArgs> = {
+  name: 'Columns hidden sideways',
+  tags: ['visual'],
+  argTypes: { ...ROW_ACTIONS_ARG_TYPES, onSelectedIdsChange: { control: false } },
+  args: { ...ROW_ACTIONS_ARGS, selectable: true, containerWidth: 'narrow', onSelectedIdsChange: fn() },
+  render: (args) => <RowActionsReport {...args} />,
+  play: async ({ args, canvasElement }) => {
+    // Written for the default configuration: a narrow box, a selection column.
+    if (args.containerWidth !== 'narrow' || !args.selectable) return;
+    const scroller = rowActionsScroller(canvasElement);
+    const shade = (edge: 'start' | 'end') => scroller.querySelector(`[data-rop-overflow-edge="${edge}"]`) as HTMLElement;
+    await waitFor(() => expect(scroller).toHaveAttribute('data-rop-overflow-end'));
+    await expect(scroller).not.toHaveAttribute('data-rop-overflow-start');
+    await waitFor(() => expect(getComputedStyle(shade('end')).opacity).toBe('1'));
+    await expect(getComputedStyle(shade('start')).visibility).toBe('hidden');
+
+    // The first row's checkbox, its centre 4px from the start edge (the right one in rtl, where
+    // `scrollLeft` is negative): under the start shade.
+    const box = within(scroller).getAllByRole('checkbox')[1]!;
+    const row = box.closest('tr')!;
+    const rtl = getComputedStyle(scroller).direction === 'rtl';
+    const centreX = () => box.getBoundingClientRect().left + box.getBoundingClientRect().width / 2;
+    const fromStart = rtl ? scroller.getBoundingClientRect().right - centreX() : centreX() - scroller.getBoundingClientRect().left;
+    scroller.scrollLeft = (rtl ? -1 : 1) * Math.round(fromStart - 4);
+    await waitFor(() => expect(scroller).toHaveAttribute('data-rop-overflow-start'));
+    await waitFor(() => expect(getComputedStyle(shade('start')).opacity).toBe('1'));
+    const shadeBox = shade('start').getBoundingClientRect();
+    const x = centreX();
+    const y = box.getBoundingClientRect().top + box.getBoundingClientRect().height / 2;
+    await expect(x).toBeGreaterThanOrEqual(shadeBox.left);
+    await expect(x).toBeLessThanOrEqual(shadeBox.right);
+    const hit = canvasElement.ownerDocument.elementFromPoint(x, y);
+    await expect(hit === box || box.contains(hit)).toBe(true);
+
+    await userEvent.click(box);
+    await expect(box).toBeChecked();
+    await expect(row).toHaveAttribute('data-selected');
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(1);
+  },
+};
+
+/**
+ * `ColumnsHiddenSideways` inside a `dir="rtl"` wrapper (the document language stays English): the
+ * columns start on the right, the end shade is on the left, and each gradient is darkest on the
+ * scroller's outer edge. The same play function, in the mirrored direction.
+ */
+export const ColumnsHiddenSidewaysRtl: StoryObj<RowActionsArgs> = {
+  ...ColumnsHiddenSideways,
+  name: 'Columns hidden sideways (rtl)',
+  tags: ['visual'],
+  render: (args) => (
+    <div dir="rtl">
+      <RowActionsReport {...args} />
+    </div>
+  ),
 };
