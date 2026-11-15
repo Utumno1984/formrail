@@ -161,7 +161,7 @@ describe('compareLegacy', () => {
   });
 });
 
-  const baseline = base({ 'a.ts': 2, 'e2e/b.spec.ts': 3, 'gone.ts': 1 });
+describe('updateBaseline: it can only go down', () => {
   const at = (files) => foundOf(Object.fromEntries(Object.entries(files).map(([p, n]) => [`packages/core/src/${p}`, 'Rossi '.repeat(n)])));
   const ratchet = base({ 'packages/core/src/a.ts': 2, 'packages/core/src/b.ts': 3, 'packages/core/src/gone.ts': 1 });
 
