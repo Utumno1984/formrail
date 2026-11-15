@@ -16,7 +16,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.e2e.json",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && npm run test:scripts",
-    "test:scripts": "vitest run --config vitest.config.mjs",
+    "test:scripts": "vitest run --config vitest.config.mjs && npm run legacy-demo:check",
     "test:unit": "npm run test --workspaces --if-present && npm run test:scripts",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test:unit",
     "storybook": "storybook dev -p 6006",
@@ -34,7 +34,9 @@
     "changeset:check": "node scripts/check-changeset.mjs",
     "default-column:check": "node scripts/default-column-measure.mjs --check",
     "bundle:check": "node scripts/bundle-budget.mjs check",
-    "bundle:update-baseline": "node scripts/bundle-budget.mjs update-baseline"
+    "bundle:update-baseline": "node scripts/bundle-budget.mjs update-baseline",
+    "legacy-demo:check": "node scripts/legacy-demo-data.mjs check",
+    "legacy-demo:update": "node scripts/legacy-demo-data.mjs update"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
