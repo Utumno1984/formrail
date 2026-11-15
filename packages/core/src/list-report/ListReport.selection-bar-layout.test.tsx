@@ -55,8 +55,13 @@ describe('selection bar layout variant (#499)', () => {
   });
 
   it('the classes: one line without bulkActions below 640px, two lines with them (full literals)', () => {
-    expect(selectionBarClass).toContain('data-[rop-bulk-actions=false]:flex-nowrap');
+    // #509 (authorised by the maintainer on the ticket): below 640px the bar wraps, the count has a minimum
+    // width and the bar goes to two lines instead of squeezing it. From 640px it is one line again.
+    expect(selectionBarClass).not.toContain('data-[rop-bulk-actions=false]:flex-nowrap');
+    expect(selectionBarClass).toContain('flex-wrap');
     expect(selectionBarClass).toContain('sm:flex-nowrap');
+    expect(selectionCountClass).toContain('group-data-[rop-bulk-actions=false]:min-w-[8ch]');
+    expect(selectionCountClass).toContain('sm:min-w-0');
     expect(selectionCountClass).toContain('group-data-[rop-bulk-actions=false]:flex-1');
     expect(selectionCountClass).toContain('basis-full');
     expect(selectionClearClass).toContain('whitespace-nowrap');
