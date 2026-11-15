@@ -36,7 +36,8 @@ export interface DemoCaseComment {
   readonly authorName: string;
   /**
    * Local date and time `yyyy-mm-ddThh:mm`, no zone, within working hours (08:00-17:59). Strictly
-   * increasing within a case, the first on the day the case was opened, none after `DEMO_TODAY`.
+   * increasing within a case, the first on the day the case was opened (any day of the week), the
+   * others Monday to Friday, none after `DEMO_TODAY`.
    */
   readonly postedAt: string;
   /** One to three sentences, never the same sentence twice; now and then a long message (6 to 9 sentences) to exercise truncation. */
@@ -472,6 +473,12 @@ function makeSupportCase(index: number): DemoSupportCase {
 
 const pad2 = (value: number): string => (value < 10 ? `0${value}` : String(value));
 const dayStart = (slot: number): number => slot - (slot % SLOTS_PER_DAY);
+const TODAY_WEEKDAY = new Date(`${DEMO_TODAY}T00:00:00Z`).getUTCDay();
+/** Whether the day `age` days before `DEMO_TODAY` is a Saturday or a Sunday. */
+function isWeekend(age: number): boolean {
+  const weekday = (((TODAY_WEEKDAY - age) % 7) + 7) % 7;
+  return weekday === 0 || weekday === 6;
+}
 
 /**
  * The employee's moves of a thread with `employees` employee messages, in order. A move that asks
@@ -496,8 +503,9 @@ function planMoves(rng: Rng, status: DemoSupportCaseStatus, employees: number, m
     if (chases < maxChases && room(asked, proposed, chases + 1) >= after) options.push(j === 0 ? 'ack' : 'progress');
     if (!asked && !proposed && room(true, false, chases) >= after) options.push('ask');
     if (!proposed && status !== 'pending' && room(asked, true, chases) >= after) options.push('propose');
-    // Never empty: every case but a `new` one is at least a day old (`maxChases` is 1 or more), which
-    // leaves room for the 3 free moves a thread has at most (`COMMENT_RANGE`); each step keeps one.
+    // Never empty: `maxChases` is 1 or more (every case but a `new` one is at least a day old, and one
+    // opened on a weekend gets a day more), which leaves room for the 3 free moves a thread has at most
+    // (`COMMENT_RANGE`); each step keeps one.
     const move = rng.pick(options);
     if (move === 'ask') asked = true;
     else if (move === 'propose') proposed = true;
@@ -513,21 +521,22 @@ function planMoves(rng: Rng, status: DemoSupportCaseStatus, employees: number, m
 
 /**
  * Distinct, increasing half-hour slots (`SLOTS_PER_DAY` a day, from the day the case was opened) for
- * `count` messages within `total` slots: the first on the opening day, and a reminder (`chase[k]`) on a
- * later day than the message before it. Each slot leaves room for the ones after it.
+ * `count` messages within `total` slots: the first on the opening day, and a message with `newDay[k]`
+ * (a reminder, or the first answer to a case opened on a weekend) on a later day than the message
+ * before it. Each slot leaves room for the ones after it.
  */
-function placeSlots(rng: Rng, chase: readonly boolean[], total: number): number[] {
-  const count = chase.length;
+function placeSlots(rng: Rng, newDay: readonly boolean[], total: number): number[] {
+  const count = newDay.length;
   const latest: number[] = new Array<number>(count);
   for (let k = count - 1; k >= 0; k--) {
     if (k === count - 1) latest[k] = total - 1;
-    else latest[k] = chase[k + 1] ? dayStart(latest[k + 1]!) - 1 : latest[k + 1]! - 1;
+    else latest[k] = newDay[k + 1] ? dayStart(latest[k + 1]!) - 1 : latest[k + 1]! - 1;
   }
   latest[0] = Math.min(latest[0]!, SLOTS_PER_DAY - 1);
   const slots: number[] = [];
   for (let k = 0; k < count; k++) {
     const previous = slots[k - 1];
-    const lo = previous === undefined ? 0 : chase[k] ? dayStart(previous) + SLOTS_PER_DAY : previous + 1;
+    const lo = previous === undefined ? 0 : newDay[k] ? dayStart(previous) + SLOTS_PER_DAY : previous + 1;
     const room = Math.max(0, latest[k]! - lo);
     // The opening anywhere in its day; then about a fair share of the room left, the last message anywhere in it.
     slots.push(lo + rng.int(0, k === 0 ? room : Math.floor((2 * room) / (count - k + 1))));
@@ -580,9 +589,15 @@ function makeSupportCaseDetail(index: number): DemoSupportCaseDetail {
   const count = supportCase.commentCount;
   // One contact of the customer writes the whole thread.
   const contact = customer.contacts[rng.int(0, customer.contacts.length - 1)]!;
-  // The thread spreads over the first days of the case (never beyond today).
-  const spanDays = Math.min(openedAge, rng.int(1, MAX_SPAN_DAYS));
-  const moves = planMoves(rng, supportCase.status, Math.floor(count / 2), spanDays);
+  // The thread spreads over the opening day and the working days after it (never beyond today): after
+  // the opening, nobody writes on a weekend. A case opened on a weekend gets its first answer on a
+  // working day, so it needs one more day; with DEMO_TODAY a Thursday, 4 working days follow any weekend.
+  const weekendOpening = isWeekend(openedAge);
+  const wantedDays = rng.int(weekendOpening ? 2 : 1, MAX_SPAN_DAYS);
+  const dayAges = [openedAge];
+  for (let age = openedAge - 1; age >= 0 && dayAges.length <= wantedDays; age--) if (!isWeekend(age)) dayAges.push(age);
+  const spanDays = dayAges.length - 1;
+  const moves = planMoves(rng, supportCase.status, Math.floor(count / 2), spanDays - (weekendOpening ? 1 : 0));
   const solution = rng.pick(topic.solutions);
   // Even positions are the customer's (the opening, then the reply to the employee move before), odd ones the employee's.
   const kinds: (CustomerMove | EmployeeMove)[] = [];
@@ -592,8 +607,8 @@ function makeSupportCaseDetail(index: number): DemoSupportCaseDetail {
   }
   const slots = placeSlots(
     rng,
-    kinds.map((kind) => kind === 'chase'),
-    (spanDays + 1) * SLOTS_PER_DAY,
+    kinds.map((kind, k) => kind === 'chase' || (k === 1 && weekendOpening)),
+    dayAges.length * SLOTS_PER_DAY,
   );
   const used = new Set<string>();
   const comments: DemoCaseComment[] = [];
@@ -639,7 +654,7 @@ function makeSupportCaseDetail(index: number): DemoSupportCaseDetail {
         authorKind: employee ? ('employee' as const) : ('customer' as const),
         authorId: employee ? assignee.id : contact.id,
         authorName: employee ? assignee.fullName : contact.fullName,
-        postedAt: `${daysAgo(openedAge - Math.floor(slot / SLOTS_PER_DAY))}T${pad2(Math.floor(minute / 60))}:${pad2(minute % 60)}`,
+        postedAt: `${daysAgo(dayAges[Math.floor(slot / SLOTS_PER_DAY)]!)}T${pad2(Math.floor(minute / 60))}:${pad2(minute % 60)}`,
         text: text.replaceAll('{sku}', sku),
       }),
     );

@@ -656,6 +656,20 @@ describe('makeSupportCases / getSupportCase', () => {
         expect(problems).toEqual([]);
       });
 
+      it('after the opening (any day), every message is posted Monday to Friday; a case opened on a weekend is answered on a working day', () => {
+        const weekend = (iso: string): boolean => [0, 6].includes(new Date(`${iso.slice(0, 10)}T00:00:00Z`).getUTCDay());
+        const problems: string[] = [];
+        let weekendOpenings = 0;
+        for (const thread of all) {
+          if (weekend(thread.comments[0]!.postedAt) && thread.comments.length > 1) weekendOpenings++;
+          thread.comments.forEach((comment, k) => {
+            if (k > 0 && weekend(comment.postedAt)) problems.push(`${comment.id}: ${comment.postedAt}`);
+          });
+        }
+        expect(problems).toEqual([]);
+        expect(weekendOpenings).toBeGreaterThan(300);
+      });
+
       it('the last message of a resolved or closed case only reports the solution: no promise, no waiting, no question', () => {
         const problems: string[] = [];
         let finals = 0;
