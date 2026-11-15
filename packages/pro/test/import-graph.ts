@@ -22,23 +22,41 @@ const isStringLiteral = (node: ts.Node | undefined): node is ts.StringLiteralLik
 
 /** Every module specifier named in `source`. */
 export function moduleSpecifiers(source: string, fileName: string): string[] {
+  return moduleImports(source, fileName).map((found) => found.specifier);
+}
+
+export interface ModuleImport {
+  /** The specifier as written. */
+  specifier: string;
+  /**
+   * `true` when the syntax can never load the module at runtime: `import type`, `export type ... from`,
+   * `import('x')` in a type position, `/// <reference types>`, `import type x = require('x')`. An
+   * `import { type A } from 'x'` is NOT type-only: with `verbatimModuleSyntax` it stays an `import 'x'` (ticket #507).
+   */
+  typeOnly: boolean;
+}
+
+/** Every module specifier named in `source`, with whether the syntax that names it is type-only. */
+export function moduleImports(source: string, fileName: string): ModuleImport[] {
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, fileName.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const found: string[] = file.typeReferenceDirectives.map((ref) => ref.fileName);
+  const found: ModuleImport[] = file.typeReferenceDirectives.map((ref) => ({ specifier: ref.fileName, typeOnly: true }));
   const visit = (node: ts.Node): void => {
-    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && isStringLiteral(node.moduleSpecifier)) {
-      found.push(node.moduleSpecifier.text);
+    if (ts.isImportDeclaration(node) && isStringLiteral(node.moduleSpecifier)) {
+      found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.importClause?.isTypeOnly === true });
+    } else if (ts.isExportDeclaration(node) && isStringLiteral(node.moduleSpecifier)) {
+      found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
     } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
       const expression = node.moduleReference.expression;
-      if (isStringLiteral(expression)) found.push(expression.text);
+      if (isStringLiteral(expression)) found.push({ specifier: expression.text, typeOnly: node.isTypeOnly });
     } else if (ts.isImportTypeNode(node)) {
       const argument = node.argument;
-      if (ts.isLiteralTypeNode(argument) && isStringLiteral(argument.literal)) found.push(argument.literal.text);
+      if (ts.isLiteralTypeNode(argument) && isStringLiteral(argument.literal)) found.push({ specifier: argument.literal.text, typeOnly: true });
     } else if (ts.isCallExpression(node)) {
       const callee = node.expression;
       const isImportCall = callee.kind === ts.SyntaxKind.ImportKeyword;
       const isRequire = ts.isIdentifier(callee) && callee.text === 'require';
       const [first] = node.arguments;
-      if ((isImportCall || isRequire) && isStringLiteral(first)) found.push(first.text);
+      if ((isImportCall || isRequire) && isStringLiteral(first)) found.push({ specifier: first.text, typeOnly: false });
     }
     ts.forEachChild(node, visit);
   };

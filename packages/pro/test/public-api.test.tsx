@@ -31,7 +31,15 @@ import type {
   VirtualListReportTableProps,
 } from '../src/index';
 import type { RebaseFormBinding } from '../src/engine';
-import { EXPECTED_WITH_OPTIONS, EXPECTED_WITHOUT_OPTIONS, SCENARIO_OPTIONS, runOptionsScenario } from './rebase-options-scenario';
+import {
+  EXPECTED_WITH_OPTIONS,
+  EXPECTED_WITH_OTHER_LABELS,
+  EXPECTED_WITHOUT_OPTIONS,
+  OTHER_LABELS,
+  SCENARIO_OPTIONS,
+  runOptionsRerenderScenario,
+  runOptionsScenario,
+} from './rebase-options-scenario';
 
 // Vitest runs in packages/pro (jsdom: `import.meta.url` is not a file URL here).
 const SRC = resolve(process.cwd(), 'src');
@@ -117,6 +125,30 @@ describe('main entry @formrail/pro', () => {
     // Control: the scenario without options has a conflict each option removes or renames.
     expect(runOptionsScenario(useObjectPageForm, main.useFormRebase)).toEqual(EXPECTED_WITHOUT_OPTIONS);
     expect(runOptionsScenario(useObjectPageForm, main.useFormRebase, SCENARIO_OPTIONS)).toEqual(EXPECTED_WITH_OPTIONS);
+  });
+});
+
+// #507 (red team of #505, round 3): "inline literals are fine" had no test. The options of a later render, before
+// the rebase, must be the ones the merge uses, through the main entry's wrapper and through the engine hook.
+describe.each([
+  ['main entry @formrail/pro', main.useFormRebase],
+  ['engine entry @formrail/pro/engine', engine.useFormRebase],
+])('%s: options changed by a rerender before the rebase', (_entry, useFormRebase) => {
+  it('none at first, then arrayIdKeys + isEqual + labels: the merge uses them', () => {
+    expect(runOptionsRerenderScenario(useObjectPageForm, useFormRebase, undefined, SCENARIO_OPTIONS)).toEqual(EXPECTED_WITH_OPTIONS);
+  });
+
+  it('arrayIdKeys + isEqual + labels at first, then none: the merge drops them', () => {
+    expect(runOptionsRerenderScenario(useObjectPageForm, useFormRebase, SCENARIO_OPTIONS, undefined)).toEqual(EXPECTED_WITHOUT_OPTIONS);
+  });
+
+  it('arrayIdKeys + isEqual + labels at first, then other labels only: the new labels, no isEqual, no arrayIdKeys', () => {
+    expect(runOptionsRerenderScenario(useObjectPageForm, useFormRebase, SCENARIO_OPTIONS, OTHER_LABELS)).toEqual(EXPECTED_WITH_OTHER_LABELS);
+  });
+
+  it('control: the same options at both renders give the result of those options', () => {
+    expect(runOptionsRerenderScenario(useObjectPageForm, useFormRebase, SCENARIO_OPTIONS, SCENARIO_OPTIONS)).toEqual(EXPECTED_WITH_OPTIONS);
+    expect(runOptionsRerenderScenario(useObjectPageForm, useFormRebase, OTHER_LABELS, OTHER_LABELS)).toEqual(EXPECTED_WITH_OTHER_LABELS);
   });
 });
 

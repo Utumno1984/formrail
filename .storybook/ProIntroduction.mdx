@@ -41,6 +41,15 @@ server value, paths changed by both sides keep the user's value and are listed a
 - [Rebase notice](?path=/docs/pro-rebasenotice--docs): "This record was updated while you were
   editing", with the server changes applied and each conflict with both values and the two choices.
 
+### React Hook Form
+
+The Change Summary and the form rebase on a React Hook Form form, without the free library:
+`useReactHookFormBinding(form)` from `@formrail/pro/react-hook-form` gives the engines snapshots of the
+values and of the saved baseline, and applies a server update without marking the form dirty.
+
+- [React Hook Form](?path=/docs/pro-integrations-react-hook-form--docs): `useReactHookFormBinding` with
+  `useChangeSummary` and `useFormRebase`, asynchronous loading, a save with a server update queued.
+
 ## License status
 
 The Pro components are under a commercial license that is not available yet. They are free to explore

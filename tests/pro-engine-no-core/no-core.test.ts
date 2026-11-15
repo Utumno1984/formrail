@@ -86,6 +86,23 @@ describe('@formrail/pro/engine in a project without @formrail/core', () => {
     expect(JSON.parse(execFileSync(process.execPath, ['run.cjs'], { cwd: sandbox, encoding: 'utf8' }))).toEqual({ paths: ['name'], hook: 'function' });
   });
 
+  // #507: the React Hook Form adapter in the same project (tsc above covers `src/rhf-binding.tsx`, the ticket's goal).
+  it('no @tanstack/react-form is reachable either (the adapter needs only react-hook-form)', () => {
+    for (const dir of ancestors(sandbox)) expect(existsSync(join(dir, 'node_modules/@tanstack/react-form'))).toBe(false);
+    expect(run(['-e', "require.resolve('@tanstack/react-form')"]).status).not.toBe(0);
+  });
+
+  it('ESM: @formrail/pro/react-hook-form binds a real useForm on the server', () => {
+    expect(JSON.parse(execFileSync(process.execPath, ['run-rhf.mjs'], { cwd: sandbox, encoding: 'utf8' }))).toEqual({ html: '<p>Acme|true|0|true</p>' });
+  });
+
+  it('CJS: requires @formrail/pro/react-hook-form', () => {
+    expect(JSON.parse(execFileSync(process.execPath, ['run-rhf.cjs'], { cwd: sandbox, encoding: 'utf8' }))).toEqual({
+      exports: ['useReactHookFormBinding'],
+      hook: 'function',
+    });
+  });
+
   // #424: a consumer shaped differently from `lineItems` (src/contacts.ts, typechecked by the tsc test above) names
   // its rows with `itemLabel` and reads its reorders: what the adapters of #507 and #508 get.
   it('ESM: computeChangeSummaryResult with itemLabel on a contacts array (#424)', () => {
@@ -152,15 +169,18 @@ describe('npm install of the packed @formrail/pro (optional core peer)', () => {
     return (JSON.parse(result.stdout) as { filename: string }[])[0]!.filename;
   };
 
-  /** A project depending on the packed pro (with `proPackage` as its package.json) plus react and react-dom. */
-  function install(proPackage: (pkg: Record<string, unknown>) => Record<string, unknown>) {
+  /**
+   * A project depending on the packed pro (with `proPackage` as its package.json) plus react and react-dom, and the
+   * `extra` packages of the monorepo, packed the same way.
+   */
+  function install(proPackage: (pkg: Record<string, unknown>) => Record<string, unknown>, extra: string[] = []) {
     const proCopy = join(project, 'pro');
     mkdirSync(proCopy, { recursive: true });
     cpSync(join(PRO, 'dist'), join(proCopy, 'dist'), { recursive: true });
     const pkg = JSON.parse(readFileSync(join(PRO, 'package.json'), 'utf8')) as Record<string, unknown>;
     writeFileSync(join(proCopy, 'package.json'), JSON.stringify(proPackage(pkg), null, 2));
     const dependencies: Record<string, string> = { '@formrail/pro': `file:./${pack(proCopy)}` };
-    for (const name of ['react', 'react-dom', 'scheduler']) dependencies[name] = `file:./${pack(join(ROOT, 'node_modules', name))}`;
+    for (const name of ['react', 'react-dom', 'scheduler', ...extra]) dependencies[name] = `file:./${pack(join(ROOT, 'node_modules', name))}`;
     writeFileSync(join(project, 'package.json'), JSON.stringify({ name: 'only-pro', private: true, dependencies }, null, 2));
     return npm(['install']);
   }
@@ -184,6 +204,41 @@ describe('npm install of the packed @formrail/pro (optional core peer)', () => {
       encoding: 'utf8',
     });
     expect(load.stdout.trim()).toBe('function');
+  });
+
+  // #507, smoke test 1-2 of the ticket: React Hook Form installed from its packed tarball next to the packed pro.
+  it('with react-hook-form installed: no core, no TanStack Form; the goal code typechecks (skipLibCheck: false) and the adapter loads in ESM and CJS', () => {
+    const result = install((pkg) => pkg, ['react-hook-form', '@types/react', '@types/react-dom', 'csstype']);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(project, 'node_modules/react-hook-form/package.json'), 'utf8')).version).toBe(
+      JSON.parse(readFileSync(join(ROOT, 'node_modules/react-hook-form/package.json'), 'utf8')).version,
+    );
+    for (const absent of ['@formrail/core', '@tanstack/react-form']) {
+      expect(existsSync(join(project, 'node_modules', absent))).toBe(false);
+      expect(npm(['ls', absent]).stdout).toContain('(empty)');
+    }
+    // The goal code, with the tsconfig of the consumer (`skipLibCheck: false`).
+    mkdirSync(join(project, 'src'));
+    cpSync(join(HERE, 'consumer/src/rhf-binding.tsx'), join(project, 'src/rhf-binding.tsx'));
+    cpSync(join(HERE, 'consumer/tsconfig.json'), join(project, 'tsconfig.json'));
+    const tsc = spawnSync(process.execPath, [TSC, '--noEmit', '-p', 'tsconfig.json'], { cwd: project, encoding: 'utf8' });
+    expect(tsc.stdout + tsc.stderr).toBe('');
+    expect(tsc.status).toBe(0);
+    // Smoke test 2: the installed adapter code imports no react-hook-form (its declaration files do, for the types
+    // of the signature) and no adapter file names the core.
+    const installed = join(project, 'node_modules/@formrail/pro/dist');
+    for (const file of ['react-hook-form.js', 'react-hook-form.cjs']) {
+      expect(readFileSync(join(installed, file), 'utf8')).not.toMatch(/from ['"]react-hook-form|require\(['"]react-hook-form/);
+    }
+    for (const file of ['react-hook-form.js', 'react-hook-form.cjs', 'react-hook-form.d.ts', 'react-hook-form.d.cts']) {
+      expect(readFileSync(join(installed, file), 'utf8')).not.toContain('@formrail/core');
+    }
+    writeFileSync(join(project, 'package.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')), type: 'module' }));
+    cpSync(join(HERE, 'consumer/run-rhf.mjs'), join(project, 'run-rhf.mjs'));
+    cpSync(join(HERE, 'consumer/run-rhf.cjs'), join(project, 'run-rhf.cjs'));
+    expect(JSON.parse(execFileSync(process.execPath, ['run-rhf.mjs'], { cwd: project, encoding: 'utf8' }))).toEqual({ html: '<p>Acme|true|0|true</p>' });
+    expect(JSON.parse(execFileSync(process.execPath, ['run-rhf.cjs'], { cwd: project, encoding: 'utf8' })).hook).toBe('function');
   });
 
   it('negative control: without peerDependenciesMeta, npm wants the core (installs it or fails offline)', () => {

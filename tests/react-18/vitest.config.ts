@@ -31,10 +31,11 @@ export default defineConfig({
     include: ['*.test.{ts,tsx}'],
     // Radix lives in the root node_modules and would be loaded un-transformed with the root's
     // React 19; inlining it makes the aliases above apply to it too. Same for the scroll-lock
-    // libraries Radix's Dialog depends on (they render React elements themselves).
+    // libraries Radix's Dialog depends on (they render React elements themselves). React Hook Form too (#507):
+    // `useForm` calls React's hooks, which must be this workspace's React 18.
     server: {
       deps: {
-        inline: [/@radix-ui/, /react-remove-scroll/, /react-style-singleton/, /use-callback-ref/, /use-sidecar/],
+        inline: [/@radix-ui/, /react-remove-scroll/, /react-style-singleton/, /use-callback-ref/, /use-sidecar/, /react-hook-form/],
       },
     },
     // Core sources import tokens.css as text (`?raw`); Vitest would blank it otherwise.

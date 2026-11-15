@@ -3,7 +3,11 @@
   "compilerOptions": {
     // The copy-paste examples (`*.example.tsx`, ticket #403) import the package by its public name, as a
     // consumer would: resolved to the sources, so a changed API fails the typecheck at once (no rebuild).
-    "paths": { "@formrail/pro": ["./src/index.ts"] },
+    "paths": {
+      "@formrail/pro": ["./src/index.ts"],
+      "@formrail/pro/engine": ["./src/engine.ts"],
+      "@formrail/pro/react-hook-form": ["./src/react-hook-form.ts"]
+    },
     "types": []
   },
   // `../core/src/types`: the ambient declarations (`*.css?raw`) of the core sources reached by the story-only

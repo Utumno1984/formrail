@@ -19,7 +19,8 @@ const DEFAULT_PACKAGE = resolve(ROOT, 'packages/core');
 /** Packages whose public exports have a versioned budget; `check` covers all of them by default. */
 export const BUDGETED_PACKAGES = ['packages/core', 'packages/pro'].map((dir) => resolve(ROOT, dir));
 /** Subpath entries budgeted besides the main entry `.`, per package (absolute dir -> subpaths). */
-export const BUDGETED_SUBPATHS = { [resolve(ROOT, 'packages/pro')]: ['./engine'] };
+// `./react-hook-form` (#507): the React Hook Form adapter, against `bundle-budget.react-hook-form.json`.
+export const BUDGETED_SUBPATHS = { [resolve(ROOT, 'packages/pro')]: ['./engine', './react-hook-form'] };
 
 /** Baseline file of `subpath` (`.` -> bundle-budget.json, `./engine` -> bundle-budget.engine.json). */
 export function budgetFileName(subpath) {

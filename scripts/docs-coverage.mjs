@@ -46,6 +46,8 @@ export const DOCUMENTED_IN = {
   computeRebase: ['Pro/Patterns/Form rebase'],
   useFormRebase: ['Pro/Patterns/Form rebase'],
   RebaseNotice: ['Pro/RebaseNotice'],
+  // `@formrail/pro/react-hook-form` (#507): a hook, documented by the page of its story.
+  useReactHookFormBinding: ['Pro/Integrations/React Hook Form'],
   VirtualListReport: ['Pro/Floorplans/Virtual List Report'],
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };
@@ -73,6 +75,41 @@ export function runtimeExports(source) {
     for (const spec of node.exportClause.elements) if (!spec.isTypeOnly) names.push(spec.name.text);
   }
   return names;
+}
+
+/** Code subpaths that are not public API, so not documented (see `entrySources`). */
+export const NOT_PUBLIC_SUBPATHS = ['./internal'];
+
+/**
+ * The source of every public entry of a package (#507): `src/index.ts` for `.`, and `src/<name>.ts` for each subpath of
+ * the `exports` map of its package.json whose ESM file is `./dist/<name>.js` (`./engine`, `./react-hook-form`).
+ * Subpaths without such a file (`./styles.css`, `./package.json`) are not code entries, and `./internal` (core's
+ * building blocks for Pro, "not public API, nothing here is documented", see packages/core/src/internal.ts) is not a
+ * public one. A code subpath whose source is missing throws: the guard would otherwise skip its exports silently.
+ */
+export function entrySources(root, packageDir) {
+  const dir = join(root, packageDir);
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  const files = [join(dir, 'src/index.ts')];
+  for (const [subpath, target] of Object.entries(pkg.exports ?? {})) {
+    if (subpath === '.' || NOT_PUBLIC_SUBPATHS.includes(subpath)) continue;
+    const file = typeof target === 'string' ? target : target?.import?.default;
+    const name = typeof file === 'string' ? /^\.\/dist\/([\w-]+)\.js$/.exec(file)?.[1] : undefined;
+    if (!name) continue;
+    const source = join(dir, 'src', `${name}.ts`);
+    try {
+      statSync(source);
+    } catch {
+      throw new Error(`${packageDir}: the subpath ${subpath} has no source ${relative(root, source)}`);
+    }
+    files.push(source);
+  }
+  return files;
+}
+
+/** The runtime exports of every public entry of a package (see `entrySources`), each name once. */
+export function packageRuntimeExports(root, packageDir) {
+  return [...new Set(entrySources(root, packageDir).flatMap((file) => runtimeExports(readFileSync(file, 'utf8'))))];
 }
 
 const stripWrappers = (node) => {
