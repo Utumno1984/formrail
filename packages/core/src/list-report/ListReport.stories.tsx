@@ -1847,11 +1847,14 @@ export const ColumnsHiddenSideways: StoryObj<RowActionsArgs> = {
     await waitFor(() => expect(getComputedStyle(shade('end')).opacity).toBe('1'));
     await expect(getComputedStyle(shade('start')).visibility).toBe('hidden');
 
-    // The first row's checkbox, its centre 4px from the start edge: under the start shade.
+    // The first row's checkbox, its centre 4px from the start edge (the right one in rtl, where
+    // `scrollLeft` is negative): under the start shade.
     const box = within(scroller).getAllByRole('checkbox')[1]!;
     const row = box.closest('tr')!;
+    const rtl = getComputedStyle(scroller).direction === 'rtl';
     const centreX = () => box.getBoundingClientRect().left + box.getBoundingClientRect().width / 2;
-    scroller.scrollLeft = Math.round(centreX() - scroller.getBoundingClientRect().left - 4);
+    const fromStart = rtl ? scroller.getBoundingClientRect().right - centreX() : centreX() - scroller.getBoundingClientRect().left;
+    scroller.scrollLeft = (rtl ? -1 : 1) * Math.round(fromStart - 4);
     await waitFor(() => expect(scroller).toHaveAttribute('data-rop-overflow-start'));
     await waitFor(() => expect(getComputedStyle(shade('start')).opacity).toBe('1'));
     const shadeBox = shade('start').getBoundingClientRect();
@@ -1867,4 +1870,20 @@ export const ColumnsHiddenSideways: StoryObj<RowActionsArgs> = {
     await expect(row).toHaveAttribute('data-selected');
     await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(1);
   },
+};
+
+/**
+ * `ColumnsHiddenSideways` inside a `dir="rtl"` wrapper (the document language stays English): the
+ * columns start on the right, the end shade is on the left, and each gradient is darkest on the
+ * scroller's outer edge. The same play function, in the mirrored direction.
+ */
+export const ColumnsHiddenSidewaysRtl: StoryObj<RowActionsArgs> = {
+  ...ColumnsHiddenSideways,
+  name: 'Columns hidden sideways (rtl)',
+  tags: ['visual'],
+  render: (args) => (
+    <div dir="rtl">
+      <RowActionsReport {...args} />
+    </div>
+  ),
 };
