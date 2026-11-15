@@ -199,3 +199,85 @@ describe('explicit isSaving / saveError', () => {
     harness.unmount();
   });
 });
+
+// README: "A rehydration during the save wins". A save in flight remembers the values sent, so that `reset(saved)` at
+// its end keeps what the user typed since. A rehydration (new `defaultValues` of another content, `form.reset(data)`)
+// or TanStack Form's own discard (`form.reset()`) during the save drops that memory: the save's `reset(saved)` is then a
+// plain hydration, `values` is `saved` itself.
+describe('a rehydration or a discard during the save wins', () => {
+  const OTHER: Invoice = { supplier: 'Halden Tools', amount: '900', notes: 'reloaded' };
+  const STORED_120: Invoice = { ...SAVED, amount: '120' };
+
+  it("new defaultValues of another content during the save: the save's reset(saved) does not keep the edits typed since", () => {
+    let record = SAVED;
+    const defaults = () => record;
+    const harness = setupInvoiceForm({ defaults });
+    harness.type('Amount', '120');
+    harness.rerender({ defaults, binding: { isSaving: true } });
+    harness.type('Notes', 'typed during the save');
+    // The app reloads the record while the save is in flight (a touched form: TanStack Form keeps the values).
+    record = OTHER;
+    harness.rerender({ defaults, binding: { isSaving: true } });
+    expect(harness.current().binding.baseline).toEqual(OTHER);
+    expect(harness.current().binding.values).toEqual({ ...SAVED, amount: '120', notes: 'typed during the save' });
+    act(() => harness.current().binding.reset(STORED_120));
+    harness.rerender({ defaults, binding: { isSaving: false, saveError: null } });
+    const { binding, entries, form } = harness.current();
+    // A plain hydration: the notes typed during the save are not kept against what was stored.
+    expect(binding.baseline).toBe(STORED_120);
+    expect(binding.values).toBe(STORED_120);
+    expect(form.state.values).toBe(STORED_120);
+    expect(entries).toEqual([]);
+    harness.unmount();
+  });
+
+  it("form.reset(data) during the save: the save's reset(saved) does not keep the edits typed since", () => {
+    let record = SAVED;
+    const defaults = () => record;
+    const harness = setupInvoiceForm({ defaults });
+    harness.type('Amount', '120');
+    harness.rerender({ defaults, binding: { isSaving: true } });
+    harness.type('Notes', 'typed during the save');
+    // `defaultValues` follows the data, as the README asks for `form.reset(data)`.
+    act(() => {
+      record = OTHER;
+      harness.current().form.reset(OTHER);
+    });
+    expect(harness.current().binding.baseline).toEqual(OTHER);
+    expect(harness.current().binding.values).toBe(harness.current().binding.baseline);
+    act(() => harness.current().binding.reset(STORED_120));
+    expect(harness.current().binding.values).toBe(STORED_120);
+    expect(harness.current().form.state.values).toBe(STORED_120);
+    expect(harness.current().entries).toEqual([]);
+    harness.unmount();
+  });
+
+  it("TanStack Form's form.reset() during the save: the save's reset(saved) does not bring the discarded edit back", () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    harness.rerender({ binding: { isSaving: true } });
+    // The user discards with TanStack Form's own reset while the save of amount 120 is in flight.
+    act(() => harness.current().form.reset());
+    expect(harness.current().binding.values).toBe(harness.current().binding.baseline);
+    expect(harness.current().binding.values).toEqual(SAVED);
+    act(() => harness.current().binding.reset(STORED_120));
+    const { binding, entries, form } = harness.current();
+    // Not "amount changed since the save started (120, then 100): kept": the discard wins, the result is what was stored.
+    expect(binding.values).toBe(STORED_120);
+    expect(form.state.values).toBe(STORED_120);
+    expect(entries).toEqual([]);
+    harness.unmount();
+  });
+
+  it('control: with no rehydration nor discard, the edits typed during the save are kept (dirty against saved)', () => {
+    const harness = setupInvoiceForm();
+    harness.type('Amount', '120');
+    harness.rerender({ binding: { isSaving: true } });
+    harness.type('Notes', 'typed during the save');
+    act(() => harness.current().binding.reset(STORED_120));
+    expect(harness.current().binding.baseline).toBe(STORED_120);
+    expect(harness.current().binding.values).toEqual({ ...STORED_120, notes: 'typed during the save' });
+    expect(harness.current().entries.map((entry) => entry.path)).toEqual(['notes']);
+    harness.unmount();
+  });
+});
