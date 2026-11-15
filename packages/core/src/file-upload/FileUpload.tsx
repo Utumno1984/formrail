@@ -25,17 +25,17 @@ import { fileIdentity, formatFileSize, resolveSelection, type FileRejection } fr
 export type { FileRejection } from './selection';
 
 export interface FileUploadLabels {
-  /** Text of the button that opens the file picker. */
+  /** Text of the button that opens the file picker. Default `Choose files`. */
   chooseFiles: string;
-  /** Hint next to the button about dropping files; hidden on touch devices (coarse pointer). */
+  /** Hint next to the button about dropping files; hidden on touch devices (coarse pointer). Default `or drop files here`. */
   dropHint: string;
-  /** Accessible name of the remove button of one file (distinct per file). */
+  /** Accessible name of the remove button of one file (distinct per file). Default `Remove <file name>`. */
   remove: (name: string) => string;
-  /** Announced (polite live region) after the user adds or removes files. */
+  /** Announced (polite live region) after the user adds or removes files. Default: `No files selected`, `1 file selected`, `N files selected`. */
   selectedCount: (count: number) => string;
-  /** Accessible name of the list of selected files. */
+  /** Accessible name of the list of selected files. Default `Selected files`. */
   listLabel: string;
-  /** Visually hidden text added to the button's description when the Field is required. */
+  /** Visually hidden text added to the button's description when the Field is required. Default `Required`. */
   required: string;
 }
 

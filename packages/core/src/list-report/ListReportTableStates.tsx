@@ -18,17 +18,17 @@ import type { ListReportColumn } from './types';
 
 /** Texts of `ListReportTable` (all overridable; the defaults are in English). */
 export interface ListReportTableLabels {
-  /** Announced when the table starts loading. */
+  /** Announced when the table starts loading. Default `Loading…`. */
   loading: string;
-  /** `status="ready"` and no rows at all. */
+  /** `status="ready"` and no rows at all. Default `No data`. */
   empty: string;
-  /** There are rows, but the current filters (or search) leave none visible. */
+  /** There are rows, but the current filters (or search) leave none visible. Default `No results for the current filters`. */
   noResults: string;
-  /** Message of the error strip when `errorMessage` is not given; also its announcement. */
+  /** Message of the error strip when `errorMessage` is not given; also its announcement. Default `Unable to load data`. */
   error: string;
-  /** Button of the error strip (when `onRetry` is given). */
+  /** Button of the error strip (when `onRetry` is given). Default `Retry`. */
   retry: string;
-  /** Button of the "no results" state (when `onClearFilters` is given). */
+  /** Button of the "no results" state (when `onClearFilters` is given). Default `Clear filters`. */
   clearFilters: string;
   /**
    * Announced when the data is back: the number of results. Default: "1 result", "10,000 results", the number
@@ -36,22 +36,22 @@ export interface ListReportTableLabels {
    * receives the raw number and formats it itself.
    */
   resultCount: (count: number) => string;
-  /** Name of the "select all results" checkbox in the header (with `selectable`). */
+  /** Name of the "select all results" checkbox in the header (with `selectable`). Default `Select all results`. */
   selectAllResults: string;
-  /** Name of the checkbox of a row, from `selection.getRowLabel(row)` (with `selectable`). Keep it distinct per row. */
+  /** Name of the checkbox of a row, from `selection.getRowLabel(row)` (with `selectable`). Keep it distinct per row. Default `Select <row label>`. */
   selectRow: (label: string) => string;
   /**
    * Name of the trigger of a row's actions menu, from `selection.getRowLabel(row)` (with `rowActions`).
-   * Keep it distinct per row.
+   * Keep it distinct per row. Default `Actions for <row label>`.
    */
   rowActions: (label: string) => string;
   /**
    * Name of an inline action button (with `rowActionsInline`), from the action's `label` and
    * `selection.getRowLabel(row)`: "Delete FT-2026-0001". Keep it distinct per row (200 buttons all
-   * named "Delete" cannot be told apart).
+   * named "Delete" cannot be told apart). Default `<action label> <row label>`.
    */
   rowAction: (actionLabel: string, rowLabel: string) => string;
-  /** Name of the header of the row actions column (visually hidden; with `rowActions`). */
+  /** Name of the header of the row actions column (visually hidden; with `rowActions`). Default `Actions`. */
   rowActionsColumn: string;
 }
 

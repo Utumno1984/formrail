@@ -49,7 +49,7 @@ export interface DescriptionListProps extends HTMLAttributes<HTMLDListElement> {
    * older browser the value stays under its label.
    */
   layout?: DescriptionListLayout;
-  /** Visually hidden text read in place of an empty value. Default (English): "Not specified". */
+  /** Visually hidden text read in place of an empty value. */
   emptyLabel?: string;
   /** Visible stand-in for an empty value (hidden from assistive technology). */
   emptyPlaceholder?: ReactNode;

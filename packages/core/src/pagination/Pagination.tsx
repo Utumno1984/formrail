@@ -22,7 +22,7 @@ export interface PaginationLabels {
   previous?: string;
   /** Name of the next button. Default `Next page`. */
   next?: string;
-  /** Name of a page button (localization hook). Default `` `Page ${page}` ``. */
+  /** Name of a page button (localization hook). Default `Page ${page}`. */
   page?: (page: number) => string;
 }
 

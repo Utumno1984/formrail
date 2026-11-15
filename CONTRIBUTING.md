@@ -55,3 +55,31 @@ a delegation to an internal component. A new `prop ?? <literal>` fallback in the
 reported (today the only one is `FileUpload.defaultValue ?? []`): when you add one, write the `@default` yourself.
 The prose reader (`proseDefaultOf`) takes a default stated in a sentence of its own for the prop; one stated in a
 sentence that opens with a named key ("`anchorBar`: ... (default "Sections")") belongs to the key, not to the prop.
+Two more limits of the prose reader, declared and not detected: a default written with a qualifier between the word and
+the value ("Default (English): "Not specified".") and one written as a bare word ("Default secondary.") are not read as a
+default, so a prose that repeats the column in one of those forms passes the guard. Write the prose without the default
+(`DescriptionList.emptyLabel` was one of them, #540): the column says it.
+
+### Label interfaces: the default is in the prose, once
+
+The keys of a `*Labels` interface (`PaginationLabels`, `ListReportTableLabels`, `ListReportFrameLabels`,
+`NumberInputLabels`, `ChangeSummaryValueLabels`, `RebaseNoticeLabels`, ...) follow the **opposite** rule of the props:
+
+- A component shows its labels as **one row**, `labels` (type `Partial<XLabels>`), with an empty Default column and no
+  row per key (checked on the built Storybook by `e2e/docs-props.spec.ts`). A `@default` on a key would be shown nowhere
+  in the Docs; removing the prose would make the value disappear.
+- So every key states its default **in the prose**, as a value: "Default `Previous page`.". A function says what it
+  returns ("Default `Page ${page}`.", "Default: `No items`, `1 item`, `N items`."). A key inherited from another
+  interface (`ListReportFrameLabels extends ListReportTableLabels`) is documented once, where it is declared. A default
+  that is a whole sentence with punctuation goes in double quotes (`Default "You have unsaved changes: ..."`), because
+  the type reference would otherwise take it for an expression.
+- A key has **no `@default`** (it would be the mixed form, and the Docs would not show it anyway).
+
+The same CI job fails on `label-no-default` (a key whose prose states no default: a new label without its default),
+`label-mixed` (`@default` and prose on one key) and `label-tag` (`@default` alone). It reads the exported types whose
+name ends in `Labels`; a label type with another name is not seen. Two different declarations of one interface name
+(say in core and in pro) fail as `label-collision`: rename one. Declared limits, not detected: keys of a
+`Record<'a' | 'b', string>` are not read (write an interface); an inline object type such as `ObjectPage`'s
+`labels?: { anchorBar?: string }` is not an exported `*Labels` type, so it is outside the guard (its keys state their
+default in the prose by hand). If the docgen one day expands the keys into rows with
+their own Default column, the e2e test fails and the convention flips to `@default` per key (option (a) of #540).

@@ -50,9 +50,9 @@ export interface ListReportFrameLabels extends ListReportTableLabels {
    * the numbers formatted in the `locale` of `useListReport`. A custom function receives the raw numbers and formats them itself.
    */
   selectionCount: (selectedCount: number, hiddenCount: number) => string;
-  /** Button of the selection bar that empties the selection (hidden ids included). Default "Clear selection". */
+  /** Button of the selection bar that empties the selection (hidden ids included). Default `Clear selection`. */
   clearSelection: string;
-  /** Name of the selection bar, followed by the title ("Selection Invoices"). Default "Selection". */
+  /** Name of the selection bar, followed by the title ("Selection Invoices"). Default `Selection`. */
   selectionBar: string;
 }
 
