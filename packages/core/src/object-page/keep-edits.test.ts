@@ -223,6 +223,47 @@ describe('keepEditsSince (core): a save that settles while the user kept typing'
     expect(keepEditsSince(s, { ...s }, returned)).toBe(returned);
   });
 
+  it('a class instance as the user value (current) at the root or in a field: the user instance whole', () => {
+    class Record_ {
+      constructor(readonly name: string, readonly amount: number, readonly note?: string) {}
+    }
+    // Root: sent and returned are plain objects, current is the user's instance.
+    const s = { name: 'r', amount: 1 };
+    const returned = { name: 'R', amount: 1, stamp: 'server' };
+    const current = new Record_('r', 2) as unknown as typeof s;
+    expect(keepEditsSince(s, current, returned)).toBe(current);
+
+    // Nested: the same in a field, the siblings still take the server's values.
+    const sNested = { box: { name: 'r', amount: 1 }, title: 't' };
+    const currentNested = { box: new Record_('r', 2), title: 't' };
+    const returnedNested = { box: { name: 'R', amount: 1, stamp: 'server' }, title: 'T' };
+    const merged = keepEditsSince(sNested, currentNested as unknown as typeof sNested, returnedNested);
+    expect(merged.box).toBe(currentNested.box);
+    expect(merged.title).toBe('T');
+  });
+
+  it('a class instance as the sent value at the root or in a field: the user plain object whole, no server keys', () => {
+    class Record_ {
+      constructor(readonly name: string, readonly amount: number) {}
+    }
+    // Root: current and returned are plain objects, sent is an instance.
+    const s = new Record_('r', 1) as unknown as { name: string; amount: number };
+    const current = { name: 'r', amount: 2 };
+    const returned = { name: 'R', amount: 1, stamp: 'server' };
+    const result = keepEditsSince(s, current, returned);
+    expect(result).toBe(current);
+    expect(Object.hasOwn(result, 'stamp')).toBe(false);
+
+    // Nested: the field is kept whole as the user's, without the server's `stamp`.
+    const sNested = { box: new Record_('r', 1), title: 't' };
+    const currentNested = { box: { name: 'r', amount: 2 }, title: 't' };
+    const returnedNested = { box: { name: 'R', amount: 1, stamp: 'server' }, title: 'T' };
+    const merged = keepEditsSince(sNested as unknown as { box: { name: string; amount: number }; title: string }, currentNested, returnedNested);
+    expect(merged.box).toBe(currentNested.box);
+    expect(Object.hasOwn(merged.box, 'stamp')).toBe(false);
+    expect(merged.title).toBe('T');
+  });
+
   it('a null prototype is kept, and a `__proto__` key is merged as data', () => {
     const make = (entries: Record<string, unknown>) => Object.assign(Object.create(null) as Record<string, unknown>, entries);
     const s = make({ a: 'x', b: 'y' });
