@@ -128,6 +128,23 @@ export function salesOrderStatusAt(index: number): DemoSalesOrderStatus {
   return createRowRng(STATUS_SEED, index).weighted(STATUS_WEIGHTS);
 }
 
+// Facts the invoices need about a row (its customer's row and its age in days), kept as numbers when the
+// row is built: no id to parse and no date to parse again, which a 100,000-invoice list would repeat.
+const customerIndexes: number[] = [];
+const orderAges: number[] = [];
+
+/** Index into `makeCustomers(DEMO_REFERENCE_POOL.customers)` of the customer of row `index` (built on demand). */
+export function salesOrderCustomerIndexAt(index: number): number {
+  salesOrders.at(index);
+  return customerIndexes[index]!;
+}
+
+/** Days from the order date of row `index` to `DEMO_TODAY` (built on demand). */
+export function salesOrderAgeAt(index: number): number {
+  salesOrders.at(index);
+  return orderAges[index]!;
+}
+
 function makeSalesOrder(index: number): DemoSalesOrder {
   const customers = makeCustomers(DEMO_REFERENCE_POOL.customers);
   customerAge ??= ageCache(customers, (createdOn) => daysBetween(createdOn, DEMO_TODAY));
@@ -140,6 +157,8 @@ function makeSalesOrder(index: number): DemoSalesOrder {
   // Never before the customer existed.
   const oldestAllowed = Math.min(oldest, customerAge(customerIndex));
   const age = rng.int(Math.min(youngest, oldestAllowed), oldestAllowed);
+  customerIndexes[index] = customerIndex;
+  orderAges[index] = age;
   const orderDate = daysAgo(age);
   const lineCount = rng.weighted(LINE_COUNTS);
   const customerReference = `REQ-${rng.int(10000, 99999)}`;

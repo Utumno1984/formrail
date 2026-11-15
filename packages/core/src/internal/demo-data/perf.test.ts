@@ -73,8 +73,11 @@ describe('demo-data performance (plain Node, fresh process)', () => {
   });
 
   // Transactional documents (ticket #514): the list needs every total but no line, so these stay cheap too.
-  // (No budget for makeInvoices(100000): it builds the totals of the ~46,000 invoiced orders it bills, about 3x a
-  // sales order list; the ticket sets the 500 ms budget on makeSalesOrders only.)
+  // Invoices bill the `invoiced` orders (about 46% of orders): 100,000 invoices build the totals of 100,000 orders found among ~217,000.
+  it(`makeInvoices(100000) runs in under ${BUDGET_MS} ms`, () => {
+    expect(timeInFreshProcess('makeInvoices', 100_000)).toBeLessThan(BUDGET_MS);
+  });
+
   it(`makeSalesOrders(100000) runs in under ${BUDGET_MS} ms`, () => {
     expect(timeInFreshProcess('makeSalesOrders', 100_000)).toBeLessThan(BUDGET_MS);
   });

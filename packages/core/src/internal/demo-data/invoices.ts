@@ -6,9 +6,9 @@ import type { StatusBadgeTone } from '../../status-badge/StatusBadge';
 import { makeCustomers } from './customers';
 import type { DemoCurrency } from './currency';
 import { createDataset, DEMO_REFERENCE_POOL, indexFromId } from './dataset';
-import { daysAgo, daysBetween, DEMO_TODAY } from './dates';
+import { daysAgo } from './dates';
 import { createRowRng, hashSeed } from './rng';
-import { salesOrderAt, salesOrderStatusAt } from './sales-orders';
+import { salesOrderAgeAt, salesOrderAt, salesOrderCustomerIndexAt, salesOrderStatusAt } from './sales-orders';
 import { PAYMENT_TERMS_DAYS } from './terms';
 
 /**
@@ -67,11 +67,11 @@ function invoicedOrderIndex(k: number): number {
 }
 
 function makeInvoice(index: number): DemoInvoice {
-  const order = salesOrderAt(invoicedOrderIndex(index));
-  const customers = makeCustomers(DEMO_REFERENCE_POOL.customers);
-  const customer = customers[indexFromId(order.customerId, 'cus-')]!;
+  const orderIndex = invoicedOrderIndex(index);
+  const order = salesOrderAt(orderIndex);
+  const customer = makeCustomers(DEMO_REFERENCE_POOL.customers)[salesOrderCustomerIndexAt(orderIndex)]!;
   const rng = createRowRng(SEED, index);
-  const orderAge = daysBetween(order.orderDate, DEMO_TODAY);
+  const orderAge = salesOrderAgeAt(orderIndex);
   // Invoiced two days to three weeks after the order, never in the future.
   const issueAge = orderAge - rng.int(2, Math.min(20, orderAge));
   const termsDays = PAYMENT_TERMS_DAYS[customer.paymentTerms];
