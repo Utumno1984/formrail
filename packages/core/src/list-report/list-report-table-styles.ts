@@ -164,15 +164,19 @@ export const edgeLayerClass =
 // full colour, transparent) and placed with a logical inset half outside the box, on its outer side.
 // The full colour, in the middle of the gradient, lands on the outer edge in either resolved direction
 // (from `dir` or from the `direction` property), and the clipped half is never painted.
-const edgeShadeClass =
-  'absolute bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 overflow-hidden invisible opacity-0 ' +
-  'before:absolute before:inset-y-0 before:w-6 ' +
+// String literals only, no shared constant interpolated: a template literal with an identifier is not
+// tree-shaken by the bundler and would put both strings in every import of the package.
+export const edgeShadowStartClass =
+  'absolute start-0 bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 overflow-hidden invisible opacity-0 ' +
+  'before:absolute before:inset-y-0 before:-start-3 before:w-6 ' +
   'before:bg-[linear-gradient(to_right,transparent,var(--rop-list-report-edge-color),transparent)] ' +
   'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
-  'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-[CanvasText]';
-export const edgeShadowStartClass =
-  `${edgeShadeClass} start-0 before:-start-3 forced-colors:border-s-2 ` +
+  'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-s-2 forced-colors:border-[CanvasText] ' +
   '[&:is([data-rop-overflow-start]>*>*)]:visible [&:is([data-rop-overflow-start]>*>*)]:opacity-100';
 export const edgeShadowEndClass =
-  `${edgeShadeClass} end-(--rop-list-report-edge-end) before:-end-3 forced-colors:border-e-2 ` +
+  'absolute end-(--rop-list-report-edge-end) bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 overflow-hidden invisible opacity-0 ' +
+  'before:absolute before:inset-y-0 before:-end-3 before:w-6 ' +
+  'before:bg-[linear-gradient(to_right,transparent,var(--rop-list-report-edge-color),transparent)] ' +
+  'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
+  'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-e-2 forced-colors:border-[CanvasText] ' +
   '[&:is([data-rop-overflow-end]>*>*)]:visible [&:is([data-rop-overflow-end]>*>*)]:opacity-100';
