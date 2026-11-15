@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
-import { gotoStory } from './helpers/story';
+import { expectPlayToPass, gotoStory } from './helpers/story';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
 
 // #499: below 640px a selection bar without `bulkActions` is one line (count + "Clear selection").
@@ -361,3 +361,15 @@ test.describe('#509 no minimum from 640px', () => {
     }
   });
 });
+
+// The play function of the story (it also checks the minimum of the count) at a narrow and at a wide viewport.
+for (const vp of [
+  { width: 390, height: 844 },
+  { width: 768, height: 1024 },
+  { width: 1280, height: 800 },
+]) {
+  test(`story SelectionWithoutBulkActions: the play function passes at ${vp.width}px`, async ({ page }) => {
+    await page.setViewportSize(vp);
+    await expectPlayToPass(page, 'floorplans-list-report--selection-without-bulk-actions');
+  });
+}

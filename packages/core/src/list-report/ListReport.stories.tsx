@@ -1232,10 +1232,12 @@ export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
     await expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(0.5);
     await expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(0.5);
     await expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(0.5);
-    // The count never gets squeezed below its minimum (8ch), whatever the width or the text size.
+    // Below 640px the count is never squeezed under its minimum (8ch), whatever the width or the text size;
+    // from 640px there is no minimum.
     const countEl = canvasElement.querySelector<HTMLElement>('[data-rop-selection-count]')!;
     const minWidth = parseFloat(getComputedStyle(countEl).minWidth);
-    await expect(minWidth).toBeGreaterThan(0);
+    if (window.innerWidth < 640) await expect(minWidth).toBeGreaterThan(0);
+    else await expect(minWidth).toBe(0);
     await expect(countEl.getBoundingClientRect().width).toBeGreaterThanOrEqual(minWidth - 0.5);
     await userEvent.click(clear);
     await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
