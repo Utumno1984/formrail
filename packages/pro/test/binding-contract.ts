@@ -32,6 +32,11 @@ export interface ContractForm {
    * (a form without live validation, as core's, validates only on save: nothing to do).
    */
   showValidationError: () => void;
+  /**
+   * The form's own discard, the way an app's Discard button calls it, outside the binding (React Hook Form:
+   * `form.reset()`, which also sets `submitCount` back to 0).
+   */
+  discard: () => void;
 }
 
 /** A hook that renders the form under test, initialized with `initial`. */
@@ -259,6 +264,31 @@ export const CONTRACT_CHECKS: ContractCheck[] = [
         await act(() => save.settle(null));
         expect(form.current().binding.isSaving).toBe(false);
         expect(form.current().binding.saveError).toBeNull();
+        expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
+      }),
+  },
+  {
+    name: 'after a save that succeeds and a discard of the form, the next save that fails has a non-null saveError',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('Acme Ltd'));
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => copy(sent));
+        });
+        await act(() => save.settle(null));
+        expect(form.current().binding.saveError).toBeNull();
+        act(() => form.current().discard());
+        act(() => form.current().editName('Acme Co'));
+        await act(async () => {
+          save = form.current().startSave((sent) => copy(sent));
+        });
+        expect(form.current().binding.isSaving).toBe(true);
+        await act(() => save.settle(new Error('500 from server')));
+        expect(form.current().binding.isSaving).toBe(false);
+        expect(form.current().binding.saveError).not.toBeNull();
+        // Nothing saved: the edit is still there, against the record of the first save.
+        expect(form.current().binding.values).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Co' });
         expect(form.current().binding.baseline).toEqual({ ...CONTRACT_INITIAL, name: 'Acme Ltd' });
       }),
   },

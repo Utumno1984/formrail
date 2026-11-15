@@ -11,6 +11,7 @@ function useCoreContractForm(initial: ContractInvoice): ContractForm {
     editCity: (city) => form.setValue('supplier', { ...form.values.supplier, city }),
     // Core validates on save only (schema / validate): no error appears while the user edits.
     showValidationError: () => undefined,
+    discard: () => form.reset(),
     startSave: (respond) => {
       const gate = deferred();
       // The documented pattern: the handler returns the stored record (or nothing: the sent values are stored).

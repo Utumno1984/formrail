@@ -85,13 +85,14 @@ class BindingStore<Values extends FieldValues> {
    * when a reset or a rehydration happened since (the reset wins: the save's result is then a plain hydration).
    */
   private sent: Values | null = null;
-  /** `formState.submitCount` as of the last commit. */
-  submitCount = 0;
+  /** `formState.submitCount` as React Hook Form last notified it (see `subscribe`). */
+  private submitCount = 0;
   /**
-   * The `submitCount` before the submit that `reset(saved)` ended (`-1`: none): that submit, once counted, saved
-   * (see `saveErrorOf`).
+   * The `submitCount` before the submit that `reset(saved)` ended (`null`: none): that submit, once counted, saved
+   * (see `saveErrorOf`). Bound to that one submit: the next submit ends at another count, and a reset that lowers
+   * the count clears it, so a count that comes back to the same number never marks another submit as saved.
    */
-  private savedAt = -1;
+  private savedAt: number | null = null;
   /**
    * The write to React Hook Form of the current synchronous run, not done yet (see `write`): the values, and the
    * defaults (`null`: React Hook Form's stay).
@@ -103,6 +104,7 @@ class BindingStore<Values extends FieldValues> {
     this.control = form.control;
     warnOnMissingInternals(form.control);
     this.defaults = form.control._defaultValues;
+    this.submitCount = form.formState.submitCount;
     const baseline = snapshotOf<unknown>(this.defaults ?? {}) as Values;
     // Equal content: the form starts as after a reset (`values === baseline`).
     this.state = { baseline, values: snapshotOf(form.getValues(), baseline) };
@@ -113,8 +115,19 @@ class BindingStore<Values extends FieldValues> {
     // `watch(callback)` receives every value event of the form, with its field name (none for `reset` and
     // `setValues` of the whole form). It registers no form-state proxy and does not mark the form mounted.
     const subscription = this.form.watch((_, info) => this.sync(info));
+    // `submitCount` as React Hook Form notifies it, synchronously (a render can show a reset and the next submit as
+    // one). Only a reset lowers it (to 0, without `keepSubmitCount`): the submit `reset(saved)` ended is then no
+    // longer the last one, and the count can come back to the same number with another submit.
+    const submits = this.form.subscribe({
+      formState: { submitCount: true },
+      callback: ({ submitCount = 0 }) => {
+        if (submitCount < this.submitCount) this.savedAt = null;
+        this.submitCount = submitCount;
+      },
+    });
     return () => {
       subscription.unsubscribe();
+      submits();
       this.listeners.delete(listener);
     };
   };
@@ -145,7 +158,7 @@ class BindingStore<Values extends FieldValues> {
    */
   saveErrorOf(formState: { isSubmitted: boolean; isSubmitSuccessful: boolean; submitCount: number; errors: unknown }): unknown {
     if (!formState.isSubmitted || formState.isSubmitSuccessful) return null;
-    return this.savedAt === formState.submitCount - 1 ? null : formState.errors;
+    return this.savedAt !== null && this.savedAt === formState.submitCount - 1 ? null : formState.errors;
   }
 
   /**
@@ -337,7 +350,7 @@ class BindingStore<Values extends FieldValues> {
  *
  * **Saving**: `isSaving` is `formState.isSubmitting`; `saveError` is `null` unless the last submit failed
  * (validation, or a handler that threw before `reset(saved)`: a submit ended by `reset(saved)` has saved, also
- * when a validation error appeared meanwhile). To save through `handleSubmit`, call `binding.reset(saved)` in the
+ * when a validation error appeared meanwhile; that submit only, also after a `form.reset()`). To save through `handleSubmit`, call `binding.reset(saved)` in the
  * handler before it resolves: a rebase queued meanwhile is then merged against what was saved. A save that
  * does not go through `handleSubmit` passes `isSaving` and `saveError` (see the options). While a save is in
  * flight, `reset(saved)` ends it as core's `save` does: `saved` is the baseline, the fields edited since
@@ -383,9 +396,6 @@ export function useReactHookFormBinding<Values extends FieldValues>(
   }
   // Before every layout effect of the commit (the rebase engine reads `isSaving` in one, also in a child).
   useInsertionEffect(() => store.observeSaving(isSaving), [store, isSaving]);
-  useInsertionEffect(() => {
-    store.submitCount = submitCount;
-  }, [store, submitCount]);
   const { arrayIdKeys } = options;
   useInsertionEffect(() => {
     store.arrayIdKeys = arrayIdKeys;

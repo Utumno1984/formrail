@@ -19,6 +19,7 @@ function contractForm(toBinding: (form: UseFormReturn<ContractInvoice>) => Rebas
       editCity: (city) => form.setValue('supplier.city', city, { shouldDirty: true, shouldTouch: true }),
       // What React Hook Form's own validation does on a change (`mode: 'onChange'`, or `reValidateMode` after a submit).
       showValidationError: () => form.setError('name', { type: 'validate', message: 'Invalid name' }),
+      discard: () => form.reset(),
       startSave: (respond) => {
         const gate = deferred();
         // The documented pattern: `binding.reset(stored)` inside the handler, before it resolves.

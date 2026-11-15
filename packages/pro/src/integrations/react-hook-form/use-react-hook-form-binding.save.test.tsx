@@ -2,7 +2,7 @@
 // the documented pattern (`binding.reset(saved)` inside the `handleSubmit` handler). The semantics are those of
 // core's `save`: the fields edited meanwhile keep the typed value and stay dirty against the new baseline, the
 // others take what the server stored (its normalization included) and are clean.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { useChangeSummary, useFormRebase, type ChangeEntry, type RebaseFormBinding, type UseFormRebaseReturn } from '../../engine';
@@ -503,3 +503,163 @@ describe('useReactHookFormBinding: a save of your own (the isSaving option)', ()
     view.unmount();
   });
 });
+
+describe('useReactHookFormBinding: saveError after a reset of React Hook Form that sets submitCount back to 0 (QA #507 round 4, point 1)', () => {
+  const required = { notes: { required: 'Notes are required' } };
+  const notesRequired = () => setupInvoiceForm({ rules: required, useFormProps: { defaultValues: { ...SAVED, notes: 'n' } } });
+  const notesError = () => expect.objectContaining({ notes: expect.objectContaining({ message: 'Notes are required' }) });
+
+  /** A first save that succeeds (ended by `reset(saved)`), then a reset of React Hook Form (submitCount back to 0). */
+  async function savedThenReset(harness: Harness, reset: (form: UseFormReturn<Invoice>) => void) {
+    harness.type('Amount', '120');
+    const first = await startSave(harness);
+    await first.settle();
+    expect(harness.current().binding.saveError).toBeNull();
+    expect(harness.current().form.formState.submitCount).toBe(1);
+    act(() => reset(harness.current().form));
+    expect(harness.current().form.formState.submitCount).toBe(0);
+  }
+
+  /** A submit that validation blocks: the handler never runs. */
+  async function blockedSubmit(harness: Harness) {
+    let ran = false;
+    await act(async () => {
+      await harness.current().form.handleSubmit(() => {
+        ran = true;
+      })();
+    });
+    expect(ran).toBe(false);
+  }
+
+  it('a discard (form.reset()), then a submit blocked by validation: saveError is the errors', async () => {
+    const harness = notesRequired();
+    await savedThenReset(harness, (form) => form.reset());
+    await act(async () => {
+      harness.type('Notes', '');
+    });
+    await blockedSubmit(harness);
+    expect(harness.current().form.formState.submitCount).toBe(1);
+    expect(harness.current().binding.saveError).toEqual(notesError());
+    harness.unmount();
+  });
+
+  it('a rehydration (form.reset(data)), then a submit blocked by validation: saveError is the errors', async () => {
+    const harness = notesRequired();
+    await savedThenReset(harness, (form) => form.reset({ ...SAVED, notes: '' }));
+    await blockedSubmit(harness);
+    expect(harness.current().binding.saveError).toEqual(notesError());
+    harness.unmount();
+  });
+
+  it('a discard, then a handler that fails (no reset(saved)): saveError is not null, the edit stays', async () => {
+    const harness = notesRequired();
+    await savedThenReset(harness, (form) => form.reset());
+    harness.type('Amount', '140');
+    const failing = await startSaveWithoutReset(harness);
+    await failing.settle(new Error('500 from server'));
+    expect(harness.current().form.formState.isSubmitSuccessful).toBe(false);
+    expect(harness.current().binding.saveError).not.toBeNull();
+    expect(harness.current().binding.values).toEqual({ ...SAVED, amount: '140', notes: 'n' });
+    expect(harness.current().binding.baseline).toEqual({ ...SAVED, amount: '120', notes: 'n' });
+    harness.unmount();
+  });
+
+  it("React Hook Form's documented pattern (reset in an effect on isSubmitSuccessful), then a save that fails: saveError is not null", async () => {
+    function ResetOnSuccess({ form }: { form: UseFormReturn<Invoice> }) {
+      const { isSubmitSuccessful } = form.formState;
+      useEffect(() => {
+        if (isSubmitSuccessful) form.reset(form.getValues());
+      }, [isSubmitSuccessful, form]);
+      return null;
+    }
+    const harness = setupInvoiceForm({ extra: (form) => <ResetOnSuccess form={form} /> });
+    harness.type('Amount', '120');
+    const first = await startSave(harness);
+    await first.settle();
+    expect(harness.current().form.formState.submitCount).toBe(0);
+    expect(harness.current().binding.saveError).toBeNull();
+    harness.type('Amount', '130');
+    const failing = await startSaveWithoutReset(harness);
+    await failing.settle(new Error('500 from server'));
+    expect(harness.current().form.formState.submitCount).toBe(1);
+    expect(harness.current().binding.saveError).not.toBeNull();
+    expect(harness.current().binding.values.amount).toBe('130');
+    harness.unmount();
+  });
+
+  it('the values prop changes after the save (React Hook Form resets, submitCount 0), then a submit blocked by validation: saveError is the errors', async () => {
+    const harness = setupInvoiceForm({ rules: required, useFormProps: { values: { ...SAVED, notes: 'n' } } });
+    harness.type('Amount', '120');
+    const first = await startSave(harness);
+    await first.settle();
+    expect(harness.current().binding.saveError).toBeNull();
+    act(() => harness.rerender({ rules: required, useFormProps: { values: { ...SAVED, notes: '' } } }));
+    expect(harness.current().form.formState.submitCount).toBe(0);
+    await blockedSubmit(harness);
+    expect(harness.current().binding.saveError).toEqual(notesError());
+    harness.unmount();
+  });
+
+  it('a rehydration and a submit that fails in the same task, no render between them: saveError is not null', async () => {
+    const harness = notesRequired();
+    harness.type('Amount', '120');
+    const first = await startSave(harness);
+    await first.settle();
+    expect(harness.current().binding.saveError).toBeNull();
+    await act(async () => {
+      const { form } = harness.current();
+      form.reset({ ...SAVED, amount: '130' });
+      await form
+        .handleSubmit(() => {
+          throw new Error('500 from server');
+        })()
+        .catch(() => undefined);
+    });
+    expect(harness.current().form.formState.submitCount).toBe(1);
+    expect(harness.current().form.formState.isSubmitSuccessful).toBe(false);
+    expect(harness.current().binding.saveError).not.toBeNull();
+    harness.unmount();
+  });
+
+  it("after the reset, a save ended by reset(saved) while a validation error appears is still a success (the critic's case)", async () => {
+    // `mode: 'onChange'`: after the reset (`isSubmitted` false) the field is validated as the user types.
+    const harness = setupInvoiceForm({ rules: required, useFormProps: { defaultValues: { ...SAVED, notes: 'n' }, mode: 'onChange' } });
+    await savedThenReset(harness, (form) => form.reset());
+    harness.type('Amount', '150');
+    const second = await startSave(harness);
+    await act(async () => {
+      harness.type('Notes', '');
+    });
+    await second.settle();
+    expect(harness.current().form.formState.isSubmitSuccessful).toBe(false);
+    expect(harness.current().binding.saveError).toBeNull();
+    expect(harness.current().binding.baseline).toEqual({ ...SAVED, amount: '150', notes: 'n' });
+    harness.unmount();
+  });
+});
+
+/** A `handleSubmit` save whose handler waits for `settle` and never calls `binding.reset` (a request that fails). */
+async function startSaveWithoutReset(harness: Harness) {
+  let release!: (error: unknown) => void;
+  const gate = new Promise<void>((resolve, reject) => {
+    release = (error) => (error === null ? resolve() : reject(error));
+  });
+  let done!: Promise<void>;
+  await act(async () => {
+    done = harness
+      .current()
+      .form.handleSubmit(async () => {
+        await gate;
+      })()
+      .catch(() => undefined);
+  });
+  expect(harness.current().binding.isSaving).toBe(true);
+  return {
+    settle: async (error: unknown = null) => {
+      await act(async () => {
+        release(error);
+        await done;
+      });
+    },
+  };
+}
