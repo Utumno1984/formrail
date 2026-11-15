@@ -1,15 +1,18 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
-import { checkLabelDefaults, readLabelRows, REPO_ROOT, type LabelException, type LabelRow, type LabelSource } from '../test/label-defaults';
+import { checkLabelDefaults, readLabelRows, REPO_ROOT, type LabelException, type LabelExample, type LabelRow, type LabelSource } from '../test/label-defaults';
 import { DEFAULT_LABELS as CALENDAR_DEFAULT_LABELS } from './calendar/Calendar';
 import { DEFAULT_LABELS as DATE_PICKER_DEFAULT_LABELS } from './date-picker/DatePicker';
 import { DEFAULT_LABELS as FILE_UPLOAD_DEFAULT_LABELS } from './file-upload/FileUpload';
 import { ListReport } from './list-report/ListReport';
 import { DEFAULT_LABELS as TABLE_DEFAULT_LABELS } from './list-report/ListReportTableStates';
 import type { ListReportColumn } from './list-report/types';
+import { ListReportFrame } from './list-report/ListReportFrame';
+import { ListReportTableShell } from './list-report/ListReportTableShell';
 import { useListReport } from './list-report/use-list-report';
 import { DEFAULT_LABELS as MULTI_SELECT_DEFAULT_LABELS } from './multi-select/MultiSelect';
 import { DEFAULT_LABELS as NUMBER_INPUT_DEFAULT_LABELS, NumberInput } from './number-input/NumberInput';
@@ -144,38 +147,90 @@ function textOf(el: Element | null | undefined, what: string): string {
 }
 
 /**
- * `ListReportFrameLabels`: its defaults are not in a constant (the count and the selection text format their
- * numbers in the locale of `useListReport`), so they are read from a rendering of `ListReport`: one row, selectable,
- * nothing selected.
+ * The texts of `ListReportFrame` (the floorplan of `ListReport` and of Pro's `VirtualListReport`, here with no
+ * table) in one state: `rowCount` rows, the first `selectedCount` selected, a committed search that keeps the first
+ * `resultCount` rows (all of them by default), `en-US`.
  */
-function frameRendering(): Record<string, string> {
+function frameState({ rowCount, selectedCount = 0, resultCount = rowCount }: { rowCount: number; selectedCount?: number; resultCount?: number }) {
   interface Row {
     id: string;
     n: string;
   }
+  const rows: Row[] = Array.from({ length: rowCount }, (_, i) => ({ id: `r${i}`, n: `${i < resultCount ? 'keep' : 'drop'} INV-${i}` }));
   const columns: ListReportColumn<Row>[] = [{ id: 'n', header: 'Number', accessor: (r) => r.n }];
   function Host() {
     const table = useListReport<Row>({
-      rows: [{ id: 'a', n: 'INV-1' }],
+      rows,
       columns,
       getRowId: (r) => r.id,
       searchCommitDelay: null,
+      defaultSearchQuery: resultCount < rowCount ? 'keep' : '',
       selectable: true,
+      defaultSelectedIds: new Set(rows.slice(0, selectedCount).map((r) => r.id)),
       locale: 'en-US',
     });
-    return <ListReport table={table} title="Invoices" />;
+    return <ListReportFrame table={table} title="Invoices" renderTable={() => null} />;
   }
   const { container, unmount } = render(<Host />);
   const group = screen.getByRole('group');
   const [barNameId] = (group.getAttribute('aria-labelledby') ?? '').split(' ');
   const values = {
-    count: textOf(container.querySelector('[data-rop-count]'), 'count of ListReport'),
-    selectionCount: textOf(group.querySelector('[data-rop-selection-count]'), 'selection count of ListReport'),
-    selectionBar: textOf(barNameId ? document.getElementById(barNameId) : null, 'name of the selection bar of ListReport'),
-    clearSelection: textOf(within(group).getByRole('button', { hidden: true }), '"clear selection" button of ListReport'),
+    count: textOf(container.querySelector('[data-rop-count]'), 'count of ListReportFrame'),
+    selectionCount: textOf(group.querySelector('[data-rop-selection-count]'), 'selection count of ListReportFrame'),
+    selectionBar: textOf(barNameId ? document.getElementById(barNameId) : null, 'name of the selection bar of ListReportFrame'),
+    clearSelection: textOf(within(group).getByRole('button', { hidden: true }), '"clear selection" button of ListReportFrame'),
   };
   unmount();
   return values;
+}
+
+/**
+ * `ListReportFrameLabels`: its defaults are not in a constant (the count and the selection text format their
+ * numbers in the locale of `useListReport`), so they are read from renderings, one per value the prose lists:
+ * `(n)` and `(n of m)` for the count, "No items selected", "3 selected" and "1,234 selected (2 hidden by filters)"
+ * for the selection.
+ */
+function frameRendering() {
+  const none = frameState({ rowCount: 1 });
+  const three = frameState({ rowCount: 3, selectedCount: 3 });
+  const hidden = frameState({ rowCount: 1236, selectedCount: 1236, resultCount: 1234 });
+  return {
+    values: {
+      count: [none.count, hidden.count],
+      selectionCount: [none.selectionCount, three.selectionCount, hidden.selectionCount],
+      selectionBar: none.selectionBar,
+      clearSelection: none.clearSelection,
+    },
+    examples: { count: [{ fill: { n: '1' } }, { fill: { n: '1,234', m: '1,236' } }] as LabelExample[] },
+  };
+}
+
+/**
+ * `ListReportTableLabels.resultCount`: the table replaces `DEFAULT_LABELS.resultCount` with one that formats the number
+ * in the locale of `useListReport` (`ListReportTableShell`), so the default is read from its live region, announced
+ * when the data is back (loading -> ready): with 1 and with 10,000 results, `en-US`.
+ */
+function announcedResultCount(rowCount: number): string {
+  interface Row {
+    id: string;
+  }
+  const rows: Row[] = Array.from({ length: rowCount }, (_, i) => ({ id: `r${i}` }));
+  const columns: ListReportColumn<Row>[] = [{ id: 'id', header: 'Id', accessor: (r) => r.id }];
+  function Host() {
+    const table = useListReport<Row>({ rows, columns, getRowId: (r) => r.id, locale: 'en-US' });
+    const [status, setStatus] = useState<'loading' | 'ready'>('loading');
+    return (
+      <>
+        <button onClick={() => setStatus('ready')}>ready</button>
+        <ListReportTableShell caption="Invoices" table={table} status={status} renderBody={() => null} />
+      </>
+    );
+  }
+  const { container, unmount } = render(<Host />);
+  fireEvent.click(screen.getByRole('button', { name: 'ready' }));
+  const text = textOf(container.querySelector('[aria-live="polite"]'), 'announcement of the results of ListReportTableShell');
+  unmount();
+  return text;
 }
 
 /**
@@ -214,6 +269,10 @@ async function dirtyGuardRendering(): Promise<Record<string, string>> {
 
 async function labelSources(): Promise<LabelSource[]> {
   const guard = await dirtyGuardRendering();
+  const frame = frameRendering();
+  // `resultCount` of the constant is not the table's default (see `announcedResultCount`): compared from the rendering.
+  const tableTexts: Partial<typeof TABLE_DEFAULT_LABELS> = { ...TABLE_DEFAULT_LABELS };
+  delete tableTexts.resultCount;
   return [
     { iface: 'CalendarLabels', from: 'DEFAULT_LABELS of calendar/Calendar.tsx', values: CALENDAR_DEFAULT_LABELS },
     {
@@ -234,34 +293,30 @@ async function labelSources(): Promise<LabelSource[]> {
       iface: 'FileUploadLabels',
       from: 'DEFAULT_LABELS of file-upload/FileUpload.tsx',
       values: FILE_UPLOAD_DEFAULT_LABELS,
-      examples: { selectedCount: { args: [0] } },
+      // "`No files selected`, `1 file selected`, `N files selected`".
+      examples: { selectedCount: [{ args: [0] }, { args: [1] }, { args: ['N'] }] },
     },
-    {
-      iface: 'ListReportFrameLabels',
-      from: 'rendering of ListReport (one row, selectable, nothing selected)',
-      values: frameRendering(),
-      examples: { count: { fill: { n: '1' } } },
-    },
+    { iface: 'ListReportFrameLabels', from: 'renderings of ListReportFrame (en-US)', values: frame.values, examples: frame.examples },
+    { iface: 'ListReportTableLabels', from: 'DEFAULT_LABELS of list-report/ListReportTableStates.tsx', values: tableTexts },
     {
       iface: 'ListReportTableLabels',
-      from: 'DEFAULT_LABELS of list-report/ListReportTableStates.tsx',
-      values: TABLE_DEFAULT_LABELS,
-      examples: { resultCount: { args: [1] } },
+      from: 'announcements of ListReportTableShell (1 and 10,000 results, en-US)',
+      values: { resultCount: [announcedResultCount(1), announcedResultCount(10_000)] },
     },
     {
       iface: 'MultiSelectLabels',
       from: 'DEFAULT_LABELS of multi-select/MultiSelect.tsx',
       values: MULTI_SELECT_DEFAULT_LABELS,
-      examples: { selectedCount: { args: [1] } },
+      // "`1 item selected` / `${n} items selected`".
+      examples: { selectedCount: [{ args: [1] }, { args: ['${n}'] }] },
     },
     { iface: 'NumberInputLabels', from: 'DEFAULT_LABELS of number-input/NumberInput.tsx', values: NUMBER_INPUT_DEFAULT_LABELS },
     { iface: 'PaginationLabels', from: 'DEFAULT_LABELS of pagination/Pagination.tsx', values: PAGINATION_DEFAULT_LABELS },
     {
       iface: 'ToastLabels',
+      // `tones` is an object: its four members, in order, against the four tones the prose lists.
       from: 'DEFAULT_DISMISS_LABEL and TONE_LABEL of toast/ToastProvider.tsx',
       values: { dismiss: DEFAULT_DISMISS_LABEL, tones: TONE_LABEL },
-      // The prose lists the four tones; the guard reads the first one, the default tone's.
-      examples: { tones: { args: ['info'] } },
     },
   ];
 }

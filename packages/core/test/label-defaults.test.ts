@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkLabelDefaults, fillProse, placeholdersOf, proseText, type LabelRow, type LabelSource } from './label-defaults';
+import { checkLabelDefaults, fillProse, placeholdersOf, proseText, type LabelExample, type LabelRow, type LabelSource } from './label-defaults';
 
 // #549: the generic comparison of `label-defaults.ts`, on synthetic rows (the shape `measureLabels` returns) and
 // sources. Each case is one way the prose and the code can disagree, or one way a key could escape the check.
@@ -169,14 +169,14 @@ describe('checkLabelDefaults: a key that cannot be verified fails, saying how to
     expect(result.problems[0]).toContain('LABEL_EXCEPTIONS with the reason');
   });
 
-  it('an object key without the member, a member that is missing, a function that throws or returns no text', () => {
+  it('an object key with more members than the prose lists and no member named, a member that is missing, a function that throws or returns no text', () => {
     const rows = [row('XLabels', 'tones', '`Information`'), row('XLabels', 'other', '`Error`'), row('XLabels', 'boom', '`<x>`'), row('XLabels', 'num', '`<x>`')];
     const result = run(rows, [
       {
         iface: 'XLabels',
         from: 'X',
         values: {
-          tones: { info: 'Information' },
+          tones: { info: 'Information', error: 'Error' },
           other: { info: 'Information' },
           boom: () => {
             throw new Error('no');
@@ -191,7 +191,7 @@ describe('checkLabelDefaults: a key that cannot be verified fails, saying how to
       'XLabels.boom (packages/core/src/x/X.tsx), source X: the function of the source throws called with ("<x>"): Error: no',
       'XLabels.num (packages/core/src/x/X.tsx), source X: the function of the source returns 3 called with ("<x>"), not a text',
       'XLabels.other (packages/core/src/x/X.tsx), source X: the object of the source has no member "error" (members: info)',
-      "XLabels.tones (packages/core/src/x/X.tsx), source X: an object key (texts by member): name the member whose text the prose states in `examples.<key>.args` (`['info']`)",
+      "XLabels.tones (packages/core/src/x/X.tsx), source X: an object of 2 texts (info, error) and a prose that lists 1 value: list every member's text in the prose, in the order of the members, or name the member of each value in `examples.<key>` (`{ args: ['info'] }`)",
     ]);
   });
 
@@ -262,5 +262,98 @@ describe('checkLabelDefaults: stale sources, examples and exceptions fail', () =
       'XLabels.gone: an exception of LABEL_EXCEPTIONS (REGISTRY.tsx) that matches no key the guard reads here (a key renamed or removed): remove it',
       'XLabels.gone: listed twice in LABEL_EXCEPTIONS of REGISTRY.tsx',
     ]);
+  });
+});
+
+// Round 2 (critic of PR #551): a prose that lists several values is compared value by value, in order and in number,
+// never on its first value alone.
+describe('checkLabelDefaults: a prose that lists several values', () => {
+  const listRow = (iface: string, key: string, values: string[]): LabelRow => ({ ...row(iface, key, values[0]), proseValues: values });
+  const tones = () => listRow('ToastLabels', 'tones', ['`Information`', '`Success`', '`Warning`', '`Error`']);
+  const TONES = { info: 'Information', success: 'Success', warning: 'Warning', error: 'Error' };
+
+  it('an object of texts: every member, in order, against every value (Toast-like tones)', () => {
+    const result = run([tones()], [{ iface: 'ToastLabels', from: 'TONE_LABEL', values: { tones: TONES } }]);
+    expect(result.problems).toEqual([]);
+    expect(result.verified).toEqual(['ToastLabels.tones']);
+  });
+
+  it('a member that is not the first one changed in the code (`success` -> `Done`) fails, naming the value', () => {
+    const result = run([tones()], [{ iface: 'ToastLabels', from: 'TONE_LABEL', values: { tones: { ...TONES, success: 'Done' } } }]);
+    expect(result.verified).toEqual([]);
+    expect(result.problems).toHaveLength(1);
+    expect(result.problems[0]).toContain('ToastLabels.tones (packages/core/src/x/X.tsx): value 2 of 4: the prose states "Success", the code has "Done" (TONE_LABEL["success"])');
+  });
+
+  it('an object with a member the prose does not list, or a value the object does not have, fails', () => {
+    const extra = run([tones()], [{ iface: 'ToastLabels', from: 'T', values: { tones: { ...TONES, neutral: 'Neutral' } } }]);
+    expect(extra.verified).toEqual([]);
+    expect(extra.problems[0]).toContain('an object of 5 texts (info, success, warning, error, neutral) and a prose that lists 4 values');
+    const fewer = run([listRow('ToastLabels', 'tones', ['`Information`', '`Success`'])], [{ iface: 'ToastLabels', from: 'T', values: { tones: TONES } }]);
+    expect(fewer.verified).toEqual([]);
+    expect(fewer.problems[0]).toContain('an object of 4 texts (info, success, warning, error) and a prose that lists 2 values');
+  });
+
+  it('a list of rendered texts (ListReportFrame-like selection count): a change of the third value fails, naming it', () => {
+    const prose = ['"No items selected"', '"3 selected"', '"1,234 selected (2 hidden by filters)"'];
+    const ok = run([listRow('FrameLabels', 'selectionCount', prose)], [{ iface: 'FrameLabels', from: 'renderings', values: { selectionCount: ['No items selected', '3 selected', '1,234 selected (2 hidden by filters)'] } }]);
+    expect(ok.problems).toEqual([]);
+    const drifted = run([listRow('FrameLabels', 'selectionCount', prose)], [{ iface: 'FrameLabels', from: 'renderings', values: { selectionCount: ['No items selected', '3 selected', '1,234 selected (2 filtered out)'] } }]);
+    expect(drifted.verified).toEqual([]);
+    expect(drifted.problems).toEqual([
+      'FrameLabels.selectionCount (packages/core/src/x/X.tsx): value 3 of 3: the prose states "1,234 selected (2 hidden by filters)", the code has "1,234 selected (2 filtered out)" (renderings[2]). Write the value of the code in the "Default ..." of the TSDoc (or fix the code, if the prose is the intended text)',
+    ]);
+  });
+
+  it('a list of rendered texts with one fill per value (ListReportFrame-like count `(n)`, `(n of m)`)', () => {
+    const r = listRow('FrameLabels', 'count', ['`(n)`', '`(n of m)`']);
+    const examples = { count: [{ fill: { n: '1' } }, { fill: { n: '1,234', m: '1,236' } }] as LabelExample[] };
+    expect(run([r], [{ iface: 'FrameLabels', from: 'renderings', values: { count: ['(1)', '(1,234 of 1,236)'] }, examples }]).problems).toEqual([]);
+    const drifted = run([r], [{ iface: 'FrameLabels', from: 'renderings', values: { count: ['(1)', '(1,234 / 1,236)'] }, examples }]);
+    expect(drifted.problems[0]).toContain('value 2 of 2: the prose states "(n of m)" (with the placeholders filled: "(1,234 of 1,236)"), the code has "(1,234 / 1,236)"');
+  });
+
+  it('a function with one example per value (FileUpload-like selected count): a change of a value that is not the first fails', () => {
+    const r = listRow('FileUploadLabels', 'selectedCount', ['`No files selected`', '`1 file selected`', '`N files selected`']);
+    const examples = { selectedCount: [{ args: [0] }, { args: [1] }, { args: ['N'] }] };
+    const fn = (c: number | string) => (c === 0 ? 'No files selected' : c === 1 ? '1 file selected' : `${c} files selected`);
+    expect(run([r], [{ iface: 'FileUploadLabels', from: 'F', values: { selectedCount: fn }, examples }]).problems).toEqual([]);
+    const drifted = (c: number | string) => (c === 0 ? 'No files selected' : c === 1 ? 'One file selected' : `${c} files selected`);
+    const result = run([r], [{ iface: 'FileUploadLabels', from: 'F', values: { selectedCount: drifted }, examples }]);
+    expect(result.verified).toEqual([]);
+    expect(result.problems).toEqual([
+      'FileUploadLabels.selectedCount (packages/core/src/x/X.tsx): value 2 of 3: the prose states "1 file selected", the code has "One file selected" (F called with (1)). Write the value of the code in the "Default ..." of the TSDoc (or fix the code, if the prose is the intended text)',
+    ]);
+  });
+
+  it('a list the source cannot compare in full fails: one text, one example, an array of the wrong length, a value with no example', () => {
+    const r = listRow('XLabels', 'count', ['`1 item`', '`N items`']);
+    const fn = (c: number | string) => (c === 1 ? '1 item' : `${c} items`);
+    const oneText = run([r], [{ iface: 'XLabels', from: 'X', values: { count: '1 item' } }]);
+    expect(oneText.problems).toEqual([
+      'XLabels.count (packages/core/src/x/X.tsx), source X: value 1 of 2: the prose lists 2 values, the source gives one text: give the 2 texts in an array, in the order of the prose (one rendered state each), or list the key in LABEL_EXCEPTIONS with the reason',
+      'XLabels.count (packages/core/src/x/X.tsx), source X: value 2 of 2: the prose lists 2 values, the source gives one text: give the 2 texts in an array, in the order of the prose (one rendered state each), or list the key in LABEL_EXCEPTIONS with the reason',
+    ]);
+    const oneExample = run([r], [{ iface: 'XLabels', from: 'X', values: { count: fn }, examples: { count: { args: [1] } } }]);
+    expect(oneExample.problems).toEqual([
+      'XLabels.count (packages/core/src/x/X.tsx), source X: the prose lists 2 values ("1 item", "N items") and `examples.count` is one example: give an array of 2 examples, one per value, in the order of the prose',
+    ]);
+    const short = run([r], [{ iface: 'XLabels', from: 'X', values: { count: fn }, examples: { count: [{ args: [1] }] } }]);
+    expect(short.problems).toEqual([
+      'XLabels.count (packages/core/src/x/X.tsx), source X: `examples.count` has 1 example, the prose lists 2 values ("1 item", "N items"): one example per value, in the order of the prose',
+    ]);
+    const shortTexts = run([r], [{ iface: 'XLabels', from: 'X', values: { count: ['1 item'] } }]);
+    expect(shortTexts.problems[0]).toContain('value 1 of 2: the source gives 1 text, the prose lists 2 values: one text per value, in the order of the prose');
+    // No example at all: the second value has a placeholder-free text, so it cannot be called.
+    const none = run([listRow('XLabels', 'count', ['`1 item`', '`${n} items`'])], [{ iface: 'XLabels', from: 'X', values: { count: fn } }]);
+    expect(none.verified).toEqual([]);
+    expect(none.problems).toEqual([
+      expect.stringContaining('XLabels.count (packages/core/src/x/X.tsx), source X: value 1 of 2: a function key whose prose states no placeholder'),
+    ]);
+    for (const result of [oneText, oneExample, short, shortTexts, none]) expect(result.verified).toEqual([]);
+  });
+
+  it('a row read without `proseValues` is compared on its `prose`, as a single value', () => {
+    expect(run([row('XLabels', 'a', '`A`')], [{ iface: 'XLabels', from: 'X', values: { a: 'A' } }]).verified).toEqual(['XLabels.a']);
   });
 });

@@ -57,13 +57,15 @@ function labelSources(): LabelSource[] {
       iface: 'ChangeSummaryValueLabels',
       from: 'DEFAULT_VALUE_LABELS of change-summary/format-change-value.ts',
       values: DEFAULT_VALUE_LABELS,
-      examples: { items: { args: [0] } },
+      // "`No items`, `1 item`, `N items`".
+      examples: { items: [{ args: [0] }, { args: [1] }, { args: ['N'] }] },
     },
     {
       iface: 'RebaseNoticeLabels',
       from: 'DEFAULT_REBASE_NOTICE_LABELS of form-rebase/RebaseNotice.tsx',
       values: DEFAULT_REBASE_NOTICE_LABELS,
-      examples: { applied: { args: [1] }, conflicts: { args: [1] } },
+      // "`1 field was updated.` / `N fields were updated.`", and the same two forms for `conflicts`.
+      examples: { applied: [{ args: [1] }, { args: ['N'] }], conflicts: [{ args: [1] }, { args: ['N'] }] },
     },
     {
       iface: 'VirtualListReportLabels',

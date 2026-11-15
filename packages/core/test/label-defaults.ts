@@ -9,7 +9,9 @@ import { pathToFileURL } from 'node:url';
 // prose states a default, not that it is true. This module is the generic comparison: the keys and the defaults the
 // prose states are read by the guard's own reader (`measureLabels`, never a second regex), the real values come
 // from a SOURCE per interface (its `DEFAULT_LABELS`, or the texts read from a rendering), and every key the guard
-// reads in a package must be verified by a source or listed as an exception with a reason. Nothing is skipped in
+// reads in a package must be verified by a source or listed as an exception with a reason. When the prose lists
+// several values ("Default `No items`, `1 item`, `N items`."), every one is compared, in order and in number: a
+// source that can give only one of them fails, it never passes on the first value alone. Nothing is skipped in
 // silence: a key without a source, a function key without an example, a source or an exception that no longer
 // matches a key all fail, each with a message that names the interface and the key and says what to do.
 //
@@ -25,6 +27,11 @@ export interface LabelRow {
   key: string;
   /** The default the prose states, as written (quotes included: `` `Next page` ``, `"1 result"`); absent if none. */
   prose?: string;
+  /**
+   * Every value of that default, as written, when the prose lists several ("`No items`, `1 item`, `N items`":
+   * three); `[prose]` for one, `[]` for none (`proseDefaultsOf` of the guard). Every one is compared.
+   */
+  proseValues?: string[];
   /** Text of a `@default` / `@defaultValue` tag (the guard reports it: label keys use the prose). */
   tag?: string;
   tagName?: string;
@@ -80,12 +87,18 @@ export interface LabelSource {
   /** What `values` is, named in the messages: "DEFAULT_LABELS of calendar/Calendar.tsx", "rendering of ListReport". */
   from: string;
   /**
-   * The real default of each key, as the component uses it: a text, a function or an object of texts. An object
-   * (`object`, not a `Record`: a labels interface has no index signature), read with `Object.entries`.
+   * The real default of each key, as the component uses it: a text, a function, an object of texts (compared member
+   * by member, in order, with the values the prose lists) or, for a rendering, an array of texts (one per value of
+   * the prose, each read from the state that shows it). An `object`, not a `Record` (a labels interface has no index
+   * signature), read with `Object.entries`.
    */
   values: object;
-  /** Per key: the arguments of a function key, the member of an object key, the placeholders of a rendered text. */
-  examples?: Readonly<Record<string, LabelExample>>;
+  /**
+   * Per key: the arguments of a function key, the member of an object key, the placeholders of a rendered text. When
+   * the prose lists several values ("`1 item selected` / `${n} items selected`"), an ARRAY with one example per value,
+   * in the order of the prose (`[{ args: [1] }, { args: ['${n}'] }]`); one example for a list is an error.
+   */
+  examples?: Readonly<Record<string, LabelExample | readonly LabelExample[]>>;
 }
 
 /** A key that cannot be verified, with the reason written out. Empty by default. */
@@ -142,21 +155,44 @@ export function fillProse(text: string, fill: Readonly<Record<string, string>>):
   return out;
 }
 
+const isExampleList = (e: LabelExample | readonly LabelExample[] | undefined): e is readonly LabelExample[] => Array.isArray(e);
 const show = (v: unknown) => (typeof v === 'string' ? JSON.stringify(v) : typeof v === 'function' ? 'a function' : String(v));
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** The real text of `value` for the comparison, or the reason it cannot be computed. */
-function realText(value: unknown, example: LabelExample | undefined, prose: string): { text: string; how: string } | { problem: string } {
+/**
+ * The real text of `value` for the comparison of the `index`-th of the `count` values the prose lists, or the
+ * reason it cannot be computed.
+ */
+function realText(
+  value: unknown,
+  example: LabelExample | undefined,
+  prose: string,
+  index: number,
+  count: number,
+): { text: string; how: string } | { problem: string } {
   if (typeof value === 'string') {
     if (example?.args) return { problem: 'the source gives a text, but `examples` has `args` for it: `args` is for a function or an object key, remove it' };
+    if (count > 1) {
+      return {
+        problem: `the prose lists ${count} values, the source gives one text: give the ${count} texts in an array, in the order of the prose (one rendered state each), or list the key in LABEL_EXCEPTIONS with the reason`,
+      };
+    }
     return { text: value, how: '' };
+  }
+  if (Array.isArray(value)) {
+    // A rendered list: one text per value of the prose (each read from the state that shows it).
+    if (example?.args) return { problem: 'the source gives a list of texts, but `examples` has `args` for it: `args` is for a function or an object key, remove it' };
+    if (value.length !== count) return { problem: `the source gives ${value.length} text${value.length === 1 ? '' : 's'}, the prose lists ${count} values: one text per value, in the order of the prose` };
+    const text: unknown = value[index];
+    if (typeof text !== 'string') return { problem: `text ${index + 1} of the source is ${show(text)}, not a text` };
+    return { text, how: `[${index}]` };
   }
   if (typeof value === 'function') {
     const args = example?.args ?? placeholdersOf(prose);
     if (!args.length && value.length > 0) {
       return {
         problem:
-          'a function key whose prose states no placeholder (`<label>`, `${n}`): give the arguments of the example the prose states in `examples.<key>.args` of the source (`[1]` for "1 item selected"), or list the key in LABEL_EXCEPTIONS with the reason',
+          'a function key whose prose states no placeholder (`<label>`, `${n}`): give the arguments of the example the prose states in `examples.<key>.args` of the source (`[1]` for "1 item selected"; when the prose lists several values, an array with one example per value), or list the key in LABEL_EXCEPTIONS with the reason',
       };
     }
     const how = ` called with (${args.map((a) => JSON.stringify(a)).join(', ')})`;
@@ -170,9 +206,22 @@ function realText(value: unknown, example: LabelExample | undefined, prose: stri
     return { text, how };
   }
   if (isPlainObject(value)) {
-    const member = example?.args?.[0];
-    if (typeof member !== 'string' || example?.args?.length !== 1) {
-      return { problem: 'an object key (texts by member): name the member whose text the prose states in `examples.<key>.args` (`[\'info\']`)' };
+    if (!example?.args) {
+      // Every member, in order, against every value of the prose ("`Information`, `Success`, `Warning` and `Error`").
+      const members = Object.keys(value);
+      if (members.length !== count) {
+        return {
+          problem: `an object of ${members.length} texts (${members.join(', ')}) and a prose that lists ${count} value${count === 1 ? '' : 's'}: list every member's text in the prose, in the order of the members, or name the member of each value in \`examples.<key>\` (\`{ args: ['info'] }\`)`,
+        };
+      }
+      const member = members[index] as string;
+      const text = value[member];
+      if (typeof text !== 'string') return { problem: `the member ${JSON.stringify(member)} of the source is ${show(text)}, not a text` };
+      return { text, how: `[${JSON.stringify(member)}]` };
+    }
+    const member = example.args[0];
+    if (typeof member !== 'string' || example.args.length !== 1) {
+      return { problem: 'an object key (texts by member): `examples.<key>.args` names one member (`[\'info\']`)' };
     }
     if (!(member in value)) return { problem: `the object of the source has no member ${JSON.stringify(member)} (members: ${Object.keys(value).join(', ')})` };
     const text = value[member];
@@ -244,29 +293,54 @@ export function checkLabelDefaults(
         problems.push(`${at}: the prose states no default ("Default \`x\`."): the guard (\`npm run default-column:check\`) reports it as label-no-default; nothing to compare`);
         continue;
       }
-      const stated = proseText(row.prose);
+      // Every value the prose lists ("`No items`, `1 item`, `N items`"), not only the first one.
+      const statedAll = (row.proseValues?.length ? row.proseValues : [row.prose]).map(proseText);
+      const count = statedAll.length;
       const example = source.examples?.[key];
-      const real = realText(value, example, stated);
-      if ('problem' in real) {
-        problems.push(`${at}, source ${source.from}: ${real.problem}`);
-        continue;
-      }
-      let expected = stated;
-      if (example?.fill) {
-        try {
-          expected = fillProse(stated, example.fill);
-        } catch (error) {
-          problems.push(`${at}, source ${source.from}: ${(error as Error).message}`);
+      let perValue: readonly (LabelExample | undefined)[];
+      if (isExampleList(example)) {
+        if (example.length !== count) {
+          problems.push(
+            `${at}, source ${source.from}: \`examples.${key}\` has ${example.length} example${example.length === 1 ? '' : 's'}, the prose lists ${count} value${count === 1 ? '' : 's'} (${statedAll.map((s) => JSON.stringify(s)).join(', ')}): one example per value, in the order of the prose`,
+          );
           continue;
         }
-      }
-      if (real.text !== expected) {
-        const filled = expected === stated ? '' : ` (with the placeholders filled: ${JSON.stringify(expected)})`;
+        perValue = example;
+      } else if (example && count > 1) {
         problems.push(
-          `${at}: the prose states ${JSON.stringify(stated)}${filled}, the code has ${JSON.stringify(real.text)} (${source.from}${real.how}). Write the value of the code in the "Default ..." of the TSDoc (or fix the code, if the prose is the intended text)`,
+          `${at}, source ${source.from}: the prose lists ${count} values (${statedAll.map((s) => JSON.stringify(s)).join(', ')}) and \`examples.${key}\` is one example: give an array of ${count} examples, one per value, in the order of the prose`,
         );
         continue;
-      }
+      } else perValue = statedAll.map(() => example);
+      let ok = true;
+      statedAll.forEach((stated, i) => {
+        const which = count > 1 ? `value ${i + 1} of ${count}: ` : '';
+        const one = perValue[i];
+        const real = realText(value, one, stated, i, count);
+        if ('problem' in real) {
+          ok = false;
+          problems.push(`${at}, source ${source.from}: ${which}${real.problem}`);
+          return;
+        }
+        let expected = stated;
+        if (one?.fill) {
+          try {
+            expected = fillProse(stated, one.fill);
+          } catch (error) {
+            ok = false;
+            problems.push(`${at}, source ${source.from}: ${which}${(error as Error).message}`);
+            return;
+          }
+        }
+        if (real.text !== expected) {
+          ok = false;
+          const filled = expected === stated ? '' : ` (with the placeholders filled: ${JSON.stringify(expected)})`;
+          problems.push(
+            `${at}: ${which}the prose states ${JSON.stringify(stated)}${filled}, the code has ${JSON.stringify(real.text)} (${source.from}${real.how}). Write the value of the code in the "Default ..." of the TSDoc (or fix the code, if the prose is the intended text)`,
+          );
+        }
+      });
+      if (!ok) continue;
       if (exceptionIds.has(id)) problems.push(`${at}: verified by ${source.from} and also listed in LABEL_EXCEPTIONS of ${registry}: remove the exception`);
       verified.add(id);
     }
