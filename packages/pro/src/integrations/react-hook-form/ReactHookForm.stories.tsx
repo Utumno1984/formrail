@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
-import { useForm } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { exampleStory } from '../../../../core/src/internal/example-story';
 import { storyControls } from '../../../../core/src/internal/story-docs';
 import { useChangeSummary, useFormRebase } from '../../engine';
@@ -215,5 +215,132 @@ export const Playground: Story = {
     await expect(canvas.getByRole('status')).toHaveTextContent('Unsaved changes');
     await expect(summaryItems()).toHaveLength(1);
     await expect(summaryItems()[0]).toHaveTextContent('Amount: "150" → "120"');
+  },
+};
+
+interface Order {
+  supplier: string;
+  lines: { id: string; description: string; qty: string }[];
+}
+
+const ORDER: Order = {
+  supplier: 'Acme Corp',
+  lines: [
+    { id: 'L1', description: 'Cable', qty: '1' },
+    { id: 'L2', description: 'Switch', qty: '2' },
+  ],
+};
+const LINE_IDS = { lines: 'id' };
+/** How long after the click the server update arrives: time to go back to typing in a row. */
+const SERVER_DELAY = 1000;
+
+function LineItemsDemo({ onServerUpdate }: DemoArgs) {
+  const form = useForm<Order>({ defaultValues: ORDER });
+  const { fields } = useFieldArray({ control: form.control, name: 'lines', keyName: 'key' });
+  // The same id key for the binding and the engines: rows are matched by id, never by position.
+  const binding = useReactHookFormBinding(form, { arrayIdKeys: LINE_IDS });
+  const { entries, isEmpty } = useChangeSummary({ values: binding.values, baseline: binding.baseline, arrayIdKeys: LINE_IDS });
+  const { rebase, conflicts, acceptTheirs } = useFormRebase(binding, { arrayIdKeys: LINE_IDS });
+  const [scheduled, setScheduled] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  // Another user renames the supplier and the first line, a moment later.
+  const scheduleServerUpdate = () => {
+    setScheduled(true);
+    timer.current = setTimeout(() => {
+      const { baseline } = binding;
+      const incoming: Order = {
+        supplier: `${baseline.supplier} (updated)`,
+        lines: baseline.lines.map((line, index) => (index === 0 ? { ...line, description: `${line.description} (updated)` } : line)),
+      };
+      onServerUpdate(incoming);
+      rebase(incoming);
+      setScheduled(false);
+    }, SERVER_DELAY);
+  };
+
+  return (
+    <form style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 560 }} onSubmit={(event) => event.preventDefault()}>
+      <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        Supplier
+        <input {...form.register('supplier')} />
+      </label>
+      {fields.map((field, index) => (
+        <fieldset key={field.key} style={{ display: 'flex', gap: 8, border: 0, padding: 0, margin: 0 }}>
+          <legend style={{ fontSize: 14 }}>{`Line ${index + 1}`}</legend>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {`Description ${index + 1}`}
+            <input {...form.register(`lines.${index}.description`)} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {`Quantity ${index + 1}`}
+            <input inputMode="numeric" {...form.register(`lines.${index}.qty`)} />
+          </label>
+        </fieldset>
+      ))}
+      <div>
+        <button type="button" disabled={scheduled} onClick={scheduleServerUpdate}>
+          {`Server update in ${SERVER_DELAY / 1000} s`}
+        </button>
+      </div>
+      <p role="status" style={{ margin: 0 }}>
+        {[isEmpty ? 'All saved' : 'Unsaved changes', scheduled ? 'server update coming' : ''].filter(Boolean).join(' · ')}
+      </p>
+      {isEmpty ? (
+        <p style={{ margin: 0 }}>No changes</p>
+      ) : (
+        <ul aria-label="Changes" style={{ margin: 0, paddingLeft: 16 }}>
+          {entries.map((entry) => (
+            <li key={entry.path}>{`${entry.label}: ${JSON.stringify(entry.before)} → ${JSON.stringify(entry.after)}`}</li>
+          ))}
+        </ul>
+      )}
+      <ul aria-label={`Conflicts (${conflicts.length})`} style={{ margin: 0, paddingLeft: 16 }}>
+        {conflicts.map((conflict) => (
+          <li key={conflict.path}>
+            {`${conflict.label}: yours ${JSON.stringify(conflict.mine)}, server ${JSON.stringify(conflict.theirs)} `}
+            <button type="button" onClick={() => acceptTheirs(conflict.path)}>{`Accept server value for ${conflict.label}`}</button>
+          </li>
+        ))}
+      </ul>
+    </form>
+  );
+}
+
+/**
+ * Rows of a `useFieldArray`, matched by id (`arrayIdKeys: { lines: 'id' }`, the same for the binding and the
+ * engines). Type in a row, press "Server update in 1 s" and go back to the row: when the update arrives (the server
+ * renames the supplier and the first line) the row you are typing in keeps its input, its focus and its caret. A
+ * rebase never remounts the rows: the binding writes only the fields that change.
+ */
+export const LineItems: Story = {
+  name: 'Line items',
+  tags: ['!visual'],
+  render: (args) => <LineItemsDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const field = (name: string) => canvas.getByRole('textbox', { name }) as HTMLInputElement;
+
+    // 1. Edit the second line, schedule a server update, go back to typing in the same line.
+    const quantity = field('Quantity 2');
+    await userEvent.clear(quantity);
+    await userEvent.type(quantity, '5');
+    await userEvent.click(canvas.getByRole('button', { name: 'Server update in 1 s' }));
+    await userEvent.click(quantity);
+    await userEvent.type(quantity, '0');
+
+    // 2. The update arrives: supplier and first line take the server values.
+    await waitFor(() => expect(field('Supplier')).toHaveValue('Acme Corp (updated)'), { timeout: SERVER_DELAY + 3000 });
+    await expect(field('Description 1')).toHaveValue('Cable (updated)');
+    await expect(args.onServerUpdate).toHaveBeenCalledTimes(1);
+
+    // 3. The line being typed in is the same input, still focused, with the user's value: typing goes on there.
+    await expect(field('Quantity 2')).toBe(quantity);
+    await expect(quantity).toHaveFocus();
+    await userEvent.keyboard('0');
+    await expect(quantity).toHaveValue('500');
+    await expect(canvas.getByRole('status')).toHaveTextContent('Unsaved changes');
+    await waitFor(() => expect(canvas.getByRole('list', { name: 'Changes' }).querySelectorAll('li')).toHaveLength(1));
   },
 };

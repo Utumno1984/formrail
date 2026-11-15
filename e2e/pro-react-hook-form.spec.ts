@@ -5,6 +5,7 @@ import { expectPlayToPass, gotoStory } from './helpers/story';
 // Pro/Integrations/React Hook Form (ticket #507): `useReactHookFormBinding` with a real React Hook Form, the Change
 // Summary and the rebase of `@formrail/pro/engine`.
 const PLAYGROUND = 'pro-integrations-react-hook-form--playground';
+const LINE_ITEMS = 'pro-integrations-react-hook-form--line-items';
 
 const field = (page: Page, name: string) => page.getByRole('textbox', { name });
 const summaryRows = (page: Page) => page.getByRole('list', { name: 'Changes' }).getByRole('listitem');
@@ -104,6 +105,47 @@ test.describe('Pro/Integrations/React Hook Form', () => {
     await expect(summaryRows(page).nth(0)).toHaveText(`Amount: "999" → "${accepted}"`);
     await expect(summaryRows(page).nth(1)).toHaveText('Notes: "" → "typed during save"');
     await expect(conflictsList(page).getByRole('listitem')).toHaveCount(0);
+  });
+
+  test('Line items: the play passes (a server update while typing in a row)', async ({ page }) => {
+    await expectPlayToPass(page, LINE_ITEMS);
+  });
+
+  // The two tests below start where the play ends: Supplier "Acme Corp (updated)", Description 1 "Cable (updated)",
+  // Quantity 2 "500" (an unsaved change).
+  test('Line items: a server update while typing in a row keeps that input node, its focus and the keystrokes (critic #507, point 2)', async ({ page }) => {
+    await expectPlayToPass(page, LINE_ITEMS);
+    const quantity = field(page, 'Quantity 2');
+    await quantity.fill('5');
+    // Mark the node: a remount would give a new input without the mark.
+    await quantity.evaluate((input) => (input.dataset.probe = 'kept'));
+    await page.getByRole('button', { name: 'Server update in 1 s' }).click();
+    await quantity.click();
+    await page.keyboard.press('End');
+    await expect(field(page, 'Supplier')).toHaveValue('Acme Corp (updated) (updated)', { timeout: 5_000 });
+    await expect(field(page, 'Description 1')).toHaveValue('Cable (updated) (updated)');
+    // The same node, still focused: the next keystrokes land in it.
+    await expect(page.locator('input[data-probe="kept"]')).toHaveCount(1);
+    await expect(page.locator('input[data-probe="kept"]')).toBeFocused();
+    await page.keyboard.type('0');
+    await expect(quantity).toHaveValue('50');
+    await expect(page.getByRole('status')).toHaveText('Unsaved changes');
+    await expect(summaryRows(page)).toHaveCount(1);
+  });
+
+  test('Line items: "Accept server value" on another field keeps the row inputs (no remount)', async ({ page }) => {
+    await expectPlayToPass(page, LINE_ITEMS);
+    await field(page, 'Supplier').fill('Mine');
+    await field(page, 'Quantity 1').fill('7');
+    await field(page, 'Quantity 1').evaluate((input) => (input.dataset.probe = 'kept'));
+    await page.getByRole('button', { name: 'Server update in 1 s' }).click();
+    const accept = page.getByRole('button', { name: 'Accept server value for Supplier' });
+    await expect(accept).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('input[data-probe="kept"]')).toHaveCount(1);
+    await accept.click();
+    await expect(field(page, 'Supplier')).toHaveValue('Acme Corp (updated) (updated)');
+    await expect(page.locator('input[data-probe="kept"]')).toHaveCount(1);
+    await expect(page.locator('input[data-probe="kept"]')).toHaveValue('7');
   });
 
   test('accept the server value: the field takes it, the conflict and its summary row go', async ({ page }) => {
