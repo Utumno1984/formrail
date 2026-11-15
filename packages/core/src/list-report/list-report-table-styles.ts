@@ -157,18 +157,18 @@ export const edgeLayerClass =
 // change fades with the feedback motion tokens, and at once under reduced motion. In forced colours the
 // gradient is dropped by the browser: a line in the text colour on the outer side carries the signal.
 // The end shade stops at the start of the sticky row actions column (`--rop-list-report-edge-end`,
-// its width, 0 without it), so it never covers the "…" button.
+// its width, 0 without it), so it never covers the "…" button. The direction of each gradient is a custom
+// property the layer sets from the measured direction (`--rop-list-report-edge-start-to` / `-end-to`):
+// no direction selector, which a build may lower to a list of languages.
 export const edgeShadowStartClass =
   'absolute start-0 bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 invisible opacity-0 ' +
-  'bg-[linear-gradient(to_right,var(--rop-list-report-edge-color),transparent)] ' +
-  '[&:dir(rtl)]:bg-[linear-gradient(to_left,var(--rop-list-report-edge-color),transparent)] ' +
+  'bg-[linear-gradient(var(--rop-list-report-edge-start-to,to_right),var(--rop-list-report-edge-color),transparent)] ' +
   'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-s-2 forced-colors:border-[CanvasText] ' +
   '[&:is([data-rop-overflow-start]>*>*)]:visible [&:is([data-rop-overflow-start]>*>*)]:opacity-100';
 export const edgeShadowEndClass =
   'absolute end-(--rop-list-report-edge-end) bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 invisible opacity-0 ' +
-  'bg-[linear-gradient(to_left,var(--rop-list-report-edge-color),transparent)] ' +
-  '[&:dir(rtl)]:bg-[linear-gradient(to_right,var(--rop-list-report-edge-color),transparent)] ' +
+  'bg-[linear-gradient(var(--rop-list-report-edge-end-to,to_left),var(--rop-list-report-edge-color),transparent)] ' +
   'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-e-2 forced-colors:border-[CanvasText] ' +
   '[&:is([data-rop-overflow-end]>*>*)]:visible [&:is([data-rop-overflow-end]>*>*)]:opacity-100';

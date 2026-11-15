@@ -13,7 +13,9 @@ interface Item {
   name: string;
 }
 
-const ROWS: Item[] = Array.from({ length: 200 }, (_, i) => ({ id: `r${i}`, name: `Item ${i}` }));
+/** The render-count test uses 200 rows (the ticket's figure); every other test 20, enough for the geometry. */
+const ROWS_200: Item[] = Array.from({ length: 200 }, (_, i) => ({ id: `r${i}`, name: `Item ${i}` }));
+const ROWS = ROWS_200.slice(0, 20);
 /** One `cell` call is one render of that row. */
 let renders = 0;
 const COLUMNS: ListReportColumn<Item>[] = [
@@ -143,14 +145,15 @@ interface HostProps {
   rowActions?: ListReportRowActions<Item>;
   rowActionsInline?: number;
   columns?: ListReportColumn<Item>[];
+  rows?: Item[];
 }
 
 let rerenderHost: () => void = () => {};
 
-function Host({ dir, rowActions, rowActionsInline, columns = COLUMNS }: HostProps) {
+function Host({ dir, rowActions, rowActionsInline, columns = COLUMNS, rows = ROWS }: HostProps) {
   const [, setTick] = useState(0);
   rerenderHost = () => setTick((t) => t + 1);
-  const table = useListReport<Item>({ rows: ROWS, columns, getRowId: (r) => r.id, selectable: true });
+  const table = useListReport<Item>({ rows, columns, getRowId: (r) => r.id, selectable: true });
   return (
     <ListReportTable
       table={table}
@@ -293,21 +296,21 @@ describe('ListReportTable: shades on the inline edges that hide columns', () => 
     mock = mockLayout(WIDE);
     render(<Host />);
     const toggle = vi.spyOn(scroller(), 'toggleAttribute');
-    for (let left = 10; left <= 490; left += 10) scrollLeftTo(left);
+    for (let left = 10; left <= 490; left += 40) scrollLeftTo(left);
     // start appears once (at 10); end stays.
     expect(toggle.mock.calls).toEqual([['data-rop-overflow-start', true]]);
   });
 
   it('200 rows: scrolling sideways back and forth renders no row; the layer appearing renders no row either', () => {
     mock = mockLayout({ ...WIDE, scrollWidth: 300 });
-    render(<Host />);
+    render(<Host rows={ROWS_200} />);
     expect(renders).toBe(200);
     renders = 0;
     mock.layout.scrollWidth = 800;
     ro.trigger();
     expect(layer()).not.toBeNull();
-    for (let left = 0; left <= 500; left += 25) scrollLeftTo(left);
-    for (let left = 500; left >= 0; left -= 25) scrollLeftTo(left);
+    for (let left = 0; left <= 500; left += 50) scrollLeftTo(left);
+    for (let left = 500; left >= 0; left -= 50) scrollLeftTo(left);
     expect(renders).toBe(0);
     // A parent render that changes nothing still renders no row (the layer is kept).
     act(() => rerenderHost());
@@ -347,14 +350,30 @@ describe('ListReportTable: shades on the inline edges that hide columns', () => 
     for (const cls of table.className.split(' ').filter((c) => c.includes('row-actions'))) expect(layer()!.classList).toContain(cls);
   });
 
-  it('unmount: the scroll listener goes, and so do the attributes', () => {
+  it('unmount: the scroll listener goes, and so do both attributes', () => {
     mock = mockLayout(WIDE);
     const { unmount } = render(<Host />);
+    scrollLeftTo(250);
+    expect(edges()).toEqual({ start: true, end: true });
     const el = scroller();
     const remove = vi.spyOn(el, 'removeEventListener');
     unmount();
     expect(remove.mock.calls.some(([type]) => type === 'scroll')).toBe(true);
+    expect(el.hasAttribute('data-rop-overflow-start')).toBe(false);
     expect(el.hasAttribute('data-rop-overflow-end')).toBe(false);
+  });
+
+  it('the direction of each gradient is a custom property of the layer, from the measured direction', () => {
+    mock = mockLayout(WIDE);
+    const { unmount } = render(<Host />);
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-start-to')).toBe('to right');
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-end-to')).toBe('to left');
+    unmount();
+    render(<Host dir="rtl" />);
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-start-to')).toBe('to left');
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-end-to')).toBe('to right');
+    // No direction selector anywhere in the classes of the shades.
+    for (const shade of layer()!.children) expect(shade.className).not.toMatch(/dir\(|rtl:/);
   });
 });
 

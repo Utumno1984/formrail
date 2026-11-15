@@ -11,11 +11,14 @@ export const OVERFLOW_END_ATTR = 'data-rop-overflow-end';
  * Where the edge layer must draw its shades, in px, or `null` when nothing overflows sideways (no
  * layer at all). `height` is the scrollport's (`clientHeight`); `bottom` moves the shades down from
  * the layer, which sits right after the table: a table shorter than the scrollport leaves room below
- * it that the shades cover too (0 when the table fills it).
+ * it that the shades cover too (0 when the table fills it). `rtl` is the container's computed
+ * direction: the gradients follow it through a custom property set by the layer, never through a
+ * `:dir()` selector (a build may lower it to a `:lang()` list, and Safari before 16.4 lacks it).
  */
 export interface OverflowEdgesGeometry {
   height: number;
   bottom: number;
+  rtl: boolean;
 }
 
 export interface OverflowEdgesSink {
@@ -42,6 +45,7 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
     let end = false;
     let overflow = false;
     let lastLeft: number | undefined;
+    let rtl = false;
     let geometry: OverflowEdgesGeometry | null = null;
 
     const measureGeometry = (): OverflowEdgesGeometry | null => {
@@ -50,15 +54,17 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       const table = el.firstElementChild;
       const tableHeight = table ? table.getBoundingClientRect().height : height;
       // Floored: the shades must never reach past the scrollport and make it scroll.
-      return { height, bottom: -Math.max(0, Math.floor(height - tableHeight)) };
+      return { height, bottom: -Math.max(0, Math.floor(height - tableHeight)), rtl };
     };
     const publish = (next: OverflowEdgesGeometry | null) => {
-      if (next === geometry || (next && geometry && next.height === geometry.height && next.bottom === geometry.bottom)) return;
+      if (next === geometry || (next && geometry && next.height === geometry.height && next.bottom === geometry.bottom && next.rtl === geometry.rtl)) return;
       geometry = next;
       sinkRef.current?.setGeometry(next);
     };
     const measure = (resized: boolean) => {
-      const rtl = getComputedStyle(el).direction === 'rtl';
+      const nextRtl = getComputedStyle(el).direction === 'rtl';
+      const directionChanged = nextRtl !== rtl;
+      rtl = nextRtl;
       const edges = overflowEdges(scrollFromStart(el, rtl), el.scrollWidth, el.clientWidth);
       if (edges.start !== start) {
         start = edges.start;
@@ -70,7 +76,7 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       }
       const overflowChanged = edges.overflow !== overflow;
       overflow = edges.overflow;
-      if (resized || overflowChanged) publish(measureGeometry());
+      if (resized || overflowChanged || directionChanged) publish(measureGeometry());
     };
     const onScroll = () => {
       const left = el.scrollLeft;

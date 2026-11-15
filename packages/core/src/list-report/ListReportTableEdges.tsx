@@ -39,6 +39,9 @@ const ListReportTableEdgesImpl = /* @__PURE__ */ forwardRef<OverflowEdgesSink, L
     '--rop-list-report-edge-height': `${geometry.height}px`,
     '--rop-list-report-edge-bottom': `${geometry.bottom}px`,
     '--rop-list-report-edge-end': rowActionsWidth ?? '0px',
+    // Each gradient runs from the outer edge inwards: the start one from the left in ltr, from the right in rtl.
+    '--rop-list-report-edge-start-to': geometry.rtl ? 'to left' : 'to right',
+    '--rop-list-report-edge-end-to': geometry.rtl ? 'to right' : 'to left',
     ...(inlineCount > 0 ? { '--rop-list-report-row-actions-inline': inlineCount } : null),
   } as CSSProperties;
   return (

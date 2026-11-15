@@ -77,6 +77,39 @@ async function shadeBox(page: Page, edge: 'start' | 'end') {
   }, edge);
 }
 
+/**
+ * Where the full colour of a shade is: its computed `background-image`, and the luminance of the first
+ * and last pixel column of the shade in a screenshot taken with the table hidden (the shade then lies on
+ * the plain page background). `outer` is the column on the scroller's edge, `inner` the one 12px inside.
+ */
+async function shadeRamp(page: Page, edge: 'start' | 'end') {
+  const shade = scroller(page).locator(`[data-rop-overflow-edge="${edge}"]`);
+  const style = await page.addStyleTag({ content: '#storybook-root [tabindex="0"] > table { visibility: hidden !important; }' });
+  const box = (await shade.boundingBox())!;
+  const area = (await scroller(page).boundingBox())!;
+  const png = await page.screenshot({ clip: { x: Math.round(box.x), y: Math.round(box.y + box.height / 2), width: Math.round(box.width), height: 1 } });
+  await style.evaluate((el) => (el as Element).remove());
+  const [left, right] = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    const lum = (x: number) => {
+      const [r, g, b] = ctx.getImageData(x, 0, 1, 1).data;
+      return 0.299 * r! + 0.587 * g! + 0.114 * b!;
+    };
+    return [lum(0), lum(img.width - 1)];
+  }, png.toString('base64'));
+  // The shade on the left half of the scroller has its outer side on the left.
+  const onLeft = box.x + box.width / 2 < area.x + area.width / 2;
+  const image = await shade.evaluate((el) => getComputedStyle(el).backgroundImage);
+  return { image, onLeft, outer: onLeft ? left! : right!, inner: onLeft ? right! : left! };
+}
+
 async function waitForRows(page: Page): Promise<void> {
   await expect(scroller(page).locator('tbody tr').nth(3)).toBeVisible();
 }
@@ -332,6 +365,24 @@ test.describe('List Report: edge shades (Free)', () => {
     expect(Math.abs(start.right - start.clientWidth)).toBeLessThanOrEqual(1);
   });
 
+  for (const dir of ['ltr', 'rtl'] as const) {
+    test(`${dir}: the full colour of both shades is on the scroller's outer edge (computed gradient and pixels)`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      // `status: loading` keeps the Playground's play out of the way (it returns at once).
+      await gotoStory(page, PLAYGROUND, `containerWidth:360;dir:${dir};status:loading`);
+      await scrollFromStart(page, 'middle');
+      await expectEdges(page, true, true);
+      for (const edge of ['start', 'end'] as const) {
+        const ramp = await shadeRamp(page, edge);
+        // The start shade is on the left in ltr, on the right in rtl; the end one opposite.
+        expect(ramp.onLeft, `${dir} ${edge}: side`).toBe((edge === 'start') === (dir === 'ltr'));
+        // A gradient from the outer edge inwards: "to right" from the left edge, "to left" from the right one.
+        expect(ramp.image, `${dir} ${edge}: gradient`).toMatch(ramp.onLeft ? /^linear-gradient\(to right, / : /^linear-gradient\(to left, /);
+        expect(ramp.outer, `${dir} ${edge}: darker on the outer edge`).toBeLessThan(ramp.inner - 20);
+      }
+    });
+  }
+
   test('restored scroll position (useListReportScrollRestoration): the start shade is there with no gesture', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await gotoStory(page, 'floorplans-list-report--scroll-restoration-no-play', 'loadDelayMs:300');
@@ -403,6 +454,13 @@ test.describe('List Report: edge shades (Free)', () => {
     await expectEdges(page, false, false);
     await page.setViewportSize(PHONE);
     await expectPlayToPass(page, FREE_STORY);
+    // The same play in rtl, then the full colour on the outer edges there too.
+    await expectPlayToPass(page, `${FREE_STORY}-rtl`);
+    for (const edge of ['start', 'end'] as const) {
+      const ramp = await shadeRamp(page, edge);
+      expect(ramp.onLeft, `rtl story ${edge}: side`).toBe(edge === 'end');
+      expect(ramp.outer, `rtl story ${edge}: darker on the outer edge`).toBeLessThan(ramp.inner - 20);
+    }
   });
 
   test('the Playground play in rtl', async ({ page }) => {
