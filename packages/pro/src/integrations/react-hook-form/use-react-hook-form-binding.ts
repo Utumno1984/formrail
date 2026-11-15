@@ -94,10 +94,11 @@ class BindingStore<Values extends FieldValues> {
    */
   private savedAt: number | null = null;
   /**
-   * The write to React Hook Form of the current synchronous run, not done yet (see `write`): the values, and the
-   * defaults (`null`: React Hook Form's stay).
+   * The write to React Hook Form of the current synchronous run, not done yet (see `write`): the values, the
+   * defaults (`null`: React Hook Form's stay), React Hook Form's values it is measured from (`base`, a snapshot)
+   * and its defaults object at that moment (`since`).
    */
-  private pending: { values: Values; defaults: Values | null } | null = null;
+  private pending: { values: Values; defaults: Values | null; base: Values; since: unknown } | null = null;
 
   constructor(form: AnyForm<Values>) {
     this.form = form;
@@ -169,9 +170,15 @@ class BindingStore<Values extends FieldValues> {
    * when the baseline was replaced by values of the same content (a hydration), never after a field edit.
    */
   private sync(event?: RhfEvent, notify = true): void {
-    // A write of the binding not done yet: React Hook Form still holds the values before it.
-    if (this.busy > 0 || this.pending !== null) return;
+    if (this.busy > 0) return;
     const { form } = this;
+    const { pending } = this;
+    // A write of the binding not done yet: React Hook Form still holds the values before it. A value event now is a
+    // write of the app made after the binding's, in the same run: it is folded into the pending write (see `absorb`).
+    if (pending !== null) {
+      if (event === undefined) return;
+      this.absorb(pending);
+    }
     const prev = this.state;
     let baseline = prev.baseline;
     const defaults = form.control._defaultValues;
@@ -179,7 +186,7 @@ class BindingStore<Values extends FieldValues> {
       this.defaults = defaults;
       baseline = snapshotOf<unknown>(defaults ?? {}, prev.baseline) as Values;
     }
-    let values = snapshotOf(form.getValues(), prev.values);
+    let values = snapshotOf(pending === null ? form.getValues() : pending.values, prev.values);
     const wholeForm = event !== undefined && event.name === undefined;
     if ((wholeForm || baseline !== prev.baseline) && values !== baseline && sameContent(values, baseline)) values = baseline;
     // A discard (`form.reset()`) or a rehydration (`form.reset(data)`) during a save: the reset wins, the save's
@@ -213,9 +220,35 @@ class BindingStore<Values extends FieldValues> {
    * field the user is typing in, then the user's value back (the caret jumps to the end).
    */
   private write(values: Values, defaults: Values | null): void {
-    const pending = this.pending;
-    this.pending = { values, defaults: defaults ?? pending?.defaults ?? null };
-    if (pending === null) queueMicrotask(this.flush);
+    const { pending } = this;
+    if (pending !== null) {
+      pending.values = values;
+      if (defaults !== null) pending.defaults = defaults;
+      return;
+    }
+    const base = snapshotOf(this.form.getValues(), this.state.values);
+    this.pending = { values, defaults, base, since: this.control._defaultValues };
+    // `resync`: the flush, then the snapshots re-read (a write of the app folded in at the flush changes them).
+    queueMicrotask(this.resync);
+  }
+
+  /**
+   * A write of the app to React Hook Form while the binding's write waits (`form.setValue`, a `Controller`, a
+   * `useFieldArray` operation, `form.reset` right after `binding.reset` / `setValues`): it comes later in call
+   * order, so it wins on what it changed. The fields it changed since `base` take its value in the pending write,
+   * the others keep the binding's (`adoptWrites`). New defaults (a reset or a rehydration of the app) replace the
+   * whole form: the binding's write is dropped, values and defaults.
+   */
+  private absorb(pending: NonNullable<BindingStore<Values>['pending']>): void {
+    const current = snapshotOf(this.form.getValues(), pending.base);
+    if (this.control._defaultValues !== pending.since) {
+      pending.values = current;
+      pending.defaults = null;
+      pending.since = this.control._defaultValues;
+    } else {
+      pending.values = adoptWrites(pending.base, current, pending.values, '', this.arrayIdKeys) as Values;
+    }
+    pending.base = current;
   }
 
   /**
@@ -230,9 +263,15 @@ class BindingStore<Values extends FieldValues> {
   flush = (): void => {
     const pending = this.pending;
     if (pending === null) return;
-    this.pending = null;
     const { form } = this;
-    const { values, defaults } = pending;
+    // A write of the app with no value event (a `useFieldArray` operation: `append`, `remove`, ...) is folded in too.
+    if (!sameContent(form.getValues(), pending.base)) this.absorb(pending);
+    this.pending = null;
+    const { values } = pending;
+    // Defaults the app wrote after the binding's write with no value event (`resetDefaultValues`, `resetField` with
+    // a default) win: the binding's are not written, and the baseline follows React Hook Form's at the next read.
+    const replaced = form.control._defaultValues !== pending.since;
+    const defaults = replaced ? null : pending.defaults;
     this.busy += 1;
     try {
       const current = form.getValues();
@@ -249,7 +288,7 @@ class BindingStore<Values extends FieldValues> {
     } finally {
       this.busy -= 1;
     }
-    this.defaults = form.control._defaultValues;
+    if (!replaced) this.defaults = form.control._defaultValues;
   };
 
   private beginRun(): NonNullable<BindingStore<Values>['run']> {
@@ -344,7 +383,8 @@ class BindingStore<Values extends FieldValues> {
  * synchronous run, without its `reset`: `setValue` on each changed field only (no validation, no
  * `type: 'change'` event, no remount of the `useFieldArray` rows, the field being typed in is not rewritten),
  * then `resetDefaultValues` (`dirtyFields` and `isDirty` against the baseline). Only a top-level key that must
- * go is written with `reset`. Both keep `touchedFields`, `submitCount` and the submit flags. An error stays on a
+ * go is written with `reset`. A write of the app made after them in the same run (`form.setValue`, a `Controller`,
+ * a `useFieldArray` operation, `form.reset`) wins on what it changes. Both keep `touchedFields`, `submitCount` and the submit flags. An error stays on a
  * field whose value they did not change; the error of a field that took another value is removed (validation
  * runs again at the next change or submit).
  *
@@ -432,6 +472,21 @@ function rowIds(rows: unknown[], idKey: string): unknown[] | null {
   return ids;
 }
 
+type IdKeys = Readonly<Record<string, string>> | undefined;
+
+/**
+ * `true` when the arrays `a` and `b` have the same length and, with an id key for `schemaPath`, the same ids in
+ * the same order: the same rows, compared index by index.
+ */
+function sameRows(a: unknown[], b: unknown[], schemaPath: string, idKeys: IdKeys): boolean {
+  if (a.length !== b.length) return false;
+  const idKey = idKeys !== undefined && Object.hasOwn(idKeys, schemaPath) ? idKeys[schemaPath] : undefined;
+  if (typeof idKey !== 'string') return true;
+  const before = rowIds(a, idKey);
+  const after = rowIds(b, idKey);
+  return before !== null && after !== null && before.every((id, index) => Object.is(id, after[index]));
+}
+
 /**
  * `setValue` (a copy, by React Hook Form) on each path where `next` differs from `current`, as deep as possible:
  * into plain objects that keep all their keys, into arrays that keep their length and, with an id key, the same
@@ -444,23 +499,44 @@ function writeChanges(
   schemaPath: string,
   current: unknown,
   next: unknown,
-  idKeys: Readonly<Record<string, string>> | undefined,
+  idKeys: IdKeys,
 ): void {
   if (sameContent(current, next)) return;
   if (isPlainRecord(current) && isPlainRecord(next) && Object.keys(current).every((key) => Object.hasOwn(next, key))) {
     for (const key of Object.keys(next)) writeChanges(setValue, join(path, key), join(schemaPath, key), current[key], next[key], idKeys);
     return;
   }
-  if (Array.isArray(current) && Array.isArray(next) && current.length === next.length) {
-    const idKey = idKeys !== undefined && Object.hasOwn(idKeys, schemaPath) ? idKeys[schemaPath] : undefined;
-    const before = typeof idKey === 'string' ? rowIds(current, idKey) : [];
-    const after = typeof idKey === 'string' ? rowIds(next, idKey) : [];
-    if (before !== null && after !== null && before.every((id, index) => Object.is(id, after[index]))) {
-      next.forEach((item: unknown, index) => writeChanges(setValue, join(path, String(index)), schemaPath, current[index], item, idKeys));
-      return;
-    }
+  if (Array.isArray(current) && Array.isArray(next) && sameRows(current, next, schemaPath, idKeys)) {
+    next.forEach((item: unknown, index) => writeChanges(setValue, join(path, String(index)), schemaPath, current[index], item, idKeys));
+    return;
   }
   setValue(path, next);
+}
+
+/**
+ * The binding's pending write `mine` with the writes of the app made since `base` on top (`theirs`: React Hook
+ * Form now): where `theirs` differs from `base` it wins, elsewhere `mine` stays. As deep as `writeChanges` goes
+ * (plain objects; arrays whose rows stay the same, see `sameRows`); anywhere else `theirs` whole (the app changed
+ * the shape of an array the binding also wrote: the app's array). Never mutates its arguments.
+ */
+function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schemaPath: string, idKeys: IdKeys): unknown {
+  if (sameContent(theirs, base)) return mine;
+  if (sameContent(mine, base)) return theirs;
+  if (isPlainRecord(base) && isPlainRecord(theirs) && isPlainRecord(mine)) {
+    const out: Record<string, unknown> = { ...mine };
+    for (const key of Object.keys(theirs)) {
+      // Removed by the binding, left as it was by the app: stays removed.
+      if (!Object.hasOwn(mine, key) && Object.hasOwn(base, key) && sameContent(theirs[key], base[key])) continue;
+      out[key] = adoptWrites(base[key], theirs[key], mine[key], join(schemaPath, key), idKeys);
+    }
+    // Removed by the app (a field unregistered with `shouldUnregister`).
+    for (const key of Object.keys(base)) if (!Object.hasOwn(theirs, key)) delete out[key];
+    return out;
+  }
+  if (Array.isArray(base) && Array.isArray(theirs) && Array.isArray(mine) && sameRows(base, theirs, schemaPath, idKeys) && sameRows(base, mine, schemaPath, idKeys)) {
+    return theirs.map((item: unknown, index) => adoptWrites(base[index], item, mine[index], schemaPath, idKeys));
+  }
+  return theirs;
 }
 
 /** The controls already warned about (one warning per form). */
