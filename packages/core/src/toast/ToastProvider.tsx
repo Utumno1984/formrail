@@ -30,9 +30,11 @@ import {
 } from './use-toast';
 
 const DEFAULT_DURATION = 5000;
-const DEFAULT_DISMISS_LABEL = 'Dismiss notification';
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_DISMISS_LABEL = 'Dismiss notification';
 
-const TONE_LABEL: Record<ToastTone, string> = {
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const TONE_LABEL: Record<ToastTone, string> = {
   info: 'Information',
   success: 'Success',
   warning: 'Warning',

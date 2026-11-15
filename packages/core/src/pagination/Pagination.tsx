@@ -55,7 +55,8 @@ export interface PaginationProps extends Omit<HTMLAttributes<HTMLElement>, 'chil
   labels?: PaginationLabels;
 }
 
-const DEFAULT_LABELS = {
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_LABELS = {
   navigation: 'Pagination',
   previous: 'Previous page',
   next: 'Next page',

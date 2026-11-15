@@ -44,7 +44,8 @@ export interface DatePickerLabels extends CalendarLabels {
   chooseDateSelected: (date: string) => string;
 }
 
-const DEFAULT_LABELS: DatePickerLabels = {
+/** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
+export const DEFAULT_LABELS: DatePickerLabels = {
   chooseDate: 'Choose date',
   chooseDateSelected: (date) => `Choose date, selected ${date}`,
   previousMonth: 'Previous month',
