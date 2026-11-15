@@ -24,13 +24,14 @@ Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LIC
 |---|---|---|
 | `@formrail/pro/engine` | The engines: `computeChangeSummary`, `useChangeSummary`, `inferSegmentLabel`, `formatChangeValue`, `computeRebase`, `useFormRebase` and their types (`RebaseFormBinding`, ...) | **Not needed**: nothing in this entry imports it, not even a type |
 | `@formrail/pro/react-hook-form` | `useReactHookFormBinding`, the React Hook Form adapter (see [React Hook Form](#react-hook-form)) | **Not needed** (needs `react-hook-form`, an optional peer) |
-| `@formrail/pro` | Everything above (but the React Hook Form adapter) plus the components (`ChangeSummary`, `RebaseNotice`, `VirtualListReport`, `VirtualListReportTable`) and `useFormRebase` typed for core's `useObjectPageForm` | **Required**: install it next to pro |
+| `@formrail/pro/tanstack-form` | `useTanStackFormBinding`, the TanStack Form adapter (see [TanStack Form](#tanstack-form)) | **Not needed** (needs `@tanstack/react-form`, an optional peer) |
+| `@formrail/pro` | Everything above (but the two adapters) plus the components (`ChangeSummary`, `RebaseNotice`, `VirtualListReport`, `VirtualListReportTable`) and `useFormRebase` typed for core's `useObjectPageForm` | **Required**: install it next to pro |
 
 `@formrail/core` is an **optional** peer dependency (`peerDependenciesMeta`), so npm does not install it
 by itself:
 
 - With React Hook Form, TanStack Form or a form of your own, install `@formrail/pro` and import only
-  `@formrail/pro/engine`. `npm ls @formrail/core` then reports it absent.
+  `@formrail/pro/engine` (and the adapter subpath of your form library). `npm ls @formrail/core` then reports it absent.
 - With core's Object Page or the Pro components, install both: `npm install @formrail/core @formrail/pro`.
 
 Importing `@formrail/pro` (the main entry) without the core installed fails, but **where** it fails
@@ -56,8 +57,7 @@ same limit as `@formrail/core/internal`.
 
 `useFormRebase` of `@formrail/pro/engine` takes any form that keeps the `RebaseFormBinding` contract
 (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`); core's `useObjectPageForm()` is one
-as is. For React Hook Form use the ready-made binding below; one for TanStack Form (#508) comes in its own
-ticket. The study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
+as is. For React Hook Form and TanStack Form use the ready-made bindings below. The study of the boundary is in `docs/planning/pro-engines-decoupling.md`.
 
 ## React Hook Form
 
@@ -252,6 +252,157 @@ pin both, and how they behave, against the tested version (`react-hook-form` `7.
 peer range); in development a form without them gets a `console.warn` naming the field, instead of a baseline
 `{}` where every field is listed as added. If you see that warning after upgrading `react-hook-form`, stay on
 the last version that does not show it.
+
+## TanStack Form
+
+`@formrail/pro/tanstack-form` binds a TanStack Form form (`useForm` of `@tanstack/react-form`) to the engines:
+the Change Summary against the saved baseline and the form rebase, without `@formrail/core` and without
+`react-hook-form`.
+
+### Install
+
+```sh
+npm install @formrail/pro @tanstack/react-form
+```
+
+- `@tanstack/react-form` `^1.33.5` (the version range tested), `react` / `react-dom` 18 or 19. `@formrail/core`
+  is not needed. `@tanstack/react-form` is an **optional** peer dependency of `@formrail/pro`, used for the
+  types only: nothing of TanStack Form (`@tanstack/react-form`, `@tanstack/form-core`, `@tanstack/store`) is
+  imported at runtime. The adapter calls the methods of your `form` (`form.store`, `form.baseStore`,
+  `form.setFieldMeta`, `form.Subscribe`, see [What the adapter reads](#what-the-adapter-reads)).
+- `@formrail/pro` is `"private": true` today: it will be installed from the private npm org once that
+  exists.
+- The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
+  `@tanstack/react-form`; import the adapter from its subpath (`moduleResolution` `bundler`, `node16` or
+  `nodenext`).
+
+### Usage
+
+```tsx
+import { useForm } from '@tanstack/react-form';
+import { useChangeSummary, useFormRebase } from '@formrail/pro/engine';
+import { useTanStackFormBinding } from '@formrail/pro/tanstack-form';
+
+function InvoiceEditor({ saved }: { saved: Invoice }) {
+  const form = useForm({
+    defaultValues: saved,
+    onSubmit: async ({ value }) => {
+      const stored = await api.saveInvoice(value);
+      binding.reset(stored); // the stored record becomes the baseline, inside onSubmit
+    },
+  });
+  const binding = useTanStackFormBinding(form); // Values inferred from defaultValues, no generic needed
+  const { entries, isEmpty } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
+  const { rebase, conflicts, keepMine, acceptTheirs, isPending } = useFormRebase(binding);
+  // ...form.Field with your inputs, the summary from `entries`, a "Save" bar shown while !isEmpty,
+  // "Discard" calling binding.reset()
+}
+```
+
+- Call `useTanStackFormBinding` in the component that calls `useForm`, after it.
+- `binding.values` / `binding.baseline` are immutable snapshots: a new object only when the content changes,
+  the same object across renders that change no value (a blur, a validation, a parent's state), so the
+  summary is never stale and is not recomputed for nothing. TanStack Form keeps the object you pass as
+  `defaultValues` (or to `form.reset(data)`) as its own values, without a copy: the binding keeps copies, so
+  its baseline never changes under the summary if your code mutates that object later (TanStack Form itself
+  would not see such a mutation either: don't mutate it).
+- A `defaultValues` written **inline** (`useForm({ defaultValues: { ...record } })`, a new object at every
+  render) is fine: an object with the same content is no change, no snapshot and no rehydration (the open
+  conflicts stay open).
+- Give every field its default in the `defaultValues` of `useForm` (`''` for an empty text input). A field
+  with a `defaultValue` of its own only (on `form.Field`) enters `values` but not the baseline: it is listed
+  as added.
+
+### Hydration: `defaultValues` and `update()`
+
+`useForm` calls TanStack Form's `formApi.update(opts)` at **every** render: the options you pass replace the
+form's, its defaults included. So the baseline TanStack Form uses is always the `defaultValues` of your last
+render, and the binding follows it:
+
+- **Async load**: pass the loaded record as `defaultValues` (`useForm({ defaultValues: record ?? empty })`).
+  While the form is not touched, TanStack Form takes the new values; the binding reads it as a rehydration:
+  no summary row in any render, no field meta written (`isTouched`, `isBlurred`, `isDirty`), no
+  `listeners.onChange` called, no validator run, and for `useFormRebase` the open conflicts are closed.
+- **`form.reset(data)`** works the same way **only if `defaultValues` follows the data** (set the state you
+  pass as `defaultValues` together with `form.reset(data)`). With a `defaultValues` that stays on the empty
+  record, TanStack Form puts it back at the next render of the component (the binding makes the component
+  render on every value change, so at once): no row is ever shown, but the data is gone.
+- **`defaultValues` that changes on a TOUCHED form** (`FormApi.js:94`): TanStack Form keeps the values the
+  user has, but compares them with the new defaults from now on. The binding does the same: the baseline
+  becomes the new `defaultValues` (a rehydration: the open conflicts close), and the summary lists every
+  field whose value differs from it, the user's edits and the fields the user never touched alike. The
+  summary is never computed against a baseline TanStack Form no longer uses. To bring server data in while
+  the user edits, use `rebase(data)` instead (below): it keeps the edits, takes the server value on the
+  untouched fields and reports the conflicts.
+- A new `defaultValues` with the content of the current baseline (an app that keeps `defaultValues` on the
+  record it saved or rebased on) is no change.
+
+### Saving
+
+- `binding.isSaving` is `form.state.isSubmitting`; `binding.saveError` is `null` unless the last submit did
+  not succeed (blocked by validation, or an `onSubmit` that threw: then `form.state.errors`; TanStack Form
+  does not keep the thrown error, pass `saveError` to expose it).
+- Call `binding.reset(saved)` **inside** `onSubmit`, before it resolves: a server update that came during the
+  save is queued (`isPending`) and merged against what was saved.
+- The user can keep typing while the save is in flight: `reset(saved)` called during the save makes `saved`
+  the baseline; a field edited since the save started keeps the typed value (in the summary), every other
+  field takes the value the server stored, its normalization included. Nothing edited meanwhile: `values` is
+  `saved` itself. The rows of an array are matched by id with
+  `useTanStackFormBinding(form, { arrayIdKeys: { lineItems: 'id' } })` (the same `arrayIdKeys` you give the
+  engines); without it, an array edited during the save is kept whole. A rehydration during the save wins.
+- A submit that succeeds closes the open conflicts; one that fails (an `onSubmit` that rejects, a submit
+  blocked by validation) leaves them open, and a queued update is merged anyway.
+- A save that does not go through `form.handleSubmit()` (a mutation of your data layer): pass its state,
+  `useTanStackFormBinding(form, { isSaving: mutation.isPending, saveError: mutation.error })`. Each option
+  replaces its own mapping; pass both. Call `binding.reset(saved)` while `isSaving` is still `true`.
+
+### Server updates: `rebase`
+
+`rebase(incoming)` merges a newer version of the record into the user's draft: the fields the user did not
+touch take the server value, the ones both changed keep the user's value and are listed in `conflicts`, to
+resolve with `keepMine(path)` / `acceptTheirs(path)`. The engine calls `binding.reset(incoming)` then
+`binding.setValues(merged)` in one batch; the binding writes each to TanStack Form in **one** update of its
+base store (`form.baseStore.setState`), so:
+
+- no field meta is written: a field the server changed is not touched, not blurred, not dirty; the user's
+  fields keep their meta;
+- no `listeners.onChange` is called and no validator runs on the server's values (no echo taken for a user
+  gesture). The error of a field that takes another value is removed (it was about a value the field no
+  longer has; validation runs again at the next change, blur or submit); an error stays on a field the
+  rebase leaves as it was;
+- no render shows `incoming` alone, nor the server value in the input the user edited;
+- a top-level key the server removed is removed from `form.state.values` too;
+- a `form.Field` in `mode="array"` renders the rows the server added or removed (its `_arrayVersion` is
+  bumped, as TanStack Form's own array operations do);
+- a write of yours after the binding's, in the same run, is applied by TanStack Form on top of it and wins.
+
+The binding never writes TanStack Form's own defaults: `useForm` would put yours back at the next render,
+and on a form not touched the values too. So after `binding.reset(saved)` or a rebase, TanStack Form's
+`isDefaultValue` / `isDirty` and its `form.reset()` still refer to the `defaultValues` of `useForm`. Discard
+with `binding.reset()` (back to the saved baseline), or keep `defaultValues` on the record you saved or
+rebased on (set your state to `stored` / `incoming` with `binding.reset(stored)` / `rebase(incoming)`):
+then TanStack Form agrees (`isDefaultValue` is `true` on the fields the server set) and `form.reset()` is a
+real discard.
+
+### `useChangeSummary().isEmpty`, not `state.isDirty`
+
+Drive the save bar and the dirty guard from `useChangeSummary().isEmpty` (and `reorders.length === 0` with
+`arrayIdKeys`), never from TanStack Form's `form.state.isDirty`. TanStack Form's dirty is **persistent**: a
+field the user changed stays dirty after being typed back to its saved value (its `isDefaultValue` is `true`
+again), while the summary drops its row. The two also differ after a rebase or a save, when `defaultValues`
+is not kept on the record (see above). The summary is what the user reads.
+
+### What the adapter reads
+
+The object `useForm` returns is a copy of TanStack Form's `FormApi` made at the first render: its methods are
+the instance's, but its `options` stay those of the first render, while TanStack Form replaces the
+instance's at every render. No public API returns the instance, so the adapter calls `form.Subscribe` once as
+a plain function (it renders TanStack Form's subscriber with the instance as its `form` prop: no hook, no
+side effect) and reads the live `defaultValues` there, checked by the identity of `form.store`. The tests of
+`@formrail/pro` pin this and the TanStack Form behaviours above against the tested version
+(`@tanstack/react-form` `1.33.5`, the minimum of the peer range); in development a form where it does not
+hold gets a `console.warn`, and the baseline then follows only the `defaultValues` of the first render. If
+you see that warning after upgrading `@tanstack/react-form`, stay on the last version that does not show it.
 
 ## Change Summary engine
 

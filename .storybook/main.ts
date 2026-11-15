@@ -100,6 +100,8 @@ const config: StorybookConfig = {
         // The subpath entries (#507): the React Hook Form example imports the engines and the adapter by name.
         { find: /^@formrail\/pro\/engine$/, replacement: fileURLToPath(new URL('../packages/pro/src/engine.ts', import.meta.url)) },
         { find: /^@formrail\/pro\/react-hook-form$/, replacement: fileURLToPath(new URL('../packages/pro/src/react-hook-form.ts', import.meta.url)) },
+        // #508: the TanStack Form example imports its adapter by name.
+        { find: /^@formrail\/pro\/tanstack-form$/, replacement: fileURLToPath(new URL('../packages/pro/src/tanstack-form.ts', import.meta.url)) },
         { find: /^@formrail\/core$/, replacement: fileURLToPath(new URL('../packages/core/src/index.ts', import.meta.url)) },
         ...(Array.isArray(viteConfig.resolve?.alias) ? viteConfig.resolve.alias : Object.entries(viteConfig.resolve?.alias ?? {}).map(([find, replacement]) => ({ find, replacement }))),
       ],

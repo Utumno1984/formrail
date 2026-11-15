@@ -48,6 +48,8 @@ export const DOCUMENTED_IN = {
   RebaseNotice: ['Pro/RebaseNotice'],
   // `@formrail/pro/react-hook-form` (#507): a hook, documented by the page of its story.
   useReactHookFormBinding: ['Pro/Integrations/React Hook Form'],
+  // `@formrail/pro/tanstack-form` (#508): a hook, documented by the page of its story.
+  useTanStackFormBinding: ['Pro/Integrations/TanStack Form'],
   VirtualListReport: ['Pro/Floorplans/Virtual List Report'],
   VirtualListReportTable: ['Pro/Floorplans/Virtual List Report'],
 };

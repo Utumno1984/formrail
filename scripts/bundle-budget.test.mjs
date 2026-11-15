@@ -420,7 +420,8 @@ describe('subpath entries (#489)', () => {
 
   it('budgets @formrail/pro/engine, with its own baseline file', () => {
     // `./react-hook-form` added by #507 (the React Hook Form adapter): an addition to the exact list of the subpaths.
-    expect(BUDGETED_SUBPATHS).toEqual({ [resolve(ROOT, 'packages/pro')]: ['./engine', './react-hook-form'] });
+    // `./tanstack-form` added by #508 (the TanStack Form adapter), the same way.
+    expect(BUDGETED_SUBPATHS).toEqual({ [resolve(ROOT, 'packages/pro')]: ['./engine', './react-hook-form', './tanstack-form'] });
     expect(budgetFileName('.')).toBe('bundle-budget.json');
     expect(budgetFileName('./engine')).toBe('bundle-budget.engine.json');
     expect(() => budgetFileName('./a/../b')).toThrow(/unsupported/);
@@ -431,6 +432,15 @@ describe('subpath entries (#489)', () => {
     expect(subpathFile(resolve(ROOT, 'packages/pro'), './react-hook-form')).toBe(resolve(ROOT, 'packages/pro/dist/react-hook-form.js'));
     const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.react-hook-form.json'), 'utf8'));
     expect(Object.keys(budget.exports)).toEqual(['useReactHookFormBinding']);
+    const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
+    expect(compareBudget(measured, budget).ok).toBe(true);
+  });
+
+  it('budgets @formrail/pro/tanstack-form (#508), with its own committed baseline: one valid entry, the adapter', () => {
+    expect(budgetFileName('./tanstack-form')).toBe('bundle-budget.tanstack-form.json');
+    expect(subpathFile(resolve(ROOT, 'packages/pro'), './tanstack-form')).toBe(resolve(ROOT, 'packages/pro/dist/tanstack-form.js'));
+    const budget = JSON.parse(readFileSync(resolve(ROOT, 'packages/pro/bundle-budget.tanstack-form.json'), 'utf8'));
+    expect(Object.keys(budget.exports)).toEqual(['useTanStackFormBinding']);
     const measured = Object.fromEntries(Object.entries(budget.exports).map(([k, v]) => [k, v.baseline]));
     expect(compareBudget(measured, budget).ok).toBe(true);
   });

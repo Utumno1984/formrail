@@ -135,3 +135,88 @@ describe('packages/pro react-hook-form entry', () => {
     expect(lock.packages['node_modules/react-hook-form'].version).toBe(floor);
   });
 });
+
+/**
+ * What the "TanStack Form" section of the Pro README must hold (#508): the parts of the text that are missing from
+ * `readme` (the section runs from its heading to the next `## ` heading).
+ */
+export function missingTanStackFormDocs(readme) {
+  const lines = readme.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trimEnd() === '## TanStack Form');
+  if (start < 0) return ['## TanStack Form'];
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+  const section = lines.slice(start, end < 0 ? undefined : end).join('\n');
+  const required = [
+    // Install, without core, with the tested versions and the private org.
+    'npm install @formrail/pro @tanstack/react-form',
+    '`^1.33.5`',
+    '`@formrail/core`\n  is not needed',
+    '"private": true',
+    // The usage.
+    "from '@formrail/pro/tanstack-form'",
+    "from '@formrail/pro/engine'",
+    // The save mapping.
+    'binding.reset(saved)',
+    'form.state.isSubmitting',
+    'isSaving',
+    'saveError',
+    // The dirty rule.
+    'useChangeSummary().isEmpty',
+    'state.isDirty',
+    // Inline defaultValues and update() on a touched form.
+    'inline',
+    'TOUCHED form',
+    // Server updates.
+    'rebase(data)',
+    'rebase(incoming)',
+  ];
+  return required.filter((text) => !section.includes(text));
+}
+
+describe('packages/pro README: the TanStack Form section (#508)', () => {
+  const readme = readFileSync(resolve(ROOT, 'packages/pro/README.md'), 'utf8');
+
+  it('has the section, with install, import paths, saving, the isEmpty rule, inline defaults, update() and the rebase', () => {
+    expect(missingTanStackFormDocs(readme)).toEqual([]);
+  });
+
+  it('negative: a missing heading or a missing part is reported', () => {
+    expect(missingTanStackFormDocs(readme.replace('## TanStack Form', '## TSF'))).toEqual(['## TanStack Form']);
+    expect(missingTanStackFormDocs(readme.replace(/@formrail\/pro\/tanstack-form'/g, "x'"))).toEqual(["from '@formrail/pro/tanstack-form'"]);
+    // Text outside the section does not count.
+    expect(missingTanStackFormDocs('## TanStack Form\n\n## Next\nnpm install @formrail/pro @tanstack/react-form')).toContain(
+      'npm install @formrail/pro @tanstack/react-form',
+    );
+  });
+});
+
+// Ticket #508: the TanStack Form adapter `@formrail/pro/tanstack-form`.
+describe('packages/pro tanstack-form entry', () => {
+  const pkg = readJson('packages/pro/package.json');
+  const lock = readJson('package-lock.json');
+
+  it('exports ./tanstack-form for import and require, each with its declaration file', () => {
+    expect(pkg.exports['./tanstack-form']).toEqual({
+      import: { types: './dist/tanstack-form.d.ts', default: './dist/tanstack-form.js' },
+      require: { types: './dist/tanstack-form.d.cts', default: './dist/tanstack-form.cjs' },
+    });
+  });
+
+  it('@tanstack/react-form is an OPTIONAL peer and a devDependency, never a dependency; form-core and store are none of them', () => {
+    expect(pkg.peerDependencies['@tanstack/react-form']).toBeDefined();
+    expect(pkg.peerDependenciesMeta['@tanstack/react-form']).toEqual({ optional: true });
+    expect(pkg.devDependencies['@tanstack/react-form']).toBeDefined();
+    expect(pkg.dependencies?.['@tanstack/react-form']).toBeUndefined();
+    for (const name of ['@tanstack/form-core', '@tanstack/store']) {
+      for (const field of ['dependencies', 'peerDependencies', 'devDependencies']) expect(pkg[field]?.[name]).toBeUndefined();
+    }
+  });
+
+  it('the peer range is the tested one: the devDependency range, whose floor is the version the lockfile installs', () => {
+    const peer = pkg.peerDependencies['@tanstack/react-form'];
+    expect(peer).toBe(pkg.devDependencies['@tanstack/react-form']);
+    const floor = /^\^(\d+\.\d+\.\d+)$/.exec(peer)?.[1];
+    expect(floor).toBeDefined();
+    expect(lock.packages['node_modules/@tanstack/react-form'].version).toBe(floor);
+  });
+});

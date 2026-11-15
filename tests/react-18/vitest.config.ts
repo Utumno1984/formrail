@@ -23,6 +23,8 @@ export default defineConfig({
           replacement: here(`../../node_modules/${name}/dist/es2015/index.js`),
         }),
       ),
+      // TanStack Form's store selector (#508): CommonJS only, so an ES copy on this workspace's React 18.
+      { find: /^use-sync-external-store\/shim\/with-selector(\.js)?$/, replacement: here('./use-sync-external-store-with-selector.ts') },
     ],
   },
   test: {
@@ -32,10 +34,10 @@ export default defineConfig({
     // Radix lives in the root node_modules and would be loaded un-transformed with the root's
     // React 19; inlining it makes the aliases above apply to it too. Same for the scroll-lock
     // libraries Radix's Dialog depends on (they render React elements themselves). React Hook Form too (#507):
-    // `useForm` calls React's hooks, which must be this workspace's React 18.
+    // `useForm` calls React's hooks, which must be this workspace's React 18. TanStack Form too (#508), with its store.
     server: {
       deps: {
-        inline: [/@radix-ui/, /react-remove-scroll/, /react-style-singleton/, /use-callback-ref/, /use-sidecar/, /react-hook-form/],
+        inline: [/@radix-ui/, /react-remove-scroll/, /react-style-singleton/, /use-callback-ref/, /use-sidecar/, /react-hook-form/, /@tanstack\//],
       },
     },
     // Core sources import tokens.css as text (`?raw`); Vitest would blank it otherwise.

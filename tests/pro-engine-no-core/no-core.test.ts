@@ -241,6 +241,54 @@ describe('npm install of the packed @formrail/pro (optional core peer)', () => {
     expect(JSON.parse(execFileSync(process.execPath, ['run-rhf.cjs'], { cwd: project, encoding: 'utf8' })).hook).toBe('function');
   });
 
+  // #508, smoke test 1-2 of the ticket: TanStack Form (with the packages it depends on) installed from packed tarballs
+  // next to the packed pro, in a second project: no core, no react-hook-form.
+  const TANSTACK = [
+    '@tanstack/react-form',
+    '@tanstack/form-core',
+    '@tanstack/store',
+    '@tanstack/react-store',
+    '@tanstack/pacer-lite',
+    '@tanstack/devtools-event-client',
+    'use-sync-external-store',
+  ];
+  it('with @tanstack/react-form installed: no core, no react-hook-form; the goal code typechecks (skipLibCheck: false) and the adapter loads in ESM and CJS', () => {
+    const result = install((pkg) => pkg, [...TANSTACK, '@types/react', '@types/react-dom', 'csstype']);
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(project, 'node_modules/@tanstack/react-form/package.json'), 'utf8')).version).toBe(
+      JSON.parse(readFileSync(join(ROOT, 'node_modules/@tanstack/react-form/package.json'), 'utf8')).version,
+    );
+    for (const absent of ['@formrail/core', 'react-hook-form']) {
+      expect(existsSync(join(project, 'node_modules', absent))).toBe(false);
+      expect(npm(['ls', absent]).stdout).toContain('(empty)');
+    }
+    // The goal code, with the tsconfig of the consumer (`skipLibCheck: false`).
+    mkdirSync(join(project, 'src'));
+    cpSync(join(HERE, 'tanstack-consumer/src/tanstack-binding.tsx'), join(project, 'src/tanstack-binding.tsx'));
+    cpSync(join(HERE, 'consumer/tsconfig.json'), join(project, 'tsconfig.json'));
+    const tsc = spawnSync(process.execPath, [TSC, '--noEmit', '-p', 'tsconfig.json'], { cwd: project, encoding: 'utf8' });
+    expect(tsc.stdout + tsc.stderr).toBe('');
+    expect(tsc.status).toBe(0);
+    // Smoke test 2: the installed adapter code imports no @tanstack/* (its declaration files do, for the types of the
+    // signature) and no adapter file names the core.
+    const installed = join(project, 'node_modules/@formrail/pro/dist');
+    for (const file of ['tanstack-form.js', 'tanstack-form.cjs']) {
+      expect(readFileSync(join(installed, file), 'utf8')).not.toMatch(/from ['"]@tanstack\/|require\(['"]@tanstack\//);
+    }
+    for (const file of ['tanstack-form.js', 'tanstack-form.cjs', 'tanstack-form.d.ts', 'tanstack-form.d.cts']) {
+      expect(readFileSync(join(installed, file), 'utf8')).not.toContain('@formrail/core');
+    }
+    writeFileSync(join(project, 'package.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')), type: 'module' }));
+    cpSync(join(HERE, 'tanstack-consumer/run-tanstack.mjs'), join(project, 'run-tanstack.mjs'));
+    cpSync(join(HERE, 'tanstack-consumer/run-tanstack.cjs'), join(project, 'run-tanstack.cjs'));
+    expect(JSON.parse(execFileSync(process.execPath, ['run-tanstack.mjs'], { cwd: project, encoding: 'utf8' }))).toEqual({ html: '<p>Lumen Parts|true|0|true</p>' });
+    expect(JSON.parse(execFileSync(process.execPath, ['run-tanstack.cjs'], { cwd: project, encoding: 'utf8' }))).toEqual({
+      exports: ['useTanStackFormBinding'],
+      hook: 'function',
+    });
+  });
+
   it('negative control: without peerDependenciesMeta, npm wants the core (installs it or fails offline)', () => {
     const result = install((pkg) => {
       const copy = { ...pkg };
