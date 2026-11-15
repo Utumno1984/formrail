@@ -149,6 +149,10 @@ export function dayOfYear(iso: string): number {
  * digits>`, e.g. `INV-2026-287000012`. Sorting the numbers as text sorts the documents by date (ties
  * by row), and the row keeps every number unique whatever the other rows are (row `i` must not depend
  * on `n`, so a running counter per year is not available). A real system would count 1, 2, 3...
+ *
+ * Limit: the row has 6 digits, so the order holds for the first 999,999 rows of a dataset. Row
+ * 1,000,000 and beyond get a 7-digit row part: the numbers stay unique, but sorting them as text no
+ * longer sorts by date. No story or test generates that many documents.
  */
 export function documentNumber(prefix: string, isoDate: string, index: number): string {
   const day = dayOfYear(isoDate);
