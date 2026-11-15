@@ -545,9 +545,10 @@ function writeChanges(
  * rows added or reordered by the binding included, each with the app's writes on the row it matches (by id with
  * an id key, a row without id matching none; by index without one); a row the binding removed drops the app's
  * writes on it. An array whose shape the app changed (rows added, removed or reordered by the app, whatever the
- * binding wrote there): the app's array whole. Never mutates its arguments.
+ * binding wrote there): the app's array whole. Never mutates its arguments. Exported for its unit test only (the
+ * entry `@formrail/pro/react-hook-form` re-exports the hook alone).
  */
-function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schemaPath: string, idKeys: IdKeys): unknown {
+export function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schemaPath: string, idKeys: IdKeys): unknown {
   if (sameContent(theirs, base)) return mine;
   if (sameContent(mine, base)) return theirs;
   if (isPlainRecord(base) && isPlainRecord(theirs) && isPlainRecord(mine)) {
@@ -563,12 +564,20 @@ function adoptWrites(base: unknown, theirs: unknown, mine: unknown, schemaPath: 
   }
   if (Array.isArray(base) && Array.isArray(theirs) && Array.isArray(mine) && sameRows(base, theirs, schemaPath, idKeys)) {
     const idKey = idKeyOf(idKeys, schemaPath);
+    // Linear in the rows, as this runs at each value event of the app while a write waits. The binding kept the rows
+    // of `base` (no id key, or the same ids in the same order): index by index. Otherwise the index of each id in
+    // `base`, built once (the first row with an id wins). `base` and `theirs` hold the same rows, and with an id key
+    // every row of `base` is a plain record with its id (see `sameRows`), so a row of the binding without id matches
+    // none.
+    let indexOf: Map<unknown, number> | null = null;
+    if (idKey !== undefined && !sameRows(base, mine, schemaPath, idKeys)) {
+      indexOf = new Map();
+      for (let index = base.length - 1; index >= 0; index -= 1) indexOf.set((base[index] as Record<string, unknown>)[idKey], index);
+    }
     return mine.map((row: unknown, index) => {
-      const id = idKey === undefined || !isPlainRecord(row) ? undefined : row[idKey];
-      // `base` and `theirs` hold the same rows, and with an id key every row of `base` has its id (see `sameRows`), so
-      // a row of the binding without id matches none. No match (-1, or an index past `base`): `base[at]` and
-      // `theirs[at]` are both `undefined`, so the binding's row stays as it is.
-      const at = idKey === undefined ? index : base.findIndex((item) => isPlainRecord(item) && Object.is(item[idKey], id));
+      // No match (-1, or an index past `base`): `base[at]` and `theirs[at]` are both `undefined`, so the binding's row
+      // stays as it is.
+      const at = indexOf === null ? index : (indexOf.get(isPlainRecord(row) ? row[idKey!] : undefined) ?? -1);
       return adoptWrites(base[at], theirs[at], row, schemaPath, idKeys);
     });
   }
