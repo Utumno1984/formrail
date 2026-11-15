@@ -3,9 +3,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useObjectPageForm } from '@formrail/core';
 import { exampleStory } from '../../../core/src/internal/example-story';
-import { storyControls } from '../../../core/src/internal/story-docs';
+import { storyControl, storyControls } from '../../../core/src/internal/story-docs';
+import type { ChangeSummaryOptions } from '../change-summary/types';
 import { computeRebase } from './compute-rebase';
 import { useFormRebase } from './use-form-rebase';
+
+type RowLabels = 'position' | 'name';
 
 interface DemoArgs {
   /** Duration of the simulated save, in milliseconds. */
@@ -14,6 +17,8 @@ interface DemoArgs {
   onSave: (values: unknown) => void;
   /** Wired to Actions: called with the incoming version when "Simulate server update" is pressed. */
   onServerUpdate: (incoming: unknown) => void;
+  /** Story-only, `RowConflicts` and `MovedRowConflict`: `name` passes an `itemLabel`, `position` passes none. */
+  rowLabels?: RowLabels;
 }
 
 const meta: Meta<DemoArgs> = {
@@ -217,5 +222,246 @@ export const PureMerge: Story = {
     await expect(canvas.getByTestId('values')).toHaveTextContent('"supplier":"Acme Ltd"');
     await expect(canvas.getByTestId('values')).toHaveTextContent('"amount":"120"');
     await expect(canvas.getByTestId('values')).toHaveTextContent('"notes":"Checked by me"');
+  },
+};
+
+// ---------------------------------------------------------------------------------------------
+// Rows identified by id (#534): `itemLabel` names the rows of `applied` and of the conflicts, and an open conflict
+// is named at the row's CURRENT position, with the row as it is now (moved, renamed, rows added or removed above).
+// ---------------------------------------------------------------------------------------------
+
+interface Row {
+  id: string;
+  name: string;
+  /** Text, as an input gives it. */
+  quantity: string;
+}
+
+interface Order {
+  lineItems: Row[];
+}
+
+const ORDER: Order = {
+  lineItems: [
+    { id: 'line-1', name: 'Desk', quantity: '1' },
+    { id: 'line-2', name: 'Chair', quantity: '4' },
+    { id: 'line-3', name: 'Lamp', quantity: '2' },
+  ],
+};
+
+const ROW_ID_KEYS = { lineItems: 'id' } as const;
+const ROW_LABELS = { lineItems: 'Line items' } as const;
+/** The rows the simulated server update changes, by id: another user adds 10 to their quantity. */
+const SERVER_ROWS = new Set(['line-2', 'line-3']);
+
+/**
+ * `UseFormRebaseOptions.itemLabel` of the stories, at module scope so `useFormRebase` keeps its `conflicts` between
+ * renders (compared by identity): a row is named by its name, `Item 2 (Chair)`; a blank name keeps `Item N`.
+ */
+const nameRows: NonNullable<ChangeSummaryOptions<object>['itemLabel']> = (arrayPath, item, { defaultLabel }) => {
+  const name = arrayPath === 'lineItems' && typeof item === 'object' && item !== null ? (item as Partial<Row>).name : undefined;
+  return typeof name === 'string' && name.trim() !== '' ? `${defaultLabel} (${name.trim()})` : undefined;
+};
+
+/** `items` with the item at `index` swapped with the one before it. */
+function movedUp<T>(items: readonly T[], index: number): T[] {
+  const next = [...items];
+  [next[index - 1], next[index]] = [next[index] as T, next[index - 1] as T];
+  return next;
+}
+
+function RowConflictsDemo({ onServerUpdate, rowLabels = 'position' }: DemoArgs) {
+  const form = useObjectPageForm<Order>({ baseline: ORDER });
+  const { rebase, conflicts, applied, acceptTheirs, keepMine } = useFormRebase(form, {
+    arrayIdKeys: ROW_ID_KEYS,
+    labels: ROW_LABELS,
+    itemLabel: rowLabels === 'name' ? nameRows : undefined,
+  });
+  // The record as stored by the simulated server.
+  const server = useRef<Order>(ORDER);
+  const lines = form.values.lineItems;
+
+  // Another user adds 10 to the quantity of "Chair" and "Lamp" (found by id, wherever they are).
+  const simulateServerUpdate = () => {
+    const incoming: Order = {
+      lineItems: server.current.lineItems.map((row) =>
+        SERVER_ROWS.has(row.id) ? { ...row, quantity: String(Number(row.quantity) + 10) } : row,
+      ),
+    };
+    server.current = incoming;
+    onServerUpdate(incoming);
+    rebase(incoming);
+  };
+
+  const setLines = (lineItems: Row[]) => form.setValue('lineItems', lineItems);
+  const update = (id: string, patch: Partial<Row>) => setLines(lines.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 640 }}>
+      <ul aria-label="Line items" style={{ display: 'flex', flexDirection: 'column', gap: 12, listStyle: 'none', margin: 0, padding: 0 }}>
+        {lines.map((row, index) => (
+          <li key={row.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 8 }}>
+            <Field label={`Name of line ${index + 1}`} name={`lineItems.${index}.name`}>
+              <Input value={row.name} onChange={(event) => update(row.id, { name: event.target.value })} />
+            </Field>
+            <Field label={`Quantity of line ${index + 1}`} name={`lineItems.${index}.quantity`}>
+              <Input inputMode="numeric" value={row.quantity} onChange={(event) => update(row.id, { quantity: event.target.value })} />
+            </Field>
+            <Button variant="secondary" size="sm" onClick={() => setLines(movedUp(lines, index))} disabled={index === 0}>
+              {`Move line ${index + 1} up`}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setLines(lines.filter((r) => r.id !== row.id))}>
+              {`Remove line ${index + 1}`}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <Button variant="secondary" onClick={simulateServerUpdate}>
+          Simulate server update
+        </Button>
+        <Button variant="secondary" onClick={() => form.reset()}>
+          Discard
+        </Button>
+      </div>
+      <section aria-labelledby="row-conflicts">
+        <h3 id="row-conflicts" style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>
+          Conflicts ({conflicts.length})
+        </h3>
+        <ul aria-labelledby="row-conflicts" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 16 }}>
+          {conflicts.map((conflict) => (
+            <li key={conflict.path} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              <Text as="span">{`${conflict.label}: yours ${JSON.stringify(conflict.mine)}, server ${JSON.stringify(conflict.theirs)}`}</Text>
+              <Button size="sm" variant="secondary" onClick={() => acceptTheirs(conflict.path)}>
+                {`Accept server value for ${conflict.label}`}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => keepMine(conflict.path)}>
+                {`Keep my value for ${conflict.label}`}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section aria-labelledby="row-applied">
+        <h3 id="row-applied" style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>
+          Applied server changes ({applied.length})
+        </h3>
+        <ul aria-labelledby="row-applied" style={{ margin: 0, paddingLeft: 16 }}>
+          {applied.map((entry) => (
+            <li key={entry.path}>
+              <Text as="span">{`${entry.label}: ${JSON.stringify(entry.before)} → ${JSON.stringify(entry.after)}`}</Text>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+const ROW_LABELS_CONTROL = {
+  rowLabels: storyControl({
+    control: 'radio',
+    options: ['position', 'name'],
+    description:
+      '`name` passes `useFormRebase(form, { itemLabel })`, which names a row by its name (`Item 2 (Chair)`); `position` passes none (`Item N`).',
+  }),
+};
+
+/** Queries of the rows demo, for the play functions. */
+function rowsCanvas(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  return {
+    canvas,
+    quantity: (line: number) => canvas.getByRole('textbox', { name: `Quantity of line ${line}` }),
+    name: (line: number) => canvas.getByRole('textbox', { name: `Name of line ${line}` }),
+    /** The text of every conflict, without its buttons. */
+    conflictTexts: () =>
+      within(canvas.getByRole('list', { name: /^Conflicts/ }))
+        .queryAllByRole('listitem')
+        .map((li) => li.querySelector('span')?.textContent),
+    appliedTexts: () =>
+      within(canvas.getByRole('list', { name: /^Applied server changes/ }))
+        .queryAllByRole('listitem')
+        .map((li) => li.textContent),
+  };
+}
+
+/**
+ * Rows identified by id (`arrayIdKeys: { lineItems: 'id' }`): "Desk", "Chair" and "Lamp". "Simulate server update"
+ * adds 10 to the quantity of "Chair" and "Lamp" (another user). A row you did not touch takes the server value and is
+ * listed under "Applied server changes"; a quantity you changed too is a conflict. With the `rowLabels` Control on
+ * `name`, `itemLabel` names the rows (`Line items > Item 2 (Chair) > Quantity`); on `position` they stay `Item N`.
+ * The play function changes the quantity of "Chair", simulates the update, removes "Desk" above it (the conflict
+ * follows the row to `Item 1`) and accepts the server value.
+ */
+export const RowConflicts: Story = {
+  args: { rowLabels: 'position' },
+  argTypes: ROW_LABELS_CONTROL,
+  // No save in this demo: the save delay would change nothing.
+  parameters: { controls: { exclude: ['saveDelay', 'onSave'] } },
+  render: (args) => <RowConflictsDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const { canvas, quantity, conflictTexts, appliedTexts } = rowsCanvas(canvasElement);
+    /** `Item N (name)` with `rowLabels: 'name'`, `Item N` with `position`. */
+    const row = (n: number, name: string) => (args.rowLabels === 'name' ? `Item ${n} (${name})` : `Item ${n}`);
+
+    await userEvent.clear(quantity(2));
+    await userEvent.type(quantity(2), '5');
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+
+    // "Lamp", untouched, takes the server value; "Chair" keeps yours and is a conflict.
+    await waitFor(() => expect(quantity(3)).toHaveValue('12'));
+    await expect(quantity(2)).toHaveValue('5');
+    await expect(conflictTexts()).toEqual([`Line items > ${row(2, 'Chair')} > Quantity: yours "5", server "14"`]);
+    await expect(appliedTexts()).toEqual([`Line items > ${row(3, 'Lamp')} > Quantity: "2" → "12"`]);
+    await expect(args.onServerUpdate).toHaveBeenCalledTimes(1);
+
+    // "Desk" removed above the conflict: the conflict follows "Chair" to the first position.
+    await userEvent.click(canvas.getByRole('button', { name: 'Remove line 1' }));
+    await waitFor(() => expect(conflictTexts()).toEqual([`Line items > ${row(1, 'Chair')} > Quantity: yours "5", server "14"`]));
+
+    await userEvent.click(canvas.getByRole('button', { name: `Accept server value for Line items > ${row(1, 'Chair')} > Quantity` }));
+    await expect(quantity(1)).toHaveValue('14');
+    await waitFor(() => expect(conflictTexts()).toEqual([]));
+  },
+};
+
+/**
+ * A conflict on a row you then move: `itemLabel` (`rowLabels: name`) names the conflict with the row at its CURRENT
+ * position, as it is now. The play function changes the quantity of "Lamp" (third line), simulates the server update
+ * (the conflict reads `Line items > Item 3 (Lamp) > Quantity`), moves "Lamp" up twice (`Item 1 (Lamp)`), renames it
+ * "Desk lamp" (`Item 1 (Desk lamp)`) and keeps its own value: the choice buttons carry the same name.
+ */
+export const MovedRowConflict: Story = {
+  args: { rowLabels: 'name' },
+  argTypes: ROW_LABELS_CONTROL,
+  parameters: { controls: { exclude: ['saveDelay', 'onSave'] } },
+  render: (args) => <RowConflictsDemo {...args} />,
+  play: async ({ args, canvasElement }) => {
+    const { canvas, quantity, name, conflictTexts } = rowsCanvas(canvasElement);
+    /** The Lamp row at position `n`: `Item n (name)` with `rowLabels: 'name'`, `Item n` with `position`. */
+    const lamp = (n: number, rowName: string) =>
+      `Line items > ${args.rowLabels === 'name' ? `Item ${n} (${rowName})` : `Item ${n}`} > Quantity`;
+
+    await userEvent.clear(quantity(3));
+    await userEvent.type(quantity(3), '7');
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+    await waitFor(() => expect(conflictTexts()).toEqual([`${lamp(3, 'Lamp')}: yours "7", server "12"`]));
+
+    // "Lamp" moved to the first line: the conflict follows it.
+    await userEvent.click(canvas.getByRole('button', { name: 'Move line 3 up' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Move line 2 up' }));
+    await expect(name(1)).toHaveValue('Lamp');
+    await waitFor(() => expect(conflictTexts()).toEqual([`${lamp(1, 'Lamp')}: yours "7", server "12"`]));
+
+    // Renamed: the label reads the row as it is now.
+    await userEvent.clear(name(1));
+    await userEvent.type(name(1), 'Desk lamp');
+    await waitFor(() => expect(conflictTexts()).toEqual([`${lamp(1, 'Desk lamp')}: yours "7", server "12"`]));
+
+    await userEvent.click(canvas.getByRole('button', { name: `Keep my value for ${lamp(1, 'Desk lamp')}` }));
+    await waitFor(() => expect(conflictTexts()).toEqual([]));
+    await expect(quantity(1)).toHaveValue('7');
+    await expect(args.onServerUpdate).toHaveBeenCalledTimes(1);
   },
 };

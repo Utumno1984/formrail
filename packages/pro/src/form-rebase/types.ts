@@ -80,6 +80,27 @@ export interface RebaseOptions<Values extends object> {
    * as a whole.
    */
   isEqual?: ChangeSummaryOptions<Values>['isEqual'];
+  /**
+   * Same semantics as `ChangeSummaryOptions.itemLabel` (return value, development warning, an
+   * exception reaching the caller), for the array-item segments of the labels of `applied` and
+   * `conflicts`: `Line items > Item 2 (Chair) > Quantity` instead of `Line items > Item 2 > Quantity`.
+   *
+   * Which item it receives (`ItemLabelContext.side` keeps its two values):
+   * - `'values'` for an item present in the result `values`, as it is there (the merged item, so a
+   *   name the server changed reads as the server's), with its index there: an item kept, merged,
+   *   added by either side, or removed by the server and kept because the user touched it
+   *   (`theirsMissing`);
+   * - `'baseline'` for an item that exists only in a baseline: removed by the server and not touched
+   *   (an `applied` entry `removed`), the item of `baseline` at its index there; removed by the user
+   *   and changed by the server (`mineMissing`), the item of `incoming` (the new baseline) at its
+   *   index there.
+   *
+   * Lazy as in `computeChangeSummary`: called only for the item segments of an entry of `applied` or
+   * of a conflict, at most once per item and value of `isLastSegment` in one call, never while the
+   * merge only decides whether a subtree changed. An order-only conflict on an array has no item
+   * segment of that array.
+   */
+  itemLabel?: ChangeSummaryOptions<Values>['itemLabel'];
 }
 
 /**
@@ -116,7 +137,10 @@ export interface RebaseConflict {
 export interface OpenRebaseConflict extends RebaseConflict {
   /** Same notation as `path`, with the current index of every id-keyed item on the way. Use it to find the field. */
   currentPath: string;
-  /** One label per segment of `currentPath` (`Item N` for an array item), as `ChangeEntry.labelPath`; `label` is their join. */
+  /**
+   * One label per segment of `currentPath` (`Item N` for an array item, unless `itemLabel` names it), as
+   * `ChangeEntry.labelPath`; `label` is their join.
+   */
   labelPath: string[];
 }
 
@@ -185,6 +209,19 @@ export interface UseFormRebaseOptions<Values extends object> {
   labels?: RebaseOptions<Values>['labels'];
   /** Same as `RebaseOptions.isEqual`: replaces the equality of two leaf values. */
   isEqual?: RebaseOptions<Values>['isEqual'];
+  /**
+   * Same as `RebaseOptions.itemLabel` (see `ChangeSummaryOptions.itemLabel`): names the array items in the labels
+   * of `applied` and `conflicts`. The labels of `applied` are those of the rebase. Those of an open conflict are
+   * named at its current position (see {@link OpenRebaseConflict}): the item as it is NOW in `form.values`
+   * (`side: 'values'`, its current index), so a row the user moved, or whose name field the user edited, reads as
+   * it is now; an item that is not in `form.values` any more keeps the label of the rebase.
+   *
+   * Compared by identity, like `isEqual` of `useChangeSummary`: a stable function (module scope or `useCallback`)
+   * keeps the `conflicts` array between renders until `form.values` or the open conflicts change; a new function
+   * names the open conflicts again, so an inline one gives a new `conflicts` array on every render. An exception
+   * thrown by it is thrown by the render (or by the layout effect that applies the rebase).
+   */
+  itemLabel?: RebaseOptions<Values>['itemLabel'];
 }
 
 /** Return value of `useFormRebase`. */

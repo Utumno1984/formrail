@@ -8,7 +8,6 @@ import { Button, MessageStrip } from '@formrail/core';
 import type {
   InvoiceEditorAddonContext,
   InvoiceEditorAddons,
-  InvoiceFormValues,
   InvoiceSaveReviewContext,
   UseInvoiceEditorAddons,
 } from '../../../core/src/showcase/InvoiceRecordPage';
@@ -23,6 +22,7 @@ import {
   ORDER_ALSO_NOTE,
   ORDER_ONLY_DESCRIPTION,
   REVIEW_LOCALE,
+  invoiceLineLabel,
   invoiceReview,
   invoiceReviewIsEqual,
   renderInvoiceReviewValue,
@@ -89,26 +89,8 @@ export const OVERWRITE_TITLE = 'You are overwriting a server change';
 /** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
 const NOTICE_MARGIN = { margin: '12px 16px' } as const;
 
+/** The row of a line in `fieldOf` (focus after a choice), from its path. */
 const LINE_ROW = /^lineItems\.(\d+)(?=\.|$)/;
-
-/**
- * `Line items > Item 2` alone is ambiguous (see `invoiceReviewItemLabel` in invoice-review.tsx): the row's description is added.
- * The row is the one at the conflict's CURRENT position (`currentPath`, found again by id after the user moved,
- * removed or added lines), never the index of the rebase; a row the user removed is read from the server's
- * version (the baseline), at the server's index. Built on `labelPath` (one label per segment), never on a split
- * of `label`.
- */
-function nameConflict(conflict: OpenRebaseConflict, values: InvoiceFormValues, baseline: InvoiceFormValues): OpenRebaseConflict {
-  const match = LINE_ROW.exec(conflict.currentPath);
-  if (!match || conflict.labelPath[1] === undefined) return conflict;
-  const rows = conflict.mineMissing ? baseline.lineItems : values.lineItems;
-  const description = rows[Number(match[1])]?.description.trim();
-  if (!description) return conflict;
-  const labelPath = conflict.labelPath.map((segment, i) =>
-    i === 1 ? `${segment} (${description.replaceAll('(', '[').replaceAll(')', ']')})` : segment,
-  );
-  return { ...conflict, labelPath, label: labelPath.join(' > ') };
-}
 
 /** The state the review dialog reads while it is open: it follows a server update that lands under it. */
 interface ReviewState {
@@ -174,10 +156,14 @@ function ReviewBody({ source }: { source: ReviewSource }) {
  * every render of an existing invoice.
  */
 export function useInvoiceRebase({ form, record, store, toValues, scrollerRef }: InvoiceEditorAddonContext, options: InvoiceRebaseOptions): InvoiceEditorAddons {
+  // `Line items > Item 2` alone is ambiguous: `invoiceLineLabel` adds the row's description, on the conflicts of the
+  // engine. The row is the one at the conflict's CURRENT position (found again by id after the user moved, removed or
+  // added lines), as it is now; a row the user removed keeps the name of the server's version.
   const rebase = useFormRebase(form, {
     arrayIdKeys: INVOICE_REVIEW_ARRAY_ID_KEYS,
     labels: INVOICE_REVIEW_PATH_LABELS,
     isEqual: invoiceReviewIsEqual,
+    itemLabel: invoiceLineLabel,
   });
   const [deleted, setDeleted] = useState(false);
   const optionsRef = useRef(options);
@@ -207,7 +193,7 @@ export function useInvoiceRebase({ form, record, store, toValues, scrollerRef }:
     else void store.updateFromServer(record.id, serverChangeOf(serverChange), serverUpdateDelayMs).catch(ignore);
   }, [store, record.id]);
 
-  const conflicts = rebase.conflicts.map((conflict) => nameConflict(conflict, form.values, form.baseline));
+  const { conflicts } = rebase;
 
   // The review dialog reads the form through this source while it is open (#384: an update may land under it).
   const [review] = useState(() => createReviewSource({ context: { values: form.values, baseline: form.baseline }, conflicts }));

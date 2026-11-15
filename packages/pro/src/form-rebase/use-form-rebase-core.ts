@@ -42,8 +42,9 @@ import { useFormRebase as useBindingRebase } from '../engine';
  * `reset(baseline)` + `setValues` (the only way to remove a top-level key) and is ignored while
  * the form is saving.
  *
- * `options` are read when a rebase is applied or a conflict is checked: inline literals are fine.
- * SSR-safe: no access to `window`/`document`.
+ * `options` are read when a rebase is applied or a conflict is checked: inline literals are fine. Except
+ * `itemLabel`, also compared by identity to name the open conflicts (see `UseFormRebaseOptions.itemLabel`): pass a
+ * stable function. SSR-safe: no access to `window`/`document`.
  */
 export function useFormRebase<Values extends object>(
   form: UseObjectPageFormReturn<Values>,

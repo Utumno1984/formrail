@@ -30,7 +30,11 @@ export interface ListReportTableLabels {
   retry: string;
   /** Button of the "no results" state (when `onClearFilters` is given). Default `Clear filters`. */
   clearFilters: string;
-  /** Announced when the data is back: the number of results. Default: `1 result`, `N results`. */
+  /**
+   * Announced when the data is back: the number of results. Default: "1 result", "10,000 results", the number
+   * formatted in the `locale` of `useListReport` (`Intl.NumberFormat`; with SSR pass `locale`). A custom function
+   * receives the raw number and formats it itself.
+   */
   resultCount: (count: number) => string;
   /** Name of the "select all results" checkbox in the header (with `selectable`). Default `Select all results`. */
   selectAllResults: string;
@@ -51,6 +55,12 @@ export interface ListReportTableLabels {
   rowActionsColumn: string;
 }
 
+/** The default announcement of the number of results, with the number formatted by `fmt`. */
+export const defaultResultCount =
+  (fmt: (n: number) => string) =>
+  (count: number): string =>
+    count === 1 ? '1 result' : `${fmt(count)} results`;
+
 export const DEFAULT_LABELS: ListReportTableLabels = {
   loading: 'Loading…',
   empty: 'No data',
@@ -58,7 +68,7 @@ export const DEFAULT_LABELS: ListReportTableLabels = {
   error: 'Unable to load data',
   retry: 'Retry',
   clearFilters: 'Clear filters',
-  resultCount: (count) => (count === 1 ? '1 result' : `${count} results`),
+  resultCount: (count) => defaultResultCount(String)(count),
   selectAllResults: 'Select all results',
   selectRow: (label) => `Select ${label}`,
   rowActions: (label) => `Actions for ${label}`,

@@ -316,11 +316,11 @@ export const LocaleCount: Story = {
   },
 };
 
-/** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: []`: no second Playground-like docs entry). */
-export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: [], play: undefined };
+/** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: ['internal']`: hidden from the public sidebar, #296; it still inherits `autodocs`). */
+export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: ['internal'], play: undefined };
 
 /** Fixture of the e2e suite: `LocaleCountNoPlay` with a long custom `labels.count` (no `whitespace-nowrap`: it wraps). */
-export const LocaleCountLongLabel: Story = { ...LocaleCountNoPlay, args: { ...LocaleCountNoPlay.args, longCountLabel: true } };
+export const LocaleCountLongLabel: Story = { ...LocaleCountNoPlay, tags: ['internal'], args: { ...LocaleCountNoPlay.args, longCountLabel: true } };
 
 /** Active filter ("To approve"): the count says "n of 200". */
 export const WithActiveFilter: Story = {

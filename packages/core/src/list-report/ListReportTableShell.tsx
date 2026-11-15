@@ -19,6 +19,7 @@ import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-eff
 import { ListReportTableHead } from './ListReportTableHead';
 import {
   DEFAULT_LABELS,
+  defaultResultCount,
   DEFAULT_LOADING_ROW_COUNT,
   ErrorContent,
   Filler,
@@ -28,6 +29,7 @@ import {
   wholeRows,
   type ListReportTableLabels,
 } from './ListReportTableStates';
+import { getNumberFormat } from './number-format';
 import { tableSize } from './list-report-table-layout';
 import {
   captionClass,
@@ -225,7 +227,8 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   const rowActionsWidth = inlineCount > 0 ? ROW_ACTIONS_INLINE_COLUMN_WIDTH : ROW_ACTIONS_COLUMN_WIDTH;
   // The selection and row actions columns are not among `columns`: every full-width row spans them too.
   const columnCount = columns.length + (selectable ? 1 : 0) + (hasRowActions ? 1 : 0);
-  const labels = { ...DEFAULT_LABELS, ...labelOverrides };
+  // The default announcement formats the number in the locale of the report; a custom `resultCount` gets the raw number.
+  const labels = { ...DEFAULT_LABELS, resultCount: defaultResultCount((n) => getNumberFormat(table.locale).format(n)), ...labelOverrides };
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mergedRef = useMemo(() => composeRefs(ref, containerRef), [ref]);
 
