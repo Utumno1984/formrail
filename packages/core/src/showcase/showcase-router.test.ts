@@ -3,7 +3,9 @@ import { updateSearch } from '../list-report/use-list-report-url-state';
 import {
   DEFAULT_MODULE,
   isLeaving,
+  isShowcaseModule,
   leaveRoute,
+  listParamPrefix,
   openCreate,
   openRecord,
   parseRoute,
@@ -154,5 +156,26 @@ describe('the router on the window (#518): the invoices keep their URLs', () => 
     window.history.replaceState(null, '', '/iframe.html?q=x&record=inv-2#top');
     leaveRoute();
     expect(`${window.location.search}${window.location.hash}`).toBe('?q=x#top');
+  });
+});
+
+describe('the module registry (#519, B3 of #518)', () => {
+  afterEach(() => window.history.replaceState(null, '', '/'));
+
+  it('reading and writing use the same list: an unregistered module is never written', () => {
+    expect(isShowcaseModule('invoices')).toBe(true);
+    expect(isShowcaseModule('tasks')).toBe(false);
+    window.history.replaceState(null, '', '/iframe.html?q=x');
+    const entries = window.history.length;
+    expect(() => openRecord('task-7', 'tasks')).toThrow('unknown module "tasks"');
+    expect(() => openCreate('tasks')).toThrow('unknown module "tasks"');
+    expect(() => recordHref('task-7', 'tasks')).toThrow('unknown module "tasks"');
+    expect(window.location.search).toBe('?q=x');
+    expect(window.history.length).toBe(entries);
+  });
+
+  it('the list parameters of the default module have no prefix (the URLs of before #519), any other has its name', () => {
+    expect(listParamPrefix(DEFAULT_MODULE)).toBeUndefined();
+    expect(listParamPrefix('tasks')).toBe('tasks');
   });
 });
