@@ -16,9 +16,18 @@ export function createRecordApi<T extends { id: string }, D>(
   delays: { readonly current: ReadDelays },
 ): RecordStore<T, D> {
   const writing = new Set<Promise<unknown>>();
+  // Waits for every write in flight, and for the ones started meanwhile. Each round takes out what it waited
+  // for (settled by then, whatever `track` did): the loop goes on only for writes that arrived during the round,
+  // so it ends, and it can never spin on microtasks over a write that is over but still in the set (#519).
   const settled = async () => {
-    while (writing.size > 0) await Promise.allSettled([...writing]);
+    while (writing.size > 0) {
+      const round = [...writing];
+      await Promise.allSettled(round);
+      for (const write of round) writing.delete(write);
+    }
   };
+  // Each write leaves the set when it settles, either way; handling the rejection here too, so tracking a write
+  // that fails raises no unhandled rejection (the caller gets `run` itself and handles its own).
   const track = <R>(run: Promise<R>): Promise<R> => {
     writing.add(run);
     const done = () => void writing.delete(run);

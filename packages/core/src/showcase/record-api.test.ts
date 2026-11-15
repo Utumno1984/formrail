@@ -93,6 +93,48 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     await expect(api.list()).resolves.toEqual(SEED);
   });
 
+  it('tracking a write that fails raises no unhandled rejection, and the reads after it do not wait (#519)', async () => {
+    // The API keeps every write in a set until it settles, through a callback on the write. A callback for the
+    // success only (`run.then(done)`) would leave a failed write in the set and its own derived promise rejected
+    // with nobody to handle it: caught here by name, never a hang (`settled()` drops what it waited for).
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => void unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const { api } = setup({ saveOutcome: 'error', deleteOutcome: 'error' });
+      await expect(api.save({ ...SEED[0]!, city: 'Nowhere' })).rejects.toBeInstanceOf(RecordNetworkError);
+      await expect(api.create({ name: 'Nobody', city: 'Nowhere' })).rejects.toBeInstanceOf(RecordNetworkError);
+      await expect(api.delete('c-1')).rejects.toBeInstanceOf(RecordNetworkError);
+      await expect(api.deleteMany(['c-2'])).rejects.toBeInstanceOf(RecordNetworkError);
+      // Node reports an unhandled rejection once the microtasks of the task that produced it are done.
+      await flush();
+      await flush();
+      expect(unhandled).toEqual([]);
+      await expect(api.get('c-1')).resolves.toEqual(SEED[0]);
+      await expect(api.list()).resolves.toEqual(SEED);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('a read waits for writes that start while it waits, round after round, then returns (#519)', async () => {
+    const gates = [gate(), gate(), gate()];
+    const { store, api } = setup({ saveDelayMs: gates[0]!.promise });
+    const writes = [api.save({ ...SEED[0]!, city: 'One' })];
+    const reading = watch(api.get('c-1'));
+    for (const [n, next] of gates.slice(1).entries()) {
+      // A new write in every round of the wait: the read waits for it too.
+      store.configure({ saveDelayMs: next.promise });
+      writes.push(api.save({ ...SEED[0]!, city: ['Two', 'Three'][n]! }));
+      gates[n]!.open();
+      await flush();
+      expect(reading.settled).toBe(false);
+    }
+    gates[2]!.open();
+    await Promise.all(writes);
+    expect((await reading.promise).city).toBe('Three');
+  });
+
   it('a list asked while a deleteMany is in flight waits for it and does not show the deleted records', async () => {
     const held = gate();
     const { api } = setup({ saveDelayMs: held.promise });
