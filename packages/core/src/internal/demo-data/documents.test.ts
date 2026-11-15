@@ -494,6 +494,14 @@ describe('makeSupportCases / getSupportCase', () => {
       expect(withComments.filter((thread) => thread.status === 'pending').length).toBeGreaterThan(100);
     });
 
+    it('a pending case ends with a question to the customer, resolved and closed ones with a solution (no question)', () => {
+      for (const thread of withComments) {
+        const last = thread.comments[thread.comments.length - 1]!;
+        if (thread.status === 'pending') expect(last.text, thread.id).toContain('?');
+        if (thread.status === 'resolved' || thread.status === 'closed') expect(last.text, thread.id).not.toContain('?');
+      }
+    });
+
     it('has one contact of the customer per thread', () => {
       for (const thread of withComments) {
         const contacts = new Set(thread.comments.filter((comment) => comment.authorKind === 'customer').map((comment) => comment.authorId));
