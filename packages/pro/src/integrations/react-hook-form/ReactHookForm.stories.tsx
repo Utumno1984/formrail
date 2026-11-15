@@ -317,6 +317,12 @@ function LineItemsDemo({ onServerUpdate }: DemoArgs) {
 export const LineItems: Story = {
   name: 'Line items',
   tags: ['!visual'],
+  // No save and no loading in this demo: the knobs of the other stories would control nothing here.
+  argTypes: {
+    saveDelay: { table: { disable: true } },
+    hydrationDelay: { table: { disable: true } },
+    onSave: { table: { disable: true } },
+  },
   render: (args) => <LineItemsDemo {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
