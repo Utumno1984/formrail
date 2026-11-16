@@ -209,8 +209,8 @@ describe('the creation page of a sales order (#521)', () => {
 
   it('the customer: choosing one is a change (there is no way back to "no customer")', async () => {
     await openCreation();
-    await chooseCustomer();
-    expect(screen.getByRole('textbox', { name: /Currency/ })).toHaveValue('EUR');
+    await chooseCustomer(USD_CUSTOMER);
+    expect(screen.getByRole('textbox', { name: /Currency/ })).toHaveValue('USD');
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeTruthy();
   }, 20_000);

@@ -161,7 +161,7 @@ export function nextLineId(taken: ReadonlySet<string>, counter: number): { id: s
 export function repriceLines(lines: readonly OrderLineValues[], from: DemoCurrency, to: DemoCurrency): OrderLineValues[] {
   if (from === to) return lines as OrderLineValues[];
   return lines.map((line) => {
-    const listPrice = line.productId === '' ? undefined : getProduct(line.productId)?.listPriceMinor[to];
+    const listPrice = getProduct(line.productId)?.listPriceMinor[to];
     return { ...line, unitPrice: listPrice === undefined ? '' : minorToText(listPrice, to) };
   });
 }
