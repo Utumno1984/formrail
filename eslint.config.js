@@ -80,7 +80,7 @@ export default tseslint.config(
             {
               regex: '(^|/)showcase(/|$)',
               message:
-                'The invoice showcase (packages/core/src/showcase, packages/pro/src/showcase) is story-only: import it only from packages/pro/src/showcase/ (ticket #377).',
+                'The record-editing showcase (packages/core/src/showcase, packages/pro/src/showcase) is story-only: import it only from packages/pro/src/showcase/ (ticket #377).',
             },
           ],
         },

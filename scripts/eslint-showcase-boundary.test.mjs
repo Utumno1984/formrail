@@ -39,6 +39,12 @@ describe('lint: the story-only showcase stays out of the Pro package (#377)', { 
     expect(await restricted(file, source)).toEqual([]);
   });
 
+  // #518: the showcase is no longer about invoices only; the message names it for what it is.
+  it('the message names the record-editing showcase', async () => {
+    const [message] = await restricted('packages/pro/src/index.ts', CORE_SHOWCASE);
+    expect(message).toContain('The record-editing showcase (packages/core/src/showcase, packages/pro/src/showcase) is story-only');
+  });
+
   it('the real sources pass: the Pro story imports the showcase, the package does not', async () => {
     const results = await eslint.lintFiles(['packages/pro/src', 'packages/pro/test']);
     const messages = results.flatMap((r) => r.messages.filter((m) => m.ruleId === 'no-restricted-imports'));

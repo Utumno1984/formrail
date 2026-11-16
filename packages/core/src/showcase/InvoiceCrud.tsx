@@ -53,7 +53,7 @@ import { ToastProvider } from '../toast/ToastProvider';
 import { useToast } from '../toast/use-toast';
 import { InvoiceEditor, InvoiceRecordPage, type InvoiceSaveReviewer, type UseInvoiceEditorAddons } from './InvoiceRecordPage';
 import { ListView, type ListViewProps } from './InvoiceListToRecord';
-import { createInvoiceApi } from './invoice-api';
+import { createRecordApi } from './record-api';
 import {
   createInvoiceStore,
   InvoiceNotFoundError,
@@ -178,7 +178,7 @@ function CrudInner({
       mounted.current = false;
     };
   }, []);
-  const api = useMemo<InvoiceStore>(() => createInvoiceApi(store, delays), [store]);
+  const api = useMemo<InvoiceStore>(() => createRecordApi(store, delays), [store]);
   useEffect(() => {
     window.__ropShowcaseStore = store;
     return () => {
