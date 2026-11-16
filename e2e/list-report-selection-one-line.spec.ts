@@ -108,13 +108,32 @@ for (const vp of [
       expect((await box(bar(page))).height).toBeGreaterThan((await oneLineHeight(page)) + 10);
     });
 
-    test('Pro VirtualListReport: always has "Select all N results", stays on two lines', async ({ page }) => {
+    // #504 (decision 1b of the maintainer): the Pro has "Select all N results" below 640px only with the consumer's
+    // bulkActions (two lines, as before); without them the bar is one line like the Free. The story `Default` passes
+    // bulkActions (Approve, Export): this case is unchanged; the case without them is the next test.
+    test('Pro VirtualListReport with consumer bulkActions: "Select all N results" on the second line, two lines', async ({ page }) => {
       await gotoStory(page, PRO);
       await rowBoxes(page).first().click();
       const c = await box(count(page));
       const a = await box(page.getByRole('button', { name: /^Select all .* results$/ }));
       expect(a.y).toBeGreaterThan(c.y + c.height - 1);
       expect((await box(bar(page))).height).toBeGreaterThan((await oneLineHeight(page)) + 10);
+    });
+
+    test('Pro VirtualListReport without consumer bulkActions (#504): one line, no "Select all N results"', async ({ page }) => {
+      await gotoStory(page, PRO, 'withBulkActions:!false');
+      await rowBoxes(page).first().click();
+      await expect(count(page)).toHaveText('1 selected');
+      await expect(page.getByRole('button', { name: /^Select all .* results$/ })).toHaveCount(0);
+      await sameRow(page);
+      // One line: "Clear selection" plus the bar's padding and border (`oneLineHeight` reads the first button of
+      // the bar, here the action under `display: none`).
+      const oneLine = await clear(page).evaluate((el) => {
+        const cs = getComputedStyle(el.closest('[data-rop-selection-bar]') as HTMLElement);
+        const v = (s: string): number => parseFloat(s);
+        return el.getBoundingClientRect().height + v(cs.paddingTop) + v(cs.paddingBottom) + v(cs.borderTopWidth) + v(cs.borderBottomWidth);
+      });
+      expect(Math.abs((await box(bar(page))).height - oneLine)).toBeLessThanOrEqual(1);
     });
 
     test('bulkActions switched on after mount (Control): the bar goes to two lines without errors', async ({ page }) => {

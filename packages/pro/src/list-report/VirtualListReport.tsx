@@ -1,7 +1,7 @@
-import { forwardRef, useMemo, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
+import { forwardRef, useId, useMemo, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
 import { Button, composeRefs, type ListReportSelection } from '@formrail/core';
 import { ListReportFrame, getNumberFormat, type ListReportFrameLabels, type ListReportFrameProps } from '@formrail/core/internal';
-import { VirtualListReportTable, type VirtualListReportTableProps } from './VirtualListReportTable';
+import { VirtualListReportTable, type VirtualListReportTableInternalProps, type VirtualListReportTableProps } from './VirtualListReportTable';
 
 /** Texts of `VirtualListReport`: those of the core floorplan plus the Pro selection action. */
 export interface VirtualListReportLabels extends ListReportFrameLabels {
@@ -12,12 +12,30 @@ export interface VirtualListReportLabels extends ListReportFrameLabels {
    * (`Intl.NumberFormat`; with SSR pass `locale`). A custom function receives the raw number and formats it itself.
    */
   selectAllResultsAction: (resultCount: number) => string;
+  /**
+   * Description of the header checkbox (its name stays `selectAllResults`), linked with `aria-describedby`: it
+   * selects every current result, also the rows the virtualization has not mounted. Not rendered while there is no
+   * result (the checkbox is disabled then). Default: "All 100,000 results, including those not on screen" (for a single
+   * result just the number and the word), the number formatted in the `locale` of `useListReport` (`Intl.NumberFormat`; with SSR pass `locale`).
+   * A custom function receives the raw number and formats it itself.
+   */
+  selectAllResultsDescription: (resultCount: number) => string;
 }
 
 const defaultSelectAllAction =
   (fmt: (n: number) => string) =>
   (resultCount: number): string =>
     `Select all ${fmt(resultCount)} ${resultCount === 1 ? 'result' : 'results'}`;
+
+const defaultSelectAllDescription =
+  (fmt: (n: number) => string) =>
+  (resultCount: number): string =>
+    resultCount === 1 ? `${fmt(1)} result` : `All ${fmt(resultCount)} results, including those not on screen`;
+
+// The table with the props only this floorplan passes (the header checkbox's description).
+const Table = VirtualListReportTable as <Row>(
+  props: VirtualListReportTableProps<Row> & VirtualListReportTableInternalProps<Row> & { ref?: Ref<HTMLDivElement> },
+) => ReactElement | null;
 
 export type VirtualListReportProps<Row> = Omit<ListReportFrameProps<Row>, 'renderTable' | 'labels'> &
   Pick<VirtualListReportTableProps<Row>, 'virtualizeThreshold' | 'overscan' | 'handleRef'> & {
@@ -30,7 +48,15 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
   const { table } = props;
   const scroller = useRef<HTMLDivElement | null>(null);
   const mergedScrollerRef = useMemo(() => composeRefs(scrollerRef, scroller), [scrollerRef]);
-  const selectAllLabel = labels?.selectAllResultsAction ?? defaultSelectAllAction((n) => getNumberFormat(table.locale).format(n));
+  const fmt = (n: number) => getNumberFormat(table.locale).format(n);
+  const selectAllLabel = labels?.selectAllResultsAction ?? defaultSelectAllAction(fmt);
+  // The header checkbox selects every result, mounted or not: a description says so (and how many), since the
+  // "Select all N results" action that says it on a wide screen is not there below 640px without consumer actions.
+  const descriptionId = `${useId()}-select-all-description`;
+  const description =
+    table.selection.enabled && table.resultCount > 0
+      ? (labels?.selectAllResultsDescription ?? defaultSelectAllDescription(fmt))(table.resultCount)
+      : undefined;
 
   const renderBulkActions = (selection: ListReportSelection<Row>): ReactNode => {
     const partial = selection.selectedResultCount > 0 && selection.selectedResultCount < table.resultCount;
@@ -63,8 +89,26 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
       labels={labels}
       scrollerRef={mergedScrollerRef}
       bulkActions={table.selection.enabled ? renderBulkActions : bulkActions}
+      // Without consumer actions (the prop, not what it returns, as in the core), "Select all N results" is the only
+      // one: below 640px the bar drops it (CSS) and keeps the one line of a bar without actions; the header
+      // checkbox selects every result there. The focus of an action hidden or removed goes to that checkbox.
+      bulkActionsWideOnly={table.selection.enabled && !bulkActions}
+      keepBulkActionsFocus={table.selection.enabled}
       renderTable={(tableProps) => (
-        <VirtualListReportTable {...tableProps} virtualizeThreshold={virtualizeThreshold} overscan={overscan} handleRef={handleRef} />
+        <>
+          <Table
+            {...tableProps}
+            virtualizeThreshold={virtualizeThreshold}
+            overscan={overscan}
+            handleRef={handleRef}
+            headSelectAllProps={description === undefined ? undefined : { 'aria-describedby': descriptionId }}
+          />
+          {description === undefined ? null : (
+            <span id={descriptionId} hidden>
+              {description}
+            </span>
+          )}
+        </>
       )}
     />
   );
@@ -79,6 +123,13 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
  *   (`labels.selectAllResultsAction`), visible only while some but not all of the results are selected:
  *   it selects every current result (the core's `toggleAllResults`, on the data — no row is mounted for
  *   it), then the focus goes to the header checkbox. The consumer's `bulkActions` follow it.
+ * - Below 640px without the consumer's `bulkActions` (the prop: one that returns `null` counts as given) the
+ *   action is not there (CSS at the bar's breakpoint: out of the layout, of the accessibility tree and of the
+ *   tab order) and the bar is one line, count and "Clear selection", as in `ListReport`. The header checkbox
+ *   selects every result there too, unmounted rows included; its description says so ("All 10,000 results,
+ *   including those not on screen", `labels.selectAllResultsDescription`). With the consumer's `bulkActions`, or
+ *   from 640px, the bar is as above. When the action (or a consumer action) has the focus and goes away (a
+ *   viewport resized or a tablet rotated across 640px, `bulkActions` dropped), the focus goes to the header checkbox.
  * - `scrollerRef` is the table's scroll container, as in `ListReport` (`useListReportScrollRestoration`).
  *
  * See `VirtualListReportTable` for the virtualization contract (threshold, fixed pitch, focus, range

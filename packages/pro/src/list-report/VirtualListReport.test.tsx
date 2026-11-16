@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Button, useListReport, useListReportScrollRestoration, type ListReportColumn } from '@formrail/core';
-import { VirtualListReport } from './VirtualListReport';
+import { Button, useListReport, useListReportScrollRestoration, type ListReportColumn, type ListReportFilter } from '@formrail/core';
+import { VirtualListReport, type VirtualListReportProps } from './VirtualListReport';
 import { PITCH, mockTableLayout } from '../../test/virtual-table-utils';
 
 interface Item {
@@ -133,6 +133,174 @@ describe('VirtualListReport', () => {
       expect(selectAllAction()).toHaveTextContent('All 100000');
       expect(action).toHaveBeenCalledWith(100_000);
     });
+  });
+});
+
+// #504: below 640px without consumer bulkActions the bar has no "Select all N results" (CSS) and the header
+// checkbox, which selects every result there, is described.
+describe('without consumer bulkActions (#504)', () => {
+  const FILTERS: ListReportFilter<Item>[] = [
+    { id: 'all', label: 'All' },
+    { id: 'even', label: 'Even', predicate: (r) => Number(r.id.slice(1)) % 2 === 0 },
+  ];
+  function Bare({
+    rows = ROWS,
+    locale = 'en-US',
+    bulk,
+    labels,
+    onSelectedIdsChange,
+  }: {
+    rows?: Item[];
+    locale?: string;
+    bulk?: VirtualListReportProps<Item>['bulkActions'];
+    labels?: VirtualListReportProps<Item>['labels'];
+    onSelectedIdsChange?: (ids: ReadonlySet<string>) => void;
+  }) {
+    const table = useListReport<Item>({ rows, columns: COLUMNS, getRowId: (r) => r.id, filters: FILTERS, selectable: true, locale, onSelectedIdsChange });
+    return <VirtualListReport title="Items" table={table} bulkActions={bulk} labels={labels} />;
+  }
+  const bar = () => screen.getByRole('group', { name: 'Selection Items' });
+  const allBox = () => screen.getByRole('checkbox', { name: 'Select all results' });
+  const approve: VirtualListReportProps<Item>['bulkActions'] = () => (
+    <Button size="sm" variant="secondary">
+      Approve
+    </Button>
+  );
+
+  it('the bar takes the one-line variant and the slot of the action is hidden below 640px (CSS, decided at render)', () => {
+    render(<Bare />);
+    expect(bar()).toHaveAttribute('data-rop-bulk-actions', 'false');
+    expect(selectAllAction().parentElement!.className.split(' ')).toContain('max-sm:hidden');
+  });
+
+  it.each([
+    ['a function that renders an action', approve],
+    ['a function that returns null (the prop decides, as in the core)', () => null],
+  ] as const)('with consumer bulkActions (%s): the two-line variant, the action in the slot, as before', (_label, bulk) => {
+    render(<Bare bulk={bulk} />);
+    expect(bar()).toHaveAttribute('data-rop-bulk-actions', 'true');
+    expect(selectAllAction().parentElement!.className.split(' ')).not.toContain('max-sm:hidden');
+  });
+
+  it('the header checkbox keeps its name and is described: at 0, at a partial selection, with a filter (the number follows resultCount)', async () => {
+    render(<Bare />);
+    const user = userEvent.setup();
+    expect(allBox()).toHaveAccessibleDescription('All 100,000 results, including those not on screen');
+    await user.click(screen.getByRole('checkbox', { name: 'Select Item 3' }));
+    expect(allBox()).toHaveAccessibleDescription('All 100,000 results, including those not on screen');
+    // A name distinct from the action's (jsdom has no media query: the action is shown here, as from 640px).
+    expect(screen.getByRole('button', { name: 'Select all 100,000 results' })).toBe(selectAllAction());
+    await user.click(screen.getByRole('radio', { name: 'Even' }));
+    // Item 3 is odd: hidden by the filter.
+    expect(screen.getByText('0 selected (1 hidden by filters)')).toBeInTheDocument();
+    expect(allBox()).toHaveAccessibleDescription('All 50,000 results, including those not on screen');
+  });
+
+  it('a filter with selected rows hidden: the header checkbox selects every CURRENT result, the description says how many', async () => {
+    const onSelectedIdsChange = vi.fn();
+    render(<Bare onSelectedIdsChange={onSelectedIdsChange} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Select Item 1' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Item 2' }));
+    await user.click(screen.getByRole('radio', { name: 'Even' }));
+    expect(screen.getByText('1 selected (1 hidden by filters)')).toBeInTheDocument();
+    expect(allBox()).toHaveAccessibleDescription('All 50,000 results, including those not on screen');
+    await user.click(allBox());
+    expect(screen.getByText('50,000 selected (1 hidden by filters)')).toBeInTheDocument();
+    expect(onSelectedIdsChange.mock.lastCall![0].size).toBe(50_001);
+  });
+
+  it.each([
+    ['click', async (user: ReturnType<typeof userEvent.setup>) => user.click(allBox())],
+    [
+      'Space',
+      async (user: ReturnType<typeof userEvent.setup>) => {
+        allBox().focus();
+        await user.keyboard(' ');
+      },
+    ],
+  ] as const)('partial selection, the header checkbox (%s) selects all 100,000 results, also those never mounted', async (_label, activate) => {
+    const onSelectedIdsChange = vi.fn();
+    render(<Bare onSelectedIdsChange={onSelectedIdsChange} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Select Item 3' }));
+    expect(allBox()).toBePartiallyChecked();
+    await activate(user);
+    expect(onSelectedIdsChange.mock.lastCall![0].size).toBe(100_000);
+    expect(onSelectedIdsChange.mock.lastCall![0].has('r99999')).toBe(true);
+    expect(screen.getByText('100,000 selected')).toBeInTheDocument();
+    expect(allBox()).toBeChecked();
+    expect(allBox()).toHaveFocus();
+  });
+
+  it('no result: the checkbox is disabled and has no description (no "All 0 results")', () => {
+    const { container } = render(<Bare rows={[]} />);
+    expect(allBox()).toBeDisabled();
+    expect(allBox()).not.toHaveAttribute('aria-describedby');
+    expect(allBox()).not.toHaveAccessibleDescription();
+    expect(container.textContent).not.toContain('including those not on screen');
+  });
+
+  it('one result: "1 result"; the description node is a hidden node of the floorplan, referenced by id', () => {
+    render(<Bare rows={ROWS.slice(0, 1)} />);
+    expect(allBox()).toHaveAccessibleDescription('1 result');
+    const node = document.getElementById(allBox().getAttribute('aria-describedby')!)!;
+    expect(node).toHaveAttribute('hidden');
+    expect(node.closest('table')).toBeNull();
+  });
+
+  it('de-DE: the number of the description is formatted like the other default texts', () => {
+    render(<Bare locale="de-DE" />);
+    expect(allBox()).toHaveAccessibleDescription('All 100.000 results, including those not on screen');
+  });
+
+  it('labels.selectAllResultsDescription receives the raw number', () => {
+    const describe = vi.fn((n: number) => `Every one of the ${n} rows`);
+    render(<Bare locale="de-DE" labels={{ selectAllResultsDescription: describe }} />);
+    expect(allBox()).toHaveAccessibleDescription('Every one of the 100000 rows');
+    expect(describe).toHaveBeenCalledWith(100_000);
+  });
+
+  it('without selection: no description and no checkbox (nothing changes)', () => {
+    function Plain() {
+      const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id });
+      return <VirtualListReport title="Items" table={table} />;
+    }
+    const { container } = render(<Plain />);
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(container.querySelector('[hidden]')).toBeNull();
+  });
+
+  it('consumer bulkActions dropped after mount while one of them has the focus: the focus goes to the header checkbox', async () => {
+    // jsdom has no layout: what is laid out is what `checkVisibility` says (here: whatever is in the document).
+    Element.prototype.checkVisibility ??= () => true;
+    vi.spyOn(Element.prototype, 'checkVisibility').mockImplementation(function (this: Element) {
+      return this.isConnected;
+    });
+    const { rerender } = render(<Bare bulk={approve} />);
+    act(() => screen.getByRole('button', { name: 'Approve' }).focus());
+    rerender(<Bare />);
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+    expect(bar()).toHaveAttribute('data-rop-bulk-actions', 'false');
+    await waitFor(() => expect(allBox()).toHaveFocus());
+    // And back: two lines again, nothing thrown.
+    rerender(<Bare bulk={approve} />);
+    expect(bar()).toHaveAttribute('data-rop-bulk-actions', 'true');
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+  });
+
+  it('the internal props of the frame are not props of VirtualListReport', () => {
+    function Typed() {
+      const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true });
+      // @ts-expect-error internal to the core's frame, never a prop of the floorplan
+      return <VirtualListReport title="Items" table={table} bulkActionsWideOnly />;
+    }
+    function TypedFocus() {
+      const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true });
+      // @ts-expect-error internal to the core's frame, never a prop of the floorplan
+      return <VirtualListReport title="Items" table={table} keepBulkActionsFocus={false} />;
+    }
+    expect([Typed, TypedFocus]).toHaveLength(2);
   });
 });
 
