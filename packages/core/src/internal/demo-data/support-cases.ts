@@ -242,7 +242,8 @@ const TOPICS: readonly Topic[] = [
     subject: 'Quotation request for {sku}',
     opening: ['Could you send us a quotation for {sku}, for the quantity we usually order?'],
     context: ['We would like to place the order this month.', 'The delivery address is the one on our account.', 'Please include the delivery time in the quotation.'],
-    ack: 'I am preparing the quotation for {sku} and I am checking the stock in our warehouses.',
+    // Not "preparing the quotation": the quantity and the date it depends on are asked afterwards.
+    ack: 'I am checking the stock of {sku} in our warehouses.',
     question: {
       ask: 'Could you tell me the quantity and the delivery date you need for the quotation of {sku}?',
       answers: ['We need 200 units of {sku}, with delivery by the end of next month.', 'We need 50 units of {sku}, with delivery within three weeks.'],
@@ -349,7 +350,8 @@ const CUSTOMER_CHASE: readonly string[] = [
 const EMPLOYEE_PROGRESS: Readonly<Record<'answer' | 'accept' | 'chase', readonly string[]>> = {
   answer: [
     'Thank you for the details, I am working on it now.',
-    'Thank you, that is what I needed to go ahead.',
+    // Not "to go ahead": a later proposal may end with "Shall I go ahead?".
+    'Thank you, that is exactly the information I needed.',
     'Thank you for the information, I have passed it to my colleagues.',
   ],
   accept: ['Thank you for the confirmation, I am arranging it now.', 'Thank you, I have started it and will confirm when it is done.'],
@@ -359,6 +361,9 @@ const EMPLOYEE_PROGRESS: Readonly<Record<'answer' | 'accept' | 'chase', readonly
     'I am still waiting for an answer from my colleagues and will come back to you.',
   ],
 };
+/** An employee message posted this many calendar days or more after the one before it says sorry for the wait. */
+const LATE_REPLY_DAYS = 7;
+const EMPLOYEE_LATE_APOLOGY = 'I apologise for the late reply.';
 const EMPLOYEE_CLOSING = 'I am closing this case, please open a new one if you need anything else.';
 
 // Extra sentences that lengthen a message without changing its meaning, by phase; never the same
@@ -556,10 +561,11 @@ function pickFresh(rng: Rng, pool: readonly string[], used: ReadonlySet<string>)
  * sentence twice; a thanks last among them), before `main` when it is a question (`mainLast`, so the
  * question ends the message), after it otherwise, then `ending`. Now and then a long one (5 to 7 extra sentences) when the pool has them.
  */
-function compose(rng: Rng, used: Set<string>, main: string, details: readonly string[], mainLast: boolean, ending?: string): string {
+function compose(rng: Rng, used: Set<string>, main: string, details: readonly string[], mainLast: boolean, ending?: string, apology = false): string {
   const pool = details.filter((sentence) => !used.has(sentence));
   const long = rng.chance(LONG_CHANCE) && pool.length >= LONG_EXTRA[1];
-  const extra = long ? rng.int(LONG_EXTRA[0], LONG_EXTRA[1]) : pool.length > 0 && rng.chance(EXTRA_CHANCE) ? 1 : 0;
+  // The apology takes the place of the one short extra sentence, so a short message keeps 3 sentences at most.
+  const extra = long ? rng.int(LONG_EXTRA[0], LONG_EXTRA[1]) : pool.length > 0 && rng.chance(EXTRA_CHANCE) && !apology ? 1 : 0;
   const picked: string[] = [];
   for (let i = 0; i < extra; i++) {
     const j = i + rng.int(0, pool.length - 1 - i);
@@ -572,7 +578,8 @@ function compose(rng: Rng, used: Set<string>, main: string, details: readonly st
   used.add(main);
   // Thanks come last, as people write them ("Thank you in advance...", "Thank you for contacting us.").
   const extras = [...picked.filter((sentence) => !sentence.startsWith('Thank you')), ...picked.filter((sentence) => sentence.startsWith('Thank you'))];
-  const parts = mainLast ? [...extras, main] : [main, ...extras];
+  // A late reply apologises right next to the main sentence (before a question, so that it stays last).
+  const parts = mainLast ? [...(apology ? [EMPLOYEE_LATE_APOLOGY] : []), ...extras, main] : [main, ...(apology ? [EMPLOYEE_LATE_APOLOGY] : []), ...extras];
   if (ending !== undefined) parts.push(ending);
   return parts.join(' ');
 }
@@ -618,6 +625,9 @@ function makeSupportCaseDetail(index: number): DemoSupportCaseDetail {
   for (let k = 0; k < count; k++) {
     const kind = kinds[k]!;
     const fromCustomer = k % 2 === 0;
+    const slot = slots[k]!;
+    // An employee reply posted a week or more after the customer's message apologises for it.
+    const late = !fromCustomer && dayAges[Math.floor(slots[k - 1]! / SLOTS_PER_DAY)]! - dayAges[Math.floor(slot / SLOTS_PER_DAY)]! >= LATE_REPLY_DAYS;
     let text: string;
     switch (kind) {
       case 'open':
@@ -633,22 +643,21 @@ function makeSupportCaseDetail(index: number): DemoSupportCaseDetail {
         text = compose(rng, used, pickFresh(rng, CUSTOMER_CHASE, used), FOLLOWUP_DETAILS, false);
         break;
       case 'ack':
-        text = compose(rng, used, topic.ack, ONGOING_DETAILS, false);
+        text = compose(rng, used, topic.ack, ONGOING_DETAILS, false, undefined, late);
         break;
       case 'progress':
-        text = compose(rng, used, pickFresh(rng, EMPLOYEE_PROGRESS[kinds[k - 1] as 'answer' | 'accept' | 'chase'], used), ONGOING_DETAILS, false);
+        text = compose(rng, used, pickFresh(rng, EMPLOYEE_PROGRESS[kinds[k - 1] as 'answer' | 'accept' | 'chase'], used), ONGOING_DETAILS, false, undefined, late);
         break;
       case 'ask':
-        text = compose(rng, used, topic.question.ask, QUESTION_DETAILS, true);
+        text = compose(rng, used, topic.question.ask, QUESTION_DETAILS, true, undefined, late);
         break;
       case 'propose':
-        text = compose(rng, used, `${solution.propose} ${rng.pick(CONFIRM_QUESTIONS)}`, QUESTION_DETAILS, true);
+        text = compose(rng, used, `${solution.propose} ${rng.pick(CONFIRM_QUESTIONS)}`, QUESTION_DETAILS, true, undefined, late);
         break;
       case 'resolve':
-        text = compose(rng, used, solution.resolve, CLOSING_DETAILS, false, supportCase.status === 'closed' ? EMPLOYEE_CLOSING : undefined);
+        text = compose(rng, used, solution.resolve, CLOSING_DETAILS, false, supportCase.status === 'closed' ? EMPLOYEE_CLOSING : undefined, late);
         break;
     }
-    const slot = slots[k]!;
     const minute = FIRST_MINUTE + (slot % SLOTS_PER_DAY) * SLOT_MINUTES + rng.int(0, SLOT_MINUTES - 1);
     const employee = !fromCustomer && assignee !== undefined;
     comments.push(
