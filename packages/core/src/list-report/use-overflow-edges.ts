@@ -51,10 +51,10 @@ function isAncestorOrSelf(node: Node, el: Element): boolean {
  * does not, and the attributes would keep the old state until the next scroll (a start shade over no
  * hidden column). The observer watches the `dir` attribute in the whole document (and in every
  * `ShadowRoot` the container is nested in, outwards to the document) and measures again only when it
- * changes on the container or on one of its ancestors, walked up through the shadow hosts: a `dir`
+ * changes on the container or on one of its ancestors, walked up through the hosts of `ShadowRoot`s: a `dir`
  * changed on a sibling or in another branch measures nothing, however many tables are mounted.
  * Limit: the ancestors are those of the DOM tree (`parentNode`, then the `host` of a `ShadowRoot`), not
- * of the flat tree. A container slotted into a host whose shadow tree sets `dir` on the `slot` or above
+ * of the flat tree. A container slotted into a host whose `ShadowRoot` sets `dir` on the `slot` or above
  * it is not seen (the `dir` of the host and of its light-DOM ancestors is).
  * Limit: a direction changed through the CSS `direction` property alone (a class, a style sheet), with
  * no `dir` attribute changing, fires nothing an observer can see at a low cost; it is measured at the
