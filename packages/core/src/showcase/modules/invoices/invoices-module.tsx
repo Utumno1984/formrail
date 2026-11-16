@@ -16,7 +16,8 @@ import { createInvoiceStore, type InvoiceDraft, type StoredInvoice } from '../..
 import { DECIMAL, isPlainPositive, isTooLarge, sameNumberText } from '../../number-text';
 import type { RecordModule, RecordSectionsProps } from '../../record-module';
 import { STATUS_LABEL, STATUS_TONE, SUPPLIERS_EN } from '../../showcase-data';
-import { InvoiceLineItems, helpProps } from './InvoiceLineItems';
+import { helpProps } from '../field-help';
+import { InvoiceLineItems } from './InvoiceLineItems';
 import { sameLines, toLineValues, toStoredLine, validateLines, type LineErrorKey, type LineValues } from './invoice-lines';
 
 type InvoiceStatus = StoredInvoice['status'];

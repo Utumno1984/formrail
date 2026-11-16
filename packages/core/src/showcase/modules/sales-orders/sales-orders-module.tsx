@@ -23,7 +23,7 @@ import { StatusBadge } from '../../../status-badge/StatusBadge';
 import type { ListReportColumn, ListReportFilter } from '../../../list-report/types';
 import type { RecordModule, RecordSectionsProps } from '../../record-module';
 import { createSalesOrderStore, type SalesOrderDraft, type StoredSalesOrder } from '../../sales-order-store';
-import { helpProps } from '../invoices/InvoiceLineItems';
+import { helpProps } from '../field-help';
 import { SalesOrderLines } from './SalesOrderLines';
 import {
   orderTotal,
@@ -81,7 +81,7 @@ export const sameValues = (a: SalesOrderValues, b: SalesOrderValues): boolean =>
   a.requestedDeliveryDate === b.requestedDeliveryDate &&
   a.deliveryNotes === b.deliveryNotes &&
   a.notes === b.notes &&
-  sameLines(a.lines, b.lines);
+  sameLines(a.lines, b.lines, a.currency);
 
 type SalesOrderErrors = Partial<Record<keyof SalesOrderValues | LineErrorKey, string>>;
 const validateOrder = (v: SalesOrderValues): SalesOrderErrors => {

@@ -16,7 +16,7 @@ import {
 } from '../../../internal/demo-data';
 import { useListMutationFocus } from '../../../internal/use-list-mutation-focus';
 import { Select } from '../../../select/Select';
-import { helpProps } from '../invoices/InvoiceLineItems';
+import { helpProps } from '../field-help';
 import { lineTotal, minorToText, nextLineId, type OrderLineValues } from './order-lines';
 
 export interface SalesOrderLinesProps {

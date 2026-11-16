@@ -203,6 +203,28 @@ test.describe('Showcase/Record editing: list -> order -> list', () => {
     await expect(table(page)).toBeVisible();
   });
 
+  test('changing only the Status is a change: the save bar shows and "Back to list" asks', async ({ page }) => {
+    await openOrder(page, 'so-15');
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Shipped' }).click();
+    await expect(bar(page)).toBeVisible();
+    await back(page).click();
+    await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toBeVisible();
+  });
+
+  test('a saved number retyped in a form the rule refuses (5 -> 5.0) is a change with an error, not an unchanged page', async ({ page }) => {
+    await openOrder(page, 'so-15');
+    const original = await quantity(page, 1).inputValue();
+    await quantity(page, 1).fill(`${original}.0`);
+    await expect(bar(page)).toBeVisible();
+    await expect(total(page)).toHaveText('—');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText(/^Quantity must be a whole number from 1 to 99,999/)).toBeVisible();
+    // The same value with a leading zero is the same valid number: nothing to save.
+    await quantity(page, 1).fill(`0${original}`);
+    await expect(bar(page)).toBeHidden();
+  });
+
   test('adding a line and pressing Back asks for confirmation: Keep editing keeps the new line', async ({ page }) => {
     await openOrder(page, 'so-15');
     await page.getByRole('button', { name: 'Add line' }).click();

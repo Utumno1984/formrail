@@ -75,6 +75,12 @@ describe('line totals (#520)', () => {
     expect(lineTotal(line({ discount: '101' }), 'EUR')).toBeNull();
   });
 
+  it('has no total for a unit price above the maximum, which validation refuses', () => {
+    expect(lineTotal(line({ quantity: '1', unitPrice: '999999.99' }), 'EUR')).toBe(99_999_999);
+    expect(lineTotal(line({ quantity: '1', unitPrice: '1000000.00' }), 'EUR')).toBeNull();
+    expect(lineTotal(line({ quantity: '1', unitPrice: '100000000' }), 'JPY')).toBeNull();
+  });
+
   it('the order total is the sum of the line totals; one unfinished line makes it null; no lines total 0', () => {
     expect(orderTotal([line({ id: 'a' }), line({ id: 'b', quantity: '1', unitPrice: '5.50' })], 'EUR')).toBe(2550);
     expect(orderTotal([line({ id: 'a' }), line({ id: 'b', quantity: '' })], 'EUR')).toBeNull();
@@ -106,6 +112,13 @@ describe('validateLines (#520)', () => {
     expect(validateLines([line({ unitPrice: '1000000.00' })], 'EUR')['lines.0.unitPrice']).toBe('Unit price is too large.');
   });
 
+  it('unit price: the largest accepted is 999,999.99 (99,999,999 minor units), one more is too large', () => {
+    expect(validateLines([line({ unitPrice: '999999.99' })], 'EUR')).toEqual({});
+    expect(validateLines([line({ unitPrice: '999999.98' })], 'EUR')).toEqual({});
+    expect(validateLines([line({ unitPrice: '99999999' })], 'JPY')).toEqual({});
+    expect(validateLines([line({ unitPrice: '100000000' })], 'JPY')['lines.0.unitPrice']).toBe('Unit price is too large.');
+  });
+
   it('discount: a whole percent from 0 to 100', () => {
     expect(validateLines([line({ discount: '100' })], 'EUR')).toEqual({});
     for (const discount of ['', '-1', '101', '2.5']) {
@@ -129,11 +142,58 @@ describe('values <-> stored lines (#520)', () => {
   });
 
   it('sameLines compares numbers as numbers, ids and product as text, and the order', () => {
-    expect(sameLines([line()], [line({ unitPrice: '10' })])).toBe(true);
-    expect(sameLines([line()], [line({ quantity: '2e0' })])).toBe(false); // not the plain form: counts as a change
-    expect(sameLines([line()], [line({ productId: 'prd-2' })])).toBe(false);
-    expect(sameLines([line({ id: 'a' }), line({ id: 'b' })], [line({ id: 'b' }), line({ id: 'a' })])).toBe(false);
-    expect(sameLines([line()], [])).toBe(false);
+    expect(sameLines([line()], [line({ unitPrice: '10' })], 'EUR')).toBe(true);
+    expect(sameLines([line()], [line({ quantity: '2e0' })], 'EUR')).toBe(false); // not the plain form: counts as a change
+    expect(sameLines([line()], [line({ productId: 'prd-2' })], 'EUR')).toBe(false);
+    expect(sameLines([line({ id: 'a' }), line({ id: 'b' })], [line({ id: 'b' }), line({ id: 'a' })], 'EUR')).toBe(false);
+    expect(sameLines([line()], [], 'EUR')).toBe(false);
+  });
+});
+
+describe('sameLines, field by field (#520)', () => {
+  const same = (patch: Partial<OrderLineValues>, currency: 'EUR' | 'JPY' = 'EUR') => sameLines([line()], [line(patch)], currency);
+
+  it('every field of a line counts: id, product, quantity, unit price, discount', () => {
+    expect(same({})).toBe(true);
+    expect(same({ id: 'l2' })).toBe(false);
+    expect(same({ productId: 'prd-2' })).toBe(false);
+    expect(same({ quantity: '3' })).toBe(false);
+    expect(same({ unitPrice: '10.01' })).toBe(false);
+    expect(same({ discount: '5' })).toBe(false);
+  });
+
+  it('a change in the second line is found', () => {
+    expect(sameLines([line({ id: 'a' }), line({ id: 'b' })], [line({ id: 'a' }), line({ id: 'b', discount: '1' })], 'EUR')).toBe(false);
+  });
+
+  it('a text that is not valid for the rule of the field is a change, even when it is numerically the same', () => {
+    expect(same({ quantity: '2.0' })).toBe(false); // a quantity is whole
+    expect(same({ discount: '0.0' })).toBe(false); // a discount is whole
+    expect(same({ unitPrice: '10.000' })).toBe(false); // EUR has 2 decimals
+    expect(same({ unitPrice: '10.0000' })).toBe(false);
+    expect(sameLines([line({ unitPrice: '1250' })], [line({ unitPrice: '1250.0' })], 'JPY')).toBe(false); // JPY has none
+    expect(same({ quantity: '2e0' })).toBe(false);
+    expect(same({ unitPrice: '1e1' })).toBe(false);
+  });
+
+  it('a text that is valid for the rule is the same number: leading zeros, fewer decimals, spaces around', () => {
+    expect(same({ quantity: '02' })).toBe(true);
+    expect(same({ discount: '00' })).toBe(true);
+    expect(same({ unitPrice: '10.0' })).toBe(true);
+    expect(same({ unitPrice: '10' })).toBe(true);
+    expect(same({ unitPrice: ' 10.00 ' })).toBe(true);
+    expect(sameLines([line({ unitPrice: '1250' })], [line({ unitPrice: '01250' })], 'JPY')).toBe(true);
+  });
+
+  it('two different valid texts are different numbers', () => {
+    expect(same({ unitPrice: '10.10' })).toBe(false);
+    expect(same({ quantity: '12' })).toBe(false);
+  });
+
+  it('digit strings too long to be exact are compared as text, never as the same number', () => {
+    const a = '9'.repeat(400);
+    expect(sameLines([line({ quantity: a })], [line({ quantity: `${a}9` })], 'EUR')).toBe(false);
+    expect(sameLines([line({ quantity: a })], [line({ quantity: a })], 'EUR')).toBe(true);
   });
 });
 

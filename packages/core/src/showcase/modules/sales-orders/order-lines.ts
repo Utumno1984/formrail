@@ -2,7 +2,7 @@
 // is typed in the major unit of the order's currency (`12.50`, whole yen for JPY) and kept in minor units. Not
 // exported by the package.
 import { CURRENCY_MINOR_DIGITS, lineTotalMinor, type DemoCurrency } from '../../../internal/demo-data';
-import { INTEGER, sameNumberText } from '../../number-text';
+import { INTEGER } from '../../number-text';
 import type { StoredOrderLine } from '../../sales-order-store';
 
 /** A line in the form: every number is text as typed, so an invalid text can be shown and reported. */
@@ -61,17 +61,31 @@ export const toStoredLine = (line: OrderLineValues, currency: DemoCurrency): Sto
   discountPercent: Number(line.discount),
 });
 
-/** Same lines, in the same order, with the same ids and values (numbers compared numerically: `5` is `5.0`). */
-export const sameLines = (a: readonly OrderLineValues[], b: readonly OrderLineValues[]): boolean =>
+// Two texts are the same number only when BOTH are valid for the rule of the field (a whole number, an amount of the
+// currency): `5` and `05` are the same quantity, but `5.0` is not valid for a quantity, so it is never "unchanged"
+// (an invalid text left in a field always counts as a change, the contract of `number-text.ts`).
+const sameInteger = (a: string, b: string): boolean => {
+  if (a === b) return true;
+  const [x, y] = [a.trim(), b.trim()];
+  return INTEGER.test(x) && INTEGER.test(y) && Number.isSafeInteger(Number(x)) && Number(x) === Number(y);
+};
+const sameAmount = (a: string, b: string, currency: DemoCurrency): boolean => {
+  if (a === b) return true;
+  const [x, y] = [textToMinor(a, currency), textToMinor(b, currency)];
+  return x !== null && x === y;
+};
+
+/** Same lines, in the same order, with the same ids and values (`5` is `05`; `5.0` is not `5`: it is not a valid quantity). */
+export const sameLines = (a: readonly OrderLineValues[], b: readonly OrderLineValues[], currency: DemoCurrency): boolean =>
   a.length === b.length &&
   a.every((line, i) => {
     const other = b[i]!;
     return (
       line.id === other.id &&
       line.productId === other.productId &&
-      sameNumberText(line.quantity, other.quantity) &&
-      sameNumberText(line.unitPrice, other.unitPrice) &&
-      sameNumberText(line.discount, other.discount)
+      sameInteger(line.quantity, other.quantity) &&
+      sameAmount(line.unitPrice, other.unitPrice, currency) &&
+      sameInteger(line.discount, other.discount)
     );
   });
 
