@@ -39,6 +39,8 @@
 @source not '../list-report/types.ts';
 /* Story-only Storybook args of the CRUD showcase (#377): no class names, a `filter` URL parameter. */
 @source not '../showcase/crud-story-args.ts';
+/* Same for the Sales orders stories' args (#520): no class names, a `filter` URL parameter. */
+@source not '../showcase/sales-order-story-args.ts';
 @source not '../list-report/search.ts';
 @source not '../list-report/use-change-flash.ts';
 @source not '../internal/normalize-text.ts';
