@@ -2,6 +2,8 @@
 
 Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LICENSE)).
 
+Works with React Hook Form (`react-hook-form` ^7.92.0) and TanStack Form (`@tanstack/react-form`, tested on 1.33.x).
+
 - `"private": true` on purpose: nothing is published until the private npm org exists (a guard test,
   `scripts/pro-package.test.mjs`, fails if `private` is removed or the license becomes MIT). There is
   no runtime licensing mechanism: no network access, no keys (asserted on the built bundle).
