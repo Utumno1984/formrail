@@ -35,6 +35,11 @@ export interface ListReportTableHeadProps<Row> {
   rowActions?: boolean;
   /** Width of the row actions `<col>` (a CSS length). Default: one row height (the "…" trigger alone). */
   rowActionsWidth?: string;
+  /**
+   * Extra attributes of the header "select all results" checkbox (e.g. `aria-describedby` with the id of a node
+   * the caller renders, in `VirtualListReport`). Its name stays `labels.selectAllResults`. Without it the checkbox has none.
+   */
+  selectAllProps?: { 'aria-describedby'?: string };
 }
 
 /**
@@ -43,7 +48,15 @@ export interface ListReportTableHeadProps<Row> {
  * sortable column headers and the optional trailing row actions column (a visually hidden name). Exported from `@formrail/core/internal` for
  * `@formrail/pro`; not public API, no semver guarantee, not meant to be used standalone.
  */
-export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, rowActions = false, rowActionsWidth = ROW_ACTIONS_COLUMN_WIDTH }: ListReportTableHeadProps<Row>) {
+export function ListReportTableHead<Row>({
+  table,
+  selectable,
+  labels,
+  rowProps,
+  rowActions = false,
+  rowActionsWidth = ROW_ACTIONS_COLUMN_WIDTH,
+  selectAllProps,
+}: ListReportTableHeadProps<Row>) {
   const { columns, selection } = table;
   return (
     <>
@@ -63,6 +76,7 @@ export function ListReportTableHead<Row>({ table, selectable, labels, rowProps, 
                   checked={selection.allResultsState}
                   disabled={table.resultCount === 0}
                   aria-label={labels.selectAllResults}
+                  aria-describedby={selectAllProps?.['aria-describedby']}
                   onCheckedChange={selection.toggleAllResults}
                 />
               </div>
