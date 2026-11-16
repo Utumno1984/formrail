@@ -464,7 +464,12 @@ export const VisualSelection: Story = {
  * Visual baseline: `VisualSelection` without the consumer's `bulkActions`: below 640px the selection bar is one line
  * (count and "Clear selection", no "Select all N results"); from 640px "Select all 100,000 results" is shown.
  */
-export const VisualSelectionWithoutBulkActions: Story = { ...VisualSelection, args: { withBulkActions: false } };
+export const VisualSelectionWithoutBulkActions: Story = {
+  // Tags written out, not spread: Storybook's indexer reads them statically.
+  tags: ['visual'],
+  args: { withBulkActions: false },
+  play: VisualSelection.play,
+};
 
 /**
  * Columns hidden sideways, 10,000 rows in a 360px box: the play function scrolls to the middle of the
