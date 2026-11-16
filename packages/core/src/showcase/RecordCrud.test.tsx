@@ -1,5 +1,5 @@
 import { StrictMode, useSyncExternalStore } from 'react';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -221,8 +221,36 @@ function switchTo(search: string) {
 /* -------------------------------------------------------------------------------------- tests */
 
 describe('RecordCrud (#519): the shell holds no word of a domain', () => {
+  // Every source file of the showcase folder is part of the shell UNLESS it is named here as a domain's file (the
+  // invoices' own files, the registry that names the modules, the data and helpers of a story): a new shell file
+  // is scanned the day it is added, a new domain file must be added to this list on purpose.
+  const DOMAIN_FILES = new Set([
+    'crud-story-args.ts',
+    'notice-cap.ts',
+    'number-text.ts',
+    'record-store.ts',
+    'showcase-data.ts',
+    'showcase-modules.ts',
+    'showcase-router.ts',
+  ]);
+  const shellFiles = () =>
+    readdirSync(import.meta.dirname)
+      .filter((file) => /\.tsx?$/.test(file) && !/\.(test|stories)\.tsx?$/.test(file))
+      .filter((file) => !/^invoice/i.test(file) && !DOMAIN_FILES.has(file));
+
+  it('the shell files (every source file of the folder that is not a domain file) are the ones expected', () => {
+    expect(shellFiles().sort()).toEqual([
+      'RecordCrud.tsx',
+      'RecordListView.tsx',
+      'RecordPageShell.tsx',
+      'list-page.ts',
+      'record-api.ts',
+      'record-module.ts',
+    ]);
+  });
+
   it('the source of the shell files names no invoice and no supplier', () => {
-    for (const file of ['RecordCrud.tsx', 'RecordListView.tsx', 'RecordPageShell.tsx', 'record-module.ts']) {
+    for (const file of shellFiles()) {
       const source = readFileSync(join(import.meta.dirname, file), 'utf8');
       expect(source, file).not.toMatch(/invoice|supplier/i);
     }
@@ -430,4 +458,120 @@ describe('RecordCrud (#519, B3 of #518): one registry for reading and writing', 
     expect(() => render(<RecordCrud {...props({ ...TASKS, name: 'contacts' })} />)).toThrow('unknown module "contacts"');
     expect(window.location.search).toBe('');
   });
+});
+
+// The combinations of `create` / `delete` / `deleteMany` the shell branches on, and what each one shows.
+describe('RecordCrud (#519): each feature a module opts into is its own, never implied by another', () => {
+  /** Row deletion and no bulk deletion, no creation: the row "…" menu, no selection, no "New …". */
+  const DELETE_ONLY: RecordModule<Person, PersonValues> = { ...PEOPLE, create: undefined, deleteMany: false };
+  /** Bulk deletion and no row deletion, no creation: the selection, no row "…" menu, no "New …". */
+  const MANY_ONLY: RecordModule<Person, PersonValues> = { ...PEOPLE, create: undefined, delete: false };
+
+  it('a module with `delete` only has the row menu and the toast, and no selection', async () => {
+    render(<RecordCrud {...props(DELETE_ONLY)} />);
+    await screen.findByRole('link', { name: 'Ben Okafor' });
+    // No bulk deletion: no checkbox, no selection bar, no "Delete selected"; no creation: no "New …".
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(document.querySelector('[data-rop-selection-bar]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Delete selected' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^New/ })).toBeNull();
+    // The row menu is there, on every row, and it deletes.
+    expect(screen.getAllByRole('button', { name: /^Actions for / })).toHaveLength(3);
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Ben Okafor' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete person Ben Okafor?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete person' }));
+    // A module that can delete but not create still announces the deletion (a toast provider is mounted).
+    expect(await screen.findByText('Person Ben Okafor deleted')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Ben Okafor' })).toBeNull());
+  }, 20_000);
+
+  it('a module with `deleteMany` only has the selection and its toast, and no row menu', async () => {
+    render(<RecordCrud {...props(MANY_ONLY)} />);
+    await screen.findByRole('link', { name: 'Ada Rivers' });
+    // No row deletion: no "Actions for …" on any row, and no "New …".
+    expect(screen.queryByRole('button', { name: /^Actions for / })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^New/ })).toBeNull();
+    // The selection is there and deletes.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Ada Rivers' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Ben Okafor' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete 2 people?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete 2 people' }));
+    expect(await screen.findByText('2 people deleted')).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Ada Rivers' })).toBeNull());
+    // Still no row menu on the rows left.
+    expect(screen.queryByRole('button', { name: /^Actions for / })).toBeNull();
+  }, 20_000);
+
+  it('the record page of a module with `deleteMany` only has no "Delete"; with `delete` only it has one', async () => {
+    window.history.replaceState(null, '', '/?record=p-2');
+    const { unmount } = render(<RecordCrud {...props(MANY_ONLY)} />);
+    await screen.findByRole('heading', { level: 1, name: /Ben Okafor/ });
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    unmount();
+    render(<RecordCrud {...props(DELETE_ONLY)} />);
+    await screen.findByRole('heading', { level: 1, name: /Ben Okafor/ });
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy();
+  });
+});
+
+describe('RecordCrud (#519): the add-ons are per module', () => {
+  const ADDON_ACTION = 'Tasks add-on action';
+  const tasksAddons = {
+    reviewSave: () => ({ title: 'Review the tasks save', confirmLabel: 'Save' }),
+    useAddons: () => ({ actions: <button type="button">{ADDON_ACTION}</button> }),
+  };
+
+  async function openAndSavePerson() {
+    await userEvent.click(await screen.findByRole('link', { name: 'Ben Okafor' }));
+    await screen.findByRole('heading', { level: 1, name: /Ben Okafor/ });
+    await userEvent.type(screen.getByRole('textbox', { name: 'City' }), ' Nord');
+    await waitFor(() => expect(footer()).not.toBeNull());
+    await userEvent.click(within(footer()!).getByRole('button', { name: 'Save' }));
+  }
+
+  it('the add-ons of another module never reach this module: its page stays the plain one', async () => {
+    const onSaved = vi.fn();
+    render(<RecordCrud {...props(PEOPLE, { addons: { tasks: tasksAddons }, onSaved })} />);
+    await openAndSavePerson();
+    // Saved at once, with no review dialog, and no header action of the tasks' add-on.
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ id: 'p-2', name: 'Ben Okafor', city: 'Porto Nord' }));
+    expect(screen.queryByRole('dialog', { name: 'Review the tasks save' })).toBeNull();
+    expect(screen.queryByRole('button', { name: ADDON_ACTION, hidden: true })).toBeNull();
+  }, 20_000);
+
+  it('the add-ons under the key of the module do reach it (the control of the test above)', async () => {
+    render(<RecordCrud {...props(PEOPLE, { addons: { tasks: {}, people: tasksAddons } })} />);
+    await openAndSavePerson();
+    expect(await screen.findByRole('dialog', { name: 'Review the tasks save' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: ADDON_ACTION, hidden: true })).toBeTruthy();
+  }, 20_000);
+});
+
+describe('RecordCrud (#519): a module that is not the default one', () => {
+  /** The tasks, with creation: the only module here that is not the default one and can create. */
+  const TASKS_WITH_CREATE: RecordModule<Task, TaskValues> = {
+    ...TASKS,
+    create: { defaults: () => ({ title: '', owner: '' }), toDraft: (v) => v },
+  };
+
+  it('a double click on "New task" is one entry, one report, one creation page', async () => {
+    window.history.replaceState(null, '', '/?module=tasks');
+    const onNavigate = vi.fn();
+    const entries = window.history.length;
+    render(<RecordCrud {...props(TASKS_WITH_CREATE, { onNavigate, history: 'push' })} />);
+    // Two clicks before React renders the creation page: the second still reaches the button (a user's double
+    // click can land before the first one has replaced the list; `userEvent.dblClick` cannot, it awaits between).
+    const button = await screen.findByRole('button', { name: 'New task' });
+    act(() => {
+      button.click();
+      button.click();
+    });
+    await screen.findByRole('heading', { level: 1, name: 'New task' });
+    expect(window.location.search).toBe('?module=tasks&create=1');
+    expect(window.history.length).toBe(entries + 1);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith({ to: 'create' });
+  }, 20_000);
 });

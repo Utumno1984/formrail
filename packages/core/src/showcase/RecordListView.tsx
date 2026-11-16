@@ -8,25 +8,16 @@
 // and the shell shows the page INSTEAD of the list (the list is unmounted); Back brings the list back with pill,
 // search, sort, scroll and focus restored. The list parameters and the saved scroll are the module's own
 // (`listParamPrefix`): two modules in one iframe never share them.
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { ListReport } from '../list-report/ListReport';
 import { EMPTY_IDS, useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
 import { useListReportUrlState } from '../list-report/use-list-report-url-state';
 import type { ListReportColumn, ListReportRowActions, ListReportSelection } from '../list-report/types';
+import { LIST_PAGE } from './list-page';
 import { capitalize, type RecordModule } from './record-module';
 import type { RecordStore } from './record-store';
 import { listParamPrefix, recordHref } from './showcase-router';
-
-/** The frame of a list page: the full height of the story, the List Report filling it. */
-export const LIST_PAGE: CSSProperties = {
-  boxSizing: 'border-box',
-  padding: 16,
-  fontFamily: 'system-ui, sans-serif',
-  height: 'var(--rop-demo-viewport-height, 100dvh)',
-  display: 'flex',
-  flexDirection: 'column',
-};
 
 // A negative offset on the focus indicator: the cell wraps its content in a clipping box that starts at the
 // link's edge, so an indicator drawn outside the link would be cut off; it is drawn inside instead (#152).

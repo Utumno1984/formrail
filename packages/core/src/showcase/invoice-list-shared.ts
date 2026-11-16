@@ -4,7 +4,7 @@
 import type { CSSProperties } from 'react';
 import { formatEuro, type DemoInvoice } from '../internal/demo-invoices';
 import type { ListReportColumn, ListReportFilter } from '../list-report/types';
-import { LIST_PAGE } from './RecordListView';
+import { LIST_PAGE } from './list-page';
 import { STATUS_LABEL } from './showcase-data';
 
 export const LABELS = {
@@ -44,5 +44,5 @@ export const COLUMNS: ListReportColumn<DemoInvoice>[] = [
 ];
 export const SORTABLE = COLUMNS.map((c) => c.id);
 
-/** The frame of a list page, the same as the record-editing shell's (`LIST_PAGE`, RecordListView.tsx). */
+/** The frame of a list page, the same as the record-editing shell's (`LIST_PAGE`, list-page.ts). */
 export const PAGE: CSSProperties = LIST_PAGE;

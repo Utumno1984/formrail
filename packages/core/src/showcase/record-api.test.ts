@@ -184,6 +184,22 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     await expect(reading.promise).resolves.toEqual(SEED[1]);
   });
 
+  it('a save that fails while a list and a record are waiting for it does not fail them: they return the data (#519)', async () => {
+    // The wait is for the write to be OVER, not for it to succeed: the list reopened after "Leave anyway" on a
+    // save that then fails shows the rows, never the save's error.
+    const held = gate();
+    const { api } = setup({ saveDelayMs: held.promise, saveOutcome: 'error' });
+    const saving = watch(api.save({ ...SEED[0]!, city: 'Graz' }));
+    const listing = watch(api.list());
+    const reading = watch(api.get('c-1'));
+    await flush();
+    expect(listing.settled || reading.settled).toBe(false);
+    held.open();
+    await expect(saving.promise).rejects.toBeInstanceOf(RecordNetworkError);
+    await expect(listing.promise).resolves.toEqual(SEED);
+    await expect(reading.promise).resolves.toEqual(SEED[0]);
+  });
+
   it('everything else is the store itself (snapshot, server updates, subscriptions, configure)', async () => {
     const { store, api } = setup();
     const changes: unknown[] = [];
