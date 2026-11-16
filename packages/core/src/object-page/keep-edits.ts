@@ -39,6 +39,10 @@ const define = (target: Container, key: string, value: unknown): void => {
  * Returns `returned` itself when the result has its content (the form shows what the server stored and is
  * clean), otherwise `current` itself when the result has its content, otherwise a new object. Never mutates its
  * arguments and never copies deeply: every subtree of the result is a subtree of `returned` or `current`.
+ *
+ * Cyclic values are not supported: a plain object that contains itself (in `sent`, `current` or `returned`)
+ * overflows the stack (`RangeError`) when this function is called directly, as it does in the adapter of
+ * `@formrail/pro`. The form values of a save are data (JSON-like), never cyclic.
  */
 export function keepEditsSince<T>(sent: T, current: T, returned: T): T {
   const merged = mergeEdits(sent, current, returned);
