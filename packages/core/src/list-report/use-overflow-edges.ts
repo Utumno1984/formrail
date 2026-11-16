@@ -12,8 +12,9 @@ export const OVERFLOW_END_ATTR = 'data-rop-overflow-end';
  * layer at all). `height` is the scrollport's (`clientHeight`); `bottom` moves the shades down from
  * the layer, which sits right after the table: a table shorter than the scrollport leaves room below
  * it that the shades cover too (0 when the table fills it). Nothing about the direction: the shades
- * follow the resolved direction in CSS alone (see `edgeShadowStartClass`), so a `dir` changed after the
- * mount needs no measure.
+ * follow the resolved direction in CSS alone (see `edgeShadowStartClass`): the geometry itself holds
+ * nothing about it. (A `dir` changed after the mount still measures once, in `useOverflowEdges`: Firefox
+ * moves `scrollLeft` back to the start without a `scroll` event, and which shade shows depends on it.)
  */
 export interface OverflowEdgesGeometry {
   height: number;
@@ -22,6 +23,14 @@ export interface OverflowEdgesGeometry {
 
 export interface OverflowEdgesSink {
   setGeometry: (geometry: OverflowEdgesGeometry | null) => void;
+}
+
+/** Whether `node` is `el` or one of its ancestors in the composed tree (a `ShadowRoot` leads to its host). */
+function isAncestorOrSelf(node: Node, el: Element): boolean {
+  for (let n: Node | null = el; n; n = n instanceof ShadowRoot ? n.host : n.parentNode) {
+    if (n === node) return true;
+  }
+  return false;
 }
 
 /**
@@ -40,8 +49,13 @@ export interface OverflowEdgesSink {
  * Why `dir` needs an observer: a change of direction moves the scroll position back to the inline
  * start of the new direction, and not every browser says so. Chromium fires a `scroll` event; Firefox
  * does not, and the attributes would keep the old state until the next scroll (a start shade over no
- * hidden column). The observer watches the `dir` attribute in the whole document (and in the `ShadowRoot`
- * holding the container, if any) and measures again when it changes on the container or above it.
+ * hidden column). The observer watches the `dir` attribute in the whole document (and in every
+ * `ShadowRoot` the container is nested in, outwards to the document) and measures again only when it
+ * changes on the container or on one of its ancestors, walked up through the shadow hosts: a `dir`
+ * changed on a sibling or in another branch measures nothing, however many tables are mounted.
+ * Limit: the ancestors are those of the DOM tree (`parentNode`, then the `host` of a `ShadowRoot`), not
+ * of the flat tree. A container slotted into a host whose shadow tree sets `dir` on the `slot` or above
+ * it is not seen (the `dir` of the host and of its light-DOM ancestors is).
  * Limit: a direction changed through the CSS `direction` property alone (a class, a style sheet), with
  * no `dir` attribute changing, fires nothing an observer can see at a low cost; it is measured at the
  * next scroll or resize. The shades are still drawn on the correct sides (CSS alone, see
@@ -100,16 +114,16 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       typeof MutationObserver === 'undefined'
         ? null
         : new MutationObserver((records) => {
-            if (!records.some((r) => r.target === el || !el.contains(r.target))) return;
+            if (!records.some((r) => isAncestorOrSelf(r.target, el))) return;
             lastLeft = el.scrollLeft;
             measure(false);
           });
     if (dirs) {
       const options: MutationObserverInit = { attributes: true, attributeFilter: ['dir'], subtree: true };
       dirs.observe(el.ownerDocument.documentElement, options);
-      // A `ShadowRoot` is not in the document's subtree: its own `dir` attributes are watched there.
-      const root = el.getRootNode();
-      if (root !== el.ownerDocument) dirs.observe(root, options);
+      // A `ShadowRoot` is not in the document's subtree: its own `dir` attributes are watched there, in
+      // every one the container is nested in (the host of one is in the next one out).
+      for (let root = el.getRootNode(); root instanceof ShadowRoot; root = root.host.getRootNode()) dirs.observe(root, options);
     }
     return {
       target: el,
