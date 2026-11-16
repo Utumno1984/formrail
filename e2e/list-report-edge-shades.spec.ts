@@ -630,6 +630,61 @@ test.describe('List Report: edge shades (Free)', () => {
     expect((await edgeState(page)).startShade).toEqual(SHOWN);
   });
 
+  test('#562 without color-mix() (Safari 16.0/16.1, emulated): the shipped @supports-not fallback draws the same shade; with color-mix nothing of it applies', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoStory(page, PLAYGROUND, 'containerWidth:360;dir:ltr;status:loading');
+    await scrollFromStart(page, 'middle');
+    await expectEdges(page, true, true);
+    const ramps = async () => Promise.all((['start', 'end'] as const).map((edge) => shadeRamp(page, edge)));
+    // Where color-mix() is supported (here) the fallback does not apply: no opacity on the ::before, and
+    // the colour is the color-mix one.
+    const supported = await scroller(page).evaluate((el) => {
+      const layer = el.querySelector('[data-rop-overflow-edges]')!;
+      const shade = layer.querySelector('[data-rop-overflow-edge="start"]')!;
+      return {
+        colour: getComputedStyle(layer).getPropertyValue('--rop-list-report-edge-color').trim(),
+        beforeOpacity: getComputedStyle(shade, '::before').opacity,
+      };
+    });
+    expect(supported.colour).toMatch(/^color-mix\(/);
+    expect(supported.beforeOpacity).toBe('1');
+    const native = await ramps();
+
+    // A browser without color-mix() keeps the custom property (not validated) and the gradient that
+    // reads it is invalid: no shade. Emulated by an invalid colour on the layer.
+    const broken = await page.addStyleTag({ content: '[data-rop-overflow-edges] { --rop-list-report-edge-color: color-mix(in nowhere, red, blue); }' });
+    for (const ramp of await ramps()) expect(Math.abs(ramp.outer - ramp.inner), 'no fallback: no shade at all').toBeLessThanOrEqual(1);
+
+    // The shipped fallback: every rule of the page's CSS under `@supports not (color: color-mix(...))`,
+    // re-inserted with no condition (what that browser applies), after the invalid colour.
+    const fallbackCss = await page.evaluate(() => {
+      const out: string[] = [];
+      const walk = (rules: CSSRuleList) => {
+        for (const rule of Array.from(rules)) {
+          if (rule instanceof CSSSupportsRule && /^not\s*\(\s*color\s*:\s*color-mix\(/.test(rule.conditionText)) {
+            const inner = Array.from(rule.cssRules).map((r) => r.cssText).join('\n');
+            out.push(rule.parentRule instanceof CSSStyleRule ? `${rule.parentRule.selectorText} { ${inner} }` : inner);
+          } else if ('cssRules' in rule) walk((rule as CSSGroupingRule).cssRules);
+        }
+      };
+      for (const sheet of Array.from(document.styleSheets)) walk(sheet.cssRules);
+      return out.join('\n');
+    });
+    expect(fallbackCss).toContain('--rop-list-report-edge-color');
+    expect(fallbackCss).toContain('opacity');
+    const fallback = await page.addStyleTag({ content: fallbackCss });
+    const emulated = await ramps();
+    for (const [i, ramp] of emulated.entries()) {
+      const label = `fallback ${i === 0 ? 'start' : 'end'}`;
+      expectFullColourOutside(ramp, label);
+      // The same shade as with color-mix(), within rounding.
+      expect(Math.abs(ramp.outer - native[i]!.outer), `${label}: outer edge as with color-mix`).toBeLessThanOrEqual(3);
+      expect(Math.abs(ramp.inner - native[i]!.inner), `${label}: inner edge as with color-mix`).toBeLessThanOrEqual(3);
+    }
+    await fallback.evaluate((el) => (el as Element).remove());
+    await broken.evaluate((el) => (el as Element).remove());
+  });
+
   test('theme: the colour comes from the text token, follows a scoped dark theme; forced colours draw a CanvasText line', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await gotoStory(page, FLOORPLAN);
@@ -688,8 +743,10 @@ test.describe('Virtual List Report: edge shades (Pro, 375x667)', () => {
 
   test('#562: in the middle of 10,000 rows and scrolled sideways, a dir set on an ancestor then removed: the state follows at once, with no scroll event', async ({ page, browserName }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    // The play leaves the table in the middle of the rows, scrolled sideways: both shades.
+    // The play leaves the table in the middle of the rows, scrolled sideways; then to the middle of the
+    // columns: both shades.
     await expectPlayToPass(page, PRO_STORY);
+    await scrollFromStart(page, 'middle');
     await expectEdges(page, true, true);
     const rtl = await changeDirection(page, { how: 'attribute', selector: '#storybook-root', dir: 'rtl' }, 'rtl', browserName !== 'firefox');
     expectBackAtStart(rtl, browserName, 'Pro, #storybook-root dir=rtl');
