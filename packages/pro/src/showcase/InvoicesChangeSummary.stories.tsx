@@ -28,7 +28,7 @@ const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
  * goes back to the form with nothing saved. A new invoice ("New invoice" -> "Create") is saved directly.
  */
 
-type Args = Omit<InvoiceCrudProps, 'reviewSave' | 'useAddons'> & InvoiceRebaseOptions;
+type Args = Omit<InvoiceCrudProps, 'addons'> & InvoiceRebaseOptions;
 
 /** The showcase with the review step (#377) and the server updates merged into the open editor (#384). */
 function ProInvoices({ serverChange, serverUpdateDelayMs, simulateServerUpdate, onServerChange, ...crud }: Args) {
@@ -36,7 +36,8 @@ function ProInvoices({ serverChange, serverUpdateDelayMs, simulateServerUpdate, 
   const options = useRef<InvoiceRebaseOptions>({ serverChange, serverUpdateDelayMs, simulateServerUpdate, onServerChange });
   options.current = { serverChange, serverUpdateDelayMs, simulateServerUpdate, onServerChange };
   const [useAddons] = useState(() => invoiceRebaseAddons(options));
-  return <InvoiceCrud {...crud} reviewSave={invoiceSaveReview} useAddons={useAddons} />;
+  // The add-ons are per module (#519): these are the invoices'.
+  return <InvoiceCrud {...crud} addons={{ invoices: { reviewSave: invoiceSaveReview, useAddons } }} />;
 }
 
 const meta: Meta<Args> = {

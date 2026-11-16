@@ -1,9 +1,10 @@
 // Story-only: the invoice list definition (pills, columns, labels, page frame) shared by the List Report
-// showcase (#132) and the list -> record showcase (#150), so the second one reuses the first instead of
-// copying it. Not exported by the package.
+// showcase (#132) and the Invoices module of the record-editing shell (#150, #519: modules/invoices), so the
+// second one reuses the first instead of copying it. Not exported by the package.
 import type { CSSProperties } from 'react';
 import { formatEuro, type DemoInvoice } from '../internal/demo-invoices';
 import type { ListReportColumn, ListReportFilter } from '../list-report/types';
+import { LIST_PAGE } from './list-page';
 import { STATUS_LABEL } from './showcase-data';
 
 export const LABELS = {
@@ -43,11 +44,5 @@ export const COLUMNS: ListReportColumn<DemoInvoice>[] = [
 ];
 export const SORTABLE = COLUMNS.map((c) => c.id);
 
-export const PAGE: CSSProperties = {
-  boxSizing: 'border-box',
-  padding: 16,
-  fontFamily: 'system-ui, sans-serif',
-  height: 'var(--rop-demo-viewport-height, 100dvh)',
-  display: 'flex',
-  flexDirection: 'column',
-};
+/** The frame of a list page, the same as the record-editing shell's (`LIST_PAGE`, list-page.ts). */
+export const PAGE: CSSProperties = LIST_PAGE;

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { InvoiceReviewValues as InvoiceValues } from '../../../core/src/showcase/InvoiceRecordPage';
-import { sameLines } from '../../../core/src/showcase/invoice-lines';
+import { sameLines } from '../../../core/src/showcase/modules/invoices/invoice-lines';
 import {
   INVOICE_REVIEW_ARRAY_ID_KEYS,
   formatIsoDate,

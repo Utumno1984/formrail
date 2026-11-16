@@ -2,10 +2,10 @@
 // exported by the package. The lines are controlled by the form of the page; this component only decides which
 // control takes the focus after an action (the control that had it may be gone or moved in the DOM).
 import { useRef, type CSSProperties, type ReactNode } from 'react';
-import { Button } from '../button/Button';
-import { Field } from '../field/Field';
-import { Input } from '../input/Input';
-import { useListMutationFocus } from '../internal/use-list-mutation-focus';
+import { Button } from '../../../button/Button';
+import { Field } from '../../../field/Field';
+import { Input } from '../../../input/Input';
+import { useListMutationFocus } from '../../../internal/use-list-mutation-focus';
 import { lineTotal, nextLineId, type LineValues } from './invoice-lines';
 
 export interface InvoiceLineItemsProps {

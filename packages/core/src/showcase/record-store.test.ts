@@ -213,6 +213,37 @@ describe('createRecordStore (#518): writes in flight', () => {
     expect(store.snapshot().map((t) => t.id)).toEqual(['task-1', 'task-2', 'task-3', 'task-4']);
   });
 
+  it('N1 (#519): a save of an id already gone waits for its delay like any save, then fails on the outcome first', async () => {
+    // The store answers at the end of the delay, as a server would: nothing is decided before it (a not-found
+    // checked before the wait would reject at once).
+    const held = gate();
+    const store = makeStore({ saveDelayMs: held.promise, saveOutcome: 'error' });
+    const saving = store.save({ ...SEED[0]!, id: 'task-404' });
+    const failed = expect(saving).rejects.toBeInstanceOf(RecordNetworkError);
+    expect(await isSettled(saving)).toBe(false);
+    held.open();
+    await failed;
+    await expect(saving).rejects.not.toBeInstanceOf(RecordNotFoundError);
+
+    const later = gate();
+    store.configure({ saveDelayMs: later.promise, saveOutcome: 'success' });
+    const missing = store.save({ ...SEED[0]!, id: 'task-404' });
+    const notFound = expect(missing).rejects.toMatchObject({ name: 'RecordNotFoundError', id: 'task-404' });
+    expect(await isSettled(missing)).toBe(false);
+    later.open();
+    await notFound;
+    expect(store.snapshot()).toEqual(SEED);
+  });
+
+  it('N2 (#519): a failed create uses up no identity: the next create gets the number the failed one would have', async () => {
+    const store = makeStore({ saveOutcome: 'error' });
+    await expect(store.create({ title: 'Never stored', estimate: 1, done: false })).rejects.toBeInstanceOf(RecordNetworkError);
+    await expect(store.create({ title: 'Nor this', estimate: 2, done: false })).rejects.toBeInstanceOf(RecordNetworkError);
+    store.configure({ saveOutcome: 'success' });
+    expect((await store.create({ title: 'Stored', estimate: 3, done: false })).id).toBe('task-4');
+    expect(store.snapshot().map((t) => t.id)).toEqual(['task-1', 'task-2', 'task-3', 'task-4']);
+  });
+
   it('error-once belongs to one store: the first error of one module is not used up by another', async () => {
     const tasks = makeStore({ loadOutcome: 'error-once' });
     const others = makeStore({ loadOutcome: 'error-once' });

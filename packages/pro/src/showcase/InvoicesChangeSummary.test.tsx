@@ -28,7 +28,8 @@ const base = (over: Partial<InvoiceCrudProps> = {}): InvoiceCrudProps => ({
   saveDelayMs: 0,
   today: '2026-11-09',
   onNavigate: vi.fn(),
-  reviewSave: invoiceSaveReview,
+  // Per module since #519 (was the `reviewSave` prop).
+  addons: { invoices: { reviewSave: invoiceSaveReview } },
   ...over,
 });
 
@@ -142,7 +143,7 @@ describe('Invoices with Change Summary (#377)', () => {
   }, 20_000);
 
   it('without reviewSave the Free showcase saves at once (no dialog)', async () => {
-    render(<InvoiceCrud {...base({ reviewSave: undefined })} />);
+    render(<InvoiceCrud {...base({ addons: { invoices: { reviewSave: undefined } } })} />);
     await openFirst();
     const save = vi.spyOn(store(), 'save');
     await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), '!');

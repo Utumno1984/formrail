@@ -93,6 +93,48 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     await expect(api.list()).resolves.toEqual(SEED);
   });
 
+  it('tracking a write that fails raises no unhandled rejection, and the reads after it do not wait (#519)', async () => {
+    // The API keeps every write in a set until it settles, through a callback on the write. A callback for the
+    // success only (`run.then(done)`) would leave a failed write in the set and its own derived promise rejected
+    // with nobody to handle it: caught here by name, never a hang (`settled()` drops what it waited for).
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => void unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const { api } = setup({ saveOutcome: 'error', deleteOutcome: 'error' });
+      await expect(api.save({ ...SEED[0]!, city: 'Nowhere' })).rejects.toBeInstanceOf(RecordNetworkError);
+      await expect(api.create({ name: 'Nobody', city: 'Nowhere' })).rejects.toBeInstanceOf(RecordNetworkError);
+      await expect(api.delete('c-1')).rejects.toBeInstanceOf(RecordNetworkError);
+      await expect(api.deleteMany(['c-2'])).rejects.toBeInstanceOf(RecordNetworkError);
+      // Node reports an unhandled rejection once the microtasks of the task that produced it are done.
+      await flush();
+      await flush();
+      expect(unhandled).toEqual([]);
+      await expect(api.get('c-1')).resolves.toEqual(SEED[0]);
+      await expect(api.list()).resolves.toEqual(SEED);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('a read waits for writes that start while it waits, round after round, then returns (#519)', async () => {
+    const gates = [gate(), gate(), gate()];
+    const { store, api } = setup({ saveDelayMs: gates[0]!.promise });
+    const writes = [api.save({ ...SEED[0]!, city: 'One' })];
+    const reading = watch(api.get('c-1'));
+    for (const [n, next] of gates.slice(1).entries()) {
+      // A new write in every round of the wait: the read waits for it too.
+      store.configure({ saveDelayMs: next.promise });
+      writes.push(api.save({ ...SEED[0]!, city: ['Two', 'Three'][n]! }));
+      gates[n]!.open();
+      await flush();
+      expect(reading.settled).toBe(false);
+    }
+    gates[2]!.open();
+    await Promise.all(writes);
+    expect((await reading.promise).city).toBe('Three');
+  });
+
   it('a list asked while a deleteMany is in flight waits for it and does not show the deleted records', async () => {
     const held = gate();
     const { api } = setup({ saveDelayMs: held.promise });
@@ -140,6 +182,42 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     await expect(api.list()).resolves.toHaveLength(2);
     expect(reading.settled).toBe(false);
     await expect(reading.promise).resolves.toEqual(SEED[1]);
+  });
+
+  it('a save that fails while a list and a record are waiting for it does not fail them: they return the data (#519)', async () => {
+    // The wait is for the write to be OVER, not for it to succeed: the list reopened after "Leave anyway" on a
+    // save that then fails shows the rows, never the save's error.
+    const held = gate();
+    const { api } = setup({ saveDelayMs: held.promise, saveOutcome: 'error' });
+    const saving = watch(api.save({ ...SEED[0]!, city: 'Graz' }));
+    const listing = watch(api.list());
+    const reading = watch(api.get('c-1'));
+    await flush();
+    expect(listing.settled || reading.settled).toBe(false);
+    held.open();
+    await expect(saving.promise).rejects.toBeInstanceOf(RecordNetworkError);
+    await expect(listing.promise).resolves.toEqual(SEED);
+    await expect(reading.promise).resolves.toEqual(SEED[0]);
+  });
+
+  it('a read waits for EVERY write of the round, also the slow one after a write that failed at once (#519)', async () => {
+    const failing = gate();
+    const slow = gate();
+    const { store, api } = setup({ saveDelayMs: failing.promise, saveOutcome: 'error' });
+    const first = api.save({ ...SEED[0]!, city: 'Vienna' });
+    const firstResult = first.catch((error: unknown) => error);
+    store.configure({ saveDelayMs: slow.promise, saveOutcome: 'success' });
+    const second = api.save({ ...SEED[1]!, city: 'Graz' });
+    const listing = watch(api.list());
+    failing.open();
+    await expect(firstResult).resolves.toBeInstanceOf(RecordNetworkError);
+    await flush();
+    await flush();
+    // The first write is over (it failed), the second is still running: the list has not been answered.
+    expect(listing.settled).toBe(false);
+    slow.open();
+    await second;
+    expect((await listing.promise).find((c) => c.id === 'c-2')?.city).toBe('Graz');
   });
 
   it('everything else is the store itself (snapshot, server updates, subscriptions, configure)', async () => {
