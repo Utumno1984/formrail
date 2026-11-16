@@ -188,6 +188,11 @@ export type ListReportTableShellProps<Row> = ListReportTableProps<Row> & {
   tableProps?: Omit<TableHTMLAttributes<HTMLTableElement>, 'className' | 'style' | 'children' | 'aria-label' | 'aria-labelledby'>;
   /** Extra attributes merged onto the header `<tr>` (e.g. `aria-rowindex={1}` in a virtualized table). */
   headRowProps?: HTMLAttributes<HTMLTableRowElement>;
+  /**
+   * Extra attributes of the header "select all results" checkbox (e.g. `aria-describedby` in `VirtualListReport`,
+   * pointing at a node it renders itself). Passed to `ListReportTableHead` as `selectAllProps`.
+   */
+  headSelectAllProps?: { 'aria-describedby'?: string };
 };
 
 function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, ref: Ref<HTMLDivElement>) {
@@ -208,6 +213,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
     renderBody,
     tableProps,
     headRowProps,
+    headSelectAllProps,
     rowActions,
     rowActionsInline: rowActionsInlineProp,
     ...rest
@@ -363,7 +369,15 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
         {...tableProps}
       >
         {hasContent(caption) ? <caption className={captionClass}>{caption}</caption> : null}
-        <ListReportTableHead table={table} selectable={selectable} labels={labels} rowProps={headRowProps} rowActions={hasRowActions} rowActionsWidth={rowActionsWidth} />
+        <ListReportTableHead
+          table={table}
+          selectable={selectable}
+          labels={labels}
+          rowProps={headRowProps}
+          rowActions={hasRowActions}
+          rowActionsWidth={rowActionsWidth}
+          selectAllProps={headSelectAllProps}
+        />
         <tbody>
           {view === 'rows' ? renderBody({ table, selectable, columnCount, labels, minRows, rowActions, rowActionsInline: inlineCount }) : null}
           {view === 'skeleton' ? (

@@ -57,6 +57,8 @@ interface DemoArgs {
   overscan: number;
   rowHeight: RowHeight;
   selectable: boolean;
+  /** Pass `bulkActions` (Approve, Export) to the floorplan. */
+  withBulkActions: boolean;
   locale: 'en-US' | 'de-DE' | 'fr-FR';
   /** Width of the box around the report (px, capped to the viewport). */
   boxWidth: number;
@@ -73,7 +75,20 @@ declare global {
   }
 }
 
-function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, locale, boxWidth, onSearchQueryChange, onSelectedIdsChange, onApprove, onExport }: DemoArgs) {
+function Demo({
+  rowCount,
+  virtualizeThreshold,
+  overscan,
+  rowHeight,
+  selectable,
+  withBulkActions,
+  locale,
+  boxWidth,
+  onSearchQueryChange,
+  onSelectedIdsChange,
+  onApprove,
+  onExport,
+}: DemoArgs) {
   const rows = makeDemoRows(rowCount);
   const [renderStart] = useState(() => performance.now());
   useLayoutEffect(() => {
@@ -102,16 +117,20 @@ function Demo({ rowCount, virtualizeThreshold, overscan, rowHeight, selectable, 
               </Button>
             ) : undefined
           }
-          bulkActions={(selection) => (
-            <>
-              <Button size="sm" disabled={selection.selectedResultCount === 0} onClick={() => onApprove(selection.getSelectedRows().map((r) => r.number))}>
-                Approve
-              </Button>
-              <Button size="sm" variant="secondary" disabled={selection.selectedResultCount === 0} onClick={() => onExport(selection.getSelectedRows().map((r) => r.number))}>
-                Export
-              </Button>
-            </>
-          )}
+          bulkActions={
+            withBulkActions
+              ? (selection) => (
+                  <>
+                    <Button size="sm" disabled={selection.selectedResultCount === 0} onClick={() => onApprove(selection.getSelectedRows().map((r) => r.number))}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="secondary" disabled={selection.selectedResultCount === 0} onClick={() => onExport(selection.getSelectedRows().map((r) => r.number))}>
+                      Export
+                    </Button>
+                  </>
+                )
+              : undefined
+          }
         />
       </div>
     </div>
@@ -141,7 +160,8 @@ const meta: Meta<DemoArgs> = {
           '`VirtualListReport` / `VirtualListReportTable` (`@formrail/pro`): the core List Report with virtualized rows. ' +
           'Same props and `useListReport` state as the Free `ListReport`; below `virtualizeThreshold` it is the Free table (same DOM, no virtualizer). ' +
           'Rows are mounted only around the viewport, between spacer rows of a native `<table>`; the focused row stays mounted; ' +
-          'shift-click / Shift+Space select a range over the current results; "Select all N results" and Escape act on the data.',
+          'shift-click / Shift+Space select a range over the current results; "Select all N results" and Escape act on the data. ' +
+          'Below 640px without the consumer\'s `bulkActions` the selection bar is one line (no "Select all N results"): the header checkbox selects every result, and its description says so.',
       },
     },
   },
@@ -177,6 +197,11 @@ const meta: Meta<DemoArgs> = {
       description: 'Overrides `--rop-list-report-row-height` on the scroll container (consumer CSS): the pitch is re-measured.',
     }),
     selectable: storyControl({ control: 'boolean', description: 'An option of the hook, not a prop: `useListReport({ selectable })`.' }),
+    withBulkActions: storyControl({
+      control: 'boolean',
+      description:
+        'Pass `bulkActions` (Approve, Export) to the floorplan. Without them, below 640px the selection bar is one line and has no "Select all N results" (the header checkbox selects every result).',
+    }),
     locale: storyControl({
       control: 'select',
       options: ['en-US', 'de-DE', 'fr-FR'],
@@ -197,6 +222,7 @@ const meta: Meta<DemoArgs> = {
     overscan: 10,
     rowHeight: 'default',
     selectable: true,
+    withBulkActions: true,
     locale: 'en-US',
     boxWidth: 1100,
     onSearchQueryChange: fn(),
@@ -295,6 +321,70 @@ export const LocaleCount: Story = {
  */
 export const DefaultNoPlay: Story = { ...Default, tags: [], play: undefined };
 
+/**
+ * Selection on 10,000 invoices without the consumer's `bulkActions` (Control `withBulkActions`: on, the Approve and
+ * Export actions come back, and below 640px the bar has two lines again). Below 640px the bar is one line, count and
+ * "Clear selection": no "Select all N results"; the header checkbox selects every result, the rows never mounted
+ * included, and its description says so ("All 10,000 results, including those not on screen"). From 640px the
+ * action is there as in `Default`. The play function selects three invoices, checks the bar and the description,
+ * selects everything from the header checkbox, checks that the bar did not move, then clears the selection and
+ * checks that the focus is on the header checkbox.
+ */
+export const Selection: Story = {
+  args: { rowCount: 10_000, withBulkActions: false },
+  argTypes: { rowCount: { control: false } },
+  play: async ({ args, canvasElement }) => {
+    // Written for the selection column, at the 10,000 rows of the story.
+    if (!args.selectable || args.rowCount !== 10_000) return;
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView!;
+    const fmt = new Intl.NumberFormat(args.locale);
+    const bar = canvas.getByRole('group', { name: 'Selection Invoices' });
+    const count = bar.querySelector('[data-rop-selection-count]') as HTMLElement;
+    const allBox = canvas.getByRole('checkbox', { name: 'Select all results' });
+    const description = `All ${fmt.format(10_000)} results, including those not on screen`;
+    const box0 = bar.getBoundingClientRect();
+    const table0 = scrollerOf(canvasElement).getBoundingClientRect();
+    const unmoved = async () => {
+      const now = bar.getBoundingClientRect();
+      const table = scrollerOf(canvasElement).getBoundingClientRect();
+      for (const k of ['x', 'y', 'width', 'height'] as const) {
+        await expect(Math.abs(now[k] - box0[k])).toBeLessThanOrEqual(0.5);
+        await expect(Math.abs(table[k] - table0[k])).toBeLessThanOrEqual(0.5);
+      }
+    };
+    await expect(count).toHaveTextContent('No items selected');
+    await expect(allBox).toHaveAccessibleDescription(description);
+
+    const user = userEvent.setup();
+    for (const number of ['INV-000002', 'INV-000003', 'INV-000004']) await user.click(canvas.getByRole('checkbox', { name: `Select ${number}` }));
+    await expect(count).toHaveTextContent('3 selected');
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(3);
+    await expect(allBox).toBePartiallyChecked();
+    await expect(allBox).toHaveAccessibleDescription(description);
+    // Below 640px without the consumer's actions the action is not there at all; otherwise it is shown.
+    const action = canvas.queryByRole('button', { name: /^Select all .+ results$/ });
+    if (win.innerWidth < 640 && !args.withBulkActions) await expect(action).toBeNull();
+    else await expect(action).toBeVisible();
+    await unmoved();
+
+    // The header checkbox, in its partial state, selects every result (not only the mounted rows).
+    await user.click(allBox);
+    await expect(count).toHaveTextContent(`${fmt.format(10_000)} selected`);
+    await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(4);
+    await expect(allBox).toBeChecked();
+    await unmoved();
+
+    await user.click(canvas.getByRole('button', { name: 'Clear selection' }));
+    await expect(count).toHaveTextContent('No items selected');
+    await expect(allBox).toHaveFocus();
+    await unmoved();
+  },
+};
+
+/** Fixture of the e2e suite: `Selection` without the play function. */
+export const SelectionNoPlay: Story = { ...Selection, play: undefined };
+
 /** Fixture of the e2e suite: the declared ceiling, 200,000 rows (not offered in Controls). */
 export const Ceiling200k: Story = {
   args: { rowCount: 200_000 },
@@ -304,7 +394,7 @@ export const Ceiling200k: Story = {
 /** Fixture of the e2e suite: the Free `ListReport` with the same columns and the same 1,000 rows, for the geometry comparison. */
 export const FreeReference: Story = {
   args: { rowCount: 1000 },
-  argTypes: { rowCount: { control: false }, virtualizeThreshold: { control: false }, overscan: { control: false } },
+  argTypes: { rowCount: { control: false }, virtualizeThreshold: { control: false }, overscan: { control: false }, withBulkActions: { control: false } },
   render: function FreeReferenceStory({ rowCount, rowHeight, selectable }) {
     const table = useListReport<DemoRow>({ rows: makeDemoRows(rowCount), columns: COLUMNS, getRowId: (r) => r.id, filters: FILTERS, selectable });
     return (
@@ -368,6 +458,17 @@ export const VisualSelection: Story = {
     // Leave the focus off the rows: no focus ring in the picture.
     (document.activeElement as HTMLElement | null)?.blur();
   },
+};
+
+/**
+ * Visual baseline: `VisualSelection` without the consumer's `bulkActions`: below 640px the selection bar is one line
+ * (count and "Clear selection", no "Select all N results"); from 640px "Select all 100,000 results" is shown.
+ */
+export const VisualSelectionWithoutBulkActions: Story = {
+  // Tags written out, not spread: Storybook's indexer reads them statically.
+  tags: ['visual'],
+  args: { withBulkActions: false },
+  play: VisualSelection.play,
 };
 
 /**
@@ -508,6 +609,7 @@ export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
     rowHeight: { control: 'radio', options: ['default', '3rem'], description: 'Overrides `--rop-list-report-row-height`' },
     onOpenDetail: { control: false },
     ...{ rowCount: { table: { disable: true } }, virtualizeThreshold: { table: { disable: true } }, overscan: { table: { disable: true } }, selectable: { table: { disable: true } } },
+    ...{ withBulkActions: { table: { disable: true } } },
     ...{ onSelectedIdsChange: { table: { disable: true } }, onApprove: { table: { disable: true } }, onExport: { table: { disable: true } } },
   },
   args: { loadDelayMs: 400, rowHeight: 'default', onOpenDetail: fn() },

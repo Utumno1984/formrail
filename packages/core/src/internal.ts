@@ -95,7 +95,7 @@ export type {
 /** @internal The floorplan without a fixed table (title, filters, selection bar, `renderTable`): see `ListReportFrame.tsx`. */
 export { ListReportFrame } from './list-report/ListReportFrame';
 /** @internal */
-export type { ListReportFrameLabels, ListReportFrameProps, ListReportFrameTableProps } from './list-report/ListReportFrame';
+export type { ListReportFrameInternalProps, ListReportFrameLabels, ListReportFrameProps, ListReportFrameTableProps } from './list-report/ListReportFrame';
 
 /** @internal Memoized `Intl.NumberFormat` of a `useListReport` `locale` (invalid tags fall back to the runtime default). */
 export { getNumberFormat } from './list-report/number-format';

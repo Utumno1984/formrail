@@ -24,6 +24,7 @@ import {
   useListReportResultIndex,
   type ListReportTableBodyContext,
   type ListReportTableProps,
+  type ListReportTableShellProps,
 } from '@formrail/core/internal';
 import { isDev } from '../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
@@ -61,6 +62,12 @@ export type VirtualListReportTableProps<Row> = ListReportTableProps<Row> & {
   handleRef?: Ref<VirtualListReportTableHandle>;
 };
 
+/**
+ * @internal Props only `VirtualListReport` passes: not part of `VirtualListReportTableProps` (so not in the
+ * public props of the table), handed to the core's Shell as they are.
+ */
+export type VirtualListReportTableInternalProps<Row> = Pick<ListReportTableShellProps<Row>, 'headSelectAllProps'>;
+
 const DEFAULT_THRESHOLD = 200;
 const DEFAULT_OVERSCAN = 10;
 const FORCE_TRUNCATE = { forceTruncate: true } as const;
@@ -80,7 +87,7 @@ const tabStops = (row: Element): HTMLElement[] =>
 const isRowCheckbox = (target: EventTarget | null): target is HTMLInputElement =>
   target instanceof HTMLInputElement && target.type === 'checkbox' && target.closest('tbody') !== null;
 
-function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>, ref: Ref<HTMLDivElement>) {
+function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row> & VirtualListReportTableInternalProps<Row>, ref: Ref<HTMLDivElement>) {
   const {
     virtualizeThreshold = DEFAULT_THRESHOLD,
     overscan = DEFAULT_OVERSCAN,

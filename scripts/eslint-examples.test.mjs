@@ -102,3 +102,33 @@ describe('lint: a story built with exampleStory overrides nothing it renders (#4
     expect(results.flatMap((r) => r.messages.filter((m) => m.ruleId === 'no-restricted-syntax'))).toEqual([]);
   });
 });
+
+// #560: `type T = import('.../demo-data')` is banned in library code like every other import of the demo universe.
+describe('lint: a type-only import() of internal/demo-data is banned in library code (#560)', { timeout: 60_000 }, () => {
+  const boundary = (file, source) => messages(file, source, 'no-restricted-syntax');
+  const TYPE_IMPORT = "export type T = import('../internal/demo-data').DemoCustomer;\n";
+
+  it.each([
+    'packages/core/src/list-report/ListReport.tsx',
+    'packages/pro/src/list-report/VirtualListReport.tsx',
+  ])('%s: the type import is an error', async (file) => {
+    const found = await boundary(file, TYPE_IMPORT);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatch(/CONTRIBUTING\.md, section "Demo data"/);
+    expect(await boundary(file, "export type T = import('../internal/demo-data/customers').DemoCustomer;\n")).toHaveLength(1);
+  });
+
+  it.each([
+    'packages/core/src/list-report/ListReport.stories.tsx',
+    'packages/core/src/list-report/ListReport.test.tsx',
+    'packages/core/src/showcase/InvoiceCrud.tsx',
+    'packages/core/src/internal/demo-data/customers.ts',
+  ])('%s: allowed', async (file) => {
+    expect(await boundary(file, TYPE_IMPORT)).toEqual([]);
+  });
+
+  it('a type import of another module is not affected', async () => {
+    expect(await boundary('packages/core/src/list-report/ListReport.tsx', "export type T = import('../internal/escape-key').X;\n")).toEqual([]);
+    expect(await boundary('packages/core/src/list-report/ListReport.tsx', "export type T = import('../internal/demo-data-like').X;\n")).toEqual([]);
+  });
+});

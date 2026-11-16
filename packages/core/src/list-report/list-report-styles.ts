@@ -50,4 +50,8 @@ export const selectionCountClass =
   'min-w-0 basis-full text-rop-text max-sm:group-data-[rop-bulk-actions=false]:min-w-[8ch] group-data-[rop-bulk-actions=false]:flex-1 ' +
   'group-data-[rop-bulk-actions=false]:basis-0 sm:flex-1 sm:basis-0';
 export const selectionActionsClass = 'flex min-w-0 flex-wrap items-center gap-2';
+// The bulk actions of a frame that gets them from the Pro alone (the frame's internal `bulkActionsWideOnly`):
+// not displayed below 640px (the same breakpoint as the rest of the bar), so the bar is the one-line bar
+// without `bulkActions` there; from 640px the slot is laid out as above.
+export const selectionActionsWideOnlyClass = 'max-sm:hidden';
 export const selectionClearClass = 'ms-auto shrink-0 whitespace-nowrap';

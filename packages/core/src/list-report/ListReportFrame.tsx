@@ -3,16 +3,19 @@ import {
   useId,
   useMemo,
   useRef,
+  useState,
   type HTMLAttributes,
   type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react';
 import { Button } from '../button/Button';
+import { isLaidOut } from '../internal/focus';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { Title, type TitleLevel } from '../typography/Title';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
+import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
 import { ListReportFilterBar } from './ListReportFilterBar';
 import type { ListReportTableLabels } from './ListReportTableStates';
 import type { ListReportTableStatus } from './ListReportTableShell';
@@ -26,6 +29,7 @@ import {
   headerClass,
   rootClass,
   selectionActionsClass,
+  selectionActionsWideOnlyClass,
   selectionBarClass,
   selectionCountClass,
   selectionClearClass,
@@ -170,7 +174,51 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
   renderTable: (tableProps: ListReportFrameTableProps<Row>) => ReactNode;
 };
 
-function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTMLDivElement>) {
+/**
+ * @internal Props of {@link ListReportFrame} that only `@formrail/pro` passes (`VirtualListReport`, which always
+ * hands the frame a `bulkActions` of its own: "Select all N results" followed by the consumer's actions). Not
+ * part of `ListReportFrameProps`, so they are neither in the props of `ListReport` nor in those of
+ * `VirtualListReport`; destructured like every prop, they never reach the DOM. `ListReport` never sets them:
+ * without them the frame is exactly the one of before.
+ */
+export interface ListReportFrameInternalProps {
+  /**
+   * The bulk actions exist from 640px only. Below 640px their slot is under `display: none`, decided by the CSS
+   * at the bar's own breakpoint (no measure, no `matchMedia`, the same markup on the server): out of the layout,
+   * of the accessibility tree and of the tab order. The bar then takes the one-line layout of a bar without
+   * `bulkActions` (`data-rop-bulk-actions="false"`). From 640px nothing changes (the bar is one line either way).
+   * `VirtualListReport` sets it when the consumer passes no `bulkActions`: its "Select all N results" is then
+   * the only action, and below 640px the header checkbox does the same (it selects every result too).
+   */
+  bulkActionsWideOnly?: boolean;
+  /**
+   * A control of the bulk actions that has the focus and stops being laid out (its slot hidden below 640px,
+   * a viewport resized or a tablet rotated across it) or is removed (the consumer's `bulkActions` dropped):
+   * the focus goes to the header checkbox (to the table container when it is disabled), as after "Clear
+   * selection", never to `body`. A focus the user moved elsewhere in the meantime is left where it is.
+   * The only JS of the rule, and only while one of those controls has the focus: an observer on the slot.
+   */
+  keepBulkActionsFocus?: boolean;
+}
+
+/** The "select all results" checkbox of the table, or the table container when it is disabled (no results). */
+function focusSelectAllOrTable(root: HTMLElement | null, tableId: string): void {
+  const header = root?.querySelector<HTMLInputElement>('th[data-rop-select] input');
+  const target = header && !header.disabled ? header : root?.querySelector<HTMLElement>(`[id="${tableId}"]`);
+  target?.focus();
+}
+
+/**
+ * Whether the focus of `node` was lost with it: the node is gone or not laid out any more, and the focus is
+ * on `body` (or nowhere, or still on the hidden node), not somewhere the user moved it on purpose.
+ */
+function focusLostWith(node: Element): boolean {
+  if (node.isConnected && isLaidOut(node)) return false;
+  const active = document.activeElement;
+  return !active || active === document.body || active === node || !active.isConnected;
+}
+
+function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportFrameInternalProps, ref: Ref<HTMLDivElement>) {
   const {
     title,
     titleLevel = 2,
@@ -191,6 +239,8 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
     rowActionsInline,
     renderTable,
     className,
+    bulkActionsWideOnly = false,
+    keepBulkActionsFocus = false,
     ...rest
   } = props;
   const baseId = useId();
@@ -226,11 +276,32 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
   const selectedAny = selection.selectedResultCount + selection.hiddenSelectedCount > 0;
   const clearSelection = () => {
     selection.clearSelection();
-    const root = rootRef.current;
-    const header = root?.querySelector<HTMLInputElement>('th[data-rop-select] input');
-    const target = header && !header.disabled ? header : root?.querySelector<HTMLElement>(`[id="${tableId}"]`);
-    target?.focus();
+    focusSelectAllOrTable(rootRef.current, tableId);
   };
+
+  // `keepBulkActionsFocus`: the control of the bulk actions holding the focus, observed only while it does.
+  // Losing the focus with the control still laid out is the user moving on; losing it with the control hidden or
+  // removed keeps it, because that is the very change the observer reacts to. (Prose here is read by the Tailwind
+  // scan of `src/`: no utility names as bare words.)
+  const actionsRef = useRef<HTMLDivElement | null>(null);
+  const [focusedAction, setFocusedAction] = useState<Element | null>(null);
+  useResizeAndMutationEffect(() => {
+    const slot = actionsRef.current;
+    const node = focusedAction;
+    if (!keepBulkActionsFocus || !slot || !node) return undefined;
+    // An environment without layout (nothing is ever laid out) never moves the focus.
+    const wasLaidOut = isLaidOut(node);
+    return {
+      target: slot,
+      // A removed action changes the slot's children; a hidden slot collapses its own box.
+      children: true,
+      update: () => {
+        if (!wasLaidOut || !focusLostWith(node)) return;
+        setFocusedAction(null);
+        focusSelectAllOrTable(rootRef.current, tableId);
+      },
+    };
+  }, [keepBulkActionsFocus, focusedAction, tableId]);
 
   return (
     <div {...rest} ref={mergedRef} className={cn(rootClass, className)}>
@@ -263,7 +334,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
           aria-labelledby={`${baseId}-selection ${nameId}`}
           aria-controls={tableId}
           data-rop-selection-bar=""
-          data-rop-bulk-actions={bulkActions ? 'true' : 'false'}
+          data-rop-bulk-actions={bulkActions && !bulkActionsWideOnly ? 'true' : 'false'}
           className={selectionBarClass}
         >
           <span id={`${baseId}-selection`} hidden>
@@ -272,7 +343,23 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
           <TruncatedText className={selectionCountClass} data-rop-selection-count="">
             {(labels?.selectionCount ?? defaultSelectionCount(fmt))(selection.selectedResultCount, selection.hiddenSelectedCount)}
           </TruncatedText>
-          {bulkActions ? <div className={selectionActionsClass}>{bulkActions(selection)}</div> : null}
+          {bulkActions ? (
+            <div
+              ref={actionsRef}
+              className={cn(selectionActionsClass, bulkActionsWideOnly && selectionActionsWideOnlyClass)}
+              onFocus={keepBulkActionsFocus ? (event) => setFocusedAction(event.target) : undefined}
+              onBlur={
+                keepBulkActionsFocus
+                  ? (event) => {
+                      const node = event.target;
+                      if (node.isConnected && isLaidOut(node)) setFocusedAction((current) => (current === node ? null : current));
+                    }
+                  : undefined
+              }
+            >
+              {bulkActions(selection)}
+            </div>
+          ) : null}
           <Button
             size="sm"
             variant="ghost"
@@ -313,5 +400,5 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row>, ref: Ref<HTM
  * `@formrail/core/internal`; not public API, no semver guarantee.
  */
 export const ListReportFrame = /* @__PURE__ */ forwardRef(ListReportFrameImpl) as <Row>(
-  props: ListReportFrameProps<Row> & { ref?: Ref<HTMLDivElement> },
+  props: ListReportFrameProps<Row> & ListReportFrameInternalProps & { ref?: Ref<HTMLDivElement> },
 ) => ReactElement | null;
