@@ -71,7 +71,7 @@ async function openDefault(page: Page, args?: string): Promise<void> {
 }
 
 test.describe('Pro/Floorplans/Virtual List Report: stories', () => {
-  for (const id of ['default', 'scroll-restoration', 'visual-top', 'visual-middle', 'visual-bottom', 'visual-selection']) {
+  for (const id of ['default', 'scroll-restoration', 'visual-top', 'visual-middle', 'visual-bottom', 'visual-selection', 'selection', 'visual-selection-without-bulk-actions']) {
     test(`${id}: the play function passes`, async ({ page }) => {
       test.setTimeout(60_000);
       await expectPlayToPass(page, `${BASE}--${id}`);
@@ -526,5 +526,279 @@ test.describe('performance (reported, not gating)', () => {
     const line = `[perf] wheel scroll (${testInfo.project.name}): commit latency P50 ${pct(result.commit, 0.5).toFixed(1)} ms, P95 ${pct(result.commit, 0.95).toFixed(1)} ms (${result.commit.length} commits); frame interval P50 ${pct(result.frames, 0.5).toFixed(1)} ms, P95 ${pct(result.frames, 0.95).toFixed(1)} ms; main-thread CPU ${cpuPerFrame.toFixed(2)} ms/frame`;
     console.log(line);
     testInfo.annotations.push({ type: 'perf', description: line });
+  });
+});
+
+// #504 (decision 1b): below 640px without the consumer's bulkActions the selection bar is one line (count and
+// "Clear selection"), without "Select all N results"; the header checkbox selects every result and is described.
+const SELECTION = `${BASE}--selection-no-play`;
+const FREE_NO_BULK = 'floorplans-list-report--selection-without-bulk-actions-no-play';
+const selBar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Invoices' });
+const selCount = (page: Page): Locator => page.locator('[data-rop-selection-count]');
+const clearButton = (page: Page): Locator => page.locator('[data-rop-selection-bar] button', { hasText: 'Clear selection' });
+const allBox = (page: Page): Locator => page.getByRole('checkbox', { name: 'Select all results' });
+/** The action as the accessibility tree sees it (absent when under `display: none`). */
+const selectAllByRole = (page: Page): Locator => page.getByRole('button', { name: /^Select all .* results$/ });
+/** The action's node, whatever its state. */
+const selectAllNode = (page: Page): Locator => page.locator('[data-rop-select-all-results]');
+const rowBox = (page: Page, n: number): Locator => page.getByRole('checkbox', { name: `Select INV-${String(n).padStart(6, '0')}` });
+const DESCRIPTION_10K = 'All 10,000 results, including those not on screen';
+
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+async function rectOf(l: Locator): Promise<Rect> {
+  const b = await l.boundingBox();
+  if (!b) throw new Error('no bounding box');
+  return b;
+}
+const centreY = (b: Rect): number => b.y + b.height / 2;
+function sameRect(a: Rect, b: Rect, what: string): void {
+  for (const k of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(a[k] - b[k]), `${what} ${k}`).toBeLessThanOrEqual(0.5);
+}
+async function pickRows(page: Page, numbers: number[]): Promise<void> {
+  for (const n of numbers) await rowBox(page, n).click();
+}
+/** What the Controls panel does: new args for the story on screen, re-rendered in place (state and focus kept). */
+async function updateArgs(page: Page, storyId: string, updatedArgs: Record<string, unknown>): Promise<void> {
+  await page.evaluate(
+    ({ id, args }) => {
+      (window as unknown as { __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void } }).__STORYBOOK_ADDONS_CHANNEL__.emit('updateStoryArgs', {
+        storyId: id,
+        updatedArgs: args,
+      });
+    },
+    { id: storyId, args: updatedArgs },
+  );
+}
+const activeIsBody = (page: Page): Promise<boolean> => page.evaluate(() => document.activeElement === document.body || document.activeElement === null);
+
+for (const vp of [
+  { width: 390, height: 844 },
+  { width: 375, height: 667 },
+]) {
+  test.describe(`#504 selection bar without consumer bulkActions at ${vp.width}x${vp.height}`, () => {
+    test.use({ viewport: vp });
+
+    test('one line at mount: count and "Clear selection" on the same row, as tall as the one-line bar of the Free ListReport', async ({ page }) => {
+      await gotoStory(page, FREE_NO_BULK);
+      const freeHeight = (await rectOf(page.getByRole('group', { name: 'Selection Invoices' }))).height;
+      await gotoStory(page, SELECTION);
+      await expect(selCount(page)).toHaveText('No items selected');
+      await expect(selBar(page)).toHaveAttribute('data-rop-bulk-actions', 'false');
+      expect(Math.abs(centreY(await rectOf(selCount(page))) - centreY(await rectOf(clearButton(page))))).toBeLessThanOrEqual(1);
+      expect(Math.abs((await rectOf(selBar(page))).height - freeHeight)).toBeLessThanOrEqual(1);
+    });
+
+    test('footprint: bar and table container keep their box through 3 selected, all selected from the header checkbox, cleared', async ({ page }) => {
+      await gotoStory(page, SELECTION);
+      const bar0 = await rectOf(selBar(page));
+      const table0 = await rectOf(scroller(page));
+      const check = async (what: string): Promise<void> => {
+        sameRect(await rectOf(selBar(page)), bar0, `bar ${what}`);
+        sameRect(await rectOf(scroller(page)), table0, `table ${what}`);
+      };
+      await pickRows(page, [2, 3, 4]);
+      await expect(selCount(page)).toHaveText('3 selected');
+      await expect(clearButton(page)).toBeVisible();
+      await check('3 selected');
+      await allBox(page).click();
+      await expect(selCount(page)).toHaveText('10,000 selected');
+      await check('all selected');
+      await clearButton(page).click();
+      await expect(selCount(page)).toHaveText('No items selected');
+      await expect(allBox(page)).toBeFocused();
+      await check('cleared');
+    });
+
+    test('partial selection: "Select all N results" is not in the layout, the accessibility tree or the tab order', async ({ page }) => {
+      await gotoStory(page, SELECTION);
+      await pickRows(page, [2, 3, 4]);
+      await expect(selCount(page)).toHaveText('3 selected');
+      await expect(selectAllByRole(page)).toHaveCount(0);
+      // In the DOM, under `display: none` decided by the CSS (its slot), so with no box.
+      await expect(selectAllNode(page)).toHaveCount(1);
+      expect(await selectAllNode(page).evaluate((el) => getComputedStyle(el.parentElement!).display)).toBe('none');
+      expect(await selectAllNode(page).boundingBox()).toBeNull();
+      // Tab order: from the search box straight to "Clear selection".
+      await page.getByRole('searchbox', { name: 'Search invoices' }).focus();
+      await page.keyboard.press('Tab');
+      await expect(clearButton(page)).toBeFocused();
+    });
+
+    for (const how of ['click', 'Space'] as const) {
+      test(`partial selection, the header checkbox (${how}) selects all 10,000 results, the never-mounted last row included`, async ({ page }) => {
+        await gotoStory(page, SELECTION);
+        await pickRows(page, [2, 3, 4]);
+        await expect(allBox(page)).toHaveJSProperty('indeterminate', true);
+        if (how === 'click') await allBox(page).click();
+        else {
+          await allBox(page).focus();
+          await page.keyboard.press('Space');
+        }
+        await expect(selCount(page)).toHaveText('10,000 selected');
+        await expect(allBox(page)).toBeChecked();
+        await expect(allBox(page)).toBeFocused();
+        await expect(rowBox(page, 10_000)).toHaveCount(0);
+        await scrollToTop(page, (await geometry(page)).scrollHeight);
+        await expect(rowBox(page, 10_000)).toBeChecked();
+      });
+    }
+
+    test('the header checkbox: its name stays "Select all results", its description says all 10,000 results (at 0, partial, filtered)', async ({ page }) => {
+      await gotoStory(page, SELECTION);
+      await expect(allBox(page)).toHaveAccessibleDescription(DESCRIPTION_10K);
+      await pickRows(page, [2, 3, 4]);
+      await expect(allBox(page)).toHaveAccessibleDescription(DESCRIPTION_10K);
+      await page.getByRole('radio', { name: 'Pending' }).click();
+      // The number follows the current results (resultCount), read from the count of the title: "(n of 10,000)".
+      const heading = page.getByRole('heading', { name: /Invoices/ });
+      await expect(heading).toContainText(' of 10,000)');
+      const results = /\((.+) of 10,000\)/.exec((await heading.textContent()) ?? '')![1];
+      await expect(allBox(page)).toHaveAccessibleDescription(`All ${results} results, including those not on screen`);
+    });
+
+    test('with consumer bulkActions: two lines, "Select all N results" with its box reserved first in the second line, then the consumer actions and "Clear selection"', async ({ page }) => {
+      await gotoStory(page, SELECTION, 'withBulkActions:!true');
+      await expect(selBar(page)).toHaveAttribute('data-rop-bulk-actions', 'true');
+      const c = await rectOf(selCount(page));
+      // Hidden at 0 selected, but with its box, on the second line.
+      const reserved = await rectOf(selectAllNode(page));
+      expect(reserved.y).toBeGreaterThan(c.y + c.height - 1);
+      await pickRows(page, [2]);
+      await expect(selectAllByRole(page)).toBeVisible();
+      const action = await rectOf(selectAllByRole(page));
+      sameRect(action, reserved, 'the action, hidden then shown');
+      const approve = await rectOf(page.getByRole('button', { name: 'Approve' }));
+      expect(approve.x).toBeGreaterThan(action.x);
+      const clear = await rectOf(clearButton(page));
+      expect(clear.y).toBeGreaterThan(c.y + c.height - 1);
+    });
+
+    test('consumer bulkActions switched on and off after mount (Control): two lines then one, the focus of a removed action goes to the header checkbox', async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await gotoStory(page, SELECTION);
+      const oneLine = (await rectOf(selBar(page))).height;
+      await updateArgs(page, SELECTION, { withBulkActions: true });
+      await expect(selBar(page)).toHaveAttribute('data-rop-bulk-actions', 'true');
+      expect((await rectOf(selBar(page))).height).toBeGreaterThan(oneLine + 10);
+      await pickRows(page, [2]);
+      await page.getByRole('button', { name: 'Approve' }).focus();
+      await updateArgs(page, SELECTION, { withBulkActions: false });
+      await expect(page.getByRole('button', { name: 'Approve' })).toHaveCount(0);
+      await expect(allBox(page)).toBeFocused();
+      expect(Math.abs((await rectOf(selBar(page))).height - oneLine)).toBeLessThanOrEqual(1);
+      expect(errors).toEqual([]);
+    });
+
+    test('de-DE: the description is "All 10.000 results…", the bar "10.000 selected"', async ({ page }) => {
+      await gotoStory(page, SELECTION, 'locale:de-DE');
+      await expect(allBox(page)).toHaveAccessibleDescription('All 10.000 results, including those not on screen');
+      await pickRows(page, [2]);
+      await allBox(page).click();
+      await expect(selCount(page)).toHaveText('10.000 selected');
+    });
+  });
+}
+
+test.describe('#504 selection bar: touch', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('partial selection, a tap on the header checkbox selects all 10,000 results @touch', async ({ page }) => {
+    await gotoStory(page, SELECTION);
+    await rowBox(page, 2).tap();
+    await rowBox(page, 3).tap();
+    await expect(selCount(page)).toHaveText('2 selected');
+    await expect(selectAllByRole(page)).toHaveCount(0);
+    await allBox(page).tap();
+    await expect(selCount(page)).toHaveText('10,000 selected');
+    await expect(allBox(page)).toBeChecked();
+  });
+});
+
+test.describe('#504 selection bar from 640px: unchanged', () => {
+  for (const vp of [
+    { width: 768, height: 1024 },
+    { width: 1280, height: 800 },
+  ]) {
+    for (const withBulk of [false, true]) {
+      test(`${vp.width}x${vp.height}, consumer bulkActions ${String(withBulk)}: the action only at a partial selection, box reserved, selects all, focus to the header checkbox`, async ({ page }) => {
+        await page.setViewportSize(vp);
+        await gotoStory(page, SELECTION, `withBulkActions:!${String(withBulk)}`);
+        await expect(selectAllByRole(page)).toHaveCount(0);
+        const reserved = await rectOf(selectAllNode(page));
+        const bar0 = await rectOf(selBar(page));
+        await pickRows(page, [2, 3]);
+        await expect(selectAllByRole(page)).toBeVisible();
+        sameRect(await rectOf(selectAllByRole(page)), reserved, 'the action, hidden then shown');
+        sameRect(await rectOf(selBar(page)), bar0, 'the bar');
+        await page.getByRole('button', { name: 'Select all 10,000 results' }).click();
+        await expect(selCount(page)).toHaveText('10,000 selected');
+        await expect(allBox(page)).toBeFocused();
+        await expect(selectAllByRole(page)).toHaveCount(0);
+      });
+    }
+  }
+});
+
+test.describe('#504 crossing 640px with the focus on the action', () => {
+  test('640 to 639: the focus goes to the header checkbox, never the body; back to 640 the action is there again', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.setViewportSize({ width: 640, height: 800 });
+    await gotoStory(page, SELECTION);
+    await pickRows(page, [2]);
+    await selectAllByRole(page).focus();
+    await expect(selectAllByRole(page)).toBeFocused();
+    await page.setViewportSize({ width: 639, height: 800 });
+    await expect(allBox(page)).toBeFocused();
+    expect(await activeIsBody(page)).toBe(false);
+    await expect(selectAllByRole(page)).toHaveCount(0);
+    await page.setViewportSize({ width: 640, height: 800 });
+    await expect(selectAllByRole(page)).toBeVisible();
+    await expect(selCount(page)).toHaveText('1 selected');
+    expect(errors).toEqual([]);
+  });
+
+  test('a tablet rotated: 768x1024 to 667x375 keeps the action and its focus, then to 375x667 the focus goes to the header checkbox', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await gotoStory(page, SELECTION);
+    await pickRows(page, [2]);
+    await selectAllByRole(page).focus();
+    await page.setViewportSize({ width: 667, height: 375 });
+    await expect(selectAllByRole(page)).toBeVisible();
+    await expect(selectAllByRole(page)).toBeFocused();
+    await page.setViewportSize({ width: 375, height: 667 });
+    await expect(allBox(page)).toBeFocused();
+    expect(await activeIsBody(page)).toBe(false);
+  });
+
+  test('with consumer bulkActions the action stays below 640px, and so does its focus', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 800 });
+    await gotoStory(page, SELECTION, 'withBulkActions:!true');
+    await pickRows(page, [2]);
+    await selectAllByRole(page).focus();
+    await page.setViewportSize({ width: 639, height: 800 });
+    await expect(selectAllByRole(page)).toBeVisible();
+    await expect(selectAllByRole(page)).toBeFocused();
+  });
+});
+
+test.describe('#504 below the virtualization threshold', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('50 rows (not virtualized): the same one-line bar, no action at a partial selection, the header checkbox described', async ({ page }) => {
+    await gotoStory(page, DEFAULT, 'rowCount:50;withBulkActions:!false');
+    await expect(table(page)).not.toHaveAttribute('aria-rowcount');
+    expect(Math.abs(centreY(await rectOf(selCount(page))) - centreY(await rectOf(clearButton(page))))).toBeLessThanOrEqual(1);
+    await expect(allBox(page)).toHaveAccessibleDescription('All 50 results, including those not on screen');
+    await pickRows(page, [2]);
+    await expect(selectAllByRole(page)).toHaveCount(0);
+    await allBox(page).click();
+    await expect(selCount(page)).toHaveText('50 selected');
   });
 });

@@ -6,8 +6,9 @@ import { ListReportTableShell } from './ListReportTableShell';
 import type { ListReportColumn, UseListReportReturn } from './types';
 import { useListReport } from './use-list-report';
 
-// The three optional, non-breaking extensions of the `/internal` building blocks used by the Pro
-// virtualized table (#231): `onToggle` and `renderCellOptions` on the Row, `headRowProps` on the Shell.
+// The optional, non-breaking extensions of the `/internal` building blocks used by the Pro
+// virtualized table (#231): `onToggle` and `renderCellOptions` on the Row, `headRowProps` on the Shell;
+// and `headSelectAllProps` on the Shell (#504, the description of the header checkbox in `VirtualListReport`).
 
 afterEach(() => {
   cleanup();
@@ -29,11 +30,13 @@ function Host({
   onToggle,
   forceTruncate,
   headRowProps,
+  headSelectAllProps,
   onSelectedIdsChange,
 }: {
   onToggle?: (table: UseListReportReturn<Item>) => (id: string, event: React.MouseEvent<HTMLInputElement>) => void;
   forceTruncate?: boolean;
   headRowProps?: React.HTMLAttributes<HTMLTableRowElement>;
+  headSelectAllProps?: { 'aria-describedby'?: string };
   onSelectedIdsChange?: (ids: ReadonlySet<string>) => void;
 }) {
   const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true, onSelectedIdsChange });
@@ -42,6 +45,7 @@ function Host({
       table={table}
       aria-label="Items"
       headRowProps={headRowProps}
+      headSelectAllProps={headSelectAllProps}
       renderBody={(ctx) =>
         ctx.table.rows.map((row) => (
           <ListReportTableRow
@@ -112,5 +116,30 @@ describe('ListReportTableShell: headRowProps', () => {
     unmount();
     const withProps = render(<Host headRowProps={{ 'aria-rowindex': 1 }} />).container;
     expect(withProps.querySelector('thead tr')).toHaveAttribute('aria-rowindex', '1');
+  });
+});
+
+describe('ListReportTableShell: headSelectAllProps (#504)', () => {
+  it('without it the header checkbox has no aria-describedby and no description', () => {
+    render(<Host />);
+    const box = screen.getByRole('checkbox', { name: 'Select all results' });
+    expect(box).not.toHaveAttribute('aria-describedby');
+    expect(box).not.toHaveAccessibleDescription();
+  });
+
+  it('aria-describedby reaches the header checkbox, whose name stays labels.selectAllResults', () => {
+    render(
+      <>
+        <Host headSelectAllProps={{ 'aria-describedby': 'desc' }} />
+        <span id="desc" hidden>
+          All 2 results, including those not on screen
+        </span>
+      </>,
+    );
+    const box = screen.getByRole('checkbox', { name: 'Select all results' });
+    expect(box).toHaveAttribute('aria-describedby', 'desc');
+    expect(box).toHaveAccessibleDescription('All 2 results, including those not on screen');
+    // Only the header checkbox: the row checkboxes have no description.
+    expect(screen.getByRole('checkbox', { name: 'Select Alpha' })).not.toHaveAttribute('aria-describedby');
   });
 });
