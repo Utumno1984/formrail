@@ -159,4 +159,29 @@ describe('useTanStackFormBinding on React 18', () => {
     }
     act(() => legacyUnmount(container));
   });
+
+  // Critic round 1 on PR #557, point 2: the hydration goes through `rederive` (a write of the base store after a
+  // change of content of the defaults). Its `busy` guard must be balanced, or the guard of a later write is off.
+  it('legacy render, hydration through defaultValues then binding.reset(x) outside any batch: no commit shows a row', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined); // legacy render notice, update outside act
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const seen: Seen[] = [];
+    act(() => legacyRender(<Probe seen={seen} onFieldChange={() => undefined} />, container));
+    act(() => loadRecord(DATA));
+    expect(seen.at(-1)!.binding.baseline).toEqual(DATA);
+    const from = seen.length;
+    const x: Invoice = { supplier: 'Saved', amount: '7', notes: 'n' };
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+    try {
+      seen.at(-1)!.binding.reset(x);
+    } finally {
+      (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    }
+    const after = seen.slice(from);
+    expect(after.length).toBeGreaterThan(0);
+    expect(seen.filter((s) => s.entries.length > 0).map((s) => s.entries)).toEqual([]);
+    expect(seen.at(-1)!.binding.values).toBe(x);
+    act(() => legacyUnmount(container));
+  });
 });

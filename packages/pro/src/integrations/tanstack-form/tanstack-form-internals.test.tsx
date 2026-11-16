@@ -70,11 +70,11 @@ function setup(defaults: () => Invoice) {
 }
 
 describe('TanStack Form 1.33.5: the installed version', () => {
-  it('is the tested minimum of the peer range', () => {
+  it('is the tested minimum of the peer range, which accepts its minor only (~)', () => {
     const require = createRequire(resolve(PACKAGE, 'package.json'));
     const installed = (require('@tanstack/react-form/package.json') as { version: string }).version;
     const pkg = JSON.parse(readFileSync(resolve(PACKAGE, 'package.json'), 'utf8')) as { peerDependencies: Record<string, string> };
-    expect(pkg.peerDependencies['@tanstack/react-form']).toBe(`^${installed}`);
+    expect(pkg.peerDependencies['@tanstack/react-form']).toBe(`~${installed}`);
   });
 });
 
@@ -300,6 +300,27 @@ describe('what the adapter reads of TanStack Form', () => {
       render(<Probe broken />);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0]![0])).toMatch(/useTanStackFormBinding: `form.Subscribe`/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("a Subscribe that renders ANOTHER form's instance is not taken: checked by the identity of the store (warning, frozen options)", () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      let baseline!: Invoice;
+      function Probe() {
+        const form = useForm({ defaultValues: DATA });
+        const other = useForm({ defaultValues: EMPTY });
+        // `Subscribe` of the other form: an object with `options` and `store`, but not this form's store.
+        const target = { ...form, Subscribe: other.Subscribe } as unknown as TanStackFormOf<Invoice>;
+        baseline = useTanStackFormBinding(target).baseline;
+        return null;
+      }
+      render(<Probe />);
+      expect(warn).toHaveBeenCalledTimes(1);
+      // The baseline is this form's defaults, never the other form's.
+      expect(baseline).toEqual(DATA);
     } finally {
       warn.mockRestore();
     }
