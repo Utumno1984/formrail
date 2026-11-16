@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SPEC, resolveSpec, SUITE_ARGS } from './tanstack-compat.mjs';
@@ -28,20 +31,28 @@ describe('resolveSpec: the run stays on 1.x', () => {
 });
 
 describe('the suite', () => {
-  it('runs the files of the TanStack binding and leaves out only the assertion on the installed version', () => {
-    expect(SUITE_ARGS).toEqual(['tanstack-form', '-t', '^(?!.*the installed version is the tested minimum of the peer range)']);
-    const excluded = new RegExp(SUITE_ARGS[2]);
-    const internals = read('packages/pro/src/integrations/tanstack-form/tanstack-form-internals.test.tsx');
-    // The excluded test exists with exactly that name, and a behaviour test is not caught by the exclusion.
-    expect(internals).toContain("describe('TanStack Form 1.33.5: the installed version'");
-    const fullName =
-      'TanStack Form 1.33.5: the installed version is the tested minimum of the peer range, which accepts its minor only (~)';
-    expect(internals).toContain("it('is the tested minimum of the peer range, which accepts its minor only (~)'");
-    expect(excluded.test(fullName)).toBe(false);
-    // Another test that merely mentions "the installed version" is not skipped by mistake.
-    expect(excluded.test('x: the installed version is read from package.json')).toBe(true);
-    expect(excluded.test('1. update(): useForm re-applies its options at every render')).toBe(true);
+  it('runs the files of the TanStack binding with the exclusion of one assertion on the installed version', () => {
+    expect(SUITE_ARGS.slice(0, 2)).toEqual(['tanstack-form', '-t']);
   });
+
+  // The real thing: vitest, from packages/pro, with the very SUITE_ARGS of the script. Vitest joins describe and it
+  // with " > " in the name the pattern is matched against; a pattern with another separator skips nothing, and only
+  // a real run can tell.
+  it('skips exactly one test, the one on the installed version, and runs the rest', () => {
+    const cwd = fileURLToPath(new URL('../packages/pro/', import.meta.url));
+    const dir = mkdtempSync(path.join(tmpdir(), 'tanstack-compat-'));
+    const outputFile = path.join(dir, 'report.json');
+    spawnSync('npx', ['vitest', 'run', ...SUITE_ARGS, '--reporter=json', `--outputFile=${outputFile}`], { cwd, encoding: 'utf8' });
+    const report = JSON.parse(readFileSync(outputFile, 'utf8'));
+    rmSync(dir, { recursive: true, force: true });
+    const tests = report.testResults.flatMap((file) => file.assertionResults);
+    const skipped = tests.filter((t) => t.status === 'skipped' || t.status === 'pending');
+    expect(skipped.map((t) => t.fullName)).toEqual([
+      'TanStack Form 1.33.5: the installed version is the tested minimum of the peer range, which accepts its minor only (~)',
+    ]);
+    expect(report.numFailedTests).toBe(0);
+    expect(report.numPassedTests).toBeGreaterThan(100);
+  }, 180_000);
 });
 
 describe('the workflow', () => {

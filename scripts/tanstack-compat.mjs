@@ -26,9 +26,11 @@ export function resolveSpec(input) {
 /**
  * The suite: every test file with `tanstack-form` in its path (the binding tests, the internals test, the boundary
  * and built-bundle tests), minus the one assertion that is about the installed VERSION and not about behaviour
- * ("the installed version is the tested minimum of the peer range"): it fails by design on any other version.
+ * (describe "the installed version", it "is the tested minimum of the peer range"): it fails by design on any other
+ * version. Vitest joins describe and it with " > " in the name the pattern is matched against, and the version number
+ * in the describe is left out of the pattern on purpose.
  */
-export const SUITE_ARGS = ['tanstack-form', '-t', '^(?!.*the installed version is the tested minimum of the peer range)'];
+export const SUITE_ARGS = ['tanstack-form', '-t', '^(?!.*the installed version > is the tested minimum of the peer range)'];
 
 function run(command, args, options = {}) {
   console.log(`$ ${command} ${args.join(' ')}`);
