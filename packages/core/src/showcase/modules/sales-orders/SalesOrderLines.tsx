@@ -3,7 +3,7 @@
 // page; this component only decides which control takes the focus after an action (the control that had it may be
 // gone or moved in the DOM). It is the invoices' line editor (`InvoiceLineItems`) with the fields of an order line:
 // copy whichever of the two is closer to your record.
-import { useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '../../../button/Button';
 import { Field } from '../../../field/Field';
 import { Input } from '../../../input/Input';
@@ -45,13 +45,31 @@ const ROW_FIELDS: CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
 };
 
-// The products an order can still be given: the active ones of the demo catalogue (a discontinued product stays
-// on the lines that already carry it, shown through `unknownValueLabel`, but cannot be picked for a new one).
-let productOptions: { value: string; label: string; textValue: string }[] | undefined;
-const options = () =>
-  (productOptions ??= makeProducts(DEMO_REFERENCE_POOL.products)
+// The products a line can be given: the first 50 active products of the demo catalogue (a Select with the whole
+// catalogue of 850 would put 850 options in the page for every line and slow every keystroke; a real catalogue
+// would be a search). A line that already carries an active product outside those 50 gets it as one more option;
+// a discontinued one is shown through `unknownValueLabel` and cannot be picked for a new line.
+const PICKABLE = 50;
+type ProductOption = { value: string; label: string; textValue: string };
+const productOption = (p: { id: string; name: string; sku: string }): ProductOption => ({
+  value: p.id,
+  label: `${p.name} (${p.sku})`,
+  textValue: p.name,
+});
+let pickable: ProductOption[] | undefined;
+const pickableOptions = (): ProductOption[] =>
+  (pickable ??= makeProducts(DEMO_REFERENCE_POOL.products)
     .filter((p) => p.status === 'active')
-    .map((p) => ({ value: p.id, label: `${p.name} (${p.sku})`, textValue: p.name })));
+    .slice(0, PICKABLE)
+    .map(productOption));
+
+/** The options of one line: the pickable ones, plus the line's own product when it is active and not among them. */
+const optionsFor = (productId: string): ProductOption[] => {
+  const base = pickableOptions();
+  if (productId === '' || base.some((o) => o.value === productId)) return base;
+  const own = getProduct(productId);
+  return own && own.status === 'active' ? [productOption(own), ...base] : base;
+};
 
 /** The product of a line that is not among the options (a discontinued one): still named, never a bare id. */
 const productLabel = (productId: string): string => {
@@ -61,7 +79,6 @@ const productLabel = (productId: string): string => {
 
 export function SalesOrderLines({ lines, currency, baselineIds, onChange, readOnly = false, readOnlyReason, listError, fieldHelp }: SalesOrderLinesProps) {
   const counterRef = useRef(0);
-  const productOptionsList = useMemo(options, []);
   // Which control takes the focus once the form shows the lines of the action. Target keys:
   // `<action>:<line id>` for the controls of a line, `add` for the button after the list.
   const focus = useListMutationFocus(lines.map((line) => line.id));
@@ -119,7 +136,8 @@ export function SalesOrderLines({ lines, currency, baselineIds, onChange, readOn
           {lines.map((line, i) => {
             const n = i + 1;
             const total = lineTotal(line, currency);
-            const inOptions = productOptionsList.some((o) => o.value === line.productId);
+            const lineOptions = optionsFor(line.productId);
+            const inOptions = lineOptions.some((o) => o.value === line.productId);
             return (
               <li key={line.id} style={ROW}>
                 <div style={ROW_HEADER}>
@@ -146,7 +164,7 @@ export function SalesOrderLines({ lines, currency, baselineIds, onChange, readOn
                 </div>
                 <Field label={`Line ${n} product`} name={`lines.${i}.productId`} required {...state} {...helpProps(fieldHelp, `lines.${i}.productId`)}>
                   <Select
-                    options={productOptionsList}
+                    options={lineOptions}
                     placeholder="Choose a product"
                     emptyLabel="No products"
                     value={line.productId || undefined}
