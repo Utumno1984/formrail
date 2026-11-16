@@ -69,7 +69,7 @@ test.describe('Pro page for teams: content', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Join the waitlist' })).toBeVisible();
   });
 
-  test('the wording names no third-party product, nor React Hook Form / TanStack (ticket #489 is not closed)', async ({ page }) => {
+  test('the wording names no third-party product; React Hook Form / TanStack are named only on teams/, in the tested-version claim (#563)', async ({ page }) => {
     for (const url of ['teams/', 'privacy/']) {
       await page.goto(url);
       const text = (await page.locator('body').innerText()).toLowerCase();
@@ -78,10 +78,25 @@ test.describe('Pro page for teams: content', () => {
         expect(new RegExp(`\\b${word}\\b`).test(text), `${url} text mentions "${word}"`).toBe(false);
         expect(new RegExp(`\\b${word}\\b`).test(html), `${url} markup mentions "${word}"`).toBe(false);
       }
-      for (const word of ['react hook form', 'react-hook-form', 'tanstack', 'hookform']) {
-        expect(text.includes(word) || html.includes(word), `${url} mentions ${word}`).toBe(false);
+      // Since #489/#508 the Pro page states which form libraries it works with (see the next test); privacy/ never does.
+      if (url === 'privacy/') {
+        for (const word of ['react hook form', 'react-hook-form', 'tanstack', 'hookform']) {
+          expect(text.includes(word) || html.includes(word), `${url} mentions ${word}`).toBe(false);
+        }
       }
     }
+  });
+
+  test('states the form libraries with the tested version, and promises no wider compatibility (#563)', async ({ page }) => {
+    await page.goto('teams/');
+    await expect(page.locator('main')).toContainText(
+      'Works with React Hook Form (react-hook-form ^7.92.0) and TanStack Form (@tanstack/react-form, tested on 1.33.x).',
+    );
+    const text = await page.locator('body').innerText();
+    expect(text).not.toMatch(/(?<![\d.])1\.x\b/);
+    // Only these two libraries are named: no other form library is claimed.
+    const lower = text.toLowerCase();
+    for (const word of ['formik', 'react final form', 'redux-form', 'rjsf']) expect(lower).not.toContain(word);
   });
 
   test('only built Pro features are offered: the feature list is a subset of the allowed one, each backed by a story link', async ({ page }) => {
