@@ -7,6 +7,7 @@ import { Field } from '../../../field/Field';
 import { Input } from '../../../input/Input';
 import { useListMutationFocus } from '../../../internal/use-list-mutation-focus';
 import { lineTotal, nextLineId, type LineValues } from './invoice-lines';
+import { helpProps } from '../field-help';
 
 export interface InvoiceLineItemsProps {
   lines: readonly LineValues[];
@@ -33,20 +34,6 @@ const ROW_FIELDS: CSSProperties = {
   gap: 12,
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
 };
-
-/**
- * Story-only (#384): the props of a Field for the help an addon gives it. A help takes the room the Field reserves
- * for a one-line error (the same height: the gap and one caption line), so a help appearing or going away moves
- * nothing below the Field; with an error shown as well, the Field grows by the help line. No help: no prop at all
- * (the Field exactly as without an addon).
- */
-export function helpProps(
-  fieldHelp: ((path: string) => ReactNode) | undefined,
-  path: string,
-): { help?: ReactNode; reserveMessageSpace?: boolean } {
-  const help = fieldHelp?.(path);
-  return help === undefined || help === null || help === false ? {} : { help, reserveMessageSpace: false };
-}
 
 export function InvoiceLineItems({ lines, baselineIds, onChange, fieldHelp }: InvoiceLineItemsProps) {
   const counterRef = useRef(0);

@@ -23,6 +23,7 @@ const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 /** Pages that document no component: their story args all belong under "Story controls". */
 const PAGES_WITHOUT_COMPONENT: Record<string, string> = {
   'Showcase/Invoices': 'an application assembled from the components, not a component',
+  'Showcase/Record editing': 'an application assembled from the components, not a component',
   'Pro/Showcase/Invoices with Change Summary': 'an application assembled from the components, not a component',
   'Foundations/Theming': 'design tokens and CSS, no component',
   'Foundations/Tokens': 'design tokens, no component',
