@@ -344,21 +344,27 @@ describe('useObjectPageForm: save field by field, a nested object and null (#545
     });
     act(() => during(view.result.current));
     let ok = false;
+    let error: unknown;
     await act(async () => {
       resolve(respond(sent));
-      ok = await done;
+      // A merge that throws must show as a failed assertion on the outcome, not as an uncaught TypeError (#559).
+      ok = await done.catch((reason: unknown) => {
+        error = reason;
+        return false;
+      });
     });
-    return { ok, form: view.result };
+    return { ok, error, form: view.result };
   }
 
   it('a nested object cleared to null during the save stays null; the other fields take the server value', async () => {
-    const { ok, form } = await saveWith(
+    const { ok, error, form } = await saveWith(
       { name: 'x', address: { street: 'oak rd', city: 'york' } },
       (f) => f.setValue('address', null),
       (sent) => ({ ...sent, name: 'Orbit', address: { street: 'Oak Rd', city: 'York' } }),
     );
     expect(ok).toBe(true);
     expect(form.current.values.address).toBeNull();
+    expect(error).toBeUndefined();
     expect(form.current.values.name).toBe('Orbit');
     expect(form.current.baseline.address).toEqual({ street: 'Oak Rd', city: 'York' });
     expect(form.current.isDirty).toBe(true);
@@ -366,14 +372,30 @@ describe('useObjectPageForm: save field by field, a nested object and null (#545
 
   it('a null field filled in with an object during the save is the user object whole (same identity)', async () => {
     const mine = { street: 'elm st', city: 'leeds' };
-    const { ok, form } = await saveWith(
+    const { ok, error, form } = await saveWith(
       { name: 'x', address: null },
       (f) => f.setValue('address', mine),
       (sent) => ({ ...sent, name: 'Orbit', address: { street: 'Elm St', city: 'Leeds' } }),
     );
     expect(ok).toBe(true);
     expect(form.current.values.address).toBe(mine);
+    expect(error).toBeUndefined();
     expect(form.current.values.name).toBe('Orbit');
+    expect(form.current.isDirty).toBe(true);
+  });
+
+  it('a nested object edited during the save while the server returns null for it: the user object whole', async () => {
+    const mine = { street: 'elm st', city: 'leeds' };
+    const { ok, error, form } = await saveWith(
+      { name: 'x', address: { street: 'oak rd', city: 'york' } },
+      (f) => f.setValue('address', mine),
+      (sent) => ({ ...sent, name: 'Orbit', address: null }),
+    );
+    expect(ok).toBe(true);
+    expect(form.current.values.address).toBe(mine);
+    expect(error).toBeUndefined();
+    expect(form.current.values.name).toBe('Orbit');
+    expect(form.current.baseline.address).toBeNull();
     expect(form.current.isDirty).toBe(true);
   });
 });

@@ -73,6 +73,56 @@ describe('InvoiceCrud: Create', () => {
     expect(await screen.findByRole('table')).toBeTruthy();
   }, 20_000);
 
+  it('two clicks on "New invoice" before the commit are one entry, one report, one creation page (#559: the guard itself)', async () => {
+    const onNavigate = vi.fn();
+    // Entries pushed, counted at the source: `history.length` also counts the forward entries a test before this one left.
+    const push = vi.spyOn(window.history, 'pushState');
+    render(<InvoiceCrud {...base({ onNavigate })} />);
+    // Both clicks reach the button because they run in one `act`: the commit comes after the second one. (A
+    // `userEvent.dblClick` awaits between the clicks, so it never gets here: the test above does not prove the guard.)
+    try {
+      const button = await screen.findByRole('button', { name: 'New invoice' });
+      act(() => {
+        button.click();
+        button.click();
+      });
+      await screen.findByRole('heading', { level: 1, name: 'New invoice' });
+      expect(window.location.search).toContain('create=1');
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenCalledWith({ to: 'create' });
+    } finally {
+      push.mockRestore();
+    }
+  }, 20_000);
+
+  it('two clicks on "Create" in one act, the first save still running: one call to store.create (#559)', async () => {
+    const { promise, release } = gate();
+    render(<InvoiceCrud {...base({ saveDelayMs: promise })} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'New invoice' }));
+    // Any supplier will do: the first option (no demo name written in this test).
+    await userEvent.click(screen.getByRole('combobox', { name: /Supplier/ }));
+    await userEvent.click((await screen.findAllByRole('option'))[0]!);
+    await userEvent.type(screen.getByRole('textbox', { name: /Amount/ }), '10');
+    const create = vi.spyOn(window.__ropShowcaseStore!, 'create');
+    try {
+      const button = screen.getByRole('button', { name: 'Create' });
+      act(() => {
+        button.click();
+        button.click();
+      });
+      // A third click while the save is still running (the first one has not concluded): still one call.
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }));
+      expect(create).toHaveBeenCalledTimes(1);
+      await act(async () => release());
+      await screen.findByRole('table');
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(window.__ropShowcaseStore?.snapshot()).toHaveLength(201);
+    } finally {
+      create.mockRestore();
+    }
+  }, 20_000);
+
   it('an invalid Create does not call store.create; a valid one (double click) calls it once, returns to the list, announces it', async () => {
     const onCreated = vi.fn();
     render(

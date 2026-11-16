@@ -353,6 +353,33 @@ describe('checkLabelDefaults: a prose that lists several values', () => {
     for (const result of [oneText, oneExample, short, shortTexts, none]) expect(result.verified).toEqual([]);
   });
 
+  it('a list LONGER than the prose fails and names the count; an exact length is accepted (#559)', () => {
+    const r = listRow('XLabels', 'count', ['`1 item`', '`N items`']);
+    const fn = (c: number | string) => (c === 1 ? '1 item' : `${c} items`);
+    const longTexts = run([r], [{ iface: 'XLabels', from: 'X', values: { count: ['1 item', 'N items', 'extra'] } }]);
+    expect(longTexts.verified).toEqual([]);
+    // One problem per value of the prose, each naming the count of the source and of the prose.
+    expect(longTexts.problems).toHaveLength(2);
+    for (const problem of longTexts.problems) expect(problem).toContain('the source gives 3 texts, the prose lists 2 values: one text per value, in the order of the prose');
+    const longExamples = run([r], [{ iface: 'XLabels', from: 'X', values: { count: fn }, examples: { count: [{ args: [1] }, { args: ['N'] }, { args: [3] }] } }]);
+    expect(longExamples.verified).toEqual([]);
+    expect(longExamples.problems).toEqual([
+      'XLabels.count (packages/core/src/x/X.tsx), source X: `examples.count` has 3 examples, the prose lists 2 values ("1 item", "N items"): one example per value, in the order of the prose',
+    ]);
+    // Exactly the same length stays accepted.
+    expect(run([r], [{ iface: 'XLabels', from: 'X', values: { count: ['1 item', 'N items'] } }]).problems).toEqual([]);
+    expect(run([r], [{ iface: 'XLabels', from: 'X', values: { count: fn }, examples: { count: [{ args: [1] }, { args: ['N'] }] } }]).problems).toEqual([]);
+  });
+
+  it('an empty array for a prose with ONE value fails and names the count (#559)', () => {
+    const one = listRow('XLabels', 'title', ['`Title`']);
+    const empty = run([one], [{ iface: 'XLabels', from: 'X', values: { title: [] } }]);
+    expect(empty.verified).toEqual([]);
+    expect(empty.problems).toHaveLength(1);
+    expect(empty.problems[0]).toContain('the source gives 0 texts, the prose lists 1 values');
+    expect(run([one], [{ iface: 'XLabels', from: 'X', values: { title: ['Title'] } }]).problems).toEqual([]);
+  });
+
   it('a row read without `proseValues` is compared on its `prose`, as a single value', () => {
     expect(run([row('XLabels', 'a', '`A`')], [{ iface: 'XLabels', from: 'X', values: { a: 'A' } }]).verified).toEqual(['XLabels.a']);
   });

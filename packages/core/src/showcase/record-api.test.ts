@@ -220,6 +220,31 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     expect((await listing.promise).find((c) => c.id === 'c-2')?.city).toBe('Graz');
   });
 
+  // #559: two writes in the same round, the first slow and successful on c-1, the second fast on c-2. A read
+  // waits for BOTH, whichever finishes first: `Promise.any` (the first to finish) and "only the last write of the
+  // round" both let the list through while the other write is still running.
+  it.each([
+    { firstOpened: 'fast', then: 'slow' },
+    { firstOpened: 'slow', then: 'fast' },
+  ] as const)('a read waits for the slow write AND the fast one of the same round: $firstOpened opens first, $then last (#559)', async ({ firstOpened, then }) => {
+    const gates = { slow: gate(), fast: gate() };
+    const { store, api } = setup({ saveDelayMs: gates.slow.promise });
+    const slowSave = api.save({ ...SEED[0]!, city: 'Vienna' });
+    store.configure({ saveDelayMs: gates.fast.promise });
+    const fastSave = api.save({ ...SEED[1]!, city: 'Graz' });
+    const listing = watch(api.list());
+    gates[firstOpened].open();
+    await (firstOpened === 'fast' ? fastSave : slowSave);
+    await flush();
+    await flush();
+    // One write is over, the other is still running: the list has not been answered.
+    expect(listing.settled).toBe(false);
+    gates[then].open();
+    await Promise.all([slowSave, fastSave]);
+    const cities = Object.fromEntries((await listing.promise).map((c) => [c.id, c.city]));
+    expect(cities).toEqual({ 'c-1': 'Vienna', 'c-2': 'Graz' });
+  });
+
   it('everything else is the store itself (snapshot, server updates, subscriptions, configure)', async () => {
     const { store, api } = setup();
     const changes: unknown[] = [];
