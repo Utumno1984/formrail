@@ -87,7 +87,7 @@ export function measureFiles(paths, read) {
 
 export const countsOf = (found) => Object.fromEntries(Object.keys(found).sort().map((f) => [f, found[f].length]));
 const total = (obj) => Object.values(obj).reduce((a, b) => a + b, 0);
-const sample = (hits) => [...new Set(hits.map((h) => h.toLowerCase()))].slice(0, 3).map((h) => JSON.stringify(h)).join(', ');
+const sample = (hits) => [...new Set(hits)].slice(0, 3).map((h) => JSON.stringify(h)).join(', ');
 
 export function validateBaseline(baseline) {
   if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) return ['baseline is not an object'];
