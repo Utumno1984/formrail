@@ -3,7 +3,7 @@
 //   - the route is ONE tagged value, `Route` = list | record(id) | create, of ONE module (a record type:
 //     `/<module>`, `/<module>/<id>`, `/<module>/new`). In the URL it is carried by the `record=<id>` and
 //     `create=1` query parameters, plus `module=<name>` for any module but the default one (so the URLs of the
-//     default module, the invoices, are the same as before modules existed). They are only ever READ through
+//     default module are the same as before modules existed). They are only ever READ through
 //     `parseRoute` (one value: with both `record` and `create` present `record` wins, documented; an unknown
 //     module is the list of the default module) and only ever WRITTEN through `routeSearch`, which sets exactly
 //     the ones of the route and removes the others. So "both present" can be parsed but never produced, and

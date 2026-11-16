@@ -1,7 +1,7 @@
 // Story-only (#518): the in-memory, deterministic "server" of the record-editing showcases, generic over the
 // record type. One store per story mount (no module singleton): two stores never share state, so two modules
 // (two record types) never share a delay, an outcome or an `error-once`. Not exported by the package.
-// The Invoices showcase uses it through `createInvoiceStore` (invoice-store.ts).
+// A domain showcase uses it through a store of its own, built on top of it.
 
 export type SaveOutcome = 'success' | 'error';
 export type DeleteOutcome = 'success' | 'error';
@@ -22,7 +22,7 @@ export interface RecordStoreConfig {
   deleteOutcome: DeleteOutcome;
 }
 
-/** Capitalizes the first letter: `invoice` -> `Invoice`. */
+/** Capitalizes the first letter: `task` -> `Task`. */
 const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
 export class RecordNotFoundError extends Error {
@@ -81,7 +81,7 @@ export interface RecordStore<T extends { id: string }, D = Omit<T, 'id'>> {
    */
   deleteMany: (ids: readonly string[]) => Promise<void>;
   /**
-   * Story-only (#384, used by the Pro story "Invoices with Change Summary"): another user changes a record
+   * Story-only (#384, used by a Pro story with Change Summary): another user changes a record
    * after `delayMs` (a number of ms or a promise, as `saveDelayMs`; default 0). `change` gets a copy of the
    * stored record and returns the new one (after the store's `normalize`, as by `save`); the subscribers are
    * then told (`subscribe`). Rejects with `RecordNotFoundError` for an id that does not exist (any more) when

@@ -200,6 +200,26 @@ describe('createRecordApi (#518): reads wait for the writes in flight', () => {
     await expect(reading.promise).resolves.toEqual(SEED[0]);
   });
 
+  it('a read waits for EVERY write of the round, also the slow one after a write that failed at once (#519)', async () => {
+    const failing = gate();
+    const slow = gate();
+    const { store, api } = setup({ saveDelayMs: failing.promise, saveOutcome: 'error' });
+    const first = api.save({ ...SEED[0]!, city: 'Vienna' });
+    const firstResult = first.catch((error: unknown) => error);
+    store.configure({ saveDelayMs: slow.promise, saveOutcome: 'success' });
+    const second = api.save({ ...SEED[1]!, city: 'Graz' });
+    const listing = watch(api.list());
+    failing.open();
+    await expect(firstResult).resolves.toBeInstanceOf(RecordNetworkError);
+    await flush();
+    await flush();
+    // The first write is over (it failed), the second is still running: the list has not been answered.
+    expect(listing.settled).toBe(false);
+    slow.open();
+    await second;
+    expect((await listing.promise).find((c) => c.id === 'c-2')?.city).toBe('Graz');
+  });
+
   it('everything else is the store itself (snapshot, server updates, subscriptions, configure)', async () => {
     const { store, api } = setup();
     const changes: unknown[] = [];

@@ -228,10 +228,8 @@ describe('RecordCrud (#519): the shell holds no word of a domain', () => {
     'crud-story-args.ts',
     'notice-cap.ts',
     'number-text.ts',
-    'record-store.ts',
     'showcase-data.ts',
     'showcase-modules.ts',
-    'showcase-router.ts',
   ]);
   const shellFiles = () =>
     readdirSync(import.meta.dirname)
@@ -246,6 +244,8 @@ describe('RecordCrud (#519): the shell holds no word of a domain', () => {
       'list-page.ts',
       'record-api.ts',
       'record-module.ts',
+      'record-store.ts',
+      'showcase-router.ts',
     ]);
   });
 
@@ -561,8 +561,9 @@ describe('RecordCrud (#519): a module that is not the default one', () => {
     const onNavigate = vi.fn();
     const entries = window.history.length;
     render(<RecordCrud {...props(TASKS_WITH_CREATE, { onNavigate, history: 'push' })} />);
-    // Two clicks before React renders the creation page: the second still reaches the button (a user's double
-    // click can land before the first one has replaced the list; `userEvent.dblClick` cannot, it awaits between).
+    // The test simulates two clicks before the commit: both reach the button, because they run in one `act`.
+    // (In a browser React applies a discrete event's update before the next click task, so a real double click
+    // hardly gets here: the guard is defensive. `userEvent.dblClick` awaits between clicks, so it cannot do this.)
     const button = await screen.findByRole('button', { name: 'New task' });
     act(() => {
       button.click();
