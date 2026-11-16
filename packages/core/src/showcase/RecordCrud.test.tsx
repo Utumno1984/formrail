@@ -228,6 +228,8 @@ describe('RecordCrud (#519): the shell holds no word of a domain', () => {
     'crud-story-args.ts',
     'notice-cap.ts',
     'number-text.ts',
+    'sales-order-store.ts',
+    'sales-order-story-args.ts',
     'showcase-data.ts',
     'showcase-modules.ts',
   ]);
