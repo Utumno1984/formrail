@@ -177,7 +177,7 @@ describe('keepBulkActionsFocus: a focused action hidden or removed hands the foc
     act(() => button.focus());
     expect(observerOf(slotOf(button))).toBeDefined();
     await userEvent.click(search);
-    // A blur that leaves the button laid out is the user moving on: no observer any more.
+    // Losing the focus with the button still laid out is the user moving on: no observer any more.
     expect(observerOf(slotOf(button))).toBeUndefined();
     setLaidOut((el) => !slotOf(button).contains(el));
     expect(search).toHaveFocus();

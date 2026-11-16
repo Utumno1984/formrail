@@ -15,8 +15,8 @@ export interface VirtualListReportLabels extends ListReportFrameLabels {
   /**
    * Description of the header checkbox (its name stays `selectAllResults`), linked with `aria-describedby`: it
    * selects every current result, also the rows the virtualization has not mounted. Not rendered while there is no
-   * result (the checkbox is disabled then). Default: "All 10,000 results, including those not on screen" ("1 result"
-   * for one), the number formatted in the `locale` of `useListReport` (`Intl.NumberFormat`; with SSR pass `locale`).
+   * result (the checkbox is disabled then). Default: "All 100,000 results, including those not on screen" (for a single
+   * result just the number and the word), the number formatted in the `locale` of `useListReport` (`Intl.NumberFormat`; with SSR pass `locale`).
    * A custom function receives the raw number and formats it itself.
    */
   selectAllResultsDescription: (resultCount: number) => string;

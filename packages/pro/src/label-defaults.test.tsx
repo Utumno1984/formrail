@@ -26,7 +26,8 @@ const LABEL_EXCEPTIONS: readonly LabelException[] = [];
 /**
  * `VirtualListReportLabels.selectAllResultsAction`: its default is not in a constant (it formats the number in the
  * locale of `useListReport`), so it is read from a rendering with the 100,000 results of the prose's example, in
- * `en-US`. The button is rendered (hidden with `visibility`) even with nothing selected.
+ * `en-US`. The button is rendered (hidden with `visibility`) even with nothing selected. Likewise
+ * `selectAllResultsDescription` (#504), read from the node the header checkbox's `aria-describedby` points to.
  */
 function virtualListReportRendering(): Record<string, string> {
   interface Item {
@@ -44,8 +45,12 @@ function virtualListReportRendering(): Record<string, string> {
     const { container, unmount } = render(<Report />);
     const action = container.querySelector('[data-rop-select-all-results]')?.textContent;
     if (!action) throw new Error('rendering of VirtualListReport: no "select all results" action');
+    // The description of the header checkbox (#504): the node its `aria-describedby` points to.
+    const describedBy = container.querySelector('th[data-rop-select] input')?.getAttribute('aria-describedby');
+    const description = describedBy ? container.ownerDocument.getElementById(describedBy)?.textContent : undefined;
+    if (!description) throw new Error('rendering of VirtualListReport: no description of the header checkbox');
     unmount();
-    return { selectAllResultsAction: action };
+    return { selectAllResultsAction: action, selectAllResultsDescription: description };
   } finally {
     layout.restore();
   }

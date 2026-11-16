@@ -280,8 +280,8 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportF
   };
 
   // `keepBulkActionsFocus`: the control of the bulk actions holding the focus, observed only while it does.
-  // A blur that leaves the control laid out is the user moving on; a blur with the control hidden or removed
-  // keeps it, because that is the very change the observer reacts to. (Prose here is read by the Tailwind
+  // Losing the focus with the control still laid out is the user moving on; losing it with the control hidden or
+  // removed keeps it, because that is the very change the observer reacts to. (Prose here is read by the Tailwind
   // scan of `src/`: no utility names as bare words.)
   const actionsRef = useRef<HTMLDivElement | null>(null);
   const [focusedAction, setFocusedAction] = useState<Element | null>(null);
