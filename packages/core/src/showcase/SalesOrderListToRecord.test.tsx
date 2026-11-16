@@ -3,7 +3,9 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SALES_ORDERS } from './modules/sales-orders/sales-orders-module';
-import { RecordCrud } from './RecordCrud';
+import { RecordCrud, type RecordCrudProps } from './RecordCrud';
+import type { SalesOrderDraft, StoredSalesOrder } from './sales-order-store';
+import type { SalesOrderValues } from './modules/sales-orders/sales-orders-module';
 
 // #520: the list of the Sales orders module in the shell: pills by status, search on number and customer, the first
 // click on Total descending, the round to an order and back, the new total in the row after a save.
@@ -25,7 +27,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const renderList = (props: Partial<Parameters<typeof RecordCrud>[0]> = {}) =>
+const renderList = (
+  props: Partial<RecordCrudProps<StoredSalesOrder, SalesOrderValues, SalesOrderDraft>> = {},
+) =>
   render(
     <StrictMode>
       <RecordCrud
