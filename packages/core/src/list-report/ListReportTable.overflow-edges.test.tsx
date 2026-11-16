@@ -167,16 +167,21 @@ function Host({ dir, rowActions, rowActionsInline, columns = COLUMNS, rows = ROW
   );
 }
 
+/**
+ * The scroll container, found by its accessible name. `getByRole` walks the accessibility tree of the
+ * whole table: with 200 rows a single call costs a few hundred milliseconds of jsdom, so a test that
+ * scrolls many times over many rows passes the node it found once to the helpers below (`el`).
+ */
 const scroller = () => screen.getByRole('table', { name: 'Items' }).parentElement as HTMLElement;
-const layer = () => scroller().querySelector<HTMLElement>('[data-rop-overflow-edges]');
-const edges = () => ({
-  start: scroller().hasAttribute('data-rop-overflow-start'),
-  end: scroller().hasAttribute('data-rop-overflow-end'),
+const layer = (el = scroller()) => el.querySelector<HTMLElement>('[data-rop-overflow-edges]');
+const edges = (el = scroller()) => ({
+  start: el.hasAttribute('data-rop-overflow-start'),
+  end: el.hasAttribute('data-rop-overflow-end'),
 });
-const scrollLeftTo = (value: number) => {
+const scrollLeftTo = (value: number, el = scroller()) => {
   act(() => {
-    scroller().scrollLeft = value;
-    fireEvent.scroll(scroller());
+    el.scrollLeft = value;
+    fireEvent.scroll(el);
   });
 };
 
@@ -305,17 +310,20 @@ describe('ListReportTable: shades on the inline edges that hide columns', () => 
     mock = mockLayout({ ...WIDE, scrollWidth: 300 });
     render(<Host rows={ROWS_200} />);
     expect(renders).toBe(200);
+    // Found once (see `scroller`): the same node all along, checked again at the end.
+    const el = scroller();
     renders = 0;
     mock.layout.scrollWidth = 800;
     ro.trigger();
-    expect(layer()).not.toBeNull();
-    for (let left = 0; left <= 500; left += 50) scrollLeftTo(left);
-    for (let left = 500; left >= 0; left -= 50) scrollLeftTo(left);
+    expect(layer(el)).not.toBeNull();
+    for (let left = 0; left <= 500; left += 50) scrollLeftTo(left, el);
+    for (let left = 500; left >= 0; left -= 50) scrollLeftTo(left, el);
     expect(renders).toBe(0);
     // A parent render that changes nothing still renders no row (the layer is kept).
     act(() => rerenderHost());
     expect(renders).toBe(0);
-    expect(layer()).not.toBeNull();
+    expect(layer(el)).not.toBeNull();
+    expect(scroller()).toBe(el);
   });
 
   it('geometry: as tall as the scrollport; a table shorter than it moves the shades down to its bottom', () => {
@@ -396,6 +404,265 @@ describe('ListReportTable: shades on the inline edges that hide columns', () => 
     scrollLeftTo(0);
     expect(edges()).toEqual({ start: false, end: true });
     expect(layer()!.outerHTML).toBe(html);
+  });
+});
+
+describe('a `dir` changed after the mount (#562)', () => {
+  // The `direction` jsdom computes follows the nearest `dir` attribute, as in a browser (each test
+  // checks it where it matters).
+  afterEach(() => {
+    document.documentElement.removeAttribute('dir');
+  });
+
+  /**
+   * Runs the microtasks left by the render: the container's own child-list observer reports the layer
+   * inserted after the table and measures once. A count of reads taken after this is the hook's alone.
+   */
+  const settle = () => act(async () => {});
+
+  /** A wrapper the test sets `dir` on (an ancestor of the scroller, outside React, like an app shell). */
+  function renderInWrapper(props: HostProps = {}) {
+    const result = render(
+      <div>
+        <Host {...props} />
+      </div>,
+    );
+    return { ...result, wrapper: result.container.firstElementChild as HTMLElement };
+  }
+
+  /**
+   * What Firefox does when the direction changes: `scrollLeft` back to 0 (the start of the new
+   * direction) and NO `scroll` event. `change` sets or removes the attributes; the act flushes the
+   * microtasks, where a MutationObserver callback runs.
+   */
+  async function likeFirefox(change: () => void, el: HTMLElement) {
+    await act(async () => {
+      change();
+      el.scrollLeft = 0;
+    });
+  }
+  const setDir = (target: Element, dir: string | null) => () => {
+    if (dir === null) target.removeAttribute('dir');
+    else target.setAttribute('dir', dir);
+  };
+
+  it('scrolled, `dir` changed on an ancestor with no `scroll` event (Firefox): the state follows at once, both ways and when `dir` is removed', async () => {
+    mock = mockLayout(WIDE);
+    const { wrapper } = renderInWrapper();
+    const el = scroller();
+    scrollLeftTo(250, el);
+    expect(edges(el)).toEqual({ start: true, end: true });
+
+    await likeFirefox(setDir(wrapper, 'rtl'), el);
+    expect(getComputedStyle(el).direction).toBe('rtl');
+    expect(edges(el)).toEqual({ start: false, end: true });
+    scrollLeftTo(-250, el);
+    expect(edges(el)).toEqual({ start: true, end: true });
+
+    await likeFirefox(setDir(wrapper, 'ltr'), el);
+    expect(getComputedStyle(el).direction).toBe('ltr');
+    expect(edges(el)).toEqual({ start: false, end: true });
+    scrollLeftTo(500, el);
+    expect(edges(el)).toEqual({ start: true, end: false });
+
+    await likeFirefox(setDir(wrapper, 'rtl'), el);
+    expect(edges(el)).toEqual({ start: false, end: true });
+    scrollLeftTo(-500, el);
+    expect(edges(el)).toEqual({ start: true, end: false });
+    await likeFirefox(setDir(wrapper, null), el);
+    expect(getComputedStyle(el).direction).toBe('ltr');
+    expect(edges(el)).toEqual({ start: false, end: true });
+  });
+
+  it('on the root element and on the container itself (the `dir` prop) too', async () => {
+    mock = mockLayout(WIDE);
+    const { rerender } = render(<Host />);
+    const el = scroller();
+    scrollLeftTo(250, el);
+    await likeFirefox(setDir(document.documentElement, 'rtl'), el);
+    expect(getComputedStyle(el).direction).toBe('rtl');
+    expect(edges(el)).toEqual({ start: false, end: true });
+    scrollLeftTo(-250, el);
+    expect(edges(el)).toEqual({ start: true, end: true });
+    // The `dir` prop of the table is the attribute of the container: the observer sees it as well.
+    await likeFirefox(() => rerender(<Host dir="ltr" />), el);
+    expect(el.getAttribute('dir')).toBe('ltr');
+    expect(getComputedStyle(el).direction).toBe('ltr');
+    expect(edges(el)).toEqual({ start: false, end: true });
+    scrollLeftTo(250, el);
+    expect(edges(el)).toEqual({ start: true, end: true });
+  });
+
+  it('changed before any scroll: measured once, no attribute written', async () => {
+    mock = mockLayout(WIDE);
+    const { wrapper } = renderInWrapper();
+    const el = scroller();
+    await settle();
+    const toggle = vi.spyOn(el, 'toggleAttribute');
+    const reads = mock.reads.scrollWidth;
+    await likeFirefox(setDir(wrapper, 'rtl'), el);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    expect(toggle).not.toHaveBeenCalled();
+    expect(edges(el)).toEqual({ start: false, end: true });
+  });
+
+  it('changed twice in a row: one measure, the state of the last direction', async () => {
+    mock = mockLayout(WIDE);
+    const { wrapper } = renderInWrapper();
+    const el = scroller();
+    scrollLeftTo(250, el);
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    await likeFirefox(() => {
+      wrapper.setAttribute('dir', 'rtl');
+      wrapper.setAttribute('dir', 'ltr');
+    }, el);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    expect(getComputedStyle(el).direction).toBe('ltr');
+    expect(edges(el)).toEqual({ start: false, end: true });
+  });
+
+  it('the `scroll` event Chromium fires after the change (at the position already measured) measures nothing again', async () => {
+    mock = mockLayout(WIDE);
+    const { wrapper } = renderInWrapper();
+    const el = scroller();
+    scrollLeftTo(250, el);
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    await likeFirefox(setDir(wrapper, 'rtl'), el);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    act(() => {
+      fireEvent.scroll(el);
+    });
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    expect(edges(el)).toEqual({ start: false, end: true });
+  });
+
+  it('a `dir` inside the container (a cell) cannot change its direction: nothing is measured', async () => {
+    mock = mockLayout(WIDE);
+    render(<Host />);
+    const el = scroller();
+    scrollLeftTo(250, el);
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    await act(async () => {
+      el.querySelector('td')!.setAttribute('dir', 'rtl');
+    });
+    expect(mock.reads.scrollWidth).toBe(reads);
+    expect(edges(el)).toEqual({ start: true, end: true });
+  });
+
+  it('no overflow before the change and overflow after it: the layer mounts, with no resize', async () => {
+    mock = mockLayout({ ...WIDE, scrollWidth: 300 });
+    const { wrapper } = renderInWrapper();
+    const el = scroller();
+    expect(layer(el)).toBeNull();
+    // The columns are wider in the new direction (other glyphs); no ResizeObserver notification is
+    // delivered (`ro.trigger` is not called).
+    mock.layout.scrollWidth = 800;
+    await likeFirefox(setDir(wrapper, 'rtl'), el);
+    expect(edges(el)).toEqual({ start: false, end: true });
+    expect(layer(el)).not.toBeNull();
+    expect(layer(el)!.style.getPropertyValue('--rop-list-report-edge-height')).toBe('400px');
+  });
+
+  it('inside a shadow root: a `dir` on a shadow ancestor and on a light-DOM ancestor of the host are both seen', async () => {
+    mock = mockLayout(WIDE);
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const wrapper = document.createElement('div');
+    shadow.appendChild(wrapper);
+    const { unmount } = render(<Host />, { container: wrapper });
+    try {
+      const el = wrapper.querySelector('table')!.parentElement as HTMLElement;
+      scrollLeftTo(250, el);
+      expect(edges(el)).toEqual({ start: true, end: true });
+      await likeFirefox(setDir(wrapper, 'rtl'), el);
+      expect(edges(el)).toEqual({ start: false, end: true });
+      scrollLeftTo(-250, el);
+      expect(edges(el)).toEqual({ start: true, end: true });
+      await likeFirefox(setDir(wrapper, null), el);
+      expect(edges(el)).toEqual({ start: false, end: true });
+      scrollLeftTo(250, el);
+      expect(edges(el)).toEqual({ start: true, end: true });
+      await likeFirefox(setDir(document.body, 'rtl'), el);
+      expect(edges(el)).toEqual({ start: false, end: true });
+    } finally {
+      unmount();
+      host.remove();
+      document.body.removeAttribute('dir');
+    }
+  });
+
+  describe('the observer is disconnected on unmount', () => {
+    /** Every MutationObserver that watches `dir` attributes, with what it observes. */
+    let observers: { targets: Node[]; connected: boolean }[];
+    let Native: typeof MutationObserver;
+    beforeEach(() => {
+      observers = [];
+      Native = globalThis.MutationObserver;
+      globalThis.MutationObserver = class extends Native {
+        private entry = { targets: [] as Node[], connected: false };
+        override observe(target: Node, options?: MutationObserverInit) {
+          if (options?.attributeFilter?.includes('dir')) {
+            if (!observers.includes(this.entry)) observers.push(this.entry);
+            this.entry.targets.push(target);
+            this.entry.connected = true;
+          }
+          super.observe(target, options);
+        }
+        override disconnect() {
+          this.entry.connected = false;
+          super.disconnect();
+        }
+      };
+    });
+    afterEach(() => {
+      globalThis.MutationObserver = Native;
+    });
+
+    const cases = [
+      ['with columns hidden (the layer mounted)', WIDE, false],
+      ['with every column in view (no layer)', { ...WIDE, scrollWidth: 300 }, true],
+    ] as const;
+    for (const [label, layout, noLayer] of cases) {
+      it(label, async () => {
+        mock = mockLayout(layout);
+        const { unmount } = render(<Host />);
+        expect(layer() === null).toBe(noLayer);
+        // One observer, on the whole document, connected while mounted.
+        expect(observers).toHaveLength(1);
+        expect(observers[0]!.targets).toEqual([document.documentElement]);
+        expect(observers[0]!.connected).toBe(true);
+        await settle();
+        unmount();
+        expect(observers[0]!.connected).toBe(false);
+        // And nothing is measured any more.
+        const reads = mock.reads.scrollWidth;
+        await act(async () => {
+          document.documentElement.setAttribute('dir', 'rtl');
+        });
+        expect(mock.reads.scrollWidth).toBe(reads);
+      });
+    }
+  });
+
+  it('without MutationObserver (a stripped environment): no error, scroll still measures, unmount cleans up', () => {
+    mock = mockLayout(WIDE);
+    const Native = globalThis.MutationObserver;
+    (globalThis as { MutationObserver?: unknown }).MutationObserver = undefined;
+    try {
+      const { unmount } = render(<Host />);
+      const el = scroller();
+      expect(edges(el)).toEqual({ start: false, end: true });
+      scrollLeftTo(250, el);
+      expect(edges(el)).toEqual({ start: true, end: true });
+      unmount();
+      expect(edges(el)).toEqual({ start: false, end: false });
+    } finally {
+      globalThis.MutationObserver = Native;
+    }
   });
 });
 

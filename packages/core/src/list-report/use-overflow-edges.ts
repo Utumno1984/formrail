@@ -33,8 +33,19 @@ export interface OverflowEdgesSink {
  *
  * Measured on the client only, in a layout effect (before the first paint) and then on every resize
  * of the container or of the table (columns, rows, a rotated tablet, a panel resized, a tab shown after
- * `display: none`) and on every horizontal scroll (touch inertia and keyboard scrolling included: the
- * last `scroll` event gives the final state). A vertical scroll returns at once.
+ * `display: none`), on every horizontal scroll (touch inertia and keyboard scrolling included: the
+ * last `scroll` event gives the final state) and on every change of a `dir` attribute on the container
+ * or on one of its ancestors. A vertical scroll returns at once.
+ *
+ * Why `dir` needs an observer: a change of direction moves the scroll position back to the inline
+ * start of the new direction, and not every browser says so. Chromium fires a `scroll` event; Firefox
+ * does not, and the attributes would keep the old state until the next scroll (a start shade over no
+ * hidden column). The observer watches the `dir` attribute in the whole document (and in the `ShadowRoot`
+ * holding the container, if any) and measures again when it changes on the container or above it.
+ * Limit: a direction changed through the CSS `direction` property alone (a class, a style sheet), with
+ * no `dir` attribute changing, fires nothing an observer can see at a low cost; it is measured at the
+ * next scroll or resize. The shades are still drawn on the correct sides (CSS alone, see
+ * `edgeShadowStartClass`); only which of them shows can be stale.
  */
 export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, sinkRef: RefObject<OverflowEdgesSink | null>): void {
   useResizeAndMutationEffect(() => {
@@ -61,9 +72,7 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
     };
     const measure = (resized: boolean) => {
       // The direction only says how to read `scrollLeft` (negative in rtl), not where the shades go (CSS).
-      // A change of direction after the mount needs no measure of its own: a `scrollLeft` it leaves
-      // unchanged can only be 0, the start in both directions; one it moves (clamped to the new range)
-      // fires a `scroll` event.
+      // A change of direction after the mount is measured by the `dir` observer below.
       const rtl = getComputedStyle(el).direction === 'rtl';
       const edges = overflowEdges(scrollFromStart(el, rtl), el.scrollWidth, el.clientWidth);
       if (edges.start !== start) {
@@ -85,6 +94,23 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       measure(false);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
+    // A `dir` changed on the container or on an ancestor (one inside the container cannot change its
+    // direction). Firefox moves `scrollLeft` back to the start with no `scroll` event: read it here.
+    const dirs =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver((records) => {
+            if (!records.some((r) => r.target === el || !el.contains(r.target))) return;
+            lastLeft = el.scrollLeft;
+            measure(false);
+          });
+    if (dirs) {
+      const options: MutationObserverInit = { attributes: true, attributeFilter: ['dir'], subtree: true };
+      dirs.observe(el.ownerDocument.documentElement, options);
+      // A `ShadowRoot` is not in the document's subtree: its own `dir` attributes are watched there.
+      const root = el.getRootNode();
+      if (root !== el.ownerDocument) dirs.observe(root, options);
+    }
     return {
       target: el,
       // The table is the first child: its box changes with the columns and the rows.
@@ -95,6 +121,7 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       },
       cleanup: () => {
         el.removeEventListener('scroll', onScroll);
+        dirs?.disconnect();
         el.removeAttribute(OVERFLOW_START_ATTR);
         el.removeAttribute(OVERFLOW_END_ATTR);
       },

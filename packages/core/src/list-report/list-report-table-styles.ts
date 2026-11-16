@@ -148,9 +148,15 @@ export const rowActionsInlineDangerClass = 'text-rop-error not-disabled:not-aria
 // overlay (menus, tooltips, modals are on higher levels). It never takes a pointer event. The colour is
 // the text colour at a low alpha, resolved on the layer: a scoped theme (a dark surface with a light
 // text) gets a light shade. Translucent, so a focus indicator under it stays in sight.
+// Without `color-mix()` (Safari 16.0 and 16.1) the custom property would hold a value that is invalid
+// where it is used, and no shade would be drawn: there, and only there (`@supports not`), the colour is
+// the text colour itself and each shade's `::before` is at 24% opacity (see `edgeShadowStartClass`), the
+// same alpha over the same gradient, still following a scoped theme. Where `color-mix()` is supported
+// neither rule applies, so the rendering is unchanged.
 export const edgeLayerClass =
   'pointer-events-none sticky start-0 bottom-0 z-rop-sticky h-0 ' +
-  '[--rop-list-report-edge-color:color-mix(in_srgb,var(--color-rop-text)_24%,transparent)]';
+  '[--rop-list-report-edge-color:color-mix(in_srgb,var(--color-rop-text)_24%,transparent)] ' +
+  'not-supports-[color:color-mix(in_srgb,red,blue)]:[--rop-list-report-edge-color:var(--color-rop-text)]';
 // Each shade hangs from the layer, as tall as the scrollport (`--rop-list-report-edge-height`, measured)
 // and moved down past a table shorter than the scrollport (`--rop-list-report-edge-bottom`, 0 or
 // negative). Out of view and fully transparent until the scroller has the attribute of its edge; the
@@ -170,6 +176,7 @@ export const edgeShadowStartClass =
   'absolute start-0 bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 overflow-hidden invisible opacity-0 ' +
   'before:absolute before:inset-y-0 before:-start-3 before:w-6 ' +
   'before:bg-[linear-gradient(to_right,transparent,var(--rop-list-report-edge-color),transparent)] ' +
+  'not-supports-[color:color-mix(in_srgb,red,blue)]:before:opacity-24 ' +
   'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-s-2 forced-colors:border-[CanvasText] ' +
   '[&:is([data-rop-overflow-start]>*>*)]:visible [&:is([data-rop-overflow-start]>*>*)]:opacity-100';
@@ -177,6 +184,7 @@ export const edgeShadowEndClass =
   'absolute end-(--rop-list-report-edge-end) bottom-(--rop-list-report-edge-bottom) h-(--rop-list-report-edge-height) w-3 overflow-hidden invisible opacity-0 ' +
   'before:absolute before:inset-y-0 before:-end-3 before:w-6 ' +
   'before:bg-[linear-gradient(to_right,transparent,var(--rop-list-report-edge-color),transparent)] ' +
+  'not-supports-[color:color-mix(in_srgb,red,blue)]:before:opacity-24 ' +
   'motion-safe:[transition-property:opacity,visibility] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)] forced-colors:border-e-2 forced-colors:border-[CanvasText] ' +
   '[&:is([data-rop-overflow-end]>*>*)]:visible [&:is([data-rop-overflow-end]>*>*)]:opacity-100';
