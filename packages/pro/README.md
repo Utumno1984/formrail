@@ -308,8 +308,9 @@ function InvoiceEditor({ loaded }: { loaded: Invoice }) {
 The Example of the Storybook page "Pro/Integrations/TanStack Form" is a complete, copy-paste version of
 this component.
 
-- Call `useTanStackFormBinding` in the component that calls `useForm`, after it (in a child of it, see
-  [What the adapter reads](#what-the-adapter-reads)).
+- Call `useTanStackFormBinding` in the component that calls `useForm`, after it. In a child of it (`withForm`, a
+  form passed as a prop) it works with one painted frame of delay: see
+  [What the adapter reads](#what-the-adapter-reads).
 - **Keep `defaultValues` on the saved record**, as above: a `saved` state passed as `defaultValues`, that
   follows `binding.baseline` (it becomes the stored record with `binding.reset(stored)`, the server version
   with a rebase). The summary and the save bar don't need it (they come from `useChangeSummary`, never from

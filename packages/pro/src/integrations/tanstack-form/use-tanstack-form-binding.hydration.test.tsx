@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useForm } from '@tanstack/react-form';
-import { useChangeSummary } from '../../engine';
+import { useChangeSummary, type RebaseFormBinding } from '../../engine';
 import { EMPTY, SAVED, setupInvoiceForm, type Commit, type Invoice } from '../../../test/tanstack-harness';
 import { useTanStackFormBinding, type TanStackFormOf } from './use-tanstack-form-binding';
 
@@ -324,5 +324,39 @@ describe('the binding in a child of the component that calls useForm', () => {
     expect(child.seen.at(-1)!.entries).toEqual([]);
     expect(child.form().state.fieldMeta.amount?.isDefaultValue).toBe(true);
     child.unmount();
+  });
+
+  it('child: reset(saved) then defaultValues follow the baseline (same content): isDefaultValue recomputed', () => {
+    let setRecord!: (r: Invoice) => void;
+    let form!: TanStackFormOf<Invoice>;
+    let binding!: RebaseFormBinding<Invoice>;
+    const seen: string[][] = [];
+    function Child({ bound }: { bound: TanStackFormOf<Invoice> }) {
+      binding = useTanStackFormBinding(bound);
+      const { entries } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
+      seen.push(entries.map((e) => e.path));
+      return null;
+    }
+    function Parent() {
+      const [record, set] = useState(SAVED);
+      setRecord = set;
+      form = useForm({ defaultValues: record });
+      return (
+        <>
+          <form.Field name="amount">
+            {(field) => <input aria-label="Amount" value={field.state.value} onChange={(e) => field.handleChange(e.target.value)} />}
+          </form.Field>
+          <Child bound={form} />
+        </>
+      );
+    }
+    render(<Parent />);
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '120' } });
+    const saved = { ...SAVED, amount: '120' };
+    act(() => binding.reset(saved));
+    act(() => setRecord({ ...saved }));
+    expect(binding.baseline).toBe(saved);
+    expect(seen.at(-1)).toEqual([]);
+    expect(form.state.fieldMeta.amount?.isDefaultValue).toBe(true);
   });
 });
