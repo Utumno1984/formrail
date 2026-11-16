@@ -212,6 +212,14 @@ test.describe('Showcase/Record editing: list -> order -> list', () => {
     await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toBeVisible();
   });
 
+  test('a space after the saved quantity is not a change: the save bar does not appear', async ({ page }) => {
+    await openOrder(page, 'so-15');
+    const original = await quantity(page, 1).inputValue();
+    await quantity(page, 1).fill(`${original} `);
+    await expect(quantity(page, 1)).toHaveValue(`${original} `);
+    await expect(bar(page)).toBeHidden();
+  });
+
   test('a saved number retyped in a form the rule refuses (5 -> 5.0) is a change with an error, not an unchanged page', async ({ page }) => {
     await openOrder(page, 'so-15');
     const original = await quantity(page, 1).inputValue();

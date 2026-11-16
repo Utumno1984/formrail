@@ -197,6 +197,34 @@ describe('sameLines, field by field (#520)', () => {
   });
 });
 
+describe('sameLines, trimmed text and symmetry (#520, round 3)', () => {
+  // Every comparison runs with the arguments in both orders, so a mutation on the first or on the second operand dies.
+  const both = (patch: Partial<OrderLineValues>, other: Partial<OrderLineValues>, currency: 'EUR' | 'JPY' = 'EUR') => [
+    sameLines([line(patch)], [line(other)], currency),
+    sameLines([line(other)], [line(patch)], currency),
+  ];
+
+  it('spaces around a whole number do not make a change (quantity and discount), in either order', () => {
+    expect(both({ quantity: ' 2 ' }, {})).toEqual([true, true]);
+    expect(both({ discount: ' 0 ' }, {})).toEqual([true, true]);
+    expect(both({ quantity: ' 2 ', discount: ' 0 ' }, {})).toEqual([true, true]);
+  });
+
+  it('a whole number is never the same as a text the rule refuses, whichever side carries it', () => {
+    expect(both({ quantity: '2.0' }, {})).toEqual([false, false]);
+    expect(both({ discount: '0.0' }, {})).toEqual([false, false]);
+    expect(both({ quantity: '2e0' }, {})).toEqual([false, false]);
+  });
+
+  it('amounts: two empty texts are the same; two different invalid texts are not, in either order', () => {
+    expect(both({ unitPrice: '' }, { unitPrice: '' })).toEqual([true, true]);
+    expect(both({ unitPrice: 'abc' }, { unitPrice: '' })).toEqual([false, false]);
+    expect(both({ unitPrice: 'abc' }, { unitPrice: 'abc' })).toEqual([true, true]);
+    expect(both({ unitPrice: '10.00' }, { unitPrice: 'abc' })).toEqual([false, false]);
+    expect(both({ unitPrice: '10.000' }, { unitPrice: '10' })).toEqual([false, false]);
+  });
+});
+
 describe('nextLineId', () => {
   it('never repeats a saved id nor one it made before', () => {
     const taken = new Set(['new-1', 'new-2']);
