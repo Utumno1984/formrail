@@ -3,8 +3,8 @@
   "version": 1,
   "exports": {
     "useTanStackFormBinding": {
-      "baseline": 2723,
-      "limit": 2996
+      "baseline": 2766,
+      "limit": 3043
     }
   }
 }
