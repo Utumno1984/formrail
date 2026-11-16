@@ -1,7 +1,7 @@
 // Story-only (#520): the lines of a sales order as the form sees them (text as typed) and the rules on them. Money
 // is typed in the major unit of the order's currency (`12.50`, whole yen for JPY) and kept in minor units. Not
 // exported by the package.
-import { CURRENCY_MINOR_DIGITS, lineTotalMinor, type DemoCurrency } from '../../../internal/demo-data';
+import { CURRENCY_MINOR_DIGITS, getProduct, lineTotalMinor, type DemoCurrency } from '../../../internal/demo-data';
 import { INTEGER } from '../../number-text';
 import type { StoredOrderLine } from '../../sales-order-store';
 
@@ -150,4 +150,18 @@ export function nextLineId(taken: ReadonlySet<string>, counter: number): { id: s
   do n += 1;
   while (taken.has(`new-${n}`));
   return { id: `new-${n}`, counter: n };
+}
+
+/**
+ * The lines of an order whose currency changed from `from` to `to` (the creation page, a customer chosen after
+ * another): every unit price was typed in `from`, so it is re-priced, never converted. A line with a product takes
+ * the product's list price in `to`; a line with no product (or an unknown one) has no price. The same currency
+ * returns `lines` itself, untouched (nothing to re-price, no change for the form to see).
+ */
+export function repriceLines(lines: readonly OrderLineValues[], from: DemoCurrency, to: DemoCurrency): OrderLineValues[] {
+  if (from === to) return lines as OrderLineValues[];
+  return lines.map((line) => {
+    const listPrice = line.productId === '' ? undefined : getProduct(line.productId)?.listPriceMinor[to];
+    return { ...line, unitPrice: listPrice === undefined ? '' : minorToText(listPrice, to) };
+  });
 }

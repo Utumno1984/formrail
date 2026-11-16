@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { getProduct } from '../../../internal/demo-data';
 import {
   lineTotal,
   minorToText,
   nextLineId,
   orderTotal,
+  repriceLines,
   sameLines,
   textToMinor,
   toLineValues,
@@ -231,5 +233,36 @@ describe('nextLineId', () => {
     const first = nextLineId(taken, 0);
     expect(first).toEqual({ id: 'new-3', counter: 3 });
     expect(nextLineId(taken, first.counter)).toEqual({ id: 'new-4', counter: 4 });
+  });
+});
+
+describe('repriceLines: a customer of another currency re-prices the lines (#521)', () => {
+  it('the same currency returns the very same lines (nothing to re-price, nothing for the form to see)', () => {
+    const lines = [line({ unitPrice: '12.34' })];
+    expect(repriceLines(lines, 'EUR', 'EUR')).toBe(lines);
+  });
+
+  it("another currency: a line with a product takes its list price in the new currency, with that currency's decimals", () => {
+    const jpy = getProduct('prd-1')!.listPriceMinor.JPY;
+    const usd = getProduct('prd-1')!.listPriceMinor.USD;
+    expect(repriceLines([line({ unitPrice: '12.34' })], 'EUR', 'JPY')[0]!.unitPrice).toBe(String(jpy));
+    expect(repriceLines([line({ unitPrice: '12.34' })], 'EUR', 'USD')[0]!.unitPrice).toBe(minorToText(usd, 'USD'));
+  });
+
+  it('a line with no product, or with a product the catalogue does not know, loses its price (it is never converted)', () => {
+    const [none, unknown] = repriceLines(
+      [line({ productId: '', unitPrice: '12.34' }), line({ id: 'l2', productId: 'prd-0', unitPrice: '5.00' })],
+      'EUR',
+      'USD',
+    );
+    expect(none!.unitPrice).toBe('');
+    expect(unknown!.unitPrice).toBe('');
+  });
+
+  it('keeps everything else of the line (id, product, quantity, discount) and does not change the input', () => {
+    const lines = [line({ quantity: '7', discount: '15' })];
+    const [repriced] = repriceLines(lines, 'EUR', 'GBP');
+    expect(repriced).toMatchObject({ id: 'l1', productId: 'prd-1', quantity: '7', discount: '15' });
+    expect(lines[0]!.unitPrice).toBe('10.00');
   });
 });

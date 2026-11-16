@@ -1,15 +1,18 @@
 // Story-only (#520): the Sales orders module of the record-editing shell (`RecordCrud`), the second `RecordModule`
 // after the invoices (modules/invoices/invoices-module.tsx, the file this one follows). Everything here belongs to
 // sales orders only: their words, their list (columns and pills), their form (values, validation, the sections of the
-// record page as explicit JSX) and their store. The flow (navigation, dirty-guard, toasts, focus, scroll) is the
-// shell's. Creation and deletion are not part of this module yet (#521). Not exported by the package.
+// record page as explicit JSX) and their store. The flow (navigation, dirty-guard, toasts, confirmations, focus,
+// scroll) is the shell's; `SALES_ORDERS_CRUD` (#521) adds the creation page, the deletion from the row and from the
+// page and the bulk deletion. Not exported by the package.
 import { useMemo } from 'react';
-import { isIsoDate } from '../../../calendar/date-math';
+import { addDays as addCalendarDays, isIsoDate, localToday } from '../../../calendar/date-math';
 import { Field } from '../../../field/Field';
 import { Input } from '../../../input/Input';
 import {
   DEMO_FX_PER_EUR,
   CURRENCY_MINOR_DIGITS,
+  DEMO_REFERENCE_POOL,
+  makeCustomers,
   SALES_ORDER_STATUS_LABEL,
   SALES_ORDER_STATUS_TONE,
   formatDate,
@@ -27,6 +30,7 @@ import { helpProps } from '../field-help';
 import { SalesOrderLines } from './SalesOrderLines';
 import {
   orderTotal,
+  repriceLines,
   sameLines,
   toLineValues,
   toStoredLine,
@@ -36,10 +40,13 @@ import {
 } from './order-lines';
 
 /**
- * The values of the editor, as typed. `customerName` and `currency` are carried, not edited: the validation and the
- * header need them and the form is the only thing they receive.
+ * The values of the editor, as typed. The customer (`customerId`, with its `customerName` and `currency`, which are
+ * the customer's) is chosen on the creation page and locked on an existing order: `customerName` and `currency` are
+ * carried, never typed.
  */
 export interface SalesOrderValues {
+  /** `''`: no customer chosen yet (the creation page only). */
+  customerId: string;
   customerName: string;
   currency: DemoCurrency;
   status: DemoSalesOrderStatus;
@@ -52,6 +59,7 @@ export interface SalesOrderValues {
 }
 
 const toValues = (r: StoredSalesOrder): SalesOrderValues => ({
+  customerId: r.customerId,
   customerName: r.customerName,
   currency: r.currency,
   status: r.status,
@@ -75,6 +83,7 @@ const toOrder = (record: StoredSalesOrder, v: SalesOrderValues): StoredSalesOrde
 });
 
 export const sameValues = (a: SalesOrderValues, b: SalesOrderValues): boolean =>
+  a.customerId === b.customerId &&
   a.status === b.status &&
   a.customerReference === b.customerReference &&
   a.orderDate === b.orderDate &&
@@ -83,9 +92,52 @@ export const sameValues = (a: SalesOrderValues, b: SalesOrderValues): boolean =>
   a.notes === b.notes &&
   sameLines(a.lines, b.lines, a.currency);
 
+/** Days between the order date and the requested delivery a new order starts with. */
+export const DEFAULT_DELIVERY_DAYS = 14;
+
+/**
+ * The values of a new order: no customer (so no currency yet: euro until one is chosen), a draft, dated today,
+ * delivery requested in two weeks, no line. `today` comes from a free-text Storybook control: anything that is not a
+ * real calendar date (`''`, `2026-02-30`) falls back to the local date.
+ */
+export const defaultValues = (today: string | undefined): SalesOrderValues => {
+  const date = isIsoDate(today) ? today : localToday();
+  return {
+    customerId: '',
+    customerName: '',
+    currency: 'EUR',
+    status: 'draft',
+    customerReference: '',
+    orderDate: date,
+    requestedDeliveryDate: addCalendarDays(date, DEFAULT_DELIVERY_DAYS) ?? date,
+    deliveryNotes: '',
+    notes: '',
+    lines: [],
+  };
+};
+
+/**
+ * What the client sends to create an order (the form was validated first): the customer with its currency, the
+ * values and the lines in minor units. Every line is sent as typed and checked: a line with no product, no
+ * quantity or no price never gets here (it is reported by `validateLines`, not dropped), so no half-line is stored.
+ */
+export const toDraft = (v: SalesOrderValues): SalesOrderDraft => ({
+  customerId: v.customerId,
+  customerName: v.customerName,
+  currency: v.currency,
+  status: v.status,
+  customerReference: v.customerReference,
+  orderDate: v.orderDate,
+  requestedDeliveryDate: v.requestedDeliveryDate,
+  deliveryNotes: v.deliveryNotes,
+  notes: v.notes,
+  lines: v.lines.map((l) => toStoredLine(l, v.currency)),
+});
+
 type SalesOrderErrors = Partial<Record<keyof SalesOrderValues | LineErrorKey, string>>;
-const validateOrder = (v: SalesOrderValues): SalesOrderErrors => {
+export const validateOrder = (v: SalesOrderValues): SalesOrderErrors => {
   const errors: SalesOrderErrors = {};
+  if (v.customerId === '') errors.customerId = 'Customer is required.';
   if (!isIsoDate(v.orderDate)) errors.orderDate = 'Order date is required.';
   if (!isIsoDate(v.requestedDeliveryDate)) errors.requestedDeliveryDate = 'Requested delivery date is required.';
   else if (isIsoDate(v.orderDate) && v.requestedDeliveryDate < v.orderDate) {
@@ -103,6 +155,17 @@ const STATUS_OPTIONS = (Object.keys(SALES_ORDER_STATUS_LABEL) as DemoSalesOrderS
 /** What the order total is when read as text: the saved lines' total in the order's currency (0 when a line is unfinished). */
 const totalText = (v: SalesOrderValues): string => formatMoney(orderTotal(v.lines, v.currency) ?? 0, v.currency);
 
+// The customers an order can be made for: the active ones among the first 40 of the demo universe (a Select with the
+// whole pool would be a search in a real application). Each carries its currency: it is the currency of the order.
+const PICKABLE_CUSTOMERS = 40;
+type CustomerOption = { value: string; label: string; textValue: string; name: string; currency: DemoCurrency };
+let customerOptions: CustomerOption[] | undefined;
+const pickableCustomers = (): CustomerOption[] =>
+  (customerOptions ??= makeCustomers(DEMO_REFERENCE_POOL.customers)
+    .filter((c) => c.status === 'active')
+    .slice(0, PICKABLE_CUSTOMERS)
+    .map((c) => ({ value: c.id, label: `${c.name} (${c.currency})`, textValue: c.name, name: c.name, currency: c.currency })));
+
 const COLUMN = { display: 'grid', gap: 16, maxWidth: 420 } as const;
 const READ_ONLY_REASON = 'A cancelled order cannot be edited.';
 
@@ -114,6 +177,19 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
   const state = readOnly ? ({ state: 'locked', stateReason: READ_ONLY_REASON } as const) : {};
   const baselineLineIds = useMemo(() => new Set(form.baseline.lines.map((l) => l.id)), [form.baseline]);
   const live = orderTotal(values.lines, values.currency);
+  // Choosing a customer sets the order's currency with it. The lines' unit prices are in that currency, so a change
+  // of currency re-prices them from the products' list prices (a line with no product loses its price): the
+  // customer is chosen before the lines are typed. The same currency keeps every line as typed.
+  const pickCustomer = (id: string) => {
+    const customer = pickableCustomers().find((c) => c.value === id);
+    if (!customer) return;
+    form.setValues({
+      customerId: customer.value,
+      customerName: customer.name,
+      currency: customer.currency,
+      lines: repriceLines(values.lines, values.currency, customer.currency),
+    });
+  };
   return (
     <>
       <ObjectPageSection id="general" title="General">
@@ -121,11 +197,23 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
           <Field label="Order number" state="locked" stateReason="The order number is assigned by the system.">
             <Input value={record ? record.number : 'Assigned on save'} readOnly />
           </Field>
-          <Field label="Customer" state="locked" stateReason="The customer cannot be changed once the order exists.">
-            <Input value={values.customerName} readOnly />
-          </Field>
+          {record ? (
+            <Field label="Customer" state="locked" stateReason="The customer cannot be changed once the order exists.">
+              <Input value={values.customerName} readOnly />
+            </Field>
+          ) : (
+            <Field label="Customer" name="customerId" required {...helpProps(help, 'customerId')}>
+              <Select
+                options={pickableCustomers()}
+                placeholder="Choose a customer"
+                emptyLabel="No customers"
+                value={values.customerId || undefined}
+                onValueChange={pickCustomer}
+              />
+            </Field>
+          )}
           <Field label="Currency" state="locked" stateReason="The currency is the customer's.">
-            <Input value={values.currency} readOnly />
+            <Input value={values.customerId ? values.currency : 'Set by the customer'} readOnly />
           </Field>
           <Field label="Status" name="status" {...state} {...helpProps(help, 'status')}>
             <Select
@@ -237,8 +325,8 @@ const LABELS = {
 };
 
 /**
- * The Sales orders module: list (200 orders), record page with lines. No creation, no deletion: those are
- * #521's. The header shows the saved customer, status and total.
+ * The Sales orders module: list (200 orders), record page with lines. No creation and no deletion here: those are
+ * `SALES_ORDERS_CRUD` below. The header shows the saved customer, status and total.
  */
 export const SALES_ORDERS: RecordModule<StoredSalesOrder, SalesOrderValues, SalesOrderDraft> = {
   name: 'sales-orders',
@@ -258,4 +346,16 @@ export const SALES_ORDERS: RecordModule<StoredSalesOrder, SalesOrderValues, Sale
     ),
     Sections: SalesOrderSections,
   },
+};
+
+/**
+ * The same module with creation, deletion from the row and from the page, and bulk deletion (#521). A separate
+ * object, as the invoices' `INVOICES` is for `InvoiceListToRecord`: the read-and-edit stories of #520 keep their
+ * list without the selection column and their page without "Delete".
+ */
+export const SALES_ORDERS_CRUD: RecordModule<StoredSalesOrder, SalesOrderValues, SalesOrderDraft> = {
+  ...SALES_ORDERS,
+  create: { defaults: defaultValues, toDraft },
+  delete: true,
+  deleteMany: true,
 };
