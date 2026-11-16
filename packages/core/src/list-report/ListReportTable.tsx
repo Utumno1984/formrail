@@ -56,7 +56,10 @@ function ListReportTableImpl<Row>(props: ListReportTableProps<Row>, ref: Ref<HTM
  *   is hidden from assistive technology; with row actions the end one is drawn before their sticky
  *   column. The state is also on the container, as a styling hook:
  *   `data-rop-overflow-start` / `data-rop-overflow-end` (present or absent), measured on the client only
- *   (never on the server) and updated on scroll and on resize. Within 1px an edge counts as in view.
+ *   (never on the server) and updated on scroll, on resize and when a `dir` attribute changes on the
+ *   container or on an ancestor (a direction changed by the `direction` property alone is picked up at
+ *   the next scroll or resize). Within 1px an edge counts as in view. Browsers without `color-mix()`
+ *   (Safari 16.0 and 16.1) draw the same shade from a fallback.
  *   The shades are laid out in the container's content box: a `padding` given to the container moves
  *   them inwards by that padding (keep the container without padding, pad its parent instead).
  * - Every row has the height of `--rop-list-report-row-height`.
