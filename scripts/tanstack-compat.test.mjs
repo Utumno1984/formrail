@@ -29,12 +29,17 @@ describe('resolveSpec: the run stays on 1.x', () => {
 
 describe('the suite', () => {
   it('runs the files of the TanStack binding and leaves out only the assertion on the installed version', () => {
-    expect(SUITE_ARGS).toEqual(['tanstack-form', '-t', '^(?!.*the installed version)']);
+    expect(SUITE_ARGS).toEqual(['tanstack-form', '-t', '^(?!.*the installed version is the tested minimum of the peer range)']);
     const excluded = new RegExp(SUITE_ARGS[2]);
     const internals = read('packages/pro/src/integrations/tanstack-form/tanstack-form-internals.test.tsx');
     // The excluded test exists with exactly that name, and a behaviour test is not caught by the exclusion.
     expect(internals).toContain("describe('TanStack Form 1.33.5: the installed version'");
-    expect(excluded.test('TanStack Form 1.33.5: the installed version is the tested minimum')).toBe(false);
+    const fullName =
+      'TanStack Form 1.33.5: the installed version is the tested minimum of the peer range, which accepts its minor only (~)';
+    expect(internals).toContain("it('is the tested minimum of the peer range, which accepts its minor only (~)'");
+    expect(excluded.test(fullName)).toBe(false);
+    // Another test that merely mentions "the installed version" is not skipped by mistake.
+    expect(excluded.test('x: the installed version is read from package.json')).toBe(true);
     expect(excluded.test('1. update(): useForm re-applies its options at every render')).toBe(true);
   });
 });

@@ -28,7 +28,7 @@ export function resolveSpec(input) {
  * and built-bundle tests), minus the one assertion that is about the installed VERSION and not about behaviour
  * ("the installed version is the tested minimum of the peer range"): it fails by design on any other version.
  */
-export const SUITE_ARGS = ['tanstack-form', '-t', '^(?!.*the installed version)'];
+export const SUITE_ARGS = ['tanstack-form', '-t', '^(?!.*the installed version is the tested minimum of the peer range)'];
 
 function run(command, args, options = {}) {
   console.log(`$ ${command} ${args.join(' ')}`);

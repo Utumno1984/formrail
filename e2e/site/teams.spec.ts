@@ -72,17 +72,25 @@ test.describe('Pro page for teams: content', () => {
   test('the wording names no third-party product; React Hook Form / TanStack are named only on teams/, in the tested-version claim (#563)', async ({ page }) => {
     for (const url of ['teams/', 'privacy/']) {
       await page.goto(url);
-      const text = (await page.locator('body').innerText()).toLowerCase();
-      const html = (await page.content()).toLowerCase();
+      let text = (await page.locator('body').innerText()).toLowerCase();
+      let html = (await page.content()).toLowerCase();
       for (const word of THIRD_PARTY) {
         expect(new RegExp(`\\b${word}\\b`).test(text), `${url} text mentions "${word}"`).toBe(false);
         expect(new RegExp(`\\b${word}\\b`).test(html), `${url} markup mentions "${word}"`).toBe(false);
       }
-      // Since #489/#508 the Pro page states which form libraries it works with (see the next test); privacy/ never does.
-      if (url === 'privacy/') {
-        for (const word of ['react hook form', 'react-hook-form', 'tanstack', 'hookform']) {
-          expect(text.includes(word) || html.includes(word), `${url} mentions ${word}`).toBe(false);
-        }
+      // Since #489/#508 teams/ states which form libraries it works with: that ONE sentence is cut out (from the text
+      // and from the markup, where it is split over lines and <code> tags), and nothing else may name them. privacy/
+      // never does, so nothing is cut there.
+      if (url === 'teams/') {
+        const claim = 'works with react hook form (react-hook-form ^7.92.0) and tanstack form (@tanstack/react-form, tested on 1.33.x).';
+        expect(text, 'teams/ text has the claim').toContain(claim);
+        text = text.replace(claim, '');
+        const markupClaim = /works with react hook form[\s\S]{0,300}?tested on 1\.33\.x\)\./;
+        expect(html, 'teams/ markup has the claim').toMatch(markupClaim);
+        html = html.replace(markupClaim, '');
+      }
+      for (const word of ['react hook form', 'react-hook-form', 'tanstack', 'hookform']) {
+        expect(text.includes(word) || html.includes(word), `${url} mentions ${word} outside the claim`).toBe(false);
       }
     }
   });
