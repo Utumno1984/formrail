@@ -33,6 +33,14 @@ describe('findOccurrences', () => {
     ["import { makeDemoRows } from './demo-rows';", 1],
     ["const m = await import('../internal/demo-invoices.ts');", 1],
     ['Acme and Acme', 2],
+    // The `FT-2026-` boundary (#560): isolated, at the start of the text or of a line, or after space/quote/punctuation
+    ['FT-2026-001', 1],
+    ['x\nFT-2026-001', 1],
+    ['see FT-2026-001', 1],
+    ["'FT-2026-001'", 1],
+    ['(FT-2026-001)', 1],
+    ['ref:FT-2026-001', 1],
+    ['a-FT-2026-001', 1],
     ["'Acme', 'Northwind'", 2],
   ])('%s -> %i', (text, n) => {
     expect(findOccurrences(text)).toHaveLength(n);
@@ -50,6 +58,12 @@ describe('findOccurrences', () => {
     'Rossi',
     'Verdi and Ferrari',
     'FT-2025-0001',
+    // `FT-2026-` preceded by a word character is part of another identifier (#560)
+    'XFT-2026-001',
+    'xFT-2026-001',
+    '9FT-2026-001',
+    '_FT-2026-001',
+    'ÉFT-2026-001',
     'a demo-invoices note',
     "import { x } from '../internal/demo-data';",
     "import { x } from '../internal/demo-invoices-like-name-without-slash';",
@@ -116,10 +130,20 @@ describe('compareLegacy', () => {
     expect(r.ok).toBe(false);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0]).toContain('packages/core/src/new.stories.tsx');
-    expect(r.errors[0]).toContain('rossi construction ltd');
+    expect(r.errors[0]).toContain('"Rossi Construction Ltd"');
     expect(r.errors[0]).toContain('CONTRIBUTING.md');
     expect(r.errors[0]).toContain('"Demo data"');
     expect(r.errors[0]).toContain(GUIDE);
+  });
+
+  it('the sample in the message keeps the original case of the match (#560)', () => {
+    const r = compareLegacy(foundOf({ 'e2e/new.spec.ts': "'ACME', 'Rossi Construction Ltd', 'FT-2026-9'" }), base({}));
+    expect(r.errors[0]).toContain('"ACME"');
+    expect(r.errors[0]).toContain('"Rossi Construction Ltd"');
+    expect(r.errors[0]).toContain('"FT-2026-"');
+    expect(r.errors[0]).not.toContain('"acme"');
+    const grown = compareLegacy(foundOf({ 'e2e/b.spec.ts': 'Acme, Northwind' }), base({ 'e2e/b.spec.ts': 1 }));
+    expect(grown.errors[0]).toContain('"Northwind"');
   });
 
   it('the message for a new file explains the rename case', () => {

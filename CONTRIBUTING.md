@@ -145,12 +145,12 @@ by `src/index.ts` nor by the `/internal` facade, never in `dist`. Library code (
 **The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
 `npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a
 ratchet: it counts them per file (the whole supplier names of the old fixtures such as `Rossi Construction Ltd`, `Acme`, `Northwind`,
-the `FT-2026-` prefix, imports of `demo-invoices` and `demo-rows`; case-insensitive, whole words, comments included) in
+the `FT-2026-` prefix when not glued to a preceding letter, digit or underscore (`XFT-2026-1` does not count), imports of `demo-invoices` and `demo-rows`; case-insensitive, whole words, comments included) in
 `packages/*/src`, `e2e`, `.storybook`, `site-root` and the READMEs, and compares the count with
 [`scripts/legacy-demo-data.baseline.json`](scripts/legacy-demo-data.baseline.json). `.changeset/*.md` and
 `CHANGELOG.md` are history and are not scanned.
 
-- A file outside the baseline with a legacy string, or a count that grows, fails: use another domain.
+- A file outside the baseline with a legacy string, or a count that grows, fails: use another domain. The message quotes a sample of the matches with their original case.
 - A count that goes down passes and suggests `npm run legacy-demo:update`; commit the new baseline.
 - `legacy-demo:update` only lowers: it never raises a count nor adds a file. A renamed file shows up as a new one:
   `update` accepts it only if the total does not grow, so the occurrences just move.

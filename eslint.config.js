@@ -183,8 +183,16 @@ export default tseslint.config(
     rules: {
       'no-restricted-syntax': [
         'error',
-        ...['ImportDeclaration', 'ExportAllDeclaration', 'ExportNamedDeclaration', 'ImportExpression'].map((node) => ({
-          selector: `${node}[source.value=/(^|\\/)demo-data(\\/|$)/]`,
+        ...[
+          ['ImportDeclaration', 'source.value'],
+          ['ExportAllDeclaration', 'source.value'],
+          ['ExportNamedDeclaration', 'source.value'],
+          ['ImportExpression', 'source.value'],
+          // `type T = import('../internal/demo-data').X` (ticket #560): erased at build time, but it still ties the
+          // library file to the demo universe, so it is banned like every other import.
+          ['TSImportType', 'source.value'],
+        ].map(([node, path]) => ({
+          selector: `${node}[${path}=/(^|\\/)demo-data(\\/|$)/]`,
           message:
             'Library code must not import `internal/demo-data`: the demo universe is for stories, tests and showcases only and would end up in the published bundle (ticket #515, CONTRIBUTING.md, section "Demo data").',
         })),
