@@ -42,6 +42,16 @@
         "default": "./dist/react-hook-form.cjs"
       }
     },
+    "./tanstack-form": {
+      "import": {
+        "types": "./dist/tanstack-form.d.ts",
+        "default": "./dist/tanstack-form.js"
+      },
+      "require": {
+        "types": "./dist/tanstack-form.d.cts",
+        "default": "./dist/tanstack-form.cjs"
+      }
+    },
     "./styles.css": "./dist/styles.css",
     "./package.json": "./package.json"
   },
@@ -55,12 +65,16 @@
   },
   "peerDependencies": {
     "@formrail/core": "0.1.0",
+    "@tanstack/react-form": "~1.33.5",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
     "react-hook-form": "^7.92.0"
   },
   "peerDependenciesMeta": {
     "@formrail/core": {
+      "optional": true
+    },
+    "@tanstack/react-form": {
       "optional": true
     },
     "react-hook-form": {
@@ -70,7 +84,7 @@
   "devDependencies": {
     "@formrail/core": "^0.1.0",
     "@tailwindcss/cli": "^4.3.3",
-    "@tanstack/react-form": "^1.33.5",
+    "@tanstack/react-form": "~1.33.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

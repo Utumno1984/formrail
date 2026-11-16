@@ -91,13 +91,15 @@ test.describe('Pro demo: manager and index', () => {
       'Pro/Floorplans/Virtual List Report',
       // #507.
       'Pro/Integrations/React Hook Form',
+      // #508.
+      'Pro/Integrations/TanStack Form',
       // Public since #384.
       'Pro/Patterns/Form rebase',
       'Pro/RebaseNotice',
       'Pro/Showcase/Invoices with Change Summary',
     ]);
     const ids = entries.map((e) => e.id);
-    for (const id of ['pro-introduction--docs', 'pro-changesummary--playground', 'pro-floorplans-virtual-list-report--default', 'pro-showcase-invoices-with-change-summary--review-changes', 'pro-patterns-form-rebase--playground', 'pro-rebasenotice--playground', 'pro-showcase-invoices-with-change-summary--server-update', 'pro-integrations-react-hook-form--playground']) {
+    for (const id of ['pro-introduction--docs', 'pro-changesummary--playground', 'pro-floorplans-virtual-list-report--default', 'pro-showcase-invoices-with-change-summary--review-changes', 'pro-patterns-form-rebase--playground', 'pro-rebasenotice--playground', 'pro-showcase-invoices-with-change-summary--server-update', 'pro-integrations-react-hook-form--playground', 'pro-integrations-tanstack-form--playground']) {
       expect(ids).toContain(id);
     }
   });

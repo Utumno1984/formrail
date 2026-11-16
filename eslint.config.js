@@ -127,6 +127,24 @@ export default tseslint.config(
     },
   },
   {
+    // The TanStack Form integration of Pro (#508): `@tanstack/react-form` is a declared (optional) peer dependency of
+    // `@formrail/pro`, so its examples may import it too (not `@tanstack/form-core` nor `@tanstack/store`).
+    files: ['packages/pro/src/integrations/tanstack-form/*.example.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { regex: '^\\.', message: 'A copy-paste example imports only the public packages by name (@formrail/core, @formrail/pro), never a relative path (ticket #403).' },
+            { regex: '(^|/)internal(/|$)', message: 'A copy-paste example uses only public API: no `internal` module (ticket #403).' },
+            { regex: '^(?!(react|@tanstack/react-form|@formrail/[\\w-]+)(/|$))[^.]', message: 'A TanStack Form example imports only `react`, `@tanstack/react-form` and `@formrail/*` packages (ticket #508).' },
+            { regex: '^(storybook|@storybook)(/|$)', message: 'A copy-paste example is plain React code: no Storybook import (fn, args, ...) (ticket #403).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // The story of a copy-paste example is `{ tags, ...exampleStory('X.example.tsx') }` and nothing else that
     // changes what is rendered (ticket #403): the spread brings the example's own `render`, and the page prints
     // that file's text. A `render`, `component`, `decorators` or `loaders` in the same object would show

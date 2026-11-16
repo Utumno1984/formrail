@@ -20,7 +20,8 @@ const DEFAULT_PACKAGE = resolve(ROOT, 'packages/core');
 export const BUDGETED_PACKAGES = ['packages/core', 'packages/pro'].map((dir) => resolve(ROOT, dir));
 /** Subpath entries budgeted besides the main entry `.`, per package (absolute dir -> subpaths). */
 // `./react-hook-form` (#507): the React Hook Form adapter, against `bundle-budget.react-hook-form.json`.
-export const BUDGETED_SUBPATHS = { [resolve(ROOT, 'packages/pro')]: ['./engine', './react-hook-form'] };
+// `./tanstack-form` (#508): the TanStack Form adapter, against `bundle-budget.tanstack-form.json`.
+export const BUDGETED_SUBPATHS = { [resolve(ROOT, 'packages/pro')]: ['./engine', './react-hook-form', './tanstack-form'] };
 
 /** Baseline file of `subpath` (`.` -> bundle-budget.json, `./engine` -> bundle-budget.engine.json). */
 export function budgetFileName(subpath) {

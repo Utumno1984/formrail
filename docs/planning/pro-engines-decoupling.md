@@ -241,6 +241,13 @@ in `dependencies` e che, se diventano peer, siano opzionali.
   strutturale, quindi l'identità cambia solo sul percorso modificato.
 - `update({ defaultValues })` riallinea i valori **solo se il form non è touched**
   (`FormApi.js:94`). Non è adatto al rebase: va usato `reset`.
+- **Verificato in #508** (`tanstack-form-internals.test.tsx`): `useForm` chiama `formApi.update(opts)` a
+  **ogni** render e `this.options = options` è incondizionato (`FormApi.js:93`). I default impostati da
+  `reset(values)` durano quindi fino al render successivo: `form.reset(data)` con un `defaultValues` che non
+  segue i dati viene annullato (form non toccato) e "impostare i default a `incoming`" non regge. L'oggetto
+  restituito da `useForm` è una copia dell'istanza: il suo `options` resta quello del primo render.
+  L'adattatore non scrive mai i default di TanStack e segue quelli vivi dell'istanza (README Pro,
+  sezione "TanStack Form").
 
 ## 6. Applicare il rebase senza falsi dirty
 
@@ -263,6 +270,10 @@ Il hook chiama `form.reset(incoming)` e poi `form.setValues(merged)` in un unico
   cambiata, dentro `batch` della store. In alternativa `reset(merged, { keepDefaultValues: true })`
   dopo aver impostato `options.defaultValues = incoming`. Da verificare con un contatore dei render
   nel ticket figlio.
+  - **Verificato in #508**: `reset(merged, { keepDefaultValues: true })` azzera la meta di tutti i campi;
+    `setFieldValue` con `dontUpdateMeta` notifica la store una volta per campo e non rimuove chiavi.
+    L'adattatore scrive con una sola `form.baseStore.setState` (metodo dell'oggetto form, nessun import
+    a runtime, niente `batch`): un solo aggiornamento, meta invariata, nessun listener né validatore.
 - **Durante un salvataggio**: il hook mette il rebase in coda finché `isSaving`.
   - RHF espone `formState.isSubmitting`, che per esempio il binding può mappare su `isSaving`, e
     TanStack `state.isSubmitting` (`FormApi.js:519-521`).
