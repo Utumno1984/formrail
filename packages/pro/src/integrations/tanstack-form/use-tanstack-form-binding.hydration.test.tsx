@@ -172,3 +172,108 @@ describe("hydration with a new defaultValues passed to useForm (TanStack Form's 
     harness.unmount();
   });
 });
+
+// On a touched form TanStack Form's `update()` takes new defaults without recomputing its field meta (pinned in
+// tanstack-form-internals.test.tsx): the binding has it recompute them at once, with one base-store update that keeps
+// the values. This is what makes the recommended pattern (`defaultValues` kept on the binding's baseline, set after a
+// save or a rebase) give `isDefaultValue` true on the saved and rebased fields.
+describe("TanStack Form's field meta after a new defaultValues on a touched form", () => {
+  const SERVER: Invoice = { ...SAVED, supplier: 'Lumen Parts Group' };
+
+  it('defaultValues moved to the rebased record after the rebase: isDefaultValue at once, meta, values and summary untouched, no echo', () => {
+    let record = SAVED;
+    const changes: string[] = [];
+    const validated: string[] = [];
+    const harness = setupInvoiceForm({ defaults: () => record, onFieldChange: (name) => changes.push(name), validate: (name) => (validated.push(name), undefined) });
+    harness.type('Notes', 'Checked by me');
+    act(() => harness.current().rebase.rebase(SERVER));
+    expect(harness.current().form.state.fieldMeta.supplier?.isDefaultValue).toBe(false);
+    const { values, baseline } = harness.current().binding;
+    const formValues = harness.current().form.state.values;
+    const notesMeta = harness.current().form.state.fieldMeta.notes;
+    // The app's state follows the binding's baseline, one render later (an effect).
+    record = SERVER;
+    harness.bump();
+    const { form, binding, entries, rebase } = harness.current();
+    expect(form.state.fieldMeta.supplier).toMatchObject({ isDefaultValue: true, isTouched: false, isDirty: false });
+    expect(form.state.fieldMeta.amount?.isDefaultValue).toBe(true);
+    expect(form.state.fieldMeta.notes).toMatchObject({ isDefaultValue: false, isTouched: notesMeta?.isTouched, isDirty: notesMeta?.isDirty });
+    expect(form.state.values).toBe(formValues);
+    expect(binding.values).toBe(values);
+    expect(binding.baseline).toBe(baseline);
+    expect(entries.map((entry) => entry.path)).toEqual(['notes']);
+    expect(rebase.applied.map((entry) => entry.path)).toEqual(['supplier']);
+    expect(changes).toEqual(['notes']);
+    expect(validated).toEqual(['notes']);
+    // TanStack Form's own discard goes back to the rebased record.
+    act(() => form.reset());
+    expect(harness.current().form.state.values).toEqual(SERVER);
+    expect(harness.current().entries).toEqual([]);
+    harness.unmount();
+  });
+
+  it('a rehydration of a touched form (other content): isDefaultValue against the new defaults at once', () => {
+    let record = SAVED;
+    const harness = setupInvoiceForm({ defaults: () => record });
+    harness.type('Amount', '120');
+    record = { ...SAVED, supplier: 'Lumen Parts Group', amount: '120' };
+    harness.bump();
+    const { fieldMeta } = harness.current().form.state;
+    expect([fieldMeta.supplier?.isDefaultValue, fieldMeta.amount?.isDefaultValue, fieldMeta.notes?.isDefaultValue]).toEqual([false, true, true]);
+    expect(harness.current().entries.map((entry) => entry.path)).toEqual(['supplier']);
+    harness.unmount();
+  });
+
+  it('an inline defaultValues of the same content on a touched form: no store update at any render (no loop)', () => {
+    const harness = setupInvoiceForm({ defaults: () => ({ ...SAVED }) });
+    harness.type('Amount', '120');
+    let updates = 0;
+    const subscription = harness.current().form.store.subscribe(() => {
+      updates += 1;
+    });
+    const commits = harness.commits.length;
+    harness.bump();
+    harness.bump();
+    harness.bump();
+    expect(updates).toBe(0);
+    expect(harness.commits.length).toBe(commits + 3);
+    subscription.unsubscribe();
+    harness.unmount();
+  });
+
+  it('a new defaultValues of other content on a touched form: one store update, then none at the next renders', () => {
+    let record = SAVED;
+    const harness = setupInvoiceForm({ defaults: () => ({ ...record }) });
+    harness.type('Amount', '120');
+    let updates = 0;
+    const subscription = harness.current().form.store.subscribe(() => {
+      updates += 1;
+    });
+    record = { ...SAVED, amount: '120' };
+    harness.bump();
+    expect(updates).toBe(1);
+    harness.bump();
+    harness.bump();
+    expect(updates).toBe(1);
+    expect(harness.current().form.state.fieldMeta.amount?.isDefaultValue).toBe(true);
+    subscription.unsubscribe();
+    harness.unmount();
+  });
+
+  it("a new defaultValues on a form not touched: one store notification, update()'s (the binding's re-derive computes the same meta)", () => {
+    let record = SAVED;
+    const harness = setupInvoiceForm({ defaults: () => record });
+    let updates = 0;
+    const subscription = harness.current().form.store.subscribe(() => {
+      updates += 1;
+    });
+    record = { ...SAVED, amount: '120' };
+    harness.bump();
+    // The one of `update()` (FormApi.js:97, one `baseStore.setState` in a batch).
+    expect(updates).toBe(1);
+    expect(harness.current().form.state.values).toEqual(record);
+    expect(harness.current().form.state.fieldMeta.amount?.isDefaultValue).toBe(true);
+    subscription.unsubscribe();
+    harness.unmount();
+  });
+});

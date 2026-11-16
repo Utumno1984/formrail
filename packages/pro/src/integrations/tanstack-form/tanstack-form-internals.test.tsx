@@ -124,6 +124,23 @@ describe('1. update(): useForm re-applies its options at every render', () => {
     form.unmount();
   });
 
+  it("a new defaultValues on a TOUCHED form: the field meta is not recomputed (isDefaultValue stale) until the next store change (FormApi.js:96)", () => {
+    let record = DATA;
+    const form = setup(() => record);
+    fireEvent.change(screen.getByLabelText('amount'), { target: { value: '120' } });
+    expect(form.form().state.fieldMeta.amount?.isDefaultValue).toBe(false);
+    // The app now has amount 120 as its record: `update()` takes the options, writes no state (`return` at :96).
+    record = { ...DATA, amount: '120' };
+    form.bump();
+    expect(form.form().state.fieldMeta.amount?.isDefaultValue).toBe(false);
+    // Any store update recomputes the derived meta against the new defaults: the binding's `rederive` writes one.
+    act(() => form.form().baseStore.setState((prev) => ({ ...prev })));
+    expect(form.form().state.fieldMeta.amount?.isDefaultValue).toBe(true);
+    expect(form.form().state.fieldMeta.amount).toMatchObject({ isTouched: true, isDirty: true });
+    expect(form.calls).toEqual(['listener:amount', 'validator:amount']);
+    form.unmount();
+  });
+
   it('an inline defaultValues (a new object with the same content at every render) changes nothing', () => {
     const form = setup(() => ({ ...DATA }));
     const values = form.form().state.values;

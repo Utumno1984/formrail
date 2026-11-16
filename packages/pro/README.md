@@ -279,11 +279,14 @@ npm install @formrail/pro @tanstack/react-form
 ### Usage
 
 ```tsx
+import { useEffect, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useChangeSummary, useFormRebase } from '@formrail/pro/engine';
 import { useTanStackFormBinding } from '@formrail/pro/tanstack-form';
 
-function InvoiceEditor({ saved }: { saved: Invoice }) {
+function InvoiceEditor({ loaded }: { loaded: Invoice }) {
+  // The record as the server has it, as the defaultValues of useForm.
+  const [saved, setSaved] = useState(loaded);
   const form = useForm({
     defaultValues: saved,
     onSubmit: async ({ value }) => {
@@ -292,6 +295,8 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
     },
   });
   const binding = useTanStackFormBinding(form); // Values inferred from defaultValues, no generic needed
+  // `saved` follows the baseline: after a save and after a rebase, also one queued until a save ends.
+  useEffect(() => setSaved(binding.baseline), [binding.baseline]);
   const { entries, isEmpty } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
   const { rebase, conflicts, keepMine, acceptTheirs, isPending } = useFormRebase(binding);
   // ...form.Field with your inputs, the summary from `entries`, a "Save" bar shown while !isEmpty,
@@ -299,7 +304,19 @@ function InvoiceEditor({ saved }: { saved: Invoice }) {
 }
 ```
 
+The Example of the Storybook page "Pro/Integrations/TanStack Form" is a complete, copy-paste version of
+this component.
+
 - Call `useTanStackFormBinding` in the component that calls `useForm`, after it.
+- **Keep `defaultValues` on the saved record**, as above: a `saved` state passed as `defaultValues`, that
+  follows `binding.baseline` (it becomes the stored record with `binding.reset(stored)`, the server version
+  with a rebase). The summary and the save bar don't need it (they come from `useChangeSummary`, never from
+  TanStack Form's `isDefaultValue` or `isDirty`), but TanStack Form's own view then agrees with them:
+  `isDefaultValue` is `true` on the saved and rebased fields, and `form.reset()` is a real discard, back to
+  the record the server has. Follow the baseline rather than setting `saved` where you call
+  `rebase(incoming)`: a rebase called during a save is queued, and `incoming` as `defaultValues` before it is
+  applied is a rehydration that wins over the save (the edits typed during the save are lost, see
+  [Saving](#saving-1)).
 - `binding.values` / `binding.baseline` are immutable snapshots: a new object only when the content changes,
   the same object across renders that change no value (a blur, a validation, a parent's state), so the
   summary is never stale and is not recomputed for nothing. TanStack Form keeps the object you pass as
@@ -335,7 +352,11 @@ render, and the binding follows it:
   the user edits, use `rebase(data)` instead (below): it keeps the edits, takes the server value on the
   untouched fields and reports the conflicts.
 - A new `defaultValues` with the content of the current baseline (an app that keeps `defaultValues` on the
-  record it saved or rebased on) is no change.
+  record it saved or rebased on) is no change for the binding.
+- On a touched form, TanStack Form's `update()` takes new defaults without recomputing its field meta: its
+  `isDefaultValue` would stay computed against the old defaults until the next change of the form. When the
+  content of `defaultValues` changes, the binding has TanStack Form recompute it at once, with one update of
+  its base store that keeps the values (no field meta written, no listener, no validator).
 
 ### Saving
 
@@ -378,11 +399,11 @@ base store (`form.baseStore.setState`), so:
 
 The binding never writes TanStack Form's own defaults: `useForm` would put yours back at the next render,
 and on a form not touched the values too. So after `binding.reset(saved)` or a rebase, TanStack Form's
-`isDefaultValue` / `isDirty` and its `form.reset()` still refer to the `defaultValues` of `useForm`. Discard
-with `binding.reset()` (back to the saved baseline), or keep `defaultValues` on the record you saved or
-rebased on (set your state to `stored` / `incoming` with `binding.reset(stored)` / `rebase(incoming)`):
-then TanStack Form agrees (`isDefaultValue` is `true` on the fields the server set) and `form.reset()` is a
-real discard.
+`isDefaultValue` and its `form.reset()` refer to the `defaultValues` of `useForm`: keep them on the
+binding's baseline (see [Usage](#usage-1)) and TanStack Form agrees, `isDefaultValue` is `true` on the
+fields the server set and `form.reset()` is a real discard. With `defaultValues` left on an older record,
+`isDefaultValue` is `false` on those fields and `form.reset()` goes back to that record: discard with
+`binding.reset()` (back to the saved baseline).
 
 ### `useChangeSummary().isEmpty`, not `state.isDirty`
 
@@ -398,7 +419,9 @@ The object `useForm` returns is a copy of TanStack Form's `FormApi` made at the 
 the instance's, but its `options` stay those of the first render, while TanStack Form replaces the
 instance's at every render. No public API returns the instance, so the adapter calls `form.Subscribe` once as
 a plain function (it renders TanStack Form's subscriber with the instance as its `form` prop: no hook, no
-side effect) and reads the live `defaultValues` there, checked by the identity of `form.store`. The tests of
+side effect) and reads the live `defaultValues` there, checked by the identity of `form.store`. After a change
+of content of `defaultValues` it writes `form.baseStore` once with the same values, so TanStack Form
+recomputes its field meta (see [Hydration](#hydration-defaultvalues-and-update)). The tests of
 `@formrail/pro` pin this and the TanStack Form behaviours above against the tested version
 (`@tanstack/react-form` `1.33.5`, the minimum of the peer range); in development a form where it does not
 hold gets a `console.warn`, and the baseline then follows only the `defaultValues` of the first render. If

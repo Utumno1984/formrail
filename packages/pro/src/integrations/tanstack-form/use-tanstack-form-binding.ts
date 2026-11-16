@@ -103,6 +103,11 @@ class BindingStore<Values extends object> {
   private defaultsContent: unknown;
   /** The values object of TanStack Form last seen (TanStack Form replaces it at every change, never mutates it). */
   private source: unknown;
+  /**
+   * Set when the defaults changed content: on a touched form TanStack Form's `update()` takes them without recomputing
+   * its field meta, so `resync` has it recompute them (see `rederive`).
+   */
+  private staleMeta = false;
   private readonly listeners = new Set<() => void>();
   /** Set while the binding itself writes to TanStack Form: its store events are not read back. */
   private busy = 0;
@@ -157,7 +162,28 @@ class BindingStore<Values extends object> {
    */
   resync = (): void => {
     this.sync();
+    if (this.staleMeta) {
+      this.staleMeta = false;
+      this.rederive();
+    }
   };
+
+  /**
+   * After a change of content of the defaults on a form the user touched, TanStack Form's `update()` replaces its
+   * options but writes no state, so its derived field meta (`isDefaultValue`) stays computed against the old defaults
+   * until the next change of the form. One update of the base store with the same values (no field meta written, no
+   * listener, no validator) has it recompute them now: an app that keeps `defaultValues` on the saved record sees
+   * `isDefaultValue` agree with the summary after a save or a rebase. On a form not touched `update()` already wrote
+   * the state: TanStack Form's derived store then computes the same meta again and notifies nothing.
+   */
+  private rederive(): void {
+    this.busy += 1;
+    try {
+      this.form.baseStore.setState((prev) => ({ ...prev }));
+    } finally {
+      this.busy -= 1;
+    }
+  }
 
   /**
    * Re-reads the defaults and the values of the form. Defaults of another content (`form.reset(data)`, a new
@@ -176,6 +202,7 @@ class BindingStore<Values extends object> {
     if (defaults !== this.defaults) {
       this.defaults = defaults;
       if (!sameContent(defaults ?? {}, this.defaultsContent)) {
+        this.staleMeta = true;
         this.defaultsContent = snapshotOf<unknown>(defaults ?? {}, this.defaultsContent);
         if (!sameContent(this.defaultsContent, baseline)) baseline = snapshotOf<unknown>(defaults ?? {}, baseline) as Values;
       }
@@ -386,8 +413,11 @@ function liveFormApi(form: FormLike): { options: { defaultValues?: unknown } } {
  * `form.reset(data)`; and the object passed to `binding.reset(saved)`. TanStack Form's own defaults stay the
  * `defaultValues` of `useForm`: the binding never writes them (`useForm` would put its own back at the next render, and
  * on a form not touched its values too). So after `binding.reset(saved)` or a rebase, `form.reset()` and TanStack
- * Form's `isDefaultValue` / `isDirty` refer to the `defaultValues` of `useForm`, unless the app keeps them on the saved
- * record. A new `defaultValues` with the content of the current baseline is no change.
+ * Form's `isDefaultValue` refer to the `defaultValues` of `useForm`: keep them on the baseline
+ * (`const [saved, setSaved] = useState(loaded)`, `defaultValues: saved`,
+ * `useEffect(() => setSaved(binding.baseline), [binding.baseline])`) and TanStack Form agrees with the summary. A new
+ * `defaultValues` with the content of the current baseline is no change for the binding; after any change of content
+ * of the defaults, the binding has TanStack Form recompute its field meta (on a touched form its `update()` does not).
  *
  * **`reset(b)` / `setValues(patch)`** (what the rebase calls): `reset(b)` makes `baseline` and `values` the object `b`
  * itself (during a save, see "Saving"); `setValues` merges the top-level keys of `patch`. Each writes the values to

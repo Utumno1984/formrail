@@ -169,15 +169,28 @@ export function missingTanStackFormDocs(readme) {
     // Server updates.
     'rebase(data)',
     'rebase(incoming)',
+    // The recommended pattern (decision of 16/11 on #508): `defaultValues` kept on the binding's baseline.
+    ...SAVED_PATTERN,
   ];
   return required.filter((text) => !section.includes(text));
 }
+
+/** The lines of the recommended pattern, the same in the README usage and in the copy-paste Example. */
+const SAVED_PATTERN = ['const [saved, setSaved] = useState(', 'defaultValues: saved,', 'useEffect(() => setSaved(binding.baseline), [binding.baseline]);'];
 
 describe('packages/pro README: the TanStack Form section (#508)', () => {
   const readme = readFileSync(resolve(ROOT, 'packages/pro/README.md'), 'utf8');
 
   it('has the section, with install, import paths, saving, the isEmpty rule, inline defaults, update() and the rebase', () => {
     expect(missingTanStackFormDocs(readme)).toEqual([]);
+  });
+
+  it('the usage and the copy-paste Example keep defaultValues on the baseline with the same lines', () => {
+    const example = readFileSync(resolve(ROOT, 'packages/pro/src/integrations/tanstack-form/TanStackForm.example.tsx'), 'utf8');
+    expect(SAVED_PATTERN.filter((line) => !example.includes(line))).toEqual([]);
+    expect(missingTanStackFormDocs(readme.replace('useEffect(() => setSaved(binding.baseline)', 'useEffect(() => setSaved(incoming)'))).toEqual([
+      SAVED_PATTERN[2],
+    ]);
   });
 
   it('negative: a missing heading or a missing part is reported', () => {

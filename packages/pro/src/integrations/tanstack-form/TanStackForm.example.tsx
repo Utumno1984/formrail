@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useChangeSummary, useFormRebase } from '@formrail/pro/engine';
 import { useTanStackFormBinding } from '@formrail/pro/tanstack-form';
@@ -9,7 +9,7 @@ interface Invoice {
   notes: string;
 }
 
-const saved: Invoice = { supplier: 'Lumen Parts', amount: '1200', notes: '' };
+const loaded: Invoice = { supplier: 'Lumen Parts', amount: '1200', notes: '' };
 
 const fields: { name: keyof Invoice; label: string }[] = [
   { name: 'supplier', label: 'Supplier' },
@@ -21,16 +21,19 @@ const fields: { name: keyof Invoice; label: string }[] = [
 const saveInvoice = (values: Invoice) => new Promise<Invoice>((resolve) => setTimeout(() => resolve(values), 500));
 
 export function InvoiceWithTanStackForm() {
-  // The record the form starts from (for an async load: `null` first, then the data; TanStack Form takes the new
-  // `defaultValues` while the form is not touched).
-  const [record] = useState(saved);
+  // The record as the server has it, passed as the `defaultValues` of `useForm` (for an async load: the loaded record;
+  // TanStack Form takes new `defaultValues` while the form is not touched).
+  const [saved, setSaved] = useState(loaded);
   const form = useForm({
-    defaultValues: record,
+    defaultValues: saved,
     // Save: the stored record becomes the baseline inside `onSubmit`, so an update queued meanwhile merges against it.
     onSubmit: async ({ value }) => binding.reset(await saveInvoice(value)),
   });
   // The TanStack Form form as the engines expect it: snapshots of the values and of the saved baseline.
   const binding = useTanStackFormBinding(form);
+  // `saved` follows the baseline: after a save (`binding.reset(stored)`) and after a rebase, also one queued until a
+  // save ends. So TanStack Form's own `isDefaultValue` and `form.reset()` agree with the summary.
+  useEffect(() => setSaved(binding.baseline), [binding.baseline]);
   const { entries, isEmpty } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
   const { rebase, conflicts, keepMine, acceptTheirs, isPending } = useFormRebase(binding);
 
