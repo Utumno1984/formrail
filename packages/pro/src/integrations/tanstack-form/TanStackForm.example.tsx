@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useChangeSummary, useFormRebase } from '@formrail/pro/engine';
 import { useTanStackFormBinding } from '@formrail/pro/tanstack-form';
@@ -21,13 +21,19 @@ const fields: { name: keyof Invoice; label: string }[] = [
 const saveInvoice = (values: Invoice) => new Promise<Invoice>((resolve) => setTimeout(() => resolve(values), 500));
 
 export function InvoiceWithTanStackForm() {
+  // The record as the server stores it (here a ref: in your app, the server itself). A save writes it when the request
+  // starts, so another user's version made during a save is built on what is being saved.
+  const server = useRef(loaded);
   // The record as the server has it, passed as the `defaultValues` of `useForm` (for an async load: the loaded record;
   // TanStack Form takes new `defaultValues` while the form is not touched).
   const [saved, setSaved] = useState(loaded);
   const form = useForm({
     defaultValues: saved,
     // Save: the stored record becomes the baseline inside `onSubmit`, so an update queued meanwhile merges against it.
-    onSubmit: async ({ value }) => binding.reset(await saveInvoice(value)),
+    onSubmit: async ({ value }) => {
+      server.current = value;
+      binding.reset(await saveInvoice(value));
+    },
   });
   // The TanStack Form form as the engines expect it: snapshots of the values and of the saved baseline.
   const binding = useTanStackFormBinding(form);
@@ -38,7 +44,10 @@ export function InvoiceWithTanStackForm() {
   const { rebase, conflicts, keepMine, acceptTheirs, isPending } = useFormRebase(binding);
 
   // A newer version of the record, saved meanwhile by someone else (a poll, a push message, a 409 response).
-  const receiveServerVersion = () => rebase({ ...binding.baseline, supplier: 'Lumen Parts Group', amount: '1350' });
+  const receiveServerVersion = () => {
+    server.current = { ...server.current, supplier: 'Lumen Parts Group', amount: '1350' };
+    rebase(server.current);
+  };
 
   return (
     <form

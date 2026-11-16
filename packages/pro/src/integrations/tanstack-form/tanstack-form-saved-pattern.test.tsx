@@ -131,6 +131,22 @@ describe.each(CASES)('$name: defaultValues kept on the saved record', ({ element
     expect(status()).toBe('All saved');
     view.unmount();
   });
+
+  it('a server version received during a save is built on what is being saved: the saved field is not taken back', async () => {
+    const view = render(element());
+    await waitFor(() => expect(status()).toContain('All saved'));
+    type('Notes', 'Saved note');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Saving…' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: serverButton }));
+    await waitSaved();
+    await waitFor(() => expect(status()).toBe('All saved'));
+    // The other user's version carries the note being saved: the merge does not put the pre-save note back.
+    expect(form().state.values.notes).toBe('Saved note');
+    expect(form().state.values.supplier).toBe(queued.supplier);
+    expect(screen.getByText('No changes')).toBeInTheDocument();
+    view.unmount();
+  });
 });
 
 // Why the pattern follows the baseline instead of setting `saved` to `incoming` where `rebase(incoming)` is called: a

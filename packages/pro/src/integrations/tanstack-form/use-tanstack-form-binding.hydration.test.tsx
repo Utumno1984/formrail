@@ -1,7 +1,11 @@
 // `useTanStackFormBinding` (ticket #508), the baseline that arrives after the mount: `form.reset(data)` and a new
 // `defaultValues` passed to `useForm` (TanStack Form's `update()`), on a form not touched and on a touched one.
-import { act } from '@testing-library/react';
+import { useState } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useForm } from '@tanstack/react-form';
+import { useChangeSummary } from '../../engine';
 import { EMPTY, SAVED, setupInvoiceForm, type Commit, type Invoice } from '../../../test/tanstack-harness';
+import { useTanStackFormBinding, type TanStackFormOf } from './use-tanstack-form-binding';
 
 const DATA: Invoice = { supplier: 'Halden Tools', amount: '1200', notes: 'Net 30' };
 
@@ -275,5 +279,50 @@ describe("TanStack Form's field meta after a new defaultValues on a touched form
     expect(harness.current().form.state.fieldMeta.amount?.isDefaultValue).toBe(true);
     subscription.unsubscribe();
     harness.unmount();
+  });
+});
+
+// The binding in a child of the component that calls `useForm` (`withForm` of `createFormHook`, a form passed as a
+// prop): the child's layout effect runs before the parent's `formApi.update(opts)`, so a new `defaultValues` on a
+// touched form (no store event) reaches the binding at its passive effect, one render later.
+describe('the binding in a child of the component that calls useForm', () => {
+  type Bound = { baseline: Invoice; entries: string[] };
+
+  function setupChild() {
+    let setRecord!: (record: Invoice) => void;
+    let form!: TanStackFormOf<Invoice>;
+    const seen: Bound[] = [];
+    function Child({ bound }: { bound: TanStackFormOf<Invoice> }) {
+      const binding = useTanStackFormBinding(bound);
+      const { entries } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
+      seen.push({ baseline: binding.baseline, entries: entries.map((entry) => entry.path) });
+      return null;
+    }
+    function Parent() {
+      const [record, set] = useState(SAVED);
+      setRecord = set;
+      form = useForm({ defaultValues: record });
+      return (
+        <>
+          <form.Field name="amount">
+            {(field) => <input aria-label="Amount" value={field.state.value} onChange={(event) => field.handleChange(event.target.value)} />}
+          </form.Field>
+          <Child bound={form} />
+        </>
+      );
+    }
+    const view = render(<Parent />);
+    return { seen, form: () => form, setRecord: (record: Invoice) => act(() => setRecord(record)), unmount: () => view.unmount() };
+  }
+
+  it('a touched form, new defaultValues: the baseline and TanStack Form follow them after the commit (passive resync)', () => {
+    const child = setupChild();
+    fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '120' } });
+    expect(child.seen.at(-1)!.entries).toEqual(['amount']);
+    child.setRecord({ ...SAVED, amount: '120' });
+    expect(child.seen.at(-1)!.baseline).toEqual({ ...SAVED, amount: '120' });
+    expect(child.seen.at(-1)!.entries).toEqual([]);
+    expect(child.form().state.fieldMeta.amount?.isDefaultValue).toBe(true);
+    child.unmount();
   });
 });

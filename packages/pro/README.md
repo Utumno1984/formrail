@@ -265,7 +265,8 @@ the Change Summary against the saved baseline and the form rebase, without `@for
 npm install @formrail/pro @tanstack/react-form
 ```
 
-- `@tanstack/react-form` `^1.33.5` (the version range tested), `react` / `react-dom` 18 or 19. `@formrail/core`
+- `@tanstack/react-form` `~1.33.5`: tested on 1.33.x; a wider range follows a verified update. `react` / `react-dom` 18
+  or 19. `@formrail/core`
   is not needed. `@tanstack/react-form` is an **optional** peer dependency of `@formrail/pro`, used for the
   types only: nothing of TanStack Form (`@tanstack/react-form`, `@tanstack/form-core`, `@tanstack/store`) is
   imported at runtime. The adapter calls the methods of your `form` (`form.store`, `form.baseStore`,
@@ -307,7 +308,8 @@ function InvoiceEditor({ loaded }: { loaded: Invoice }) {
 The Example of the Storybook page "Pro/Integrations/TanStack Form" is a complete, copy-paste version of
 this component.
 
-- Call `useTanStackFormBinding` in the component that calls `useForm`, after it.
+- Call `useTanStackFormBinding` in the component that calls `useForm`, after it (in a child of it, see
+  [What the adapter reads](#what-the-adapter-reads)).
 - **Keep `defaultValues` on the saved record**, as above: a `saved` state passed as `defaultValues`, that
   follows `binding.baseline` (it becomes the stored record with `binding.reset(stored)`, the server version
   with a rebase). The summary and the save bar don't need it (they come from `useChangeSummary`, never from
@@ -423,9 +425,23 @@ side effect) and reads the live `defaultValues` there, checked by the identity o
 of content of `defaultValues` it writes `form.baseStore` once with the same values, so TanStack Form
 recomputes its field meta (see [Hydration](#hydration-defaultvalues-and-update)). The tests of
 `@formrail/pro` pin this and the TanStack Form behaviours above against the tested version
-(`@tanstack/react-form` `1.33.5`, the minimum of the peer range); in development a form where it does not
-hold gets a `console.warn`, and the baseline then follows only the `defaultValues` of the first render. If
-you see that warning after upgrading `@tanstack/react-form`, stay on the last version that does not show it.
+(`@tanstack/react-form` `1.33.5`, the minimum of the peer range `~1.33.5`, which accepts 1.33.x only: a newer minor
+is a peer conflict at install time, not a silent change of behaviour); in development a form where it does not
+hold gets a `console.warn`, and the baseline then follows only the `defaultValues` of the first render. In
+production there is no warning (a hydration through `defaultValues` would then show as changes): this is why
+the peer range stops at the tested minor. If you see that warning, or force an install outside the range, stay
+on the last version that does not show it.
+
+The adapter also relies on these behaviours of TanStack Form, all pinned by the tests on 1.33.5: the store
+semantics of `baseStore.setState` (one notification, the derived stores recomputed), `fieldMeta._arrayVersion`
+for the fields in `mode="array"`, and the copy of the `FormApi` that `useForm` returns.
+
+Call `useTanStackFormBinding` in the component that calls `useForm`. In a child of it (a form passed as a prop,
+`withForm` of `createFormHook`), the child's layout effects run before the parent's `formApi.update(opts)`: a
+new `defaultValues` on a form the user touched (TanStack Form writes no state then) reaches the binding at its
+passive effect, so for one painted frame the summary is computed against the previous baseline while TanStack
+Form already compares with the new defaults. On a form not touched, `update()` writes the values and the
+binding follows them at once.
 
 ## Change Summary engine
 

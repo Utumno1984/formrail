@@ -1,4 +1,4 @@
-import { useInsertionEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useInsertionEffect, useMemo, useState, useSyncExternalStore } from 'react';
 // Types only (decision 2a of #489): the adapter calls the methods of the `form` object it receives and never imports
 // TanStack Form (nor `@tanstack/form-core` / `@tanstack/store`) at runtime, so `@tanstack/react-form` is an optional
 // peer of `@formrail/pro`.
@@ -204,6 +204,8 @@ class BindingStore<Values extends object> {
       if (!sameContent(defaults ?? {}, this.defaultsContent)) {
         this.staleMeta = true;
         this.defaultsContent = snapshotOf<unknown>(defaults ?? {}, this.defaultsContent);
+        // (Only a saving: `snapshotOf` returns `baseline` itself for the same content, so its identity, and the open
+        // conflicts of an app that keeps `defaultValues` on the baseline, stay either way.)
         if (!sameContent(this.defaultsContent, baseline)) baseline = snapshotOf<unknown>(defaults ?? {}, baseline) as Values;
       }
     }
@@ -248,6 +250,8 @@ class BindingStore<Values extends object> {
     this.busy += 1;
     try {
       form.baseStore.setState((prev) => ({ ...prev, values }));
+      // (Also set by the next `sync`, which every write reaches first through the render it causes, before `useForm`
+      // can change the defaults in its layout effect: kept here so `source` never names an object TanStack Form left.)
       this.source = values;
       for (const name of Object.keys(form.store.state.fieldMeta)) {
         const after = valueAt(values, name);
@@ -382,7 +386,7 @@ function liveFormApi(form: FormLike): { options: { defaultValues?: unknown } } {
     warnedForms.add(form);
     console.warn(
       '[formrail] useTanStackFormBinding: `form.Subscribe` does not render the FormApi instance of `form` as its `form` prop ' +
-        '(tested with @tanstack/react-form ^1.33.5): the baseline follows only the `defaultValues` of the first render.',
+        '(tested with @tanstack/react-form ~1.33.5): the baseline follows only the `defaultValues` of the first render.',
     );
   }
   return form;
@@ -455,6 +459,10 @@ export function useTanStackFormBinding<Values extends object>(
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   // After `useForm`'s own layout effect (`formApi.update(opts)`): a new `defaultValues` is read before paint.
   useIsomorphicLayoutEffect(store.resync);
+  // In a child of the component that calls `useForm` (`withForm`, a form passed as a prop), the child's layout effect
+  // runs before the parent's `update(opts)`: the passive effect, after every layout effect of the commit, reads the new
+  // `defaultValues` then (a render later, after paint). In the component of `useForm` it finds nothing new.
+  useEffect(() => store.resync());
 
   const isSaving = options.isSaving ?? snapshot.isSubmitting;
   const saveError = options.saveError !== undefined ? options.saveError : snapshot.failed;
