@@ -59,20 +59,33 @@ const lineIds = () => [...document.querySelectorAll('[data-line-total]')].map((e
 
 describe('SalesOrderLines: wiring (#520)', () => {
   it('the Move up of the first line and the Move down of the last do nothing when clicked (aria-disabled does not block the click)', async () => {
-    const onChange = vi.fn();
-    render(<Harness initial={[line('a'), line('b')]} onChange={onChange} />);
-    expect(screen.getByRole('button', { name: 'Move line 1 up' })).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(screen.getByRole('button', { name: 'Move line 1 up' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Move line 2 down' }));
-    expect(onChange).not.toHaveBeenCalled();
-    expect(lineIds()).toEqual(['a', 'b']);
-    // A one-line list has no move at all.
-    cleanup();
-    render(<Harness initial={[line('only')]} onChange={onChange} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Move line 1 up' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Move line 1 down' }));
-    expect(onChange).not.toHaveBeenCalled();
-    expect(lineIds()).toEqual(['only']);
+    // An error thrown by a click handler would be reported on the window: collect it here so it fails THIS test.
+    const crashes: string[] = [];
+    const collect = (e: ErrorEvent) => {
+      crashes.push(String(e.error ?? e.message));
+      e.preventDefault();
+    };
+    window.addEventListener('error', collect);
+    try {
+      const onChange = vi.fn();
+      render(<Harness initial={[line('a'), line('b')]} onChange={onChange} />);
+      expect(screen.getByRole('button', { name: 'Move line 1 up' })).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(screen.getByRole('button', { name: 'Move line 1 up' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Move line 2 down' }));
+      expect(crashes).toEqual([]);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(lineIds()).toEqual(['a', 'b']);
+      // A one-line list has no move at all.
+      cleanup();
+      render(<Harness initial={[line('only')]} onChange={onChange} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Move line 1 up' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Move line 1 down' }));
+      expect(crashes).toEqual([]);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(lineIds()).toEqual(['only']);
+    } finally {
+      window.removeEventListener('error', collect);
+    }
   });
 
   it('removing a MIDDLE line puts the focus on the Remove of the line that took its place (not the previous one)', async () => {
