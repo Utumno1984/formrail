@@ -25,9 +25,21 @@ export interface OverflowEdgesSink {
   setGeometry: (geometry: OverflowEdgesGeometry | null) => void;
 }
 
-/** Whether `node` is `el` or one of its ancestors in the composed tree (a `ShadowRoot` leads to its host). */
+/**
+ * The host of a `ShadowRoot`, or `null` for any other node. Not `instanceof ShadowRoot`: that fails for a
+ * node of another realm (an iframe's document, the library loaded in the parent window), and throws
+ * where the global is missing.
+ */
+function hostOf(node: Node): Element | null {
+  return node.nodeType === 11 && 'host' in node ? (node as ShadowRoot).host : null;
+}
+
+/**
+ * Whether `node` is `el` or one of its ancestors, the ones across `ShadowRoot` boundaries: the DOM-tree parents, and
+ * at a `ShadowRoot` the host. Not the flat tree: a `slot` is not an ancestor of what it displays.
+ */
 function isAncestorOrSelf(node: Node, el: Element): boolean {
-  for (let n: Node | null = el; n; n = n instanceof ShadowRoot ? n.host : n.parentNode) {
+  for (let n: Node | null = el; n; n = hostOf(n) ?? n.parentNode) {
     if (n === node) return true;
   }
   return false;
@@ -56,6 +68,8 @@ function isAncestorOrSelf(node: Node, el: Element): boolean {
  * Limit: the ancestors are those of the DOM tree (`parentNode`, then the `host` of a `ShadowRoot`), not
  * of the flat tree. A container slotted into a host whose `ShadowRoot` sets `dir` on the `slot` or above
  * it is not seen (the `dir` of the host and of its light-DOM ancestors is).
+ * Limit: the roots to observe are computed at the mount: a table moved into another `ShadowRoot` with
+ * no unmount does not see the `dir` attributes of the new one (it does see the document's).
  * Limit: a direction changed through the CSS `direction` property alone (a class, a style sheet), with
  * no `dir` attribute changing, fires nothing an observer can see at a low cost; it is measured at the
  * next scroll or resize. The shades are still drawn on the correct sides (CSS alone, see
@@ -123,7 +137,9 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       dirs.observe(el.ownerDocument.documentElement, options);
       // A `ShadowRoot` is not in the document's subtree: its own `dir` attributes are watched there, in
       // every one the container is nested in (the host of one is in the next one out).
-      for (let root = el.getRootNode(); root instanceof ShadowRoot; root = root.host.getRootNode()) dirs.observe(root, options);
+      for (let root: Node = el.getRootNode(), host = hostOf(root); host; root = host.getRootNode(), host = hostOf(root)) {
+        dirs.observe(root, options);
+      }
     }
     return {
       target: el,

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { useMemo, useState } from 'react';
+import { StrictMode, useMemo, useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
@@ -777,6 +777,94 @@ describe('a `dir` changed after the mount (#562)', () => {
     const source = readFileSync(resolve(__dirname, 'use-overflow-edges.ts'), 'utf8');
     expect(source).not.toMatch(/needs no measure/);
     expect(source).toMatch(/still measures once/);
+  });
+
+  it('a batch with a `dir` on a non-ancestor and on an ancestor, in one task: the table measures (once)', async () => {
+    mock = mockLayout(WIDE);
+    const { container, wrapper } = renderInWrapper();
+    const el = scroller();
+    const sibling = document.createElement('p');
+    container.appendChild(sibling);
+    scrollLeftTo(250, el);
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    await likeFirefox(() => {
+      sibling.setAttribute('dir', 'rtl');
+      wrapper.setAttribute('dir', 'rtl');
+    }, el);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    expect(edges(el)).toEqual({ start: false, end: true });
+  });
+
+  it('StrictMode (effects run twice): a single observer stays connected', async () => {
+    mock = mockLayout(WIDE);
+    const live = new Set<unknown>();
+    const Native = globalThis.MutationObserver;
+    globalThis.MutationObserver = class extends Native {
+      override observe(target: Node, options?: MutationObserverInit) {
+        if (options?.attributeFilter?.includes('dir')) live.add(this);
+        super.observe(target, options);
+      }
+      override disconnect() {
+        live.delete(this);
+        super.disconnect();
+      }
+    };
+    try {
+      const { unmount } = render(
+        <StrictMode>
+          <Host />
+        </StrictMode>,
+      );
+      await settle();
+      expect(live.size).toBe(1);
+      unmount();
+      expect(live.size).toBe(0);
+    } finally {
+      globalThis.MutationObserver = Native;
+    }
+  });
+
+  it('a table in a shadow root inside an iframe (another realm): a `dir` in the shadow tree and on the host measure', async () => {
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument!;
+    // The realm of the iframe has its own `ShadowRoot`: `instanceof` with the parent's would say no.
+    expect(doc.defaultView!.ShadowRoot).not.toBe(ShadowRoot);
+    const host = doc.createElement('div');
+    doc.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    expect(shadow instanceof ShadowRoot).toBe(false);
+    const wrapper = doc.createElement('div');
+    shadow.appendChild(wrapper);
+    const container = doc.createElement('div');
+    wrapper.appendChild(container);
+    const { unmount } = render(<Host />, { container });
+    const el = container.querySelector('table')!.parentElement as HTMLElement;
+    const measured = vi.spyOn(window, 'getComputedStyle');
+    const count = () => measured.mock.calls.filter(([target]) => target === el).length;
+    try {
+      await settle();
+      const before = count();
+      await act(async () => {
+        wrapper.setAttribute('dir', 'rtl');
+      });
+      expect(count()).toBe(before + 1);
+      await act(async () => {
+        host.setAttribute('dir', 'rtl');
+      });
+      expect(count()).toBe(before + 2);
+      const unrelated = doc.createElement('p');
+      doc.body.appendChild(unrelated);
+      await act(async () => {
+        unrelated.setAttribute('dir', 'rtl');
+      });
+      expect(count()).toBe(before + 2);
+    } finally {
+      measured.mockRestore();
+      unmount();
+      iframe.remove();
+    }
   });
 
   describe('the observer is disconnected on unmount', () => {
