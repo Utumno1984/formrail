@@ -207,6 +207,7 @@ test.describe('Pro examples on their Docs pages', () => {
       'packages/pro/src/form-rebase/FormRebase.example.tsx',
       'packages/pro/src/form-rebase/RebaseNotice.example.tsx',
       'packages/pro/src/integrations/react-hook-form/ReactHookForm.example.tsx',
+      'packages/pro/src/integrations/tanstack-form/TanStackForm.example.tsx',
       'packages/pro/src/list-report/VirtualListReport.example.tsx',
     ]);
     for (const { file, marker } of examples) expect(text.includes(marker), file).toBe(true);

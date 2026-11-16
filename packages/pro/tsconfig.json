@@ -6,7 +6,8 @@
     "paths": {
       "@formrail/pro": ["./src/index.ts"],
       "@formrail/pro/engine": ["./src/engine.ts"],
-      "@formrail/pro/react-hook-form": ["./src/react-hook-form.ts"]
+      "@formrail/pro/react-hook-form": ["./src/react-hook-form.ts"],
+      "@formrail/pro/tanstack-form": ["./src/tanstack-form.ts"]
     },
     "types": []
   },

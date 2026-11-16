@@ -135,3 +135,105 @@ describe('packages/pro react-hook-form entry', () => {
     expect(lock.packages['node_modules/react-hook-form'].version).toBe(floor);
   });
 });
+
+/**
+ * What the "TanStack Form" section of the Pro README must hold (#508): the parts of the text that are missing from
+ * `readme` (the section runs from its heading to the next `## ` heading).
+ */
+export function missingTanStackFormDocs(readme) {
+  const lines = readme.split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trimEnd() === '## TanStack Form');
+  if (start < 0) return ['## TanStack Form'];
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('## '));
+  const section = lines.slice(start, end < 0 ? undefined : end).join('\n');
+  const required = [
+    // Install, without core, with the tested versions and the private org.
+    'npm install @formrail/pro @tanstack/react-form',
+    '`~1.33.5`',
+    'a wider range follows a verified update',
+    '`@formrail/core`\n  is not needed',
+    '"private": true',
+    // The usage.
+    "from '@formrail/pro/tanstack-form'",
+    "from '@formrail/pro/engine'",
+    // The save mapping.
+    'binding.reset(saved)',
+    'form.state.isSubmitting',
+    'isSaving',
+    'saveError',
+    // The dirty rule.
+    'useChangeSummary().isEmpty',
+    'state.isDirty',
+    // Inline defaultValues and update() on a touched form.
+    'inline',
+    'TOUCHED form',
+    // Server updates.
+    'rebase(data)',
+    'rebase(incoming)',
+    // The recommended pattern (decision of 16/11 on #508): `defaultValues` kept on the binding's baseline.
+    ...SAVED_PATTERN,
+  ];
+  return required.filter((text) => !section.includes(text));
+}
+
+/** The lines of the recommended pattern, the same in the README usage and in the copy-paste Example. */
+const SAVED_PATTERN = ['const [saved, setSaved] = useState(', 'defaultValues: saved,', 'useEffect(() => setSaved(binding.baseline), [binding.baseline]);'];
+
+describe('packages/pro README: the TanStack Form section (#508)', () => {
+  const readme = readFileSync(resolve(ROOT, 'packages/pro/README.md'), 'utf8');
+
+  it('has the section, with install, import paths, saving, the isEmpty rule, inline defaults, update() and the rebase', () => {
+    expect(missingTanStackFormDocs(readme)).toEqual([]);
+  });
+
+  it('the usage and the copy-paste Example keep defaultValues on the baseline with the same lines', () => {
+    const example = readFileSync(resolve(ROOT, 'packages/pro/src/integrations/tanstack-form/TanStackForm.example.tsx'), 'utf8');
+    expect(SAVED_PATTERN.filter((line) => !example.includes(line))).toEqual([]);
+    expect(missingTanStackFormDocs(readme.replace('useEffect(() => setSaved(binding.baseline)', 'useEffect(() => setSaved(incoming)'))).toEqual([
+      SAVED_PATTERN[2],
+    ]);
+  });
+
+  it('negative: a missing heading or a missing part is reported', () => {
+    expect(missingTanStackFormDocs(readme.replace('## TanStack Form', '## TSF'))).toEqual(['## TanStack Form']);
+    expect(missingTanStackFormDocs(readme.replace(/@formrail\/pro\/tanstack-form'/g, "x'"))).toEqual(["from '@formrail/pro/tanstack-form'"]);
+    // Text outside the section does not count.
+    expect(missingTanStackFormDocs('## TanStack Form\n\n## Next\nnpm install @formrail/pro @tanstack/react-form')).toContain(
+      'npm install @formrail/pro @tanstack/react-form',
+    );
+  });
+});
+
+// Ticket #508: the TanStack Form adapter `@formrail/pro/tanstack-form`.
+describe('packages/pro tanstack-form entry', () => {
+  const pkg = readJson('packages/pro/package.json');
+  const lock = readJson('package-lock.json');
+
+  it('exports ./tanstack-form for import and require, each with its declaration file', () => {
+    expect(pkg.exports['./tanstack-form']).toEqual({
+      import: { types: './dist/tanstack-form.d.ts', default: './dist/tanstack-form.js' },
+      require: { types: './dist/tanstack-form.d.cts', default: './dist/tanstack-form.cjs' },
+    });
+  });
+
+  it('@tanstack/react-form is an OPTIONAL peer and a devDependency, never a dependency; form-core and store are none of them', () => {
+    expect(pkg.peerDependencies['@tanstack/react-form']).toBeDefined();
+    expect(pkg.peerDependenciesMeta['@tanstack/react-form']).toEqual({ optional: true });
+    expect(pkg.devDependencies['@tanstack/react-form']).toBeDefined();
+    expect(pkg.dependencies?.['@tanstack/react-form']).toBeUndefined();
+    for (const name of ['@tanstack/form-core', '@tanstack/store']) {
+      for (const field of ['dependencies', 'peerDependencies', 'devDependencies']) expect(pkg[field]?.[name]).toBeUndefined();
+    }
+  });
+
+  // Critic round 1 on PR #557: the adapter reads internals of TanStack Form that are not public API, so the peer accepts
+  // the tested minor only (`~1.33.5`: >=1.33.5 <1.34.0). A newer minor gives a peer conflict, not a silent false dirty;
+  // widening it is a ticket of its own, with the suite run on that version.
+  it('the peer range is the tested minor only (~): the devDependency range, whose floor is the version the lockfile installs', () => {
+    const peer = pkg.peerDependencies['@tanstack/react-form'];
+    expect(peer).toBe(pkg.devDependencies['@tanstack/react-form']);
+    const floor = /^~(\d+\.\d+\.\d+)$/.exec(peer)?.[1];
+    expect(floor).toBeDefined();
+    expect(lock.packages['node_modules/@tanstack/react-form'].version).toBe(floor);
+  });
+});

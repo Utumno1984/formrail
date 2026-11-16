@@ -44,6 +44,24 @@ describe('lint: what a copy-paste example may import (#403)', { timeout: 60_000 
     expect((await messages(RHF_EXAMPLE, importOf(specifier), 'no-restricted-imports')).length).toBeGreaterThanOrEqual(1);
   });
 
+  // #508: @tanstack/react-form (an optional peer of pro) is allowed in the examples of the TanStack Form integration only.
+  const TANSTACK_EXAMPLE = 'packages/pro/src/integrations/tanstack-form/Some.example.tsx';
+  it.each(['@tanstack/react-form', 'react', '@formrail/pro/engine', '@formrail/pro/tanstack-form'])('%s is allowed in a TanStack Form example', async (specifier) => {
+    expect(await messages(TANSTACK_EXAMPLE, importOf(specifier), 'no-restricted-imports')).toEqual([]);
+  });
+
+  it.each(['zod', './sibling', '@formrail/core/internal', 'storybook/test', 'react-hook-form', '@tanstack/store', '@tanstack/form-core'])(
+    '%s is still rejected in a TanStack Form example',
+    async (specifier) => {
+      expect((await messages(TANSTACK_EXAMPLE, importOf(specifier), 'no-restricted-imports')).length).toBeGreaterThanOrEqual(1);
+    },
+  );
+
+  it('@tanstack/react-form stays rejected in the other examples', async () => {
+    expect((await messages(EXAMPLE, importOf('@tanstack/react-form'), 'no-restricted-imports')).length).toBe(1);
+    expect((await messages('packages/pro/src/form-rebase/Some.example.tsx', importOf('@tanstack/react-form'), 'no-restricted-imports')).length).toBe(1);
+  });
+
   it('react-hook-form stays rejected in the other examples', async () => {
     expect((await messages(EXAMPLE, importOf('react-hook-form'), 'no-restricted-imports')).length).toBe(1);
     expect((await messages('packages/pro/src/form-rebase/Some.example.tsx', importOf('react-hook-form'), 'no-restricted-imports')).length).toBe(1);

@@ -84,8 +84,11 @@ describe('docs coverage: the entries of a package (#507)', () => {
       'packages/pro/src/engine.ts',
       'packages/pro/src/index.ts',
       'packages/pro/src/react-hook-form.ts',
+      // #508.
+      'packages/pro/src/tanstack-form.ts',
     ]);
     expect(proExports).toContain('useReactHookFormBinding');
+    expect(proExports).toContain('useTanStackFormBinding');
     // Core's `./internal` facade is not public API: not read.
     expect(entrySources(ROOT, 'packages/core').map((file) => file.slice(ROOT.length + 1))).toEqual(['packages/core/src/index.ts']);
     expect(runtimeExports(read('packages/pro/src/index.ts'))).not.toContain('useReactHookFormBinding');

@@ -48,14 +48,32 @@ export default defineConfig({
   // `engine` (#489): `@formrail/pro/engine`, the engines without `@formrail/core`. `shared`: the stateless
   // helpers of both entries, imported by them only (not a public subpath, so no declarations).
   // `react-hook-form` (#507): `@formrail/pro/react-hook-form`, the React Hook Form adapter (types of
-  // `react-hook-form` only, an optional peer: external, and never imported at runtime).
-  entry: { index: 'src/index.ts', engine: 'src/engine.ts', 'react-hook-form': 'src/react-hook-form.ts', shared: 'src/internal/shared.ts' },
+  // `react-hook-form` only, an optional peer: external, and never imported at runtime). `tanstack-form` (#508):
+  // `@formrail/pro/tanstack-form`, the TanStack Form adapter (types of `@tanstack/react-form` only, the same way).
+  entry: {
+    index: 'src/index.ts',
+    engine: 'src/engine.ts',
+    'react-hook-form': 'src/react-hook-form.ts',
+    'tanstack-form': 'src/tanstack-form.ts',
+    shared: 'src/internal/shared.ts',
+  },
   format: ['esm', 'cjs'],
-  dts: { entry: { index: 'src/index.ts', engine: 'src/engine.ts', 'react-hook-form': 'src/react-hook-form.ts' } },
+  dts: {
+    entry: { index: 'src/index.ts', engine: 'src/engine.ts', 'react-hook-form': 'src/react-hook-form.ts', 'tanstack-form': 'src/tanstack-form.ts' },
+  },
   clean: true,
   sourcemap: true,
   target: 'es2022',
-  external: ['react', 'react-dom', 'react/jsx-runtime', '@formrail/core', '@formrail/core/internal', 'react-hook-form'],
+  external: [
+    'react',
+    'react-dom',
+    'react/jsx-runtime',
+    '@formrail/core',
+    '@formrail/core/internal',
+    'react-hook-form',
+    '@tanstack/react-form',
+    '@tanstack/form-core',
+  ],
   esbuildPlugins: [oneCopyPerModule],
   // No automatic shared chunks (tsup splits ESM by default): they would move most of the code out of
   // `dist/index.js`. The files shared between the entries are the explicit ones above.
