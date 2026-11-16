@@ -149,7 +149,8 @@ export function missingTanStackFormDocs(readme) {
   const required = [
     // Install, without core, with the tested versions and the private org.
     'npm install @formrail/pro @tanstack/react-form',
-    '`^1.33.5`',
+    '`~1.33.5`',
+    'a wider range follows a verified update',
     '`@formrail/core`\n  is not needed',
     '"private": true',
     // The usage.
@@ -225,10 +226,13 @@ describe('packages/pro tanstack-form entry', () => {
     }
   });
 
-  it('the peer range is the tested one: the devDependency range, whose floor is the version the lockfile installs', () => {
+  // Critic round 1 on PR #557: the adapter reads internals of TanStack Form that are not public API, so the peer accepts
+  // the tested minor only (`~1.33.5`: >=1.33.5 <1.34.0). A newer minor gives a peer conflict, not a silent false dirty;
+  // widening it is a ticket of its own, with the suite run on that version.
+  it('the peer range is the tested minor only (~): the devDependency range, whose floor is the version the lockfile installs', () => {
     const peer = pkg.peerDependencies['@tanstack/react-form'];
     expect(peer).toBe(pkg.devDependencies['@tanstack/react-form']);
-    const floor = /^\^(\d+\.\d+\.\d+)$/.exec(peer)?.[1];
+    const floor = /^~(\d+\.\d+\.\d+)$/.exec(peer)?.[1];
     expect(floor).toBeDefined();
     expect(lock.packages['node_modules/@tanstack/react-form'].version).toBe(floor);
   });
