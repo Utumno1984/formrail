@@ -234,9 +234,12 @@ export interface UseFormRebaseReturn<Values extends object> {
    * so it can be called on every render or in an effect on the data. Stable identity.
    */
   rebase: (incoming: Values) => void;
-  /** `applied` of the last rebase, until the form is saved or reset. */
+  /** `applied` of the last rebase (not accumulated across rebases), until the form is saved or reset. */
   applied: ChangeEntry[];
-  /** Open conflicts (see the lifecycle on `useFormRebase`), with their current position (see {@link OpenRebaseConflict}). */
+  /**
+   * Open conflicts, accumulated across rebases until they are resolved (see the lifecycle on `useFormRebase`), with
+   * their current position (see {@link OpenRebaseConflict}).
+   */
   conflicts: OpenRebaseConflict[];
   /** The field (or item, or order) takes the server value and the conflict is closed. Stable identity. */
   acceptTheirs: (path: string) => void;

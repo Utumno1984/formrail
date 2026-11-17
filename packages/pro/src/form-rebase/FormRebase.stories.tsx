@@ -82,6 +82,14 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
     rebase(incoming);
   };
 
+  // Another update, on other fields: Number and Notes (#584, several updates in a row).
+  const simulateAnotherServerUpdate = () => {
+    const incoming: Invoice = { ...server.current, number: `${server.current.number}-B`, notes: 'Approved by finance' };
+    server.current = incoming;
+    onServerUpdate(incoming);
+    rebase(incoming);
+  };
+
   return (
     // Inline styles: the pro stylesheet emits no utilities (only `.rop-pro-*` component classes).
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
@@ -93,6 +101,9 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <Button variant="secondary" onClick={simulateServerUpdate}>
           Simulate server update
+        </Button>
+        <Button variant="secondary" onClick={simulateAnotherServerUpdate}>
+          Simulate another server update
         </Button>
         <Button
           variant="primary"
@@ -159,6 +170,11 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
  * "Supplier", not touched, takes the server value; "Amount", touched, keeps yours and is listed as
  * a conflict; "Notes" stays yours. "Accept server value" resolves the conflict with the server
  * value. "Save" waits `saveDelay` ms: a server update pressed meanwhile is queued until it ends.
+ *
+ * Several updates in a row: "Simulate another server update" changes "Number" and "Notes". Pressed
+ * after "Simulate server update" with "Amount" still in conflict, the conflict of the first update
+ * stays open next to the new one on "Notes": the conflicts accumulate until you resolve them, while
+ * "Applied server changes" lists the last update only. The play function ends with this case.
  */
 export const Playground: Story = {
   tags: ['playground'],
@@ -186,6 +202,33 @@ export const Playground: Story = {
     await waitFor(() => expect(conflictItems()).toHaveLength(0));
     await expect(field('Notes')).toHaveValue('Checked by me');
     await expect(field('Supplier')).toHaveValue('Acme Corp (updated)');
+
+    // Two server updates in a row before resolving (#584): the conflict of the first one stays open.
+    const applied = () => within(canvas.getByRole('region', { name: /Applied server changes/ })).getByText(/"path"/);
+    await userEvent.clear(field('Amount'));
+    await userEvent.type(field('Amount'), '130');
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+    await waitFor(() => expect(field('Supplier')).toHaveValue('Acme Corp (updated) (updated)'));
+    await expect(conflictItems()).toHaveLength(1);
+    await expect(conflictItems()[0]).toHaveTextContent('Amount: yours "130", server "200"');
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate another server update' }));
+    await waitFor(() => expect(field('Number')).toHaveValue('INV-001-B'));
+    await expect(conflictItems()).toHaveLength(2);
+    await expect(conflictItems()[0]).toHaveTextContent('Amount: yours "130", server "200"');
+    await expect(conflictItems()[1]).toHaveTextContent('Notes: yours "Checked by me", server "Approved by finance"');
+    // "Applied server changes" lists the last update only: Number, not Supplier.
+    await expect(applied()).toHaveTextContent('"path": "number"');
+    await expect(applied()).not.toHaveTextContent('supplier');
+    await expect(args.onServerUpdate).toHaveBeenCalledTimes(3);
+
+    // Each conflict is resolved on its own: the other one stays.
+    await userEvent.click(canvas.getByRole('button', { name: 'Accept server value for Notes' }));
+    await expect(field('Notes')).toHaveValue('Approved by finance');
+    await waitFor(() => expect(conflictItems()).toHaveLength(1));
+    await expect(conflictItems()[0]).toHaveTextContent('Amount: yours "130", server "200"');
+    await userEvent.click(canvas.getByRole('button', { name: 'Keep my value for Amount' }));
+    await waitFor(() => expect(conflictItems()).toHaveLength(0));
+    await expect(field('Amount')).toHaveValue('130');
   },
 };
 

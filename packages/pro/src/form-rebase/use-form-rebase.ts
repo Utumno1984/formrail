@@ -176,13 +176,31 @@ function reorderedAs(current: readonly unknown[], theirs: readonly unknown[], id
  * left (the one returned by the handler on success, the unchanged one on failure). A `reset`
  * during a save would win over the save, so it is never called then.
  *
- * **Conflict lifecycle**: a conflict stays open until `acceptTheirs`/`keepMine`/`acceptAllTheirs`,
- * until a save succeeds (the user's values were saved: conflicts and `applied` are cleared, the
- * save is never blocked), or until the form is reset by the consumer (`reset()` or
- * `reset(newBaseline)`: conflicts and `applied` are cleared). A new rebase recomputes conflicts
- * and `applied` from scratch against its `incoming`. A conflict whose field the user brings back to
- * the incoming value (by hand) closes by itself and does not reopen. A `reset()` on a form that is
- * already clean changes nothing observable and keeps `applied`.
+ * **Conflict lifecycle**: a conflict stays open until the user's value and the server's agree:
+ * until `acceptTheirs`/`keepMine`/`acceptAllTheirs`, until the user brings the field to the server
+ * value by hand (it closes by itself and does not reopen), or until a later rebase brings the server
+ * to the user's value. A save that succeeds closes them all (the user's values were saved: conflicts
+ * and `applied` are cleared, the save is never blocked), and so does a reset of the form by the
+ * consumer (`reset()`, `reset(newBaseline)`, a rehydration: conflicts and `applied` are cleared). A
+ * `reset()` on a form that is already clean changes nothing observable and keeps `applied`.
+ *
+ * **Several rebases in a row**: the open conflicts accumulate. A new rebase keeps every open
+ * conflict on a field it does not change (Save would still overwrite the server's value there), and
+ * merges the fields it changes against the previous version: on a field of an open conflict, still
+ * one conflict, with `theirs` the new server value and `base` the value it replaced; none when the
+ * server now holds the user's value. A server that goes back to an older value does not close a
+ * conflict. There is one conflict per field (items of id-keyed arrays by id), in the order of the
+ * form whatever the order in which the rebases arrive; `path` and labels are those of the last
+ * rebase, and a conflict on a field covers the conflicts nested in it. `applied` does not
+ * accumulate: it lists the changes of the last rebase only.
+ *
+ * ```ts
+ * // The user changed Number from 'A-1' to 'A-2'; `saved` is the record the form was loaded with.
+ * rebase({ ...saved, number: 'A-3' });             // conflicts: Number (base 'A-1', theirs 'A-3')
+ * rebase({ ...saved, number: 'A-3', amount: 50 }); // conflicts: Number, still open; applied: Amount
+ * rebase({ ...saved, number: 'A-4', amount: 50 }); // conflicts: Number (base 'A-3', theirs 'A-4'); applied: none
+ * rebase({ ...saved, number: 'A-2', amount: 50 }); // conflicts: none (the server has the user's value)
+ * ```
  *
  * `path` and `mine` of a conflict are those computed by the rebase; `acceptTheirs`/`keepMine`
  * take that `path`. Items of id-keyed arrays are found again by id, so a later reorder by the user
