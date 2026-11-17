@@ -328,7 +328,8 @@ export const DefaultNoPlay: Story = { ...Default, tags: [], play: undefined };
  * included, and its description says so ("All 10,000 results, including those not on screen"). From 640px the
  * action is there as in `Default`. The play function selects three invoices, checks the bar and the description,
  * selects everything from the header checkbox, checks that the bar did not move, then clears the selection and
- * checks that the focus is on the header checkbox.
+ * checks that the focus is on the header checkbox. Where the action is there, it then gives it the focus and selects
+ * every result from outside: the action hides itself (`visibility: hidden`) and the focus goes to the header checkbox.
  */
 export const Selection: Story = {
   args: { rowCount: 10_000, withBulkActions: false },
@@ -378,6 +379,22 @@ export const Selection: Story = {
     await user.click(canvas.getByRole('button', { name: 'Clear selection' }));
     await expect(count).toHaveTextContent('No items selected');
     await expect(allBox).toHaveFocus();
+    await unmoved();
+
+    // Where the action exists (from 640px, or with the consumer's actions): it has the focus and every result gets
+    // selected by a change that is not a gesture on it (a programmatic click on the header checkbox does not move the
+    // focus). The action is then under `visibility: hidden`: the focus goes to the header checkbox, never to the body.
+    if (!action) return;
+    await user.click(canvas.getByRole('checkbox', { name: 'Select INV-000002' }));
+    const shown = canvas.getByRole('button', { name: /^Select all .+ results$/ });
+    shown.focus();
+    await expect(shown).toHaveFocus();
+    allBox.click();
+    await expect(count).toHaveTextContent(`${fmt.format(10_000)} selected`);
+    await waitFor(() => expect(allBox).toHaveFocus());
+    await expect(canvasElement.ownerDocument.activeElement).not.toBe(canvasElement.ownerDocument.body);
+    await user.click(canvas.getByRole('button', { name: 'Clear selection' }));
+    await expect(count).toHaveTextContent('No items selected');
     await unmoved();
   },
 };
