@@ -55,6 +55,8 @@ describe('`@formrail/core/internal` shares its modules with the public entry (no
       'ListReportFrame',
       'useListReportResultIndex',
       'getNumberFormat',
+      // #571: the focus rule of the Pro selection bar reads the same "laid out" predicate as the core.
+      'isLaidOut',
     ];
     for (const name of expected) {
       expect(internalEsm, `missing export ${name}`).toHaveProperty(name);

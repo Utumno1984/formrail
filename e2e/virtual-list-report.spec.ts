@@ -802,3 +802,108 @@ test.describe('#504 below the virtualization threshold', () => {
     await expect(selCount(page)).toHaveText('50 selected');
   });
 });
+
+// #571: the focus rule of the selection bar (now in the Pro, `use-keep-bulk-actions-focus.ts`) also sees a control
+// under `visibility: hidden` (no resize, no change of children) and a control nested in a wrapper of the bulk actions.
+test.describe('#571 focus of a bulk action hidden without a resize', () => {
+  for (const { vp, withBulk } of [
+    { vp: { width: 1280, height: 800 }, withBulk: false },
+    { vp: { width: 375, height: 667 }, withBulk: true },
+  ]) {
+    test(`${vp.width}x${vp.height}, consumer bulkActions ${String(withBulk)}: "Select all N results" under visibility: hidden once every result is selected from outside, the focus goes to the header checkbox`, async ({ page }) => {
+      await page.setViewportSize(vp);
+      await gotoStory(page, SELECTION, `withBulkActions:!${String(withBulk)}`);
+      await pickRows(page, [2]);
+      await selectAllByRole(page).focus();
+      await expect(selectAllByRole(page)).toBeFocused();
+      // A change that is not a gesture on the action: a programmatic click on the header checkbox does not move the focus.
+      await allBox(page).evaluate((el: HTMLElement) => el.click());
+      await expect(selCount(page)).toHaveText('10,000 selected');
+      expect(await selectAllNode(page).evaluate((el) => getComputedStyle(el).visibility)).toBe('hidden');
+      await expect(allBox(page)).toBeFocused();
+      expect(await activeIsBody(page)).toBe(false);
+    });
+  }
+
+  /** Appends a wrapper with a "Nested" button to the slot of the bulk actions (the parent of the Pro action), as a consumer's markup. */
+  async function nestedControl(page: Page): Promise<{ wrapper: Locator; nested: Locator }> {
+    await selectAllNode(page).evaluate((action) => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-e2e-wrapper', '');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Nested';
+      wrapper.append(button);
+      action.parentElement!.append(wrapper);
+    });
+    return { wrapper: page.locator('[data-e2e-wrapper]'), nested: page.getByRole('button', { name: 'Nested' }) };
+  }
+
+  test('a control nested in a wrapper of the bulk actions, the wrapper under visibility: hidden: the focus goes to the header checkbox', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoStory(page, SELECTION, 'withBulkActions:!true');
+    await pickRows(page, [2]);
+    const { wrapper, nested } = await nestedControl(page);
+    await nested.focus();
+    await expect(nested).toBeFocused();
+    await wrapper.evaluate((el: HTMLElement) => {
+      el.style.visibility = 'hidden';
+    });
+    await expect(allBox(page)).toBeFocused();
+    expect(await activeIsBody(page)).toBe(false);
+  });
+
+  // Review point 1: the action activated for real (keyboard or mouse) hides itself and focuses the header checkbox in
+  // the same click. Nothing of the bar may stay tracked: a click on a blank area (focus on body) then a viewport
+  // crossing 640px (the slot under `display: none`, a resize) must leave the focus on body, and the page where it is.
+  for (const gesture of ['Enter', 'Space', 'mouse'] as const) {
+    test(`"Select all N results" activated with ${gesture}, then a click on a blank area, then 1280 to 639 wide: the focus stays on body, nothing scrolls @engines`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, SELECTION, 'withBulkActions:!false');
+      await pickRows(page, [2]);
+      if (gesture === 'mouse') await selectAllByRole(page).click();
+      else {
+        await selectAllByRole(page).focus();
+        await page.keyboard.press(gesture === 'Space' ? ' ' : gesture);
+      }
+      await expect(selCount(page)).toHaveText('10,000 selected');
+      await expect(allBox(page)).toBeFocused();
+      expect(await selectAllNode(page).evaluate((el) => getComputedStyle(el).visibility)).toBe('hidden');
+      // A blank area: the title of the floorplan (not focusable).
+      await page.getByRole('heading', { name: /Invoices/ }).click();
+      expect(await activeIsBody(page)).toBe(true);
+      await scrollToTop(page, 2_000);
+      const scrolled = (): Promise<[number, number, number]> =>
+        scroller(page).evaluate((el) => [el.scrollTop, window.scrollY, document.scrollingElement!.scrollTop]);
+      const before = await scrolled();
+      await page.setViewportSize({ width: 639, height: 800 });
+      // The resize is observed at the next frames: give them time to (wrongly) move the focus.
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => r())))));
+      expect(await activeIsBody(page)).toBe(true);
+      await expect(allBox(page)).not.toBeFocused();
+      expect(await scrolled()).toEqual(before);
+      // And back: the action is there again, still nothing moved.
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+      expect(await activeIsBody(page)).toBe(true);
+    });
+  }
+
+  test('the same wrapper hidden with visibility: visible on the nested control: the control is shown and keeps the focus', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoStory(page, SELECTION, 'withBulkActions:!true');
+    await pickRows(page, [2]);
+    const { wrapper, nested } = await nestedControl(page);
+    await nested.evaluate((el: HTMLElement) => {
+      el.style.visibility = 'visible';
+    });
+    await nested.focus();
+    await wrapper.evaluate(async (el: HTMLElement) => {
+      el.style.visibility = 'hidden';
+      // The observer's callback (a microtask) and a frame for a resize, if any.
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+    });
+    await expect(nested).toBeVisible();
+    await expect(nested).toBeFocused();
+  });
+});

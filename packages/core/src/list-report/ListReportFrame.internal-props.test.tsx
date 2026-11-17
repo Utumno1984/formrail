@@ -1,5 +1,5 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { selectionActionsClass, selectionActionsWideOnlyClass } from './list-report-styles';
 import { ListReport } from './ListReport';
@@ -76,7 +76,6 @@ function setLaidOut(laidOut: (el: Element) => boolean) {
   });
 }
 const observerOf = (el: Element) => observers.find((o) => o.targets.includes(el));
-const fire = (el: Element) => act(() => observerOf(el)!.callback([], {} as ResizeObserver));
 
 describe('bulkActionsWideOnly: the bar of a frame whose only action is the Pro one', () => {
   it('the bar takes the one-line variant of a bar without bulkActions, and the slot is hidden below 640px (CSS)', () => {
@@ -110,97 +109,40 @@ describe('bulkActionsWideOnly: the bar of a frame whose only action is the Pro o
   });
 
   it('never reaches the DOM: no attribute named after either internal prop, anywhere', () => {
-    const { container } = render(<Host bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
+    // #571: `keepBulkActionsFocus` is gone (its rule lives in the Pro); the frame's second internal prop is now
+    // `bulkActionsSlotRef`. Both names stay in the patterns.
+    const { container } = render(<Host bulkActions={approve} bulkActionsWideOnly bulkActionsSlotRef={createRef()} />);
     const names = Array.from(container.querySelectorAll('*')).flatMap((el) => el.getAttributeNames());
-    expect(names.filter((n) => /wideonly|keepbulk/i.test(n))).toEqual([]);
-    expect(container.innerHTML).not.toMatch(/bulkActionsWideOnly|keepBulkActionsFocus/i);
+    expect(names.filter((n) => /wideonly|keepbulk|slotref/i.test(n))).toEqual([]);
+    expect(container.innerHTML).not.toMatch(/bulkActionsWideOnly|keepBulkActionsFocus|bulkActionsSlotRef/i);
   });
 });
 
-describe('keepBulkActionsFocus: a focused action hidden or removed hands the focus to the header checkbox', () => {
-  it('the slot is hidden (below 640px) while an action has the focus: the focus goes to the header checkbox', () => {
-    render(<Host bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
-    const button = screen.getByRole('button', { name: 'Approve' });
-    const slot = slotOf(button);
-    setLaidOut(() => true);
-    // No observer while nothing of the slot has the focus.
-    expect(observerOf(slot)).toBeUndefined();
-    act(() => button.focus());
-    expect(observerOf(slot)).toBeDefined();
-    // The viewport crosses 640px: the slot is under `display: none`, the browser drops the focus.
-    setLaidOut((el) => !slot.contains(el));
-    act(() => button.blur());
-    expect(document.activeElement).toBe(document.body);
-    fire(slot);
-    expect(allBox()).toHaveFocus();
-    // Done: the observer is gone with the focus.
-    expect(observerOf(slot)).toBeUndefined();
+describe('bulkActionsSlotRef: the slot of the bulk actions, for the focus rule of the Pro (#571)', () => {
+  it('receives the slot that wraps what bulkActions returns, and null once the slot is gone', () => {
+    const slotRef = createRef<HTMLDivElement>();
+    const { rerender } = render(<Host bulkActions={approve} bulkActionsSlotRef={slotRef} />);
+    expect(slotRef.current).toBe(slotOf(screen.getByRole('button', { name: 'Approve' })));
+    expect(slotRef.current).toHaveClass(...selectionActionsClass.split(' '));
+    rerender(<Host bulkActionsSlotRef={slotRef} />);
+    expect(slotRef.current).toBeNull();
   });
 
-  it('also while the hidden button still holds the focus (the observer runs before the browser drops it)', () => {
-    render(<Host bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
-    const button = screen.getByRole('button', { name: 'Approve' });
-    setLaidOut(() => true);
-    act(() => button.focus());
-    setLaidOut((el) => !slotOf(button).contains(el));
-    fire(slotOf(button));
-    expect(allBox()).toHaveFocus();
-  });
-
-  it('an action removed with the focus (the consumer dropped it): the focus goes to the header checkbox', async () => {
+  it('only a ref: an action of the slot that has the focus and is removed is not handled by the frame (the rule is the Pro hook, see @formrail/pro use-keep-bulk-actions-focus)', async () => {
     setLaidOut((el) => el.isConnected);
-    const { rerender } = render(<Host bulkActions={approve} keepBulkActionsFocus />);
+    const slotRef = createRef<HTMLDivElement>();
+    const { rerender } = render(<Host bulkActions={approve} bulkActionsSlotRef={slotRef} />);
     act(() => screen.getByRole('button', { name: 'Approve' }).focus());
-    // The slot stays (the Pro always passes its own action); the consumer's button goes away.
-    rerender(<Host bulkActions={() => <span>Nothing</span>} keepBulkActionsFocus />);
-    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
-    // The change of the slot's children is seen by its MutationObserver (a microtask).
-    await waitFor(() => expect(allBox()).toHaveFocus());
+    expect(observers.filter((o) => o.targets.includes(slotRef.current!))).toEqual([]);
+    rerender(<Host bulkActions={() => <span>Nothing</span>} bulkActionsSlotRef={slotRef} />);
+    await act(async () => {});
+    expect(allBox()).not.toHaveFocus();
   });
+});
 
-  it('without results the header checkbox is disabled: the focus goes to the table container', () => {
-    setLaidOut(() => true);
-    render(<Host rows={[]} bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
-    const button = screen.getByRole('button', { name: 'Approve' });
-    act(() => button.focus());
-    setLaidOut((el) => !slotOf(button).contains(el));
-    fire(slotOf(button));
-    expect(allBox()).toBeDisabled();
-    expect(screen.getByRole('table', { name: 'Items' }).parentElement).toHaveFocus();
-  });
-
-  it('a focus the user moved elsewhere first is left where it is', async () => {
-    setLaidOut(() => true);
-    render(<Host bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
-    const button = screen.getByRole('button', { name: 'Approve' });
-    const search = screen.getByRole('searchbox');
-    act(() => button.focus());
-    expect(observerOf(slotOf(button))).toBeDefined();
-    await userEvent.click(search);
-    // Losing the focus with the button still laid out is the user moving on: no observer any more.
-    expect(observerOf(slotOf(button))).toBeUndefined();
-    setLaidOut((el) => !slotOf(button).contains(el));
-    expect(search).toHaveFocus();
-  });
-
-  it('a resize of the slot while its action is still laid out moves nothing', () => {
-    setLaidOut(() => true);
-    render(<Host bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
-    const button = screen.getByRole('button', { name: 'Approve' });
-    act(() => button.focus());
-    fire(slotOf(button));
-    expect(button).toHaveFocus();
-  });
-
-  it('an environment without layout (nothing laid out at focus time) never moves the focus', () => {
-    setLaidOut(() => false);
-    render(<Host bulkActions={approve} bulkActionsWideOnly keepBulkActionsFocus />);
-    const button = screen.getByRole('button', { name: 'Approve' });
-    act(() => button.focus());
-    fire(slotOf(button));
-    expect(button).toHaveFocus();
-  });
-
+// The tests of the rule itself (the focus of a hidden or removed action) moved with it to `@formrail/pro`
+// (`use-keep-bulk-actions-focus.test.tsx`, #571), with their titles and assertions. The Free one stays here.
+describe('keepBulkActionsFocus: a focused action hidden or removed hands the focus to the header checkbox', () => {
   it('without keepBulkActionsFocus (ListReport): no observer, the focus of a removed action is not handled (unchanged)', async () => {
     setLaidOut((el) => el.isConnected);
     function Free({ withApprove }: { withApprove: boolean }) {

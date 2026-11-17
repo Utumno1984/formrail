@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, useListReport, useListReportScrollRestoration, type ListReportColumn, type ListReportFilter } from '@formrail/core';
-import { VirtualListReport, type VirtualListReportProps } from './VirtualListReport';
-import { PITCH, mockTableLayout } from '../../test/virtual-table-utils';
+import { VirtualListReport, type VirtualListReportLabels, type VirtualListReportProps } from './VirtualListReport';
+import { PITCH, installResizeObserverStub, mockTableLayout } from '../../test/virtual-table-utils';
 
 interface Item {
   id: string;
@@ -301,6 +301,125 @@ describe('without consumer bulkActions (#504)', () => {
       return <VirtualListReport title="Items" table={table} keepBulkActionsFocus={false} />;
     }
     expect([Typed, TypedFocus]).toHaveLength(2);
+  });
+
+  it('#571: bulkActionsSlotRef, the frame\'s internal ref of the slot, is not a prop of VirtualListReport either', () => {
+    function TypedSlot() {
+      const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true });
+      // @ts-expect-error internal to the core's frame, never a prop of the floorplan
+      return <VirtualListReport title="Items" table={table} bulkActionsSlotRef={() => {}} />;
+    }
+    expect(TypedSlot).toBeTypeOf('function');
+  });
+
+  it('#571 (decision B): a complete VirtualListReportLabels object may leave out selectAllResultsDescription (it has a default)', () => {
+    // Optional: an object with every other key compiles as a `VirtualListReportLabels`.
+    expectTypeOf<Omit<VirtualListReportLabels, 'selectAllResultsDescription'>>().toExtend<VirtualListReportLabels>();
+    expectTypeOf<VirtualListReportLabels['selectAllResultsDescription']>().toEqualTypeOf<((resultCount: number) => string) | undefined>();
+    // Only that key changed: `selectAllResultsAction` stays required, as before.
+    expectTypeOf<Omit<VirtualListReportLabels, 'selectAllResultsAction'>>().not.toExtend<VirtualListReportLabels>();
+    // And at runtime the default is used when the key is absent from `labels` (unchanged).
+    render(<Bare labels={{ selectAllResultsAction: (n) => `All ${n}` }} />);
+    const describedBy = screen.getByRole('checkbox', { name: 'Select all results' }).getAttribute('aria-describedby')!;
+    expect(document.getElementById(describedBy)).toHaveTextContent('All 100,000 results, including those not on screen');
+  });
+
+  // #571, review point 1: activating "Select all N results" hides it (`visibility: hidden`) and focuses the header
+  // checkbox in the same click. React re-renders in a microtask queued before the one that reads the `focusout`, so
+  // that read saw the action already hidden and kept tracking it: observers left on at rest, and once the user put
+  // the focus on `body`, any later change of the slot "recovered" the focus to the header checkbox (and scrolled).
+  // Run with React's real scheduling (no `act` around the gesture), as in a browser.
+  describe('#571: a real activation of "Select all N results", then the focus on body: nothing tracked, nothing stolen', () => {
+    let ro: ReturnType<typeof installResizeObserverStub>;
+    const mutationObservers: { targets: Node[] }[] = [];
+    const OriginalMutationObserver = globalThis.MutationObserver;
+    const actEnvironment = (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
+    beforeEach(() => {
+      ro = installResizeObserverStub();
+      globalThis.MutationObserver = class extends OriginalMutationObserver {
+        private entry = { targets: [] as Node[] };
+        constructor(callback: MutationCallback) {
+          super(callback);
+          mutationObservers.push(this.entry);
+        }
+        override observe(target: Node, options?: MutationObserverInit) {
+          this.entry.targets.push(target);
+          super.observe(target, options);
+        }
+        override disconnect() {
+          this.entry.targets.length = 0;
+          super.disconnect();
+        }
+      };
+      // Laid out = in the document (jsdom has no layout); the action's `visibility: hidden` is its inline style.
+      Element.prototype.checkVisibility ??= () => true;
+      vi.spyOn(Element.prototype, 'checkVisibility').mockImplementation(function (this: Element) {
+        return this.isConnected;
+      });
+    });
+    afterEach(() => {
+      (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
+      globalThis.MutationObserver = OriginalMutationObserver;
+      ro.restore();
+      mutationObservers.length = 0;
+    });
+    const realScheduling = () => {
+      (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+    };
+    /** Every microtask and a task: React's render, the observers' callbacks, the `focusout` read. */
+    const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+    /** The observers still observing the slot or anything inside it. */
+    const observing = (slot: Element) => ({
+      mutation: mutationObservers.filter((o) => o.targets.some((t) => slot.contains(t))),
+      resize: ro.instances.filter((o) => o.observed.some((t) => slot.contains(t))),
+    });
+
+    for (const [gesture, activate] of [
+      ['a click (focus, then click: as a mouse in Chrome and Firefox)', async (action: HTMLElement) => {
+        realScheduling();
+        action.focus();
+        await settle();
+        action.click();
+      }],
+      ['the mouse (user-event: pointer down focuses it, then click)', async (action: HTMLElement) => userEvent.setup().click(action)],
+      ['Enter', async (action: HTMLElement) => {
+        act(() => action.focus());
+        await userEvent.setup().keyboard('{Enter}');
+      }],
+      ['Space', async (action: HTMLElement) => {
+        act(() => action.focus());
+        await userEvent.setup().keyboard(' ');
+      }],
+    ] as const) {
+      it(`activated with ${gesture}: the header checkbox gets the focus, then body keeps it through a change and a resize of the slot`, async () => {
+        render(<Bare />);
+        await userEvent.setup().click(screen.getByRole('checkbox', { name: 'Select Item 3' }));
+        const action = selectAllAction();
+        const slot = action.parentElement!;
+        await activate(action);
+        realScheduling();
+        await settle();
+        expect(screen.getByText('100,000 selected')).toBeInTheDocument();
+        expect(action.style.visibility).toBe('hidden');
+        expect(allBox()).toHaveFocus();
+        // The focus moved on purpose: nothing of the slot is tracked any more.
+        expect(observing(slot)).toEqual({ mutation: [], resize: [] });
+        // The user clicks a blank area: the focus is on body.
+        allBox().blur();
+        expect(document.activeElement).toBe(document.body);
+        // Changes of the slot (class, style, children) and a resize (the viewport crossing 640px, a tablet rotated).
+        slot.classList.add('rop-test-changed');
+        slot.style.outline = '1px solid';
+        slot.append(document.createElement('span'));
+        await settle();
+        expect(document.activeElement).toBe(document.body);
+        // Every resize observer still connected (a disconnected one never calls back).
+        for (const o of ro.instances.filter((i) => i.observed.length > 0)) o.callback([], o as unknown as ResizeObserver);
+        await settle();
+        expect(document.activeElement).toBe(document.body);
+        expect(observing(slot)).toEqual({ mutation: [], resize: [] });
+      });
+    }
   });
 });
 

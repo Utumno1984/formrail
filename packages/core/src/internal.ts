@@ -104,3 +104,9 @@ export { getNumberFormat } from './list-report/number-format';
 export { useListReportResultIndex } from './list-report/use-list-report-result-index';
 /** @internal */
 export type { ListReportResultIndex } from './list-report/use-list-report-result-index';
+
+/**
+ * @internal Whether an element has a box in the layout (`checkVisibility`, or its rendered boxes): see `internal/focus.ts`.
+ * For the focus rule of the Pro selection bar (`VirtualListReport`), the same predicate the core's own focus code uses.
+ */
+export { isLaidOut } from './internal/focus';
