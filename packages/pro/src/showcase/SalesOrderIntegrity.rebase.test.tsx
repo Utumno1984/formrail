@@ -4,10 +4,10 @@
 import { act } from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { formatDate, getProduct } from '../../../core/src/internal/demo-data';
 import { createSalesOrderStore, type StoredSalesOrder } from '../../../core/src/showcase/sales-order-store';
-import { CONFLICT_HELP, NOTICE_TITLE, REMOVED_HELP, serverChangeOf, serverLineIds } from './sales-order-rebase';
+import { CONFLICT_HELP, DELETED_REVIEW_DESCRIPTION, NOTICE_TITLE, REMOVED_HELP, serverChangeOf, serverLineIds } from './sales-order-rebase';
 import {
   LINES_ORDER,
   ORDER,
@@ -15,6 +15,7 @@ import {
   conflictItems,
   dateField,
   footer,
+  gate,
   notice,
   opened,
   renderOrder,
@@ -236,7 +237,43 @@ describe('Record editing integrity, sales orders: a save in flight, a deleted or
     await waitFor(() => expect(footer()).toBeNull());
   }, 30_000);
 
-  it('the order deleted on the server while edited: an explicit error, my edits still in the form, the form still dirty; Save says it is gone', async () => {
+  it('a line the server adds during a save: the id announced is the id saved (the replay does not issue another)', async () => {
+    const held = gate();
+    const store = createSalesOrderStore(undefined, { saveDelayMs: held.promise });
+    const onServerChange = vi.fn();
+    renderOrder(ORDER, { store, serverChange: 'add-line', onServerChange });
+    await opened();
+    await typeInto(textbox('Customer reference'), 'PO-9');
+    await userEvent.click(await saveButton());
+    await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Save changes' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Simulate server update' }));
+    await waitFor(() => expect(onServerChange).toHaveBeenCalledTimes(1));
+    const announced = onServerChange.mock.calls[0]![0].record.lines.at(-1).id;
+    expect(announced).toBe('srv-line-1');
+    await act(async () => {
+      held.release();
+      await held.promise;
+    });
+    await waitFor(() => expect(footer()).toBeNull());
+    expect(stored(store).lines.map((l) => l.id)).toContain(announced);
+    expect(stored(store).lines.map((l) => l.id)).not.toContain('srv-line-2');
+  }, 30_000);
+
+  it('the order deleted on the server with the review open: the description says it can no longer be saved, not "1 change will be saved."', async () => {
+    const { store } = renderOrder();
+    await opened();
+    await typeInto(textbox('Customer reference'), 'PO-lost');
+    await userEvent.click(await saveButton());
+    const dialog = await reviewDialog();
+    expect(dialog).toHaveAccessibleDescription('1 change will be saved.');
+    await act(async () => {
+      await store.removeFromServer(ORDER);
+    });
+    await waitFor(() => expect(dialog).toHaveAccessibleDescription(DELETED_REVIEW_DESCRIPTION));
+    expect(dialog).not.toHaveAccessibleDescription(/will be saved/);
+  }, 30_000);
+
+  it('the order deleted on the server: an explicit error, my edits still in the form, the form still dirty; Save says it is gone', async () => {
     const { store } = renderOrder(ORDER, { serverChange: 'delete-order' });
     await opened();
     await typeInto(textbox('Customer reference'), 'PO-lost');

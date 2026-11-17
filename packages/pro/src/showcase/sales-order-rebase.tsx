@@ -131,6 +131,7 @@ export const CONFLICT_HELP = 'Changed on the server too.';
 export const REMOVED_HELP = 'Removed on the server.';
 export const DELETED_TITLE = 'This sales order was deleted on the server';
 export const DELETED_TEXT = 'Your changes are still in the form, but they can no longer be saved. Copy what you need, then go back to the list.';
+export const DELETED_REVIEW_DESCRIPTION = 'This sales order was deleted on the server: these changes can no longer be saved.';
 export const OVERWRITE_TITLE = 'You are overwriting a server change';
 
 /** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
@@ -140,6 +141,8 @@ const NOTICE_MARGIN = { margin: '12px 16px' } as const;
 interface ReviewState {
   context: SalesOrderReviewContext;
   conflicts: OpenRebaseConflict[];
+  /** The order was deleted on the server: what the review lists can no longer be saved. */
+  deleted: boolean;
 }
 
 function createReviewSource(initial: ReviewState) {
@@ -165,7 +168,8 @@ function useReview(source: ReviewSource) {
 
 /** The description of the review, recomputed when the form changes under the dialog. */
 function ReviewDescription({ source }: { source: ReviewSource }) {
-  const { context } = useReview(source);
+  const { context, deleted } = useReview(source);
+  if (deleted) return <>{DELETED_REVIEW_DESCRIPTION}</>;
   const { entries, reorders } = salesOrderReview(context);
   if (entries.length > 0) return <>{reviewDescription(entries.length)}</>;
   return <>{reorders.length > 0 ? ORDER_ONLY_DESCRIPTION : NOTHING_LEFT_DESCRIPTION}</>;
@@ -234,17 +238,21 @@ export function useSalesOrderRebase({ form, record, store, toValues, scrollerRef
     // An order already gone rejects with "not found": the deletion was announced already.
     const ignore = () => undefined;
     if (serverChange === 'delete-order') void store.removeFromServer(record.id, serverUpdateDelayMs).catch(ignore);
-    else void store.updateFromServer(record.id, serverChangeOf(serverChange, newLineId), serverUpdateDelayMs).catch(ignore);
+    else {
+      // One id per click: the store replays the change on top of a save in flight, and the replay must give the same id.
+      const lineId = serverChange === 'add-line' ? newLineId() : '';
+      void store.updateFromServer(record.id, serverChangeOf(serverChange, () => lineId), serverUpdateDelayMs).catch(ignore);
+    }
   }, [store, record.id, newLineId]);
 
   const { conflicts } = rebase;
 
   // The review dialog reads the form through this source while it is open: an update may land under it.
-  const [review] = useState(() => createReviewSource({ context: { values: form.values, baseline: form.baseline }, conflicts }));
+  const [review] = useState(() => createReviewSource({ context: { values: form.values, baseline: form.baseline }, conflicts, deleted }));
   useEffect(() => {
     const current = review.get();
-    if (current.context.values === form.values && current.context.baseline === form.baseline && sameConflicts(current.conflicts, conflicts)) return;
-    review.set({ context: { values: form.values, baseline: form.baseline }, conflicts });
+    if (current.context.values === form.values && current.context.baseline === form.baseline && sameConflicts(current.conflicts, conflicts) && current.deleted === deleted) return;
+    review.set({ context: { values: form.values, baseline: form.baseline }, conflicts, deleted });
   });
 
   const reviewSave = useCallback(
@@ -252,7 +260,7 @@ export function useSalesOrderRebase({ form, record, store, toValues, scrollerRef
       const base = salesOrderSaveReview(context);
       const open = review.get().conflicts;
       if (!base && open.length === 0) return null;
-      review.set({ context, conflicts: open });
+      review.set({ context, conflicts: open, deleted: review.get().deleted });
       return {
         title: 'Review changes',
         confirmLabel: 'Save changes',
