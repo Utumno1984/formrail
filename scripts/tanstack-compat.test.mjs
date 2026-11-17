@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,24 +35,78 @@ describe('the suite', () => {
     expect(SUITE_ARGS.slice(0, 2)).toEqual(['tanstack-form', '-t']);
   });
 
-  // The real thing: vitest, from packages/pro, with the very SUITE_ARGS of the script. Vitest joins describe and it
-  // with " > " in the name the pattern is matched against; a pattern with another separator skips nothing, and only
-  // a real run can tell.
-  it('skips exactly one test, the one on the installed version, and runs the rest', () => {
+  // The real thing: vitest, from packages/pro, with the very SUITE_ARGS of the script, but only LISTING the tests
+  // (nothing is executed). Vitest joins describe and it with " > " in the name the pattern is matched against; a
+  // pattern with another separator skips nothing, and only a real vitest can tell.
+  it('skips exactly one test, the one on the installed version, and keeps the rest', () => {
     const cwd = fileURLToPath(new URL('../packages/pro/', import.meta.url));
-    const dir = mkdtempSync(path.join(tmpdir(), 'tanstack-compat-'));
-    const outputFile = path.join(dir, 'report.json');
-    spawnSync('npx', ['vitest', 'run', ...SUITE_ARGS, '--reporter=json', `--outputFile=${outputFile}`], { cwd, encoding: 'utf8' });
-    const report = JSON.parse(readFileSync(outputFile, 'utf8'));
-    rmSync(dir, { recursive: true, force: true });
-    const tests = report.testResults.flatMap((file) => file.assertionResults);
-    const skipped = tests.filter((t) => t.status === 'skipped' || t.status === 'pending');
-    expect(skipped.map((t) => t.fullName)).toEqual([
-      'TanStack Form 1.33.5: the installed version is the tested minimum of the peer range, which accepts its minor only (~)',
+    const listed = (args) => {
+      const r = spawnSync('npx', ['vitest', 'list', ...args, '--json'], { cwd, encoding: 'utf8', timeout: 120_000 });
+      expect(r.error).toBeUndefined();
+      expect(r.status, r.stderr).toBe(0);
+      return JSON.parse(r.stdout.slice(r.stdout.indexOf('[')));
+    };
+    const all = listed([SUITE_ARGS[0]]);
+    const kept = listed(SUITE_ARGS);
+    const keptNames = new Set(kept.map((t) => `${t.file}::${t.name}`));
+    const dropped = all.filter((t) => !keptNames.has(`${t.file}::${t.name}`));
+    expect(dropped.map((t) => t.name)).toEqual([
+      'TanStack Form 1.33.5: the installed version > is the tested minimum of the peer range, which accepts its minor only (~)',
     ]);
-    expect(report.numFailedTests).toBe(0);
-    expect(report.numPassedTests).toBeGreaterThan(100);
-  }, 180_000);
+    expect(kept.length).toBeGreaterThan(100);
+  }, 150_000);
+});
+
+// The failure path, with stub npm and npx first in the PATH: the script must exit 1 when the install or vitest
+// fails, and 0 only when both pass. The workflow is silent about everything else, so this is what keeps the weekly
+// job honest.
+describe('the script exit code', () => {
+  const script = fileURLToPath(new URL('./tanstack-compat.mjs', import.meta.url));
+  const runWith = ({ npm, npx }) => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'tanstack-compat-stubs-'));
+    const log = path.join(dir, 'calls.log');
+    for (const [name, code] of [
+      ['npm', npm],
+      ['npx', npx],
+    ]) {
+      const file = path.join(dir, name);
+      writeFileSync(file, `#!/bin/sh\necho "${name} $*" >> "${log}"\nexit ${code}\n`);
+      chmodSync(file, 0o755);
+    }
+    const r = spawnSync(process.execPath, [script, '1.33.5'], {
+      encoding: 'utf8',
+      timeout: 30_000,
+      env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}` },
+    });
+    let calls = '';
+    try {
+      calls = readFileSync(log, 'utf8');
+    } catch {
+      // no stub was called
+    }
+    rmSync(dir, { recursive: true, force: true });
+    return { status: r.status, calls, out: r.stdout + r.stderr };
+  };
+
+  it('exits 0 when the install and the tests pass', () => {
+    const r = runWith({ npm: 0, npx: 0 });
+    expect(r.status).toBe(0);
+    expect(r.calls).toMatch(/^npm install .*@tanstack\/react-form@1\.33\.5/m);
+    expect(r.calls).toMatch(/^npx vitest run tanstack-form -t /m);
+    expect(r.out).toContain('PASS');
+  });
+
+  it('exits 1 when the tests fail', () => {
+    const r = runWith({ npm: 0, npx: 1 });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('FAIL');
+  });
+
+  it('exits non-zero when the install fails, and runs no test', () => {
+    const r = runWith({ npm: 3, npx: 0 });
+    expect(r.status).toBe(3);
+    expect(r.calls).not.toContain('npx');
+  });
 });
 
 describe('the workflow', () => {
@@ -71,12 +125,34 @@ describe('the workflow', () => {
   });
 
   it('has the minimum permissions: read-only token, no write scope', () => {
-    expect(yml).toMatch(/^permissions:\s*\n\s+contents: read\s*$/m);
+    // The whole block, exactly: an extra read scope (e.g. actions: read) fails too.
+    expect(/^permissions:\n((?: {2}\S.*\n)+)/m.exec(yml)[1]).toBe('  contents: read\n');
     expect(yml).not.toMatch(/:\s*write/);
   });
 
   it('runs the script of this repo, which stays on 1.x', () => {
     expect(yml).toContain('node scripts/tanstack-compat.mjs');
+  });
+
+  it('makes a failing script fail the step (pipefail) and takes the version from the input through env only', () => {
+    const step = /- name: Run the TanStack[\s\S]*?(?=\n {6}- name:|$)/.exec(yml)[0];
+    expect(step).toMatch(/set -o pipefail|shell: bash/);
+    expect(step).toMatch(/env:\s*\n\s+VERSION: \$\{\{ inputs\.version \}\}/);
+    expect(step).toContain('"$VERSION"');
+  });
+
+  it('never interpolates an expression into a shell command (script injection)', () => {
+    const runs = [...yml.matchAll(/^\s*(?:- )?run: (\|\s*\n(?:\s{10,}.*\n?)+|.*)/gm)].map((m) => m[1]);
+    expect(runs.length).toBeGreaterThan(3);
+    for (const run of runs) expect(run).not.toContain('${{');
+  });
+
+  it('writes the summary even when the run failed (if: always())', () => {
+    expect(yml).toMatch(/- name: Summary\n\s+if: always\(\)/);
+  });
+
+  it('does not keep the token in the checkout (persist-credentials: false)', () => {
+    expect(yml).toMatch(/actions\/checkout@v\d+\n\s+with:\n\s+persist-credentials: false/);
   });
 
   it('does not touch the job names of the required CI', () => {

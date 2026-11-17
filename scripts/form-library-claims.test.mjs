@@ -62,14 +62,40 @@ describe('the guards themselves', () => {
     expect(reworded).not.toContain(claim);
   });
 
-  it.each(['works with every 1.x', 'compatible with @tanstack/react-form ^1', 'any 1.x release'])(
+  it.each([
+    'works with every 1.x',
+    'compatible with @tanstack/react-form ^1',
+    'any 1.x release',
+    'any @tanstack/react-form ^1.33.5 release works',
+    '@tanstack/react-form >=1.33.5',
+    'works with 1.33+',
+    'versions 1.33 and later',
+    'versions 1.33.5 or newer',
+    'Any `@tanstack/react-form` ^1.33.5 release works, as do versions 1.33 and later.',
+  ])(
     'spot the promise "%s"',
     (text) => {
       expect(promisesAnyMajor1(text)).toBe(true);
     },
   );
 
-  it.each(['tested on 1.33.x', 'versions 1.33.5', 'react-hook-form ^7.92.0', '~1.33.5'])('let "%s" through', (text) => {
+  it.each(['tested on 1.33.x', 'versions 1.33.5', 'react-hook-form ^7.92.0', '~1.33.5', 'release 11.x', 'Map {"k" => 1}', 'tested on 1.33.x and 1.34 later this year'])('let "%s" through', (text) => {
     expect(promisesAnyMajor1(text)).toBe(false);
+  });
+});
+
+describe('the helpers, one mutation each', () => {
+  it('testedOnVersions is case-insensitive ("Tested on 1.32.x")', () => {
+    expect(testedOnVersions('Tested on 1.32.x')).toEqual(['1.32.x']);
+  });
+
+  it('plainText drops an HTML comment, even one containing ">"', () => {
+    const text = plainText('<p>Hello</p><!-- a > tested on 1.32.x -->');
+    expect(text).not.toContain('1.32.x');
+    expect(testedOnVersions(text)).toEqual([]);
+  });
+
+  it('expectedClaim fails loudly when the react-hook-form peer is missing', () => {
+    expect(() => expectedClaim({ peerDependencies: { '@tanstack/react-form': '~1.33.5' } })).toThrow(/react-hook-form is missing/);
   });
 });

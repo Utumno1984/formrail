@@ -37,7 +37,17 @@ export function testedOnVersions(text) {
   return [...text.matchAll(/tested on (\d[\w.]*\w)/gi)].map((m) => m[1]);
 }
 
-/** A promise of compatibility with any 1.x of TanStack Form ("1.x", "all 1.x versions", "^1"). */
+/**
+ * A promise of compatibility beyond the tested minor: "1.x", "^1", "^1.33.5", ">=1.33.5", "1.33+", "1.33 and later".
+ * Only "~1.33.5", "1.33.5" and "tested on 1.33.x" are allowed.
+ */
 export function promisesAnyMajor1(text) {
-  return /(?<![\d.])1\.x\b|(?<![\w.])\^1(?:\.0)?(?:\.0)?(?![\d.])/.test(text);
+  const open = [
+    /(?<![\d.])1\.x\b/, // "1.x" (not "11.x", not "1.33.x")
+    /\^\s*1(?!\d)/, // "^1", "^1.33.5"
+    />=\s*1(?!\d)/, // ">=1.33.5"
+    /(?<![\d.])1\.\d+(?:\.\d+)?\s*\+/, // "1.33+"
+    /\d\s+(?:and|or)\s+(?:later|newer|above|higher|up)\b/i, // "1.33 and later"
+  ];
+  return open.some((re) => re.test(text));
 }
