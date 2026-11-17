@@ -640,6 +640,16 @@ export const SalesOrderCrud: StoryObj<CrudArgs> = {
     await addLine(canvas, '1000', '100000.00');
     await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
 
+    if (args.saveOutcome === 'error') {
+      // The server refuses: the page stays with what was typed, the message is in the footer, nothing was created.
+      await expect(await canvas.findByRole('region', { name: 'Save actions' })).toHaveTextContent(/Could not save/i);
+      await expect(canvas.getByRole('heading', { level: 1, name: 'New sales order' })).toBeVisible();
+      await expect(canvas.getByRole('textbox', { name: /Line 1 quantity/ })).toHaveValue('1000');
+      await expect(mountedStore()?.snapshot()).toHaveLength(200);
+      await expect(args.onCreated).not.toHaveBeenCalled();
+      return;
+    }
+
     await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
     await expect(args.onCreated).toHaveBeenCalledTimes(1);
     const params = new URLSearchParams(win.location.search);

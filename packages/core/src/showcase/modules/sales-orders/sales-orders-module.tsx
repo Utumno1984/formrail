@@ -29,6 +29,7 @@ import { createSalesOrderStore, type SalesOrderDraft, type StoredSalesOrder } fr
 import { helpProps } from '../field-help';
 import { SalesOrderLines } from './SalesOrderLines';
 import {
+  minorToText,
   orderTotal,
   repriceLines,
   sameLines,
@@ -160,7 +161,7 @@ const totalText = (v: SalesOrderValues): string => formatMoney(orderTotal(v.line
 const PICKABLE_CUSTOMERS = 40;
 type CustomerOption = { value: string; label: string; textValue: string; name: string; currency: DemoCurrency };
 let customerOptions: CustomerOption[] | undefined;
-const pickableCustomers = (): CustomerOption[] =>
+export const pickableCustomers = (): CustomerOption[] =>
   (customerOptions ??= makeCustomers(DEMO_REFERENCE_POOL.customers)
     .filter((c) => c.status === 'active')
     .slice(0, PICKABLE_CUSTOMERS)
@@ -177,6 +178,8 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
   const state = readOnly ? ({ state: 'locked', stateReason: READ_ONLY_REASON } as const) : {};
   const baselineLineIds = useMemo(() => new Set(form.baseline.lines.map((l) => l.id)), [form.baseline]);
   const live = orderTotal(values.lines, values.currency);
+  // The creation page before the customer: no currency yet (`Currency` says so), so no price or total names one.
+  const currencyChosen = record !== null || values.customerId !== '';
   // Choosing a customer sets the order's currency with it. The lines' unit prices are in that currency, so a change
   // of currency re-prices them from the products' list prices (a line with no product loses its price): the
   // customer is chosen before the lines are typed. The same currency keeps every line as typed.
@@ -213,7 +216,7 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
             </Field>
           )}
           <Field label="Currency" state="locked" stateReason="The currency is the customer's.">
-            <Input value={values.customerId ? values.currency : 'Set by the customer'} readOnly />
+            <Input value={currencyChosen ? values.currency : 'Set by the customer'} readOnly />
           </Field>
           <Field label="Status" name="status" {...state} {...helpProps(help, 'status')}>
             <Select
@@ -235,6 +238,7 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
         <SalesOrderLines
           lines={values.lines}
           currency={values.currency}
+          currencyChosen={currencyChosen}
           baselineIds={baselineLineIds}
           onChange={(next) => setValue('lines', next)}
           readOnly={readOnly}
@@ -243,7 +247,7 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
           fieldHelp={help}
         />
         <p style={{ margin: '16px 0 0' }}>
-          Order total: <strong data-order-total="">{live === null ? '—' : formatMoney(live, values.currency)}</strong>
+          Order total: <strong data-order-total="">{live === null ? '—' : currencyChosen ? formatMoney(live, values.currency) : minorToText(live, values.currency)}</strong>
         </p>
       </ObjectPageSection>
       <ObjectPageSection id="delivery" title="Delivery">

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { addDays, localToday } from '../../../calendar/date-math';
 import { createSalesOrderStore } from '../../sales-order-store';
-import { SALES_ORDERS, SALES_ORDERS_CRUD, defaultValues, sameValues, toDraft, validateOrder, type SalesOrderValues } from './sales-orders-module';
+import { SALES_ORDERS, SALES_ORDERS_CRUD, defaultValues, pickableCustomers, sameValues, toDraft, validateOrder, type SalesOrderValues } from './sales-orders-module';
+import { DEMO_REFERENCE_POOL, makeCustomers } from '../../../internal/demo-data';
 import type { OrderLineValues } from './order-lines';
 
 // #521: the creation of a sales order: the values a new order starts with, what is sent to the "server", the rules
@@ -163,6 +164,21 @@ describe('toDraft: what the client sends', () => {
     expect(draft).not.toHaveProperty('totalMinor');
   });
 
+  it('the currency, the status and the delivery instructions are the ones of the form (a USD, confirmed order with a note)', () => {
+    expect(toDraft(valid({ customerId: 'cus-3', customerName: 'Quillenbrook Components Corp.', currency: 'USD', status: 'confirmed', deliveryNotes: 'Dock 3' }))).toEqual({
+      customerId: 'cus-3',
+      customerName: 'Quillenbrook Components Corp.',
+      currency: 'USD',
+      status: 'confirmed',
+      customerReference: '',
+      orderDate: '2026-11-09',
+      requestedDeliveryDate: '2026-11-23',
+      deliveryNotes: 'Dock 3',
+      notes: '',
+      lines: [{ id: 'new-1', productId: 'prd-1', quantity: 2, unitPriceMinor: 1050, discountPercent: 0 }],
+    });
+  });
+
   it('yen have no decimals: 1200 is 1200 minor units', () => {
     const draft = toDraft(valid({ currency: 'JPY', lines: [line({ unitPrice: '1200' })] }));
     expect(draft.lines[0]!.unitPriceMinor).toBe(1200);
@@ -196,5 +212,23 @@ describe('the "server" creates (sales-order-store)', () => {
     expect(store.snapshot()).toHaveLength(200);
     store.configure({ saveOutcome: 'success' });
     expect((await store.create(toDraft(valid()))).number).toBe('SO-NEW-0201');
+  });
+});
+
+describe('pickableCustomers (the customers an order can be made for)', () => {
+  it('only the active customers, at most 40, each with the currency of the order it makes', () => {
+    const picked = pickableCustomers();
+    const all = makeCustomers(DEMO_REFERENCE_POOL.customers);
+    // The demo universe has inactive customers among its first ones: the filter has something to remove.
+    expect(all.slice(0, 40).some((c) => c.status !== 'active')).toBe(true);
+    expect(picked.length).toBeGreaterThan(0);
+    expect(picked.length).toBeLessThanOrEqual(40);
+    const byId = new Map(all.map((c) => [c.id, c]));
+    for (const option of picked) {
+      const customer = byId.get(option.value)!;
+      expect(customer.status).toBe('active');
+      expect(option.currency).toBe(customer.currency);
+      expect(option.name).toBe(customer.name);
+    }
   });
 });

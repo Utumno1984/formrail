@@ -156,12 +156,21 @@ export function nextLineId(taken: ReadonlySet<string>, counter: number): { id: s
  * The lines of an order whose currency changed from `from` to `to` (the creation page, a customer chosen after
  * another): every unit price was typed in `from`, so it is re-priced, never converted. A line with a product takes
  * the product's list price in `to`; a line with no product (or an unknown one) has no price. The same currency
- * returns `lines` itself, untouched (nothing to re-price, no change for the form to see).
+ * returns `lines` itself, untouched (nothing to re-price, no change for the form to see); so does a change of
+ * currency that leaves every price as it was (no line, or a line whose price is already that one), and a line whose
+ * price is unchanged is returned as the same object.
  */
 export function repriceLines(lines: readonly OrderLineValues[], from: DemoCurrency, to: DemoCurrency): OrderLineValues[] {
   if (from === to) return lines as OrderLineValues[];
-  return lines.map((line) => {
+  let changed = false;
+  const next = lines.map((line) => {
     const listPrice = getProduct(line.productId)?.listPriceMinor[to];
-    return { ...line, unitPrice: listPrice === undefined ? '' : minorToText(listPrice, to) };
+    const unitPrice = listPrice === undefined ? '' : minorToText(listPrice, to);
+    if (unitPrice === line.unitPrice) return line;
+    changed = true;
+    return { ...line, unitPrice };
   });
+  // Nothing re-priced (no line, or every price already what it would be): the same array, so the form sees no change
+  // and keeps the errors of the lines it already reported.
+  return changed ? next : (lines as OrderLineValues[]);
 }

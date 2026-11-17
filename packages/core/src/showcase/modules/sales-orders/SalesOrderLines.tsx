@@ -22,6 +22,12 @@ import { lineTotal, minorToText, nextLineId, type OrderLineValues } from './orde
 export interface SalesOrderLinesProps {
   lines: readonly OrderLineValues[];
   currency: DemoCurrency;
+  /**
+   * The currency is the customer's, and none is chosen yet (the creation page before the customer): the unit price
+   * and the line total are plain numbers, with no currency name or symbol that the page would then contradict.
+   * Defaults to `true`.
+   */
+  currencyChosen?: boolean;
   /** Ids already used by the saved baseline: a new line never reuses one. */
   baselineIds: ReadonlySet<string>;
   onChange: (next: OrderLineValues[]) => void;
@@ -77,7 +83,7 @@ const productLabel = (productId: string): string => {
   return product ? `${product.name} (${product.sku})${product.status === 'discontinued' ? ' - discontinued' : ''}` : productId;
 };
 
-export function SalesOrderLines({ lines, currency, baselineIds, onChange, readOnly = false, readOnlyReason, listError, fieldHelp }: SalesOrderLinesProps) {
+export function SalesOrderLines({ lines, currency, currencyChosen = true, baselineIds, onChange, readOnly = false, readOnlyReason, listError, fieldHelp }: SalesOrderLinesProps) {
   const counterRef = useRef(0);
   // Which control takes the focus once the form shows the lines of the action. Target keys:
   // `<action>:<line id>` for the controls of a line, `add` for the button after the list.
@@ -177,7 +183,7 @@ export function SalesOrderLines({ lines, currency, baselineIds, onChange, readOn
                   <Field label={`Line ${n} quantity`} name={`lines.${i}.quantity`} required {...state} {...helpProps(fieldHelp, `lines.${i}.quantity`)}>
                     <Input inputMode="numeric" value={line.quantity} onChange={(e) => update(i, { quantity: e.target.value })} />
                   </Field>
-                  <Field label={`Line ${n} unit price (${currency})`} name={`lines.${i}.unitPrice`} required {...state} {...helpProps(fieldHelp, `lines.${i}.unitPrice`)}>
+                  <Field label={currencyChosen ? `Line ${n} unit price (${currency})` : `Line ${n} unit price`} name={`lines.${i}.unitPrice`} required {...state} {...helpProps(fieldHelp, `lines.${i}.unitPrice`)}>
                     <Input inputMode={currency === 'JPY' ? 'numeric' : 'decimal'} value={line.unitPrice} onChange={(e) => update(i, { unitPrice: e.target.value })} />
                   </Field>
                   <Field label={`Line ${n} discount (%)`} name={`lines.${i}.discount`} required {...state} {...helpProps(fieldHelp, `lines.${i}.discount`)}>
@@ -186,7 +192,7 @@ export function SalesOrderLines({ lines, currency, baselineIds, onChange, readOn
                   <div style={{ display: 'grid', gap: 4, alignContent: 'start' }}>
                     <span aria-hidden="true">Total</span>
                     <span className="sr-only">{`Line ${n} total`}</span>
-                    <span data-line-total={line.id}>{total === null ? '—' : formatMoney(total, currency)}</span>
+                    <span data-line-total={line.id}>{total === null ? '—' : currencyChosen ? formatMoney(total, currency) : minorToText(total, currency)}</span>
                   </div>
                 </div>
               </li>

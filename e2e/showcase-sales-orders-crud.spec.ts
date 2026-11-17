@@ -31,6 +31,7 @@ interface StoreOrder {
   customerName: string;
   currency: string;
   status: string;
+  deliveryNotes: string;
   totalMinor: number;
   lines: { quantity: number; unitPriceMinor: number }[];
 }
@@ -129,10 +130,17 @@ test.describe('Showcase/Record editing: the stories of the creation and deletion
     await expectPlayToPass(page, 'showcase-record-editing--sales-order-crud-bulk-delete', 'deleteOutcome:error');
   });
 
-  test('the reduced-motion preference leads the visual stories to the same end state', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const id of VISUAL_STORIES) await expectPlayToPass(page, `showcase-record-editing--${id}`);
+  test('the creation also plays with saveOutcome error (the page stays with its values, the message is in the footer)', async ({ page }) => {
+    await expectPlayToPass(page, 'showcase-record-editing--sales-order-crud', 'saveOutcome:error');
   });
+
+  // One test per story: eight plays in one test would run into the 30 s timeout on a slow runner.
+  for (const id of VISUAL_STORIES) {
+    test(`${id}: the reduced-motion preference leads the story to the same end state`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expectPlayToPass(page, `showcase-record-editing--${id}`);
+    });
+  }
 });
 
 test.describe('Showcase/Record editing: creating a sales order', () => {
@@ -350,10 +358,27 @@ test.describe('Showcase/Record editing: creating a sales order', () => {
     const price = page.getByRole('textbox', { name: /Line 1 unit price/ });
     await expect(price).toHaveValue('87.45');
     await price.fill('1.00');
-    await chooseCustomer(page);
+    // Same currency, ANOTHER customer (the same one again may never reach the handler): the typed price stays.
+    await chooseCustomer(page, 'Alcorvena Dairy S.A. (EUR)');
+    await expect(page.getByRole('combobox', { name: /Customer/ })).toContainText('Alcorvena Dairy S.A.');
     await expect(price).toHaveValue('1.00');
     await chooseCustomer(page, 'Sorakane Construction Co., Ltd. (JPY)');
     await expect(page.getByRole('textbox', { name: /Line 1 unit price \(JPY\)/ })).toHaveValue(/^\d+$/);
+  });
+
+  test('a USD customer, Status Confirmed and delivery instructions are stored as chosen, and the page leaves without "Unsaved changes"', async ({ page }) => {
+    await openList(page, SORTED);
+    await newOrder(page).click();
+    await chooseCustomer(page, 'Quillenbrook Components Corp. (USD)');
+    await addLine(page, '2', '10.50');
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Confirmed' }).click();
+    await page.getByRole('textbox', { name: /Delivery instructions/ }).fill('Dock 3');
+    await create(page).click();
+    await expect(table(page)).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const made = (await store(page)).at(-1)!;
+    expect(made).toMatchObject({ currency: 'USD', status: 'confirmed', deliveryNotes: 'Dock 3', totalMinor: 2100 });
   });
 
   test('a created order opens as a normal page: the customer is locked, the number is the one assigned', async ({ page }) => {

@@ -242,6 +242,26 @@ describe('repriceLines: a customer of another currency re-prices the lines (#521
     expect(repriceLines(lines, 'EUR', 'EUR')).toBe(lines);
   });
 
+  it('no line: the same (empty) array, also for another currency', () => {
+    const lines: OrderLineValues[] = [];
+    expect(repriceLines(lines, 'EUR', 'USD')).toBe(lines);
+  });
+
+  it('no price changes (a line with no product has none): the same array, the same line objects', () => {
+    const lines = [line({ productId: '', unitPrice: '' })];
+    expect(repriceLines(lines, 'EUR', 'USD')).toBe(lines);
+  });
+
+  it('a line whose price already is the list price of the new currency is the same object; only the changed ones are new', () => {
+    const usd = minorToText(getProduct('prd-1')!.listPriceMinor.USD, 'USD');
+    const same = line({ id: 'a', unitPrice: usd });
+    const other = line({ id: 'b', unitPrice: '1.00' });
+    const out = repriceLines([same, other], 'EUR', 'USD');
+    expect(out[0]).toBe(same);
+    expect(out[1]).not.toBe(other);
+    expect(out[1]!.unitPrice).toBe(usd);
+  });
+
   it("another currency: a line with a product takes its list price in the new currency, with that currency's decimals", () => {
     const jpy = getProduct('prd-1')!.listPriceMinor.JPY;
     const usd = getProduct('prd-1')!.listPriceMinor.USD;
