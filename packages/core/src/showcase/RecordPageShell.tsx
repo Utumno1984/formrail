@@ -273,6 +273,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   const creating = record === null;
   const { form: definition, noun } = module;
   const Sections = definition.Sections;
+  const HeaderActions = definition.HeaderActions;
   // #365: `deleting` while the confirmed delete waits for the server; `deleted` once the server deleted the
   // record (set in the same callback, so no render ever has both false in between). `deleting` ARMS the guard
   // like a save in flight does (browser Back asks "Delete in progress", also on a clean form); `deleted`
@@ -378,6 +379,13 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   useEffect(() => {
     if (focusTitleOnMount) frameRef.current?.querySelector('h1')?.focus();
   }, [focusTitleOnMount]);
+
+  // #523: what a module's header action writes on the server (the customers' "Restore"): the page's store, as Save.
+  const saveRecord = async (changed: T): Promise<T> => {
+    const stored = await store.save(changed);
+    onSaved?.(stored);
+    return stored;
+  };
 
   // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).
   const [created, setCreated] = useState<T | null>(null);
@@ -504,6 +512,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
                     Delete
                   </Button>
                 ) : null}
+                {record && HeaderActions ? <HeaderActions form={form} record={record} saveRecord={saveRecord} /> : null}
                 {addons.actions}
               </>
             }

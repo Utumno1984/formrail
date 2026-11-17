@@ -42,6 +42,31 @@ export interface RecordModuleList<T extends { id: string }> {
   linkColumn: string;
   /** The texts of the table's states (loading, empty, no results, error, counts). */
   labels: Partial<ListReportLabels>;
+  /**
+   * #523: the text the search box matches for a row, when it is not the text of the searchable columns (the
+   * customers search their city, which is not a column). Passed to `useListReport` as `getSearchText`, so the
+   * columns' `searchable` no longer count. A module constant (a new function per render would re-run the search).
+   * Absent: the searchable columns, as before.
+   */
+  getSearchText?: (row: T) => string;
+}
+
+/**
+ * #523: what the module's own header actions receive, on the page of an EXISTING record (never on the creation page).
+ * For an action that changes the record on the server outside the Save of the footer (the customers' "Restore").
+ */
+export interface RecordHeaderActionsProps<T extends { id: string }, V extends object> {
+  /** The page's form, as the sections get it. */
+  form: UseObjectPageFormReturn<V>;
+  /** The record the page was opened with. */
+  record: T;
+  /**
+   * Writes `record` on the server through the page's store, like the footer's Save (the same store, so a list read
+   * afterwards waits for it; the shell's `onSaved` is called with what the server stored), and resolves with what the
+   * server stored, or rejects with the store's error. It touches no state of the form: the action decides what to do
+   * with the result (e.g. `form.reset(toValues(stored))`, which takes it as the new baseline).
+   */
+  saveRecord: (record: T) => Promise<T>;
 }
 
 /** The record page of a module: how a record becomes the values of a form, how they are checked and saved. */
@@ -63,6 +88,11 @@ export interface RecordModuleForm<T extends { id: string }, V extends object> {
    * page's `ObjectPage`, after its header and footer, on the record page and on the creation page.
    */
   Sections: ComponentType<RecordSectionsProps<T, V>>;
+  /**
+   * #523: more header actions of the module's own, after the shell's ("Back to list", "Delete") and before those of
+   * an add-on. Rendered on the page of an existing record only. Absent: none.
+   */
+  HeaderActions?: ComponentType<RecordHeaderActionsProps<T, V>>;
 }
 
 /** Creation (#363): the page of a new record. Absent, the list has no "New …" button and there is no creation page. */
