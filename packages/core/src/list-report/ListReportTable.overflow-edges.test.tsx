@@ -796,6 +796,53 @@ describe('a `dir` changed after the mount (#562)', () => {
     expect(edges(el)).toEqual({ start: false, end: true });
   });
 
+  describe('an ancestor that has a `host` property of its own (not a ShadowRoot)', () => {
+    /** The table inside `inner`, in an outer `div` that gets the `dir`; errors raised in observer callbacks are collected. */
+    async function dirAboveInner(inner: HTMLElement) {
+      mock = mockLayout(WIDE);
+      const outer = document.createElement('div');
+      outer.appendChild(inner);
+      document.body.appendChild(outer);
+      const container = document.createElement('div');
+      inner.appendChild(container);
+      const errors: unknown[] = [];
+      const onError = (event: ErrorEvent) => {
+        errors.push(event.error ?? event.message);
+        event.preventDefault();
+      };
+      window.addEventListener('error', onError);
+      const { unmount } = render(<Host />, { container });
+      try {
+        const el = scroller();
+        scrollLeftTo(250, el);
+        await settle();
+        const reads = mock.reads.scrollWidth;
+        await likeFirefox(setDir(outer, 'rtl'), el);
+        expect(errors).toEqual([]);
+        expect(mock.reads.scrollWidth).toBe(reads + 1);
+        expect(edges(el)).toEqual({ start: false, end: true });
+      } finally {
+        window.removeEventListener('error', onError);
+        unmount();
+        outer.remove();
+      }
+    }
+
+    it('a table inside `<a href>` (its `host` is a string): a `dir` above the link measures once, with no error', async () => {
+      const link = document.createElement('a');
+      link.href = 'https://example.com/x';
+      await dirAboveInner(link);
+    });
+
+    it('a table inside a `<form>` with an `<input name="host">` (named access): a `dir` above the form measures once, with no error', async () => {
+      const form = document.createElement('form');
+      const input = document.createElement('input');
+      input.name = 'host';
+      form.appendChild(input);
+      await dirAboveInner(form);
+    });
+  });
+
   it('StrictMode (effects run twice): a single observer stays connected', async () => {
     mock = mockLayout(WIDE);
     const live = new Set<unknown>();
