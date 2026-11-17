@@ -41,6 +41,48 @@ describe('lint: library code does not import internal/demo-data (#515)', { timeo
     expect(await boundary('packages/pro/src/internal/Some.tsx', source)).toHaveLength(1);
   });
 
+  // Ticket #573: the CommonJS forms are banned like the ES ones, with the same message.
+  const CJS_BANNED = [
+    ['import x = require, bare', "import x = require('../internal/demo-data');\nexport { x };\n"],
+    ['import x = require, subpath', "import x = require('../internal/demo-data/customers');\nexport { x };\n"],
+    ['import x = require, demo-data as last segment of a longer path', "import x = require('../../internal/demo-data');\nexport { x };\n"],
+    ['require, bare', "export const x = require('../internal/demo-data');\n"],
+    ['require, subpath', "export const x = require('../internal/demo-data/x');\n"],
+    ['require, template literal without interpolation', 'export const x = require(`../internal/demo-data`);\n'],
+    ['require, in a nested expression', "export const load = () => ({ x: require('../internal/demo-data/x') });\n"],
+  ];
+  it.each(CJS_BANNED)('%s is an error, with the message of the guard', async (_label, source) => {
+    for (const file of ['packages/core/src/internal/Some.tsx', 'packages/pro/src/internal/Some.tsx']) {
+      const found = await boundary(file, source);
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatch(/Library code must not import `internal\/demo-data`.*CONTRIBUTING\.md, section "Demo data"/);
+    }
+  });
+
+  it.each(CJS_BANNED)('%s is allowed where the ES import is allowed (story, test, showcase, demo-data)', async (_label, source) => {
+    for (const file of [
+      'packages/core/src/list-report/ListReport.stories.tsx',
+      'packages/core/src/list-report/ListReport.test.tsx',
+      'packages/core/src/showcase/InvoiceCrud.tsx',
+      'packages/core/src/internal/demo-data/customers.ts',
+    ]) {
+      expect(await boundary(file, source)).toEqual([]);
+    }
+  });
+
+  it.each([
+    ['require of a variable', "declare const name: string;\nexport const x = require(name);\n"],
+    ['require of another module', "export const x = require('react');\n"],
+    ['require.resolve of demo-data (not a require call, deliberately not banned)', "export const x = require.resolve('../internal/demo-data');\n"],
+    ['import x = require of another module', "import x = require('react');\nexport { x };\n"],
+    ['import x = require of a name that only contains demo-data', "import x = require('../internal/my-demo-data-utils');\nexport { x };\n"],
+    ['require of a name that only contains demo-data', "export const x = require('../internal/my-demo-data-utils');\n"],
+    ['import x = Namespace.Member (no module reference)', 'namespace N { export const a = 1; }\nimport x = N.a;\nexport { x };\n'],
+    ['a method named require', "declare const loader: { require(s: string): unknown };\nexport const x = loader.require('../internal/demo-data');\n"],
+  ])('%s: no error', async (_label, source) => {
+    expect(await boundary('packages/core/src/internal/Some.tsx', source)).toEqual([]);
+  });
+
   it.each([
     ['core story', 'packages/core/src/list-report/ListReport.stories.tsx'],
     ['pro story', 'packages/pro/src/list-report/VirtualListReport.stories.tsx'],

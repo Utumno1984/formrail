@@ -70,7 +70,9 @@ describe('the script exit code', () => {
       ['npx', npx],
     ]) {
       const file = path.join(dir, name);
-      writeFileSync(file, `#!/bin/sh\necho "${name} $*" >> "${log}"\nexit ${code}\n`);
+      // `code` is an exit status, or 'kill' to die by signal (`kill -9 $$`): spawnSync then reports status null.
+      const end = code === 'kill' ? 'kill -9 $$' : `exit ${code}`;
+      writeFileSync(file, `#!/bin/sh\necho "${name} $*" >> "${log}"\n${end}\n`);
       chmodSync(file, 0o755);
     }
     const r = spawnSync(process.execPath, [script, '1.33.5'], {
@@ -94,6 +96,32 @@ describe('the script exit code', () => {
     expect(r.calls).toMatch(/^npm install .*@tanstack\/react-form@1\.33\.5/m);
     expect(r.calls).toMatch(/^npx vitest run tanstack-form -t /m);
     expect(r.out).toContain('PASS');
+  });
+
+  it('installs without saving, into the Pro workspace, the exact spec (package.json and lockfile stay as they are)', () => {
+    const r = runWith({ npm: 0, npx: 0 });
+    const install = r.calls.split('\n').find((l) => l.startsWith('npm install'));
+    expect(install).toBeDefined();
+    expect(install).toMatch(/ --no-save( |$)/);
+    expect(install).toMatch(/ --workspace packages\/pro /);
+    expect(install).toMatch(/ @tanstack\/react-form@1\.33\.5$/);
+    expect(install).not.toMatch(/ (--save|-S|--save-dev|-D|--global|-g)( |$)/);
+  });
+
+  // `spawnSync` gives `status: null` when the child dies by signal: `?? 1` turns it into a failure, `?? 0` into a
+  // pass. Only a stub that kills itself tells the two apart.
+  it('exits 1 when vitest is killed by a signal (status null is a failure, never a pass)', () => {
+    const r = runWith({ npm: 0, npx: 'kill' });
+    expect(r.calls).toContain('npx vitest run');
+    expect(r.status).toBe(1);
+    expect(r.out).toContain('FAIL');
+    expect(r.out).not.toContain('PASS');
+  });
+
+  it('exits 1 when the install is killed by a signal, and runs no test', () => {
+    const r = runWith({ npm: 'kill', npx: 0 });
+    expect(r.status).toBe(1);
+    expect(r.calls).not.toContain('npx');
   });
 
   it('exits 1 when the tests fail', () => {
@@ -139,6 +167,34 @@ describe('the workflow', () => {
     expect(step).toMatch(/set -o pipefail|shell: bash/);
     expect(step).toMatch(/env:\s*\n\s+VERSION: \$\{\{ inputs\.version \}\}/);
     expect(step).toContain('"$VERSION"');
+  });
+
+  // Ticket #573: the three ways to make a red run green without touching the script. Asserted on the YAML without
+  // comments, which explain what the workflow does not do.
+  it('has no way to swallow a failure: no continue-on-error, no `|| true`, no `set +o pipefail`, no `set +e`', () => {
+    expect(yml).not.toMatch(/continue-on-error/);
+    expect(yml).not.toMatch(/\|\|\s*(true|:|exit\s+0)\b/);
+    expect(yml).not.toMatch(/set\s+\+o\s+pipefail/);
+    expect(yml).not.toMatch(/set\s+\+[a-z]*e\b/);
+  });
+
+  it('the run step is not made optional by an `if:` that could skip it', () => {
+    const step = /- name: Run the TanStack[\s\S]*?(?=\n {6}- name:|$)/.exec(yml)[0];
+    expect(step).not.toMatch(/^\s+if:/m);
+  });
+
+  it('the Summary reads the log the run step wrote: stderr merged in, and `tee` to the same file', () => {
+    const run = /- name: Run the TanStack[\s\S]*?(?=\n {6}- name:|$)/.exec(yml)[0];
+    const summary = /- name: Summary[\s\S]*$/.exec(yml)[0];
+    // `2>&1` before the pipe: the failing lines of vitest go to stderr and must reach the log.
+    expect(run).toMatch(/node scripts\/tanstack-compat\.mjs "\$VERSION" 2>&1 \| tee compat\.log\s*$/m);
+    const teeTarget = /\| tee (\S+)/.exec(run)[1];
+    const grepTarget = /grep -E '[^']+' (\S+)/.exec(summary)[1];
+    expect(teeTarget).toBe('compat.log');
+    expect(grepTarget).toBe(teeTarget);
+    // The summary lines are the ones the script prints with that prefix.
+    expect(summary).toMatch(/grep -E '\^tanstack-compat:'/);
+    expect(summary).toContain('"$GITHUB_STEP_SUMMARY"');
   });
 
   it('never interpolates an expression into a shell command (script injection)', () => {

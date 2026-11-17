@@ -79,6 +79,41 @@ describe('findOccurrences', () => {
   });
 });
 
+// Ticket #573: a file checked out with Windows line endings (or with mixed ones) is measured like the same file with `\n`.
+describe('line endings: \\r\\n, mixed and a lone \\r count like \\n', () => {
+  const LF = "const a = 'Rossi Construction Ltd';\nconst b = 'acme';\n// FT-2026-0001\nimport x from './demo-rows';\nconst c = 'Northwind';\n";
+  const variants = {
+    'CRLF': LF.replace(/\n/g, '\r\n'),
+    'mixed CRLF and LF': LF.replace(/\n/, '\r\n').replace(/\n(?=import)/, '\r\n'),
+    'lone CR': LF.replace(/\n/g, '\r'),
+  };
+
+  it('has the occurrences the LF reference is expected to have (the comparison below is not vacuous)', () => {
+    expect(findOccurrences(LF)).toEqual(['Rossi Construction Ltd', 'acme', 'FT-2026-', './demo-rows', 'Northwind']);
+  });
+
+  it.each(Object.entries(variants))('%s: same occurrences, same counts, same sample as LF', (_name, text) => {
+    expect(text).not.toBe(LF);
+    expect(findOccurrences(text)).toEqual(findOccurrences(LF));
+    const path = 'packages/core/src/a.stories.tsx';
+    expect(foundOf({ [path]: text })).toEqual(foundOf({ [path]: LF }));
+    expect(countsOf(foundOf({ [path]: text }))).toEqual({ [path]: 5 });
+  });
+
+  it.each(Object.entries(variants))('%s: same verdict and same messages against the baseline, as LF', (_name, text) => {
+    const path = 'packages/core/src/a.stories.tsx';
+    for (const files of [{ [path]: 5 }, { [path]: 6 }, { [path]: 4 }, {}]) {
+      expect(compareLegacy(foundOf({ [path]: text }), base(files))).toEqual(compareLegacy(foundOf({ [path]: LF }), base(files)));
+    }
+    expect(compareLegacy(foundOf({ [path]: text }), base({ [path]: 5 })).ok).toBe(true);
+  });
+
+  it('a term at the end of a CRLF line is not glued to the line break (no word boundary is lost)', () => {
+    expect(findOccurrences('x = Acme\r\ny = Acme\r')).toEqual(['Acme', 'Acme']);
+    expect(findOccurrences('Acmeda\r\n')).toEqual([]);
+  });
+});
+
 describe('isScanned', () => {
   it.each([
     'packages/core/src/list-report/ListReport.stories.tsx',
@@ -302,6 +337,27 @@ describe('the CLI, on a scratch repository', () => {
       expect(run(dir, 'check').stdout).not.toContain('lower it');
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('check: a file with CRLF line endings gives the same result as the same file with LF (#573)', () => {
+    const lf = "const s = 'Rossi Construction Ltd';\nconst t = 'Acme';\n";
+    const files = { a: lf.replace(/\n/g, '\r\n'), b: lf.replace(/\n/, '\r\n') };
+    for (const [name, text] of Object.entries(files)) {
+      const dir = scratch({ 'packages/core/src/a.stories.tsx': text }, { 'packages/core/src/a.stories.tsx': 2 });
+      try {
+        expect(readFileSync(join(dir, 'packages/core/src/a.stories.tsx'), 'utf8'), name).toContain('\r\n');
+        const same = run(dir, 'check');
+        expect(same.code, name).toBe(0);
+        expect(same.stdout, name).not.toContain('lower it');
+        writeFileSync(join(dir, 'packages/core/src/a.stories.tsx'), text + "const u = 'Northwind';\r\n");
+        const grown = run(dir, 'check');
+        expect(grown.code, name).toBe(1);
+        expect(grown.stderr, name).toContain('3 legacy demo-data occurrences, baseline 2');
+        expect(grown.stderr, name).toContain('"Rossi Construction Ltd"');
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     }
   });
 

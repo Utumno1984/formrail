@@ -362,9 +362,9 @@ describe('useObjectPageForm: save field by field, a nested object and null (#545
       (f) => f.setValue('address', null),
       (sent) => ({ ...sent, name: 'Orbit', address: { street: 'Oak Rd', city: 'York' } }),
     );
+    expect(error).toBeUndefined();
     expect(ok).toBe(true);
     expect(form.current.values.address).toBeNull();
-    expect(error).toBeUndefined();
     expect(form.current.values.name).toBe('Orbit');
     expect(form.current.baseline.address).toEqual({ street: 'Oak Rd', city: 'York' });
     expect(form.current.isDirty).toBe(true);
@@ -377,9 +377,9 @@ describe('useObjectPageForm: save field by field, a nested object and null (#545
       (f) => f.setValue('address', mine),
       (sent) => ({ ...sent, name: 'Orbit', address: { street: 'Elm St', city: 'Leeds' } }),
     );
+    expect(error).toBeUndefined();
     expect(ok).toBe(true);
     expect(form.current.values.address).toBe(mine);
-    expect(error).toBeUndefined();
     expect(form.current.values.name).toBe('Orbit');
     expect(form.current.isDirty).toBe(true);
   });
@@ -391,9 +391,9 @@ describe('useObjectPageForm: save field by field, a nested object and null (#545
       (f) => f.setValue('address', mine),
       (sent) => ({ ...sent, name: 'Orbit', address: null }),
     );
+    expect(error).toBeUndefined();
     expect(ok).toBe(true);
     expect(form.current.values.address).toBe(mine);
-    expect(error).toBeUndefined();
     expect(form.current.values.name).toBe('Orbit');
     expect(form.current.baseline.address).toBeNull();
     expect(form.current.isDirty).toBe(true);
