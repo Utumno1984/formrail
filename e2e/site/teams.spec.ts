@@ -537,6 +537,33 @@ test.describe('responsive', () => {
   });
 });
 
+// Ticket #586: the compatibility claim row has the same space above and below. Measured on the real rects
+// (margin collapsing makes the declared margins misleading); the claim is found by structure.
+test.describe('compatibility claim spacing', () => {
+  for (const [width, height] of [
+    [375, 667],
+    [768, 1024],
+    [1280, 800],
+  ] as const) {
+    test(`${width}px: equal space above and below the claim`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto('teams/');
+      const m = await page.evaluate(() => {
+        const claim = [...document.querySelectorAll('p.section-lead')].find((p) =>
+          p.textContent!.toLowerCase().includes('react-hook-form'),
+        );
+        if (!claim) throw new Error('claim not found');
+        const prev = claim.previousElementSibling!.getBoundingClientRect();
+        const next = claim.nextElementSibling!.getBoundingClientRect();
+        const c = claim.getBoundingClientRect();
+        return { above: c.top - prev.bottom, below: next.top - c.bottom, overflow: document.documentElement.scrollWidth - window.innerWidth };
+      });
+      expect(Math.abs(m.above - m.below), JSON.stringify(m)).toBeLessThanOrEqual(1);
+      expect(m.overflow).toBeLessThanOrEqual(0);
+    });
+  }
+});
+
 test.describe('accessibility', () => {
   for (const url of ['teams/', 'privacy/']) {
     test(`${url}: axe finds no violation (WCAG 2.x A/AA)`, async ({ page }) => {
