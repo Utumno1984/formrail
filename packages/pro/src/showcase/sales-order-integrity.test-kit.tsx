@@ -119,7 +119,8 @@ export const changesIn = (dialog: HTMLElement) => readItems(within(dialog).getBy
 
 export const stored = (store: SalesOrderStore, id = ORDER): StoredSalesOrder => store.snapshot().find((o) => o.id === id)!;
 export const textbox = (name: string | RegExp) => screen.getByRole('textbox', { name }) as HTMLInputElement;
-export const dateField = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+/** A date Field by the start of its label (a required Field adds its marker to the label). */
+export const dateField = (label: string) => screen.getByLabelText(new RegExp(`^${label}`)) as HTMLInputElement;
 export const statusText = () => screen.getByRole('combobox', { name: 'Status' }).textContent ?? '';
 
 export const typeInto = async (el: HTMLElement, text: string) => {

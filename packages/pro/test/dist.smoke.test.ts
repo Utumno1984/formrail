@@ -1,7 +1,8 @@
 // @vitest-environment node
 // Smoke test on the BUILT bundle (run `npm run build` first; `npm run check` does): what a consumer
 // of the published package would import, ESM and CJS.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import * as esm from '../dist/index.js';
@@ -86,6 +87,32 @@ describe('built bundle (dist)', () => {
       expect(out.conflicts.map((c) => c.path)).toEqual(['supplier.vatNumber']);
       expect(out.applied.map((e) => e.path)).toEqual(['supplier.name', 'lineItems.4']);
       expect(typeof api.useFormRebase).toBe('function');
+    }
+  });
+
+  // #522: the story-only showcase (`src/showcase/`, Record editing integrity and the invoices' one) never reaches the
+  // published bundle. Each probe is first found in the showcase sources, so the check cannot pass on a typo.
+  it('contains no text of the story-only showcase', () => {
+    const showcaseDir = fileURLToPath(new URL('../src/showcase/', import.meta.url));
+    const sources = readdirSync(showcaseDir)
+      .filter((name) => /\.tsx?$/.test(name) && !/\.(test|stories)\.tsx?$/.test(name) && !name.includes('test-kit'))
+      .map((name) => readFileSync(join(showcaseDir, name), 'utf8'))
+      .join('\n');
+    const probes = [
+      'Simulate server update',
+      'This sales order was updated while you were editing.',
+      'This sales order was deleted on the server',
+      'Server changes you overwrite',
+      'Only the order of the lines changed.',
+      'srv-line-',
+      'This invoice was updated while you were editing.',
+    ];
+    const distDir = fileURLToPath(new URL('../dist/', import.meta.url));
+    const bundles = readdirSync(distDir).filter((name) => /\.(c?js|d\.c?ts)$/.test(name));
+    expect(bundles.length).toBeGreaterThan(0);
+    for (const probe of probes) {
+      expect(sources, probe).toContain(probe);
+      for (const name of bundles) expect(readFileSync(join(distDir, name), 'utf8'), `${name}: ${probe}`).not.toContain(probe);
     }
   });
 

@@ -105,7 +105,7 @@ describe('Record editing integrity, sales orders: merging into an edited order (
     expect(delivery.value).toBe('2026-07-01');
     expect(conflictItems().map((li) => li.textContent)).toEqual([expect.stringMatching(new RegExp(`^Requested delivery Yours: Jul 1, 2026 Server: ${formatDate(server)}`))]);
     expect(delivery).toHaveAccessibleDescription(CONFLICT_HELP);
-    expect(delivery).toHaveAccessibleName('Requested delivery');
+    expect(delivery).toHaveAccessibleName(/^Requested delivery/);
     // The status the user did not touch came from the server: not a conflict.
     expect(statusText()).toContain('Shipped');
     await userEvent.click(screen.getByRole('button', { name: 'Keep mine for Requested delivery' }));
@@ -133,9 +133,21 @@ describe('Record editing integrity, sales orders: merging into an edited order (
     await typeInto(textbox('Line 1 quantity'), '9');
     await serverUpdate(store, serverChangeOf('line-1-quantity'));
     expect(conflictItems().map((li) => li.textContent)).toEqual([
-      `Lines > Line 1 (${productOf(ORDER, 0)}) > Quantity Yours: 9 Server: ${seed().lines[0]!.quantity + 1}Use server valueKeep mine`,
+      `Lines > Line 1 (${productOf(ORDER, 0)}) > Quantity Yours: 9 Server: ${seed().lines[0]!.quantity + 1} Use server value Keep mine`,
     ]);
     expect(textbox('Line 1 quantity')).toHaveAccessibleDescription(CONFLICT_HELP);
+  }, 30_000);
+
+  it('a quantity retyped as the same number ("01" for 1) is not an edit: the server\'s quantity arrives, no conflict, the form stays clean', async () => {
+    const { store } = renderOrder();
+    await opened();
+    const quantity = textbox('Line 1 quantity');
+    await typeInto(quantity, `0${seed().lines[0]!.quantity}`);
+    expect(footer()).toBeNull();
+    await serverUpdate(store, serverChangeOf('line-1-quantity'));
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+    expect(quantity.value).toBe(String(seed().lines[0]!.quantity + 1));
+    expect(footer()).toBeNull();
   }, 30_000);
 
   it('the server removes the line I edited: the line stays with my value, one conflict on the row, its fields marked', async () => {
