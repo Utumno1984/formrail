@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { COUNTRY_NAME, formatMoney } from '../internal/demo-data';
-import { makeShowcaseCustomers, type CustomerStore } from './customer-store';
+import { createCustomerStore, makeShowcaseCustomers, type CustomerStore } from './customer-store';
 import { setupCustomerTests } from './modules/customers/customer-test-kit';
 import { CUSTOMERS, accountManagerName } from './modules/customers/customers-module';
 import { RecordCrud } from './RecordCrud';
@@ -13,13 +13,15 @@ import { RecordCrud } from './RecordCrud';
 setupCustomerTests();
 
 const seed = makeShowcaseCustomers();
-const renderList = () => {
+// The flow test needs no 200 rows: the same module on the first 20 customers renders the list (twice) much faster.
+const FEW = { ...CUSTOMERS, createStore: () => createCustomerStore(makeShowcaseCustomers(20)) };
+const renderList = (module = CUSTOMERS) => {
   window.history.replaceState(null, '', '/');
   const onNavigate = vi.fn();
   const onSaved = vi.fn();
   render(
     <StrictMode>
-      <RecordCrud module={CUSTOMERS} history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={0} onNavigate={onNavigate} onSaved={onSaved} />
+      <RecordCrud module={module} history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={0} onNavigate={onNavigate} onSaved={onSaved} />
     </StrictMode>,
   );
   return { onNavigate, onSaved };
@@ -114,8 +116,9 @@ describe('the customer list (#523)', () => {
   });
 
   it('the code opens the customer page; a name changed and saved is in the list when it comes back', async () => {
-    const { onNavigate, onSaved } = renderList();
+    const { onNavigate, onSaved } = renderList(FEW);
     await listReady();
+    expect(heading()).toHaveTextContent('(20)');
     await userEvent.click(screen.getByRole('link', { name: 'C-10004' }));
     expect(onNavigate).toHaveBeenLastCalledWith({ to: 'record', id: 'cus-4' });
     const name = await screen.findByRole('textbox', { name: 'Name' });
