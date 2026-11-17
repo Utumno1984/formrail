@@ -73,6 +73,17 @@ describe('the server changes of the story', () => {
     expect(added.productId).toBe(active[2]!.id);
   });
 
+  it('a line added: never a discontinued product; with every active product already on the order there is none left', () => {
+    const all = makeProducts(DEMO_REFERENCE_POOL.products);
+    expect(all.some((p) => p.status !== 'active')).toBe(true);
+    const so13 = order('so-13');
+    const holdingAllActive: StoredSalesOrder = {
+      ...so13,
+      lines: all.filter((p) => p.status === 'active').map((p, i) => ({ ...so13.lines[0]!, id: `so-13-held-${i}`, productId: p.id })),
+    };
+    expect(() => serverChangeOf('add-line', () => 'srv-line-1')(holdingAllActive)).toThrow(/no product left/);
+  });
+
   it('server line ids: one sequence per store, never reused, never in the client\'s `new-<n>` space', () => {
     const a = createSalesOrderStore();
     const b = createSalesOrderStore();
