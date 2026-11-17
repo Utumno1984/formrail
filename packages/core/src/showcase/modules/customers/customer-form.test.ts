@@ -132,7 +132,8 @@ describe('sameValues, key by key (#523)', () => {
     const removed = base.contacts[1]!;
     const again: ContactValues = { ...removed, id: 'new-contact-1' };
     const contacts = [base.contacts[0]!, again];
-    expect(contacts.map(({ id: _id, ...texts }) => texts)).toEqual(base.contacts.map(({ id: _id, ...texts }) => texts));
+    const texts = (c: ContactValues) => [c.name, c.role, c.email, c.phone];
+    expect(contacts.map(texts)).toEqual(base.contacts.map(texts));
     expect(sameContacts(base.contacts, contacts)).toBe(false);
     expect(sameValues(base, withPatch({ contacts }))).toBe(false);
     // The very same contact (same id) put back is no change.

@@ -12,7 +12,6 @@ import {
   gone,
   pick,
   ready,
-  retype,
   save,
   setupCustomerTests,
   setupPage,
