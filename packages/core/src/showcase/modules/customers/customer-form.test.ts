@@ -14,7 +14,7 @@ import {
   type ContactValues,
   type CustomerValues,
 } from './customer-form';
-import { accountManagerName, accountManagerOptions, customerSearchText } from './customers-module';
+import { CUSTOMERS, accountManagerName, accountManagerOptions, customerSearchText } from './customers-module';
 
 // #523: the customer as the form sees it. Seed ids used below (makeShowcaseCustomers): cus-4 IT EUR active with two
 // contacts and a region; cus-6 JP JPY; cus-8 SE with a line 2; cus-9 with an account manager who left the company.
@@ -273,6 +273,16 @@ describe('nextContactId (#523)', () => {
 });
 
 describe('the list and the account managers (#523)', () => {
+  it('the credit limit column sorts by the amount in EUR, not by the minor units of each currency', () => {
+    const credit = CUSTOMERS.list.columns.find((c) => c.id === 'creditLimit')!;
+    const yen = { ...byId('cus-6'), currency: 'JPY' as const, creditLimitMinor: 1_000_000 }; // ¥1,000,000 = €6,172.84
+    const euro = { ...byId('cus-4'), currency: 'EUR' as const, creditLimitMinor: 900_000 }; // €9,000.00
+    expect(credit.accessor!(yen) as number).toBeCloseTo(1_000_000 / 162, 6);
+    expect(credit.accessor!(euro)).toBe(9000);
+    expect((credit.accessor!(euro) as number) > (credit.accessor!(yen) as number)).toBe(true);
+    expect(credit.firstSortDirection).toBe('desc');
+  });
+
   it('the search text is the code, the name and the city, each on its own line', () => {
     const customer = byId('cus-4');
     expect(customerSearchText(customer)).toBe(`${customer.code}\n${customer.name}\n${customer.billingAddress.city}`);

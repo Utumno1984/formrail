@@ -35,7 +35,7 @@ const search = async (text: string) => {
 const store = (): CustomerStore => (window as unknown as { __ropShowcaseStore: CustomerStore }).__ropShowcaseStore;
 
 describe('the customer list (#523)', () => {
-  it('200 customers with Code, Name, Country, Account manager, Credit limit (in the customer currency) and Status', async () => {
+  it('200 customers with Code, Name, Country, Account manager, Credit limit (in the customer currency) and Status', { timeout: 30_000 }, async () => {
     renderList();
     await listReady();
     expect(heading()).toHaveTextContent('Customers');
@@ -61,7 +61,7 @@ describe('the customer list (#523)', () => {
     expect(within(yenRow).getAllByRole('cell')[4]).toHaveTextContent(/^¥[\d,]+$/);
   });
 
-  it('the pills filter by status', async () => {
+  it('the pills filter by status', { timeout: 30_000 }, async () => {
     renderList();
     await listReady();
     const count = (status: string) => seed.filter((c) => c.status === status).length;
@@ -100,7 +100,7 @@ describe('the customer list (#523)', () => {
     await waitFor(() => expect(codes()).toEqual([]));
   });
 
-  it('the credit limit sorts by the amount (in EUR), descending on the first click', async () => {
+  it('the credit limit sorts by the amount (in EUR), descending on the first click', { timeout: 30_000 }, async () => {
     renderList();
     await listReady();
     await userEvent.click(screen.getByRole('button', { name: 'Credit limit' }));

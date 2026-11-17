@@ -88,6 +88,15 @@ describe('the contacts (#523)', () => {
     expect(textbox('Contact 1 name')).toHaveValue(contacts[1]!.name);
   });
 
+  it('removing a contact in the middle: the NEXT one (which takes its place) gets the focus, not the previous one', async () => {
+    const { store } = setupPage('cus-7');
+    await ready();
+    const contacts = stored(store, 'cus-7').contacts;
+    await userEvent.click(removeButton(2));
+    await waitFor(() => expect(removeButton(2)).toHaveFocus());
+    expect(textbox('Contact 2 name')).toHaveValue(contacts[2]!.name);
+  });
+
   it('removing the primary contact leaves none chosen: Save says so on "Primary contact" and nothing is saved', async () => {
     const { store, onSaved } = setupPage();
     await ready();
