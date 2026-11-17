@@ -82,14 +82,6 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
     rebase(incoming);
   };
 
-  // Another update, on other fields: Number and Notes (#584, several updates in a row).
-  const simulateAnotherServerUpdate = () => {
-    const incoming: Invoice = { ...server.current, number: `${server.current.number}-B`, notes: 'Approved by finance' };
-    server.current = incoming;
-    onServerUpdate(incoming);
-    rebase(incoming);
-  };
-
   return (
     // Inline styles: the pro stylesheet emits no utilities (only `.rop-pro-*` component classes).
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
@@ -101,9 +93,6 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <Button variant="secondary" onClick={simulateServerUpdate}>
           Simulate server update
-        </Button>
-        <Button variant="secondary" onClick={simulateAnotherServerUpdate}>
-          Simulate another server update
         </Button>
         <Button
           variant="primary"
@@ -170,11 +159,6 @@ function FormRebaseDemo({ saveDelay, onSave, onServerUpdate }: DemoArgs) {
  * "Supplier", not touched, takes the server value; "Amount", touched, keeps yours and is listed as
  * a conflict; "Notes" stays yours. "Accept server value" resolves the conflict with the server
  * value. "Save" waits `saveDelay` ms: a server update pressed meanwhile is queued until it ends.
- *
- * Several updates in a row: "Simulate another server update" changes "Number" and "Notes". Pressed
- * after "Simulate server update" with "Amount" still in conflict, the conflict of the first update
- * stays open next to the new one on "Notes": the conflicts accumulate until you resolve them, while
- * "Applied server changes" lists the last update only. The play function ends with this case.
  */
 export const Playground: Story = {
   tags: ['playground'],
@@ -202,33 +186,6 @@ export const Playground: Story = {
     await waitFor(() => expect(conflictItems()).toHaveLength(0));
     await expect(field('Notes')).toHaveValue('Checked by me');
     await expect(field('Supplier')).toHaveValue('Acme Corp (updated)');
-
-    // Two server updates in a row before resolving (#584): the conflict of the first one stays open.
-    const applied = () => within(canvas.getByRole('region', { name: /Applied server changes/ })).getByText(/"path"/);
-    await userEvent.clear(field('Amount'));
-    await userEvent.type(field('Amount'), '130');
-    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
-    await waitFor(() => expect(field('Supplier')).toHaveValue('Acme Corp (updated) (updated)'));
-    await expect(conflictItems()).toHaveLength(1);
-    await expect(conflictItems()[0]).toHaveTextContent('Amount: yours "130", server "200"');
-    await userEvent.click(canvas.getByRole('button', { name: 'Simulate another server update' }));
-    await waitFor(() => expect(field('Number')).toHaveValue('INV-001-B'));
-    await expect(conflictItems()).toHaveLength(2);
-    await expect(conflictItems()[0]).toHaveTextContent('Amount: yours "130", server "200"');
-    await expect(conflictItems()[1]).toHaveTextContent('Notes: yours "Checked by me", server "Approved by finance"');
-    // "Applied server changes" lists the last update only: Number, not Supplier.
-    await expect(applied()).toHaveTextContent('"path": "number"');
-    await expect(applied()).not.toHaveTextContent('supplier');
-    await expect(args.onServerUpdate).toHaveBeenCalledTimes(3);
-
-    // Each conflict is resolved on its own: the other one stays.
-    await userEvent.click(canvas.getByRole('button', { name: 'Accept server value for Notes' }));
-    await expect(field('Notes')).toHaveValue('Approved by finance');
-    await waitFor(() => expect(conflictItems()).toHaveLength(1));
-    await expect(conflictItems()[0]).toHaveTextContent('Amount: yours "130", server "200"');
-    await userEvent.click(canvas.getByRole('button', { name: 'Keep my value for Amount' }));
-    await waitFor(() => expect(conflictItems()).toHaveLength(0));
-    await expect(field('Amount')).toHaveValue('130');
   },
 };
 
@@ -336,6 +293,16 @@ function RowConflictsDemo({ onServerUpdate, rowLabels = 'position' }: DemoArgs) 
     rebase(incoming);
   };
 
+  // Another update, on another field (#584): another user renames "Desk". The open conflicts stay open.
+  const simulateAnotherServerUpdate = () => {
+    const incoming: Order = {
+      lineItems: server.current.lineItems.map((row) => (row.id === 'line-1' ? { ...row, name: 'Standing desk' } : row)),
+    };
+    server.current = incoming;
+    onServerUpdate(incoming);
+    rebase(incoming);
+  };
+
   const setLines = (lineItems: Row[]) => form.setValue('lineItems', lineItems);
   const update = (id: string, patch: Partial<Row>) => setLines(lines.map((row) => (row.id === id ? { ...row, ...patch } : row)));
 
@@ -362,6 +329,9 @@ function RowConflictsDemo({ onServerUpdate, rowLabels = 'position' }: DemoArgs) 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <Button variant="secondary" onClick={simulateServerUpdate}>
           Simulate server update
+        </Button>
+        <Button variant="secondary" onClick={simulateAnotherServerUpdate}>
+          Simulate another server update
         </Button>
         <Button variant="secondary" onClick={() => form.reset()}>
           Discard
@@ -474,6 +444,11 @@ export const RowConflicts: Story = {
  * position, as it is now. The play function changes the quantity of "Lamp" (third line), simulates the server update
  * (the conflict reads `Line items > Item 3 (Lamp) > Quantity`), moves "Lamp" up twice (`Item 1 (Lamp)`), renames it
  * "Desk lamp" (`Item 1 (Desk lamp)`) and keeps its own value: the choice buttons carry the same name.
+ *
+ * Several updates in a row (#584): "Simulate another server update" renames "Desk" (another field). The play then
+ * changes the quantity of "Chair", simulates the update (conflicts on "Lamp" and "Chair") and the other update: the two
+ * conflicts of the first update stay open (they accumulate until resolved), while "Applied server changes" lists the
+ * last update only (the rename). It ends by resolving them one by one.
  */
 export const MovedRowConflict: Story = {
   args: { rowLabels: 'name' },
@@ -506,5 +481,30 @@ export const MovedRowConflict: Story = {
     await waitFor(() => expect(conflictTexts()).toEqual([]));
     await expect(quantity(1)).toHaveValue('7');
     await expect(args.onServerUpdate).toHaveBeenCalledTimes(1);
+
+    // Two server updates in a row before resolving (#584). Lines now: "Desk lamp", "Desk", "Chair".
+    const { appliedTexts } = rowsCanvas(canvasElement);
+    const chair = `Line items > ${args.rowLabels === 'name' ? 'Item 3 (Chair)' : 'Item 3'} > Quantity`;
+    await userEvent.clear(quantity(3));
+    await userEvent.type(quantity(3), '5');
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+    const both = [`${lamp(1, 'Desk lamp')}: yours "7", server "22"`, `${chair}: yours "5", server "24"`];
+    await waitFor(() => expect(conflictTexts()).toEqual(both));
+    // The other update renames "Desk" only: the conflicts of the first one stay open, applied is the rename.
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate another server update' }));
+    await waitFor(() => expect(name(2)).toHaveValue('Standing desk'));
+    await expect(conflictTexts()).toEqual(both);
+    await expect(appliedTexts()).toEqual([
+      `Line items > ${args.rowLabels === 'name' ? 'Item 2 (Standing desk)' : 'Item 2'} > Name: "Desk" → "Standing desk"`,
+    ]);
+    await expect(args.onServerUpdate).toHaveBeenCalledTimes(3);
+
+    // Resolved one by one: the other stays.
+    await userEvent.click(canvas.getByRole('button', { name: `Accept server value for ${chair}` }));
+    await expect(quantity(3)).toHaveValue('24');
+    await waitFor(() => expect(conflictTexts()).toEqual([both[0]]));
+    await userEvent.click(canvas.getByRole('button', { name: `Keep my value for ${lamp(1, 'Desk lamp')}` }));
+    await waitFor(() => expect(conflictTexts()).toEqual([]));
+    await expect(quantity(1)).toHaveValue('7');
   },
 };
