@@ -41,6 +41,8 @@
 @source not '../showcase/crud-story-args.ts';
 /* Same for the Sales orders stories' args (#520): no class names, a `filter` URL parameter. */
 @source not '../showcase/sales-order-story-args.ts';
+/* Same for the Customers stories' args (#523): no class names, a `filter` URL parameter. */
+@source not '../showcase/customer-story-args.ts';
 @source not '../list-report/search.ts';
 @source not '../list-report/use-change-flash.ts';
 @source not '../internal/normalize-text.ts';
