@@ -13,7 +13,7 @@ import {
   type ItemLabelOption,
   type PlainObject,
 } from '../internal/structural-diff';
-import { SOURCE, arrange, decisionDiffer, keysOf, rebaseInternal, type ConflictRecord, type Segment } from './compute-rebase';
+import { SOURCE, arrange, decisionDiffer, keysOf, rebaseInternal, sameOrder, type ConflictRecord, type Segment } from './compute-rebase';
 import type { OpenRebaseConflict, RebaseFormBinding, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
 import { itemLabel as defaultItemLabel } from '../change-summary/infer-label';
 
@@ -155,17 +155,6 @@ function reorderedAs(current: readonly unknown[], theirs: readonly unknown[], id
   return order.map((key) => current[currentKeys.indexOf(key)]);
 }
 
-/** Same relative order of the items `current` and `theirs` share. */
-function sameOrder(current: readonly unknown[], theirs: readonly unknown[], idKey: string): boolean {
-  const currentKeys = keysOf(current, idKey);
-  const theirsKeys = keysOf(theirs, idKey);
-  const inCurrent = new Set(currentKeys);
-  const inTheirs = new Set(theirsKeys);
-  const a = currentKeys.filter((key) => inTheirs.has(key));
-  const b = theirsKeys.filter((key) => inCurrent.has(key));
-  return a.length === b.length && a.every((key, i) => key === b[i]);
-}
-
 /**
  * Applies the merge of `computeRebase` to a form of core's `useObjectPageForm`, through its public
  * API only (`baseline`, `values`, `isSaving`, `saveError`, `reset`, `setValues`). The hook of
@@ -267,7 +256,11 @@ export function useFormRebase<Values extends object>(
       const { incoming } = pending;
       if (incoming !== form.baseline) {
         const { arrayIdKeys, labels, isEqual, itemLabel } = optionsRef.current;
-        const { result, records } = rebaseInternal({ baseline: form.baseline, values: form.values, incoming, arrayIdKeys, labels, isEqual, itemLabel });
+        // The conflicts still open (`next.records`, checked above against these values) go into the merge (#584).
+        const { result, records } = rebaseInternal(
+          { baseline: form.baseline, values: form.values, incoming, arrayIdKeys, labels, isEqual, itemLabel },
+          next.records,
+        );
         ownBaselineRef.current = { baseline: incoming };
         merged = { incoming, values: result.values };
         next = records.length === 0 && result.applied.length === 0 ? EMPTY : { applied: result.applied, records };

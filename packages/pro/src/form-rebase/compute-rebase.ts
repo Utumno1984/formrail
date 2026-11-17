@@ -47,11 +47,38 @@ export function decisionDiffer(options: Pick<RebaseOptions<object>, 'arrayIdKeys
 const sameSequence = (a: readonly unknown[], b: readonly unknown[]): boolean =>
   a.length === b.length && a.every((key, i) => key === b[i]);
 
+const NONE: readonly ConflictRecord[] = [];
+
+/** `true` when `segment` is the step `step` (same key, or same id key and id). */
+const sameSegment = (segment: Segment, step: Segment): boolean =>
+  'idKey' in segment
+    ? 'idKey' in step && segment.idKey === step.idKey && idMapKey(segment.id) === idMapKey(step.id)
+    : !('idKey' in step) && segment.key === step.key;
+
+/** The records of `records` (all at or under a node of `depth` segments) that are under its child `step`. */
+function under(records: readonly ConflictRecord[], depth: number, step: Segment): readonly ConflictRecord[] {
+  if (records.length === 0) return NONE;
+  const found = records.filter((record) => record.segments.length > depth && sameSegment(record.segments[depth] as Segment, step));
+  return found.length === 0 ? NONE : found;
+}
+
 /** Id map keys of `items` (see `idMapKey`), in order. */
 export const keysOf = (items: readonly unknown[], idKey: string): unknown[] => items.map((item) => idMapKey(itemId(item, idKey)));
 
 /** `keys` restricted to the keys in `among`, in the order of `keys`. */
 const restricted = (keys: readonly unknown[], among: ReadonlySet<unknown>): unknown[] => keys.filter((key) => among.has(key));
+
+/** Same relative order of the items `a` and `b` share. */
+export function sameOrder(a: readonly unknown[], b: readonly unknown[], idKey: string): boolean {
+  const aKeys = keysOf(a, idKey);
+  const bKeys = keysOf(b, idKey);
+  return sameSequence(restricted(aKeys, new Set(bKeys)), restricted(bKeys, new Set(aKeys)));
+}
+
+const idsOf = (items: readonly unknown[], idKey: string): unknown[] => items.map((item) => itemId(item, idKey));
+
+/** The `base` of a conflict record as a merge side (`MISSING` when absent). */
+const baseOf = (record: ConflictRecord): unknown => (record.conflict.baseMissing ? MISSING : record.conflict.base);
 
 /**
  * Order of the merged items: `primary` restricted to `kept`, then every other kept key of
@@ -98,18 +125,105 @@ class Merger {
     this.entries = new EntryDiffer({ ...options, source: SOURCE, blockWithoutIds: true });
   }
 
-  /** Merged value of one node (`MISSING` when absent from the result). */
-  merge(base: unknown, mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[]): unknown {
+  /**
+   * Merged value of one node (`MISSING` when absent from the result). `carried`: the still open conflicts of the
+   * earlier rebases at or under the node (see `rebaseInternal`).
+   */
+  merge(base: unknown, mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[], carried: readonly ConflictRecord[]): unknown {
     if (!this.decide.differs(base, mine, node)) {
       if (this.decide.differs(base, theirs, node)) this.entries.run(base, theirs, this.applied, node);
       return theirs;
     }
-    if (!this.decide.differs(base, theirs, node) || !this.decide.differs(mine, theirs, node)) return mine;
-    return this.mergeChanged(base, mine, theirs, node, segments);
+    if (!this.decide.differs(base, theirs, node)) {
+      // The server did not change the node: the conflicts of the earlier rebases in it stay where they still differ.
+      if (carried.length > 0) this.carry(mine, theirs, node, segments, carried);
+      return mine;
+    }
+    // Both sides now hold the same value: nothing is overwritten, the earlier conflicts in it are over.
+    if (!this.decide.differs(mine, theirs, node)) return mine;
+    // The server changed the node again: this merge decides, the earlier conflicts in it are recomputed.
+    return this.mergeChanged(base, mine, theirs, node, segments, carried);
+  }
+
+  /**
+   * Emits again the carried conflicts at or under a node the result takes from `mine` (or an item out of the result,
+   * `mine` then `MISSING`) and the server did not change in this rebase, where the user's value still differs from
+   * the server's (`theirs`): with their `base`, and `mine`, `theirs`, path and labels of this rebase. A carried
+   * conflict on the node itself covers anything under it. In the depth-first order of the result: keys of `mine`
+   * then the keys only in `theirs`; items of `mine` (index in the result), then the items only in `theirs` (index
+   * there, the item named on the `'baseline'` side).
+   */
+  private carry(mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[], carried: readonly ConflictRecord[]): void {
+    const depth = segments.length;
+    const here = carried.filter((record) => record.segments.length === depth);
+    const onValue = here.find((record) => record.orderIdKey === undefined);
+    if (onValue) {
+      if (this.decide.differs(theirs, mine, node)) this.conflict(node, segments, baseOf(onValue), mine, theirs, undefined);
+      return;
+    }
+    const onOrder = here[0];
+    const orderIdKey = onOrder?.orderIdKey;
+    if (onOrder && orderIdKey !== undefined && Array.isArray(mine) && Array.isArray(theirs) && !sameOrder(mine, theirs, orderIdKey)) {
+      this.conflict(node, segments, MISSING, mine, theirs, {
+        idKey: orderIdKey,
+        base: onOrder.conflict.base as unknown[],
+        mine: idsOf(mine, orderIdKey),
+        theirs: idsOf(theirs, orderIdKey),
+      });
+    }
+    if (here.length === carried.length) return;
+    if (Array.isArray(mine) || Array.isArray(theirs)) {
+      const mineItems: readonly unknown[] = Array.isArray(mine) ? mine : [];
+      const theirsItems: readonly unknown[] = Array.isArray(theirs) ? theirs : [];
+      const steps = carried.flatMap((record) => {
+        const step = record.segments[depth];
+        return step !== undefined && 'idKey' in step ? [step] : [];
+      });
+      const visit = (items: readonly unknown[], other: readonly unknown[], inResult: boolean) => {
+        for (let index = 0; index < items.length; index += 1) {
+          const item = items[index];
+          const step = steps.find((s) => idMapKey(itemId(item, s.idKey)) === idMapKey(s.id));
+          if (!step) continue;
+          const key = idMapKey(step.id);
+          const counterpart = other.find((o) => idMapKey(itemId(o, step.idKey)) === key);
+          if (!inResult && counterpart !== undefined) continue;
+          const sub = under(carried, depth, step);
+          const child = this.decide.indexChild(node, index, item, inResult ? 'values' : 'baseline');
+          const childSegments = [...segments, step];
+          if (inResult) this.carry(item, counterpart === undefined ? MISSING : counterpart, child, childSegments, sub);
+          else this.carry(MISSING, item, child, childSegments, sub);
+        }
+      };
+      visit(mineItems, theirsItems, true);
+      visit(theirsItems, mineItems, false);
+      return;
+    }
+    const mineObject = isPlainObject(mine) ? mine : undefined;
+    const theirsObject = isPlainObject(theirs) ? theirs : undefined;
+    const keys = [...(mineObject ? Object.keys(mineObject) : []), ...(theirsObject ? Object.keys(theirsObject).filter((key) => !mineObject || !Object.hasOwn(mineObject, key)) : [])];
+    for (const key of keys) {
+      const step = { key };
+      const sub = under(carried, depth, step);
+      if (sub.length === 0) continue;
+      this.carry(
+        mineObject ? own(mineObject, key) : MISSING,
+        theirsObject ? own(theirsObject, key) : MISSING,
+        this.decide.keyChild(node, key),
+        [...segments, step],
+        sub,
+      );
+    }
   }
 
   /** Both sides changed the node, to different values. */
-  private mergeChanged(base: unknown, mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[]): unknown {
+  private mergeChanged(
+    base: unknown,
+    mine: unknown,
+    theirs: unknown,
+    node: DiffNode,
+    segments: readonly Segment[],
+    carried: readonly ConflictRecord[],
+  ): unknown {
     const { isEqual } = this.decide;
     const decidedByIsEqual =
       node.depth > 0 &&
@@ -123,13 +237,14 @@ class Merger {
       const idKey = this.decide.idKeyFor(node, base, mine, theirs);
       const baseUsable = isAbsent(base);
       if (idKey !== undefined && Array.isArray(mine) && Array.isArray(theirs) && (baseUsable || Array.isArray(base))) {
-        const merged = this.guarded(mine, theirs, () => this.mergeArray(base, mine, theirs, idKey, node, segments));
+        const merged = this.guarded(mine, theirs, () => this.mergeArray(base, mine, theirs, idKey, node, segments, carried));
         if (merged !== MISSING) return merged;
       } else if (idKey === undefined && isPlainObject(mine) && isPlainObject(theirs) && (baseUsable || isPlainObject(base))) {
-        const merged = this.guarded(mine, theirs, () => this.mergeObject(base, mine, theirs, node, segments));
+        const merged = this.guarded(mine, theirs, () => this.mergeObject(base, mine, theirs, node, segments, carried));
         if (merged !== MISSING) return merged;
       }
     }
+    // A conflict on the whole node: it covers the carried conflicts under it.
     this.conflict(node, segments, base, mine, theirs, undefined);
     return mine;
   }
@@ -179,17 +294,26 @@ class Merger {
     });
   }
 
-  private mergeObject(base: unknown, mine: PlainObject, theirs: PlainObject, node: DiffNode, segments: readonly Segment[]): PlainObject {
+  private mergeObject(
+    base: unknown,
+    mine: PlainObject,
+    theirs: PlainObject,
+    node: DiffNode,
+    segments: readonly Segment[],
+    carried: readonly ConflictRecord[],
+  ): PlainObject {
     const baseObject = isPlainObject(base) ? base : undefined;
     const out: PlainObject = Object.getPrototypeOf(mine) === null ? (Object.create(null) as PlainObject) : {};
     const keys = [...Object.keys(mine), ...Object.keys(theirs).filter((key) => !Object.hasOwn(mine, key))];
     for (const key of keys) {
+      const step = { key };
       const merged = this.merge(
         baseObject ? own(baseObject, key) : MISSING,
         own(mine, key),
         own(theirs, key),
         this.decide.keyChild(node, key),
-        [...segments, { key }],
+        [...segments, step],
+        under(carried, segments.length, step),
       );
       if (merged !== MISSING) put(out, key, merged);
     }
@@ -203,6 +327,7 @@ class Merger {
     idKey: string,
     node: DiffNode,
     segments: readonly Segment[],
+    carried: readonly ConflictRecord[],
   ): unknown[] {
     const baseItems: readonly unknown[] = Array.isArray(base) ? base : [];
     // `idKeyFor` checked every side: no duplicate, every item has an id.
@@ -237,14 +362,25 @@ class Merger {
     const mineReordered = !sameSequence(restricted(mineKeys, baseSet), restricted(baseKeys, mineSet));
     const theirsReordered = !sameSequence(restricted(theirsKeys, baseSet), restricted(baseKeys, theirsSet));
     const shared = new Set(baseKeys.filter((key) => mineSet.has(key) && theirsSet.has(key)));
+    const depth = segments.length;
     if (mineReordered && theirsReordered && !sameSequence(restricted(mineKeys, shared), restricted(theirsKeys, shared))) {
-      const ids = (items: readonly unknown[]) => items.map((item) => itemId(item, idKey));
       this.conflict(node, segments, base, mine, theirs, {
         idKey,
-        base: ids(baseItems),
-        mine: ids(mine),
-        theirs: ids(theirs),
+        base: idsOf(baseItems, idKey),
+        mine: idsOf(mine, idKey),
+        theirs: idsOf(theirs, idKey),
       });
+    } else if (!theirsReordered) {
+      // The server kept the order: a carried order conflict stays while the user's order still differs from it.
+      const onOrder = carried.find((record) => record.segments.length === depth && record.orderIdKey === idKey);
+      if (onOrder && !sameOrder(mine, theirs, idKey)) {
+        this.conflict(node, segments, base, mine, theirs, {
+          idKey,
+          base: onOrder.conflict.base as unknown[],
+          mine: idsOf(mine, idKey),
+          theirs: idsOf(theirs, idKey),
+        });
+      }
     }
     const fromMine = mineReordered || !theirsReordered;
     const order = fromMine ? arrange(mineKeys, theirsKeys, kept) : arrange(theirsKeys, mineKeys, kept);
@@ -260,10 +396,17 @@ class Merger {
       const baseItem = b === undefined ? MISSING : baseItems[b];
       let item: unknown;
       if (m !== undefined && t !== undefined) {
-        item = this.merge(baseItem, mine[m], theirs[t], child, [...segments, { idKey, id: itemId(mine[m], idKey) }]);
+        const step = { idKey, id: itemId(mine[m], idKey) };
+        item = this.merge(baseItem, mine[m], theirs[t], child, [...segments, step], under(carried, depth, step));
       } else if (m !== undefined) {
         item = mine[m];
-        if (b !== undefined) this.conflict(child, [...segments, { idKey, id: itemId(item, idKey) }], baseItem, item, MISSING, undefined);
+        const step = { idKey, id: itemId(item, idKey) };
+        if (b !== undefined) this.conflict(child, [...segments, step], baseItem, item, MISSING, undefined);
+        else {
+          // Neither the previous nor this server version has the item: a carried conflict on it (or in it) stays.
+          const sub = under(carried, depth, step);
+          if (sub.length > 0) this.carry(item, MISSING, child, [...segments, step], sub);
+        }
       } else {
         item = theirs[t as number];
         this.entries.emit(this.applied, child, 'added', MISSING, item);
@@ -279,17 +422,34 @@ class Merger {
         const t = theirsIndex.get(key) as number;
         const item = theirs[t];
         this.conflict(this.decide.indexChild(node, t, item, 'baseline'), [...segments, { idKey, id: itemId(item, idKey) }], baseItems[b], MISSING, item, undefined);
+      } else if (!mineSet.has(key) && theirsIndex.has(key)) {
+        // Removed by the user, not changed by the server in this rebase: a carried conflict on it (or in it) stays.
+        const t = theirsIndex.get(key) as number;
+        const item = theirs[t];
+        const step = { idKey, id: itemId(item, idKey) };
+        const sub = under(carried, depth, step);
+        if (sub.length > 0) this.carry(MISSING, item, this.decide.indexChild(node, t, item, 'baseline'), [...segments, step], sub);
       }
     }
     return out;
   }
 }
 
-/** `computeRebase` plus the conflict records `useFormRebase` keeps. */
-export function rebaseInternal<Values extends object>(options: RebaseOptions<Values>): RebaseComputation<Values> {
+/**
+ * `computeRebase` plus the conflict records `useFormRebase` keeps. `carried`: the conflicts of the earlier rebases
+ * still open on `values` (#584). They are emitted again, with the paths and labels of this rebase, at the places
+ * this rebase does not decide (the server did not change them since `baseline`) where the user's value still
+ * differs from `incoming`; where the server changed the value again this merge decides alone (one conflict whose
+ * `base` is the value of `baseline`, or none when both sides now agree). No record is emitted twice for a path, and
+ * one on a node covers those under it.
+ */
+export function rebaseInternal<Values extends object>(
+  options: RebaseOptions<Values>,
+  carried: readonly ConflictRecord[] = NONE,
+): RebaseComputation<Values> {
   const { baseline, values, incoming, arrayIdKeys, labels, isEqual, itemLabel } = options;
   const merger = new Merger({ arrayIdKeys, labels, isEqual });
-  const merged = merger.merge(baseline, values, incoming, ROOT, []) as Values;
+  const merged = merger.merge(baseline, values, incoming, ROOT, [], carried) as Values;
   if (itemLabel) {
     // Named after the merge, on nodes of this computation only (each one asks `itemLabel` once per slot).
     const labeler = new Differ({ itemLabel, source: SOURCE });
