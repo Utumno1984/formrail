@@ -191,6 +191,12 @@ export default tseslint.config(
           // `type T = import('../internal/demo-data').X` (ticket #560): erased at build time, but it still ties the
           // library file to the demo universe, so it is banned like every other import.
           ['TSImportType', 'source.value'],
+          // `import x = require('../internal/demo-data')` and `require('../internal/demo-data')` (ticket #573): the
+          // CommonJS forms of the same import. `require.resolve(...)` is not a `require(...)` call and stays allowed.
+          ['TSImportEqualsDeclaration', 'moduleReference.expression.value'],
+          ['CallExpression[callee.name="require"]', 'arguments.0.value'],
+          // `require(`../internal/demo-data`)`: a template literal without interpolation is the same string.
+          ['CallExpression[callee.name="require"]', 'arguments.0.quasis.0.value.cooked'],
         ].map(([node, path]) => ({
           selector: `${node}[${path}=/(^|\\/)demo-data(\\/|$)/]`,
           message:

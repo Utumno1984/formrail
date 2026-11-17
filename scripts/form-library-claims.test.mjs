@@ -72,6 +72,20 @@ describe('the guards themselves', () => {
     'versions 1.33 and later',
     'versions 1.33.5 or newer',
     'Any `@tanstack/react-form` ^1.33.5 release works, as do versions 1.33 and later.',
+    // Ticket #573: the open-ended forms with a ".x" or other wordings.
+    '1.33.x and later',
+    '1.33.x or later',
+    '1.33.x and above',
+    '1.33.x or newer',
+    '1.33.x+',
+    '1.33.5+',
+    'versions 1.33.x onwards',
+    '1.33.5 onwards',
+    'at least 1.33.5',
+    'At least v1.33',
+    '≥1.33.5',
+    '≥ 1.33.5',
+    'Works with TanStack Form 1.33.x and later (React 18 and later).',
   ])(
     'spot the promise "%s"',
     (text) => {
@@ -79,7 +93,20 @@ describe('the guards themselves', () => {
     },
   );
 
-  it.each(['tested on 1.33.x', 'versions 1.33.5', 'react-hook-form ^7.92.0', '~1.33.5', 'release 11.x', 'Map {"k" => 1}', 'tested on 1.33.x and 1.34 later this year'])('let "%s" through', (text) => {
+  it.each(['tested on 1.33.x', 'versions 1.33.5', 'react-hook-form ^7.92.0', '~1.33.5', 'release 11.x', 'Map {"k" => 1}', 'tested on 1.33.x and 1.34 later this year',
+    // Other libraries' requirements are not a promise about the form libraries (ticket #573).
+    'React 18 and later',
+    'React 18.2 and later',
+    'Node 20 or newer',
+    'Node 21 or newer',
+    'requires React 19 or above',
+    'TypeScript 5.4 and later',
+    'Vitest 2.1 onwards',
+    'Node 20+',
+    'at least 18 characters',
+    'at least 1 release',
+    '≥18',
+  ])('let "%s" through', (text) => {
     expect(promisesAnyMajor1(text)).toBe(false);
   });
 });
