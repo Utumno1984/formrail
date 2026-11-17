@@ -3,19 +3,16 @@ import {
   useId,
   useMemo,
   useRef,
-  useState,
   type HTMLAttributes,
   type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react';
 import { Button } from '../button/Button';
-import { isLaidOut } from '../internal/focus';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { Title, type TitleLevel } from '../typography/Title';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
-import { useResizeAndMutationEffect } from '../utils/use-resize-and-mutation-effect';
 import { ListReportFilterBar } from './ListReportFilterBar';
 import type { ListReportTableLabels } from './ListReportTableStates';
 import type { ListReportTableStatus } from './ListReportTableShell';
@@ -192,30 +189,12 @@ export interface ListReportFrameInternalProps {
    */
   bulkActionsWideOnly?: boolean;
   /**
-   * A control of the bulk actions that has the focus and stops being laid out (its slot hidden below 640px,
-   * a viewport resized or a tablet rotated across it) or is removed (the consumer's `bulkActions` dropped):
-   * the focus goes to the header checkbox (to the table container when it is disabled), as after "Clear
-   * selection", never to `body`. A focus the user moved elsewhere in the meantime is left where it is.
-   * The only JS of the rule, and only while one of those controls has the focus: an observer on the slot.
+   * The slot of the bulk actions: the element that wraps what `bulkActions` returns (null while there is none). Only
+   * a ref: the rule "a focused control of the slot hidden or removed hands the focus to the header checkbox" lives
+   * in `@formrail/pro` (`VirtualListReport`), which observes the slot through it, so the Free `ListReport` carries
+   * none of that code and runs no observer.
    */
-  keepBulkActionsFocus?: boolean;
-}
-
-/** The "select all results" checkbox of the table, or the table container when it is disabled (no results). */
-function focusSelectAllOrTable(root: HTMLElement | null, tableId: string): void {
-  const header = root?.querySelector<HTMLInputElement>('th[data-rop-select] input');
-  const target = header && !header.disabled ? header : root?.querySelector<HTMLElement>(`[id="${tableId}"]`);
-  target?.focus();
-}
-
-/**
- * Whether the focus of `node` was lost with it: the node is gone or not laid out any more, and the focus is
- * on `body` (or nowhere, or still on the hidden node), not somewhere the user moved it on purpose.
- */
-function focusLostWith(node: Element): boolean {
-  if (node.isConnected && isLaidOut(node)) return false;
-  const active = document.activeElement;
-  return !active || active === document.body || active === node || !active.isConnected;
+  bulkActionsSlotRef?: Ref<HTMLDivElement>;
 }
 
 function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportFrameInternalProps, ref: Ref<HTMLDivElement>) {
@@ -240,7 +219,7 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportF
     renderTable,
     className,
     bulkActionsWideOnly = false,
-    keepBulkActionsFocus = false,
+    bulkActionsSlotRef,
     ...rest
   } = props;
   const baseId = useId();
@@ -276,32 +255,11 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportF
   const selectedAny = selection.selectedResultCount + selection.hiddenSelectedCount > 0;
   const clearSelection = () => {
     selection.clearSelection();
-    focusSelectAllOrTable(rootRef.current, tableId);
+    const root = rootRef.current;
+    const header = root?.querySelector<HTMLInputElement>('th[data-rop-select] input');
+    const target = header && !header.disabled ? header : root?.querySelector<HTMLElement>(`[id="${tableId}"]`);
+    target?.focus();
   };
-
-  // `keepBulkActionsFocus`: the control of the bulk actions holding the focus, observed only while it does.
-  // Losing the focus with the control still laid out is the user moving on; losing it with the control hidden or
-  // removed keeps it, because that is the very change the observer reacts to. (Prose here is read by the Tailwind
-  // scan of `src/`: no utility names as bare words.)
-  const actionsRef = useRef<HTMLDivElement | null>(null);
-  const [focusedAction, setFocusedAction] = useState<Element | null>(null);
-  useResizeAndMutationEffect(() => {
-    const slot = actionsRef.current;
-    const node = focusedAction;
-    if (!keepBulkActionsFocus || !slot || !node) return undefined;
-    // An environment without layout (nothing is ever laid out) never moves the focus.
-    const wasLaidOut = isLaidOut(node);
-    return {
-      target: slot,
-      // A removed action changes the slot's children; a hidden slot collapses its own box.
-      children: true,
-      update: () => {
-        if (!wasLaidOut || !focusLostWith(node)) return;
-        setFocusedAction(null);
-        focusSelectAllOrTable(rootRef.current, tableId);
-      },
-    };
-  }, [keepBulkActionsFocus, focusedAction, tableId]);
 
   return (
     <div {...rest} ref={mergedRef} className={cn(rootClass, className)}>
@@ -345,17 +303,8 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportF
           </TruncatedText>
           {bulkActions ? (
             <div
-              ref={actionsRef}
+              ref={bulkActionsSlotRef}
               className={cn(selectionActionsClass, bulkActionsWideOnly && selectionActionsWideOnlyClass)}
-              onFocus={keepBulkActionsFocus ? (event) => setFocusedAction(event.target) : undefined}
-              onBlur={
-                keepBulkActionsFocus
-                  ? (event) => {
-                      const node = event.target;
-                      if (node.isConnected && isLaidOut(node)) setFocusedAction((current) => (current === node ? null : current));
-                    }
-                  : undefined
-              }
             >
               {bulkActions(selection)}
             </div>

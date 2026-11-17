@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, useListReport, useListReportScrollRestoration, type ListReportColumn, type ListReportFilter } from '@formrail/core';
-import { VirtualListReport, type VirtualListReportProps } from './VirtualListReport';
+import { VirtualListReport, type VirtualListReportLabels, type VirtualListReportProps } from './VirtualListReport';
 import { PITCH, mockTableLayout } from '../../test/virtual-table-utils';
 
 interface Item {
@@ -301,6 +301,27 @@ describe('without consumer bulkActions (#504)', () => {
       return <VirtualListReport title="Items" table={table} keepBulkActionsFocus={false} />;
     }
     expect([Typed, TypedFocus]).toHaveLength(2);
+  });
+
+  it('#571: bulkActionsSlotRef, the frame\'s internal ref of the slot, is not a prop of VirtualListReport either', () => {
+    function TypedSlot() {
+      const table = useListReport<Item>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id, selectable: true });
+      // @ts-expect-error internal to the core's frame, never a prop of the floorplan
+      return <VirtualListReport title="Items" table={table} bulkActionsSlotRef={() => {}} />;
+    }
+    expect(TypedSlot).toBeTypeOf('function');
+  });
+
+  it('#571 (decision B): a complete VirtualListReportLabels object may leave out selectAllResultsDescription (it has a default)', () => {
+    // Optional: an object with every other key compiles as a `VirtualListReportLabels`.
+    expectTypeOf<Omit<VirtualListReportLabels, 'selectAllResultsDescription'>>().toExtend<VirtualListReportLabels>();
+    expectTypeOf<VirtualListReportLabels['selectAllResultsDescription']>().toEqualTypeOf<((resultCount: number) => string) | undefined>();
+    // Only that key changed: `selectAllResultsAction` stays required, as before.
+    expectTypeOf<Omit<VirtualListReportLabels, 'selectAllResultsAction'>>().not.toExtend<VirtualListReportLabels>();
+    // And at runtime the default is used when the key is absent from `labels` (unchanged).
+    render(<Bare labels={{ selectAllResultsAction: (n) => `All ${n}` }} />);
+    const describedBy = screen.getByRole('checkbox', { name: 'Select all results' }).getAttribute('aria-describedby')!;
+    expect(document.getElementById(describedBy)).toHaveTextContent('All 100,000 results, including those not on screen');
   });
 });
 

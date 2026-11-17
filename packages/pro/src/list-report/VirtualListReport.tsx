@@ -1,7 +1,8 @@
-import { forwardRef, useId, useMemo, useRef, type ReactElement, type ReactNode, type Ref } from 'react';
+import { forwardRef, useId, useMemo, useRef, useState, type ReactElement, type ReactNode, type Ref } from 'react';
 import { Button, composeRefs, type ListReportSelection } from '@formrail/core';
 import { ListReportFrame, getNumberFormat, type ListReportFrameLabels, type ListReportFrameProps } from '@formrail/core/internal';
 import { VirtualListReportTable, type VirtualListReportTableInternalProps, type VirtualListReportTableProps } from './VirtualListReportTable';
+import { useKeepBulkActionsFocus } from './use-keep-bulk-actions-focus';
 
 /** Texts of `VirtualListReport`: those of the core floorplan plus the Pro selection action. */
 export interface VirtualListReportLabels extends ListReportFrameLabels {
@@ -17,9 +18,11 @@ export interface VirtualListReportLabels extends ListReportFrameLabels {
    * selects every current result, also the rows the virtualization has not mounted. Not rendered while there is no
    * result (the checkbox is disabled then). Default: "All 100,000 results, including those not on screen" (for a single
    * result just the number and the word), the number formatted in the `locale` of `useListReport` (`Intl.NumberFormat`; with SSR pass `locale`).
-   * A custom function receives the raw number and formats it itself.
+   * A custom function receives the raw number and formats it itself. Those words are English only, in every
+   * `locale`, like the other labels (only the number follows the `locale`): to localize them, pass this function
+   * in `labels`. Optional, as it has a default: a complete `VirtualListReportLabels` object may leave it out.
    */
-  selectAllResultsDescription: (resultCount: number) => string;
+  selectAllResultsDescription?: (resultCount: number) => string;
 }
 
 const defaultSelectAllAction =
@@ -48,6 +51,10 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
   const { table } = props;
   const scroller = useRef<HTMLDivElement | null>(null);
   const mergedScrollerRef = useMemo(() => composeRefs(scrollerRef, scroller), [scrollerRef]);
+  // The slot of the bulk actions (the frame's internal ref): a focused action hidden or removed hands the focus to
+  // the header checkbox. The slot exists only with the selection (the bar is not rendered without it).
+  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null);
+  useKeepBulkActionsFocus(actionsSlot, scroller);
   const fmt = (n: number) => getNumberFormat(table.locale).format(n);
   const selectAllLabel = labels?.selectAllResultsAction ?? defaultSelectAllAction(fmt);
   // The header checkbox selects every result, mounted or not: a description says so (and how many), since the
@@ -93,7 +100,7 @@ function VirtualListReportImpl<Row>(props: VirtualListReportProps<Row>, ref: Ref
       // one: below 640px the bar drops it (CSS) and keeps the one line of a bar without actions; the header
       // checkbox selects every result there. The focus of an action hidden or removed goes to that checkbox.
       bulkActionsWideOnly={table.selection.enabled && !bulkActions}
-      keepBulkActionsFocus={table.selection.enabled}
+      bulkActionsSlotRef={setActionsSlot}
       renderTable={(tableProps) => (
         <>
           <Table
