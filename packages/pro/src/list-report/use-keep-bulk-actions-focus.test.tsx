@@ -186,6 +186,22 @@ describe('keepBulkActionsFocus: a focused action hidden or removed hands the foc
     expect(search).toHaveFocus();
   });
 
+  it('#571: the action leaves the layout, the user moves the focus elsewhere, then the observer runs: the focus is not stolen', async () => {
+    setLaidOut(() => true);
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const search = screen.getByRole('searchbox');
+    act(() => button.focus());
+    // The slot leaves the layout (a media query: no mutation), the focus leaves it with the action not shown, so the
+    // action stays tracked; the user puts the focus in the search field before the resize is observed.
+    setLaidOut((el) => !slotOf(button).contains(el));
+    act(() => search.focus());
+    await act(async () => {});
+    expect(observerOf(slotOf(button))).toBeDefined();
+    fire(slotOf(button));
+    expect(search).toHaveFocus();
+  });
+
   it('a resize of the slot while its action is still laid out moves nothing', () => {
     setLaidOut(() => true);
     render(<Host bulkActions={approve} />);
