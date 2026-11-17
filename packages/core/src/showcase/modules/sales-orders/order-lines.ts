@@ -63,13 +63,17 @@ export const toStoredLine = (line: OrderLineValues, currency: DemoCurrency): Sto
 
 // Two texts are the same number only when BOTH are valid for the rule of the field (a whole number, an amount of the
 // currency): `5` and `05` are the same quantity, but `5.0` is not valid for a quantity, so it is never "unchanged"
-// (an invalid text left in a field always counts as a change, the contract of `number-text.ts`).
-const sameInteger = (a: string, b: string): boolean => {
+// (an invalid text left in a field always counts as a change, the contract of `number-text.ts`). Exported for the Pro
+// showcase (#522): its Change Summary and Form Rebase compare a line's numbers with these, so "dirty" and "has an entry"
+// never disagree on a quantity, a price or a discount.
+/** Two texts of a whole number (quantity, discount): the same number when both are valid integers, else `a === b`. */
+export const sameInteger = (a: string, b: string): boolean => {
   if (a === b) return true;
   const [x, y] = [a.trim(), b.trim()];
   return INTEGER.test(x) && INTEGER.test(y) && Number.isSafeInteger(Number(x)) && Number(x) === Number(y);
 };
-const sameAmount = (a: string, b: string, currency: DemoCurrency): boolean => {
+/** Two texts of an amount of `currency` (unit price): the same minor units when both are valid, else `a === b`. */
+export const sameAmount = (a: string, b: string, currency: DemoCurrency): boolean => {
   if (a === b) return true;
   const [x, y] = [textToMinor(a, currency), textToMinor(b, currency)];
   return x !== null && x === y;
