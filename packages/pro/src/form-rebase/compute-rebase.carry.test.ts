@@ -1,0 +1,105 @@
+// `rebaseInternal` with the conflicts of an earlier rebase (`carried`, ticket #584): what `useFormRebase` passes it
+// when a second server update lands. The hook passes only the conflicts still open; the merge does not rely on it.
+import { rebaseInternal, type ConflictRecord } from './compute-rebase';
+import type { RebaseOptions } from './types';
+
+type Line = { id: number; qty: number };
+type Invoice = { number: string; amount: number; supplier: { name: string; vat: string }; lines: Line[] };
+
+const lines = (...pairs: [number, number][]): Line[] => pairs.map(([id, qty]) => ({ id, qty }));
+const BASE: Invoice = { number: 'A-1', amount: 10, supplier: { name: 'ACME', vat: 'IT1' }, lines: lines([1, 1], [2, 2], [3, 3]) };
+const OPTIONS: Pick<RebaseOptions<Invoice>, 'arrayIdKeys'> = { arrayIdKeys: { lines: 'id' } };
+
+/** Two rebases in a row: `values` against `first`, then `then` (the user's values meanwhile) against `second`. */
+function twice(values: Invoice, first: Invoice, then: Invoice, second: Invoice, carried?: (records: ConflictRecord[]) => ConflictRecord[]) {
+  const one = rebaseInternal({ baseline: BASE, values, incoming: first, ...OPTIONS });
+  const two = rebaseInternal({ baseline: first, values: then, incoming: second, ...OPTIONS }, carried ? carried(one.records) : one.records);
+  return { one, two, conflicts: two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs]) };
+}
+
+describe('rebaseInternal with carried conflicts (#584)', () => {
+  it('no carried conflict: the same result as computeRebase (nothing remembered)', () => {
+    const values = { ...BASE, number: 'A-2' };
+    const { two } = twice(values, { ...BASE, number: 'A-3' }, values, { ...BASE, number: 'A-3', amount: 5 }, () => []);
+    expect(two.result.conflicts).toEqual([]);
+    expect(two.result.applied.map((e) => e.path)).toEqual(['amount']);
+  });
+
+  it('a carried conflict where the values now hold the server value is not emitted again (no ghost)', () => {
+    // The user then takes the server name by hand and changes the VAT: Save would overwrite nothing on the name.
+    const values = { ...BASE, supplier: { name: 'Mine', vat: 'IT1' } };
+    const first = { ...BASE, supplier: { name: 'Theirs', vat: 'IT1' } };
+    const { one, conflicts } = twice(values, first, { ...BASE, supplier: { name: 'Theirs', vat: 'IT2' } }, { ...first, amount: 5 });
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['supplier.name']);
+    expect(conflicts).toEqual([]);
+  });
+
+  it('a carried order conflict where the values now hold the server order is not emitted again (no ghost)', () => {
+    const first = { ...BASE, lines: lines([1, 1], [3, 3], [2, 2]) };
+    const { one, conflicts } = twice(
+      { ...BASE, lines: lines([2, 2], [1, 1], [3, 3]) },
+      first,
+      // The user takes the server order and edits a quantity; the server changes another row, not the order.
+      { ...BASE, lines: lines([1, 9], [3, 3], [2, 2]) },
+      { ...BASE, lines: lines([1, 1], [3, 3], [2, 7]) },
+    );
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['lines']);
+    expect(conflicts).toEqual([]);
+  });
+
+  it('carried conflicts on two keys of one object stay each with its own base', () => {
+    const values = { ...BASE, supplier: { name: 'Mine', vat: 'IT-mine' } };
+    const first = { ...BASE, supplier: { name: 'Theirs', vat: 'IT-theirs' } };
+    expect(twice(values, first, values, { ...first, amount: 5 }).conflicts).toEqual([
+      ['supplier.name', 'ACME', 'Mine', 'Theirs'],
+      ['supplier.vat', 'IT1', 'IT-mine', 'IT-theirs'],
+    ]);
+  });
+
+  it('carried conflicts on two rows stay each on its own row (matched by id), with its own base', () => {
+    const values = { ...BASE, lines: lines([1, 10], [2, 2], [3, 30]) };
+    const first = { ...BASE, lines: lines([1, 11], [2, 2], [3, 31]) };
+    expect(twice(values, first, values, { ...first, amount: 5 }).conflicts).toEqual([
+      ['lines.0.qty', 1, 10, 11],
+      ['lines.2.qty', 3, 30, 31],
+    ]);
+  });
+
+  it('a carried conflict in a row the user moved: the index in the result (the user order), not in incoming', () => {
+    const values = { ...BASE, lines: lines([3, 30], [1, 1], [2, 2]) };
+    const first = { ...BASE, lines: lines([1, 1], [2, 2], [3, 31]) };
+    const { one, two, conflicts } = twice(values, first, values, { ...first, amount: 5 });
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['lines.0.qty']);
+    expect(conflicts).toEqual([['lines.0.qty', 3, 30, 31]]);
+    expect(two.result.values.lines).toBe(values.lines);
+  });
+
+  it('a carried conflict on a key the user removed (the key only on the server side) stays', () => {
+    const values = { ...BASE, supplier: { name: 'ACME' } as Invoice['supplier'] };
+    const first = { ...BASE, supplier: { name: 'ACME', vat: 'IT2' } };
+    const { two } = twice(values, first, values, { ...first, amount: 5 });
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([['supplier.vat', 'IT1', undefined, 'IT2', true]]);
+  });
+
+  it('a carried conflict on a row the user removed: named on the baseline side, at its index in incoming', () => {
+    const values = { ...BASE, lines: lines([1, 1], [3, 3]) };
+    const first = { ...BASE, lines: lines([1, 1], [2, 8], [3, 3]) };
+    const seen: unknown[] = [];
+    const one = rebaseInternal({ baseline: BASE, values, incoming: first, ...OPTIONS });
+    const two = rebaseInternal(
+      {
+        baseline: first,
+        values,
+        incoming: { ...first, lines: lines([0, 0], [1, 1], [2, 8], [3, 3]) },
+        ...OPTIONS,
+        itemLabel: (_path, item, context) => {
+          seen.push([(item as Line).id, context.side, context.index]);
+          return undefined;
+        },
+      },
+      one.records,
+    );
+    expect(two.result.conflicts.map((c) => [c.path, c.label, c.mineMissing])).toEqual([['lines.2', 'Lines > Item 3', true]]);
+    expect(seen).toContainEqual([2, 'baseline', 2]);
+  });
+});
