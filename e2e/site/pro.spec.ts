@@ -166,6 +166,8 @@ test.describe('Pro demo: banner', () => {
     for (const [name, id] of [
       ['Change Summary', 'pro-changesummary--docs'],
       ['Invoices with Change Summary', 'pro-showcase-invoices-with-change-summary--docs'],
+      // #522.
+      ['Record editing integrity', 'pro-showcase-record-editing-integrity--docs'],
       ['Virtual List Report', 'pro-floorplans-virtual-list-report--docs'],
       // Public since #384.
       ['Form rebase', 'pro-patterns-form-rebase--docs'],
