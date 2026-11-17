@@ -23,8 +23,8 @@ import {
 const TWO_MODULES = ['invoices', 'tasks'] as const;
 
 describe('parseRoute (#518)', () => {
-  it('the default module is the invoices, the only one known so far', () => {
-    expect(SHOWCASE_MODULES).toEqual(['invoices']);
+  it('the default module is the invoices, the first of the registered ones (sales orders since #520)', () => {
+    expect(SHOWCASE_MODULES).toEqual(['invoices', 'sales-orders']);
     expect(DEFAULT_MODULE).toBe('invoices');
   });
 

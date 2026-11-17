@@ -8,6 +8,7 @@ const FLOORPLAN = 'floorplans-list-report--no-play';
 const ROW_ACTIONS = 'floorplans-list-report--row-actions-no-play';
 const ROW_ACTIONS_INLINE = 'floorplans-list-report--row-actions-inline-no-play';
 const FREE_STORY = 'floorplans-list-report--columns-hidden-sideways';
+const DIR_SWITCH_STORY = 'floorplans-list-report--columns-hidden-sideways-direction-switch';
 const PLAYGROUND = 'data-listreporttable--playground';
 const PRO_STORY = 'pro-floorplans-virtual-list-report--columns-hidden-sideways';
 const PRO_FIXTURE = 'pro-floorplans-virtual-list-report--default-no-play';
@@ -161,6 +162,77 @@ async function updateArgs(page: Page, storyId: string, updatedArgs: Record<strin
     },
     { id: storyId, args: updatedArgs },
   );
+}
+
+/** How a test changes the direction: the `dir` control of the story, or a `dir` attribute set or removed. */
+type DirectionChange =
+  | { how: 'controls'; storyId: string; dir: 'ltr' | 'rtl' }
+  | { how: 'attribute'; selector: string; dir: 'ltr' | 'rtl' | null };
+
+interface AfterDirectionChange {
+  start: boolean;
+  end: boolean;
+  scrollLeft: number;
+  /** `scroll` events of the scroller stopped by the test (0 when nothing is stopped). */
+  stopped: number;
+}
+
+/**
+ * #562. When the direction changes, every engine moves the scroll back to the inline start of the new
+ * direction; Chromium and WebKit fire a `scroll` event for it, Firefox does not. `firefoxLike` stops the
+ * scroller's `scroll` events before they reach it (a capturing listener on the window runs first) for
+ * the time of the change, so the engine is in Firefox's situation: only the hook's `dir` observer can
+ * bring the state up to date. Makes the change, then reads the state on the first animation frame where
+ * the scroller's computed direction is `to` (the scroll events of that frame are dispatched before the
+ * frame callbacks), with no wait for anything else.
+ */
+async function changeDirection(page: Page, change: DirectionChange, to: 'ltr' | 'rtl', firefoxLike: boolean): Promise<AfterDirectionChange> {
+  return scroller(page).evaluate(
+    async (el, { change: c, to: target, stop }) => {
+      let stopped = 0;
+      const block = (event: Event) => {
+        if (event.target !== el) return;
+        stopped += 1;
+        event.stopImmediatePropagation();
+      };
+      const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (stop) window.addEventListener('scroll', block, true);
+      try {
+        if (c.how === 'controls') {
+          (window as unknown as { __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void } }).__STORYBOOK_ADDONS_CHANNEL__.emit('updateStoryArgs', {
+            storyId: c.storyId,
+            updatedArgs: { dir: c.dir },
+          });
+        } else {
+          const node = document.querySelector(c.selector)!;
+          if (c.dir === null) node.removeAttribute('dir');
+          else node.setAttribute('dir', c.dir);
+        }
+        const deadline = performance.now() + 5_000;
+        do {
+          await frame();
+          if (performance.now() > deadline) throw new Error(`the direction is still ${getComputedStyle(el).direction}`);
+        } while (getComputedStyle(el).direction !== target);
+        const state = { start: el.hasAttribute('data-rop-overflow-start'), end: el.hasAttribute('data-rop-overflow-end'), scrollLeft: el.scrollLeft };
+        // Two more frames before the listener goes: a `scroll` event the engine fires late is stopped too.
+        await frame();
+        await frame();
+        return { ...state, stopped };
+      } finally {
+        if (stop) window.removeEventListener('scroll', block, true);
+      }
+    },
+    { change, to, stop: firefoxLike },
+  );
+}
+
+/** After a change of direction from a scrolled position: back at the start of the new direction, end shade alone. */
+function expectBackAtStart(after: AfterDirectionChange, browserName: string, label: string): void {
+  expect({ start: after.start, end: after.end, scrollLeft: after.scrollLeft }, label).toEqual({ start: false, end: true, scrollLeft: 0 });
+  // In Chromium the stopped event proves that the test did take the state's other way in (the `scroll`
+  // event) away; Firefox fires none, and its events are not stopped.
+  if (browserName === 'chromium') expect(after.stopped, `${label}: the scroll event Chromium fires was stopped`).toBeGreaterThan(0);
+  if (browserName === 'firefox') expect(after.stopped, label).toBe(0);
 }
 
 /** The invoice button of the first data row (the data has arrived: skeleton rows hold no button). */
@@ -476,6 +548,52 @@ test.describe('List Report: edge shades (Free)', () => {
     });
   }
 
+  // #562: the direction changed AFTER a horizontal scroll. The browser moves the scroll back to the
+  // start of the new direction; in Firefox with no `scroll` event (simulated elsewhere, see
+  // `changeDirection`), and the attributes must follow at once, not at the next scroll.
+  for (const [from, to] of [
+    ['ltr', 'rtl'],
+    ['rtl', 'ltr'],
+  ] as const) {
+    test(`@engines ${from} -> ${to} after a scroll to the middle, by the dir prop (Controls): the start shade goes at once, with no scroll event`, async ({ page, browserName }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, PLAYGROUND, `containerWidth:360;dir:${from};status:loading`);
+      await scrollFromStart(page, 'middle');
+      await expectEdges(page, true, true);
+      const after = await changeDirection(page, { how: 'controls', storyId: PLAYGROUND, dir: to }, to, browserName !== 'firefox');
+      expectBackAtStart(after, browserName, `${from} -> ${to}`);
+      expect(await scroller(page).getAttribute('dir')).toBe(to);
+      await expectEdges(page, false, true);
+      // The scroll measures again as before (the test listener is gone).
+      await scrollFromStart(page, 'end');
+      await expectEdges(page, true, false);
+    });
+  }
+
+  test('@engines a dir set on the root element after a scroll, then removed: the state follows each time, with no scroll event', async ({ page, browserName }) => {
+    await page.setViewportSize(PHONE);
+    // The play leaves the table scrolled, a checkbox under the start shade: both shades.
+    await expectPlayToPass(page, FREE_STORY);
+    await expectEdges(page, true, true);
+    try {
+      const rtl = await changeDirection(page, { how: 'attribute', selector: 'html', dir: 'rtl' }, 'rtl', browserName !== 'firefox');
+      expectBackAtStart(rtl, browserName, 'html dir=rtl');
+      await expectEdges(page, false, true);
+      await scrollFromStart(page, 'end');
+      await expectEdges(page, true, false);
+      const removed = await changeDirection(page, { how: 'attribute', selector: 'html', dir: null }, 'ltr', browserName !== 'firefox');
+      expectBackAtStart(removed, browserName, 'html dir removed');
+      await expectEdges(page, false, true);
+    } finally {
+      await page.evaluate(() => document.documentElement.removeAttribute('dir'));
+    }
+  });
+
+  test('@engines the story that switches the direction after a scroll: its play passes', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await expectPlayToPass(page, DIR_SWITCH_STORY);
+  });
+
   test('restored scroll position (useListReportScrollRestoration): the start shade is there with no gesture', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await gotoStory(page, 'floorplans-list-report--scroll-restoration-no-play', 'loadDelayMs:300');
@@ -510,6 +628,61 @@ test.describe('List Report: edge shades (Free)', () => {
     await scrollFromStart(page, 'middle');
     // The final state with no transition: visible at the first read.
     expect((await edgeState(page)).startShade).toEqual(SHOWN);
+  });
+
+  test('#562 without color-mix() (Safari 16.0/16.1, emulated): the shipped @supports-not fallback draws the same shade; with color-mix nothing of it applies', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await gotoStory(page, PLAYGROUND, 'containerWidth:360;dir:ltr;status:loading');
+    await scrollFromStart(page, 'middle');
+    await expectEdges(page, true, true);
+    const ramps = async () => Promise.all((['start', 'end'] as const).map((edge) => shadeRamp(page, edge)));
+    // Where color-mix() is supported (here) the fallback does not apply: no opacity on the ::before, and
+    // the colour is the color-mix one.
+    const supported = await scroller(page).evaluate((el) => {
+      const layer = el.querySelector('[data-rop-overflow-edges]')!;
+      const shade = layer.querySelector('[data-rop-overflow-edge="start"]')!;
+      return {
+        colour: getComputedStyle(layer).getPropertyValue('--rop-list-report-edge-color').trim(),
+        beforeOpacity: getComputedStyle(shade, '::before').opacity,
+      };
+    });
+    expect(supported.colour).toMatch(/^color-mix\(/);
+    expect(supported.beforeOpacity).toBe('1');
+    const native = await ramps();
+
+    // A browser without color-mix() keeps the custom property (not validated) and the gradient that
+    // reads it is invalid: no shade. Emulated by an invalid colour on the layer.
+    const broken = await page.addStyleTag({ content: '[data-rop-overflow-edges] { --rop-list-report-edge-color: color-mix(in nowhere, red, blue); }' });
+    for (const ramp of await ramps()) expect(Math.abs(ramp.outer - ramp.inner), 'no fallback: no shade at all').toBeLessThanOrEqual(1);
+
+    // The shipped fallback: every rule of the page's CSS under `@supports not (color: color-mix(...))`,
+    // re-inserted with no condition (what that browser applies), after the invalid colour.
+    const fallbackCss = await page.evaluate(() => {
+      const out: string[] = [];
+      const walk = (rules: CSSRuleList) => {
+        for (const rule of Array.from(rules)) {
+          if (rule instanceof CSSSupportsRule && /^not\s*\(\s*color\s*:\s*color-mix\(/.test(rule.conditionText)) {
+            const inner = Array.from(rule.cssRules).map((r) => r.cssText).join('\n');
+            out.push(rule.parentRule instanceof CSSStyleRule ? `${rule.parentRule.selectorText} { ${inner} }` : inner);
+          } else if ('cssRules' in rule) walk((rule as CSSGroupingRule).cssRules);
+        }
+      };
+      for (const sheet of Array.from(document.styleSheets)) walk(sheet.cssRules);
+      return out.join('\n');
+    });
+    expect(fallbackCss).toContain('--rop-list-report-edge-color');
+    expect(fallbackCss).toContain('opacity');
+    const fallback = await page.addStyleTag({ content: fallbackCss });
+    const emulated = await ramps();
+    for (const [i, ramp] of emulated.entries()) {
+      const label = `fallback ${i === 0 ? 'start' : 'end'}`;
+      expectFullColourOutside(ramp, label);
+      // The same shade as with color-mix(), within rounding.
+      expect(Math.abs(ramp.outer - native[i]!.outer), `${label}: outer edge as with color-mix`).toBeLessThanOrEqual(3);
+      expect(Math.abs(ramp.inner - native[i]!.inner), `${label}: inner edge as with color-mix`).toBeLessThanOrEqual(3);
+    }
+    await fallback.evaluate((el) => (el as Element).remove());
+    await broken.evaluate((el) => (el as Element).remove());
   });
 
   test('theme: the colour comes from the text token, follows a scoped dark theme; forced colours draw a CanvasText line', async ({ page }) => {
@@ -566,6 +739,23 @@ test.describe('Virtual List Report: edge shades (Pro, 375x667)', () => {
   test('the play function passes (middle of 10,000 rows, a checkbox under the start shade)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await expectPlayToPass(page, PRO_STORY);
+  });
+
+  test('#562: in the middle of 10,000 rows and scrolled sideways, a dir set on an ancestor then removed: the state follows at once, with no scroll event', async ({ page, browserName }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    // The play leaves the table in the middle of the rows, scrolled sideways; then to the middle of the
+    // columns: both shades.
+    await expectPlayToPass(page, PRO_STORY);
+    await scrollFromStart(page, 'middle');
+    await expectEdges(page, true, true);
+    const rtl = await changeDirection(page, { how: 'attribute', selector: '#storybook-root', dir: 'rtl' }, 'rtl', browserName !== 'firefox');
+    expectBackAtStart(rtl, browserName, 'Pro, #storybook-root dir=rtl');
+    await expectEdges(page, false, true);
+    await scrollFromStart(page, 'middle');
+    await expectEdges(page, true, true);
+    const removed = await changeDirection(page, { how: 'attribute', selector: '#storybook-root', dir: null }, 'ltr', browserName !== 'firefox');
+    expectBackAtStart(removed, browserName, 'Pro, #storybook-root dir removed');
+    await expectEdges(page, false, true);
   });
 
   test('100,000 rows: scrolled to the bottom then sideways; a real click under the start shade; "Go to" leaves the sideways state', async ({ page }) => {

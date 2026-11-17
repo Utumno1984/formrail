@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
@@ -1886,4 +1886,64 @@ export const ColumnsHiddenSidewaysRtl: StoryObj<RowActionsArgs> = {
       <RowActionsReport {...args} />
     </div>
   ),
+};
+
+/** An app's direction switch: a toggle button above a wrapper whose `dir` it sets. */
+function DirectionSwitch({ children }: { children: ReactNode }) {
+  const [rtl, setRtl] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" aria-pressed={rtl} onClick={() => setRtl((on) => !on)}>
+        Right to left
+      </Button>
+      <div dir={rtl ? 'rtl' : 'ltr'} style={{ marginTop: 8 }}>
+        {children}
+      </div>
+    </>
+  );
+}
+
+/**
+ * `ColumnsHiddenSideways` under a direction switch, as an app with a language menu has it. Switching
+ * the direction moves the scroll back to the start of the new direction; Firefox does not fire a
+ * `scroll` event for it, and the shades still follow at once (the table watches `dir` attributes).
+ * The play function scrolls to the middle (both shades), switches to right to left (the end shade
+ * alone, now on the left), scrolls to the end (the start shade alone) and switches back (the end shade
+ * alone, on the right), checking each state with no scroll in between.
+ */
+export const ColumnsHiddenSidewaysDirectionSwitch: StoryObj<RowActionsArgs> = {
+  ...ColumnsHiddenSideways,
+  name: 'Columns hidden sideways: direction switched after a scroll',
+  tags: [],
+  render: (args) => (
+    <DirectionSwitch>
+      <RowActionsReport {...args} />
+    </DirectionSwitch>
+  ),
+  play: async ({ args, canvasElement }) => {
+    // Written for the default configuration: a narrow box.
+    if (args.containerWidth !== 'narrow') return;
+    const scroller = rowActionsScroller(canvasElement);
+    const toggle = within(canvasElement).getByRole('button', { name: 'Right to left' });
+    const edges = () => ({ start: scroller.hasAttribute('data-rop-overflow-start'), end: scroller.hasAttribute('data-rop-overflow-end') });
+    const max = () => scroller.scrollWidth - scroller.clientWidth;
+    await waitFor(() => expect(edges()).toEqual({ start: false, end: true }));
+
+    scroller.scrollLeft = Math.round(max() / 2);
+    await waitFor(() => expect(edges()).toEqual({ start: true, end: true }));
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(getComputedStyle(scroller).direction).toBe('rtl'));
+    await expect(scroller.scrollLeft).toBe(0);
+    await expect(edges()).toEqual({ start: false, end: true });
+
+    // The end of an rtl scroller is at a negative `scrollLeft`.
+    scroller.scrollLeft = -max();
+    await waitFor(() => expect(edges()).toEqual({ start: true, end: false }));
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(getComputedStyle(scroller).direction).toBe('ltr'));
+    await expect(scroller.scrollLeft).toBe(0);
+    await expect(edges()).toEqual({ start: false, end: true });
+  },
 };

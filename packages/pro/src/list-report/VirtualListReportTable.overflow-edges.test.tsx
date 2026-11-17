@@ -145,6 +145,33 @@ describe('VirtualListReportTable (10,000 rows): the edge shades of the shared Sh
     expect(renders).toBe(0);
   });
 
+  it('#562: scrolled down and sideways, a `dir` changed on the root with no `scroll` event (Firefox): the state follows at once, no row renders', async () => {
+    horizontal = mockHorizontalLayout(800, 300);
+    render(<Host />);
+    const el = scroller();
+    scrollTop(5_000 * PITCH);
+    scrollLeft(250);
+    expect(edges()).toEqual({ start: true, end: true });
+    // The microtasks the render left (the container's child-list observer measures once for the layer
+    // inserted after the table) run now, not inside the change below where they would measure for it.
+    await act(async () => {});
+    expect(edges()).toEqual({ start: true, end: true });
+    renders = 0;
+    try {
+      // Firefox: back to the start of the new direction (0), and no `scroll` event. The act flushes the
+      // microtasks, where the hook's MutationObserver measures.
+      await act(async () => {
+        document.documentElement.setAttribute('dir', 'rtl');
+        el.scrollLeft = 0;
+      });
+      expect(edges()).toEqual({ start: false, end: true });
+      expect(scroller()).toBe(el);
+      expect(renders).toBe(0);
+    } finally {
+      document.documentElement.removeAttribute('dir');
+    }
+  });
+
   it('handle.scrollToRowId leaves the horizontal state alone', () => {
     horizontal = mockHorizontalLayout(800, 300);
     const handle = createRef<VirtualListReportTableHandle>();
