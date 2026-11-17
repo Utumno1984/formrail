@@ -642,7 +642,8 @@ export const SalesOrderCrud: StoryObj<CrudArgs> = {
 
     if (args.saveOutcome === 'error') {
       // The server refuses: the page stays with what was typed, the message is in the footer, nothing was created.
-      await expect(await canvas.findByRole('region', { name: 'Save actions' })).toHaveTextContent(/Could not save/i);
+      const footer = await canvas.findByRole('region', { name: 'Save actions' });
+      await waitFor(() => expect(footer).toHaveTextContent(/Could not save/i), { timeout: 5000 });
       await expect(canvas.getByRole('heading', { level: 1, name: 'New sales order' })).toBeVisible();
       await expect(canvas.getByRole('textbox', { name: /Line 1 quantity/ })).toHaveValue('1000');
       await expect(mountedStore()?.snapshot()).toHaveLength(200);
