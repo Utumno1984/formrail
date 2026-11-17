@@ -111,6 +111,20 @@ describe('keepBulkActionsFocus: a focused action hidden or removed hands the foc
     expect(observerOf(slot)).toBeUndefined();
   });
 
+  it('#571: the browser drops the focus of the hidden slot, then microtasks run, then the resize is observed: still handed over', async () => {
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    setLaidOut(() => true);
+    act(() => button.focus());
+    setLaidOut((el) => !slot.contains(el));
+    // The blur comes with the style recalculation, the ResizeObserver at the next frame: microtasks run in between.
+    await act(async () => button.blur());
+    expect(observerOf(slot)).toBeDefined();
+    fire(slot);
+    expect(allBox()).toHaveFocus();
+  });
+
   it('also while the hidden button still holds the focus (the observer runs before the browser drops it)', () => {
     render(<Host bulkActions={approve} />);
     const button = screen.getByRole('button', { name: 'Approve' });
@@ -129,6 +143,21 @@ describe('keepBulkActionsFocus: a focused action hidden or removed hands the foc
     rerender(<Host bulkActions={() => <span>Nothing</span>} />);
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
     // The change of the slot's children is seen by its MutationObserver (a microtask).
+    await waitFor(() => expect(allBox()).toHaveFocus());
+  });
+
+  it('#571: a browser that blurs the control while removing it (still in the document at its focusout): the focus still goes to the header checkbox', async () => {
+    setLaidOut((el) => el.isConnected);
+    // As Chrome does: the focused node gets its focusout during the removal, before it leaves the document.
+    const removeChild = Node.prototype.removeChild;
+    vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(this: Node, child: T): T {
+      if ((child as Node) === document.activeElement) child.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      return removeChild.call(this, child) as T;
+    });
+    const { rerender } = render(<Host bulkActions={approve} />);
+    act(() => screen.getByRole('button', { name: 'Approve' }).focus());
+    rerender(<Host bulkActions={() => <span>Nothing</span>} />);
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
     await waitFor(() => expect(allBox()).toHaveFocus());
   });
 

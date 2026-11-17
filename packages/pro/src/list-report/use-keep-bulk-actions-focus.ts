@@ -46,10 +46,13 @@ export function useKeepBulkActionsFocus(slot: HTMLElement | null, container: Ref
     if (!slot) return undefined;
     const onFocusIn = (event: FocusEvent) => setFocused(event.target as Element);
     // Losing the focus with the control still shown is the user moving on; losing it with the control hidden or
-    // removed keeps it, because that is the very change the observer reacts to.
+    // removed keeps it, because that is the very change the observer reacts to. Read after the change that blurred it
+    // (a microtask): a browser that blurs a control while removing it does so with the control still in the document.
     const onFocusOut = (event: FocusEvent) => {
       const node = event.target as Element;
-      if (node.isConnected && isShown(node)) setFocused((current) => (current === node ? null : current));
+      queueMicrotask(() => {
+        if (node.isConnected && isShown(node)) setFocused((current) => (current === node ? null : current));
+      });
     };
     slot.addEventListener('focusin', onFocusIn);
     slot.addEventListener('focusout', onFocusOut);
