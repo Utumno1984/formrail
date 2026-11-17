@@ -853,6 +853,42 @@ test.describe('#571 focus of a bulk action hidden without a resize', () => {
     expect(await activeIsBody(page)).toBe(false);
   });
 
+  // Review point 1: the action activated for real (keyboard or mouse) hides itself and focuses the header checkbox in
+  // the same click. Nothing of the bar may stay tracked: a click on a blank area (focus on body) then a viewport
+  // crossing 640px (the slot under `display: none`, a resize) must leave the focus on body, and the page where it is.
+  for (const gesture of ['Enter', 'Space', 'mouse'] as const) {
+    test(`"Select all N results" activated with ${gesture}, then a click on a blank area, then 1280 to 639 wide: the focus stays on body, nothing scrolls @engines`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, SELECTION, 'withBulkActions:!false');
+      await pickRows(page, [2]);
+      if (gesture === 'mouse') await selectAllByRole(page).click();
+      else {
+        await selectAllByRole(page).focus();
+        await page.keyboard.press(gesture === 'Space' ? ' ' : gesture);
+      }
+      await expect(selCount(page)).toHaveText('10,000 selected');
+      await expect(allBox(page)).toBeFocused();
+      expect(await selectAllNode(page).evaluate((el) => getComputedStyle(el).visibility)).toBe('hidden');
+      // A blank area: the title of the floorplan (not focusable).
+      await page.getByRole('heading', { name: /Invoices/ }).click();
+      expect(await activeIsBody(page)).toBe(true);
+      await scrollToTop(page, 2_000);
+      const scrolled = (): Promise<[number, number, number]> =>
+        scroller(page).evaluate((el) => [el.scrollTop, window.scrollY, document.scrollingElement!.scrollTop]);
+      const before = await scrolled();
+      await page.setViewportSize({ width: 639, height: 800 });
+      // The resize is observed at the next frames: give them time to (wrongly) move the focus.
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => r())))));
+      expect(await activeIsBody(page)).toBe(true);
+      await expect(allBox(page)).not.toBeFocused();
+      expect(await scrolled()).toEqual(before);
+      // And back: the action is there again, still nothing moved.
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+      expect(await activeIsBody(page)).toBe(true);
+    });
+  }
+
   test('the same wrapper hidden with visibility: visible on the nested control: the control is shown and keeps the focus', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, SELECTION, 'withBulkActions:!true');

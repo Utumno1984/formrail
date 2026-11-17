@@ -330,6 +330,9 @@ export const DefaultNoPlay: Story = { ...Default, tags: [], play: undefined };
  * selects everything from the header checkbox, checks that the bar did not move, then clears the selection and
  * checks that the focus is on the header checkbox. Where the action is there, it then gives it the focus and selects
  * every result from outside: the action hides itself (`visibility: hidden`) and the focus goes to the header checkbox.
+ * Last, it activates the action with Enter (the focus goes to the header checkbox), clicks the title (the focus on
+ * body), changes the selection from outside so that the action shows and hides again, and checks that the focus is
+ * still on body.
  */
 export const Selection: Story = {
   args: { rowCount: 10_000, withBulkActions: false },
@@ -393,6 +396,28 @@ export const Selection: Story = {
     await expect(count).toHaveTextContent(`${fmt.format(10_000)} selected`);
     await waitFor(() => expect(allBox).toHaveFocus());
     await expect(canvasElement.ownerDocument.activeElement).not.toBe(canvasElement.ownerDocument.body);
+    await user.click(canvas.getByRole('button', { name: 'Clear selection' }));
+    await expect(count).toHaveTextContent('No items selected');
+    await unmoved();
+
+    // The action activated for real, from the keyboard: every result selected, the focus on the header checkbox.
+    // Then a click on a blank area (the focus on body) and the selection changed from outside, the action shown then
+    // hidden again: nothing of the bar is tracked any more, so the focus stays on body.
+    await user.click(canvas.getByRole('checkbox', { name: 'Select INV-000002' }));
+    canvas.getByRole('button', { name: /^Select all .+ results$/ }).focus();
+    await user.keyboard('{Enter}');
+    await expect(count).toHaveTextContent(`${fmt.format(10_000)} selected`);
+    await expect(allBox).toHaveFocus();
+    await user.click(canvas.getByRole('heading', { name: /Invoices/ }));
+    const body = canvasElement.ownerDocument.body;
+    await expect(canvasElement.ownerDocument.activeElement).toBe(body);
+    canvas.getByRole('checkbox', { name: 'Select INV-000002' }).click();
+    await expect(count).toHaveTextContent(`${fmt.format(9_999)} selected`);
+    allBox.click();
+    await expect(count).toHaveTextContent(`${fmt.format(10_000)} selected`);
+    // Two frames: the observers' callbacks, if any were left, would have run.
+    await new Promise<void>((resolve) => win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve())));
+    await expect(canvasElement.ownerDocument.activeElement).toBe(body);
     await user.click(canvas.getByRole('button', { name: 'Clear selection' }));
     await expect(count).toHaveTextContent('No items selected');
     await unmoved();
