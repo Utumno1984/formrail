@@ -84,7 +84,7 @@ test.describe('Showcase/Record editing, customers: the list', () => {
     expect(params(page).get('customers.q')).toBe('munchen');
     await search.fill('Italy');
     await search.press('Enter');
-    await expect(page.getByText('No results for the current filters')).toBeVisible();
+    await expect(table(page).getByText('No results for the current filters')).toBeVisible();
   });
 });
 
@@ -183,7 +183,7 @@ test.describe('Showcase/Record editing, customers: list -> customer -> list', ()
     const remove = page.getByRole('button', { name: 'Remove contact 1' });
     await expect(remove).toHaveAttribute('aria-disabled', 'true');
     await expect(remove).toHaveAccessibleDescription('A customer needs at least one contact: add another one before removing this one.');
-    await remove.click();
+    await remove.click({ force: true });
     await remove.focus();
     await page.keyboard.press('Enter');
     await expect(textbox(page, 'Contact 1 name')).toBeVisible();

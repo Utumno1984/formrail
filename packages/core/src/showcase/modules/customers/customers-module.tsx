@@ -42,7 +42,9 @@ import { sameValues, toCustomer, toValues, validateCustomer, type AddressValues,
 
 export type { CustomerValues } from './customer-form';
 
-const COLUMN = { display: 'grid', gap: 16, maxWidth: 420 } as const;
+// `position: relative`: the visually hidden status of the Combobox (and of the Selects) is absolutely positioned and
+// must stay inside the scroller; without a positioned ancestor it would stretch the document below the page.
+const COLUMN = { position: 'relative', display: 'grid', gap: 16, maxWidth: 420 } as const;
 const ADDRESS_ROW = {
   display: 'grid',
   gap: 16,
