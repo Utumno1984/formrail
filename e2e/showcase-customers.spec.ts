@@ -178,6 +178,33 @@ test.describe('Showcase/Record editing, customers: list -> customer -> list', ()
     await expect(bar(page)).toBeHidden();
   });
 
+  test('after Save and reopening the customer, removing the saved new contact and re-adding it identical still shows the save bar', async ({ page }) => {
+    await openList(page);
+    await page.getByRole('link', { name: 'C-10004', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'C-10004' })).toBeVisible();
+    await page.getByRole('button', { name: 'Add contact' }).click();
+    await textbox(page, 'Contact 3 name').fill('Ilse Visser');
+    await textbox(page, 'Contact 3 e-mail').fill('ilse.visser@company.example');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await expect(bar(page)).toBeHidden();
+    const savedId = (await storedCustomer(page, 'cus-4'))?.contacts[2]?.id;
+    expect(savedId).toMatch(/^new-contact-/);
+
+    // Back to the list and open it again: the counter of the new ids starts from 0 again.
+    await back(page).click();
+    await expect(table(page)).toBeVisible();
+    await page.getByRole('link', { name: 'C-10004', exact: true }).click();
+    await expect(textbox(page, 'Contact 3 name')).toHaveValue('Ilse Visser');
+    await page.getByRole('button', { name: 'Remove contact 3' }).click();
+    await page.getByRole('button', { name: 'Add contact' }).click();
+    await textbox(page, 'Contact 3 name').fill('Ilse Visser');
+    await textbox(page, 'Contact 3 e-mail').fill('ilse.visser@company.example');
+    await expect(bar(page)).toBeVisible();
+    const newId = await page.locator('[data-contact-id]').nth(2).getAttribute('data-contact-id');
+    expect(newId).toMatch(/^new-contact-/);
+    expect(newId).not.toBe(savedId);
+  });
+
   test('the only contact cannot be removed: aria-disabled, its reason, nothing happens on click or Enter', async ({ page }) => {
     await openCustomer(page, 'cus-1');
     const remove = page.getByRole('button', { name: 'Remove contact 1' });
