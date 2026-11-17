@@ -221,6 +221,27 @@ describe('salesOrderValueText: values as the user knows them, in the currency of
     expect(text('1250.5', { path: 'lines.0.unitPrice' }, 'JPY')).toBe('1250.5');
   });
 
+  it('a number typed with spaces around it reads as the number (the form accepts it)', () => {
+    expect(text(' 60', { path: 'lines.0.quantity' })).toBe('60');
+    expect(text(' 1200 ', { path: 'lines.0.quantity' })).toBe('1,200');
+    expect(text(' 15 ', { path: 'lines.0.discount' })).toBe('15%');
+    expect(text(' 61.30 ', { path: 'lines.0.unitPrice' }, 'USD')).toBe('$61.30');
+  });
+
+  it('a quantity beyond the safe integers stays as typed, never rounded and grouped', () => {
+    expect(text('12345678901234567890', { path: 'lines.0.quantity' })).toBe('12345678901234567890');
+    expect(text('12345678901234567890', { path: 'lines.0.discount' })).toBe('12345678901234567890');
+  });
+
+  it("in a whole line an empty or non-integer discount is never read as 0 (spec §1.13.1): '' is Empty, '0.0' as typed, '0' none", () => {
+    const [first] = USD.lines as [OrderLineValues];
+    const line = { ...first, productId: '', quantity: '5', unitPrice: '1.00' };
+    expect(text({ ...line, discount: '' }, { path: 'lines.0' }, 'USD')).toBe('No product, 5 × $1.00, Empty discount');
+    expect(text({ ...line, discount: '0.0' }, { path: 'lines.0' }, 'USD')).toBe('No product, 5 × $1.00, 0.0 discount');
+    expect(text({ ...line, discount: ' 0 ' }, { path: 'lines.0' }, 'USD')).toBe('No product, 5 × $1.00');
+    expect(text({ ...line, discount: '0' }, { path: 'lines.0' }, 'USD')).toBe('No product, 5 × $1.00');
+  });
+
   it('a whole line: product, quantity × price in the currency, and the discount when there is one', () => {
     const [first, second] = USD.lines as [OrderLineValues, OrderLineValues];
     expect(text(first, { path: 'lines.0' }, 'USD')).toBe(`${nameOf(first)}, 50 × $61.30`);
