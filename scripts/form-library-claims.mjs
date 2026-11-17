@@ -53,7 +53,7 @@ export function promisesAnyMajor1(text) {
     /≥\s*v?1(?!\d)/, // "≥1.33.5"
     /\bat\s+least\s+v?1\.\d/i, // "at least 1.33.5"
     /(?<![\d.])v?1\.\d+(?:\.(?:\d+|x))?\s*\+/, // "1.33+", "1.33.x+"
-    new RegExp(`${v}\\s+(?:and|or)\\s+(?:later|newer|above|higher|up|onwards?)\\b`, 'i'), // "1.33.x and later"
+    new RegExp(`${v}\\s+(?:and|or)\\s+(?:later|newer|above|higher|up)\\b`, 'i'), // "1.33.x and later"
     new RegExp(`${v}\\s+onwards?\\b`, 'i'), // "1.33.5 onwards"
   ];
   return open.some((re) => re.test(text));
