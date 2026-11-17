@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { SALES_ORDERS } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';
 import { createSalesOrderStore, makeShowcaseSalesOrders, type StoredSalesOrder } from '../../../core/src/showcase/sales-order-store';
+import { DEMO_REFERENCE_POOL, makeProducts } from '../../../core/src/internal/demo-data';
 import { computeRebase } from '../form-rebase/compute-rebase';
 import { SALES_ORDER_ARRAY_ID_KEYS, SALES_ORDER_LABELS, salesOrderEngine, salesOrderLineLabel } from './sales-order-review';
 import { DELIVERY_SHIFT_DAYS, NEXT_STATUS, SALES_ORDER_SERVER_CHANGES, serverChangeOf, serverLineIds } from './sales-order-rebase';
@@ -58,6 +59,18 @@ describe('the server changes of the story', () => {
     expect(so13.lines.map((l) => l.productId)).not.toContain(added.productId);
     expect(added.unitPriceMinor).toBeGreaterThan(0);
     expect(() => serverChangeOf('add-line')(so13)).toThrow(/needs a line id/);
+  });
+
+  it('a line added: never a product the order already has, even the first active one of the catalogue', () => {
+    const active = makeProducts(DEMO_REFERENCE_POOL.products).filter((p) => p.status === 'active');
+    const so13 = order('so-13');
+    // The order holds the first two active products: the added line must be a third one.
+    const withFirst: StoredSalesOrder = {
+      ...so13,
+      lines: [{ ...so13.lines[0]!, productId: active[0]!.id }, { ...so13.lines[0]!, id: 'so-13-line-x', productId: active[1]!.id }],
+    };
+    const added = serverChangeOf('add-line', () => 'srv-line-1')(withFirst).lines.at(-1)!;
+    expect(added.productId).toBe(active[2]!.id);
   });
 
   it('server line ids: one sequence per store, never reused, never in the client\'s `new-<n>` space', () => {
