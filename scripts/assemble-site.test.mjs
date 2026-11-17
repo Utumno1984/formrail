@@ -308,13 +308,12 @@ describe('themeTokensToRoot', () => {
 
   it('on the real theme: every token the landing stylesheet uses is declared', () => {
     const root = themeTokensToRoot(readFileSync(new URL('../packages/core/src/styles/tokens.css', import.meta.url), 'utf8'));
-    const used = new Set(
-      readFileSync(new URL('../site-root/landing.css', import.meta.url), 'utf8')
-        .match(/var\((--[a-z0-9-]+)\)/g)
-        ?.map((m) => m.slice(4, -1)),
-    );
+    const landing = readFileSync(new URL('../site-root/landing.css', import.meta.url), 'utf8');
+    // Layout measures the landing declares itself (e.g. `--site-cards-gap`, #586) are not theme tokens.
+    const own = new Set([...landing.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)].map((m) => m[1]));
+    const used = new Set(landing.match(/var\((--[a-z0-9-]+)\)/g)?.map((m) => m.slice(4, -1)));
     expect(used.size).toBeGreaterThan(10);
-    for (const name of used) expect(root, name).toContain(`  ${name}:`);
+    for (const name of used) if (!own.has(name)) expect(root, name).toContain(`  ${name}:`);
     expect(root).not.toContain('@keyframes');
   });
 });
