@@ -96,8 +96,8 @@ export const makeShowcaseSalesOrders = (count = 200): StoredSalesOrder[] =>
 
 /**
  * The "server" of the Sales orders module. Every write derives the total from the lines, so the list always
- * shows the total of what is stored. `create` is not used by this module yet (#521): it gets an identity from the
- * store's monotonic counter like every record store.
+ * shows the total of what is stored. `create` (#521) gets an identity from the store's monotonic counter like every
+ * record store: the "server" assigns the id and the number (`SO-NEW-0201` for the first one, after the 200 seeded; never reused) and derives the total.
  */
 export function createSalesOrderStore(
   seed: readonly StoredSalesOrder[] = makeShowcaseSalesOrders(),

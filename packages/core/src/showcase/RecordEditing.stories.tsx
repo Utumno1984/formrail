@@ -4,7 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { formatMoney } from '../internal/demo-data';
 import { githubSource, showcaseFiles, showcaseSource } from '../internal/story-example';
 import { storyControls } from '../internal/story-docs';
-import { SALES_ORDERS } from './modules/sales-orders/sales-orders-module';
+import { SALES_ORDERS, SALES_ORDERS_CRUD } from './modules/sales-orders/sales-orders-module';
 import { RecordCrud } from './RecordCrud';
 import { RecordPage } from './RecordPageShell';
 import {
@@ -14,6 +14,9 @@ import {
   type StoredSalesOrder,
 } from './sales-order-store';
 import {
+  CRUD_ARGS,
+  CRUD_ARGTYPES,
+  CRUD_VISUAL_ARGS,
   LIST_ARGS,
   LIST_ARGTYPES,
   LIST_PARAMS,
@@ -21,6 +24,7 @@ import {
   mountedStore,
   resetSalesOrders,
   type SalesOrderCrudProps,
+  type SalesOrderCrudStoryProps,
 } from './sales-order-story-args';
 
 /*
@@ -65,9 +69,9 @@ const IN_APP = 'Imports the components by relative path because it lives inside 
 // with no file next to this one), and e2e/docs-source.spec.ts compares what the page shows with the file on disk.
 const SOURCES = import.meta.glob<string>(['./**/*.{ts,tsx}', '!./**/*.{test,stories}.{ts,tsx}'], { query: '?raw', import: 'default', eager: true });
 const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
-  'RecordCrud.tsx': `The shell: the flow every module shares. List and record page as two routes, the dirty-guard, the focus after each navigation. It holds no word of a domain: those come from the module. ${IN_APP} Not public: \`./record-api\`, \`./record-store\`, \`./record-module\`, \`./showcase-router\` (a minimal router for the story) and \`EMPTY_IDS\` from \`../list-report/use-list-report\` (an empty selection: write \`new Set<string>()\`).`,
+  'RecordCrud.tsx': `The shell: the flow every module shares. List and record page as two routes, "New ..." and the creation page, deletion from the row (optimistic, with rollback), from the page (pessimistic) and in bulk, toasts, the dirty-guard, the focus after each navigation and each mutation. It holds no word of a domain: those come from the module. ${IN_APP} Not public: \`./record-api\`, \`./record-store\`, \`./record-module\`, \`./showcase-router\` (a minimal router for the story) and \`EMPTY_IDS\` from \`../list-report/use-list-report\` (an empty selection: write \`new Set<string>()\`).`,
   'RecordListView.tsx': `The shell's list: the List Report with URL state and scroll restoration (both per module), a link to the record page, the focus back on the opened row. ${IN_APP} Not public: \`./list-page\` (the frame of the page), \`./record-module\`, \`./record-store\`, \`./showcase-router\` and \`EMPTY_IDS\` from \`../list-report/use-list-report\`.`,
-  'RecordPageShell.tsx': `The shell's record page: loading, not found, the editor mounted already hydrated, error summary, save bar, dirty-guard and its wording, Save/Discard. The fields come from the module. ${IN_APP} Not public: \`../internal/is-dev\`, \`./notice-cap\`, \`./record-module\`, \`./record-store\`.`,
+  'RecordPageShell.tsx': `The shell's record page: loading, not found, the editor mounted already hydrated, error summary, save bar, dirty-guard and its wording, Save/Discard, Create/Cancel, Delete. The fields come from the module. ${IN_APP} Not public: \`../internal/is-dev\`, \`./notice-cap\`, \`./record-module\`, \`./record-store\`.`,
   'record-module.ts': 'What a module gives the shell (`RecordModule`): its nouns, its store, its list (columns, pills, the link column, texts) and its form (values, validation, the sections as JSX). A plain object, written once per domain: no registry of fields, no form generated from a schema.',
   'showcase-modules.ts': 'The one list of the modules (record types) the router knows, the default one first. A new domain adds its name here, next to its module file.',
   'modules/sales-orders/sales-orders-module.tsx': `The Sales orders module: everything that belongs to sales orders only (their nouns, their list with the total in the order's currency and the status badge, the values and validation of their form, the fields of their record page as explicit JSX). The file a new domain copies. ${IN_APP} Not public: \`../../../calendar/date-math\` (an internal date helper), \`../../../internal/demo-data\` (the demo universe: fixtures, not part of the library), \`../../sales-order-store\`, \`../../record-module\`, \`./order-lines\`.`,
@@ -87,7 +91,7 @@ const meta: Meta<RecordPageArgs> = {
     docs: {
       description: {
         component:
-          "A complete worked example: a List Report of sales orders that opens an order as an Object Page (sections, lines, validation, a sticky save-bar and a dirty-guard), built only from the library's components. Use the controls to open another order (a cancelled one is read-only, a yen one has no decimals, one has 18 lines), slow down the load or open one that does not exist; edit a field and try to leave to see the guard. The source is on [GitHub](" +
+          "A complete worked example: a List Report of sales orders that opens an order as an Object Page (sections, lines, validation, a sticky save-bar and a dirty-guard), built only from the library's components. Use the controls to open another order (a cancelled one is read-only, a yen one has no decimals, one has 18 lines), slow down the load or open one that does not exist; edit a field and try to leave to see the guard. The `SalesOrderCrud` stories add the rest of the cycle: a creation page (customer required, at least one line), deleting an order from its row or from its page, and deleting several at once, each with a named confirmation. The source is on [GitHub](" +
           githubSource(SHOWCASE_FOLDER) +
           '); its main files are at the bottom of this page.',
       },
@@ -574,5 +578,326 @@ export const SalesOrderListAfterSave: StoryObj<ListToRecordArgs> = {
     const row = canvas.getByRole('link', { name: number }).closest('tr') as HTMLElement;
     await expect(row).toHaveTextContent(formatMoney(saved?.totalMinor ?? 0, saved?.currency ?? 'EUR'));
     await waitFor(() => expect(canvas.getByRole('link', { name: number })).toHaveFocus());
+  },
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* #521: creation and deletion (the `SALES_ORDERS_CRUD` module), end to end and as pictures.     */
+/* ------------------------------------------------------------------------------------------ */
+
+type CrudArgs = SalesOrderCrudStoryProps;
+const crudRender = (args: CrudArgs) => <RecordCrud {...args} module={SALES_ORDERS_CRUD} />;
+
+// The first orders of the demo list, in the order of the list without sort (the numbers are fixed by the seed).
+const SECOND = 'SO-2026-018000002';
+const THIRD = 'SO-2026-056000003';
+const BULK = [SECOND, 'SO-2026-038000004', 'SO-2026-144000005'];
+const FIRST_CUSTOMER = 'Hoevenstrand Coatings BV (EUR)';
+
+/** Picks the customer in the Select of the creation page (its options are in a portal on `document.body`). */
+async function chooseCustomer(canvas: ReturnType<typeof within>, name = FIRST_CUSTOMER) {
+  await userEvent.click(await canvas.findByRole('combobox', { name: /Customer/ }));
+  await userEvent.click(await within(document.body).findByRole('option', { name }));
+}
+
+/** Adds one line with the first product of the Select, the quantity and the unit price typed. */
+async function addLine(canvas: ReturnType<typeof within>, quantity: string, unitPrice: string) {
+  await userEvent.click(canvas.getByRole('button', { name: 'Add line' }));
+  await userEvent.click(await canvas.findByRole('combobox', { name: /Line 1 product/ }));
+  await userEvent.click((await within(document.body).findAllByRole('option'))[0] as HTMLElement);
+  const qty = canvas.getByRole('textbox', { name: /Line 1 quantity/ });
+  await userEvent.clear(qty);
+  await userEvent.type(qty, quantity);
+  const price = canvas.getByRole('textbox', { name: /Line 1 unit price/ });
+  await userEvent.clear(price);
+  await userEvent.type(price, unitPrice);
+}
+
+/**
+ * Create, end to end: sort the list by Total (the first click is descending), "New sales order" opens the editor in
+ * creation mode (focus on the title), choose a customer (the currency comes with it), add a line, "Create": back to
+ * the list (same sort, 201 orders), the new order at the top and focused, and a toast with its number. The footer
+ * is never reported as "unsaved" after a successful Create. Controls: delays, `saveOutcome` (`error` keeps the
+ * form with the message in the footer), `history`, `today`.
+ */
+export const SalesOrderCrud: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement, args }) => {
+    const { canvas, win } = await startList(canvasElement);
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(200\)/ })).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Total' }));
+
+    await userEvent.click(canvas.getByRole('button', { name: 'New sales order' }));
+    await expect(args.onNavigate).toHaveBeenLastCalledWith({ to: 'create' });
+    await expect(new URLSearchParams(win.location.search).get('create')).toBe('1');
+    const title = await canvas.findByRole('heading', { level: 1, name: 'New sales order' });
+    await waitFor(() => expect(title).toHaveFocus());
+    await expect(canvas.queryByRole('table')).toBeNull();
+
+    await chooseCustomer(canvas);
+    await addLine(canvas, '1000', '100000.00');
+    await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
+
+    if (args.saveOutcome === 'error') {
+      // The server refuses: the page stays with what was typed, the message is in the footer, nothing was created.
+      const footer = await canvas.findByRole('region', { name: 'Save actions' });
+      await waitFor(() => expect(footer).toHaveTextContent(/Could not save/i), { timeout: 5000 });
+      await expect(canvas.getByRole('heading', { level: 1, name: 'New sales order' })).toBeVisible();
+      await expect(canvas.getByRole('textbox', { name: /Line 1 quantity/ })).toHaveValue('1000');
+      await expect(mountedStore()?.snapshot()).toHaveLength(200);
+      await expect(args.onCreated).not.toHaveBeenCalled();
+      return;
+    }
+
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10), { timeout: 5000 });
+    await expect(args.onCreated).toHaveBeenCalledTimes(1);
+    const params = new URLSearchParams(win.location.search);
+    await expect(params.get('create')).toBeNull();
+    await expect(params.get(LIST_PARAMS.sort)).toBe('total.desc');
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(201\)/ })).toBeVisible();
+    await expect(canvas.getByRole('columnheader', { name: /Total/ })).toHaveAttribute('aria-sort', 'descending');
+    await waitFor(() => expect(canvas.getByRole('link', { name: 'SO-NEW-0201' })).toHaveFocus());
+    await expect(await within(document.body).findByText('Sales order SO-NEW-0201 created')).toBeVisible();
+    await expect(within(document.body).queryByRole('dialog')).toBeNull();
+  },
+};
+
+/**
+ * Delete from the list, optimistic: "..." of the second order -> "Delete" -> the confirmation (focus on Cancel) ->
+ * "Delete sales order". The row goes AT ONCE, before the server answers (the store still holds it), the count goes
+ * from 200 to 199, the focus lands on the "..." of the row that took its place, and once the server answered a
+ * toast confirms it. Controls: `saveDelayMs` (how long the server takes), `deleteOutcome` (`error`: the row comes
+ * back where it was, with an error toast). On an order page "Delete" waits for the server.
+ */
+export const SalesOrderCrudDelete: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  args: { ...CRUD_ARGS, saveDelayMs: 800 },
+  render: crudRender,
+  play: async ({ canvasElement, args }) => {
+    const { canvas } = await startList(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(200\)/ })).toBeVisible();
+
+    await userEvent.click(canvas.getByRole('button', { name: `Actions for ${SECOND}` }));
+    await userEvent.click(await body.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await body.findByRole('dialog', { name: `Delete sales order ${SECOND}?` });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete sales order' }));
+
+    // Optimistic: gone from the list while the server still holds it. (`hidden`: until the dialog has finished
+    // closing, the page behind it is still `aria-hidden`.)
+    await waitFor(() => expect(canvas.queryByRole('link', { name: SECOND, hidden: true })).toBeNull());
+    if (args.deleteOutcome !== 'error' && Number(args.saveDelayMs) > 0) {
+      await expect(mountedStore()?.snapshot().some((o) => o.number === SECOND)).toBe(true);
+    }
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(199\)/, hidden: true })).toBeInTheDocument();
+    // After the dialog's exit animation.
+    await waitFor(() => expect(canvas.getByRole('button', { name: `Actions for ${THIRD}` })).toHaveFocus(), { timeout: 3000 });
+    await expect(body.queryByRole('dialog')).toBeNull();
+    if (args.deleteOutcome === 'error') {
+      const error = await body.findByText(`Could not delete ${SECOND}`, undefined, { timeout: 5000 });
+      await waitFor(() => expect(error).toBeVisible());
+      await expect(await canvas.findByRole('link', { name: SECOND })).toBeVisible();
+      return;
+    }
+    const done = await body.findByText(`Sales order ${SECOND} deleted`, undefined, { timeout: 5000 });
+    await waitFor(() => expect(done).toBeVisible());
+    await expect(mountedStore()?.snapshot().some((o) => o.number === SECOND)).toBe(false);
+    await expect(args.onDeleted).toHaveBeenCalledTimes(1);
+    await expect(canvas.getByRole('button', { name: `Actions for ${THIRD}` })).toHaveFocus();
+  },
+};
+
+/**
+ * Bulk delete from the list, optimistic and atomic: tick three orders (the bar says "3 selected"), "Delete
+ * selected" -> "Delete 3 sales orders?" (focus on Cancel) -> "Delete 3 sales orders". The three rows go AT ONCE,
+ * before the server answers (the store still holds them), the count goes from 200 to 197, the focus lands on
+ * "Select all results", and once the server answered a toast confirms it. Controls: `saveDelayMs`, `deleteOutcome`
+ * (`error`: all three rows come back where they were, still selected, with an error toast).
+ */
+export const SalesOrderCrudBulkDelete: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  // 2.5 s: the assertions made "while the server has not answered" need a window that a loaded machine does not
+  // close under them.
+  args: { ...CRUD_ARGS, saveDelayMs: 2500 },
+  render: crudRender,
+  play: async ({ canvasElement, args }) => {
+    const { canvas } = await startList(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(200\)/ })).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Delete selected' })).toHaveAttribute('aria-disabled', 'true');
+
+    for (const n of BULK) await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${n}` }));
+    await expect(canvas.getByText('3 selected')).toBeVisible();
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete selected' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete 3 sales orders?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete 3 sales orders' }));
+
+    for (const n of BULK) await waitFor(() => expect(canvas.queryByRole('link', { name: n, hidden: true })).toBeNull());
+    if (args.deleteOutcome !== 'error' && Number(args.saveDelayMs) > 0) {
+      await expect(mountedStore()?.snapshot().some((o) => o.number === BULK[0])).toBe(true);
+    }
+    await expect(canvas.getByRole('heading', { level: 2, name: /\(197\)/, hidden: true })).toBeInTheDocument();
+    await waitFor(() => expect(canvas.getByRole('checkbox', { name: 'Select all results' })).toHaveFocus(), { timeout: 3000 });
+    await expect(body.queryByRole('dialog')).toBeNull();
+    if (args.deleteOutcome === 'error') {
+      const error = await body.findByText('Could not delete 3 sales orders', undefined, { timeout: 5000 });
+      await waitFor(() => expect(error).toBeVisible());
+      for (const n of BULK) await expect(await canvas.findByRole('link', { name: n })).toBeVisible();
+      await expect(canvas.getByText('3 selected')).toBeVisible();
+      return;
+    }
+    const done = await body.findByText('3 sales orders deleted', undefined, { timeout: 5000 });
+    await waitFor(() => expect(done).toBeVisible());
+    await expect(mountedStore()?.snapshot()).toHaveLength(197);
+    await expect(args.onDeleted).toHaveBeenCalledTimes(3);
+    await expect(canvas.getByText('No items selected')).toBeVisible();
+    await expect(canvas.getByRole('checkbox', { name: 'Select all results' })).toHaveFocus();
+  },
+};
+
+/** `SalesOrderCrud` without a `play` function: what `e2e/showcase-sales-orders-crud.spec.ts` drives with real input. */
+export const SalesOrderCrudManual: StoryObj<CrudArgs> = {
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_ARGS,
+  render: crudRender,
+};
+
+// Visual states (3 viewports, via the `visual` tag): `today` is fixed so the dates do not change with the calendar,
+// no delays.
+async function openCreation(canvasElement: HTMLElement) {
+  const { canvas } = await startList(canvasElement, 5);
+  await userEvent.click(canvas.getByRole('button', { name: 'New sales order' }));
+  await expect(await canvas.findByRole('heading', { level: 1, name: 'New sales order' })).toBeVisible();
+  return canvas;
+}
+
+/** A new order, untouched: defaults, the locked number, no customer, no line, no status badge, the footer already there. */
+export const SalesOrderCreateEmpty: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const canvas = await openCreation(canvasElement);
+    await expect(canvas.getByRole('region', { name: 'Save actions' })).toBeVisible();
+    await expect(canvas.getByRole('combobox', { name: /Customer/ })).toHaveTextContent('Choose a customer');
+  },
+};
+
+/** "Create" on the empty form: the field errors (customer, lines) and the summary in the footer. */
+export const SalesOrderCreateInvalid: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const canvas = await openCreation(canvasElement);
+    await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
+    await expect(await canvas.findByText('2 invalid fields')).toBeVisible();
+  },
+};
+
+/** A Create in flight (the delay is an hour, the picture is taken before it ends): "Create" disabled, "Saving...". */
+export const SalesOrderCreateSaving: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: { ...CRUD_VISUAL_ARGS, saveDelayMs: 3_600_000 },
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const canvas = await openCreation(canvasElement);
+    await chooseCustomer(canvas);
+    await addLine(canvas, '12', '120.50');
+    await userEvent.click(canvas.getByRole('button', { name: 'Create' }));
+    await expect(await canvas.findByText('Saving…')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-disabled', 'true');
+  },
+};
+
+/** The delete confirmation over the list ("..." of the second row -> "Delete"), not confirmed. */
+export const SalesOrderDeleteConfirmList: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const { canvas } = await startList(canvasElement, 5);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole('button', { name: `Actions for ${SECOND}` }));
+    await userEvent.click(await body.findByRole('menuitem', { name: 'Delete' }));
+    const dialog = await body.findByRole('dialog', { name: `Delete sales order ${SECOND}?` });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+  },
+};
+
+/** The selection bar with "Delete selected" disabled (nothing selected). */
+export const SalesOrderBulkDeleteIdle: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const { canvas } = await startList(canvasElement, 5);
+    await expect(canvas.getByRole('button', { name: 'Delete selected' })).toHaveAttribute('aria-disabled', 'true');
+  },
+};
+
+/** Three orders selected, "Delete selected" enabled. */
+export const SalesOrderBulkDeleteSelected: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const { canvas } = await startList(canvasElement, 5);
+    for (const n of BULK) await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${n}` }));
+    await expect(canvas.getByText('3 selected')).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Delete selected' })).not.toHaveAttribute('aria-disabled');
+  },
+};
+
+/** The bulk delete confirmation over the list (three orders selected), not confirmed. */
+export const SalesOrderBulkDeleteConfirm: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: CRUD_VISUAL_ARGS,
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const { canvas } = await startList(canvasElement, 5);
+    const body = within(canvasElement.ownerDocument.body);
+    for (const n of BULK) await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${n}` }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete selected' }));
+    const dialog = await body.findByRole('dialog', { name: 'Delete 3 sales orders?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus());
+  },
+};
+
+/**
+ * The delete confirmation over an order page with unsaved changes, CONFIRMED and waiting for the server (the delay
+ * is an hour, the picture is taken before it ends): the warning about the unsaved changes, the spinner on "Delete
+ * sales order", both buttons `aria-disabled`.
+ */
+export const SalesOrderDeleteConfirmRecordPending: StoryObj<CrudArgs> = {
+  tags: ['visual'],
+  argTypes: CRUD_ARGTYPES,
+  args: { ...CRUD_VISUAL_ARGS, saveDelayMs: 3_600_000 },
+  render: crudRender,
+  play: async ({ canvasElement }) => {
+    const { canvas } = await startList(canvasElement, 5);
+    const body = within(canvasElement.ownerDocument.body);
+    const first = canvas.getAllByRole('link')[0] as HTMLElement;
+    const number = first.textContent ?? '';
+    await userEvent.click(first);
+    await canvas.findByRole('heading', { level: 1, name: new RegExp(number) });
+    await userEvent.type(await canvas.findByRole('textbox', { name: 'Notes' }), ' (draft)');
+    await userEvent.click(canvas.getByRole('button', { name: 'Delete' }));
+    const dialog = await body.findByRole('dialog', { name: `Delete sales order ${number}?` });
+    // `waitFor`: the dialog enters with an animation (transparent at first).
+    await waitFor(() => expect(within(dialog).getByText(/Unsaved changes will be lost too\./)).toBeVisible());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete sales order' }));
+    await expect(within(dialog).getByRole('button', { name: 'Delete sales order' })).toHaveAttribute('aria-disabled', 'true');
   },
 };

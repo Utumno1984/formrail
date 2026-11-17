@@ -76,3 +76,52 @@ export const LIST_ARGS = {
 
 /** Deterministic picture of the visual stories: nothing is mid-load when the screenshot is taken. */
 export const VISUAL_ARGS = { ...LIST_ARGS, listLoadDelayMs: 0, recordLoadDelayMs: 0, saveDelayMs: 0 } satisfies Partial<SalesOrderCrudProps>;
+
+/* ------------------------------------------------------------------------------------------------------------- */
+/* #521: creation and deletion (the `SALES_ORDERS_CRUD` module).                                                    */
+/* ------------------------------------------------------------------------------------------------------------- */
+
+/** The props of the stories with creation and deletion: everything the shell takes but the module and the add-ons. */
+export type SalesOrderCrudStoryProps = Omit<RecordCrudProps<StoredSalesOrder, SalesOrderValues, SalesOrderDraft>, 'module' | 'addons'>;
+
+export const CRUD_ARGTYPES = {
+  ...LIST_ARGTYPES,
+  saveDelayMs: {
+    control: DELAY_RANGE,
+    description:
+      'How long a save, a create or a delete takes. Leaving while a Create is in flight ("Leave anyway") goes at once; the order is still created and the list shows it.',
+  },
+  saveOutcome: {
+    control: 'radio',
+    options: ['success', 'error'],
+    description: '`error`: the create (or the save) fails, the form keeps its values with the message in the footer, nothing is created.',
+  },
+  today: {
+    control: 'text',
+    description: 'The default order date of a new order (yyyy-mm-dd; the delivery is requested 14 days later). Empty: the local date.',
+  },
+  onCreated: {
+    control: false,
+    description: 'Called once per successful Create with the order as the server stored it, even if the page was left meanwhile.',
+  },
+  deleteOutcome: {
+    control: 'radio',
+    options: ['success', 'error'],
+    description:
+      '`error`: a delete fails after `saveDelayMs`. From the list the row comes back where it was, with an error toast; on the order page the confirmation stays open (Retry by confirming again, or Cancel).',
+  },
+  onDeleted: {
+    control: false,
+    description: 'Called once per order the server deleted, from the list, from the order page or in bulk.',
+  },
+} as const;
+
+export const CRUD_ARGS = {
+  ...LIST_ARGS,
+  deleteOutcome: 'success',
+  onCreated: fn(),
+  onDeleted: fn(),
+} satisfies Partial<SalesOrderCrudStoryProps>;
+
+/** Deterministic picture of the visual stories of the creation and deletion: no delay, a fixed date for the new order. */
+export const CRUD_VISUAL_ARGS = { ...CRUD_ARGS, ...VISUAL_ARGS, today: '2026-11-09' } satisfies Partial<SalesOrderCrudStoryProps>;

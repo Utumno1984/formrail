@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { StrictMode, useMemo, useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
@@ -592,6 +594,323 @@ describe('a `dir` changed after the mount (#562)', () => {
       unmount();
       host.remove();
       document.body.removeAttribute('dir');
+    }
+  });
+
+  it('a `dir` on a node that is not an ancestor (a sibling, another branch) measures nothing; one on an ancestor measures exactly once', async () => {
+    mock = mockLayout(WIDE);
+    const { container } = render(
+      <div>
+        <div data-testid="branch">
+          <Host />
+        </div>
+        <p data-testid="sibling" />
+      </div>,
+    );
+    const el = scroller();
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    const sibling = container.querySelector('p')!;
+    await act(async () => {
+      for (const dir of ['rtl', 'ltr', 'rtl']) sibling.setAttribute('dir', dir);
+    });
+    await act(async () => {
+      sibling.removeAttribute('dir');
+    });
+    expect(mock.reads.scrollWidth).toBe(reads);
+    await likeFirefox(setDir(container.querySelector('[data-testid="branch"]')!, 'rtl'), el);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+  });
+
+  it('three tables in distinct branches: a `dir` on the first branch measures only the first', async () => {
+    mock = mockLayout(WIDE);
+    const { container } = render(
+      <div>
+        {[0, 1, 2].map((i) => (
+          <section key={i} data-branch={i}>
+            <Host />
+          </section>
+        ))}
+      </div>,
+    );
+    await settle();
+    const scrollers = Array.from(container.querySelectorAll<HTMLElement>('section')).map((s) => s.querySelector('table')!.parentElement!);
+    expect(scrollers).toHaveLength(3);
+    // Each table in its own state: scrolled to the middle, so a measure of it would show a change.
+    for (const [i, el] of scrollers.entries()) {
+      act(() => {
+        el.scrollLeft = 250;
+        fireEvent.scroll(el);
+      });
+      expect(edges(el), `table ${i}`).toEqual({ start: true, end: true });
+    }
+    const reads = mock.reads.scrollWidth;
+    // Firefox on the first table only: its scrollLeft goes back to 0, with no event. The others stay at 250.
+    await likeFirefox(setDir(container.querySelector('section')!, 'rtl'), scrollers[0]!);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    expect(edges(scrollers[0]!)).toEqual({ start: false, end: true });
+    // Had the others measured, they would have read their scrollLeft (250) as rtl and changed state.
+    expect(edges(scrollers[1]!)).toEqual({ start: true, end: true });
+    expect(edges(scrollers[2]!)).toEqual({ start: true, end: true });
+  });
+
+  it('a change of `class` on an ancestor reads nothing (the observer watches `dir` alone)', async () => {
+    mock = mockLayout(WIDE);
+    const { wrapper } = renderInWrapper();
+    const el = scroller();
+    scrollLeftTo(250, el);
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    await act(async () => {
+      wrapper.setAttribute('class', 'a');
+      wrapper.className = 'b';
+      document.documentElement.setAttribute('class', 'c');
+      el.setAttribute('class', 'd');
+    });
+    document.documentElement.removeAttribute('class');
+    expect(mock.reads.scrollWidth).toBe(reads);
+  });
+
+  describe('shadow roots nested in shadow roots', () => {
+    /** host > shadow > wrapper > innerHost > innerShadow > container (the React root). */
+    function nested() {
+      const outerHost = document.createElement('div');
+      document.body.appendChild(outerHost);
+      const outerShadow = outerHost.attachShadow({ mode: 'open' });
+      const wrapper = document.createElement('div');
+      outerShadow.appendChild(wrapper);
+      const innerHost = document.createElement('div');
+      wrapper.appendChild(innerHost);
+      const innerShadow = innerHost.attachShadow({ mode: 'open' });
+      const container = document.createElement('div');
+      innerShadow.appendChild(container);
+      return { outerHost, outerShadow, wrapper, innerHost, innerShadow, container };
+    }
+
+    it('a `dir` on the outer host, on a wrapper in the outer shadow and on the inner host: the inner table measures once each', async () => {
+      mock = mockLayout(WIDE);
+      const n = nested();
+      const { unmount } = render(<Host />, { container: n.container });
+      try {
+        const el = n.container.querySelector('table')!.parentElement as HTMLElement;
+        await settle();
+        for (const target of [n.outerHost, n.wrapper, n.innerHost]) {
+          scrollLeftTo(250, el);
+          expect(edges(el)).toEqual({ start: true, end: true });
+          const reads = mock.reads.scrollWidth;
+          await likeFirefox(setDir(target, 'rtl'), el);
+          expect(mock.reads.scrollWidth).toBe(reads + 1);
+          expect(edges(el)).toEqual({ start: false, end: true });
+          await likeFirefox(setDir(target, null), el);
+        }
+      } finally {
+        unmount();
+        n.outerHost.remove();
+      }
+    });
+
+    it('observes the document and each shadow root outwards, and disconnects them all on unmount', async () => {
+      mock = mockLayout(WIDE);
+      const Native = globalThis.MutationObserver;
+      const instances: { targets: Node[]; disconnected: boolean }[] = [];
+      globalThis.MutationObserver = class extends Native {
+        private entry = { targets: [] as Node[], disconnected: false };
+        override observe(target: Node, options?: MutationObserverInit) {
+          if (options?.attributeFilter?.includes('dir')) {
+            if (!instances.includes(this.entry)) instances.push(this.entry);
+            this.entry.targets.push(target);
+          }
+          super.observe(target, options);
+        }
+        override disconnect() {
+          this.entry.disconnected = true;
+          super.disconnect();
+        }
+      };
+      const n = nested();
+      const { unmount } = render(<Host />, { container: n.container });
+      try {
+        expect(instances).toHaveLength(1);
+        expect(instances[0]!.targets).toEqual([document.documentElement, n.innerShadow, n.outerShadow]);
+        expect(instances[0]!.disconnected).toBe(false);
+        await settle();
+        unmount();
+        expect(instances[0]!.disconnected).toBe(true);
+      } finally {
+        globalThis.MutationObserver = Native;
+        n.outerHost.remove();
+      }
+    });
+
+    it('limit, documented: a `dir` set in the shadow tree of a host that slots the container is not seen; the host and its light-DOM ancestors are', async () => {
+      mock = mockLayout(WIDE);
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const shadow = host.attachShadow({ mode: 'open' });
+      const shell = document.createElement('div');
+      const slot = document.createElement('slot');
+      shell.appendChild(slot);
+      shadow.appendChild(shell);
+      // The container is a light-DOM child of the host, rendered through the slot.
+      const container = document.createElement('div');
+      host.appendChild(container);
+      const { unmount } = render(<Host />, { container });
+      try {
+        const el = container.querySelector('table')!.parentElement as HTMLElement;
+        await settle();
+        scrollLeftTo(250, el);
+        const reads = mock.reads.scrollWidth;
+        // In the flat tree `shell` is an ancestor; in the DOM tree it is not: not measured (the limit).
+        await likeFirefox(setDir(shell, 'rtl'), el);
+        expect(mock.reads.scrollWidth).toBe(reads);
+        // The host is a DOM ancestor: measured.
+        await likeFirefox(setDir(host, 'rtl'), el);
+        expect(mock.reads.scrollWidth).toBe(reads + 1);
+      } finally {
+        unmount();
+        host.remove();
+      }
+    });
+  });
+
+  it('the TSDoc of `OverflowEdgesGeometry` no longer says that a `dir` changed after the mount needs no measure', () => {
+    const source = readFileSync(resolve(__dirname, 'use-overflow-edges.ts'), 'utf8');
+    expect(source).not.toMatch(/needs no measure/);
+    expect(source).toMatch(/still measures once/);
+  });
+
+  it('a batch with a `dir` on a non-ancestor and on an ancestor, in one task: the table measures (once)', async () => {
+    mock = mockLayout(WIDE);
+    const { container, wrapper } = renderInWrapper();
+    const el = scroller();
+    const sibling = document.createElement('p');
+    container.appendChild(sibling);
+    scrollLeftTo(250, el);
+    await settle();
+    const reads = mock.reads.scrollWidth;
+    await likeFirefox(() => {
+      sibling.setAttribute('dir', 'rtl');
+      wrapper.setAttribute('dir', 'rtl');
+    }, el);
+    expect(mock.reads.scrollWidth).toBe(reads + 1);
+    expect(edges(el)).toEqual({ start: false, end: true });
+  });
+
+  describe('an ancestor that has a `host` property of its own (not a ShadowRoot)', () => {
+    /** The table inside `inner`, in an outer `div` that gets the `dir`; errors raised in observer callbacks are collected. */
+    async function dirAboveInner(inner: HTMLElement) {
+      mock = mockLayout(WIDE);
+      const outer = document.createElement('div');
+      outer.appendChild(inner);
+      document.body.appendChild(outer);
+      const container = document.createElement('div');
+      inner.appendChild(container);
+      const errors: unknown[] = [];
+      const onError = (event: ErrorEvent) => {
+        errors.push(event.error ?? event.message);
+        event.preventDefault();
+      };
+      window.addEventListener('error', onError);
+      const { unmount } = render(<Host />, { container });
+      try {
+        const el = scroller();
+        scrollLeftTo(250, el);
+        await settle();
+        const reads = mock.reads.scrollWidth;
+        await likeFirefox(setDir(outer, 'rtl'), el);
+        expect(errors).toEqual([]);
+        expect(mock.reads.scrollWidth).toBe(reads + 1);
+        expect(edges(el)).toEqual({ start: false, end: true });
+      } finally {
+        window.removeEventListener('error', onError);
+        unmount();
+        outer.remove();
+      }
+    }
+
+    it('a table inside `<a href>` (its `host` is a string): a `dir` above the link measures once, with no error', async () => {
+      const link = document.createElement('a');
+      link.href = 'https://example.com/x';
+      await dirAboveInner(link);
+    });
+
+    it('a table inside a `<form>` with an `<input name="host">` (named access): a `dir` above the form measures once, with no error', async () => {
+      const form = document.createElement('form');
+      const input = document.createElement('input');
+      input.name = 'host';
+      form.appendChild(input);
+      await dirAboveInner(form);
+    });
+  });
+
+  it('StrictMode (effects run twice): a single observer stays connected', async () => {
+    mock = mockLayout(WIDE);
+    const live = new Set<unknown>();
+    const Native = globalThis.MutationObserver;
+    globalThis.MutationObserver = class extends Native {
+      override observe(target: Node, options?: MutationObserverInit) {
+        if (options?.attributeFilter?.includes('dir')) live.add(this);
+        super.observe(target, options);
+      }
+      override disconnect() {
+        live.delete(this);
+        super.disconnect();
+      }
+    };
+    try {
+      const { unmount } = render(
+        <StrictMode>
+          <Host />
+        </StrictMode>,
+      );
+      await settle();
+      expect(live.size).toBe(1);
+      unmount();
+      expect(live.size).toBe(0);
+    } finally {
+      globalThis.MutationObserver = Native;
+    }
+  });
+
+  it('a table in a shadow root inside an iframe (another realm): a `dir` in the shadow tree and on the host measure', async () => {
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument!;
+    // The realm of the iframe has its own `ShadowRoot`: `instanceof` with the parent's would say no.
+    expect(doc.defaultView!.ShadowRoot).not.toBe(ShadowRoot);
+    const host = doc.createElement('div');
+    doc.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    expect(shadow instanceof ShadowRoot).toBe(false);
+    const wrapper = doc.createElement('div');
+    shadow.appendChild(wrapper);
+    const container = doc.createElement('div');
+    wrapper.appendChild(container);
+    const { unmount } = render(<Host />, { container });
+    const el = container.querySelector('table')!.parentElement as HTMLElement;
+    const measured = vi.spyOn(window, 'getComputedStyle');
+    const count = () => measured.mock.calls.filter(([target]) => target === el).length;
+    try {
+      await settle();
+      const before = count();
+      await act(async () => {
+        wrapper.setAttribute('dir', 'rtl');
+      });
+      expect(count()).toBe(before + 1);
+      await act(async () => {
+        host.setAttribute('dir', 'rtl');
+      });
+      expect(count()).toBe(before + 2);
+      const unrelated = doc.createElement('p');
+      doc.body.appendChild(unrelated);
+      await act(async () => {
+        unrelated.setAttribute('dir', 'rtl');
+      });
+      expect(count()).toBe(before + 2);
+    } finally {
+      measured.mockRestore();
+      unmount();
+      iframe.remove();
     }
   });
 
