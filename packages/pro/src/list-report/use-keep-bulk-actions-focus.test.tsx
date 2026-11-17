@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ListReportTable, useListReport, type ListReportSelection } from '@formrail/core';
 import { ListReportFrame } from '@formrail/core/internal';
@@ -9,11 +9,30 @@ import { isShown, useKeepBulkActionsFocus } from './use-keep-bulk-actions-focus'
 // to the Pro. The tests of #504 moved with it (same titles and assertions; only the host changed: the frame with
 // its internal `bulkActionsSlotRef` and this hook, instead of the removed internal prop). jsdom has no layout and no
 // ResizeObserver: the observer records its callbacks, and what is "laid out" is what `checkVisibility` says, stubbed
-// per test. The MutationObserver is jsdom's own (a real DOM): it reports attributes and children for real.
+// per test. The MutationObserver is jsdom's own (a real DOM): it reports attributes and children for real; it is only
+// subclassed to record what each instance observes until it is disconnected.
 
 const observers: { callback: ResizeObserverCallback; targets: Element[] }[] = [];
+const mutationObservers: { targets: Node[] }[] = [];
 const OriginalResizeObserver = globalThis.ResizeObserver;
+const OriginalMutationObserver = globalThis.MutationObserver;
+const actEnvironment = (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
 beforeAll(() => {
+  globalThis.MutationObserver = class extends OriginalMutationObserver {
+    private entry = { targets: [] as Node[] };
+    constructor(callback: MutationCallback) {
+      super(callback);
+      mutationObservers.push(this.entry);
+    }
+    override observe(target: Node, options?: MutationObserverInit) {
+      this.entry.targets.push(target);
+      super.observe(target, options);
+    }
+    override disconnect() {
+      this.entry.targets.length = 0;
+      super.disconnect();
+    }
+  };
   globalThis.ResizeObserver = class {
     private entry: { callback: ResizeObserverCallback; targets: Element[] };
     constructor(callback: ResizeObserverCallback) {
@@ -31,12 +50,15 @@ beforeAll(() => {
 });
 afterAll(() => {
   globalThis.ResizeObserver = OriginalResizeObserver;
+  globalThis.MutationObserver = OriginalMutationObserver;
 });
 
 afterEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = actEnvironment;
   cleanup();
   vi.restoreAllMocks();
   observers.length = 0;
+  mutationObservers.length = 0;
   document.head.querySelectorAll('style[data-test]').forEach((s) => s.remove());
 });
 
@@ -83,6 +105,14 @@ function setLaidOut(laidOut: (el: Element) => boolean) {
 /** Laid out unless detached, under `hidden`, under the test class `rop-test-gone` or under an inline `display: none`. */
 const laidOutUnlessHidden = (el: Element) => el.isConnected && !el.closest('[hidden], .rop-test-gone, [style*="display: none"]');
 const observerOf = (el: Element) => observers.find((o) => o.targets.includes(el));
+/** The MutationObserver still observing `el`, if any. */
+const mutationObserverOf = (el: Node) => mutationObservers.find((o) => o.targets.includes(el));
+/** React's real scheduling (a render is a microtask), as in a browser: no `act` around what follows. */
+const realScheduling = () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
+};
+/** Every microtask and a task: React's render, the observers' callbacks, the `focusout` read. */
+const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const fire = (el: Element) => act(() => observerOf(el)!.callback([], {} as ResizeObserver));
 const addStyle = (css: string) => {
   const style = document.createElement('style');
@@ -186,21 +216,69 @@ describe('keepBulkActionsFocus: a focused action hidden or removed hands the foc
     expect(search).toHaveFocus();
   });
 
-  it('#571: the action leaves the layout, the user moves the focus elsewhere, then the observer runs: the focus is not stolen', async () => {
+  it('#571: the action leaves the layout and the browser drops its focus, then the user moves the focus elsewhere: nothing tracked, the focus is left there', async () => {
     setLaidOut(() => true);
     render(<Host bulkActions={approve} />);
     const button = screen.getByRole('button', { name: 'Approve' });
     const search = screen.getByRole('searchbox');
     act(() => button.focus());
-    // The slot leaves the layout (a media query: no mutation), the focus leaves it with the action not shown, so the
-    // action stays tracked; the user puts the focus in the search field before the resize is observed.
+    // The slot leaves the layout (a media query: no mutation), the browser drops the focus to body with the action not
+    // shown: still tracked, for the resize to come.
     setLaidOut((el) => !slotOf(button).contains(el));
+    await act(async () => button.blur());
+    expect(observerOf(slotOf(button))).toBeDefined();
+    // The user puts the focus in the search field first: a focus that lands elsewhere is moved there on purpose.
     act(() => search.focus());
     await act(async () => {});
-    expect(observerOf(slotOf(button))).toBeDefined();
-    fire(slotOf(button));
+    expect(observerOf(slotOf(button))).toBeUndefined();
+    expect(mutationObserverOf(slotOf(button))).toBeUndefined();
     expect(search).toHaveFocus();
   });
+
+  it('#571: the action hidden and the focus moved elsewhere in the same task (the observer runs before React re-renders): the focus is not stolen', async () => {
+    setLaidOut((el) => el.isConnected);
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const search = screen.getByRole('searchbox');
+    act(() => button.focus());
+    expect(mutationObserverOf(slotOf(button))).toBeDefined();
+    // As a handler of the consumer would: it hides the action, then focuses the search field. The mutation is
+    // reported in a microtask queued before React's render (the one that stops tracking the action).
+    realScheduling();
+    button.style.visibility = 'hidden';
+    search.focus();
+    await settle();
+    expect(search).toHaveFocus();
+    expect(mutationObserverOf(slotOf(button))).toBeUndefined();
+  });
+
+  for (const [what, hide] of [
+    ['hidden', { hidden: true }],
+    ['removed', null],
+  ] as const) {
+    it(`#571: Tab from one control of the slot to the next, then the second one ${what}: the focus goes to the header checkbox`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const two = (second: { hidden?: boolean } | null) => () => (
+        <>
+          <button type="button">Approve</button>
+          {second && (
+            <button type="button" {...second}>
+              Export
+            </button>
+          )}
+        </>
+      );
+      const { rerender } = render(<Host bulkActions={two({})} />);
+      const user = userEvent.setup();
+      act(() => screen.getByRole('button', { name: 'Approve' }).focus());
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Export' })).toHaveFocus();
+      // The `focusout` of the first control is read after the `focusin` of the second: the second stays tracked.
+      await act(async () => {});
+      rerender(<Host bulkActions={two(hide)} />);
+      await waitFor(() => expect(allBox()).toHaveFocus());
+    });
+  }
 
   it('a resize of the slot while its action is still laid out moves nothing', () => {
     setLaidOut(() => true);
@@ -336,6 +414,20 @@ describe('a focused control under visibility: hidden', () => {
 });
 
 describe('edge cases', () => {
+  it('#571: the slot goes away while a control has the focus, then a new one comes: no observer at rest on it', () => {
+    setLaidOut((el) => el.isConnected);
+    const { rerender } = render(<Host bulkActions={approve} />);
+    act(() => screen.getByRole('button', { name: 'Approve' }).focus());
+    expect(mutationObserverOf(slotOf(screen.getByRole('button', { name: 'Approve' })))).toBeDefined();
+    // Without bulkActions the frame renders no slot: the focused control goes with it, nothing is tracked any more.
+    rerender(<Host />);
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+    rerender(<Host bulkActions={approve} />);
+    const slot = slotOf(screen.getByRole('button', { name: 'Approve' }));
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+  });
+
   it('an empty slot (bulkActions returns null) or one without a focused control: no observer at rest', () => {
     setLaidOut(() => true);
     const { rerender } = render(<Host bulkActions={() => null} />);
@@ -373,17 +465,44 @@ describe('edge cases', () => {
   it('unmount while a control has the focus: observers disconnected and the native listeners removed', () => {
     setLaidOut(() => true);
     const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+    const added = vi.spyOn(document, 'addEventListener');
     const { unmount } = render(<Host bulkActions={approve} />);
     const button = screen.getByRole('button', { name: 'Approve' });
     const slot = slotOf(button);
     const removed = vi.spyOn(slot, 'removeEventListener');
+    const removedFromDocument = vi.spyOn(document, 'removeEventListener');
     act(() => button.focus());
     expect(observerOf(slot)).toBeDefined();
     const observer = observerOf(slot)!;
+    const mutations = mutationObserverOf(slot)!;
+    expect(mutations).toBeDefined();
     unmount();
     expect(observer.targets).toEqual([]);
     expect(disconnect).toHaveBeenCalled();
-    expect(removed.mock.calls.map(([type]) => type).sort()).toEqual(['focusin', 'focusout']);
+    // The hook's own MutationObserver (not just any: the core and jsdom have others).
+    expect(mutations.targets).toEqual([]);
+    expect(removed.mock.calls.map(([type]) => type)).toEqual(['focusout']);
+    // The `focusin` listener is on the document (a focus that lands outside the slot untracks): the same one, removed.
+    const onFocusIn = added.mock.calls.filter(([type]) => type === 'focusin').at(-1)![1];
+    expect(removedFromDocument.mock.calls.filter(([type]) => type === 'focusin').map(([, listener]) => listener)).toContain(onFocusIn);
+  });
+
+  it('#571: after the focus is handed over, the user puts it on body: a later change of the slot leaves it there', async () => {
+    setLaidOut((el) => el.isConnected);
+    const { rerender } = render(<Host bulkActions={approve} />);
+    const slot = slotOf(screen.getByRole('button', { name: 'Approve' }));
+    act(() => screen.getByRole('button', { name: 'Approve' }).focus());
+    rerender(<Host bulkActions={() => <span>Nothing</span>} />);
+    await waitFor(() => expect(allBox()).toHaveFocus());
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    // A click on a blank area: the focus is on body. Then the slot changes (children, class, style).
+    act(() => allBox().blur());
+    expect(document.activeElement).toBe(document.body);
+    rerender(<Host bulkActions={approve} />);
+    slot.classList.add('rop-test-changed');
+    slot.style.outline = '1px solid';
+    await act(async () => {});
+    expect(document.activeElement).toBe(document.body);
   });
 
   it('after the focus is handed over, a later change of the slot moves nothing (no observer left)', async () => {
@@ -398,6 +517,112 @@ describe('edge cases', () => {
     await act(async () => {});
     expect(search).toHaveFocus();
   });
+});
+
+// #571, review notes: the focus is read in the slot's root, not in the global document: its own document (an iframe's)
+// or its shadow root (where the target of a `focusin` is the control, not the host), then that root's document.
+describe('#571: the frame in another document or in a shadow root', () => {
+  const hiddenApprove = () => (
+    <button type="button" hidden>
+      Approve
+    </button>
+  );
+  /** A shadow root in the document, with a container for React inside it. */
+  const inShadowRoot = (mode: ShadowRootMode) => {
+    const host = document.body.appendChild(document.createElement('div'));
+    const root = host.attachShadow({ mode });
+    return { host, root, container: root.appendChild(document.createElement('div')) };
+  };
+
+  for (const mode of ['open', 'closed'] as const) {
+    it(`inside a ${mode} shadow root: tracked, a hidden focused control hands the focus to the header checkbox`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const { host, root, container } = inShadowRoot(mode);
+      const { rerender } = render(<Host bulkActions={approve} />, { container });
+      const button = within(container).getByRole('button', { name: 'Approve' });
+      const slot = slotOf(button);
+      act(() => button.focus());
+      expect(root.activeElement).toBe(button);
+      // The document only sees the host: the `focusin` is read on the shadow root, where its target is the control.
+      expect(document.activeElement).toBe(host);
+      expect(mutationObserverOf(slot)).toBeDefined();
+      // Hidden while it still holds the focus (the observer runs before the browser drops it): read in the root.
+      rerender(<Host bulkActions={hiddenApprove} />);
+      const header = within(container).getByRole('checkbox', { name: 'Select all results' });
+      await waitFor(() => expect(root.activeElement).toBe(header));
+      expect(mutationObserverOf(slot)).toBeUndefined();
+      host.remove();
+    });
+
+    it(`inside a ${mode} shadow root: the control leaves the layout and the browser drops its focus to body, then a change: the focus goes to the header checkbox`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const { host, root, container } = inShadowRoot(mode);
+      const { rerender } = render(<Host bulkActions={approve} />, { container });
+      const button = within(container).getByRole('button', { name: 'Approve' });
+      act(() => button.focus());
+      // A media query on the control (no mutation): the browser drops its focus, still tracked.
+      setLaidOut((el) => el !== button && laidOutUnlessHidden(el));
+      await act(async () => button.blur());
+      // The root has no active element then: its document's one is read (body).
+      expect(root.activeElement).toBeNull();
+      expect(document.activeElement).toBe(document.body);
+      rerender(<Host bulkActions={hiddenApprove} />);
+      await waitFor(() => expect(root.activeElement).toBe(within(container).getByRole('checkbox', { name: 'Select all results' })));
+      host.remove();
+    });
+
+    it(`inside a ${mode} shadow root: the control hidden and the focus moved to the document outside the root in the same task, the focus is not stolen`, async () => {
+      setLaidOut((el) => el.isConnected);
+      const outside = document.body.appendChild(document.createElement('input'));
+      const { host, root, container } = inShadowRoot(mode);
+      render(<Host bulkActions={approve} />, { container });
+      const button = within(container).getByRole('button', { name: 'Approve' });
+      act(() => button.focus());
+      expect(mutationObserverOf(slotOf(button))).toBeDefined();
+      realScheduling();
+      button.style.visibility = 'hidden';
+      outside.focus();
+      await settle();
+      // The root has no active element then: its document's one is read (the input, not body).
+      expect(root.activeElement).toBeNull();
+      expect(outside).toHaveFocus();
+      // The change ended the tracking (React re-renders in a later task: no event there).
+      await waitFor(() => expect(mutationObserverOf(slotOf(button))).toBeUndefined());
+      expect(outside).toHaveFocus();
+      host.remove();
+      outside.remove();
+    });
+  }
+
+  for (const dropped of [false, true]) {
+    it(`in another document (an iframe): tracked there, a hidden focused control hands the focus to the header checkbox${dropped ? ' (dropped to the body of that document first)' : ''}`, async () => {
+      const iframe = document.body.appendChild(document.createElement('iframe'));
+      const frameWindow = iframe.contentWindow as unknown as typeof globalThis;
+      const doc = iframe.contentDocument!;
+      // The iframe has its own `Element`: laid out = in the document and not under `hidden`, as above.
+      frameWindow.Element.prototype.checkVisibility = function (this: Element) {
+        return laidOutUnlessHidden(this);
+      };
+      const container = doc.body.appendChild(doc.createElement('div'));
+      const { rerender } = render(<Host bulkActions={approve} />, { container });
+      const button = within(container).getByRole('button', { name: 'Approve' });
+      act(() => button.focus());
+      expect(doc.activeElement).toBe(button);
+      expect(mutationObserverOf(slotOf(button))).toBeDefined();
+      if (dropped) {
+        // The control leaves the layout (no mutation) and the browser drops its focus to the body of that document
+        // (not the global one): still tracked; then a change of the slot is seen.
+        frameWindow.Element.prototype.checkVisibility = function (this: Element) {
+          return this !== button && laidOutUnlessHidden(this);
+        };
+        await act(async () => button.blur());
+        expect(doc.activeElement).toBe(doc.body);
+      }
+      rerender(<Host bulkActions={hiddenApprove} />);
+      await waitFor(() => expect(doc.activeElement).toBe(within(container).getByRole('checkbox', { name: 'Select all results' })));
+      iframe.remove();
+    });
+  }
 });
 
 describe('isShown: laid out and not under visibility: hidden', () => {
