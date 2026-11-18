@@ -83,6 +83,16 @@ describe('rebaseCarrying: the merge with carried conflicts (#584)', () => {
     expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([['supplier.vat', 'IT1', undefined, 'IT2', true]]);
   });
 
+  it('a carried conflict on a key the baseline did not have keeps baseMissing (a missing key, not undefined, §1.13.1)', () => {
+    type WithExtra = Invoice & { extra?: string };
+    const values: WithExtra = { ...BASE, extra: 'mine' };
+    const first: WithExtra = { ...BASE, extra: 'theirs' };
+    const { one, two } = twice(values, first, values, { ...first, amount: 5 });
+    const shape = (c: { path: string; base: unknown; baseMissing: boolean }) => [c.path, c.base, c.baseMissing];
+    expect(one.result.conflicts.map(shape)).toEqual([['extra', undefined, true]]);
+    expect(two.result.conflicts.map(shape)).toEqual([['extra', undefined, true]]);
+  });
+
   it('a carried conflict on a node covers carried conflicts under it (one per path, even from a list that has both)', () => {
     const values = { ...BASE, supplier: { name: 'Mine', vat: 'IT1' } };
     const first = { ...BASE, supplier: { name: 'Theirs', vat: 'IT1' } };

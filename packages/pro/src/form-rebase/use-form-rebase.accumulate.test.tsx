@@ -281,3 +281,15 @@ describe('useFormRebase: conflicts across updates, id-keyed rows', () => {
   });
 });
 
+describe('useFormRebase: conflicts across updates, missing values (§1.13.1)', () => {
+  it('a carried conflict on a key the baseline did not have keeps baseMissing after an update elsewhere', () => {
+    const { h, edit, rebase } = setup();
+    type WithEmail = Invoice['supplier'] & { email?: string };
+    edit('supplier', { name: 'Lumen Parts', vat: 'IT1', email: 'mine@example.com' } as WithEmail);
+    rebase(server({ supplier: { name: 'Lumen Parts', vat: 'IT1', email: 'theirs@example.com' } as WithEmail }));
+    const shape = () => h().rebase.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.baseMissing]);
+    expect(shape()).toEqual([['supplier.email', undefined, 'mine@example.com', 'theirs@example.com', true]]);
+    rebase(server({ supplier: { name: 'Lumen Parts', vat: 'IT1', email: 'theirs@example.com' } as WithEmail, amount: 50 }));
+    expect(shape()).toEqual([['supplier.email', undefined, 'mine@example.com', 'theirs@example.com', true]]);
+  });
+});
