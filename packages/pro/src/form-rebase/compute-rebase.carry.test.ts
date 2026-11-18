@@ -200,6 +200,26 @@ describe('rebaseCarrying: carried conflicts under a node the user removed (#588)
   });
 });
 
+describe('rebaseCarrying: ids compared as the engine does (0 and -0 are two rows)', () => {
+  it('a carried conflict on the row -0 stays on it, not on the row 0', () => {
+    const at = (...rows: [number, number][]): Invoice => ({ ...BASE, lines: lines(...rows) });
+    const base = at([0, 1], [-0, 1], [1, 1]);
+    // The user edits the rows 0 and -0; the server changes the row -0 only: one conflict, on it.
+    const values = at([0, 2], [-0, 5], [1, 1]);
+    const first = at([0, 1], [-0, 6], [1, 1]);
+    const one = rebaseInternal({ baseline: base, values, incoming: first, ...OPTIONS });
+    expect(one.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs])).toEqual([['lines.1.qty', 1, 5, 6]]);
+    // The server then changes the row 1: the carried conflict stays on the row -0, the row 0 keeps the user's value.
+    const two = rebaseCarrying({ baseline: first, values, incoming: at([0, 1], [-0, 6], [1, 9]), ...OPTIONS }, one.records);
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs])).toEqual([['lines.1.qty', 1, 5, 6]]);
+    expect(two.result.values.lines.map((line) => [Object.is(line.id, -0), line.qty])).toEqual([
+      [false, 2],
+      [true, 5],
+      [false, 9],
+    ]);
+  });
+});
+
 describe('rebaseCarrying: nested id-keyed arrays', () => {
   type Group = { id: number; name: string; parts: Line[] };
   type Order = { amount: number; groups: Group[] };
