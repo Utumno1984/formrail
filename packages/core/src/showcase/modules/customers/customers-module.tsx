@@ -218,6 +218,8 @@ function CustomerSections({ form, record, help, savingLock }: RecordSectionsProp
               unknownValueLabel={values.accountManagerId && !managerListed ? formerManagerLabel(values.accountManagerId) : undefined}
               emptyLabel="No sales employee matches"
               onValueChange={(id) => {
+                // `undefined` comes only with `clearOnEmpty` (not set: leaving an emptied text keeps the saved manager).
+                // The check is for the type (`string | undefined`); without it the code does not compile.
                 if (id !== undefined) setValue('accountManagerId', id);
               }}
             />
