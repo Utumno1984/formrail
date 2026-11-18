@@ -30,6 +30,11 @@ export interface RecordSectionsProps<T extends { id: string }, V extends object>
   record: T | null;
   /** Story-only (#384): a help text an add-on gives the Field of a form path, `undefined` without one. */
   help: ((path: string) => ReactNode) | undefined;
+  /**
+   * #523: while a save that the module locks is in flight (`form.lockWhileSaving`), the reason it gave: the sections
+   * disable every field with it. `undefined` otherwise (and always for a module without `lockWhileSaving`).
+   */
+  savingLock?: string | undefined;
 }
 
 /** The list of a module: what `useListReport` and `ListReport` need that belongs to the record type. */
@@ -93,6 +98,16 @@ export interface RecordModuleForm<T extends { id: string }, V extends object> {
    * an add-on. Rendered on the page of an existing record only. Absent: none.
    */
   HeaderActions?: ComponentType<RecordHeaderActionsProps<T, V>>;
+  /**
+   * #523: a save whose values make the record no longer editable (the customers' "Archived") must not let the user
+   * keep typing while it is in flight: those edits would survive the save (`useObjectPageForm` keeps the edits made
+   * since Save) on a record that can no longer be edited, and a Save of them would write it. Called with the values
+   * the save in flight sends; a string is the reason the page is locked until the save settles: the sections get it
+   * as `savingLock` (and disable their fields with it), the footer says it, and "Discard" does nothing (a reset during
+   * the save would keep the OLD baseline while the server stores the new one). `undefined`: the user keeps editing
+   * during the save, as without it. Absent: never locked.
+   */
+  lockWhileSaving?: (sent: V) => string | undefined;
 }
 
 /** Creation (#363): the page of a new record. Absent, the list has no "New …" button and there is no creation page. */

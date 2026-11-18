@@ -306,6 +306,11 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   const sentRef = useRef<V | null>(null);
   const editedSinceSave =
     form.isSaving && form.isDirty && !!sentRef.current && !definition.isEqual(form.values, sentRef.current);
+  // #523: a save the module locks (`lockWhileSaving`, the customers' archiving): from the render where it starts
+  // (`sentRef` is set synchronously by the handler, in the same task as `isSaving`) until it settles, the sections
+  // disable their fields with this reason and "Discard" does nothing. Read from what is SENT, not from the draft.
+  const savingLock =
+    form.isSaving && sentRef.current && definition.lockWhileSaving ? definition.lockWhileSaving(sentRef.current) : undefined;
   // The "delete" wording is sticky like the "save" one: a guard dialog opened during the delete keeps saying
   // what it said if the delete then fails (a clean form disarms the guard, but an open dialog stays until the
   // user chooses); real unsaved edits, once no delete runs, bring back the "unsaved changes" wording.
@@ -474,7 +479,9 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
     getErrorSummary(form.fieldErrors, { formErrors: form.formErrors, message: summaryText });
   // #166: while a save runs, the footer Discard only restores the form (the save still lands): say it BEFORE
   // the click, since the footer hides once the form is clean.
-  const message = problem || (form.isSaving ? (creating ? 'Saving…' : SAVING_HINT) : undefined);
+  // #523: during a locked save Discard does nothing, so the hint says why instead.
+  const message =
+    problem || (form.isSaving ? (creating ? 'Saving…' : savingLock ? `Saving… ${savingLock}` : SAVING_HINT) : undefined);
 
   return (
     <div
@@ -536,15 +543,15 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
               <Button
                 variant="secondary"
                 onClick={() => {
-                  if (!deleteBusy) form.reset();
+                  if (!deleteBusy && !savingLock) form.reset();
                 }}
-                aria-disabled={deleteBusy || undefined}
+                aria-disabled={deleteBusy || savingLock !== undefined || undefined}
               >
                 Discard
               </Button>
             )}
           </ObjectPageFooter>
-          <Sections form={form} record={record} help={help} />
+          <Sections form={form} record={record} help={help} savingLock={savingLock} />
         </ObjectPage>
       </ValidationProvider>
       {dialog}

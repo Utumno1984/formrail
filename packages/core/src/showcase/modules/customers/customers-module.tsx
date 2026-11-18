@@ -55,6 +55,12 @@ const ADDRESS_ROW = {
 /** Why every field of an archived customer is disabled: linked to each of them with `aria-describedby`. */
 export const ARCHIVED_REASON = 'An archived customer cannot be edited: restore it first.';
 
+/**
+ * Why every field is disabled while a save that archives the customer is in flight (`lockWhileSaving`): an edit typed
+ * then would survive the save on a customer that is archived by then, and its Save would write an archived customer.
+ */
+export const ARCHIVING_REASON = 'The customer is being archived: nothing can be changed until the save completes.';
+
 const options = <K extends string>(labels: Readonly<Record<K, string>>) =>
   (Object.keys(labels) as K[]).map((value) => ({ value, label: labels[value] }));
 const STATUS_OPTIONS = options(CUSTOMER_STATUS_LABEL);
@@ -83,11 +89,14 @@ export const accountManagerName = (id: string): string => getEmployee(id)?.fullN
 const formerManagerLabel = (id: string): string => `${accountManagerName(id)} (left the company)`;
 
 /** The sections of the customer page: the fields, as explicit JSX. */
-function CustomerSections({ form, record, help }: RecordSectionsProps<StoredCustomer, CustomerValues>) {
+function CustomerSections({ form, record, help, savingLock }: RecordSectionsProps<StoredCustomer, CustomerValues>) {
   const { values, setValue, setValues } = form;
-  // Archived is the SAVED status, not the draft: choosing "Archived" locks nothing until it is saved.
+  // Archived is the SAVED status, not the draft: choosing "Archived" locks nothing until it is saved. While the save
+  // that archives is in flight everything is locked too (`savingLock`), so that once it lands the draft IS what was
+  // saved: an archived customer never has unsaved edits that Save or Restore could write or drop.
   const archived = form.baseline.status === 'archived';
-  const state = archived ? ({ state: 'disabled', stateReason: ARCHIVED_REASON } as const) : {};
+  const lockReason = archived ? ARCHIVED_REASON : savingLock;
+  const state = lockReason ? ({ state: 'disabled', stateReason: lockReason } as const) : {};
   const baselineContactIds = useMemo(() => new Set(form.baseline.contacts.map((c) => c.id)), [form.baseline]);
   const address = values.billingAddress;
   // One nested object, one key of the form: an edit writes the whole address with the one part changed.
@@ -106,8 +115,8 @@ function CustomerSections({ form, record, help }: RecordSectionsProps<StoredCust
           ) : null}
           <Field
             label="Code"
-            {...(archived
-              ? ({ state: 'disabled', stateReason: ARCHIVED_REASON } as const)
+            {...(lockReason
+              ? ({ state: 'disabled', stateReason: lockReason } as const)
               : ({ state: 'locked', stateReason: 'The customer code is assigned by the system.' } as const))}
           >
             <Input value={record ? record.code : ''} readOnly />
@@ -168,7 +177,7 @@ function CustomerSections({ form, record, help }: RecordSectionsProps<StoredCust
           primaryContactId={values.primaryContactId}
           baselineIds={baselineContactIds}
           onChange={setValues}
-          disabledReason={archived ? ARCHIVED_REASON : undefined}
+          disabledReason={lockReason}
           listError={form.fieldErrors.contacts}
           fieldHelp={help}
         />
@@ -244,6 +253,13 @@ function CustomerHeaderActions({ form, record, saveRecord }: RecordHeaderActions
     if (restored === 0) return;
     scopeRef.current?.querySelector<HTMLElement>('[data-rop-name="name"]')?.focus();
   }, [restored]);
+  // A Save that archived the customer (its saved status turned archived on this page, never at mount): said in the
+  // same live region, since every field just became disabled under the user.
+  const wasArchived = useRef(archived);
+  useEffect(() => {
+    if (archived && !wasArchived.current) setMessage({ error: false, text: `Customer ${record.code} archived.` });
+    wasArchived.current = archived;
+  }, [archived, record.code]);
 
   const restore = async (event: MouseEvent<HTMLButtonElement>) => {
     // `aria-disabled` does not block a click.
@@ -351,6 +367,7 @@ export const CUSTOMERS: RecordModule<StoredCustomer, CustomerValues, never> = {
     isEqual: sameValues,
     validate: validateCustomer,
     toRecord: toCustomer,
+    lockWhileSaving: (sent) => (sent.status === 'archived' ? ARCHIVING_REASON : undefined),
     subtitle: (saved) => `${saved.name} · ${COUNTRY_NAME[saved.billingAddress.country]}`,
     status: (saved) => <StatusBadge tone={CUSTOMER_STATUS_TONE[saved.status]}>{CUSTOMER_STATUS_LABEL[saved.status]}</StatusBadge>,
     Sections: CustomerSections,

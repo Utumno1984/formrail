@@ -272,6 +272,36 @@ test.describe('Showcase/Record editing, customers: archived', () => {
     expect((await storedCustomer(page, 'cus-11'))?.name).toBe('Schwertling Power Systems AG');
   });
 
+  test('a Save that archives locks the page while it runs: typing and Discard change nothing; then archived, clean, announced', async ({ page }) => {
+    // The longest delay of the control: the checks "while it runs" have the whole of it.
+    await openCustomer(page, 'cus-4', 'loadDelayMs:0;saveDelayMs:3000');
+    const name = textbox(page, 'Name');
+    const savedName = await name.inputValue();
+    await page.getByRole('combobox', { name: 'Status' }).click();
+    await page.getByRole('option', { name: 'Archived' }).click();
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    const reason = 'The customer is being archived: nothing can be changed until the save completes.';
+    await expect(name).toBeDisabled();
+    await expect(name).toHaveAccessibleDescription(reason);
+    await expect(bar(page).getByRole('status')).toContainText(reason);
+    // A click on a disabled field focuses nothing: the keys go nowhere.
+    await name.click({ force: true });
+    await page.keyboard.type(' EDIT');
+    await expect(name).toHaveValue(savedName);
+    const discard = bar(page).getByRole('button', { name: 'Discard' });
+    await expect(discard).toHaveAttribute('aria-disabled', 'true');
+    await discard.click();
+    await expect(page.getByRole('combobox', { name: 'Status' })).toHaveText(/Archived/);
+    expect((await storedCustomer(page, 'cus-4'))?.status).toBe('active');
+
+    await expect(page.getByRole('button', { name: 'Restore' })).toBeVisible({ timeout: 10_000 });
+    await expect(bar(page)).toBeHidden();
+    expect(await storedCustomer(page, 'cus-4')).toMatchObject({ status: 'archived', name: savedName });
+    await expect(name).toHaveValue(savedName);
+    await expect(name).toHaveAccessibleDescription('An archived customer cannot be edited: restore it first.');
+    await expect(page.getByRole('status').filter({ hasText: 'Customer C-10004 archived.' })).toHaveCount(1);
+  });
+
   test('a Restore that fails says so; the customer stays archived', async ({ page }) => {
     await openCustomer(page, 'cus-11', 'loadDelayMs:0;saveDelayMs:0;saveOutcome:error');
     await page.getByRole('button', { name: 'Restore' }).click();
