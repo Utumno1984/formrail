@@ -894,9 +894,17 @@ test.describe('Pro showcase at 390x500: the notice leaves the editor room, also 
     await blur(page);
     const before = await fieldSpots(page);
     const rowBefore = await heightOf(noticeRow(page));
-    // A new update: the server changes the Status only. The conflicts of the previous one are gone ("1 field was
-    // updated."), the notice is shorter than its cap: it renders, and must scroll by its own change only.
-    await serverPatch(page, record.id, { status: NEXT_STATUS[record.status] });
+    // #584 (decision of 2026-11-18): the conflicts accumulate, so an update on the Status only (the step before) no
+    // longer closes them. Rewritten: the new update changes the Status AND brings the four fields to the user's values,
+    // so the conflicts are gone because the server reached the user's value ("1 field was updated."); the notice is
+    // shorter than its cap: it renders, and must scroll by its own change only. Geometry checks unchanged.
+    await serverPatch(page, record.id, {
+      status: NEXT_STATUS[record.status],
+      dueDate: '2026-03-05',
+      amount: 1234.56,
+      notes: LONG_MINE,
+      lineItems: record.lineItems.map((line, i) => (i === 0 ? { ...line, description: `${LONG_MINE} (line)` } : line)),
+    });
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(notice(page)).toContainText('1 field was updated.');
     expect(await heightOf(noticeRow(page))).toBeLessThan(rowBefore - 1);
