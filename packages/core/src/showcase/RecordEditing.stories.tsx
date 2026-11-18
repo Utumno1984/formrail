@@ -13,6 +13,20 @@ import {
   type SaveOutcome,
   type StoredSalesOrder,
 } from './sales-order-store';
+import { createCustomerStore } from './customer-store';
+import {
+  CUSTOMER_LIST_ARGS,
+  CUSTOMER_LIST_ARGTYPES,
+  CUSTOMER_LIST_PARAMS,
+  CUSTOMER_PAGE_ARGS,
+  CUSTOMER_PAGE_ARGTYPES,
+  CUSTOMER_VISUAL_ARGS,
+  mountedCustomerStore,
+  resetCustomers,
+  type CustomerCrudProps,
+  type CustomerPageArgs,
+} from './customer-story-args';
+import { CUSTOMERS } from './modules/customers/customers-module';
 import {
   CRUD_ARGS,
   CRUD_ARGTYPES,
@@ -79,6 +93,10 @@ const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
   'modules/sales-orders/order-lines.ts': 'The rules on the lines of an order: money typed in the major unit of the order\'s currency (no decimals for JPY) and kept in minor units, the half-up discount, the totals, validation.',
   'sales-order-store.ts': 'Fixture, not part of the library: the in-memory "server" the showcase reads from and saves to, with configurable delays and failures. The sales orders\' instance of `./record-store`: the demo orders with their lines; every write derives the total from the lines.',
   'record-store.ts': 'Fixture, not part of the library: the in-memory "server" of any record type (list, read, save, create, delete), with configurable delays and failures. Each store is its own server: nothing is shared between two of them.',
+  'modules/customers/customers-module.tsx': `The Customers module (#523), a record of another shape than the order: a nested billing address (\`billingAddress.*\`), contacts with ids, an account manager chosen in a Combobox, a credit limit in the customer's currency, an archived state with "Restore" in the header. ${IN_APP} Not public: \`../../../internal/demo-data\`, \`../../customer-store\`, \`../../record-module\`, \`./customer-form\`, \`./CustomerContacts\`.`,
+  'modules/customers/CustomerContacts.tsx': `The contacts of a customer, a section of the Customers module: add, remove, edit, the primary contact, the last contact that cannot be removed (with its reason). ${IN_APP} Not public: \`../../../internal/use-list-mutation-focus\` and \`./customer-form\`.`,
+  'modules/customers/customer-form.ts': 'The rules on a customer: the values of the form (an absent line 2 is `null` stored and empty in the form), the comparison that decides "dirty" (a contact is its id), the validation with errors on nested paths (`billingAddress.postalCode`, `contacts.1.email`), the postal code format of the billing country.',
+  'customer-store.ts': 'Fixture, not part of the library: the customers\' instance of `./record-store`, the demo customers with their address and contacts; every write derives the account country from the billing address.',
   'record-api.ts': 'Fixture, not part of the library: the store as the pages call it. A write outlives the page that started it, so every read first waits for the writes still in flight: a list or a reopened order never shows a value older than the one the server is about to hold.',
 });
 
@@ -91,7 +109,7 @@ const meta: Meta<RecordPageArgs> = {
     docs: {
       description: {
         component:
-          "A complete worked example: a List Report of sales orders that opens an order as an Object Page (sections, lines, validation, a sticky save-bar and a dirty-guard), built only from the library's components. Use the controls to open another order (a cancelled one is read-only, a yen one has no decimals, one has 18 lines), slow down the load or open one that does not exist; edit a field and try to leave to see the guard. The `SalesOrderCrud` stories add the rest of the cycle: a creation page (customer required, at least one line), deleting an order from its row or from its page, and deleting several at once, each with a named confirmation. The source is on [GitHub](" +
+          "A complete worked example: a List Report of sales orders that opens an order as an Object Page (sections, lines, validation, a sticky save-bar and a dirty-guard), built only from the library's components. Use the controls to open another order (a cancelled one is read-only, a yen one has no decimals, one has 18 lines), slow down the load or open one that does not exist; edit a field and try to leave to see the guard. The `SalesOrderCrud` stories add the rest of the cycle: a creation page (customer required, at least one line), deleting an order from its row or from its page, and deleting several at once, each with a named confirmation. The `Customer` stories open a record of another shape on the same shell: a nested billing address, an array of contacts, an account manager chosen among the employees, and an archived state that only \"Restore\" lifts. The source is on [GitHub](" +
           githubSource(SHOWCASE_FOLDER) +
           '); its main files are at the bottom of this page.',
       },
@@ -899,5 +917,279 @@ export const SalesOrderDeleteConfirmRecordPending: StoryObj<CrudArgs> = {
     await waitFor(() => expect(within(dialog).getByText(/Unsaved changes will be lost too\./)).toBeVisible());
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete sales order' }));
     await expect(within(dialog).getByRole('button', { name: 'Delete sales order' })).toHaveAttribute('aria-disabled', 'true');
+  },
+};
+
+/* ------------------------------------------------------------------------------------------ */
+/* #523: the Customers module, a record of another shape on the same shell.                      */
+/* ------------------------------------------------------------------------------------------ */
+
+function CustomerPageDemo({ recordId, loadDelayMs, saveDelayMs, saveOutcome, loadOutcome, onBack, onSaved }: CustomerPageArgs) {
+  // One store per mount of the story, as for the sales orders.
+  const [store] = useState(() => createCustomerStore(undefined, { loadDelayMs, saveDelayMs, saveOutcome, loadOutcome }));
+  useLayoutEffect(() => {
+    store.configure({ loadDelayMs, saveDelayMs, saveOutcome, loadOutcome });
+  }, [store, loadDelayMs, saveDelayMs, saveOutcome, loadOutcome]);
+  useEffect(() => {
+    const w = window as unknown as { __ropShowcaseStore?: unknown };
+    w.__ropShowcaseStore = store;
+    return () => {
+      if (w.__ropShowcaseStore === store) delete w.__ropShowcaseStore;
+    };
+  }, [store]);
+  return <RecordPage module={CUSTOMERS} store={store} recordId={recordId} onBack={onBack} onSaved={onSaved} />;
+}
+
+type CustomerPageStory = StoryObj<CustomerPageArgs>;
+const customerPage = (args: Partial<CustomerPageArgs> = {}): Pick<CustomerPageStory, 'argTypes' | 'args' | 'render'> => ({
+  argTypes: CUSTOMER_PAGE_ARGTYPES,
+  args: { ...CUSTOMER_PAGE_ARGS, ...args },
+  render: (a) => <CustomerPageDemo {...a} />,
+});
+
+type CustomerListArgs = CustomerCrudProps;
+const customerListRender = (args: CustomerListArgs) => <RecordCrud {...args} module={CUSTOMERS} />;
+
+async function startCustomers(canvasElement: HTMLElement, minRows = 10) {
+  const canvas = within(canvasElement);
+  const win = canvasElement.ownerDocument.defaultView;
+  if (!win) throw new Error('customers story: no window');
+  resetCustomers(win);
+  await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(minRows), { timeout: 5000 });
+  return { canvas, win };
+}
+
+const customerRegion = (canvas: ReturnType<typeof within>) => canvas.queryByRole('region', { name: 'Save actions' });
+
+/**
+ * One customer, real input: the page mounts hydrated (no field while it loads), change the city of the billing address
+ * (a nested field: the save bar appears), put it back (the bar goes away: the form is compared with the saved
+ * customer, part by part), change the role of the second contact and the payment terms, Save: the store holds them,
+ * the bar hides, and "Back to list" on a clean form leaves at once. Controls: customer, delays, outcomes. With
+ * `saveOutcome: error`, `loadOutcome: error` or an unknown customer this play is expected to fail (those states are
+ * what the Controls are for); a zero delay skips the in-flight assertions.
+ */
+export const CustomerRecordPage: CustomerPageStory = {
+  ...customerPage(),
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    if (args.loadDelayMs > 0) {
+      await expect(canvas.getByRole('status')).toHaveTextContent('Loading customer…');
+      await expect(canvas.queryByRole('textbox')).toBeNull();
+    }
+    const city = (await canvas.findByRole('textbox', { name: 'City' })) as HTMLInputElement;
+    await expect(customerRegion(canvas)).toBeNull();
+    const savedCity = city.value;
+
+    await userEvent.clear(city);
+    await userEvent.type(city, 'Ravenna');
+    await expect(await canvas.findByRole('region', { name: 'Save actions' })).toBeVisible();
+    await userEvent.clear(city);
+    await userEvent.type(city, savedCity);
+    await waitFor(() => expect(customerRegion(canvas)).toBeNull());
+
+    const role = canvas.getByRole('textbox', { name: 'Contact 2 role' });
+    await userEvent.clear(role);
+    await userEvent.type(role, 'Head of Purchasing');
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Payment terms' }));
+    await userEvent.click(await within(document.body).findByRole('option', { name: 'Net 60 days' }));
+    const save = within(await canvas.findByRole('region', { name: 'Save actions' })).getByRole('button', { name: 'Save' });
+    await userEvent.click(save);
+    if (args.saveDelayMs >= 200) await waitFor(() => expect(save).toHaveAttribute('aria-disabled', 'true'));
+    await waitFor(() => expect(customerRegion(canvas)).toBeNull());
+    await expect(args.onSaved).toHaveBeenCalledTimes(1);
+    const saved = mountedCustomerStore()?.snapshot().find((c) => c.id === args.recordId);
+    await expect(saved?.contacts[1]?.role).toBe('Head of Purchasing');
+    await expect(saved?.paymentTerms).toBe('net-60');
+    await expect(saved?.billingAddress.city).toBe(savedCity);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Back to list' }));
+    await expect(args.onBack).toHaveBeenCalledTimes(1);
+    await expect(within(document.body).queryByRole('dialog')).toBeNull();
+  },
+};
+
+/** `CustomerRecordPage` without a `play` function: what `e2e/showcase-customers.spec.ts` drives with real input. */
+export const CustomerRecordPageManual: CustomerPageStory = { ...customerPage() };
+
+/**
+ * The contacts, an array with identity: "Add contact" (the focus goes to its name), fill it with an e-mail that is not
+ * one, make it the primary contact, Save: the error is on THAT contact's e-mail (`contacts.2.email`), which takes the
+ * focus, and the footer counts it. Fix the e-mail and Save: the store holds three contacts, the new one primary.
+ * Controls: customer and delays (`cus-1` has a single contact: its Remove explains why it cannot go).
+ */
+export const CustomerContacts: CustomerPageStory = {
+  ...customerPage({ loadDelayMs: 0, saveDelayMs: 0 }),
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole('textbox', { name: 'Name' });
+    const count = canvas.getAllByRole('button', { name: /^Remove contact / }).length;
+    const n = count + 1;
+    await userEvent.click(canvas.getByRole('button', { name: 'Add contact' }));
+    const name = canvas.getByRole('textbox', { name: `Contact ${n} name` });
+    await waitFor(() => expect(name).toHaveFocus());
+    await userEvent.type(name, 'Ilse Visser');
+    const email = canvas.getByRole('textbox', { name: `Contact ${n} e-mail` });
+    await userEvent.type(email, 'ilse.visser.company.example');
+    await userEvent.click(canvas.getByRole('combobox', { name: 'Primary contact' }));
+    await userEvent.click(await within(document.body).findByRole('option', { name: 'Ilse Visser' }));
+    await expect(canvas.getByText(`Contact ${n} (primary)`)).toBeInTheDocument();
+
+    const bar = await canvas.findByRole('region', { name: 'Save actions' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(email).toHaveAttribute('aria-invalid', 'true'));
+    await expect(email).toHaveAttribute('data-rop-name', `contacts.${n - 1}.email`);
+    await expect(email).toHaveAccessibleDescription(/Enter a valid e-mail address/);
+    await waitFor(() => expect(email).toHaveFocus());
+    await expect(bar).toHaveTextContent('1 invalid field');
+    await expect(args.onSaved).not.toHaveBeenCalled();
+
+    await userEvent.clear(email);
+    await userEvent.type(email, 'ilse.visser@company.example');
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(customerRegion(canvas)).toBeNull());
+    const saved = mountedCustomerStore()?.snapshot().find((c) => c.id === args.recordId);
+    await expect(saved?.contacts).toHaveLength(n);
+    await expect(saved?.contacts.filter((c) => c.primary).map((c) => c.name)).toEqual(['Ilse Visser']);
+  },
+};
+
+/**
+ * List Report to customer page and back: the pill "On hold", open a customer (the Code is a real link), change the
+ * city and put it back (no save bar), "Back to list": the pill and the focus on the opened link come back. The search
+ * matches the code, the name and the city (accents ignored: `munchen` finds München). Controls: delays, `history`.
+ */
+export const CustomerListToRecord: StoryObj<CustomerListArgs> = {
+  argTypes: CUSTOMER_LIST_ARGTYPES,
+  args: CUSTOMER_LIST_ARGS,
+  render: customerListRender,
+  play: async ({ canvasElement, args }) => {
+    const { canvas, win } = await startCustomers(canvasElement);
+    await expect(canvas.getByRole('heading', { level: 2, name: /Customers/ })).toHaveTextContent('(200)');
+    await userEvent.click(canvas.getByRole('radio', { name: 'On hold' }));
+    await expect(canvas.getByRole('heading', { level: 2, name: /Customers/ })).toHaveTextContent(/of 200/);
+    const link = canvas.getAllByRole('link')[0] as HTMLElement;
+    const code = link.textContent ?? '';
+    await expect(link.getAttribute('href')).toContain('module=customers');
+    await expect(link.getAttribute('href')).toContain(`${CUSTOMER_LIST_PARAMS.filter}=on-hold`);
+
+    await userEvent.click(link);
+    await expect(args.onNavigate).toHaveBeenLastCalledWith({ to: 'record', id: link.getAttribute('data-record-id') });
+    await expect(await canvas.findByRole('heading', { level: 1, name: code })).toBeVisible();
+    const city = (await canvas.findByRole('textbox', { name: 'City' })) as HTMLInputElement;
+    const saved = city.value;
+    await userEvent.type(city, 'x');
+    await expect(await canvas.findByRole('region', { name: 'Save actions' })).toBeVisible();
+    await userEvent.clear(city);
+    await userEvent.type(city, saved);
+    await waitFor(() => expect(customerRegion(canvas)).toBeNull());
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Back to list' }));
+    await expect(within(document.body).queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(2), { timeout: 5000 });
+    await expect(new URLSearchParams(win.location.search).get(CUSTOMER_LIST_PARAMS.filter)).toBe('on-hold');
+    await expect(canvas.getByRole('radio', { name: 'On hold' })).toBeChecked();
+    await waitFor(() => expect(canvas.getByRole('link', { name: code })).toHaveFocus());
+
+    await userEvent.click(canvas.getByRole('radio', { name: 'All' }));
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'munchen{Enter}');
+    await waitFor(() => expect(new URLSearchParams(win.location.search).get(CUSTOMER_LIST_PARAMS.search)).toBe('munchen'));
+    await waitFor(() => expect(canvas.getByRole('heading', { level: 2, name: /Customers/ })).toHaveTextContent(/of 200/));
+  },
+};
+
+/** `CustomerListToRecord` without a `play` function: what `e2e/showcase-customers.spec.ts` drives with real input. */
+export const CustomerListToRecordManual: StoryObj<CustomerListArgs> = {
+  argTypes: CUSTOMER_LIST_ARGTYPES,
+  args: CUSTOMER_LIST_ARGS,
+  render: customerListRender,
+};
+
+/**
+ * An archived customer: every field disabled, out of the Tab order, with "An archived customer cannot be edited"
+ * linked by `aria-describedby`; Tab from "Back to list" reaches "Restore", never a field. "Restore": the server first,
+ * then the customer is Active, every field is enabled and the focus goes to "Name". Controls: delays, `saveOutcome`
+ * (`error`: the Restore fails and says so, the customer stays archived; this play then fails, as expected).
+ */
+export const CustomerArchived: CustomerPageStory = {
+  ...customerPage({ recordId: 'cus-11', loadDelayMs: 0 }),
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const restore = await canvas.findByRole('button', { name: 'Restore' });
+    const name = canvas.getByRole('textbox', { name: 'Name' });
+    await expect(name).toBeDisabled();
+    await expect(name).toHaveAccessibleDescription(/An archived customer cannot be edited/);
+    await expect(canvas.getByRole('combobox', { name: 'Account manager' })).toBeDisabled();
+    await expect(canvas.queryByRole('button', { name: 'Add contact' })).toBeNull();
+
+    canvas.getByRole('button', { name: 'Back to list' }).focus();
+    await userEvent.tab();
+    await expect(restore).toHaveFocus();
+    for (let i = 0; i < 6; i++) {
+      await userEvent.tab();
+      await expect((document.activeElement as HTMLElement).matches('input, [role="combobox"]')).toBe(false);
+    }
+
+    await userEvent.click(restore);
+    await waitFor(() => expect(name).not.toBeDisabled(), { timeout: 5000 });
+    await waitFor(() => expect(name).toHaveFocus());
+    await expect(canvas.queryByRole('button', { name: 'Restore' })).toBeNull();
+    await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();
+    await expect(args.onSaved).toHaveBeenCalledTimes(1);
+    await expect(mountedCustomerStore()?.snapshot().find((c) => c.id === args.recordId)?.status).toBe('active');
+  },
+};
+
+// Visual states (3 viewports, via the `visual` tag): no delays, the same customers every time.
+
+/** A customer just opened: header with the saved name and status, Anchor Bar, hydrated sections, no save bar. */
+export const CustomerRecordOpen: CustomerPageStory = {
+  tags: ['visual'],
+  ...customerPage({ loadDelayMs: 0, saveDelayMs: 0 }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole('textbox', { name: 'Name' })).toBeVisible();
+    await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();
+  },
+};
+
+/** A contact added with an e-mail that is not one, then Save: the error on that contact, focused, counted in the bar. */
+export const CustomerRecordContactError: CustomerPageStory = {
+  tags: ['visual'],
+  ...customerPage({ loadDelayMs: 0, saveDelayMs: 0 }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole('textbox', { name: 'Name' });
+    await userEvent.click(canvas.getByRole('button', { name: 'Add contact' }));
+    await userEvent.type(canvas.getByRole('textbox', { name: 'Contact 3 name' }), 'Ilse Visser');
+    const email = canvas.getByRole('textbox', { name: 'Contact 3 e-mail' });
+    await userEvent.type(email, 'ilse.visser@');
+    const bar = await canvas.findByRole('region', { name: 'Save actions' });
+    await userEvent.click(within(bar).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(email).toHaveFocus());
+    await expect(bar).toHaveTextContent('1 invalid field');
+  },
+};
+
+/** An archived customer: the notice, every field disabled with its reason, "Restore" in the header. */
+export const CustomerRecordArchived: CustomerPageStory = {
+  tags: ['visual'],
+  ...customerPage({ recordId: 'cus-11', loadDelayMs: 0, saveDelayMs: 0 }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole('button', { name: 'Restore' })).toBeVisible();
+    await expect(canvas.getByRole('textbox', { name: 'Name' })).toBeDisabled();
+  },
+};
+
+/** The customer list: 200 customers, the credit limit in each customer's currency, the status as a badge. */
+export const CustomerList: StoryObj<CustomerListArgs> = {
+  tags: ['visual'],
+  argTypes: CUSTOMER_LIST_ARGTYPES,
+  args: CUSTOMER_VISUAL_ARGS,
+  render: customerListRender,
+  play: async ({ canvasElement }) => {
+    const { canvas } = await startCustomers(canvasElement, 5);
+    await expect(canvas.getByRole('heading', { level: 2, name: /Customers/ })).toHaveTextContent('(200)');
   },
 };

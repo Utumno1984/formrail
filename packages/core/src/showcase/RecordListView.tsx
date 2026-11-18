@@ -128,6 +128,8 @@ export function RecordListView<T extends { id: string }>({
     columns,
     getRowId: (r) => r.id,
     filters,
+    // #523: the module's own search text (the customers' city), when it has one.
+    ...(list.getSearchText ? { getSearchText: list.getSearchText } : {}),
     ...url,
     ...(selection
       ? { selectable: true, selectedIds: selection.selectedIds, onSelectedIdsChange: selection.onChange }

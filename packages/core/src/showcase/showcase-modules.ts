@@ -4,4 +4,4 @@
 // domain adds its name here, next to its `RecordModule` (see `record-module.ts`). Not exported by the package.
 
 /** The modules the router knows, the default one first: it is the one whose URLs carry no `module` parameter. */
-export const SHOWCASE_MODULES: readonly [string, ...string[]] = ['invoices', 'sales-orders'];
+export const SHOWCASE_MODULES: readonly [string, ...string[]] = ['invoices', 'sales-orders', 'customers'];

@@ -273,6 +273,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   const creating = record === null;
   const { form: definition, noun } = module;
   const Sections = definition.Sections;
+  const HeaderActions = definition.HeaderActions;
   // #365: `deleting` while the confirmed delete waits for the server; `deleted` once the server deleted the
   // record (set in the same callback, so no render ever has both false in between). `deleting` ARMS the guard
   // like a save in flight does (browser Back asks "Delete in progress", also on a clean form); `deleted`
@@ -297,14 +298,23 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   // open when the save settles with a clean form keeps saying what it said; if the save fails or edits made
   // meanwhile remain, the form is dirty again and the wording goes back to "unsaved changes" (which is true).
   const [savingWording, setSavingWording] = useState(false);
+  // #523: the writes of a module's header action in flight (`saveRecord`, the customers' "Restore"). They arm the
+  // guard like a save does (also on a clean form: leaving does not cancel them) and use the same "save" wording.
+  const [actionWrites, setActionWrites] = useState(0);
+  const writing = form.isSaving || actionWrites > 0;
   useEffect(() => {
-    if (form.isSaving) setSavingWording(true);
+    if (writing) setSavingWording(true);
     else if (form.isDirty) setSavingWording(false);
-  }, [form.isSaving, form.isDirty]);
+  }, [writing, form.isDirty]);
   // The values the save in flight sends: an edit made after Save is NOT part of it and would be lost on leaving.
   const sentRef = useRef<V | null>(null);
   const editedSinceSave =
     form.isSaving && form.isDirty && !!sentRef.current && !definition.isEqual(form.values, sentRef.current);
+  // #523: a save the module locks (`lockWhileSaving`, the customers' archiving): from the render where it starts
+  // (`sentRef` is set synchronously by the handler, in the same task as `isSaving`) until it settles, the sections
+  // disable their fields with this reason and "Discard" does nothing. Read from what is SENT, not from the draft.
+  const savingLock =
+    form.isSaving && sentRef.current && definition.lockWhileSaving ? definition.lockWhileSaving(sentRef.current) : undefined;
   // The "delete" wording is sticky like the "save" one: a guard dialog opened during the delete keeps saying
   // what it said if the delete then fails (a clean form disarms the guard, but an open dialog stays until the
   // user chooses); real unsaved edits, once no delete runs, bring back the "unsaved changes" wording.
@@ -314,7 +324,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
     else if (form.isDirty) setDeleteWording(false);
   }, [deleting, form.isDirty]);
   const { guard, dialog } = useDirtyGuard({
-    when: !deleted && (form.isDirty || form.isSaving || deleting),
+    when: !deleted && (form.isDirty || writing || deleting),
     labels: deleting || deleteWording
       ? {
           title: 'Delete in progress',
@@ -334,7 +344,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
           leave: 'Discard newer changes',
           close: 'Close',
         }
-      : savingWording || form.isSaving
+      : savingWording || writing
       ? {
           title: 'Unsaved changes',
           description: 'A save is still in progress. Leaving does not cancel it: it will complete in the background.',
@@ -378,6 +388,19 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   useEffect(() => {
     if (focusTitleOnMount) frameRef.current?.querySelector('h1')?.focus();
   }, [focusTitleOnMount]);
+
+  // #523: what a module's header action writes on the server (the customers' "Restore"): the page's store, as Save.
+  // Counted while in flight: the guard stays armed until the store answers (a setState after unmount is a no-op).
+  const saveRecord = async (changed: T): Promise<T> => {
+    setActionWrites((n) => n + 1);
+    try {
+      const stored = await store.save(changed);
+      onSaved?.(stored);
+      return stored;
+    } finally {
+      setActionWrites((n) => n - 1);
+    }
+  };
 
   // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).
   const [created, setCreated] = useState<T | null>(null);
@@ -466,7 +489,9 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
     getErrorSummary(form.fieldErrors, { formErrors: form.formErrors, message: summaryText });
   // #166: while a save runs, the footer Discard only restores the form (the save still lands): say it BEFORE
   // the click, since the footer hides once the form is clean.
-  const message = problem || (form.isSaving ? (creating ? 'Saving…' : SAVING_HINT) : undefined);
+  // #523: during a locked save Discard does nothing, so the hint says why instead.
+  const message =
+    problem || (form.isSaving ? (creating ? 'Saving…' : savingLock ? `Saving… ${savingLock}` : SAVING_HINT) : undefined);
 
   return (
     <div
@@ -504,6 +529,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
                     Delete
                   </Button>
                 ) : null}
+                {record && HeaderActions ? <HeaderActions form={form} record={record} saveRecord={saveRecord} /> : null}
                 {addons.actions}
               </>
             }
@@ -527,15 +553,15 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
               <Button
                 variant="secondary"
                 onClick={() => {
-                  if (!deleteBusy) form.reset();
+                  if (!deleteBusy && !savingLock) form.reset();
                 }}
-                aria-disabled={deleteBusy || undefined}
+                aria-disabled={deleteBusy || savingLock !== undefined || undefined}
               >
                 Discard
               </Button>
             )}
           </ObjectPageFooter>
-          <Sections form={form} record={record} help={help} />
+          <Sections form={form} record={record} help={help} savingLock={savingLock} />
         </ObjectPage>
       </ValidationProvider>
       {dialog}
