@@ -215,6 +215,19 @@ describe('validateCustomer: messages on nested paths (#523)', () => {
     expect(validateCustomer(contact({ email: 'bad' }, 0))).toEqual({ 'contacts.0.email': expect.any(String) });
   });
 
+  // Declared rule: the postal code and the e-mail are checked as typed, never trimmed (unlike the name, the street and
+  // the city, whose "required" ignores spaces). Spaces only are therefore not "empty" but a text of the wrong shape:
+  // the message says the shape expected, as for ' 20121' or ' name@company.com'.
+  it('a postal code or an e-mail of spaces only: the message of the format, not "required"', () => {
+    const it20121 = withPatch({ billingAddress: { ...base.billingAddress, country: 'IT', postalCode: '20121' } });
+    expect(validateCustomer({ ...it20121, billingAddress: { ...it20121.billingAddress, postalCode: '  ' } })).toEqual({
+      'billingAddress.postalCode': 'Postal code must look like 20121 for Italy.',
+    });
+    expect(validateCustomer(contact({ email: '  ' }))).toEqual({
+      'contacts.1.email': 'Enter a valid e-mail address, like name@company.com.',
+    });
+  });
+
   it('a contact name is required; the role and the phone are not', () => {
     expect(validateCustomer(contact({ name: ' ' }))).toEqual({ 'contacts.1.name': 'Contact name is required.' });
     expect(validateCustomer(contact({ role: '', phone: '' }))).toEqual({});
