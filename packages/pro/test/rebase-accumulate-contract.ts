@@ -59,10 +59,10 @@ export const ACCUMULATE_CHECKS: AccumulateCheck[] = [
       withForm(use, (form) => {
         act(() => form.current().editName('Mine'));
         rebase(form, server({ name: 'Theirs' }));
-        expect(open(form)).toEqual([['name', 'Acme', 'Mine', 'Theirs']]);
+        expect(open(form)).toEqual([['name', CONTRACT_INITIAL.name, 'Mine', 'Theirs']]);
         expect(form.current().rebase.applied).toEqual([]);
         rebase(form, server({ name: 'Theirs', amount: 20 }));
-        expect(open(form)).toEqual([['name', 'Acme', 'Mine', 'Theirs']]);
+        expect(open(form)).toEqual([['name', CONTRACT_INITIAL.name, 'Mine', 'Theirs']]);
         expect(form.current().rebase.applied.map((entry) => entry.path)).toEqual(['amount']);
         expect(form.current().binding.values).toEqual({ ...server({ amount: 20 }), name: 'Mine' });
       }),
@@ -78,7 +78,7 @@ export const ACCUMULATE_CHECKS: AccumulateCheck[] = [
           expect(form.current().rebase.conflicts).toHaveLength(1);
           rebase(form, server({ name: 'Theirs', city: 'Rome' }));
           expect(open(form)).toEqual([
-            ['name', 'Acme', 'Mine', 'Theirs'],
+            ['name', CONTRACT_INITIAL.name, 'Mine', 'Theirs'],
             ['supplier.city', 'Turin', 'Milan', 'Rome'],
           ]);
           expect(form.current().binding.values).toEqual({ ...server(), name: 'Mine', supplier: { city: 'Milan', tags: ['a'] } });
@@ -108,7 +108,7 @@ export const ACCUMULATE_CHECKS: AccumulateCheck[] = [
         act(() => form.current().editName('Mine'));
         rebase(form, server({ name: 'Theirs' }));
         rebase(form, server());
-        expect(open(form)).toEqual([['name', 'Theirs', 'Mine', 'Acme']]);
+        expect(open(form)).toEqual([['name', 'Theirs', 'Mine', CONTRACT_INITIAL.name]]);
       }),
   },
   {
@@ -195,7 +195,7 @@ export const ACCUMULATE_CHECKS: AccumulateCheck[] = [
         await act(() => save.settle(new Error('offline')));
         expect(form.current().rebase.isPending).toBe(false);
         expect(open(form)).toEqual([
-          ['name', 'Acme', 'Mine', 'Theirs'],
+          ['name', CONTRACT_INITIAL.name, 'Mine', 'Theirs'],
           ['supplier.city', 'Turin', 'Milan', 'Rome'],
         ]);
       });
