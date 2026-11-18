@@ -1,6 +1,8 @@
-// `rebaseInternal` with the conflicts of an earlier rebase (`carried`, ticket #584): what `useFormRebase` passes it
-// when a second server update lands. The hook passes only the conflicts still open; the merge does not rely on it.
+// `rebaseCarrying` (rebase-carry.ts) with the conflicts of an earlier rebase (`carried`, ticket #584): what
+// `useFormRebase` passes it when a second server update lands. The hook passes only the conflicts still open; the merge
+// does not rely on it.
 import { rebaseInternal, type ConflictRecord } from './compute-rebase';
+import { rebaseCarrying } from './rebase-carry';
 import type { RebaseOptions } from './types';
 
 type Line = { id: number; qty: number };
@@ -13,11 +15,11 @@ const OPTIONS: Pick<RebaseOptions<Invoice>, 'arrayIdKeys'> = { arrayIdKeys: { li
 /** Two rebases in a row: `values` against `first`, then `then` (the user's values meanwhile) against `second`. */
 function twice(values: Invoice, first: Invoice, then: Invoice, second: Invoice, carried?: (records: ConflictRecord[]) => ConflictRecord[]) {
   const one = rebaseInternal({ baseline: BASE, values, incoming: first, ...OPTIONS });
-  const two = rebaseInternal({ baseline: first, values: then, incoming: second, ...OPTIONS }, carried ? carried(one.records) : one.records);
+  const two = rebaseCarrying({ baseline: first, values: then, incoming: second, ...OPTIONS }, carried ? carried(one.records) : one.records);
   return { one, two, conflicts: two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs]) };
 }
 
-describe('rebaseInternal with carried conflicts (#584)', () => {
+describe('rebaseCarrying: the merge with carried conflicts (#584)', () => {
   it('no carried conflict: the same result as computeRebase (nothing remembered)', () => {
     const values = { ...BASE, number: 'A-2' };
     const { two } = twice(values, { ...BASE, number: 'A-3' }, values, { ...BASE, number: 'A-3', amount: 5 }, () => []);
@@ -86,7 +88,7 @@ describe('rebaseInternal with carried conflicts (#584)', () => {
     const first = { ...BASE, lines: lines([1, 1], [2, 8], [3, 3]) };
     const seen: unknown[] = [];
     const one = rebaseInternal({ baseline: BASE, values, incoming: first, ...OPTIONS });
-    const two = rebaseInternal(
+    const two = rebaseCarrying(
       {
         baseline: first,
         values,

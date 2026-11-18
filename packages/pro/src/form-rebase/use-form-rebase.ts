@@ -13,7 +13,8 @@ import {
   type ItemLabelOption,
   type PlainObject,
 } from '../internal/structural-diff';
-import { SOURCE, arrange, decisionDiffer, keysOf, rebaseInternal, sameOrder, type ConflictRecord, type Segment } from './compute-rebase';
+import { SOURCE, arrange, decisionDiffer, keysOf, type ConflictRecord, type Segment } from './compute-rebase';
+import { rebaseCarrying, sameOrder } from './rebase-carry';
 import type { OpenRebaseConflict, RebaseFormBinding, UseFormRebaseOptions, UseFormRebaseReturn } from './types';
 import { itemLabel as defaultItemLabel } from '../change-summary/infer-label';
 
@@ -275,7 +276,7 @@ export function useFormRebase<Values extends object>(
       if (incoming !== form.baseline) {
         const { arrayIdKeys, labels, isEqual, itemLabel } = optionsRef.current;
         // The conflicts still open (`next.records`, checked above against these values) go into the merge (#584).
-        const { result, records } = rebaseInternal(
+        const { result, records } = rebaseCarrying(
           { baseline: form.baseline, values: form.values, incoming, arrayIdKeys, labels, isEqual, itemLabel },
           next.records,
         );
