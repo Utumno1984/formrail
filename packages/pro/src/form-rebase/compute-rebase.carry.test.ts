@@ -200,3 +200,26 @@ describe('rebaseCarrying: carried conflicts under a node the user removed (#588)
   });
 });
 
+describe('rebaseCarrying: nested id-keyed arrays', () => {
+  type Group = { id: number; name: string; parts: Line[] };
+  type Order = { amount: number; groups: Group[] };
+  const NESTED = { arrayIdKeys: { groups: 'id', 'groups.parts': 'id' } };
+  const group = (id: number, name: string, ...ids: number[]): Group => ({ id, name, parts: lines(...ids.map((part): [number, number] => [part, 1])) });
+  const order = (conflicts: readonly { path: string; base: unknown; mine: unknown; theirs: unknown }[]) =>
+    conflicts.map((c) => [c.path, c.base, c.mine, c.theirs]);
+
+  it('a carried order conflict of a nested array stays on it: the parent the user reordered gets no order conflict of its own', () => {
+    const base: Order = { amount: 1, groups: [group(1, 'G1', 1, 2, 3), group(2, 'G2', 1, 2, 3)] };
+    // The user reorders the groups and the parts of G2; the server reorders the parts of G2 another way.
+    const values: Order = { amount: 1, groups: [group(2, 'G2', 3, 1, 2), group(1, 'G1', 1, 2, 3)] };
+    const first: Order = { amount: 1, groups: [group(1, 'G1', 1, 2, 3), group(2, 'G2', 1, 3, 2)] };
+    const one = rebaseInternal({ baseline: base, values, incoming: first, ...NESTED });
+    expect(order(one.result.conflicts)).toEqual([['groups.0.parts', [1, 2, 3], [3, 1, 2], [1, 3, 2]]]);
+    // The server renames G2 (it changes the groups, not their order): only the carried conflict on the parts.
+    const second: Order = { amount: 1, groups: [group(1, 'G1', 1, 2, 3), group(2, 'G2 renamed', 1, 3, 2)] };
+    const two = rebaseCarrying({ baseline: first, values, incoming: second, ...NESTED }, one.records);
+    expect(order(two.result.conflicts)).toEqual([['groups.0.parts', [1, 2, 3], [3, 1, 2], [1, 3, 2]]]);
+    expect(two.result.values.groups.map((g) => g.name)).toEqual(['G2 renamed', 'G1']);
+  });
+});
+
