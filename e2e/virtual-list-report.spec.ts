@@ -907,3 +907,80 @@ test.describe('#571 focus of a bulk action hidden without a resize', () => {
     await expect(nested).toBeFocused();
   });
 });
+
+// #582: follow-ups of the review of #571 (PR #577), in a real browser: a `focusout` that moves nothing (the one a
+// `Tooltip` closed by force dispatches on its trigger) keeps the control tracked; `prefers-reduced-motion` does not
+// change when the focus is read; `disabled`/`inert` on the focused control are not handled (the browser drops its
+// focus to body, where it is left).
+test.describe('#582 focus of a bulk action: a focusout that moves nothing, reduced motion, disabled/inert', () => {
+  /** A wrapper with a "Nested" button appended to the slot of the bulk actions, as a consumer's markup. */
+  async function nestedControl(page: Page): Promise<{ wrapper: Locator; nested: Locator }> {
+    await selectAllNode(page).evaluate((action) => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-e2e-wrapper', '');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Nested';
+      wrapper.append(button);
+      action.parentElement!.append(wrapper);
+    });
+    return { wrapper: page.locator('[data-e2e-wrapper]'), nested: page.getByRole('button', { name: 'Nested' }) };
+  }
+  const frames = (page: Page): Promise<void> =>
+    page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    test(`prefers-reduced-motion ${reducedMotion}: a nested control gets the focusout of a Tooltip closed by force (the focus stays on it), then its wrapper is hidden: the focus goes to the header checkbox`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion });
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, SELECTION, 'withBulkActions:!true');
+      await pickRows(page, [2]);
+      const { wrapper, nested } = await nestedControl(page);
+      await nested.focus();
+      // What `Tooltip` dispatches on its trigger when it closes by force (`TruncatedText` whose text fits again).
+      await nested.evaluate((el) => el.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+      await frames(page);
+      await expect(nested).toBeFocused();
+      await wrapper.evaluate((el: HTMLElement) => {
+        el.style.visibility = 'hidden';
+      });
+      await expect(allBox(page)).toBeFocused();
+      expect(await activeIsBody(page)).toBe(false);
+    });
+
+    test(`prefers-reduced-motion ${reducedMotion}: 640 to 639 with the focus on "Select all N results": the focus goes to the header checkbox`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion });
+      await page.setViewportSize({ width: 640, height: 800 });
+      await gotoStory(page, SELECTION);
+      await pickRows(page, [2]);
+      await selectAllByRole(page).focus();
+      await page.setViewportSize({ width: 639, height: 800 });
+      await expect(allBox(page)).toBeFocused();
+      expect(await activeIsBody(page)).toBe(false);
+    });
+  }
+
+  for (const what of ['disabled on the control', 'inert on the control', 'inert on its wrapper', 'inert on the selection bar'] as const) {
+    test(`${what}: the browser drops the focus to body, where it is left; hiding the wrapper then moves nothing`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, SELECTION, 'withBulkActions:!true');
+      await pickRows(page, [2]);
+      const { wrapper, nested } = await nestedControl(page);
+      await nested.focus();
+      await expect(nested).toBeFocused();
+      await nested.evaluate((el: HTMLButtonElement, how) => {
+        if (how === 'disabled on the control') el.disabled = true;
+        else if (how === 'inert on the control') el.inert = true;
+        else if (how === 'inert on its wrapper') el.parentElement!.inert = true;
+        else (el.closest('[data-rop-selection-bar]') as HTMLElement).inert = true;
+      }, what);
+      await expect.poll(() => activeIsBody(page)).toBe(true);
+      await wrapper.evaluate((el: HTMLElement) => {
+        el.style.visibility = 'hidden';
+      });
+      await frames(page);
+      expect(await activeIsBody(page)).toBe(true);
+      await expect(allBox(page)).not.toBeFocused();
+    });
+  }
+});
