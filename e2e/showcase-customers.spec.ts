@@ -290,7 +290,10 @@ test.describe('Showcase/Record editing, customers: archived', () => {
     await expect(name).toHaveValue(savedName);
     const discard = bar(page).getByRole('button', { name: 'Discard' });
     await expect(discard).toHaveAttribute('aria-disabled', 'true');
-    await discard.click();
+    // `aria-disabled` does not block a click (nor Enter): neither resets the draft.
+    await discard.click({ force: true });
+    await discard.focus();
+    await page.keyboard.press('Enter');
     await expect(page.getByRole('combobox', { name: 'Status' })).toHaveText(/Archived/);
     expect((await storedCustomer(page, 'cus-4'))?.status).toBe('active');
 
