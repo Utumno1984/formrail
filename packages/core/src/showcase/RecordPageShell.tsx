@@ -298,10 +298,14 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   // open when the save settles with a clean form keeps saying what it said; if the save fails or edits made
   // meanwhile remain, the form is dirty again and the wording goes back to "unsaved changes" (which is true).
   const [savingWording, setSavingWording] = useState(false);
+  // #523: the writes of a module's header action in flight (`saveRecord`, the customers' "Restore"). They arm the
+  // guard like a save does (also on a clean form: leaving does not cancel them) and use the same "save" wording.
+  const [actionWrites, setActionWrites] = useState(0);
+  const writing = form.isSaving || actionWrites > 0;
   useEffect(() => {
-    if (form.isSaving) setSavingWording(true);
+    if (writing) setSavingWording(true);
     else if (form.isDirty) setSavingWording(false);
-  }, [form.isSaving, form.isDirty]);
+  }, [writing, form.isDirty]);
   // The values the save in flight sends: an edit made after Save is NOT part of it and would be lost on leaving.
   const sentRef = useRef<V | null>(null);
   const editedSinceSave =
@@ -320,7 +324,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
     else if (form.isDirty) setDeleteWording(false);
   }, [deleting, form.isDirty]);
   const { guard, dialog } = useDirtyGuard({
-    when: !deleted && (form.isDirty || form.isSaving || deleting),
+    when: !deleted && (form.isDirty || writing || deleting),
     labels: deleting || deleteWording
       ? {
           title: 'Delete in progress',
@@ -340,7 +344,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
           leave: 'Discard newer changes',
           close: 'Close',
         }
-      : savingWording || form.isSaving
+      : savingWording || writing
       ? {
           title: 'Unsaved changes',
           description: 'A save is still in progress. Leaving does not cancel it: it will complete in the background.',
@@ -386,10 +390,16 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   }, [focusTitleOnMount]);
 
   // #523: what a module's header action writes on the server (the customers' "Restore"): the page's store, as Save.
+  // Counted while in flight: the guard stays armed until the store answers (a setState after unmount is a no-op).
   const saveRecord = async (changed: T): Promise<T> => {
-    const stored = await store.save(changed);
-    onSaved?.(stored);
-    return stored;
+    setActionWrites((n) => n + 1);
+    try {
+      const stored = await store.save(changed);
+      onSaved?.(stored);
+      return stored;
+    } finally {
+      setActionWrites((n) => n - 1);
+    }
   };
 
   // Creation: the record the server created. The way out waits for the CLEAN form that follows (below).

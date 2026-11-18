@@ -179,6 +179,45 @@ describe('a save that archives the customer (#523)', () => {
   }, 30_000);
 });
 
+describe('Restore and the way out (#523)', () => {
+  it('Back to list while "Restoring…" asks first (leaving does not cancel it); once restored, Back leaves at once', async () => {
+    const { store, release } = gatedStore();
+    const { onBack } = setupPage(ARCHIVED, store);
+    await userEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    expect(screen.getByRole('button', { name: 'Restoring…' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    expect(dialog).toHaveTextContent('A save is still in progress. Leaving does not cancel it: it will complete in the background.');
+    expect(onBack).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    release();
+    await waitFor(() => expect(textbox('Name')).not.toBeDisabled());
+    expect(stored(store, ARCHIVED).status).toBe('active');
+    // Restored and clean: nothing in flight, nothing unsaved, the guard is disarmed.
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  }, 30_000);
+
+  it('a guard dialog open when the Restore lands keeps saying what it said; Leave anyway leaves', async () => {
+    const { store, release } = gatedStore();
+    const { onBack } = setupPage(ARCHIVED, store);
+    await userEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    const said = 'A save is still in progress. Leaving does not cancel it: it will complete in the background.';
+    expect(dialog).toHaveTextContent(said);
+    release();
+    await waitFor(() => expect(stored(store, ARCHIVED).status).toBe('active'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Restoring…' })).toBeNull());
+    expect(screen.getByRole('dialog', { name: 'Unsaved changes' })).toHaveTextContent(said);
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Leave anyway' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  }, 30_000);
+});
+
 describe('Restore, as a component: never while a save is in flight (#523)', () => {
   // The page no longer reaches "archived and saving" (see above); the action keeps its own guard all the same, as
   // the shell's Delete does: a click on the aria-disabled button writes nothing.
