@@ -15,7 +15,7 @@ const BASE: Invoice = {
   number: 'A-1',
   notes: '',
   amount: 10,
-  supplier: { name: 'ACME', vat: 'IT1' },
+  supplier: { name: 'Lumen Parts', vat: 'IT1' },
   lines: lines([1, 1], [2, 1], [3, 1]),
 };
 
@@ -62,7 +62,7 @@ describe('useFormRebase: conflicts across updates, nested fields', () => {
     edit('supplier', { name: 'Mine Ltd', vat: 'IT1' });
     rebase(server({ supplier: { name: 'Theirs Ltd', vat: 'IT1' } }));
     rebase(server({ supplier: { name: 'Theirs Ltd', vat: 'IT9' } }));
-    expect(open()).toEqual([['supplier.name', 'ACME', 'Mine Ltd', 'Theirs Ltd']]);
+    expect(open()).toEqual([['supplier.name', 'Lumen Parts', 'Mine Ltd', 'Theirs Ltd']]);
     expect(h().rebase.applied.map((e) => e.path)).toEqual(['supplier.vat']);
     expect(h().form.values.supplier).toEqual({ name: 'Mine Ltd', vat: 'IT9' });
   });

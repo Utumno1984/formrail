@@ -9,7 +9,7 @@ type Line = { id: number; qty: number };
 type Invoice = { number: string; amount: number; supplier: { name: string; vat: string }; lines: Line[] };
 
 const lines = (...pairs: [number, number][]): Line[] => pairs.map(([id, qty]) => ({ id, qty }));
-const BASE: Invoice = { number: 'A-1', amount: 10, supplier: { name: 'ACME', vat: 'IT1' }, lines: lines([1, 1], [2, 2], [3, 3]) };
+const BASE: Invoice = { number: 'A-1', amount: 10, supplier: { name: 'Lumen Parts', vat: 'IT1' }, lines: lines([1, 1], [2, 2], [3, 3]) };
 const OPTIONS: Pick<RebaseOptions<Invoice>, 'arrayIdKeys'> = { arrayIdKeys: { lines: 'id' } };
 
 /** Two rebases in a row: `values` against `first`, then `then` (the user's values meanwhile) against `second`. */
@@ -53,7 +53,7 @@ describe('rebaseCarrying: the merge with carried conflicts (#584)', () => {
     const values = { ...BASE, supplier: { name: 'Mine', vat: 'IT-mine' } };
     const first = { ...BASE, supplier: { name: 'Theirs', vat: 'IT-theirs' } };
     expect(twice(values, first, values, { ...first, amount: 5 }).conflicts).toEqual([
-      ['supplier.name', 'ACME', 'Mine', 'Theirs'],
+      ['supplier.name', 'Lumen Parts', 'Mine', 'Theirs'],
       ['supplier.vat', 'IT1', 'IT-mine', 'IT-theirs'],
     ]);
   });
@@ -77,8 +77,8 @@ describe('rebaseCarrying: the merge with carried conflicts (#584)', () => {
   });
 
   it('a carried conflict on a key the user removed (the key only on the server side) stays', () => {
-    const values = { ...BASE, supplier: { name: 'ACME' } as Invoice['supplier'] };
-    const first = { ...BASE, supplier: { name: 'ACME', vat: 'IT2' } };
+    const values = { ...BASE, supplier: { name: 'Lumen Parts' } as Invoice['supplier'] };
+    const first = { ...BASE, supplier: { name: 'Lumen Parts', vat: 'IT2' } };
     const { two } = twice(values, first, values, { ...first, amount: 5 });
     expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([['supplier.vat', 'IT1', undefined, 'IT2', true]]);
   });
