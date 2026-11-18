@@ -97,7 +97,7 @@ export function useKeepBulkActionsFocus(slot: HTMLElement | null, container: Ref
     const onFocusOut = (event: FocusEvent) => {
       const node = event.target as Element;
       queueMicrotask(() => {
-        if (tracked.current === node && activeIn(slot) !== node && (isShown(node) || !shown.current)) setFocused((tracked.current = null));
+        if (tracked.current === node && activeIn(slot) !== node && (isShown(node) || !shown.current)) setFocused(null);
       });
     };
     root.addEventListener('focusin', onFocusIn);

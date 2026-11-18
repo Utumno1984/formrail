@@ -1,4 +1,4 @@
-import { Profiler, useRef, useState, type ReactNode } from 'react';
+import { Profiler, startTransition, useRef, useState, type ReactNode } from 'react';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ListReportTable, Tooltip, TruncatedText, useListReport, type ListReportSelection } from '@formrail/core';
@@ -703,6 +703,99 @@ describe('#582: a control not shown when its tracking starts never leaves an obs
     expect(button).toHaveFocus();
   });
 
+  it('hidden while it still holds the focus when its tracking starts, then shown again: the first change ends its tracking, and nothing moves the focus', () => {
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    setLaidOut(() => true);
+    act(() => {
+      button.focus();
+      // In the same task: the slot leaves the layout, the browser has not dropped the focus yet.
+      setLaidOut((el) => !slot.contains(el));
+    });
+    expect(observerOf(slot)).toBeDefined();
+    setLaidOut(() => true);
+    fire(slot);
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    expect(button).toHaveFocus();
+  });
+
+  // React renders after the `focusout` microtask (a transition, as passive effects deferred to a later task would):
+  // the focus already left the control when its tracking starts.
+  it('a render that comes after the focusout (a transition): the control hidden as it takes the focus and its focus dropped to body: no observer; shown and focused again later, tracked', async () => {
+    const commits: string[] = [];
+    render(
+      <Profiler id="bulk-actions" onRender={(_id, phase) => commits.push(phase)}>
+        <Host bulkActions={approve} />
+      </Profiler>,
+    );
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    setLaidOut(() => true);
+    commits.length = 0;
+    realScheduling();
+    startTransition(() => {
+      button.focus();
+      setLaidOut((el) => !slot.contains(el));
+      button.blur();
+    });
+    await waitFor(() => expect(commits.length).toBeGreaterThan(0));
+    await settle();
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    // Shown again and focused: a new tracking (the one that ended left no state behind).
+    setLaidOut(() => true);
+    button.focus();
+    await waitFor(() => expect(mutationObserverOf(slot)).toBeDefined());
+  });
+
+  it('a render that comes after the focusout (a transition): a control focused and the focus moved elsewhere in the same transition: no observer', async () => {
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    setLaidOut(() => true);
+    realScheduling();
+    const constructed = observers.length;
+    startTransition(() => {
+      button.focus();
+      screen.getByRole('searchbox').focus();
+    });
+    // The transition renders in a task of React's scheduler: give it a few.
+    for (let i = 0; i < 5; i++) await settle();
+    expect(observers.slice(constructed).filter((o) => o.targets.includes(slot))).toEqual([]);
+    expect(mutationObserverOf(slot)).toBeUndefined();
+  });
+
+  it('the slot passed as null while its control keeps the focus in the DOM, the focus moved meanwhile, then the same slot again: no observer at rest', async () => {
+    setLaidOut((el) => el.isConnected);
+    function Toggle({ on }: { on: boolean }) {
+      const scroller = useRef<HTMLDivElement | null>(null);
+      const [el, setEl] = useState<HTMLDivElement | null>(null);
+      useKeepBulkActionsFocus(on ? el : null, scroller);
+      return (
+        <div ref={scroller}>
+          <div ref={setEl}>
+            <button type="button">Approve</button>
+          </div>
+          <input aria-label="Elsewhere" />
+        </div>
+      );
+    }
+    const { rerender } = render(<Toggle on />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    act(() => button.focus());
+    expect(mutationObserverOf(slot)).toBeDefined();
+    rerender(<Toggle on={false} />);
+    // No slot, no listener: this focus is not heard.
+    act(() => screen.getByLabelText('Elsewhere').focus());
+    rerender(<Toggle on />);
+    await act(async () => {});
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+  });
+
   it('an environment without layout, then the focus dropped to body: untracked at once, no observer until the next focus', async () => {
     setLaidOut(() => false);
     render(<Host bulkActions={approve} />);
@@ -876,6 +969,53 @@ describe('#582: the focusin listener of the root renders nothing for a focus out
     commits.length = 0;
     await throughTheForm();
     expect(commits).toEqual([]);
+  });
+
+  it('after a tracking ended by a change of the slot (no focusin: an environment without layout), tabbing through the fields: zero commits', async () => {
+    setLaidOut(() => false);
+    const commits: string[] = [];
+    const { rerender } = render(
+      <>
+        <Profiler id="bulk-actions" onRender={(_id, phase) => commits.push(phase)}>
+          <Host bulkActions={approve} />
+        </Profiler>
+        <input aria-label="Field 1" />
+        <input aria-label="Field 2" />
+      </>,
+    );
+    const button = screen.getByRole('button', { name: 'Approve' });
+    act(() => button.focus());
+    expect(mutationObserverOf(slotOf(button))).toBeDefined();
+    rerender(
+      <>
+        <Profiler id="bulk-actions" onRender={(_id, phase) => commits.push(phase)}>
+          <Host bulkActions={() => <>{approve()}<button type="button">Export</button></>} />
+        </Profiler>
+        <input aria-label="Field 1" />
+        <input aria-label="Field 2" />
+      </>,
+    );
+    await act(async () => {});
+    expect(mutationObserverOf(slotOf(button))).toBeUndefined();
+    commits.length = 0;
+    const user = userEvent.setup();
+    act(() => screen.getByLabelText('Field 1').focus());
+    await user.tab();
+    expect(screen.getByLabelText('Field 2')).toHaveFocus();
+    expect(commits).toEqual([]);
+  });
+
+  it('a control of the bar focused, then the focus moved elsewhere in the same task (before React renders): nothing tracked', async () => {
+    setLaidOut(() => true);
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    act(() => {
+      button.focus();
+      screen.getByRole('searchbox').focus();
+    });
+    await act(async () => {});
+    expect(observerOf(slotOf(button))).toBeUndefined();
+    expect(mutationObserverOf(slotOf(button))).toBeUndefined();
   });
 });
 
