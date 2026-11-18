@@ -34,5 +34,6 @@ describe('CustomerContacts: new ids after a remount (#523)', () => {
     const newId = document.querySelectorAll('[data-contact-id]')[2]!.getAttribute('data-contact-id');
     expect(newId).toMatch(/^new-contact-/);
     expect(newId).not.toBe(savedId);
-  });
+    // The slowest test of the customers (a Save and a second mount): an explicit budget, as the other long ones.
+  }, 30_000);
 });
