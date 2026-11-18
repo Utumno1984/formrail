@@ -202,6 +202,26 @@ export const ACCUMULATE_CHECKS: AccumulateCheck[] = [
     },
   },
   {
+    name: 'a successful save with an update queued: the update is merged with no earlier conflict, even on a field edited during the save',
+    run: (use) =>
+      withForm(use, async (form) => {
+        act(() => form.current().editName('Mine'));
+        rebase(form, server({ name: 'Theirs' }));
+        expect(form.current().rebase.conflicts).toHaveLength(1);
+        let save!: { settle: (error: unknown) => Promise<void> };
+        await act(async () => {
+          save = form.current().startSave((sent) => ({ ...sent, supplier: { ...sent.supplier, tags: [...sent.supplier.tags] } }));
+        });
+        // The server stores "Mine", then another user changes the amount only; the user edits the name again meanwhile.
+        rebase(form, server({ name: 'Mine', amount: 20 }));
+        act(() => form.current().editName('Mine 2'));
+        await act(() => save.settle(null));
+        expect(form.current().rebase.conflicts).toEqual([]);
+        expect(form.current().rebase.applied.map((entry) => entry.path)).toEqual(['amount']);
+        expect(form.current().binding.values).toEqual({ ...server({ amount: 20 }), name: 'Mine 2' });
+      }),
+  },
+  {
     name: "the form's own discard, reset() and reset(newBaseline) clear the accumulated conflicts and applied",
     run: async (use) => {
       for (const clear of ['discard', 'reset()', 'reset(newBaseline)'] as const) {

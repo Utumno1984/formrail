@@ -83,6 +83,31 @@ describe('rebaseCarrying: the merge with carried conflicts (#584)', () => {
     expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([['supplier.vat', 'IT1', undefined, 'IT2', true]]);
   });
 
+  it('a carried conflict on a node covers carried conflicts under it (one per path, even from a list that has both)', () => {
+    const values = { ...BASE, supplier: { name: 'Mine', vat: 'IT1' } };
+    const first = { ...BASE, supplier: { name: 'Theirs', vat: 'IT1' } };
+    const nested = rebaseInternal({ baseline: BASE, values, incoming: first, ...OPTIONS }).records;
+    const whole = rebaseInternal({ baseline: BASE, values, incoming: { ...BASE, supplier: null as unknown as Invoice['supplier'] }, ...OPTIONS }).records;
+    expect([...nested, ...whole].map((r) => r.conflict.path)).toEqual(['supplier.name', 'supplier']);
+    // The server keeps `supplier`: only the conflict on the whole node comes back.
+    const two = rebaseCarrying({ baseline: first, values, incoming: { ...first, amount: 5 }, ...OPTIONS }, [...whole, ...nested]);
+    expect(two.result.conflicts.map((c) => c.path)).toEqual(['supplier']);
+  });
+
+  it('a carried conflict on a row the user removed, the lines not changed by the server: named on the baseline side too', () => {
+    const values = { ...BASE, lines: lines([1, 1], [3, 3]) };
+    const first = { ...BASE, lines: lines([1, 1], [2, 8], [3, 3]) };
+    const seen: unknown[] = [];
+    const one = rebaseInternal({ baseline: BASE, values, incoming: first, ...OPTIONS });
+    const itemLabel: RebaseOptions<Invoice>['itemLabel'] = (_path, item, context) => {
+      seen.push([(item as Line).id, context.side, context.index]);
+      return undefined;
+    };
+    const two = rebaseCarrying({ baseline: first, values, incoming: { ...first, amount: 5 }, ...OPTIONS, itemLabel }, one.records);
+    expect(two.result.conflicts.map((c) => [c.path, c.mineMissing])).toEqual([['lines.1', true]]);
+    expect(seen).toEqual([[2, 'baseline', 1]]);
+  });
+
   it('a carried conflict on a row the user removed: named on the baseline side, at its index in incoming', () => {
     const values = { ...BASE, lines: lines([1, 1], [3, 3]) };
     const first = { ...BASE, lines: lines([1, 1], [2, 8], [3, 3]) };
