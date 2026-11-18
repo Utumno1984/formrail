@@ -1,7 +1,7 @@
 // `rebaseCarrying` (rebase-carry.ts) with the conflicts of an earlier rebase (`carried`, ticket #584): what
 // `useFormRebase` passes it when a second server update lands. The hook passes only the conflicts still open; the merge
 // does not rely on it.
-import { rebaseInternal, type ConflictRecord } from './compute-rebase';
+import { computeRebase, rebaseInternal, type ConflictRecord } from './compute-rebase';
 import { rebaseCarrying } from './rebase-carry';
 import type { RebaseOptions } from './types';
 
@@ -130,3 +130,63 @@ describe('rebaseCarrying: the merge with carried conflicts (#584)', () => {
     expect(seen).toContainEqual([2, 'baseline', 2]);
   });
 });
+
+describe('rebaseCarrying: carried conflicts under a node the user removed (#588)', () => {
+  const shape = (conflicts: readonly { path: string; mine: unknown; theirs: unknown; baseMissing: boolean; mineMissing: boolean; theirsMissing: boolean }[]) =>
+    conflicts.map((c) => [c.path, c.mine, c.theirs, c.baseMissing, c.mineMissing, c.theirsMissing]);
+
+  it('a conflict on a field of a row the user then removes: on the row, the shape of a fresh merge, base the row of baseline', () => {
+    const first = { ...BASE, lines: lines([1, 1], [2, 6], [3, 3]) };
+    const removed = { ...BASE, lines: lines([1, 1], [3, 3]) };
+    const second = { ...first, amount: 5 };
+    const { one, two } = twice({ ...BASE, lines: lines([1, 1], [2, 5], [3, 3]) }, first, removed, second);
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['lines.1.qty']);
+    const fresh = computeRebase({ baseline: BASE, values: removed, incoming: second, ...OPTIONS });
+    expect(shape(two.result.conflicts)).toEqual(shape(fresh.conflicts));
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([
+      ['lines.1', { id: 2, qty: 6 }, undefined, { id: 2, qty: 6 }, true],
+    ]);
+    expect(two.records[0]!.theirs).toEqual({ id: 2, qty: 6 });
+  });
+
+  it('the mirror case, a conflict on a field of a row the server then removes: on the row, the shape of a fresh merge', () => {
+    const values = { ...BASE, lines: lines([1, 1], [2, 5], [3, 3]) };
+    const first = { ...BASE, lines: lines([1, 1], [2, 6], [3, 3]) };
+    const second = { ...BASE, lines: lines([1, 1], [3, 3]), amount: 5 };
+    const { two } = twice(values, first, values, second);
+    const fresh = computeRebase({ baseline: BASE, values, incoming: second, ...OPTIONS });
+    expect(shape(two.result.conflicts)).toEqual(shape(fresh.conflicts));
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.theirsMissing])).toEqual([
+      ['lines.1', { id: 2, qty: 6 }, { id: 2, qty: 5 }, undefined, true],
+    ]);
+  });
+
+  it('a conflict nested in an object the user replaced with a non-object value: on the object', () => {
+    const first = { ...BASE, supplier: { name: 'Theirs', vat: 'IT1' } };
+    const cleared = { ...BASE, supplier: null as unknown as Invoice['supplier'] };
+    const listed = { ...BASE, supplier: [] as unknown as Invoice['supplier'] };
+    for (const then of [cleared, listed]) {
+      const { two } = twice({ ...BASE, supplier: { name: 'Mine', vat: 'IT1' } }, first, then, { ...first, amount: 5 });
+      expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([
+        ['supplier', { name: 'Theirs', vat: 'IT1' }, then.supplier, { name: 'Theirs', vat: 'IT1' }, false],
+      ]);
+    }
+  });
+
+  it('a conflict on a field of a nested item the user then removes (the lines not changed by the server): on the item', () => {
+    type Group = { id: number; name: string; parts: Line[] };
+    type Order = { amount: number; groups: Group[] };
+    const NESTED = { arrayIdKeys: { groups: 'id', 'groups.parts': 'id' } };
+    const base: Order = { amount: 1, groups: [{ id: 1, name: 'G1', parts: lines([1, 1], [2, 2]) }] };
+    const first: Order = { amount: 1, groups: [{ id: 1, name: 'G1', parts: lines([1, 1], [2, 6]) }] };
+    const one = rebaseInternal({ baseline: base, values: { amount: 1, groups: [{ id: 1, name: 'G1', parts: lines([1, 1], [2, 5]) }] }, incoming: first, ...NESTED });
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['groups.0.parts.1.qty']);
+    // The user removes the part and renames the group; the server changes the amount only.
+    const then: Order = { amount: 1, groups: [{ id: 1, name: 'G1 renamed', parts: lines([1, 1]) }] };
+    const two = rebaseCarrying({ baseline: first, values: then, incoming: { ...first, amount: 2 }, ...NESTED }, one.records);
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([
+      ['groups.0.parts.1', { id: 2, qty: 6 }, undefined, { id: 2, qty: 6 }, true],
+    ]);
+  });
+});
+

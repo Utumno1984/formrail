@@ -228,4 +228,56 @@ describe('useFormRebase: conflicts across updates, id-keyed rows', () => {
     rebase(server({ lines: lines([2, 1], [3, 1]) }));
     expect(h().rebase.conflicts.map((c) => [c.path, c.theirsMissing])).toEqual([['lines.0', true]]);
   });
+
+  it('a conflict in a row the user then removes: after an update elsewhere it is on the row, acceptTheirs brings the row back', async () => {
+    const { h, edit, rebase, open } = setup();
+    edit('lines', lines([1, 1], [2, 5], [3, 1]));
+    rebase(server({ lines: lines([1, 1], [2, 6], [3, 1]) }));
+    expect(open()).toEqual([['lines.1.qty', 1, 5, 6]]);
+    edit('lines', lines([1, 1], [3, 1]));
+    rebase(server({ lines: lines([1, 1], [2, 6], [3, 1]), amount: 50 }));
+    // The same shape as a fresh merge: a conflict on the row (not on a field of a row that is not in the values).
+    expect(h().rebase.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.baseMissing, c.mineMissing, c.theirsMissing])).toEqual([
+      ['lines.1', { id: 2, qty: 6 }, undefined, { id: 2, qty: 6 }, false, true, false],
+    ]);
+    act(() => h().rebase.acceptTheirs('lines.1'));
+    expect(h().rebase.conflicts).toEqual([]);
+    expect(h().form.values.lines).toEqual(lines([1, 1], [2, 6], [3, 1]));
+    expect(h().form.isDirty).toBe(false);
+    // Save does not overwrite the server: the row it changed is sent with its value.
+    let sent: Invoice | undefined;
+    await act(async () => {
+      await h().form.save((values) => {
+        sent = values;
+      });
+    });
+    expect(sent?.lines).toEqual(lines([1, 1], [2, 6], [3, 1]));
+  });
+
+  it('a conflict in a row the server then removes: on the row (theirsMissing), acceptTheirs removes it, Save sends no row', async () => {
+    const { h, edit, rebase, open } = setup();
+    edit('lines', lines([1, 1], [2, 5], [3, 1]));
+    rebase(server({ lines: lines([1, 1], [2, 6], [3, 1]) }));
+    rebase(server({ lines: lines([1, 1], [3, 1]), amount: 50 }));
+    expect(open()).toEqual([['lines.1', { id: 2, qty: 6 }, { id: 2, qty: 5 }, undefined]]);
+    expect(h().rebase.conflicts.map((c) => [c.baseMissing, c.mineMissing, c.theirsMissing])).toEqual([[false, false, true]]);
+    act(() => h().rebase.acceptTheirs('lines.1'));
+    expect(h().form.values.lines).toEqual(lines([1, 1], [3, 1]));
+    expect(h().form.isDirty).toBe(false);
+  });
+
+  it('a nested carried conflict under a key the user then removes: on the key, acceptTheirs brings it back', () => {
+    const { h, edit, rebase } = setup();
+    edit('supplier', { name: 'Mine Ltd', vat: 'IT1' });
+    rebase(server({ supplier: { name: 'Theirs Ltd', vat: 'IT1' } }));
+    edit('supplier', undefined as unknown as Invoice['supplier']);
+    rebase(server({ supplier: { name: 'Theirs Ltd', vat: 'IT1' }, amount: 50 }));
+    expect(h().rebase.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.mineMissing])).toEqual([
+      ['supplier', { name: 'Theirs Ltd', vat: 'IT1' }, undefined, { name: 'Theirs Ltd', vat: 'IT1' }, false],
+    ]);
+    act(() => h().rebase.acceptTheirs('supplier'));
+    expect(h().form.values.supplier).toEqual({ name: 'Theirs Ltd', vat: 'IT1' });
+    expect(h().form.isDirty).toBe(false);
+  });
 });
+
