@@ -36,8 +36,11 @@ function activeIn(slot: Element): Element | null {
  *   is none. The `focusin` of its root (document or shadow root) and its own `focusout` (native listeners, removed
  *   with the slot) track which control has the focus. A focus that lands on any element outside the slot (the
  *   user's, or the header checkbox focused by "Select all N results" as it hides itself) ends the tracking at once;
- *   a focus lost to no element (`body`, another window) ends it when the control is still shown, and the first
- *   change seen once the control is hidden or removed ends it in any case.
+ *   a focus lost to no element (`body`) ends it when the control is still shown, and the first change seen once the
+ *   control is hidden or removed ends it in any case. A `focusout` that leaves the focus on the control ends nothing:
+ *   the synthetic one of a `Tooltip` closed by force (`TruncatedText` when its text stops overflowing), or another
+ *   window taking the focus (the control stays the active element of its document). A `focusin` outside the slot
+ *   while nothing is tracked sets no state: typing or tabbing through fields elsewhere never renders the hook.
  * - `container`: the table's container (the scroll container, which holds the header checkbox).
  *
  * What it sees, only while a control of the slot has the focus (no observer at rest): the box of the slot and of
@@ -46,15 +49,22 @@ function activeIn(slot: Element): Element | null {
  * `hidden`/`class`/`style` attributes anywhere inside the slot, nested controls included (a control removed, a
  * wrapper hidden, a control under `visibility: hidden`). Not seen: a change outside the slot that hides it
  * without changing its box (`visibility: hidden` on an ancestor of the bar); the focus is then left as the
- * browser leaves it. An environment without layout (nothing is laid out when the control takes the focus) never
- * moves the focus.
+ * browser leaves it. A control not shown when its tracking starts (an environment without layout, where nothing is
+ * ever laid out, or a control hidden as it takes the focus) never moves the focus: it is tracked only while it holds
+ * the focus, until the first change seen. Nothing here is animated or timed: `prefers-reduced-motion` does not change
+ * when the focus is read or moved.
  *
  * The frame may be in another document (an iframe: that document is read) or in a shadow root (its focus and its
- * active element are read there). A focus moved from inside a shadow root to the document outside it is not a
- * `focusin` of the root: a hidden control whose change was not seen stays tracked until the next one. Not
- * handled: a focused control that becomes `disabled` or `inert` while it stays shown (a browser may then drop its
- * focus to `body`, where it is left; that control is not "hidden", and moving the focus away from an action disabled
- * for a moment, e.g. while its request runs, is not this rule's call).
+ * active element are read there). The root is read once per slot element: a slot moved to another root (document or
+ * shadow root) without being replaced keeps listening to the old one, so its controls are not tracked in the new one
+ * and their focus is left as the browser leaves it (React never moves an element across roots: a new portal
+ * container renders a new slot). A focus moved from inside a shadow root to the document outside it is not a
+ * `focusin` of the root: the control's `focusout` sees it, which untracks a shown control; a hidden one stays tracked
+ * until the first change seen, which leaves the focus where it went. Not handled: a focused control that becomes
+ * `disabled` or `inert` (on itself or on an ancestor, inside or outside the slot) while it stays shown. A browser
+ * that drops its focus to `body` then ends the tracking and the focus is left there; one that keeps the focus on it
+ * keeps it tracked, as any shown control. That control is not "hidden", and moving the focus away from an action
+ * disabled for a moment, e.g. while its request runs, is not this rule's call.
  */
 export function useKeepBulkActionsFocus(slot: HTMLElement | null, container: RefObject<HTMLElement | null>): void {
   const [focused, setFocused] = useState<Element | null>(null);

@@ -1,7 +1,7 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { Profiler, useRef, useState, type ReactNode } from 'react';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ListReportTable, useListReport, type ListReportSelection } from '@formrail/core';
+import { ListReportTable, Tooltip, TruncatedText, useListReport, type ListReportSelection } from '@formrail/core';
 import { ListReportFrame } from '@formrail/core/internal';
 import { isShown, useKeepBulkActionsFocus } from './use-keep-bulk-actions-focus';
 
@@ -648,5 +648,366 @@ describe('isShown: laid out and not under visibility: hidden', () => {
     const root = make('<div style="visibility: hidden"><button id="in">in</button><button id="over" style="visibility: visible">over</button></div>');
     expect(isShown(root.querySelector('#in')!)).toBe(false);
     expect(isShown(root.querySelector('#over')!)).toBe(true);
+  });
+});
+
+// #582: follow-ups of the review of #571 (PR #577).
+describe('#582: a control not shown when its tracking starts never leaves an observer at rest', () => {
+  it('hidden as it takes the focus, its focus dropped to body before its tracking starts: no observer, a later change moves nothing', async () => {
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    setLaidOut(() => true);
+    act(() => {
+      button.focus();
+      // In the same task: the slot leaves the layout (a media query: no mutation) and the browser drops the focus.
+      setLaidOut((el) => !slot.contains(el));
+      button.blur();
+    });
+    await act(async () => {});
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    slot.classList.add('rop-test-changed');
+    await act(async () => {});
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('an environment without layout, the control holding the focus: the first change seen ends its tracking (observers disconnected), the focus stays', async () => {
+    setLaidOut(() => false);
+    const { rerender } = render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+    act(() => button.focus());
+    const resize = observerOf(slot)!;
+    const mutations = mutationObserverOf(slot)!;
+    expect(resize).toBeDefined();
+    expect(mutations).toBeDefined();
+    disconnect.mockClear();
+    // A change of the slot's children (an action added), the focused control untouched.
+    rerender(
+      <Host
+        bulkActions={() => (
+          <>
+            {approve()}
+            <button type="button">Export</button>
+          </>
+        )}
+      />,
+    );
+    await act(async () => {});
+    expect(screen.getByRole('button', { name: 'Approve' })).toBe(button);
+    expect(disconnect).toHaveBeenCalled();
+    expect(resize.targets).toEqual([]);
+    expect(mutations.targets).toEqual([]);
+    expect(button).toHaveFocus();
+  });
+
+  it('an environment without layout, then the focus dropped to body: untracked at once, no observer until the next focus', async () => {
+    setLaidOut(() => false);
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    act(() => button.focus());
+    expect(mutationObserverOf(slot)).toBeDefined();
+    await act(async () => button.blur());
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    act(() => button.focus());
+    expect(mutationObserverOf(slot)).toBeDefined();
+  });
+});
+
+/** jsdom has no layout: the widths `TruncatedText` reads to know whether it overflows. */
+function setWidths(el: HTMLElement, scrollWidth: number, clientWidth: number) {
+  Object.defineProperty(el, 'scrollWidth', { value: scrollWidth, configurable: true });
+  Object.defineProperty(el, 'clientWidth', { value: clientWidth, configurable: true });
+}
+
+describe('#582: an action inside a Tooltip keeps its tracking when the tooltip closes', () => {
+  it('a TruncatedText action whose tooltip closes by force (its text fits again: a synthetic focusout, the focus stays): still tracked; hidden then, the focus goes to the header checkbox', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    const actions = (text: string, hidden = false) =>
+      function Actions() {
+        return (
+          <>
+            <button type="button">Before</button>
+            <TruncatedText tabIndex={0} data-testid="truncated" hidden={hidden}>
+              {text}
+            </TruncatedText>
+          </>
+        );
+      };
+    const { rerender } = render(<Host bulkActions={actions('Approve every selected invoice of this supplier')} />);
+    const truncated = screen.getByTestId('truncated');
+    const slot = slotOf(truncated);
+    setWidths(truncated, 500, 100);
+    const user = userEvent.setup();
+    act(() => screen.getByRole('button', { name: 'Before' }).focus());
+    await user.tab();
+    expect(truncated).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    const focusouts = vi.fn();
+    truncated.addEventListener('focusout', focusouts);
+    // The text fits again: the tooltip closes through the `focusout` it dispatches on its trigger.
+    setWidths(truncated, 50, 100);
+    rerender(<Host bulkActions={actions('Approve')} />);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+    expect(focusouts).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+    expect(truncated).toHaveFocus();
+    expect(mutationObserverOf(slot)).toBeDefined();
+    rerender(<Host bulkActions={actions('Approve', true)} />);
+    await waitFor(() => expect(allBox()).toHaveFocus());
+  });
+
+  for (const how of ['Escape', 'the pointer leaving'] as const) {
+    it(`a Tooltip around an action, opened with the mouse and closed by ${how}: the action keeps the focus and its tracking; hidden then, the focus goes to the header checkbox`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const actions = (hidden = false) =>
+        function Actions() {
+          return (
+            <Tooltip content="Approve the selected invoices" delayDuration={0}>
+              <button type="button" hidden={hidden}>
+                Approve
+              </button>
+            </Tooltip>
+          );
+        };
+      const { rerender } = render(<Host bulkActions={actions()} />);
+      const button = screen.getByRole('button', { name: 'Approve' });
+      const user = userEvent.setup();
+      act(() => button.focus());
+      await user.hover(button);
+      expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+      if (how === 'Escape') await user.keyboard('{Escape}');
+      else {
+        // Out of the grace area towards the (hoverable) tooltip too, as the Tooltip's own tests do.
+        await user.unhover(button);
+        await user.pointer({ target: document.body, coords: { clientX: 900, clientY: 900 } });
+      }
+      await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+      await act(async () => {});
+      expect(button).toHaveFocus();
+      expect(mutationObserverOf(slotOf(button))).toBeDefined();
+      rerender(<Host bulkActions={actions(true)} />);
+      await waitFor(() => expect(allBox()).toHaveFocus());
+    });
+  }
+
+  it('a Tooltip around an action closed by a blur (Tab to the next action): the next action is tracked; hidden then, the focus goes to the header checkbox', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    const actions = (hidden = false) =>
+      function Actions() {
+        return (
+          <>
+            <button type="button">Before</button>
+            <Tooltip content="Approve the selected invoices">
+              <button type="button">Approve</button>
+            </Tooltip>
+            <button type="button" hidden={hidden}>
+              Export
+            </button>
+          </>
+        );
+      };
+    const { rerender } = render(<Host bulkActions={actions()} />);
+    const user = userEvent.setup();
+    act(() => screen.getByRole('button', { name: 'Before' }).focus());
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Approve' })).toHaveFocus();
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Export' })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+    await act(async () => {});
+    rerender(<Host bulkActions={actions(true)} />);
+    await waitFor(() => expect(allBox()).toHaveFocus());
+  });
+
+  it('a focusout that leaves the control the active element (another window took the focus): still tracked', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    const { rerender } = render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    act(() => button.focus());
+    await act(async () => {
+      button.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+    expect(button).toHaveFocus();
+    expect(mutationObserverOf(slotOf(button))).toBeDefined();
+    rerender(<Host bulkActions={() => <span>Nothing</span>} />);
+    await waitFor(() => expect(allBox()).toHaveFocus());
+  });
+});
+
+describe('#582: the focusin listener of the root renders nothing for a focus outside the bar', () => {
+  it('Tab and typing through 20 fields elsewhere: zero commits under a Profiler, at rest and after a control of the bar had the focus', async () => {
+    setLaidOut(() => true);
+    const commits: string[] = [];
+    render(
+      <>
+        <Profiler id="bulk-actions" onRender={(_id, phase) => commits.push(phase)}>
+          <Host bulkActions={approve} />
+        </Profiler>
+        <form aria-label="Elsewhere">
+          {Array.from({ length: 20 }, (_, i) => (
+            <input key={i} aria-label={`Field ${i + 1}`} />
+          ))}
+        </form>
+      </>,
+    );
+    const user = userEvent.setup();
+    const throughTheForm = async () => {
+      act(() => screen.getByLabelText('Field 1').focus());
+      for (let i = 1; i < 20; i++) {
+        await user.keyboard('x');
+        await user.tab();
+      }
+      expect(screen.getByLabelText('Field 20')).toHaveFocus();
+    };
+    commits.length = 0;
+    await throughTheForm();
+    expect(commits).toEqual([]);
+    // A control of the bar takes the focus, then leaves it for the form: one commit each (tracked, then untracked).
+    act(() => screen.getByRole('button', { name: 'Approve' }).focus());
+    act(() => screen.getByLabelText('Field 1').focus());
+    await act(async () => {});
+    expect(commits).toEqual(['update', 'update']);
+    commits.length = 0;
+    await throughTheForm();
+    expect(commits).toEqual([]);
+  });
+});
+
+describe('#582: slots in different roots, and a slot moved to another root', () => {
+  const hiddenApprove = () => (
+    <button type="button" hidden>
+      Approve
+    </button>
+  );
+  const shadowContainer = (mode: ShadowRootMode = 'open') => {
+    const host = document.body.appendChild(document.createElement('div'));
+    const root = host.attachShadow({ mode });
+    return { host, root, container: root.appendChild(document.createElement('div')) };
+  };
+
+  it('two frames, one in the document and one in a shadow root: each tracks its own control; the focus moved from one to the other untracks the first', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    const inDocument = document.body.appendChild(document.createElement('div'));
+    const { host, root, container: inShadow } = shadowContainer();
+    const first = render(<Host bulkActions={approve} />, { container: inDocument });
+    const second = render(<Host bulkActions={approve} />, { container: inShadow });
+    const buttonA = within(inDocument).getByRole('button', { name: 'Approve' });
+    const buttonB = within(inShadow).getByRole('button', { name: 'Approve' });
+    act(() => buttonA.focus());
+    expect(mutationObserverOf(slotOf(buttonA))).toBeDefined();
+    // The document hears the host (outside the first slot), the shadow root the control of the second slot.
+    act(() => buttonB.focus());
+    expect(mutationObserverOf(slotOf(buttonA))).toBeUndefined();
+    expect(mutationObserverOf(slotOf(buttonB))).toBeDefined();
+    second.rerender(<Host bulkActions={hiddenApprove} />);
+    const headerB = within(inShadow).getByRole('checkbox', { name: 'Select all results' });
+    await waitFor(() => expect(root.activeElement).toBe(headerB));
+    // The first frame's action hidden afterwards: nothing tracked there, nothing moves.
+    first.rerender(<Host bulkActions={hiddenApprove} />);
+    await act(async () => {});
+    expect(root.activeElement).toBe(headerB);
+    expect(document.activeElement).toBe(host);
+    host.remove();
+    inDocument.remove();
+  });
+
+  it('the slot element moved to a shadow root without being replaced: not followed (its control is not tracked there, its focus is left as the browser leaves it); back in its root, tracked again', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    const parent = slot.parentNode!;
+    const next = slot.nextSibling;
+    const { host, root } = shadowContainer();
+    root.append(slot);
+    act(() => button.focus());
+    expect(root.activeElement).toBe(button);
+    expect(observerOf(slot)).toBeUndefined();
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    button.hidden = true;
+    await act(async () => {});
+    expect(allBox()).not.toHaveFocus();
+    expect(root.activeElement).toBe(button);
+    // Back in its root: the listener stayed on the document, the control is tracked again.
+    button.hidden = false;
+    act(() => button.blur());
+    parent.insertBefore(slot, next);
+    act(() => button.focus());
+    expect(mutationObserverOf(slot)).toBeDefined();
+    host.remove();
+  });
+
+  for (const mode of ['open', 'closed'] as const) {
+    it(`inside a ${mode} shadow root: the focus moved to the document outside the root with the control shown (no focusin on the root): its focusout untracks it, a later change moves nothing`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const outside = document.body.appendChild(document.createElement('input'));
+      const { host, container } = shadowContainer(mode);
+      const { rerender } = render(<Host bulkActions={approve} />, { container });
+      const button = within(container).getByRole('button', { name: 'Approve' });
+      const slot = slotOf(button);
+      act(() => button.focus());
+      expect(mutationObserverOf(slot)).toBeDefined();
+      await act(async () => outside.focus());
+      expect(observerOf(slot)).toBeUndefined();
+      expect(mutationObserverOf(slot)).toBeUndefined();
+      rerender(<Host bulkActions={() => <span>Nothing</span>} />);
+      await act(async () => {});
+      expect(outside).toHaveFocus();
+      host.remove();
+      outside.remove();
+    });
+  }
+});
+
+describe('#582: disabled or inert on the focused control (not handled, as the TSDoc says)', () => {
+  const wrapped = (withButton = true) =>
+    function Actions() {
+      return <div data-testid="wrapper">{withButton ? <button type="button">Approve</button> : <span>Nothing</span>}</div>;
+    };
+  for (const [what, apply] of [
+    ['`disabled` on the control', (button: HTMLButtonElement) => (button.disabled = true)],
+    ['`inert` on the control', (button: HTMLButtonElement) => button.setAttribute('inert', '')],
+    ['`inert` on a wrapper of the consumer inside the slot', (button: HTMLButtonElement) => button.parentElement!.setAttribute('inert', '')],
+    ['`inert` on an ancestor of the bar, outside the slot', (button: HTMLButtonElement) => slotOf(button.parentElement!).parentElement!.setAttribute('inert', '')],
+  ] as const) {
+    it(`${what}, the browser drops its focus to body: untracked, the focus is left on body, removing the control then moves nothing`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const { rerender } = render(<Host bulkActions={wrapped()} />);
+      const button = screen.getByRole<HTMLButtonElement>('button', { name: 'Approve' });
+      const slot = slotOf(button.parentElement!);
+      act(() => button.focus());
+      expect(mutationObserverOf(slot)).toBeDefined();
+      // The browser's blur, then the attribute (jsdom ignores `blur()` on a disabled control): the `focusout` is read
+      // after both, in a microtask, as after a browser that drops the focus when the attribute is set.
+      await act(async () => {
+        button.blur();
+        apply(button);
+      });
+      expect(observerOf(slot)).toBeUndefined();
+      expect(mutationObserverOf(slot)).toBeUndefined();
+      rerender(<Host bulkActions={wrapped(false)} />);
+      await act(async () => {});
+      expect(document.activeElement).toBe(document.body);
+    });
+  }
+
+  it('`disabled` on the control, a browser that keeps the focus on it: still tracked as a shown control; removed then, the focus goes to the header checkbox', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    const { rerender } = render(<Host bulkActions={wrapped()} />);
+    const button = screen.getByRole<HTMLButtonElement>('button', { name: 'Approve' });
+    act(() => button.focus());
+    await act(async () => {
+      button.disabled = true;
+    });
+    expect(button).toHaveFocus();
+    expect(mutationObserverOf(slotOf(button.parentElement!))).toBeDefined();
+    rerender(<Host bulkActions={wrapped(false)} />);
+    await waitFor(() => expect(allBox()).toHaveFocus());
   });
 });
