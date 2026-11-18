@@ -198,6 +198,20 @@ describe('rebaseCarrying: carried conflicts under a node the user removed (#588)
       ['groups.0.parts.1', { id: 2, qty: 6 }, undefined, { id: 2, qty: 6 }, true],
     ]);
   });
+
+  it('a node the user cleared that isEqual takes as equal to the server one: no conflict (no ghost)', () => {
+    type Address = { street: string; city: string };
+    type Doc = { amount: number; supplier: { vat: string; address: Address | null } };
+    const isEqual = (a: unknown, b: unknown, path: string) => (path === 'supplier.address' && (a === null || b === null) ? true : undefined);
+    const doc = (street: string, vat = 'IT1'): Doc => ({ amount: 1, supplier: { vat, address: { street, city: 'C1' } } });
+    const first = doc('Theirs');
+    const one = rebaseInternal({ baseline: doc('S1'), values: doc('Mine'), incoming: first, isEqual });
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['supplier.address.street']);
+    const then: Doc = { amount: 1, supplier: { vat: 'IT-mine', address: null } };
+    const two = rebaseCarrying({ baseline: first, values: then, incoming: { ...first, amount: 2 }, isEqual }, one.records);
+    expect(two.result.conflicts).toEqual([]);
+    expect(two.result.values.supplier).toBe(then.supplier);
+  });
 });
 
 describe('rebaseCarrying: ids compared as the engine does (0 and -0 are two rows)', () => {
