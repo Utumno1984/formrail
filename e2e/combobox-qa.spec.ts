@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { gotoStory } from "./helpers/story";
+import { expectPlayToFail, gotoStory } from "./helpers/story";
 
 // QA spec for #45 (Combobox): cases the ticket lists as "casi limite" and that e2e/combobox.spec.ts
 // does not drive with a real keyboard/mouse. Permanent: it covers the contract of onValueChange
@@ -68,6 +68,8 @@ async function holdLoadButton(page: Page) {
     );
   });
 }
+/** The doomed play of AsyncLoad (its "Load data" click is swallowed by `holdLoadButton`): the message of its failure. */
+const ASYNC_LOAD_DOOMED_PLAY = /^expect\(element\)\.toHaveValue\(Torino\)/;
 const release = (page: Page) =>
   page.evaluate(() =>
     (window as unknown as { __release: () => void }).__release(),
@@ -128,8 +130,7 @@ test.describe("QA #45: onValueChange contract", () => {
   }) => {
     await recordCalls(page);
     await holdLoadButton(page);
-    await gotoStory(page, STORY("async-load"));
-    await page.waitForTimeout(1500); // let the (doomed) play function give up
+    await expectPlayToFail(page, STORY("async-load"), undefined, ASYNC_LOAD_DOOMED_PLAY);
     const box = input(page);
     await box.click();
     await page.keyboard.type("abc");
@@ -151,8 +152,7 @@ test.describe("QA #45: onValueChange contract", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await holdLoadButton(page);
-    await gotoStory(page, STORY("async-load"));
-    await page.waitForTimeout(1500);
+    await expectPlayToFail(page, STORY("async-load"), undefined, ASYNC_LOAD_DOOMED_PLAY);
     const box = input(page);
     await box.click();
     await release(page);

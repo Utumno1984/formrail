@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
-import { expectPlayToPass, gotoStory } from './helpers/story';
+import { expectPlayToFail, expectPlayToPass, gotoStory } from './helpers/story';
 
 const EPS = 1;
 const PLAYGROUND = 'data-descriptionlist--playground';
@@ -45,6 +45,9 @@ async function itemsGeometry(list: Locator) {
   );
 }
 
+/** The message of the Playground play when a forced layout contradicts its resize expectations (`toBeGreaterThanOrEqual`). */
+const PLAY_RESIZE_EXPECTATION = /^expected \d+(\.\d+)? to be greater than or equal to \d+(\.\d+)?/;
+
 const setWidth = (page: Page, width: number) =>
   page.getByTestId('container').evaluate((el, w) => {
     (el as HTMLElement).style.width = `${w}px`;
@@ -56,7 +59,8 @@ test.describe('Data/DescriptionList', () => {
       await gotoStory(page, id);
       await expectNoA11yViolations(page);
     }
-    await gotoStory(page, PLAYGROUND, 'valueKind:with-empties');
+    // The Playground play passes with these values too (it clicks "Open invoice" only for `mixed`).
+    await expectPlayToPass(page, PLAYGROUND, 'valueKind:with-empties');
     await expect(page.locator('dl > div > dt')).toHaveCount(5);
     await expectNoA11yViolations(page);
     // The placeholder is visible, the accessible text is the hidden label.
@@ -106,14 +110,16 @@ test.describe('Data/DescriptionList', () => {
 
   test('forced layouts hold at 280px and 600px', async ({ page }) => {
     for (const width of [280, 600]) {
-      await gotoStory(page, PLAYGROUND, `layout:inline;width:${width}`);
-      // The Playground play (it ends before gotoStory returns; it fails by design with a forced layout)
-      // resizes the container itself and leaves it wherever it stopped: measure at the declared width.
+      // The Playground play fails by design with a forced layout, on its first resize expectation
+      // (the value does not drop under / sit beside its label as the play expects): declare it, and
+      // wait for it to end, before the test drives the same container.
+      await expectPlayToFail(page, PLAYGROUND, `layout:inline;width:${width}`, PLAY_RESIZE_EXPECTATION);
+      // The play resizes the container itself and leaves it wherever it stopped: measure at the declared width.
       await setWidth(page, width);
       for (const g of await itemsGeometry(page.getByTestId('list'))) {
         expect(g.dd.left).toBeGreaterThanOrEqual(g.dt.right);
       }
-      await gotoStory(page, PLAYGROUND, `layout:stacked;width:${width}`);
+      await expectPlayToFail(page, PLAYGROUND, `layout:stacked;width:${width}`, PLAY_RESIZE_EXPECTATION);
       await setWidth(page, width);
       for (const g of await itemsGeometry(page.getByTestId('list'))) {
         expect(g.dd.top).toBeGreaterThanOrEqual(g.dt.bottom - EPS);
