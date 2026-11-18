@@ -292,4 +292,33 @@ describe('useFormRebase: conflicts across updates, missing values (§1.13.1)', (
     rebase(server({ supplier: { name: 'Lumen Parts', vat: 'IT1', email: 'theirs@example.com' } as WithEmail, amount: 50 }));
     expect(shape()).toEqual([['supplier.email', undefined, 'mine@example.com', 'theirs@example.com', true]]);
   });
+
+  it('a carried conflict under a key the server omits (isEqual takes the partial object as equal): on the key, base from the baseline', () => {
+    // A partial payload: a supplier sent without its address is the same supplier for this `isEqual`.
+    type Supplier = { id: number; name: string; address?: { street: string } };
+    type Doc = { amount: number; supplier: Supplier };
+    const isEqual = (a: unknown, b: unknown, path: string) => {
+      if (path !== 'supplier') return undefined;
+      const [x, y] = [a as Supplier, b as Supplier];
+      return x.address && y.address ? undefined : x.id === y.id && x.name === y.name;
+    };
+    const initial: Doc = { amount: 1, supplier: { id: 1, name: 'S', address: { street: 'S1' } } };
+    const view = renderHook(() => {
+      const form = useObjectPageForm<Doc>({ baseline: initial });
+      return { form, rebase: useFormRebase(form, { isEqual }) };
+    });
+    const h = () => view.result.current;
+    act(() => h().form.setValue('supplier', { id: 1, name: 'S', address: { street: 'Mine' } }));
+    act(() => h().rebase.rebase({ amount: 1, supplier: { id: 1, name: 'S', address: { street: 'Theirs' } } }));
+    expect(h().rebase.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs])).toEqual([['supplier.address.street', 'S1', 'Mine', 'Theirs']]);
+    act(() => h().rebase.rebase({ amount: 2, supplier: { id: 1, name: 'S' } }));
+    expect(h().rebase.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.baseMissing, c.mineMissing, c.theirsMissing])).toEqual([
+      ['supplier.address', { street: 'Theirs' }, { street: 'Mine' }, undefined, false, false, true],
+    ]);
+    act(() => h().rebase.acceptTheirs('supplier.address'));
+    expect(h().rebase.conflicts).toEqual([]);
+    expect(h().form.values).toEqual({ amount: 2, supplier: { id: 1, name: 'S' } });
+    expect(Object.hasOwn(h().form.values.supplier, 'address')).toBe(false);
+    expect(h().form.isDirty).toBe(false);
+  });
 });

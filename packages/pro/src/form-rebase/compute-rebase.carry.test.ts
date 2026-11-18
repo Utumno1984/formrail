@@ -212,6 +212,50 @@ describe('rebaseCarrying: carried conflicts under a node the user removed (#588)
     expect(two.result.conflicts).toEqual([]);
     expect(two.result.values.supplier).toBe(then.supplier);
   });
+
+  it('a node the server omits that isEqual takes as equal to the baseline one: on the node, its base is the baseline node', () => {
+    // A partial payload: a supplier sent without its address is the same supplier for this `isEqual`.
+    type Supplier = { id: number; name: string; address?: { street: string } };
+    type Doc = { amount: number; supplier: Supplier };
+    const isEqual = (a: unknown, b: unknown, path: string) => {
+      if (path !== 'supplier') return undefined;
+      const [x, y] = [a as Supplier, b as Supplier];
+      return x.address && y.address ? undefined : x.id === y.id && x.name === y.name;
+    };
+    const doc = (street: string): Doc => ({ amount: 1, supplier: { id: 1, name: 'S', address: { street } } });
+    const first = doc('Theirs');
+    const one = rebaseInternal({ baseline: doc('S1'), values: doc('Mine'), incoming: first, isEqual });
+    expect(one.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs])).toEqual([['supplier.address.street', 'S1', 'Mine', 'Theirs']]);
+    const two = rebaseCarrying({ baseline: first, values: doc('Mine'), incoming: { amount: 2, supplier: { id: 1, name: 'S' } }, isEqual }, one.records);
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.baseMissing, c.mineMissing, c.theirsMissing])).toEqual([
+      ['supplier.address', { street: 'Theirs' }, { street: 'Mine' }, undefined, false, false, true],
+    ]);
+  });
+
+  it('a row the user removes and the server sends without a nested object (isEqual on the rows): on the row, its base is the baseline row', () => {
+    type Row = { id: number; qty: number; meta?: { note: string } };
+    type Doc = { amount: number; lines: Row[] };
+    // A partial payload: a row sent without its `meta` is the same row for this `isEqual`.
+    const isEqual = (a: unknown, b: unknown, path: string) => {
+      const [x, y] = [a as Row | undefined, b as Row | undefined];
+      if (!/^lines\.\d+$/.test(path) || !x || !y) return undefined;
+      return x.meta && y.meta ? undefined : x.id === y.id && x.qty === y.qty;
+    };
+    const row = (id: number, note?: string): Row => (note === undefined ? { id, qty: id } : { id, qty: id, meta: { note } });
+    const ROWS = { arrayIdKeys: { lines: 'id' }, isEqual };
+    const first: Doc = { amount: 1, lines: [row(1, 'A'), row(2, 'Theirs')] };
+    const one = rebaseInternal({ baseline: { amount: 1, lines: [row(1, 'A'), row(2, 'S1')] }, values: { amount: 1, lines: [row(1, 'A'), row(2, 'Mine')] }, incoming: first, ...ROWS });
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['lines.1.meta.note']);
+    // The user removes the row. The server sends it without `meta`, and changes the amount only (the lines are the
+    // same for `isEqual`: the carry walks them) or also another row (the merge walks the lines).
+    const removed: Doc = { amount: 1, lines: [row(1, 'A')] };
+    for (const other of [row(1, 'A'), { ...row(1, 'A'), qty: 9 }]) {
+      const two = rebaseCarrying({ baseline: first, values: removed, incoming: { amount: 2, lines: [other, row(2)] }, ...ROWS }, one.records);
+      expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.baseMissing, c.mineMissing, c.theirsMissing])).toEqual([
+        ['lines.1', { id: 2, qty: 2, meta: { note: 'Theirs' } }, undefined, { id: 2, qty: 2 }, false, true, false],
+      ]);
+    }
+  });
 });
 
 describe('rebaseCarrying: ids compared as the engine does (0 and -0 are two rows)', () => {
@@ -231,6 +275,19 @@ describe('rebaseCarrying: ids compared as the engine does (0 and -0 are two rows
       [true, 5],
       [false, 9],
     ]);
+  });
+
+  it('a carried conflict in the row -0 the user then removes: on the row, its base is the row -0 of the baseline, not the row 0', () => {
+    const at = (...rows: [number, number][]): Invoice => ({ ...BASE, lines: lines(...rows) });
+    const first = at([0, 1], [-0, 6], [1, 1]);
+    const one = rebaseInternal({ baseline: at([0, 1], [-0, 1], [1, 1]), values: at([0, 1], [-0, 5], [1, 1]), incoming: first, ...OPTIONS });
+    expect(one.result.conflicts.map((c) => c.path)).toEqual(['lines.1.qty']);
+    // The user removes the row -0; the server changes the amount only.
+    const two = rebaseCarrying({ baseline: first, values: at([0, 1], [1, 1]), incoming: { ...first, amount: 5 }, ...OPTIONS }, one.records);
+    expect(two.result.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs, c.baseMissing, c.mineMissing])).toEqual([
+      ['lines.1', { id: -0, qty: 6 }, undefined, { id: -0, qty: 6 }, false, true],
+    ]);
+    expect(Object.is((two.result.conflicts[0]!.base as Line).id, -0)).toBe(true);
   });
 });
 

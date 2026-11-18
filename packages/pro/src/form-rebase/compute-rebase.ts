@@ -104,8 +104,11 @@ export class Merger {
   readonly entries: EntryDiffer;
   private readonly onStack = new Map<object, Set<object>>();
 
-  /** Emits the carried conflicts at or under a node whose result is `mine` (or out of the result) the server kept. */
-  protected carry?(mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[], carried: readonly ConflictRecord[]): void;
+  /**
+   * Emits the carried conflicts at or under a node whose result is `mine` (or out of the result) the server kept.
+   * `base`: the node of `baseline` (`MISSING` when it has none).
+   */
+  protected carry?(base: unknown, mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[], carried: readonly ConflictRecord[]): void;
   /** Emits the carried order conflict of an id-keyed array the server changed without reordering it. */
   protected carryOrder?(node: DiffNode, segments: readonly Segment[], mine: unknown[], theirs: unknown[], idKey: string, carried: readonly ConflictRecord[]): void;
   /** The carried records under the child `step` of a node of `depth` segments. */
@@ -124,9 +127,17 @@ export class Merger {
   }
 
   /** `carry` on the item `step` of the array of `segments`, when a carried record is there. */
-  private carryItem(mine: unknown, theirs: unknown, child: DiffNode, segments: readonly Segment[], step: Segment, carried: readonly ConflictRecord[]): void {
+  private carryItem(
+    base: unknown,
+    mine: unknown,
+    theirs: unknown,
+    child: DiffNode,
+    segments: readonly Segment[],
+    step: Segment,
+    carried: readonly ConflictRecord[],
+  ): void {
     const sub = this.down(carried, segments.length, step);
-    if (sub.length > 0) this.carry?.(mine, theirs, child, [...segments, step], sub);
+    if (sub.length > 0) this.carry?.(base, mine, theirs, child, [...segments, step], sub);
   }
 
   /**
@@ -140,7 +151,7 @@ export class Merger {
     }
     if (!this.decide.differs(base, theirs, node)) {
       // The server did not change the node: the conflicts of the earlier rebases in it stay where they still differ.
-      if (carried.length > 0) this.carry?.(mine, theirs, node, segments, carried);
+      if (carried.length > 0) this.carry?.(base, mine, theirs, node, segments, carried);
       return mine;
     }
     // Both sides now hold the same value: nothing is overwritten, the earlier conflicts in it are over.
@@ -327,7 +338,7 @@ export class Merger {
         const step = { idKey, id: itemId(item, idKey) };
         if (b !== undefined) this.conflict(child, [...segments, step], baseItem, item, MISSING, undefined);
         // Neither the previous nor this server version has the item: a carried conflict on it (or in it) stays.
-        else this.carryItem(item, MISSING, child, segments, step, carried);
+        else this.carryItem(MISSING, item, MISSING, child, segments, step, carried);
       } else {
         item = theirs[t as number];
         this.entries.emit(this.applied, child, 'added', MISSING, item);
@@ -347,7 +358,7 @@ export class Merger {
         // Removed by the user, not changed by the server in this rebase: a carried conflict on it (or in it) stays.
         const t = theirsIndex.get(key) as number;
         const item = theirs[t];
-        this.carryItem(MISSING, item, this.decide.indexChild(node, t, item, 'baseline'), segments, { idKey, id: itemId(item, idKey) }, carried);
+        this.carryItem(baseItems[b], MISSING, item, this.decide.indexChild(node, t, item, 'baseline'), segments, { idKey, id: itemId(item, idKey) }, carried);
       }
     }
     return out;

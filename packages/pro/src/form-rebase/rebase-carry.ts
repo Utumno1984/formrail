@@ -19,6 +19,13 @@ type IdSegment = Extract<Segment, { idKey: string }>;
 
 const idOf = (item: unknown, idKey: string): unknown => idMapKey(itemId(item, idKey));
 
+/** The item `step` of `list` (`MISSING` when `list` is not an array or has no such item). */
+const itemAt = (list: unknown, step: IdSegment): unknown => {
+  const items = Array.isArray(list) ? list : [];
+  const at = items.findIndex((item) => idOf(item, step.idKey) === idMapKey(step.id));
+  return at < 0 ? MISSING : items[at];
+};
+
 /** 1 for an array, 2 for a plain object, 0 for anything else (no child a carried conflict could be on). */
 const kindOf = (value: unknown): number => (Array.isArray(value) ? 1 : isPlainObject(value) ? 2 : 0);
 
@@ -69,26 +76,34 @@ class CarryingMerger extends Merger {
    * Emits the carried conflicts at or under a node whose result is `mine` (`MISSING` for an item out of the result)
    * and that the server did not change in this rebase, where the user's value still differs from the server's: with
    * their `base`, and the sides, path and labels of this rebase. Under a node the user's value cannot hold (removed,
-   * or not the same kind of container as the server's), one conflict on that node instead. In the depth-first order
-   * of the result: keys of `mine`, then the keys only in `theirs`; items of `mine` (index in the result), then the
-   * items only in `theirs` (index there, named on the `'baseline'` side).
+   * or not the same kind of container as the server's), one conflict on that node instead, whose `base` is `base`
+   * (the node of `baseline`, `MISSING` when it has none). In the depth-first order of the result: keys of `mine`,
+   * then the keys only in `theirs`; items of `mine` (index in the result), then the items only in `theirs` (index
+   * there, named on the `'baseline'` side).
    */
-  protected override carry(mine: unknown, theirs: unknown, node: DiffNode, segments: readonly Segment[], carried: readonly ConflictRecord[]): void {
+  protected override carry(
+    base: unknown,
+    mine: unknown,
+    theirs: unknown,
+    node: DiffNode,
+    segments: readonly Segment[],
+    carried: readonly ConflictRecord[],
+  ): void {
     const depth = segments.length;
     const here = carried.filter((r) => r.segments.length === depth);
     const onValue = here.find((r) => r.orderIdKey === undefined);
     if (onValue) {
-      const { base, baseMissing } = onValue.conflict;
-      if (this.decide.differs(theirs, mine, node)) this.conflict(node, segments, baseMissing ? MISSING : base, mine, theirs, undefined);
+      const { conflict } = onValue;
+      if (this.decide.differs(theirs, mine, node)) this.conflict(node, segments, conflict.baseMissing ? MISSING : conflict.base, mine, theirs, undefined);
       return;
     }
     // The carried conflicts are under the node, and the user's value cannot hold them (a row or a key the user
     // removed, a value that is no longer an object or an array): one conflict on the node, as a fresh merge gives, so
-    // that `acceptTheirs` puts the server's node back (a conflict under it would have no parent to be set in). The
-    // server did not change the node: its `base` is the node of `baseline`, that is `theirs` (never `MISSING` here:
-    // a conflict under the node was emitted against an earlier version that had the node, and the server kept it).
+    // that `acceptTheirs` sets the server's node (a conflict under it would have no parent to be set in). Its `base`
+    // is the node of `baseline`, not `theirs`: `isEqual` may take the two as equal while `theirs` lacks a child or
+    // the whole node (a partial payload), and `baseMissing` must say whether `baseline` has the node.
     if (kindOf(mine) !== kindOf(theirs)) {
-      if (this.decide.differs(theirs, mine, node)) this.conflict(node, segments, theirs, mine, theirs, undefined);
+      if (this.decide.differs(theirs, mine, node)) this.conflict(node, segments, base, mine, theirs, undefined);
       return;
     }
     const orderIdKey = here[0]?.orderIdKey;
@@ -107,18 +122,20 @@ class CarryingMerger extends Merger {
           if (outside && counterpart !== undefined) return;
           const child = this.decide.indexChild(node, index, item, outside ? 'baseline' : 'values');
           const sub = this.under(carried, depth, step);
-          if (outside) this.carry(MISSING, item, child, [...segments, step], sub);
-          else this.carry(item, counterpart === undefined ? MISSING : counterpart, child, [...segments, step], sub);
+          const baseItem = itemAt(base, step);
+          if (outside) this.carry(baseItem, MISSING, item, child, [...segments, step], sub);
+          else this.carry(baseItem, item, counterpart === undefined ? MISSING : counterpart, child, [...segments, step], sub);
         }),
       );
       return;
     }
+    const b = isPlainObject(base) ? base : {};
     const m = isPlainObject(mine) ? mine : {};
     const t = isPlainObject(theirs) ? theirs : {};
     for (const key of new Set([...Object.keys(m), ...Object.keys(t)])) {
       const step = { key };
       const sub = this.under(carried, depth, step);
-      if (sub.length > 0) this.carry(own(m, key), own(t, key), this.decide.keyChild(node, key), [...segments, step], sub);
+      if (sub.length > 0) this.carry(own(b, key), own(m, key), own(t, key), this.decide.keyChild(node, key), [...segments, step], sub);
     }
   }
 }
