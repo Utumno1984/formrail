@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { isLaidOut } from '@formrail/core/internal';
 
 /**
@@ -17,9 +17,13 @@ export function isShown(el: Element): boolean {
  * a document with an element always has an active element).
  */
 function focusLostWith(node: Element, slot: Element): boolean {
-  const doc = slot.ownerDocument;
-  const active = (slot.getRootNode() as Document | ShadowRoot).activeElement ?? doc.activeElement;
-  return active === doc.body || active === node;
+  const active = activeIn(slot);
+  return active === slot.ownerDocument.body || active === node;
+}
+
+/** The element with the focus as the root of `slot` sees it (see `focusLostWith`): still the same one after a `focusout` that moved nothing. */
+function activeIn(slot: Element): Element | null {
+  return (slot.getRootNode() as Document | ShadowRoot).activeElement ?? slot.ownerDocument.activeElement;
 }
 
 /**
@@ -54,6 +58,11 @@ function focusLostWith(node: Element, slot: Element): boolean {
  */
 export function useKeepBulkActionsFocus(slot: HTMLElement | null, container: RefObject<HTMLElement | null>): void {
   const [focused, setFocused] = useState<Element | null>(null);
+  // The tracked control: `focused` as of its last commit (the second effect), set ahead of it by a `focusin`. A focus
+  // that lands outside the slot while nothing is tracked sets no state, so it never renders the hook.
+  const tracked = useRef<Element | null>(null);
+  // Whether the tracked control was shown when its tracking started (the second effect).
+  const shown = useRef(true);
 
   useEffect(() => {
     if (!slot) return undefined;
@@ -65,17 +74,20 @@ export function useKeepBulkActionsFocus(slot: HTMLElement | null, container: Ref
     // slot, to see the latter.
     const onFocusIn = (event: Event) => {
       const target = event.target as Element;
-      setFocused(slot.contains(target) ? target : null);
+      const next = slot.contains(target) ? target : null;
+      if (next || tracked.current) setFocused((tracked.current = next));
     };
-    // A focus lost to no element (`body`, another window: no `focusin` follows) with the control still shown is the
-    // user moving on; with the control hidden or removed it is kept, because that is the very change the observer
-    // reacts to. Read after the change that blurred it (a microtask): a browser that blurs a control while removing it
-    // does so with the control still in the document. Only that control is untracked: by then the focus may be on
+    // A focus lost to no element (`body`: no `focusin` follows) with the control still shown is the user moving on;
+    // with the control hidden or removed it is kept, because that is the very change the observer reacts to (unless the
+    // control was not shown when its tracking started: that one never moves the focus). Read after the change that
+    // blurred it (a microtask): a browser that blurs a control while removing it does so with the control still in the
+    // document. A `focusout` that leaves the focus on the control (the synthetic one of a `Tooltip` closed by force,
+    // another window taking the focus) loses nothing. Only that control is untracked: by then the focus may be on
     // another control of the slot.
     const onFocusOut = (event: FocusEvent) => {
       const node = event.target as Element;
       queueMicrotask(() => {
-        if (isShown(node)) setFocused((current) => (current === node ? null : current));
+        if (tracked.current === node && activeIn(slot) !== node && (isShown(node) || !shown.current)) setFocused((tracked.current = null));
       });
     };
     root.addEventListener('focusin', onFocusIn);
@@ -88,16 +100,21 @@ export function useKeepBulkActionsFocus(slot: HTMLElement | null, container: Ref
   }, [slot]);
 
   useEffect(() => {
-    const node = focused;
+    const node = (tracked.current = focused);
     if (!slot || !node) return undefined;
-    // An environment without layout (nothing is ever laid out) never moves the focus.
-    const wasShown = isShown(node);
-    const update = () => {
-      if (!wasShown || isShown(node)) return;
-      // Gone or hidden (`isShown` is false for a node out of the document): tracked no more, whatever the focus;
-      // recovered only if it was lost with the control.
+    // A control not shown when its tracking starts (an environment without layout, or a control hidden as it takes the
+    // focus) never moves the focus: tracked only while it holds it, until the first change seen.
+    const wasShown = (shown.current = isShown(node));
+    if (!wasShown && activeIn(slot) !== node) {
       setFocused(null);
-      if (!focusLostWith(node, slot)) return;
+      return undefined;
+    }
+    const update = () => {
+      if (wasShown && isShown(node)) return;
+      // Gone or hidden (`isShown` is false for a node out of the document), or never shown: tracked no more, whatever
+      // the focus; recovered only if it was lost with a control that was shown.
+      setFocused(null);
+      if (!wasShown || !focusLostWith(node, slot)) return;
       const scroller = container.current;
       const header = scroller?.querySelector<HTMLInputElement>('th[data-rop-select] input');
       (header && !header.disabled ? header : scroller)?.focus();
