@@ -350,12 +350,16 @@ test.describe('Showcase/Record editing, customers: viewports', () => {
         await textbox(page, 'Name').fill('Dirty on purpose');
         await expect(bar(page)).toBeVisible();
         const field = textbox(page, 'Contact 4 e-mail');
-        await field.scrollIntoViewIfNeeded();
         const keyboard = Math.round(viewport.height * 0.45);
+        const keyboardLine = viewport.height - keyboard;
         const rect = (loc: Locator) => loc.evaluate((el) => ({ top: el.getBoundingClientRect().top, bottom: el.getBoundingClientRect().bottom }));
+        // The field at the BOTTOM of the visible page, where the keyboard will cover it: without this precondition the
+        // check below would pass with no keyboard handling at all (red team of #523).
+        await field.evaluate((el) => el.scrollIntoView({ block: 'end' }));
         await field.focus();
+        expect((await rect(field)).bottom).toBeGreaterThan(keyboardLine);
         await page.evaluate((px) => (window as unknown as KeyboardWindow).__setKeyboard(px), keyboard);
-        await expect.poll(async () => (await rect(field)).bottom).toBeLessThanOrEqual(viewport.height - keyboard);
+        await expect.poll(async () => (await rect(field)).bottom).toBeLessThanOrEqual(keyboardLine);
         expect((await rect(field)).top).toBeGreaterThanOrEqual(0);
         const f = await rect(field);
         const b = await rect(bar(page));
