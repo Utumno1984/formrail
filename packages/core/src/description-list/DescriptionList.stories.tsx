@@ -143,7 +143,8 @@ export const Example: Story = {
  * Controls: layout, container width (a range), kind of values, empty label. `onOpen` shows in
  * Actions. The play function narrows the container under the threshold, checks the value drops
  * under its label, widens it again and checks the values are back beside the labels in a single
- * column (a string row and a custom-node row start at the same x).
+ * column (a string row and a custom-node row start at the same x). With the `mixed` values it also
+ * clicks the "Open invoice" button, which only that kind of value contains.
  */
 export const Playground: Story = {
   tags: ['playground'],
@@ -167,8 +168,11 @@ export const Playground: Story = {
     const lefts = dds.map((d) => Math.round(rect(d).left));
     await expect(new Set(lefts).size).toBe(1);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Open invoice' }));
-    await expect(args.onOpen).toHaveBeenCalledTimes(1);
+    // The button is part of the `mixed` values only: with `strings` / `with-empties` there is nothing to click.
+    if (args.valueKind === 'mixed') {
+      await userEvent.click(canvas.getByRole('button', { name: 'Open invoice' }));
+      await expect(args.onOpen).toHaveBeenCalledTimes(1);
+    }
     container.style.width = original;
   },
 };
