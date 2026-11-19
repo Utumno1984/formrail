@@ -31,8 +31,10 @@ test.describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
     // The dialog itself is still described by its description only.
     await expect(dialog(page)).toHaveAccessibleDescription('3 changes will be saved.');
     for (const key of ['Enter', 'Space', 'Enter']) await page.keyboard.press(key);
-    await button.click();
-    await button.dblclick();
+    // `force`: Playwright's actionability check counts `aria-disabled` as "not enabled" and would wait forever. The
+    // real mouse events are still dispatched at the button's position: that is what a user's click does.
+    await button.click({ force: true });
+    await button.dblclick({ force: true });
     await expect(dialog(page)).toBeVisible();
     await expect(button).toBeFocused();
     await expect(confirmedText(page)).toHaveText('');
@@ -85,7 +87,8 @@ test.describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
       await expectNoHorizontalOverflow(dialog(page));
       await expect(dialog(page).getByText(REASON)).toBeInViewport({ ratio: 1 });
       for (const name of ['Keep editing', 'Save changes']) await expect(dialog(page).getByRole('button', { name })).toBeInViewport({ ratio: 1 });
-      await saveChanges(page).tap();
+      // `force`: see above (an `aria-disabled` button is not "enabled" for Playwright; the real touch is dispatched).
+      await saveChanges(page).tap({ force: true });
       await expect(dialog(page)).toBeVisible();
       await expect(confirmedText(page)).toHaveText('');
     });
