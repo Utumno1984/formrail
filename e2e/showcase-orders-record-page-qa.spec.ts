@@ -93,6 +93,8 @@ test.describe('Showcase/Record editing, orders: RecordPage QA (migrated from Sho
     await open(page);
     const status = page.getByRole('combobox', { name: 'Status' });
     const original = ((await status.textContent()) ?? '').trim();
+    const badge = (text: string): Locator => page.locator('h1').locator('..').getByText(text, { exact: true });
+    await expect(badge(original)).toHaveCount(1);
     await status.click();
     const options = page.getByRole('option');
     const n = await options.count();
@@ -108,9 +110,13 @@ test.describe('Showcase/Record editing, orders: RecordPage QA (migrated from Sho
     }
     await expect(bar(page)).toBeVisible();
     await expect(status).toContainText(chosen);
+    // The header shows the SAVED status, not the draft one.
+    await expect(badge(original)).toHaveCount(1);
+    await expect(badge(chosen)).toHaveCount(0);
     await bar(page).getByRole('button', { name: 'Discard' }).click();
     await expect(bar(page)).toBeHidden();
     await expect(status).toContainText(original);
+    await expect(badge(original)).toHaveCount(1);
   });
 
   test('keyboard: Tab order in the save bar is Save then Discard; Enter on Save saves; Escape closes the dialog and returns focus to Back to list', async ({ page }) => {

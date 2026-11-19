@@ -176,7 +176,7 @@ test.describe('Showcase/Record editing, orders: ListToRecord (migrated from Show
 
   test('deep link ?module=sales-orders&record=so-150: the detail; Back to list replaces the URL with the list defaults', async ({ page }) => {
     await page.goto(url('module=sales-orders&record=so-150'));
-    await expect(page.getByRole('heading', { level: 1, name: /^SO-/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /SO-2026-229000150/ })).toBeVisible();
     const entries = await page.evaluate(() => history.length);
     await back(page).click();
     await expect(table(page)).toBeVisible();

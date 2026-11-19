@@ -123,6 +123,8 @@ test.describe('Showcase/Record editing, orders: EditFlow (migrated from Showcase
     await expect(dialogOf(page)).toHaveCount(0);
     expect(await totalText(page, number)).toBe(shown);
     expect(await positionOf()).toBeLessThan(before);
+    // Sorted by Total descending, the biggest order of the list is the first row.
+    await expect(page.getByRole('row').nth(1)).toContainText(number);
   });
 
   test('Confirmed filter, status changed to Shipped and saved: the row is gone, the count follows, focus on the title', async ({ page }) => {
@@ -260,6 +262,7 @@ test.describe('Showcase/Record editing, orders: EditFlow (migrated from Showcase
       const number = await linkAt(page, 2);
       await openRecord(page, number);
       await typeQuantity(page, '700');
+      const shown = (await page.locator('[data-order-total]').textContent()) ?? '';
       await back(page).click();
       await dialogOf(page).getByRole('button', { name: 'Keep editing' }).click();
       await expect(dialogOf(page)).toHaveCount(0);
@@ -268,6 +271,7 @@ test.describe('Showcase/Record editing, orders: EditFlow (migrated from Showcase
       await back(page).click();
       await expect(table(page)).toBeVisible();
       await expect(rowOf(page, number)).toBeVisible();
+      expect(await totalText(page, number)).toBe(shown);
       expect(await stored(page)).toContain('"quantity":700');
     });
   });

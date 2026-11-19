@@ -38,6 +38,18 @@ const storeQuantity = (page: Page, id: string): Promise<number | undefined> =>
     id,
   );
 
+interface StoredOrder {
+  id: string;
+  totalMinor: number;
+  lines: { quantity: number; unitPriceMinor: number; discountPercent: number }[];
+}
+const storeOrder = (page: Page, id: string): Promise<StoredOrder | undefined> =>
+  page.evaluate(
+    (i) => (window as unknown as { __ropShowcaseStore?: { snapshot: () => StoredOrder[] } }).__ropShowcaseStore?.snapshot().find((r) => r.id === i),
+    id,
+  );
+const headerTotal = (page: Page): Promise<string> => page.locator('[data-order-total]').innerText();
+
 async function open(page: Page, args = ''): Promise<void> {
   await gotoStory(page, FIXTURE, args);
   await expect(quantity(page)).toBeVisible();
@@ -110,13 +122,25 @@ test.describe('Showcase/Record editing, orders: RecordPage (migrated from Showca
 
   test('save success: the form is clean, and the store has the quantity and the total the server derived', async ({ page }) => {
     await open(page, 'saveDelayMs:600');
+    const totalBefore = (await storeOrder(page, ORDER))!.totalMinor;
+    const headerBefore = await headerTotal(page);
     await quantity(page).fill('37');
+    // The header follows the form while typing; the server's total must agree with it once the save lands.
+    await expect.poll(() => headerTotal(page)).not.toBe(headerBefore);
+    const headerTyped = await headerTotal(page);
     const save = bar(page).getByRole('button', { name: 'Save' });
     await save.click();
     await expect(save).toHaveAttribute('aria-disabled', 'true');
     await expect(bar(page)).toBeHidden();
     await expect(quantity(page)).toHaveValue('37');
     expect(await storeQuantity(page, ORDER)).toBe(37);
+    // The total derived by the server: changed, equal to the sum of the stored lines (discounts included, rounding
+    // tolerance of one minor unit per line), and the header shows it.
+    const saved = (await storeOrder(page, ORDER))!;
+    expect(saved.totalMinor).not.toBe(totalBefore);
+    const expected = saved.lines.reduce((sum, l) => sum + (l.quantity * l.unitPriceMinor * (100 - l.discountPercent)) / 100, 0);
+    expect(Math.abs(saved.totalMinor - expected)).toBeLessThanOrEqual(saved.lines.length);
+    await expect.poll(() => headerTotal(page)).toBe(headerTyped);
   });
 
   test('validation: quantity 0 blocks the save, the message is on the field, the summary is English, the store is untouched', async ({ page }) => {

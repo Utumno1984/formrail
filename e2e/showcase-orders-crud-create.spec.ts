@@ -73,6 +73,67 @@ test.describe('Showcase/Record editing, orders: Crud (Create), the rest of the i
     await expect(unsavedDialog(page)).toHaveCount(0);
   });
 
+  test('"New sales order" keeps the list parameters in the URL next to create=1', async ({ page }) => {
+    await openList(page, LIST_QUERY);
+    await newOrder(page).click();
+    await expect(heading(page)).toBeVisible();
+    const p = params(page);
+    expect([p.get('create'), p.get('sales-orders.filter'), p.get('sales-orders.q'), p.get('sales-orders.sort')]).toEqual([
+      '1',
+      'all',
+      'SO-2026',
+      'total.desc',
+    ]);
+  });
+
+  test('a new page has no status badge in its header (the order is not saved yet)', async ({ page }) => {
+    await openList(page, LIST_QUERY);
+    await newOrder(page).click();
+    await expect(heading(page)).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Status' })).toContainText('Draft');
+    await expect(page.locator('h1').locator('..').getByText('Draft', { exact: true })).toHaveCount(0);
+  });
+
+  test('a valid Create (double click, Enter held) creates ONE order, returns to the list, no dialog, toast, focus on the link', async ({ page }) => {
+    await openList(page, SORTED, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:200');
+    const entries = await page.evaluate(() => history.length);
+    await newOrder(page).click();
+    await fillValid(page);
+    await create(page).dblclick();
+    await create(page).press('Enter').catch(() => undefined);
+    await expect(table(page)).toBeVisible();
+    await expect(unsavedDialog(page)).toHaveCount(0);
+    expect(params(page).get('create')).toBeNull();
+    expect(await page.evaluate(() => history.length)).toBe(entries + 1); // the pushed entry is still there for Forward
+    expect((await store(page)).filter((o) => o.number === FIRST_NEW)).toHaveLength(1);
+    expect(await store(page)).toHaveLength(201);
+    await expect(createdToast(page)).toBeVisible();
+    await expect(newLink(page)).toBeFocused();
+  });
+
+  test('a Create hidden by the filters: the toast names the order, says it is not shown, and there is no link to it', async ({ page }) => {
+    await openList(page, 'sales-orders.filter=cancelled');
+    await newOrder(page).click();
+    await fillValid(page);
+    await create(page).click();
+    await expect(table(page)).toBeVisible();
+    await expect(createdToast(page)).toBeVisible();
+    await expect(page.getByText('Not shown with the current filters.')).toBeVisible();
+    await expect(newLink(page)).toHaveCount(0);
+    expect(await store(page)).toHaveLength(201);
+  });
+
+  test('saveOutcome=error: create=1 stays in the URL and the customer stays chosen', async ({ page }) => {
+    await openList(page, '', `${FAST};saveOutcome:error`);
+    await newOrder(page).click();
+    await fillValid(page, '3', '10.50');
+    await create(page).click();
+    await expect(page.getByRole('region', { name: 'Save actions' })).toContainText(/Could not save/i);
+    expect(params(page).get('create')).toBe('1');
+    await expect(page.getByRole('combobox', { name: /Customer/ })).toContainText('Hoevenstrand Coatings BV');
+    expect(await store(page)).toHaveLength(200);
+  });
+
   test('an invalid line quantity never reaches the store and focuses the field (the order rule of "Amount must be greater than 0")', async ({ page }) => {
     await openList(page);
     await newOrder(page).click();

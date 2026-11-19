@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectNoA11yViolations } from './helpers/a11y';
 
 // #525 (part 2): the sales-order equivalents of the tests of `showcase-crud-delete.spec.ts` that
 // `showcase-sales-orders-crud.spec.ts` (#521) does not already cover, with the same titles (the invoice spec stays
@@ -191,6 +192,7 @@ test.describe('Showcase/Record editing, orders: Crud (Delete from the record pag
     await remove(page).click();
     const dialog = confirmDialog(page, SECOND);
     await expect(dialog).toContainText('Unsaved changes will be lost too.');
+    await expectNoA11yViolations(page);
     await confirmButton(dialog).click();
     await expect(table(page)).toBeVisible();
     await expect(unsavedDialog(page)).toHaveCount(0);

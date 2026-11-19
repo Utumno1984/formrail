@@ -55,7 +55,7 @@ test.describe('Showcase/Record editing, orders: ListToRecord QA (migrated from S
 
   test('deep link then Back to list: focus never on body', async ({ page }) => {
     await page.goto(url('module=sales-orders&record=so-12'));
-    await expect(page.getByRole('heading', { level: 1, name: /^SO-/ })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /SO-2026-255000012/ })).toBeVisible();
     await back(page).click();
     await expect(table(page)).toBeVisible();
     expect(params(page).get('record')).toBeNull();
