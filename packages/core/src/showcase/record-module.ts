@@ -9,6 +9,7 @@ import type { ListReportLabels } from '../list-report/ListReport';
 import type { ListReportColumn, ListReportFilter } from '../list-report/types';
 import type { FieldErrors } from '../object-page/field-errors';
 import type { UseObjectPageFormReturn } from '../object-page/use-object-page-form';
+import type { RelatedRecords } from './record-app-context';
 import type { RecordStore } from './record-store';
 
 /**
@@ -35,6 +36,11 @@ export interface RecordSectionsProps<T extends { id: string }, V extends object>
    * disable every field with it. `undefined` otherwise (and always for a module without `lockWhileSaving`).
    */
   savingLock?: string | undefined;
+  /**
+   * #525: links to records of other modules, behind the page's dirty-guard. Only inside the showcase app
+   * (`RecordApp`): `undefined` when the shell is mounted on its own, where there is no other module to open.
+   */
+  related?: RelatedRecords | undefined;
 }
 
 /** The list of a module: what `useListReport` and `ListReport` need that belongs to the record type. */

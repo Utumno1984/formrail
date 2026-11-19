@@ -3,6 +3,7 @@
 // terms in the customer's currency and an account manager. Money is an integer amount of minor units next to the
 // customer's currency, as in the demo data; the form turns it into text. Not exported by the package.
 import {
+  getCustomer,
   makeCustomers,
   type DemoCountryCode,
   type DemoCurrency,
@@ -78,6 +79,20 @@ const fromDemo = (c: DemoCustomer): StoredCustomer => ({
 
 /** The seed: the first `count` demo customers (200: the list of the showcase). */
 export const makeShowcaseCustomers = (count = 200): StoredCustomer[] => makeCustomers(count).map(fromDemo);
+
+/**
+ * #525: the seed of the customers of the app: the first `count` demo customers AND the customers `referencedIds` name
+ * (the customers of the orders: an order's link to its customer must open that customer, and the orders' customers
+ * come from a pool of 1,000), in the order of their number. An id that is not a demo customer is left out.
+ */
+export const makeCustomersReferencedBy = (referencedIds: Iterable<string>, count = 200): StoredCustomer[] => {
+  const seed = new Map(makeShowcaseCustomers(count).map((c) => [c.id, c]));
+  for (const id of referencedIds) {
+    const demo = seed.has(id) ? undefined : getCustomer(id);
+    if (demo) seed.set(demo.id, fromDemo(demo));
+  }
+  return [...seed.values()].sort((a, b) => Number(a.id.slice('cus-'.length)) - Number(b.id.slice('cus-'.length)));
+};
 
 /**
  * The "server" of the Customers module. Every write derives the account's country from the billing address, so the

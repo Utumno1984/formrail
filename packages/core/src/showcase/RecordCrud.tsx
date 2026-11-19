@@ -74,6 +74,12 @@ export type CrudNavigateEvent = { to: 'record'; id: string } | { to: 'create' } 
 export interface RecordCrudProps<T extends { id: string }, V extends object, D> {
   /** The record type: a static object, the same for the whole life of the shell. */
   module: RecordModule<T, V, D>;
+  /**
+   * #525: the "server" to use, when the app that hosts the shell keeps it across modules (a module that is left and
+   * shown again finds its records as they were). Absent: a new one per mount, from `module.createStore`. Chosen at
+   * mount; a later change of the prop is ignored.
+   */
+  store?: RecordStore<T, D>;
   /** How a list gesture (pill, search, sort) writes the URL. Navigation to a page is always a `push`. */
   history: 'replace' | 'push';
   listLoadDelayMs: number;
@@ -143,6 +149,7 @@ const showsToasts = (module: { create?: unknown; delete?: boolean; deleteMany?: 
 
 function CrudFlow<T extends { id: string }, V extends object, D>({
   module,
+  store: storeProp,
   toast,
   history,
   listLoadDelayMs,
@@ -158,8 +165,8 @@ function CrudFlow<T extends { id: string }, V extends object, D>({
   addons,
 }: RecordCrudProps<T, V, D> & { toast: Pick<UseToastReturn, 'show'> }) {
   const { name, noun, recordName } = module;
-  // One store per mount of the shell: nothing shared between stories, nor between two modules.
-  const [store] = useState(() => module.createStore());
+  // One store per mount of the shell (unless the app gives one, #525): nothing shared between stories, nor modules.
+  const [store] = useState(() => storeProp ?? module.createStore());
   const delays = useRef({ listLoadDelayMs, recordLoadDelayMs });
   const callbacks = useRef({ onNavigate, onSaved, onCreated, onDeleted });
   useEffect(() => {
