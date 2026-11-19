@@ -309,6 +309,32 @@ describe('Record editing integrity, customers: merging into an edited customer (
     expect(within(dialog).queryByRole('list', { name: 'Changes to save' })).toBeNull();
   }, 30_000);
 
+  it('the primary contact changed by both: each side named by its own contacts ("Yours" a contact only in my form)', async () => {
+    const { store } = renderCustomer();
+    await opened();
+    await userEvent.click(screen.getByRole('button', { name: 'Add contact' }));
+    await userEvent.type(textbox('Contact 3 name'), 'Ilse Visser');
+    await userEvent.type(textbox('Contact 3 e-mail'), 'ilse.visser@company.example');
+    await pick(combobox('Primary contact'), 'Ilse Visser');
+    await serverUpdate(store, (c) => ({ ...c, contacts: c.contacts.map((p) => ({ ...p, primary: p.id === 'cus-4-con-2' })) }));
+    expect(conflictTexts()).toEqual(['Primary contact Yours: Ilse Visser Server: Giulia Bellini Use server value Keep mine']);
+    expect(screen.getByRole('list', { name: 'Conflicts' })).not.toHaveTextContent(/new-contact-|cus-4-con-/);
+  }, 30_000);
+
+  it('the currency changed to yen and the limit retyped for it ("100000" for "100000.00" euros), then a server update: what I typed stays', async () => {
+    const { store } = renderCustomer();
+    await opened();
+    await pick(combobox('Currency'), 'JPY');
+    const limit = textbox(/^Credit limit/);
+    await retype(limit, '100000');
+    await serverUpdate(store, serverChangeOf('account-manager'));
+    expect(limit.value).toBe('100000');
+    expect(combobox('Currency')).toHaveTextContent('JPY');
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+    await userEvent.click(await saveButton());
+    expect(changesIn(await reviewDialog())).toEqual(['Currency, changed, from EUR to JPY', 'Credit limit, changed, from €100,000.00 to ¥100,000']);
+  }, 30_000);
+
   it('another customer changing on the server does not touch the open one', async () => {
     const { store } = renderCustomer();
     await opened();
