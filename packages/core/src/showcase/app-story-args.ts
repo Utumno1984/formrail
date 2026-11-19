@@ -2,6 +2,7 @@
 // (`Showcase/Record editing`, the main story and the navigation ones), in a file of their own so the stories file
 // reads as the stories.
 import { fn } from 'storybook/test';
+import { storyControls } from '../internal/story-docs';
 import { APP_MODULES, type RecordAppProps } from './RecordApp';
 
 /** The args of the app stories: the props of `RecordApp`. */
@@ -9,7 +10,8 @@ export type AppStoryArgs = RecordAppProps;
 
 const DELAY_RANGE = { type: 'range', min: 0, max: 3000, step: 100 } as const;
 
-export const APP_ARGTYPES = {
+// Every arg is a knob of the demo: filed under "Story controls", not as a prop of a component.
+export const APP_ARGTYPES = storyControls({
   module: {
     control: 'select',
     options: APP_MODULES.map((m) => m.name),
@@ -37,7 +39,7 @@ export const APP_ARGTYPES = {
     control: false,
     description: 'Called on the navigations the app starts: a link of the "Modules" bar, or the order\'s customer. Never on browser Back/Forward.',
   },
-} as const;
+});
 
 export const APP_ARGS = {
   module: 'sales-orders',
