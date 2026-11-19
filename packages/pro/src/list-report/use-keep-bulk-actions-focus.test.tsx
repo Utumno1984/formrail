@@ -918,7 +918,7 @@ describe('#582: an action inside a Tooltip keeps its tracking when the tooltip c
     await waitFor(() => expect(allBox()).toHaveFocus());
   });
 
-  it('a focusout that leaves the control the active element (another window took the focus): still tracked', async () => {
+  it('a focusout dispatched by code (not trusted) that leaves the control the active element: still tracked', async () => {
     setLaidOut(laidOutUnlessHidden);
     const { rerender } = render(<Host bulkActions={approve} />);
     const button = screen.getByRole('button', { name: 'Approve' });
@@ -1150,4 +1150,191 @@ describe('#582: disabled or inert on the focused control (not handled, as the TS
     rerender(<Host bulkActions={wrapped(false)} />);
     await waitFor(() => expect(allBox()).toHaveFocus());
   });
+});
+
+// #582, second review: only a `focusout` dispatched by code (not trusted) may leave the control tracked, and only when
+// the focus is still on it as the slot's root sees it. One dispatched by the browser is a focus that went, even when
+// the control stays the active element of its document: Firefox keeps a frame's active element on the control when
+// the focus goes to the parent document, as every browser does for its document when another window takes the focus.
+describe('#582: a focusout dispatched by the browser ends the tracking even when the control stays the active element', () => {
+  const hiddenApprove = () => (
+    <button type="button" hidden>
+      Approve
+    </button>
+  );
+  /** A same-origin iframe whose `Element`s are laid out unless detached or hidden, with a container for React. */
+  const inIframe = () => {
+    const iframe = document.body.appendChild(document.createElement('iframe'));
+    const frameWindow = iframe.contentWindow as unknown as typeof globalThis;
+    const doc = iframe.contentDocument!;
+    frameWindow.Element.prototype.checkVisibility = function (this: Element) {
+      return laidOutUnlessHidden(this);
+    };
+    return { iframe, doc, container: doc.body.appendChild(doc.createElement('div')) };
+  };
+
+  it('the frame in an iframe, the focus moved to a field of the parent document while the frame keeps the control as its active element (Firefox): untracked; hidden then, the field keeps the focus', async () => {
+    const field = document.body.appendChild(document.createElement('input'));
+    const { iframe, doc, container } = inIframe();
+    const { rerender } = render(<Host bulkActions={approve} />, { container });
+    const button = within(container).getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    const header = within(container).getByRole('checkbox', { name: 'Select all results' });
+    const headerFocus = vi.fn();
+    header.addEventListener('focus', headerFocus);
+    act(() => button.focus());
+    expect(doc.activeElement).toBe(button);
+    expect(mutationObserverOf(slot)).toBeDefined();
+    // What Firefox reports once the focus is in the parent document: the frame's active element is still the
+    // control, and its document has no focus. The `focusout` on the control is the browser's own (trusted).
+    const active = vi.spyOn(doc, 'activeElement', 'get').mockReturnValue(button);
+    const hasFocus = vi.spyOn(doc, 'hasFocus').mockReturnValue(false);
+    const focusouts: boolean[] = [];
+    button.addEventListener('focusout', (event) => focusouts.push(event.isTrusted));
+    await act(async () => field.focus());
+    expect(focusouts).toEqual([true]);
+    expect(field).toHaveFocus();
+    expect(doc.activeElement).toBe(button);
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    // The control hidden afterwards (an action of the parent clears the selection): nothing moves the focus back
+    // into the frame, where the next key would go.
+    rerender(<Host bulkActions={hiddenApprove} />);
+    await act(async () => {});
+    expect(headerFocus).not.toHaveBeenCalled();
+    expect(field).toHaveFocus();
+    active.mockRestore();
+    hasFocus.mockRestore();
+    iframe.remove();
+    field.remove();
+  });
+
+  it('another window takes the focus (the control stays the active element of its document, a trusted focusout): untracked; hidden then, the focus is not moved', async () => {
+    setLaidOut(laidOutUnlessHidden);
+    const { rerender } = render(<Host bulkActions={approve} />);
+    const button = screen.getByRole('button', { name: 'Approve' });
+    const slot = slotOf(button);
+    const headerFocus = vi.fn();
+    allBox().addEventListener('focus', headerFocus);
+    act(() => button.focus());
+    expect(mutationObserverOf(slot)).toBeDefined();
+    // The window loses the focus: the browser blurs the control (trusted) and keeps it as the active element.
+    const active = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(button);
+    const hasFocus = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+    await act(async () => button.blur());
+    expect(document.activeElement).toBe(button);
+    expect(mutationObserverOf(slot)).toBeUndefined();
+    rerender(<Host bulkActions={hiddenApprove} />);
+    await act(async () => {});
+    expect(headerFocus).not.toHaveBeenCalled();
+    active.mockRestore();
+    hasFocus.mockRestore();
+  });
+
+  /** A `TruncatedText` action after a "Before" button; `hidden` hides the action. */
+  const truncatedActions = (text: string, hidden = false) =>
+    function Actions() {
+      return (
+        <>
+          <button type="button">Before</button>
+          <TruncatedText tabIndex={0} data-testid="truncated" hidden={hidden}>
+            {text}
+          </TruncatedText>
+        </>
+      );
+    };
+  const LONG = 'Approve every selected invoice of this supplier';
+
+  /**
+   * Criterion 2 in another root: the action takes the focus from the keyboard (its tooltip opens), then its text fits
+   * again and the tooltip closes through the synthetic `focusout` it dispatches on its trigger (the focus stays). The
+   * control is still tracked in its root; hidden then, the focus goes to the header checkbox of that root.
+   */
+  async function tooltipClosedByForce(container: HTMLElement, activeElement: () => Element | null) {
+    const { rerender } = render(<Host bulkActions={truncatedActions(LONG)} />, { container });
+    const truncated = within(container).getByTestId('truncated');
+    const slot = slotOf(truncated);
+    setWidths(truncated, 500, 100);
+    act(() => within(container).getByRole('button', { name: 'Before' }).focus());
+    // A navigation key down: the focus that follows is the user's, so the tooltip opens on it.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    act(() => truncated.focus());
+    expect(activeElement()).toBe(truncated);
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+    const focusouts: boolean[] = [];
+    truncated.addEventListener('focusout', (event) => focusouts.push(event.isTrusted));
+    setWidths(truncated, 50, 100);
+    rerender(<Host bulkActions={truncatedActions('Approve')} />);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).toBeNull());
+    expect(focusouts).toEqual([false]);
+    await act(async () => {});
+    expect(activeElement()).toBe(truncated);
+    // The global document does not see the control (the host of the shadow root, or the iframe element: the
+    // iframe's focus is its own document's): reading the focus there would untrack the control.
+    expect(document.activeElement).not.toBe(truncated);
+    expect(mutationObserverOf(slot)).toBeDefined();
+    rerender(<Host bulkActions={truncatedActions('Approve', true)} />);
+    const header = within(container).getByRole('checkbox', { name: 'Select all results' });
+    await waitFor(() => expect(activeElement()).toBe(header));
+  }
+
+  for (const mode of ['open', 'closed'] as const) {
+    it(`inside a ${mode} shadow root: a TruncatedText action whose tooltip closes by force stays tracked; hidden then, the focus goes to the header checkbox`, async () => {
+      setLaidOut(laidOutUnlessHidden);
+      const host = document.body.appendChild(document.createElement('div'));
+      const root = host.attachShadow({ mode });
+      const container = root.appendChild(document.createElement('div'));
+      await tooltipClosedByForce(container, () => root.activeElement);
+      host.remove();
+    });
+  }
+
+  it('in another document (an iframe): a TruncatedText action whose tooltip closes by force stays tracked; hidden then, the focus goes to the header checkbox', async () => {
+    const { iframe, doc, container } = inIframe();
+    await tooltipClosedByForce(container, () => doc.activeElement);
+    iframe.remove();
+  });
+
+  // The early exit of a control not shown when its tracking starts reads the focus in the slot's root too: there the
+  // control holds it, so it stays tracked (with its observers) until the first change seen, as in the document.
+  for (const where of ['an open shadow root', 'a closed shadow root', 'an iframe'] as const) {
+    it(`an environment without layout, the frame in ${where}: the control holding the focus is tracked until the first change seen, the focus stays`, async () => {
+      let root: Document | ShadowRoot;
+      let container: HTMLElement;
+      let dispose: () => void;
+      if (where === 'an iframe') {
+        const frame = inIframe();
+        (frame.iframe.contentWindow as unknown as typeof globalThis).Element.prototype.checkVisibility = () => false;
+        ({ doc: root, container } = frame);
+        dispose = () => frame.iframe.remove();
+      } else {
+        setLaidOut(() => false);
+        const host = document.body.appendChild(document.createElement('div'));
+        root = host.attachShadow({ mode: where === 'an open shadow root' ? 'open' : 'closed' });
+        container = root.appendChild(document.createElement('div'));
+        dispose = () => host.remove();
+      }
+      const { rerender } = render(<Host bulkActions={approve} />, { container });
+      const button = within(container).getByRole('button', { name: 'Approve' });
+      const slot = slotOf(button);
+      act(() => button.focus());
+      expect(root.activeElement).toBe(button);
+      expect(document.activeElement).not.toBe(button);
+      const mutations = mutationObserverOf(slot)!;
+      expect(mutations).toBeDefined();
+      rerender(
+        <Host
+          bulkActions={() => (
+            <>
+              {approve()}
+              <button type="button">Export</button>
+            </>
+          )}
+        />,
+      );
+      await act(async () => {});
+      expect(mutations.targets).toEqual([]);
+      expect(root.activeElement).toBe(button);
+      dispose();
+    });
+  }
 });
