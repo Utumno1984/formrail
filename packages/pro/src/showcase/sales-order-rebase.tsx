@@ -3,7 +3,7 @@
 // `useAddons` add-on (#519). `useFormRebase` merges every server version the store announces into the open editor,
 // `RebaseNotice` shows the result above the page, a Field in conflict says so, and the "Review changes" dialog names
 // the server changes a save would overwrite. The rows of a conflict are named by the engine (`itemLabel`, #534).
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, MessageStrip } from '@formrail/core';
 import { addDays } from '../../../core/src/calendar/date-math';
 import { DEMO_REFERENCE_POOL, makeProducts, type DemoSalesOrderStatus } from '../../../core/src/internal/demo-data';
@@ -16,13 +16,20 @@ import type { OpenRebaseConflict, RebaseConflict } from '../form-rebase/types';
 import { useFormRebase } from '../form-rebase/use-form-rebase';
 import {
   NOTHING_LEFT_DESCRIPTION,
+  OverwrittenChanges,
+  REVIEW_LOCALE,
+  createReviewSource,
+  reviewDescription,
+  sameConflicts,
+  useReview,
+  type ReviewSource,
+} from './record-integrity';
+import {
   ORDER_ALSO_NOTE,
   ORDER_ONLY_DESCRIPTION,
-  REVIEW_LOCALE,
   SALES_ORDER_ARRAY_ID_KEYS,
   SALES_ORDER_LABELS,
   SalesOrderChanges,
-  reviewDescription,
   salesOrderEngine,
   salesOrderLineLabel,
   salesOrderReview,
@@ -132,7 +139,7 @@ export const REMOVED_HELP = 'Removed on the server.';
 export const DELETED_TITLE = 'This sales order was deleted on the server';
 export const DELETED_TEXT = 'Your changes are still in the form, but they can no longer be saved. Copy what you need, then go back to the list.';
 export const DELETED_REVIEW_DESCRIPTION = 'This sales order was deleted on the server: these changes can no longer be saved.';
-export const OVERWRITE_TITLE = 'You are overwriting a server change';
+export { OVERWRITE_TITLE } from './record-integrity';
 
 /** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
 const NOTICE_MARGIN = { margin: '12px 16px' } as const;
@@ -145,29 +152,8 @@ interface ReviewState {
   deleted: boolean;
 }
 
-function createReviewSource(initial: ReviewState) {
-  let state = initial;
-  const listeners = new Set<() => void>();
-  return {
-    get: () => state,
-    set: (next: ReviewState) => {
-      state = next;
-      for (const listener of [...listeners]) listener();
-    },
-    subscribe: (listener: () => void) => {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
-  };
-}
-type ReviewSource = ReturnType<typeof createReviewSource>;
-
-function useReview(source: ReviewSource) {
-  return useSyncExternalStore(source.subscribe, source.get, source.get);
-}
-
 /** The description of the review, recomputed when the form changes under the dialog. */
-function ReviewDescription({ source }: { source: ReviewSource }) {
+function ReviewDescription({ source }: { source: ReviewSource<ReviewState> }) {
   const { context, deleted } = useReview(source);
   if (deleted) return <>{DELETED_REVIEW_DESCRIPTION}</>;
   const { entries, reorders } = salesOrderReview(context);
@@ -176,28 +162,17 @@ function ReviewDescription({ source }: { source: ReviewSource }) {
 }
 
 /** The body of the review: the server changes the save would overwrite, then the changes to save. */
-function ReviewBody({ source }: { source: ReviewSource }) {
+function ReviewBody({ source }: { source: ReviewSource<ReviewState> }) {
   const { context, conflicts } = useReview(source);
   const { entries, reorders } = salesOrderReview(context);
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      {conflicts.length > 0 ? (
-        <MessageStrip tone="warning" live={false} title={OVERWRITE_TITLE}>
-          <ul aria-label="Server changes you overwrite" style={{ margin: 0, paddingInlineStart: 20 }}>
-            {conflicts.map((conflict) => (
-              <li key={conflict.path}>{conflict.label}</li>
-            ))}
-          </ul>
-        </MessageStrip>
-      ) : null}
+      <OverwrittenChanges conflicts={conflicts} />
       {entries.length > 0 ? <SalesOrderChanges entries={entries} currency={context.baseline.currency} /> : null}
       {reorders.length > 0 && entries.length > 0 ? <p style={{ margin: 0 }}>{ORDER_ALSO_NOTE}</p> : null}
     </div>
   );
 }
-
-const sameConflicts = (a: readonly OpenRebaseConflict[], b: readonly OpenRebaseConflict[]): boolean =>
-  a.length === b.length && a.every((c, i) => c.path === b[i]?.path && c.label === b[i]?.label);
 
 /**
  * The hook plugged into the editor (`useAddons`). It never changes the order of its hooks: the editor calls it at
@@ -248,7 +223,7 @@ export function useSalesOrderRebase({ form, record, store, toValues, scrollerRef
   const { conflicts } = rebase;
 
   // The review dialog reads the form through this source while it is open: an update may land under it.
-  const [review] = useState(() => createReviewSource({ context: { values: form.values, baseline: form.baseline }, conflicts, deleted }));
+  const [review] = useState(() => createReviewSource<ReviewState>({ context: { values: form.values, baseline: form.baseline }, conflicts, deleted }));
   useEffect(() => {
     const current = review.get();
     if (current.context.values === form.values && current.context.baseline === form.baseline && sameConflicts(current.conflicts, conflicts) && current.deleted === deleted) return;

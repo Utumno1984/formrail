@@ -25,9 +25,10 @@ import { ChangeSummary } from '../change-summary/ChangeSummary';
 import { computeChangeSummaryResult } from '../change-summary/compute-change-summary';
 import { DEFAULT_VALUE_LABELS, formatChangeValue } from '../change-summary/format-change-value';
 import type { ChangeEntry, ChangeSummaryResult, ItemLabelContext } from '../change-summary/types';
+import { REVIEW_LOCALE, absentText, fieldAsChange, reviewDescription, reviewValue } from './record-integrity';
 
-/** Fixed in the story, so the texts (and the visual baselines) do not depend on the machine. */
-export const REVIEW_LOCALE = 'en-US';
+// What every module's review shares (#524) lives in record-integrity.tsx; re-exported for the files that read it here.
+export { NOTHING_LEFT_DESCRIPTION, REVIEW_LOCALE, reviewDescription } from './record-integrity';
 
 export type SalesOrderReviewContext = RecordSaveReviewContext<SalesOrderValues>;
 
@@ -136,24 +137,6 @@ function lineText(value: unknown, currency: DemoCurrency): string | null {
 }
 
 /**
- * "No value" in its three forms, told apart (spec §1.13.1): `''` is `Empty`, `null` is `Null`, `undefined` is
- * `Missing` when the entry says that side has no key, else `Undefined`. The side being rendered is the one whose
- * value is `undefined`; when BOTH sides are `undefined` (a key present with `undefined` against a missing one) the
- * two calls get the same arguments and cannot be told apart (the declared limit of `renderValue`, §1.13.1 point 4).
- */
-function absentText(value: '' | null | undefined, entry: ChangeEntry): string {
-  if (value === '') return DEFAULT_VALUE_LABELS.empty;
-  if (value === null) return DEFAULT_VALUE_LABELS.nullValue;
-  const missing =
-    entry.before === undefined && entry.after !== undefined
-      ? entry.beforeMissing
-      : entry.after === undefined && entry.before !== undefined
-        ? entry.afterMissing
-        : false;
-  return missing ? DEFAULT_VALUE_LABELS.missingValue : DEFAULT_VALUE_LABELS.undefinedValue;
-}
-
-/**
  * The values as the user knows them, in the order's `currency`: the status by its label (`Confirmed`, not
  * `confirmed`), the dates as dates, a product by its name, a unit price as money, a whole line as a sentence. A
  * value these do not recognize (a text the rule refuses, typed in a field in conflict) reads as typed.
@@ -195,14 +178,7 @@ export function salesOrderEngine(currency: DemoCurrency): SalesOrderEngine {
   if (!engine) {
     engine = {
       isEqual: isEqualIn(currency),
-      renderValue: (value, entry) => {
-        const muted = value === '' || value === null || value === undefined;
-        return (
-          <span className={muted ? 'rop-pro-change-summary__value rop-pro-change-summary__value--muted' : 'rop-pro-change-summary__value'}>
-            {salesOrderValueText(value, entry, currency)}
-          </span>
-        );
-      },
+      renderValue: (value, entry) => reviewValue(value, salesOrderValueText(value, entry, currency)),
     };
     ENGINES.set(currency, engine);
   }
@@ -213,7 +189,8 @@ export function salesOrderEngine(currency: DemoCurrency): SalesOrderEngine {
  * The review of a save, from ONE run of the engine against the SAVED order (`baseline`, the record as the server
  * last returned it, never the values the page opened with): the entries, rows named by {@link salesOrderLineLabel},
  * and the reorders (`lines` when the lines present on both sides changed their relative order). The currency is the
- * saved order's (it is the customer's, fixed once the order exists).
+ * saved order's (it is the customer's, fixed once the order exists). A field of the order with no value on one side
+ * reads as a change from or to that absence (`fieldAsChange`, record-integrity.tsx).
  */
 export function salesOrderReview({ values, baseline }: SalesOrderReviewContext): ChangeSummaryResult {
   const result = computeChangeSummaryResult<SalesOrderValues>({
@@ -227,33 +204,8 @@ export function salesOrderReview({ values, baseline }: SalesOrderReviewContext):
   return { ...result, entries: result.entries.map((entry) => fieldAsChange(entry, values, baseline)) };
 }
 
-/**
- * A field of the order (a top-level key, never a line) with no value on one side: the engine reports it as `added`
- * or `removed`, which shows only the side that has a value and normalizes a `null` to `undefined`. A field is not
- * added to an order nor removed from it, and `''`, `null` and a missing key must read differently (spec §1.13.1:
- * a backend tells "cleared" from "not sent"). So it reads as a change from or to that absence, with both sides taken
- * from the two records as they are: `Notes, changed, from Null to Call first.`, `from Missing to ...`. Same path,
- * label and count of entries: only the kind and the absent side change. A line (`lines.2`) keeps `added`/`removed`.
- */
-function fieldAsChange(entry: ChangeEntry, values: SalesOrderValues, baseline: SalesOrderValues): ChangeEntry {
-  if (entry.kind === 'changed' || entry.path.includes('.')) return entry;
-  const key = entry.path as keyof SalesOrderValues;
-  return {
-    ...entry,
-    kind: 'changed',
-    before: baseline[key],
-    after: values[key],
-    beforeMissing: !Object.hasOwn(baseline, key),
-    afterMissing: !Object.hasOwn(values, key),
-  };
-}
-
-/** `1 change will be saved.`, `3 changes will be saved.` */
-export const reviewDescription = (n: number): string => (n === 1 ? '1 change will be saved.' : `${n} changes will be saved.`);
-
 export const ORDER_ONLY_DESCRIPTION = 'Only the order of the lines changed.';
 export const ORDER_ALSO_NOTE = 'The order of the lines also changed.';
-export const NOTHING_LEFT_DESCRIPTION = 'Nothing left to save.';
 
 /** The list of the review: the changes, in the order's currency. */
 export function SalesOrderChanges({ entries, currency }: { entries: ChangeEntry[]; currency: DemoCurrency }) {
