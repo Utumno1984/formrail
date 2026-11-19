@@ -346,4 +346,138 @@ test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
     expect(size.scroll).toBeLessThanOrEqual(size.client);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
+
+  test.describe('kind badges (#485)', () => {
+    test('the EditedInvoice play function passes (text, tint and shape of each badge)', async ({ page }) => {
+      await expectPlayToPass(page, EDITED);
+    });
+
+    test('each kind has its own decorative shape and tint, with no node and no accessible text for the icon', async ({ page }) => {
+      await gotoStory(page, EDITED);
+      const info = await page.evaluate(() =>
+        ['added', 'removed', 'changed'].map((kind) => {
+          const el = document.querySelector(`.rop-pro-change-summary__kind--${kind}`) as HTMLElement;
+          const before = getComputedStyle(el, '::before');
+          return {
+            text: el.textContent,
+            children: el.children.length,
+            content: before.content,
+            shape: before.clipPath,
+            width: before.width,
+            tint: getComputedStyle(el).backgroundColor,
+          };
+        }),
+      );
+      expect(info.map((i) => i.text)).toEqual(['added', 'removed', 'changed']);
+      for (const i of info) {
+        expect(i.children).toBe(0);
+        expect(i.content).toBe('""');
+        expect(parseFloat(i.width)).toBeGreaterThan(4);
+      }
+      expect(new Set(info.map((i) => i.shape)).size).toBe(3);
+      expect(new Set(info.map((i) => i.tint)).size).toBe(3);
+    });
+
+    test('forced-colors: the 1px outline and the icon are kept', async ({ page }) => {
+      await page.emulateMedia({ forcedColors: 'active' });
+      await gotoStory(page, EDITED);
+      for (const kind of ['added', 'removed', 'changed']) {
+        const badge = page.locator(`.rop-pro-change-summary__kind--${kind}`).first();
+        await expect(badge).toHaveCSS('outline-width', '1px');
+        await expect(badge).toHaveCSS('outline-style', 'solid');
+        const icon = await badge.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+        expect(icon).not.toBe('rgba(0, 0, 0, 0)');
+      }
+    });
+
+    // 320px is the 200% zoom of a 640px viewport: the badge stays whole and inside the box.
+    for (const [name, width] of [
+      ['320px (200% zoom of 640px)', 320],
+      ['375px', 375],
+      ['1280px', 1280],
+    ] as const) {
+      test(`LongValues at ${name}: a badge next to a long label is one line and inside the box`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await expectPlayToPass(page, LONG_VALUES);
+        const box = (await page.locator('.rop-pro-change-summary').boundingBox())!;
+        const badges = page.locator('.rop-pro-change-summary__kind');
+        expect(await badges.count()).toBe(2);
+        for (let i = 0; i < 2; i++) {
+          const b = (await badges.nth(i).boundingBox())!;
+          expect(b.x).toBeGreaterThanOrEqual(box.x);
+          expect(b.x + b.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
+          // One line of the caption text: never split in the middle.
+          expect(await badges.nth(i).evaluate((el) => el.getClientRects().length)).toBe(1);
+          const lineHeight = await badges.nth(i).evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+          expect(b.height).toBeLessThan(lineHeight * 1.6);
+        }
+      });
+    }
+
+    // The icon is drawn by `::before` and a break opportunity sits between it and the text: at
+    // some widths the diamond ended a line and the word started the next. The test makes the
+    // unfavourable condition explicit (wider letters, bigger text) so it does not depend on the
+    // fonts of the machine running it.
+    for (const id of [EDITED, VALUE_TYPES, LONG_VALUES]) {
+      for (const width of [320, 375]) {
+        test(`${id} at ${width}px, with wide text: every badge is a single rectangle (icon and text never split)`, async ({ page }) => {
+          await page.setViewportSize({ width, height: 1600 });
+          await gotoStory(page, id);
+          await page.locator('.rop-pro-change-summary__kind').first().waitFor();
+          await page.addStyleTag({
+            content: '.rop-pro-change-summary { font-size: 20px; letter-spacing: 0.12em; }',
+          });
+          const rects = await page.evaluate(() =>
+            [...document.querySelectorAll('.rop-pro-change-summary__kind')].map((el) => ({
+              text: el.textContent,
+              rects: el.getClientRects().length,
+            })),
+          );
+          expect(rects.length).toBeGreaterThan(0);
+          expect(rects.filter((r) => r.rects !== 1)).toEqual([]);
+        });
+      }
+    }
+
+    // The icon is a `::before` out of the flow, so its place is only measurable from the computed
+    // geometry: the box is the badge's first rect (position: relative) plus the resolved `left`
+    // and `width` of the pseudo-element. It must sit wholly in the leading padding, before the
+    // text in the reading direction: left of the text in LTR, right of it in RTL.
+    for (const dir of ['ltr', 'rtl'] as const) {
+      test(`the badge icon sits in the leading padding, before the text, with dir="${dir}"`, async ({ page }) => {
+        await page.setViewportSize({ width: 800, height: 800 });
+        await gotoStory(page, EDITED);
+        await page.locator('.rop-pro-change-summary__kind').first().waitFor();
+        await page.locator('.rop-pro-change-summary').evaluate((el, d) => el.setAttribute('dir', d), dir);
+        const geo = await page.evaluate(() =>
+          [...document.querySelectorAll<HTMLElement>('.rop-pro-change-summary__kind')].map((el) => {
+            const badge = el.getClientRects()[0]!;
+            const before = getComputedStyle(el, '::before');
+            const left = badge.left + parseFloat(before.left);
+            const iconWidth = parseFloat(before.width);
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            const text = range.getClientRects()[0]!;
+            return {
+              badge: { left: badge.left, right: badge.right },
+              icon: { left, right: left + iconWidth },
+              text: { left: text.left, right: text.right },
+            };
+          }),
+        );
+        expect(geo.length).toBeGreaterThan(0);
+        for (const g of geo) {
+          expect(g.icon.right - g.icon.left).toBeGreaterThan(0);
+          // Inside the badge and clear of the text, with a sub-pixel tolerance.
+          expect(g.icon.left).toBeGreaterThanOrEqual(g.badge.left - 0.5);
+          expect(g.icon.right).toBeLessThanOrEqual(g.badge.right + 0.5);
+          if (dir === 'ltr') {
+            expect(g.icon.right).toBeLessThanOrEqual(g.text.left + 0.5);
+          } else {
+            expect(g.icon.left).toBeGreaterThanOrEqual(g.text.right - 0.5);
+          }
+        }
+      });
+    }
+  });
 });

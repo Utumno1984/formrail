@@ -65,11 +65,6 @@ const CHECK_ICON = (
     <path d="M8 12.5l3 3 5-6" />
   </svg>
 );
-const KIND_CLASS: Record<ChangeKind, string> = {
-  added: 'rop-pro-change-summary__kind--added',
-  removed: 'rop-pro-change-summary__kind--removed',
-  changed: 'rop-pro-change-summary__kind--changed',
-};
 
 /**
  * A comma for assistive technology only, in the middle of a line of text. It stays `display:
@@ -101,6 +96,9 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
   const emptyText = emptyLabel.trim() ? emptyLabel : 'No changes';
   const format: FormatChangeValueOptions = { locale, timeZone, labels: valueLabels };
   const labels = { ...DEFAULT_VALUE_LABELS, ...definedOnly(valueLabels) };
+
+  // A blank text for a kind would leave an icon with no name for assistive technology: the default text.
+  const kindText = (kind: ChangeKind): string => (String(labels[kind]).trim() ? labels[kind] : DEFAULT_VALUE_LABELS[kind]);
 
   const text = (value: unknown, level: FormatLevel): string => formatChangeValueAt(value, format, level);
 
@@ -162,8 +160,8 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
                 <span className={`${CS}__head`}>
                   <span className={`${CS}__label`}>{entry.label}</span>
                   <Pause />
-                  <span className={`${CS}__kind ${KIND_CLASS[entry.kind]}`}>
-                    {labels[entry.kind]}
+                  <span className={`${CS}__kind ${CS}__kind--${entry.kind}`}>
+                    {kindText(entry.kind)}
                   </span>
                   <Pause />
                 </span>
