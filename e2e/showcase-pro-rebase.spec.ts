@@ -361,17 +361,46 @@ test.describe('Pro/Showcase/Invoices with Change Summary: server updates (#384)'
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
   });
 
-  test('two updates in a row with different conflicts: only the conflicts of the last one, no ghost', async ({ page }) => {
+  // #584 (decision of 2026-11-17, conflicts accumulate): rewritten from "two updates in a row with different conflicts:
+  // only the conflicts of the last one, no ghost" (#384), which expected one conflict (Notes) and no description on Due date.
+  test('two updates in a row with different conflicts: the conflict of the first stays next to the second, no ghost', async ({ page }) => {
     const record = await openRecord(page);
     await dueDate(page).fill('2026-03-05');
     await notes(page).fill('Mine');
     await serverPatch(page, record.id, { dueDate: '2026-03-12' });
     await expect(conflicts(page)).toHaveCount(1);
     await serverPatch(page, record.id, { notes: 'Theirs' });
-    await expect(conflicts(page).first()).toContainText(/^Notes/);
+    await expect(conflicts(page)).toHaveCount(2);
+    await expect(conflicts(page).nth(0)).toContainText(/^Due date/);
+    await expect(conflicts(page).nth(1)).toContainText(/^Notes/);
+    await expect(dueDate(page)).toHaveAccessibleDescription('Changed on the server too.');
+    await expect(notes(page)).toHaveAccessibleDescription('Changed on the server too.');
+    // No ghost: the description goes with the conflict it belongs to, the other one stays.
+    await page.getByRole('button', { name: 'Use server value for Due date' }).click();
+    await expect(dueDate(page)).toHaveValue('2026-03-12');
     await expect(conflicts(page)).toHaveCount(1);
     await expect(dueDate(page)).not.toHaveAccessibleDescription('Changed on the server too.');
     await expect(notes(page)).toHaveAccessibleDescription('Changed on the server too.');
+  });
+
+  test('two updates in a row: the review lists the server change of the first update as overwritten while its conflict is open (#584)', async ({ page }) => {
+    const record = await openRecord(page);
+    await dueDate(page).fill('2026-03-05');
+    await notes(page).fill('Mine');
+    await serverPatch(page, record.id, { dueDate: '2026-03-12' });
+    await expect(conflicts(page)).toHaveCount(1);
+    // The second update changes only the notes: the due date conflict of the first one is still open.
+    await serverPatch(page, record.id, { notes: 'Theirs' });
+    await expect(conflicts(page)).toHaveCount(2);
+    await saveButton(page).click();
+    const overwritten = reviewDialog(page).getByRole('list', { name: 'Server changes you overwrite' }).getByRole('listitem');
+    await expect(overwritten).toHaveText(['Due date', 'Notes']);
+    await reviewDialog(page).getByRole('button', { name: 'Keep editing' }).click();
+    // Resolved: no longer overwritten.
+    await page.getByRole('button', { name: 'Keep mine for Notes' }).click();
+    await expect(conflicts(page)).toHaveCount(1);
+    await saveButton(page).click();
+    await expect(overwritten).toHaveText(['Due date']);
   });
 
   test('Discard with an open conflict: back to the server values, the notice closed', async ({ page }) => {
@@ -865,9 +894,17 @@ test.describe('Pro showcase at 390x500: the notice leaves the editor room, also 
     await blur(page);
     const before = await fieldSpots(page);
     const rowBefore = await heightOf(noticeRow(page));
-    // A new update: the server changes the Status only. The conflicts of the previous one are gone ("1 field was
-    // updated."), the notice is shorter than its cap: it renders, and must scroll by its own change only.
-    await serverPatch(page, record.id, { status: NEXT_STATUS[record.status] });
+    // #584 (decision of 2026-11-18): the conflicts accumulate, so an update on the Status only (the step before) no
+    // longer closes them. Rewritten: the new update changes the Status AND brings the four fields to the user's values,
+    // so the conflicts are gone because the server reached the user's value ("1 field was updated."); the notice is
+    // shorter than its cap: it renders, and must scroll by its own change only. Geometry checks unchanged.
+    await serverPatch(page, record.id, {
+      status: NEXT_STATUS[record.status],
+      dueDate: '2026-03-05',
+      amount: 1234.56,
+      notes: LONG_MINE,
+      lineItems: record.lineItems.map((line, i) => (i === 0 ? { ...line, description: `${LONG_MINE} (line)` } : line)),
+    });
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(notice(page)).toContainText('1 field was updated.');
     expect(await heightOf(noticeRow(page))).toBeLessThan(rowBefore - 1);

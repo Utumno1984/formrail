@@ -293,6 +293,16 @@ function RowConflictsDemo({ onServerUpdate, rowLabels = 'position' }: DemoArgs) 
     rebase(incoming);
   };
 
+  // Another update, on another field (#584): another user renames "Desk". The open conflicts stay open.
+  const simulateAnotherServerUpdate = () => {
+    const incoming: Order = {
+      lineItems: server.current.lineItems.map((row) => (row.id === 'line-1' ? { ...row, name: 'Standing desk' } : row)),
+    };
+    server.current = incoming;
+    onServerUpdate(incoming);
+    rebase(incoming);
+  };
+
   const setLines = (lineItems: Row[]) => form.setValue('lineItems', lineItems);
   const update = (id: string, patch: Partial<Row>) => setLines(lines.map((row) => (row.id === id ? { ...row, ...patch } : row)));
 
@@ -319,6 +329,9 @@ function RowConflictsDemo({ onServerUpdate, rowLabels = 'position' }: DemoArgs) 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <Button variant="secondary" onClick={simulateServerUpdate}>
           Simulate server update
+        </Button>
+        <Button variant="secondary" onClick={simulateAnotherServerUpdate}>
+          Simulate another server update
         </Button>
         <Button variant="secondary" onClick={() => form.reset()}>
           Discard
@@ -431,6 +444,11 @@ export const RowConflicts: Story = {
  * position, as it is now. The play function changes the quantity of "Lamp" (third line), simulates the server update
  * (the conflict reads `Line items > Item 3 (Lamp) > Quantity`), moves "Lamp" up twice (`Item 1 (Lamp)`), renames it
  * "Desk lamp" (`Item 1 (Desk lamp)`) and keeps its own value: the choice buttons carry the same name.
+ *
+ * Several updates in a row (#584): "Simulate another server update" renames "Desk" (another field). The play then
+ * changes the quantity of "Chair", simulates the update (conflicts on "Lamp" and "Chair") and the other update: the two
+ * conflicts of the first update stay open (they accumulate until resolved), while "Applied server changes" lists the
+ * last update only (the rename). It ends by resolving them one by one.
  */
 export const MovedRowConflict: Story = {
   args: { rowLabels: 'name' },
@@ -463,5 +481,30 @@ export const MovedRowConflict: Story = {
     await waitFor(() => expect(conflictTexts()).toEqual([]));
     await expect(quantity(1)).toHaveValue('7');
     await expect(args.onServerUpdate).toHaveBeenCalledTimes(1);
+
+    // Two server updates in a row before resolving (#584). Lines now: "Desk lamp", "Desk", "Chair".
+    const { appliedTexts } = rowsCanvas(canvasElement);
+    const chair = `Line items > ${args.rowLabels === 'name' ? 'Item 3 (Chair)' : 'Item 3'} > Quantity`;
+    await userEvent.clear(quantity(3));
+    await userEvent.type(quantity(3), '5');
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate server update' }));
+    const both = [`${lamp(1, 'Desk lamp')}: yours "7", server "22"`, `${chair}: yours "5", server "24"`];
+    await waitFor(() => expect(conflictTexts()).toEqual(both));
+    // The other update renames "Desk" only: the conflicts of the first one stay open, applied is the rename.
+    await userEvent.click(canvas.getByRole('button', { name: 'Simulate another server update' }));
+    await waitFor(() => expect(name(2)).toHaveValue('Standing desk'));
+    await expect(conflictTexts()).toEqual(both);
+    await expect(appliedTexts()).toEqual([
+      `Line items > ${args.rowLabels === 'name' ? 'Item 2 (Standing desk)' : 'Item 2'} > Name: "Desk" → "Standing desk"`,
+    ]);
+    await expect(args.onServerUpdate).toHaveBeenCalledTimes(3);
+
+    // Resolved one by one: the other stays.
+    await userEvent.click(canvas.getByRole('button', { name: `Accept server value for ${chair}` }));
+    await expect(quantity(3)).toHaveValue('24');
+    await waitFor(() => expect(conflictTexts()).toEqual([both[0]]));
+    await userEvent.click(canvas.getByRole('button', { name: `Keep my value for ${lamp(1, 'Desk lamp')}` }));
+    await waitFor(() => expect(conflictTexts()).toEqual([]));
+    await expect(quantity(1)).toHaveValue('7');
   },
 };
