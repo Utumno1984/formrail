@@ -32,14 +32,18 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
    */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
   /**
-   * Text shown when `entries` is empty, next to a decorative check icon. Default: `No changes`. An
+   * Text shown when `entries` is empty, next to a decorative check icon. An
    * empty or blank string (`""`, `"  "`) also gives the default text: an empty box next to the
    * icon would read as a summary that is still loading, which is what this state must not look like.
+   *
+   * @default 'No changes'
    */
   emptyLabel?: string;
   /**
    * Accessible name of the list, and of the group that holds `emptyLabel` when there is no entry
-   * (so the name does not disappear with the list). Default: `Changes`.
+   * (so the name does not disappear with the list).
+   *
+   * @default 'Changes'
    */
   label?: string;
   /** BCP 47 locale of the default number and date formatting. Default: the runtime locale. */
@@ -54,7 +58,6 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
 // emitted by both pro and core collides by source order (see the header of that file). Nothing here
 // is animated. Plain literals at module level (a template literal there is not tree-shaken).
 const CS = 'rop-pro-change-summary';
-const DEFAULT_EMPTY_LABEL = 'No changes';
 // Own drawing (24x24, `currentColor`): core's icon set is not part of its public API.
 const CHECK_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -92,10 +95,10 @@ function Hidden({ children }: { children: ReactNode }) {
  * build your own list on top of `useChangeSummary`.
  */
 export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSummaryProps>(function ChangeSummary(
-  { entries, renderValue, emptyLabel, label = 'Changes', locale, timeZone, valueLabels, className, ...rest },
+  { entries, renderValue, emptyLabel = 'No changes', label = 'Changes', locale, timeZone, valueLabels, className, ...rest },
   ref,
 ) {
-  const emptyText = typeof emptyLabel === 'string' && emptyLabel.trim() !== '' ? emptyLabel : DEFAULT_EMPTY_LABEL;
+  const emptyText = emptyLabel.trim() ? emptyLabel : 'No changes';
   const format: FormatChangeValueOptions = { locale, timeZone, labels: valueLabels };
   const labels = { ...DEFAULT_VALUE_LABELS, ...definedOnly(valueLabels) };
 
