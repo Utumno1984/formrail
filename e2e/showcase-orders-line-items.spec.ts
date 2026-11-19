@@ -163,7 +163,7 @@ test.describe('Showcase/Record editing, orders: lines (migrated from Showcase/In
     await expect(bar(page)).toBeHidden();
     const lines = (await storedLines(page, THREE)) as { id: string; productId: string; quantity: number; unitPriceMinor: number; discountPercent: number }[];
     expect(lines.map((l) => l.id)).toEqual([before[0]!.id, before[2]!.id, before[1]!.id, 'new-1']);
-    expect(lines[3]).toEqual({ id: 'new-1', productId: expect.stringMatching(/^prd-/) as string, quantity: 2, unitPriceMinor: 15000, discountPercent: 0 });
+    expect(lines[3]).toEqual({ id: 'new-1', productId: expect.stringMatching(/^prd-/) as unknown as string, quantity: 2, unitPriceMinor: 15000, discountPercent: 0 });
     expect(typeof lines[0]!.quantity).toBe('number');
     await expect(price(page, 4)).toHaveValue('150.00');
   });
