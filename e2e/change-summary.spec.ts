@@ -438,5 +438,46 @@ test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
         });
       }
     }
+
+    // The icon is a `::before` out of the flow, so its place is only measurable from the computed
+    // geometry: the box is the badge's first rect (position: relative) plus the resolved `left`
+    // and `width` of the pseudo-element. It must sit wholly in the leading padding, before the
+    // text in the reading direction: left of the text in LTR, right of it in RTL.
+    for (const dir of ['ltr', 'rtl'] as const) {
+      test(`the badge icon sits in the leading padding, before the text, with dir="${dir}"`, async ({ page }) => {
+        await page.setViewportSize({ width: 800, height: 800 });
+        await gotoStory(page, EDITED);
+        await page.locator('.rop-pro-change-summary__kind').first().waitFor();
+        await page.locator('.rop-pro-change-summary').evaluate((el, d) => el.setAttribute('dir', d), dir);
+        const geo = await page.evaluate(() =>
+          [...document.querySelectorAll<HTMLElement>('.rop-pro-change-summary__kind')].map((el) => {
+            const badge = el.getClientRects()[0]!;
+            const before = getComputedStyle(el, '::before');
+            const left = badge.left + parseFloat(before.left);
+            const iconWidth = parseFloat(before.width);
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            const text = range.getClientRects()[0]!;
+            return {
+              badge: { left: badge.left, right: badge.right },
+              icon: { left, right: left + iconWidth },
+              text: { left: text.left, right: text.right },
+            };
+          }),
+        );
+        expect(geo.length).toBeGreaterThan(0);
+        for (const g of geo) {
+          expect(g.icon.right - g.icon.left).toBeGreaterThan(0);
+          // Inside the badge and clear of the text, with a sub-pixel tolerance.
+          expect(g.icon.left).toBeGreaterThanOrEqual(g.badge.left - 0.5);
+          expect(g.icon.right).toBeLessThanOrEqual(g.badge.right + 0.5);
+          if (dir === 'ltr') {
+            expect(g.icon.right).toBeLessThanOrEqual(g.text.left + 0.5);
+          } else {
+            expect(g.icon.left).toBeGreaterThanOrEqual(g.text.right - 0.5);
+          }
+        }
+      });
+    }
   });
 });

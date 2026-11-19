@@ -92,9 +92,13 @@
      wraps between words, and anywhere as a last resort, so it never leaves the box.
      The icon is out of the text flow (absolute, in the left padding of the first line): an inline-block
      next to the text would leave a break opportunity between the two, and the shape could end a line
-     with its word on the next. Padding and icon belong to the first fragment, so they never split. */
+     with its word on the next. Padding and icon belong to the first fragment, so they never split.
+     Trade-off: when a long custom label wraps onto more lines, only the first line has the leading
+     padding, the next lines restart flush with the badge edge. Accepted over repeating the padding
+     (`box-decoration-break: clone` would also repeat the icon space and the outline).
+     Logical properties (ms/pe/ps/start): the icon follows the reading direction (right in RTL). */
   .rop-pro-change-summary__kind {
-    @apply relative ml-2 rounded-rop-sm pr-1 pl-[calc(0.5rem+0.75em)] text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
+    @apply relative ms-2 rounded-rop-sm pe-1 ps-[calc(0.5rem+0.75em)] text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
     background-color: color-mix(in srgb, var(--_cs-tone) 12%, var(--color-rop-surface));
     color: color-mix(in srgb, var(--_cs-tone) 45%, black);
     /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
@@ -102,7 +106,7 @@
     outline-offset: -1px;
 
     &::before {
-      @apply absolute top-[0.2em] left-1 size-[0.75em];
+      @apply absolute top-[0.2em] start-1 size-[0.75em];
       content: '';
       background-color: currentColor;
       clip-path: var(--_cs-shape);
