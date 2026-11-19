@@ -168,6 +168,11 @@ export const REMOVED_HELP = 'Removed on the server.';
 export const DELETED_TITLE = 'This sales order was deleted on the server';
 export const DELETED_TEXT = 'Your changes are still in the form, but they can no longer be saved. Copy what you need, then go back to the list.';
 export const DELETED_REVIEW_DESCRIPTION = 'This sales order was deleted on the server: these changes can no longer be saved.';
+/**
+ * #583: why "Save changes" of the review cannot be used once the order is deleted on the server (the reason the button
+ * is described by). Short, about the button: the dialog's description already says what happened to the changes.
+ */
+export const DELETED_SAVE_REASON = 'Unavailable: this sales order no longer exists on the server.';
 export { OVERWRITE_TITLE } from './record-integrity';
 
 /** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
@@ -332,6 +337,10 @@ export function useSalesOrderRebase({ form, record, store, toValues, scrollerRef
     ) : null,
     fieldHelp,
     reviewSave,
+    // #583: one source, the deletion the store announced, whenever it landed: before Save was pressed (the review
+    // opens with "Save changes" unavailable) or while the review is open (the button turns unavailable under it).
+    // Read by the shell at every render, so both reach the dialog the same way; never a "not found" from a save.
+    confirmDisabledReason: deleted ? DELETED_SAVE_REASON : undefined,
   };
 }
 
