@@ -24,6 +24,8 @@ interface DemoArgs {
   description: string;
   confirmLabel: string;
   cancelLabel: string;
+  /** Blank: the prop is not effective (the confirm button works). */
+  confirmDisabledReason: string;
   /** Milliseconds the simulated server round-trip of `onConfirm` takes (0: synchronous). */
   pendingMs: number;
   onConfirm: () => void;
@@ -44,6 +46,8 @@ const meta: Meta<DemoArgs> = {
     description: { control: 'text' },
     confirmLabel: { control: 'text' },
     cancelLabel: { control: 'text' },
+    // Blank (the default): no reason, the confirm button works. Type one to make it `aria-disabled`.
+    confirmDisabledReason: { control: 'text' },
     onConfirm: { control: false },
     onCancel: { control: false },
     onOpenChange: { control: false },
@@ -61,6 +65,7 @@ const meta: Meta<DemoArgs> = {
     description: 'The invoice and its 3 attachments are deleted for good. This cannot be undone.',
     confirmLabel: 'Delete invoice',
     cancelLabel: 'Cancel',
+    confirmDisabledReason: '',
     pendingMs: 600,
     onConfirm: fn(),
     onCancel: fn(),
@@ -114,6 +119,7 @@ function Demo({ args, initialOpen = false, onConfirmOverride }: { args: DemoArgs
         description={args.description}
         confirmLabel={args.confirmLabel}
         cancelLabel={args.cancelLabel}
+        confirmDisabledReason={args.confirmDisabledReason}
         onCancel={args.onCancel}
         onConfirm={() => {
           args.onConfirm();
@@ -294,6 +300,56 @@ export const ReviewStep: Story = {
     await expect(args.onConfirm).not.toHaveBeenCalled();
     await expect(args.onCancel).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(opener).toHaveFocus());
+  },
+};
+
+/**
+ * The action cannot be confirmed right now (`confirmDisabledReason`, e.g. the record was deleted on the server while
+ * the review was open): the confirm button is `aria-disabled`, still reachable with Tab, and described by the reason
+ * shown above the buttons. The play function opens the review from the keyboard, tabs to "Save changes", presses
+ * Enter and Space and clicks it: nothing is confirmed, the dialog stays open, the focus stays on the button (it is
+ * photographed so). Empty the `confirmDisabledReason` Control and the same play confirms with Enter.
+ */
+export const ConfirmUnavailable: Story = {
+  tags: ['visual'],
+  args: {
+    tone: 'default',
+    initialFocus: 'cancel',
+    title: 'Review changes',
+    description: '3 changes will be saved.',
+    confirmLabel: 'Save changes',
+    cancelLabel: 'Keep editing',
+    confirmDisabledReason: 'This sales order was deleted on the server: it can no longer be saved.',
+    pendingMs: 0,
+  },
+  render: (args) => <Demo args={args} />,
+  play: async ({ args, canvasElement }) => {
+    const opener = within(canvasElement).getByRole('button', { name: 'Delete…' });
+    opener.focus();
+    await userEvent.keyboard('{Enter}');
+    const body = within(document.body);
+    const dialog = await body.findByRole('dialog', { name: args.title });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: args.cancelLabel })).toHaveFocus());
+    await userEvent.tab();
+    const confirm = within(dialog).getByRole('button', { name: args.confirmLabel });
+    await expect(confirm).toHaveFocus();
+    if (args.confirmDisabledReason.trim() === '') {
+      await expect(confirm).not.toHaveAttribute('aria-disabled');
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+      await expect(args.onConfirm).toHaveBeenCalledTimes(1);
+      return;
+    }
+    await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+    await expect(confirm).toHaveAccessibleDescription(args.confirmDisabledReason);
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard(' ');
+    await userEvent.click(confirm);
+    await expect(args.onConfirm).not.toHaveBeenCalled();
+    await expect(args.onOpenChange).not.toHaveBeenCalled();
+    await expect(body.getByRole('dialog', { name: args.title })).toBeInTheDocument();
+    await expect(confirm).toHaveFocus();
+    await settleMotion();
   },
 };
 
