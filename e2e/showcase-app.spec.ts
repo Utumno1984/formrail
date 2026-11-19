@@ -429,6 +429,40 @@ test.describe('Showcase/Record editing as an app: the Control `module` changed w
     await page.waitForTimeout(300);
     expect(await scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(0);
   });
+
+  test('starting with Customers, reaching the orders from the bar: the control to sales-orders starts the orders\' list over', async ({ page }) => {
+    await openApp(page, `${NO_DELAYS};module:customers`);
+    await modLink(page, 'Sales orders').click();
+    await expect(page.getByRole('heading', { level: 2, name: /Sales orders/ })).toBeVisible();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    await page.getByRole('radio', { name: 'Confirmed' }).click();
+    await page.getByRole('button', { name: 'Total' }).click();
+    await expect(page.getByRole('columnheader', { name: /Total/ })).toHaveAttribute('aria-sort', 'descending');
+    await scrollerOf(page).evaluate((el) => (el.scrollTop = 420));
+    await expect.poll(() => scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(420);
+    await page.waitForTimeout(300);
+    await setControl(page, 'sales-orders');
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
+    expect(params(page).get('sales-orders.filter')).toBeNull();
+    expect(params(page).get('sales-orders.sort')).toBeNull();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Total/ })).not.toHaveAttribute('aria-sort', 'descending');
+    await expect(modLink(page, 'Sales orders')).toHaveAttribute('aria-current', 'page');
+    await page.waitForTimeout(300);
+    expect(await scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(0);
+  });
+
+  test('the control changed on a "New sales order" page (create=1) shows the list of the module chosen', async ({ page }) => {
+    await page.goto(`/iframe.html?id=${APP}&viewMode=story&args=${encodeURIComponent(NO_DELAYS)}&module=sales-orders&create=1`);
+    await expect(reference(page)).toBeVisible();
+    expect(params(page).get('create')).toBe('1');
+    await setControl(page, 'customers');
+    await expect(page.getByRole('heading', { level: 2, name: /Customers/ })).toBeVisible();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    expect(params(page).get('create')).toBeNull();
+    expect(params(page).get('module')).toBe('customers');
+    await expect(modLink(page, 'Customers')).toHaveAttribute('aria-current', 'page');
+  });
 });
 
 test.describe('Showcase/Record editing as an app: a phone', () => {

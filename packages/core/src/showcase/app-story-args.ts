@@ -16,7 +16,7 @@ export const APP_ARGTYPES = storyControls({
     control: 'select',
     options: APP_MODULES.map((m) => m.name),
     description:
-      'The module shown at the start (the URL wins when it names one, so a link to a customer opens it): `sales-orders` or `customers`. Changing it brings that module back to its list, as at the start; over unsaved changes or a save in flight it asks first, as a link of the bar does.',
+      'The module shown at the start (the URL wins when it names one, so a link to a customer opens it): `sales-orders` or `customers`. Changing it brings that module back to its list, as at the start; over unsaved changes or a save in flight it asks first, as a link of the bar does. Limit: after "Keep editing" the Controls panel shows the new value while the app stays where it was; to get that module from the Control, pass through the other value, or use the modules bar.',
   },
   history: {
     control: 'radio',

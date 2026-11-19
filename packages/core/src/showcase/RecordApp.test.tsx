@@ -430,4 +430,41 @@ describe('the Control `module` changed while the app runs (#525, round 2)', () =
     await listReady('Customers');
     expect(screen.getByRole('table')).not.toBe(table);
   });
+
+  it('starting with Customers, reaching the orders from the bar, the control to `sales-orders` brings the orders\' list back to the start', { timeout: BUDGET }, async () => {
+    window.sessionStorage.clear();
+    const { setControl } = renderWithControl({ module: 'customers' });
+    await listReady('Customers');
+    await userEvent.click(bar().getByRole('link', { name: 'Sales orders' }));
+    await listReady('Sales orders');
+    await userEvent.click(screen.getByRole('radio', { name: 'Confirmed' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Total' }));
+    expect(params().get('sales-orders.filter')).toBe('confirmed');
+    expect(params().get('sales-orders.sort')).toBe('total.desc');
+    window.sessionStorage.setItem('rop:list-report-scroll:sales-orders#/?', JSON.stringify({ top: 300, left: 0 }));
+    const table = screen.getByRole('table');
+    setControl('sales-orders');
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'All' })).toBeChecked());
+    expect(params().get('sales-orders.filter')).toBeNull();
+    expect(params().get('sales-orders.sort')).toBeNull();
+    expect(Object.keys(window.sessionStorage).filter((k) => k.startsWith('rop:list-report-scroll:'))).toEqual([]);
+    current('Sales orders');
+    await listReady('Sales orders');
+    expect(screen.getByRole('columnheader', { name: /Total/ })).not.toHaveAttribute('aria-sort', 'descending');
+    // A list mounted again (the `key` of the orders carries the generation, as the customers' does), not the same one re-read.
+    expect(screen.getByRole('table')).not.toBe(table);
+  });
+
+  it('the control changed on a "New ..." page (create=1) shows the list of the module chosen, not a creation page', { timeout: BUDGET }, async () => {
+    window.history.replaceState(null, '', '/?module=sales-orders&create=1');
+    const { setControl } = renderWithControl();
+    await screen.findByRole('textbox', { name: 'Customer reference' });
+    expect(params().get('create')).toBe('1');
+    setControl('customers');
+    await listReady('Customers');
+    expect(params().get('create')).toBeNull();
+    expect(params().get('module')).toBe('customers');
+    expect(screen.queryByRole('textbox', { name: 'Customer reference' })).toBeNull();
+    current('Customers');
+  });
 });
