@@ -22,7 +22,7 @@ import { SALES_ORDERS_CRUD } from './modules/sales-orders/sales-orders-module';
 import { RecordAppContext, type PageGuard, type RecordAppContextValue } from './record-app-context';
 import { RecordCrud, type RecordCrudProps } from './RecordCrud';
 import type { SaveOutcome } from './record-store';
-import { moduleHref, openModule, openRelated, readRoute, recordHref, subscribeRoute } from './showcase-router';
+import { moduleHref, openModule, openRelated, readRoute, recordHref, replaceRoute, subscribeRoute } from './showcase-router';
 
 /** The modules of the app, in the order of the bar: the router name and the text of the link. */
 export const APP_MODULES = [
@@ -84,20 +84,33 @@ const readAppModule = (): AppModuleName | null => {
 };
 const readNoModule = (): null => null;
 
-/**
- * Brings the URL back to the list of `module` (a control changed): every route parameter and list parameter of the app's
- * modules goes, and so does the saved scroll, as at the start of a story. Not a navigation: `replaceState`.
- */
-export function resetApp(win: Window, module: AppModuleName): void {
+/** Forgets the saved scroll of every list (`useListReportScrollRestoration`), as at the start of a story. */
+const forgetListScroll = (win: Window): void => {
   for (const key of Object.keys(win.sessionStorage)) {
     if (key.startsWith('rop:list-report-scroll:')) win.sessionStorage.removeItem(key);
   }
+};
+
+/** The URL of the list of `module` with no route parameter and no list parameter of the app's modules (the others stay). */
+const startUrl = (win: Window, module: AppModuleName): string => {
   const params = new URLSearchParams(win.location.search);
   for (const key of [...params.keys()]) {
     if (key === 'module' || key === 'record' || key === 'create' || APP_MODULES.some((m) => key.startsWith(`${m.name}.`))) params.delete(key);
   }
   params.set('module', module);
-  win.history.replaceState(null, '', `${win.location.pathname}?${params.toString()}`);
+  return `${win.location.pathname}?${params.toString()}`;
+};
+
+/**
+ * For the START of a `play` function only, on a story just mounted (as the `reset*` helpers of the other showcase
+ * stories): the URL back to the list of `module` (every route and list parameter of the app's modules goes, and so
+ * does the saved scroll), then a `popstate` so the lists already mounted read it again. Never while the app runs: a
+ * `popstate` sent over a dirty page is taken by its dirty-guard for browser Back (a control changed while the app runs
+ * goes through `RecordApp` itself, behind the page's guard and with no `popstate`).
+ */
+export function resetApp(win: Window, module: AppModuleName): void {
+  forgetListScroll(win);
+  win.history.replaceState(null, '', startUrl(win, module));
   win.dispatchEvent(new PopStateEvent('popstate', { state: null }));
 }
 
@@ -120,12 +133,29 @@ export function RecordApp({ module: initial, history, listLoadDelayMs, recordLoa
 
   const routed = useSyncExternalStore(subscribeRoute, readAppModule, readNoModule);
   const active = routed ?? initial;
-  // A control that changes the initial module shows that module's list (the first render keeps the URL: a deep link wins).
+
+  // The guard of the page on screen (none on a list, none on the not-found page).
+  const guardRef = useRef<PageGuard | null>(null);
+
+  // A control that changes the initial module shows that module's list, as at the start of a story (the first render
+  // keeps the URL: a deep link wins). It leaves the page on screen as a link of the bar does: behind the page's guard
+  // ("Keep editing" leaves URL and page as they were), and with no `popstate` (the guard would take it for browser
+  // Back and undo it with `history.go`): `replaceRoute` tells the router's subscribers, and a new `generation` mounts
+  // the shell again so its lists read their parameters (and their saved scroll) from the cleaned URL. The value read
+  // when the reset runs is the control's latest: one changed again while the dialog is open is the one shown.
   const shownInitial = useRef(initial);
+  const [generation, setGeneration] = useState(0);
   useEffect(() => {
     if (shownInitial.current === initial) return;
     shownInitial.current = initial;
-    resetApp(window, initial);
+    const reset = () => {
+      forgetListScroll(window);
+      replaceRoute(startUrl(window, shownInitial.current));
+      setGeneration((g) => g + 1);
+    };
+    const guard = guardRef.current;
+    if (guard) guard(reset);
+    else reset();
   }, [initial]);
 
   const callbacks = useRef({ onNavigate });
@@ -133,8 +163,6 @@ export function RecordApp({ module: initial, history, listLoadDelayMs, recordLoa
     callbacks.current = { onNavigate };
   });
 
-  // The guard of the page on screen (none on a list, none on the not-found page).
-  const guardRef = useRef<PageGuard | null>(null);
   const context = useMemo<RecordAppContextValue>(
     () => ({
       hrefRelated: (module, id) => recordHref(id, module),
@@ -199,11 +227,12 @@ export function RecordApp({ module: initial, history, listLoadDelayMs, recordLoa
           </ul>
         </nav>
         <div style={inner}>
-          {/* A key per module: another record type is another shell (its list, its toasts), the stores stay. */}
+          {/* A key per module: another record type is another shell (its list, its toasts), the stores stay. And per
+              reset by the control: the shell starts over on the cleaned URL. */}
           {active === 'customers' ? (
-            <RecordCrud key="customers" module={CUSTOMERS} store={stores.customers} {...shell} />
+            <RecordCrud key={`customers:${generation}`} module={CUSTOMERS} store={stores.customers} {...shell} />
           ) : (
-            <RecordCrud key="sales-orders" module={SALES_ORDERS_CRUD} store={stores['sales-orders']} {...shell} />
+            <RecordCrud key={`sales-orders:${generation}`} module={SALES_ORDERS_CRUD} store={stores['sales-orders']} {...shell} />
           )}
         </div>
       </div>

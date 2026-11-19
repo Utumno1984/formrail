@@ -157,6 +157,20 @@ export const openModule = (module: string): void => open({ module, kind: 'list' 
  */
 export const openRelated = (id: string, module: string): void => open({ module, kind: 'record', id }, false);
 
+/**
+ * #525: replaces the URL of the current entry with `url` (path and query) and tells the route's subscribers, with NO
+ * `popstate`: it is not a traversal, so a dirty-guard (which reads every `popstate` as browser Back/Forward and undoes
+ * it with `history.go`) never takes it for one. For a change the app makes by itself while it runs (a Storybook
+ * control), which asks the page's guard BEFORE calling it. The `fromList` marker goes with the page it described.
+ * Only the router's subscribers are told: a list that reads its own parameters must be mounted again to see them.
+ */
+export function replaceRoute(url: string): void {
+  const state = { ...stateObject() };
+  delete state[FROM_LIST];
+  window.history.replaceState(state, '', url);
+  notifyRoute();
+}
+
 // `history.back()` is asynchronous: until its `popstate` the page is still on screen and still carries the
 // marker, so a second click would go back TWO entries (out of the app). One at a time.
 let leaving = false;

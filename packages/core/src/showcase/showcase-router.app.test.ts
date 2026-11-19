@@ -8,6 +8,8 @@ import {
   openRecord,
   openRelated,
   readRoute,
+  replaceRoute,
+  subscribeRoute,
 } from './showcase-router';
 
 // #525: the router of the app: the list of another module, a record of another module opened from a page.
@@ -88,5 +90,30 @@ describe('openRelated (#525)', () => {
     leaveRoute(); // the list of a module has no page to leave: it stays on the list of its module
     expect(isLeaving()).toBe(false);
     expect(readRoute()).toEqual({ module: 'customers', kind: 'list' });
+  });
+});
+
+describe('replaceRoute (#525, round 2)', () => {
+  it('replaces the URL of the entry and tells the subscribers, with no popstate and no new entry', () => {
+    window.history.replaceState({ other: 1, ropFromList: true }, '', '/iframe.html?id=s&module=customers&record=cus-4');
+    const entries = window.history.length;
+    let popstates = 0;
+    const onPop = () => popstates++;
+    window.addEventListener('popstate', onPop, true);
+    let told = 0;
+    const unsubscribe = subscribeRoute(() => told++);
+    try {
+      replaceRoute('/iframe.html?id=s&module=sales-orders');
+      expect(window.location.search).toBe('?id=s&module=sales-orders');
+      expect(readRoute()).toEqual({ module: 'sales-orders', kind: 'list' });
+      expect(told).toBe(1);
+      expect(popstates).toBe(0);
+      expect(window.history.length).toBe(entries);
+      // The marker described the page that is gone; the rest of the state (a tool's own data) stays.
+      expect(window.history.state).toEqual({ other: 1 });
+    } finally {
+      unsubscribe();
+      window.removeEventListener('popstate', onPop, true);
+    }
   });
 });
