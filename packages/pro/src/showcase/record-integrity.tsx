@@ -4,7 +4,7 @@
 // (`computeChangeSummaryResult`, `useFormRebase`) with each module's options. Here: how "no value" reads, a top-level
 // field with no value on one side, the wrapper of a value, the counts of the review, and the state the open review
 // dialog reads while a server update lands under it.
-import { useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { MessageStrip } from '@formrail/core';
 import { DEFAULT_VALUE_LABELS } from '../change-summary/format-change-value';
 import type { ChangeEntry } from '../change-summary/types';
@@ -88,6 +88,39 @@ export type ReviewSource<S> = ReturnType<typeof createReviewSource<S>>;
 
 export function useReview<S>(source: ReviewSource<S>): S {
   return useSyncExternalStore(source.subscribe, source.get, source.get);
+}
+
+/** Out of view, still read by assistive technology (the same box as the shell's own announcer). */
+const VISUALLY_HIDDEN: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
+/**
+ * #583: the live region of the open review dialog. The dialog's description (`aria-describedby`) is read when the
+ * dialog opens, but not when it changes under it (a server update lands, the record is deleted): this region, a
+ * polite `status` mounted EMPTY with the dialog's body, then says the new `text`. Once per text: a render with the
+ * same text (another change of the body, a second announcement of the same server version) leaves the region as it is,
+ * so a screen reader does not read it again; the opening text is never put in it (the dialog has just read it). Only
+ * the text of the description: never the page's own alert (deleted, updated), which says something else.
+ */
+export function ReviewAnnouncer({ text }: { text: string }) {
+  const [announced, setAnnounced] = useState('');
+  const last = useRef(text);
+  useEffect(() => {
+    if (text === last.current) return;
+    last.current = text;
+    setAnnounced(text);
+  }, [text]);
+  return (
+    <div role="status" data-review-announcer="" style={VISUALLY_HIDDEN}>
+      {announced}
+    </div>
+  );
 }
 
 /** Same open conflicts, in the same order, with the same labels (the review source is set only when they change). */
