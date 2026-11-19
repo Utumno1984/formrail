@@ -14,6 +14,8 @@ import {
   type StoredSalesOrder,
 } from './sales-order-store';
 import { createCustomerStore } from './customer-store';
+import { APP_ARGS, APP_ARGTYPES, APP_LIST_PARAMS, APP_VISUAL_ARGS, type AppStoryArgs } from './app-story-args';
+import { RecordApp, resetApp } from './RecordApp';
 import {
   CUSTOMER_LIST_ARGS,
   CUSTOMER_LIST_ARGTYPES,
@@ -97,6 +99,8 @@ const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
   'modules/customers/CustomerContacts.tsx': `The contacts of a customer, a section of the Customers module: add, remove, edit, the primary contact, the last contact that cannot be removed (with its reason). ${IN_APP} Not public: \`../../../internal/use-list-mutation-focus\` and \`./customer-form\`.`,
   'modules/customers/customer-form.ts': 'The rules on a customer: the values of the form (an absent line 2 is `null` stored and empty in the form), the comparison that decides "dirty" (a contact is its id), the validation with errors on nested paths (`billingAddress.postalCode`, `contacts.1.email`), the postal code format of the billing country.',
   'customer-store.ts': 'Fixture, not part of the library: the customers\' instance of `./record-store`, the demo customers with their address and contacts; every write derives the account country from the billing address.',
+  'RecordApp.tsx': `The app around the shell (#525): a "Modules" bar (Sales orders, Customers) of real links, the active module read from the URL, the stores kept here so a module left and shown again finds its records as they were, the order's customer as a link behind the page's dirty-guard. ${IN_APP} Not public: \`./record-app-context\`, \`./RecordCrud\`, \`./record-store\`, \`./showcase-router\` and the two modules.`,
+  'record-app-context.ts': 'What the app gives to the pages inside it: the href and the opening of a record of another module, and the registration of the page\'s dirty-guard so the modules bar can ask it before leaving.',
   'record-api.ts': 'Fixture, not part of the library: the store as the pages call it. A write outlives the page that started it, so every read first waits for the writes still in flight: a list or a reopened order never shows a value older than the one the server is about to hold.',
 });
 
@@ -163,6 +167,160 @@ type Story = StoryObj<RecordPageArgs>;
 
 const region = (canvas: ReturnType<typeof within>) => canvas.queryByRole('region', { name: 'Save actions' });
 const orderTotal = (canvasElement: HTMLElement) => canvasElement.querySelector('[data-order-total]')?.textContent ?? '';
+
+/* ------------------------------------------------------------------------------------------ */
+/* #525: the showcase as a small business app: the "Modules" bar and the order -> customer link. */
+/* ------------------------------------------------------------------------------------------ */
+
+type AppArgs = AppStoryArgs;
+const appRender = (args: AppArgs) => <RecordApp {...args} />;
+const MODULE_LABEL = { 'sales-orders': 'Sales orders', customers: 'Customers' } as const;
+
+const navLink = (canvas: ReturnType<typeof within>, label: string) =>
+  within(canvas.getByRole('navigation', { name: 'Modules' })).getByRole('link', { name: label });
+
+/** Waits for the list of a module to be on screen (its title and rows). */
+async function appListReady(canvas: ReturnType<typeof within>, module: keyof typeof MODULE_LABEL, minRows = 10) {
+  await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(minRows), { timeout: 5000 });
+  await expect(canvas.getByRole('heading', { level: 2, name: new RegExp(MODULE_LABEL[module]) })).toBeVisible();
+}
+
+/**
+ * The showcase as a small business app. A "Modules" bar (`aria-current="page"` on the active one) switches between
+ * Sales orders and Customers, two record types on the same shell: each module keeps its own pill, search, sort and
+ * scroll while the other is shown. From an order the customer is a link: with unsaved changes it asks first
+ * ("Keep editing" / "Discard changes"), and browser Back from the customer returns to the order as saved. The `play`
+ * drives the round: pill "Confirmed" and sort by Total on the orders, a scroll, Customers and back (the list is as
+ * it was left), an order, an edit, the customer link and its guard, the customer page, browser Back. Controls:
+ * `module` (the one shown first), the delays, `history`, `saveOutcome`.
+ */
+export const RecordEditing: StoryObj<AppArgs> = {
+  tags: ['showcase-source'],
+  parameters: showcaseSource(SHOWCASE_FOLDER, SOURCE_FILES),
+  argTypes: APP_ARGTYPES,
+  args: APP_ARGS,
+  render: appRender,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('RecordEditing: no window');
+    resetApp(win, args.module);
+    const body = within(document.body);
+
+    // The module the Control chose is the one shown first.
+    await appListReady(canvas, args.module);
+    await expect(navLink(canvas, MODULE_LABEL[args.module])).toHaveAttribute('aria-current', 'page');
+    if (args.module === 'customers') {
+      await userEvent.click(navLink(canvas, 'Sales orders'));
+      await expect(args.onNavigate).toHaveBeenLastCalledWith({ to: 'module', module: 'sales-orders' });
+    }
+    await appListReady(canvas, 'sales-orders');
+    await expect(navLink(canvas, 'Customers')).not.toHaveAttribute('aria-current');
+
+    // The orders: a pill, a sort and a scroll of their own.
+    await userEvent.click(canvas.getByRole('radio', { name: 'Confirmed' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Total' }));
+    const scrollerOf = () => canvas.getByRole('table').parentElement as HTMLElement;
+    scrollerOf().scrollTop = 300;
+    await waitFor(() => expect(scrollerOf().scrollTop).toBe(300));
+    await settle();
+
+    // Customers, with nothing of the orders' parameters: its own list.
+    await userEvent.click(navLink(canvas, 'Customers'));
+    await expect(args.onNavigate).toHaveBeenLastCalledWith({ to: 'module', module: 'customers' });
+    await appListReady(canvas, 'customers');
+    await expect(navLink(canvas, 'Customers')).toHaveAttribute('aria-current', 'page');
+    await expect(navLink(canvas, 'Sales orders')).not.toHaveAttribute('aria-current');
+    await expect(canvas.getByRole('radio', { name: 'All' })).toBeChecked();
+    await expect(new URLSearchParams(win.location.search).get(APP_LIST_PARAMS['sales-orders'].filter)).toBe('confirmed');
+
+    // Back to the orders: the list as it was left.
+    await userEvent.click(navLink(canvas, 'Sales orders'));
+    await appListReady(canvas, 'sales-orders');
+    await expect(canvas.getByRole('radio', { name: 'Confirmed' })).toBeChecked();
+    await expect(canvas.getByRole('columnheader', { name: /Total/ })).toHaveAttribute('aria-sort', 'descending');
+    await waitFor(() => expect(Math.abs(scrollerOf().scrollTop - 300)).toBeLessThanOrEqual(1));
+
+    // An order, an edit, the customer link: the guard asks.
+    const area = scrollerOf().getBoundingClientRect();
+    const link = canvas
+      .getAllByRole('link')
+      .find((l) => l.hasAttribute('data-record-id') && l.getBoundingClientRect().top > area.top + 120 && l.getBoundingClientRect().bottom < area.bottom);
+    if (!link) throw new Error('RecordEditing: no order link in view');
+    const number = link.textContent ?? '';
+    await userEvent.click(link);
+    await canvas.findByRole('heading', { level: 1, name: number });
+    const reference = (await canvas.findByRole('textbox', { name: 'Customer reference' })) as HTMLInputElement;
+    const saved = reference.value;
+    await userEvent.clear(reference);
+    await userEvent.type(reference, 'PO-525-EDIT');
+    const customerLink = canvas.getByRole('link', { name: /^Open customer / });
+    await expect(customerLink.getAttribute('href')).toContain('module=customers');
+    await userEvent.click(customerLink);
+    const dialog = await body.findByRole('dialog', { name: 'Unsaved changes' });
+    await waitFor(() => expect(dialog).toBeVisible());
+    await expect(new URLSearchParams(win.location.search).get('module')).toBe('sales-orders');
+
+    // "Keep editing": still the order, the edit kept.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(reference).toHaveValue('PO-525-EDIT');
+
+    // "Discard changes": the customer's page.
+    await userEvent.click(customerLink);
+    await userEvent.click(await within(await body.findByRole('dialog', { name: 'Unsaved changes' })).findByRole('button', { name: 'Discard changes' }));
+    await expect(await canvas.findByRole('heading', { level: 1, name: /^C-\d+$/ })).toBeVisible();
+    await expect(new URLSearchParams(win.location.search).get('module')).toBe('customers');
+    await expect(args.onNavigate).toHaveBeenLastCalledWith({ to: 'related', module: 'customers', id: expect.stringMatching(/^cus-/) as string });
+
+    // Browser Back: the order, with no edit.
+    win.history.back();
+    await canvas.findByRole('heading', { level: 1, name: number });
+    await expect(await canvas.findByRole('textbox', { name: 'Customer reference' })).toHaveValue(saved);
+    await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();
+  },
+};
+
+/** `RecordEditing` without a `play` function: what `e2e/showcase-app.spec.ts` drives with real input. */
+export const RecordEditingManual: StoryObj<AppArgs> = {
+  argTypes: APP_ARGTYPES,
+  args: APP_ARGS,
+  render: appRender,
+};
+
+/** The bar of modules over the orders: "Sales orders" is the current page, "Customers" a link. */
+export const AppNavigationOrders: StoryObj<AppArgs> = {
+  tags: ['visual'],
+  argTypes: APP_ARGTYPES,
+  args: APP_VISUAL_ARGS,
+  render: appRender,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('AppNavigationOrders: no window');
+    resetApp(win, args.module);
+    await appListReady(canvas, args.module, 5);
+    await expect(navLink(canvas, MODULE_LABEL[args.module])).toHaveAttribute('aria-current', 'page');
+  },
+};
+
+/** An order with its customer as a link, in the app: the bar above the page, the link under "Customer". */
+export const AppOrderCustomerLink: StoryObj<AppArgs> = {
+  tags: ['visual'],
+  argTypes: APP_ARGTYPES,
+  args: { ...APP_VISUAL_ARGS, module: 'sales-orders' },
+  render: appRender,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const win = canvasElement.ownerDocument.defaultView;
+    if (!win) throw new Error('AppOrderCustomerLink: no window');
+    resetApp(win, 'sales-orders');
+    await appListReady(canvas, 'sales-orders', 5);
+    await userEvent.click(canvas.getAllByRole('link').find((l) => l.hasAttribute('data-record-id')) as HTMLElement);
+    await expect(await canvas.findByRole('link', { name: /^Open customer / })).toBeVisible();
+    await expect(navLink(canvas, 'Sales orders')).toHaveAttribute('aria-current', 'page');
+  },
+};
 
 /**
  * The whole flow with real input: load (no field until the order arrives), change the quantity of a line (the

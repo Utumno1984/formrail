@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { getEmployee, makeCustomers } from '../internal/demo-data';
-import { createCustomerStore, makeShowcaseCustomers } from './customer-store';
+import { getCustomer, getEmployee, makeCustomers } from '../internal/demo-data';
+import { createCustomerStore, makeCustomersReferencedBy, makeShowcaseCustomers } from './customer-store';
+import { makeShowcaseSalesOrders } from './sales-order-store';
 
 describe('the customer store (#523)', () => {
   it('seeds 200 customers of the demo universe, each with one primary contact and its billing country as country', () => {
@@ -67,5 +68,42 @@ describe('the customer store (#523)', () => {
     await expect(failing.save({ ...customer, name: 'x' })).rejects.toThrow(/Could not save the customer/);
     expect((await failing.get('cus-4')).name).toBe(customer.name);
     await expect(createCustomerStore().get('cus-9999')).rejects.toThrow('Customer "cus-9999" not found');
+  });
+});
+
+describe('the customers of the app: the seed and those the orders name (#525)', () => {
+  const idNumber = (id: string) => Number(id.slice('cus-'.length));
+
+  it('is in the order of the customer number, not the order the ids were named in (nor the order of the strings)', () => {
+    const ids = makeCustomersReferencedBy(['cus-950', 'cus-1000', 'cus-205'], 200).map((c) => c.id);
+    expect(ids).toHaveLength(203);
+    // Named 950, 1000, 205: by number 205 < 950 < 1000 (as strings "1000" < "205" < "950").
+    expect(ids.slice(-3)).toEqual(['cus-205', 'cus-950', 'cus-1000']);
+    expect(ids).toEqual([...ids].sort((a, b) => idNumber(a) - idNumber(b)));
+    expect(ids.slice(0, 200)).toEqual(makeShowcaseCustomers(200).map((c) => c.id));
+  });
+
+  it('every customer an order names is there, once, with the name the order shows', () => {
+    const orders = makeShowcaseSalesOrders();
+    const customers = makeCustomersReferencedBy(orders.map((o) => o.customerId));
+    const byId = new Map(customers.map((c) => [c.id, c]));
+    expect(byId.size).toBe(customers.length);
+    for (const order of orders) {
+      const customer = byId.get(order.customerId);
+      expect(customer, order.customerId).toBeDefined();
+      expect(customer!.name).toBe(order.customerName);
+      expect(customer!.name).toBe(getCustomer(order.customerId)!.name);
+    }
+    // The seed and the named ones, nothing else.
+    const named = new Set(orders.map((o) => o.customerId));
+    for (const c of customers) expect(idNumber(c.id) <= 200 || named.has(c.id), c.id).toBe(true);
+  });
+
+  it('an id that is not a demo customer is left out; one already in the seed is not added twice, nor replaced', () => {
+    const seed = makeShowcaseCustomers(200);
+    const customers = makeCustomersReferencedBy(['nope', 'cus-', 'cus-abc', 'cus-0', 'cus-007', 'cus--4', 'inv-4', 'cus-4', 'cus-4', 'cus-200'], 200);
+    expect(customers).toHaveLength(200);
+    expect(customers.map((c) => c.id)).toEqual(seed.map((c) => c.id));
+    expect(customers.find((c) => c.id === 'cus-4')).toEqual(seed.find((c) => c.id === 'cus-4'));
   });
 });
