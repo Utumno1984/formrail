@@ -1,5 +1,4 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass } from './helpers/story';
 import { MOBILE_VIEWPORT } from './helpers/viewports';
 
@@ -24,7 +23,11 @@ const back = (page: Page): Locator => page.getByRole('button', { name: 'Back to 
 const reference = (page: Page): Locator => page.getByRole('textbox', { name: 'Customer reference', exact: true });
 const customerLink = (page: Page): Locator => page.getByRole('link', { name: /^Open customer / });
 const guard = (page: Page): Locator => page.getByRole('dialog', { name: 'Unsaved changes' });
-const scrollerOf = (page: Page): Locator => page.getByRole('table').locator('xpath=..');
+/** The page itself does not scroll sideways (the table has its own scroller: only the document is measured). */
+const expectNoPageOverflow = async (page: Page): Promise<void> => {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+};
+const scrollerOf =(page: Page): Locator => page.getByRole('table').locator('xpath=..');
 
 async function openApp(page: Page, args = NO_DELAYS, query = ''): Promise<void> {
   await page.goto(`/iframe.html?id=${APP}&viewMode=story&args=${encodeURIComponent(args)}${query ? `&${query}` : ''}`);
@@ -293,14 +296,14 @@ test.describe('Showcase/Record editing as an app: a phone', () => {
     const customers = (await modLink(page, 'Customers').boundingBox())!;
     expect(Math.abs(sales.y - customers.y)).toBeLessThan(2);
     expect((await nav(page).boundingBox())!.height).toBeLessThanOrEqual(48);
-    await expectNoHorizontalOverflow(page.locator('body'));
+    await expectNoPageOverflow(page);
     await modLink(page, 'Sales orders').focus();
     await page.keyboard.press('Tab');
     await expect(modLink(page, 'Customers')).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { level: 2, name: /Customers/ })).toBeVisible();
     await expect(modLink(page, 'Customers')).toHaveAttribute('aria-current', 'page');
-    await expectNoHorizontalOverflow(page.locator('body'));
+    await expectNoPageOverflow(page);
   });
 
   test('an order page under the bar: the whole page does not scroll, the link to the customer is reachable', async ({ page }) => {
@@ -308,6 +311,6 @@ test.describe('Showcase/Record editing as an app: a phone', () => {
     expect(await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 1)).toBe(false);
     await customerLink(page).scrollIntoViewIfNeeded();
     await expect(customerLink(page)).toBeVisible();
-    await expectNoHorizontalOverflow(page.locator('body'));
+    await expectNoPageOverflow(page);
   });
 });
