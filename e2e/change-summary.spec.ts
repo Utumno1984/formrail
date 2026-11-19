@@ -413,5 +413,30 @@ test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
         }
       });
     }
+
+    // The icon is drawn by `::before` and a break opportunity sits between it and the text: at
+    // some widths the diamond ended a line and the word started the next. The test makes the
+    // unfavourable condition explicit (wider letters, bigger text) so it does not depend on the
+    // fonts of the machine running it.
+    for (const id of [EDITED, VALUE_TYPES, LONG_VALUES]) {
+      for (const width of [320, 375]) {
+        test(`${id} at ${width}px, with wide text: every badge is a single rectangle (icon and text never split)`, async ({ page }) => {
+          await page.setViewportSize({ width, height: 1600 });
+          await gotoStory(page, id);
+          await page.locator('.rop-pro-change-summary__kind').first().waitFor();
+          await page.addStyleTag({
+            content: '.rop-pro-change-summary { font-size: 20px; letter-spacing: 0.12em; }',
+          });
+          const rects = await page.evaluate(() =>
+            [...document.querySelectorAll('.rop-pro-change-summary__kind')].map((el) => ({
+              text: el.textContent,
+              rects: el.getClientRects().length,
+            })),
+          );
+          expect(rects.length).toBeGreaterThan(0);
+          expect(rects.filter((r) => r.rects !== 1)).toEqual([]);
+        });
+      }
+    }
   });
 });

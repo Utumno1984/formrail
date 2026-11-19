@@ -89,9 +89,12 @@
      decorative shape drawn in CSS (no node, no extra JS): `+` added, `-` removed, a diamond changed.
      Left `inline` on purpose: an inline-block makes Chromium put a space around it in the accessible
      name (`Amount, changed , from`). A one-word kind moves to the next line whole; a long custom text
-     wraps between words, and anywhere as a last resort, so it never leaves the box. */
+     wraps between words, and anywhere as a last resort, so it never leaves the box.
+     The icon is out of the text flow (absolute, in the left padding of the first line): an inline-block
+     next to the text would leave a break opportunity between the two, and the shape could end a line
+     with its word on the next. Padding and icon belong to the first fragment, so they never split. */
   .rop-pro-change-summary__kind {
-    @apply ml-2 rounded-rop-sm px-1 text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
+    @apply relative ml-2 rounded-rop-sm pr-1 pl-[calc(0.5rem+0.75em)] text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
     background-color: color-mix(in srgb, var(--_cs-tone) 12%, var(--color-rop-surface));
     color: color-mix(in srgb, var(--_cs-tone) 45%, black);
     /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
@@ -99,7 +102,7 @@
     outline-offset: -1px;
 
     &::before {
-      @apply mr-1 inline-block size-[0.75em];
+      @apply absolute top-[0.2em] left-1 size-[0.75em];
       content: '';
       background-color: currentColor;
       clip-path: var(--_cs-shape);
