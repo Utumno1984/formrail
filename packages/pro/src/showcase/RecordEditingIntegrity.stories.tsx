@@ -565,7 +565,9 @@ export const CustomerServerUpdate: CustomerStory = {
     await userEvent.click(canvas.getByRole('button', { name: 'Save' }));
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription('2 changes will be saved.');
-    await expect(dialog).not.toHaveTextContent(serverEmail(primary.email));
+    // Against the customer the server holds now: the e-mail is mine over the server's (the conflict was kept).
+    await expect(changeList(dialog)[1]).toHaveTextContent(`Contacts > Contact 1 (${primary.name}) > E-mail`);
+    await expect(changeList(dialog)[1]).toHaveTextContent(new RegExp(`${serverEmail(primary.email).replace(/\./g, '\\.')}.*matteo@borgavella-tooling\\.example$`));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
     if (args.saveOutcome === 'error') return;
     await waitFor(() => expect(saveBar(canvas)).toBeNull(), { timeout: 5000 });
@@ -611,10 +613,11 @@ export const CustomerArchivedRemotely: CustomerStory = {
     const dialog = await body.findByRole('dialog', { name: 'Review changes' });
     await expect(dialog).toHaveAccessibleDescription(ARCHIVED_REVIEW_DESCRIPTION);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
     await expect(await canvas.findByText(ARCHIVED_SAVE_ERROR, undefined, { timeout: 5000 })).toBeVisible();
     await expect(storeCustomer(CUSTOMER)).toEqual({ ...before, status: 'archived' });
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Restore' }));
+    await userEvent.click(await canvas.findByRole('button', { name: 'Restore' }));
     await waitFor(() => expect(canvas.getByRole('textbox', { name: 'City' })).toBeEnabled(), { timeout: 5000 });
     await expect(canvas.queryByText(ARCHIVED_TITLE)).toBeNull();
     await expect(storeCustomer(CUSTOMER)).toEqual(before);

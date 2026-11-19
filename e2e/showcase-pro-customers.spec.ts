@@ -396,9 +396,18 @@ test.describe('Pro/Showcase/Record editing integrity: a customer archived on the
       'Billing address > City, changed, from Bologna to Modena',
       'Contacts > Contact 2 (Giulia Bellini) > Role, changed, from Buyer to Senior Buyer',
     ]);
-    await list.getByRole('listitem').nth(1).click({ clickCount: 3 });
-    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    // Selected as a user would select it (a selection over the whole list): text, not `user-select: none`.
+    const selected = await list.evaluate((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return selection.toString();
+    });
+    expect(selected).toContain('Modena');
     expect(selected).toContain('Senior Buyer');
+    expect(await list.evaluate((node) => getComputedStyle(node).userSelect)).not.toBe('none');
   });
 
   test('Save: the review says it can no longer be saved, the server refuses, nothing is written', async ({ page }) => {
