@@ -5,7 +5,7 @@
 // pessimistic Delete, the story-only add-ons of the Pro showcase. Not exported by the package.
 // Spec §1.4: the editor is mounted already hydrated (`key` per record + `baseline` at mount); a fetch in flight is
 // a loading state, never an editor that is hydrated afterwards (no render with empty values before the data).
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Button } from '../button/Button';
 import { useConfirmDialog, type ConfirmOptions } from '../confirm-dialog/use-confirm-dialog';
 import { ValidationProvider } from '../field/ValidationContext';
@@ -19,6 +19,7 @@ import { useObjectPageForm, type UseObjectPageFormReturn } from '../object-page/
 import { isDev } from '../internal/is-dev';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { NOTICE_CAP_VAR, useNoticeCap } from './notice-cap';
+import { RecordAppContext, type RelatedRecords } from './record-app-context';
 import { capitalize, type RecordModule } from './record-module';
 import { RecordNotFoundError, type RecordStore } from './record-store';
 
@@ -360,6 +361,15 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
           close: 'Close',
         },
   });
+  // #525: inside the showcase app the page registers its guard (the modules bar asks it before leaving) and lends its
+  // sections the links to related records, each behind that same guard. Outside the app: neither.
+  const app = useContext(RecordAppContext);
+  const registerGuard = app?.registerGuard;
+  useEffect(() => registerGuard?.(guard), [registerGuard, guard]);
+  const related = useMemo<RelatedRecords | undefined>(
+    () => (app ? { href: app.hrefRelated, open: (module, id) => guard(() => app.openRelated(module, id)) } : undefined),
+    [app, guard],
+  );
   // #384: ONE hook for the life of the editor, chosen at mount: calling another one later (the prop removed or
   // replaced) would change the order of the hooks. A later change of the prop is ignored, with a warning.
   const [useAddons] = useState<UseRecordEditorAddons<T, V, D>>(() => (record && useAddonsProp) || useNoAddons);
@@ -561,7 +571,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
               </Button>
             )}
           </ObjectPageFooter>
-          <Sections form={form} record={record} help={help} savingLock={savingLock} />
+          <Sections form={form} record={record} help={help} savingLock={savingLock} related={related} />
         </ObjectPage>
       </ValidationProvider>
       {dialog}

@@ -4,7 +4,7 @@
 // record page as explicit JSX) and their store. The flow (navigation, dirty-guard, toasts, confirmations, focus,
 // scroll) is the shell's; `SALES_ORDERS_CRUD` (#521) adds the creation page, the deletion from the row and from the
 // page and the bulk deletion. Not exported by the package.
-import { useMemo } from 'react';
+import { useMemo, type MouseEvent } from 'react';
 import { addDays as addCalendarDays, isIsoDate, localToday } from '../../../calendar/date-math';
 import { Field } from '../../../field/Field';
 import { Input } from '../../../input/Input';
@@ -24,6 +24,7 @@ import { ObjectPageSection } from '../../../object-page/ObjectPageSection';
 import { Select } from '../../../select/Select';
 import { StatusBadge } from '../../../status-badge/StatusBadge';
 import type { ListReportColumn, ListReportFilter } from '../../../list-report/types';
+import type { RelatedRecords } from '../../record-app-context';
 import type { RecordModule, RecordSectionsProps } from '../../record-module';
 import { createSalesOrderStore, type SalesOrderDraft, type StoredSalesOrder } from '../../sales-order-store';
 import { helpProps } from '../field-help';
@@ -170,8 +171,27 @@ export const pickableCustomers = (): CustomerOption[] =>
 const COLUMN = { display: 'grid', gap: 16, maxWidth: 420 } as const;
 const READ_ONLY_REASON = 'A cancelled order cannot be edited.';
 
+/**
+ * #525: the order's customer as a link to the customer's page (a module of the same app). A real link: a plain click
+ * goes through the page's dirty-guard (`related.open`), a modified click opens the href in a new tab untouched.
+ */
+function CustomerLink({ related, customerId, name }: { related: RelatedRecords; customerId: string; name: string }) {
+  const click = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    related.open('customers', customerId);
+  };
+  return (
+    <p style={{ margin: 0 }}>
+      <a href={related.href('customers', customerId)} onClick={click}>
+        Open customer {name}
+      </a>
+    </p>
+  );
+}
+
 /** The sections of the sales order page: the fields, as explicit JSX. */
-function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSalesOrder, SalesOrderValues>) {
+function SalesOrderSections({ form, record, help, related }: RecordSectionsProps<StoredSalesOrder, SalesOrderValues>) {
   const { values, setValue } = form;
   // The page is read-only when the SAVED status is cancelled, not when the draft is changed to it.
   const readOnly = form.baseline.status === 'cancelled';
@@ -215,6 +235,7 @@ function SalesOrderSections({ form, record, help }: RecordSectionsProps<StoredSa
               />
             </Field>
           )}
+          {record && related ? <CustomerLink related={related} customerId={record.customerId} name={record.customerName} /> : null}
           <Field label="Currency" state="locked" stateReason="The currency is the customer's.">
             <Input value={currencyChosen ? values.currency : 'Set by the customer'} readOnly />
           </Field>

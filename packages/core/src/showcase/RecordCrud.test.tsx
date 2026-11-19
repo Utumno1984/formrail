@@ -225,6 +225,7 @@ describe('RecordCrud (#519): the shell holds no word of a domain', () => {
   // invoices' own files, the registry that names the modules, the data and helpers of a story): a new shell file
   // is scanned the day it is added, a new domain file must be added to this list on purpose.
   const DOMAIN_FILES = new Set([
+    'app-story-args.ts',
     'crud-story-args.ts',
     'customer-store.ts',
     'customer-story-args.ts',
@@ -242,11 +243,13 @@ describe('RecordCrud (#519): the shell holds no word of a domain', () => {
 
   it('the shell files (every source file of the folder that is not a domain file) are the ones expected', () => {
     expect(shellFiles().sort()).toEqual([
+      'RecordApp.tsx',
       'RecordCrud.tsx',
       'RecordListView.tsx',
       'RecordPageShell.tsx',
       'list-page.ts',
       'record-api.ts',
+      'record-app-context.ts',
       'record-module.ts',
       'record-store.ts',
       'showcase-router.ts',

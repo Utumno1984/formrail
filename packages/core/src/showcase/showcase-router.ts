@@ -123,15 +123,39 @@ export const recordHref = (id: string, module: string = DEFAULT_MODULE): string 
   return routeUrl({ module, kind: 'record', id });
 };
 
-function open(route: Route): void {
+/**
+ * `fromList`: the entry is pushed by the list of the SAME module (a row, "New ..."), so leaving the page is
+ * `history.back()` (exact restoration, Forward reopens the page). `false` (#525: another module's nav link, a link
+ * from a record to a related record): the entry before is NOT this module's list, so leaving the page goes to the
+ * list of its module (as a deep link does), never back to where the user came from.
+ */
+function open(route: Route, fromList: boolean): void {
   assertShowcaseModule(route.module); // before anything is written: no URL, no history entry, no report
   if (routeKey(readRoute()) === routeKey(route)) return; // a double click leaves ONE history entry
-  window.history.pushState({ ...stateObject(), [FROM_LIST]: true }, '', routeUrl(route));
+  window.history.pushState({ ...stateObject(), [FROM_LIST]: fromList }, '', routeUrl(route));
   notifyRoute();
 }
 
-export const openRecord = (id: string, module: string = DEFAULT_MODULE): void => open({ module, kind: 'record', id });
-export const openCreate = (module: string = DEFAULT_MODULE): void => open({ module, kind: 'create' });
+export const openRecord = (id: string, module: string = DEFAULT_MODULE): void => open({ module, kind: 'record', id }, true);
+export const openCreate = (module: string = DEFAULT_MODULE): void => open({ module, kind: 'create' }, true);
+
+/**
+ * #525: the href of the list of `module` (what the app's navigation links to): the list parameters of every module
+ * are kept as they are, so a module comes back with its own pill, search and sort. Throws for an unregistered module.
+ */
+export const moduleHref = (module: string): string => {
+  assertShowcaseModule(module);
+  return routeUrl({ module, kind: 'list' });
+};
+
+/** #525: shows the list of `module` (a `pushState`: Back returns to where the user was). */
+export const openModule = (module: string): void => open({ module, kind: 'list' }, false);
+
+/**
+ * #525: opens a record of ANOTHER module from a page (the order's customer). A `pushState`, so browser Back returns to
+ * the page it left; the page's own "Back to list" goes to the list of ITS module (the entry before is not that list).
+ */
+export const openRelated = (id: string, module: string): void => open({ module, kind: 'record', id }, false);
 
 // `history.back()` is asynchronous: until its `popstate` the page is still on screen and still carries the
 // marker, so a second click would go back TWO entries (out of the app). One at a time.
