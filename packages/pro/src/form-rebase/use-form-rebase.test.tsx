@@ -154,13 +154,15 @@ describe('useFormRebase: applying a rebase', () => {
     expect(h().rebase.conflicts.map((c) => c.path)).toEqual(['number']);
   });
 
-  it('a new rebase recomputes conflicts from scratch against the new incoming', () => {
+  // #584 (decision of 2026-11-17, conflicts accumulate): rewritten from "a new rebase recomputes conflicts from scratch
+  // against the new incoming", which expected `conflicts` to be `[]` after the second rebase.
+  it('a new rebase keeps the open conflict of the earlier one on a field it does not change (#584)', () => {
     const { h } = setup();
     act(() => h().form.setValue('number', 'A-2'));
     act(() => h().rebase.rebase({ ...BASE, number: 'A-3' }));
     expect(h().rebase.conflicts.map((c) => c.path)).toEqual(['number']);
     act(() => h().rebase.rebase({ ...BASE, number: 'A-3', amount: 50 }));
-    expect(h().rebase.conflicts).toEqual([]);
+    expect(h().rebase.conflicts.map((c) => [c.path, c.base, c.mine, c.theirs])).toEqual([['number', 'A-1', 'A-2', 'A-3']]);
     expect(h().rebase.applied.map((e) => e.path)).toEqual(['amount']);
     expect(h().form.values.number).toBe('A-2');
   });

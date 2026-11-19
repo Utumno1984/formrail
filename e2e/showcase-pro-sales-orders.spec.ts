@@ -370,6 +370,35 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     expect(await stored(page)).toMatchObject({ requestedDeliveryDate: '2026-07-01', status: 'shipped' });
   });
 
+  test('two updates in a row: the conflict of the first stays open, the review still names it as overwritten (#584)', async ({ page }) => {
+    await openOrder(page);
+    await delivery(page).fill('2026-07-01');
+    await textbox(page, 'Notes').fill('Mine');
+    await simulate(page).click();
+    await expect(conflicts(page)).toHaveCount(1);
+    // Another user then changes only the notes: the delivery conflict of the first update is still open.
+    await page.evaluate(
+      (id) =>
+        void (window as unknown as { __ropShowcaseStore: { updateFromServer: (id: string, change: (o: Stored) => Stored) => Promise<Stored> } }).__ropShowcaseStore.updateFromServer(
+          id,
+          (o) => ({ ...o, notes: 'Theirs' }),
+        ),
+      ORDER.id,
+    );
+    await expect(conflicts(page)).toHaveCount(2);
+    await expect(conflicts(page).nth(0)).toContainText(/^Requested delivery/);
+    await expect(conflicts(page).nth(1)).toContainText(/^Notes/);
+    await saveButton(page).click();
+    await expect(reviewDialog(page).getByRole('list', { name: 'Server changes you overwrite' }).getByRole('listitem')).toHaveText([
+      'Requested delivery',
+      'Notes',
+    ]);
+    await reviewDialog(page).getByRole('button', { name: 'Save changes' }).click();
+    await expect(footer(page)).toBeHidden();
+    await expect(notice(page)).toHaveCount(0);
+    expect(await stored(page)).toMatchObject({ requestedDeliveryDate: '2026-07-01', notes: 'Mine', status: 'shipped' });
+  });
+
   test('the order deleted on the server while edited: an explicit error, my edits still there, leaving asks first', async ({ page }) => {
     await openOrder(page, `${FAST};serverChange:delete-order`);
     await textbox(page, 'Customer reference').fill('PO-lost');
