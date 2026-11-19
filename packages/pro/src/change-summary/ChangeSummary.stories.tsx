@@ -750,6 +750,24 @@ export const EditedInvoice: Story = {
   ),
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getAllByRole('listitem').length).toBeGreaterThanOrEqual(4);
+    // The badge of each kind: its own text, a tint behind it and its own decorative shape (a CSS
+    // pseudo-element: `+` added, `-` removed, a diamond changed), so the three differ without colour.
+    const kinds = ['added', 'removed', 'changed'] as const;
+    const badges = kinds.map((kind) => {
+      const el = within(canvasElement).getAllByText(kind, { selector: '[class*="__kind"]' })[0]!;
+      const style = getComputedStyle(el);
+      return { el, kind, style, shape: getComputedStyle(el, '::before').clipPath };
+    });
+    for (const { el, kind, style, shape } of badges) {
+      await expect(el).toBeVisible();
+      await expect(el).toHaveTextContent(new RegExp(`^${kind}$`));
+      await expect(el.querySelector('svg')).toBeNull();
+      await expect(style.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+      await expect(shape).toMatch(/^polygon\(/);
+      await expect(getComputedStyle(el, '::before').width).not.toBe('0px');
+    }
+    await expect(new Set(badges.map((b) => b.shape)).size).toBe(3);
+    await expect(new Set(badges.map((b) => b.style.backgroundColor)).size).toBe(3);
   },
 };
 

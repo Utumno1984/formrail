@@ -346,4 +346,72 @@ test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
     expect(size.scroll).toBeLessThanOrEqual(size.client);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
+
+  test.describe('kind badges (#485)', () => {
+    test('the EditedInvoice play function passes (text, tint and shape of each badge)', async ({ page }) => {
+      await expectPlayToPass(page, EDITED);
+    });
+
+    test('each kind has its own decorative shape and tint, with no node and no accessible text for the icon', async ({ page }) => {
+      await gotoStory(page, EDITED);
+      const info = await page.evaluate(() =>
+        ['added', 'removed', 'changed'].map((kind) => {
+          const el = document.querySelector(`.rop-pro-change-summary__kind--${kind}`) as HTMLElement;
+          const before = getComputedStyle(el, '::before');
+          return {
+            text: el.textContent,
+            children: el.children.length,
+            content: before.content,
+            shape: before.clipPath,
+            width: before.width,
+            tint: getComputedStyle(el).backgroundColor,
+          };
+        }),
+      );
+      expect(info.map((i) => i.text)).toEqual(['added', 'removed', 'changed']);
+      for (const i of info) {
+        expect(i.children).toBe(0);
+        expect(i.content).toBe('""');
+        expect(parseFloat(i.width)).toBeGreaterThan(4);
+      }
+      expect(new Set(info.map((i) => i.shape)).size).toBe(3);
+      expect(new Set(info.map((i) => i.tint)).size).toBe(3);
+    });
+
+    test('forced-colors: the 1px outline and the icon are kept', async ({ page }) => {
+      await page.emulateMedia({ forcedColors: 'active' });
+      await gotoStory(page, EDITED);
+      for (const kind of ['added', 'removed', 'changed']) {
+        const badge = page.locator(`.rop-pro-change-summary__kind--${kind}`).first();
+        await expect(badge).toHaveCSS('outline-width', '1px');
+        await expect(badge).toHaveCSS('outline-style', 'solid');
+        const icon = await badge.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+        expect(icon).not.toBe('rgba(0, 0, 0, 0)');
+      }
+    });
+
+    // 320px is the 200% zoom of a 640px viewport: the badge stays whole and inside the box.
+    for (const [name, width] of [
+      ['320px (200% zoom of 640px)', 320],
+      ['375px', 375],
+      ['1280px', 1280],
+    ] as const) {
+      test(`LongValues at ${name}: a badge next to a long label is one line and inside the box`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 800 });
+        await expectPlayToPass(page, LONG_VALUES);
+        const box = (await page.locator('.rop-pro-change-summary').boundingBox())!;
+        const badges = page.locator('.rop-pro-change-summary__kind');
+        expect(await badges.count()).toBe(2);
+        for (let i = 0; i < 2; i++) {
+          const b = (await badges.nth(i).boundingBox())!;
+          expect(b.x).toBeGreaterThanOrEqual(box.x);
+          expect(b.x + b.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
+          // One line of the caption text: never split in the middle.
+          expect(await badges.nth(i).evaluate((el) => el.getClientRects().length)).toBe(1);
+          const lineHeight = await badges.nth(i).evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+          expect(b.height).toBeLessThan(lineHeight * 1.6);
+        }
+      });
+    }
+  });
 });
