@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Button } from '../button/Button';
 import {
   Dialog,
@@ -60,6 +60,22 @@ export interface ConfirmDialogProps {
    */
   initialFocus?: 'cancel' | 'confirm';
   /**
+   * Why the action cannot be confirmed right now (e.g. "This sales order was deleted on the server: it can no
+   * longer be saved."). Given, the confirm button is `aria-disabled="true"` and described by this text
+   * (`aria-describedby`), shown in the footer above the buttons: a click, Enter or Space on it does nothing
+   * (`onConfirm` is not called). It stays focusable (not `disabled`), so the focus never moves when the reason
+   * appears or goes away while the dialog is open, and a keyboard user can reach the button and hear why.
+   * Cancel, Escape and the backdrop still cancel. `undefined`, `null`, a boolean, a blank string, `0`, `NaN`
+   * or an array made only of those: no reason, the button works as without the prop (so `blocked && reason` and
+   * `count && reason` can be passed as is). A fragment or a component that renders nothing cannot be told apart
+   * from one that renders text: it counts as a reason, so pass `undefined` when there is none.
+   *
+   * Read at every render: it may change while the dialog is open. The dialog does not announce it when it
+   * appears (it is not a live region): announce the event that caused it if the user must hear it at once.
+   * A confirmation already pending when it appears is not interrupted.
+   */
+  confirmDisabledReason?: ReactNode;
+  /**
    * Runs the action. If it returns a promise the dialog stays open while it is pending: the confirm
    * button is `aria-disabled` with a spinner, further clicks / Enter are ignored (no double
    * submission), and Cancel, Escape and the backdrop do nothing. Resolved: the dialog asks to close.
@@ -98,7 +114,14 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> =>
   typeof (value as { then?: unknown }).then === 'function';
 
 const isBlankLabel = (label: unknown): boolean =>
-  label === null || label === undefined || typeof label === 'boolean' || (typeof label === 'string' && label.trim() === '');
+  label === null ||
+  label === undefined ||
+  typeof label === 'boolean' ||
+  // `0` / `NaN`: what `count && reason` leaves behind when the count is 0.
+  label === 0 ||
+  (typeof label === 'number' && Number.isNaN(label)) ||
+  (typeof label === 'string' && label.trim() === '') ||
+  (Array.isArray(label) && label.every(isBlankLabel));
 
 /** Reports an error as uncaught without interrupting the caller (a window `error` event). */
 function reportUncaught(error: unknown): void {
@@ -123,6 +146,7 @@ export function ConfirmDialogBase({
   cancelLabel = 'Cancel',
   tone = 'danger',
   initialFocus,
+  confirmDisabledReason,
   onConfirm,
   onCancel,
   onError,
@@ -141,6 +165,9 @@ export function ConfirmDialogBase({
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const confirmRef = useRef<HTMLButtonElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  // The explanation of a confirm button that cannot be used, and its id (stable, SSR-safe) for `aria-describedby`.
+  const blocked = !isBlankLabel(confirmDisabledReason);
+  const reasonId = useId();
 
   // Latest callbacks, read when a promise settles (the props may have changed meanwhile).
   const callbacks = useRef({ onOpenChange, onError, onConfirmed });
@@ -209,7 +236,8 @@ export function ConfirmDialogBase({
   }, []);
 
   const handleConfirm = () => {
-    if (pendingRef.current || !open) return;
+    // `aria-disabled` does not block a click, nor Enter / Space on a focused button: this does.
+    if (pendingRef.current || !open || blocked) return;
     const run = runRef.current;
     let result: unknown;
     try {
@@ -280,6 +308,12 @@ export function ConfirmDialogBase({
           <DialogBody>{children}</DialogBody>
         ) : null}
         <DialogFooter>
+          {blocked ? (
+            // In the footer, which never scrolls away: next to the button it explains, also under a long body.
+            <p id={reasonId} className="m-0 basis-full text-rop-body text-rop-text-muted">
+              {confirmDisabledReason}
+            </p>
+          ) : null}
           <Button
             ref={cancelRef as RefObject<HTMLElement | null>}
             variant="secondary"
@@ -291,7 +325,8 @@ export function ConfirmDialogBase({
           <Button
             ref={confirmRef as RefObject<HTMLElement | null>}
             variant={tone === 'danger' ? 'danger' : 'primary'}
-            aria-disabled={pending || undefined}
+            aria-disabled={pending || blocked || undefined}
+            aria-describedby={blocked ? reasonId : undefined}
             className={OPTICAL_LABEL_TYPOGRAPHY}
             onClick={handleConfirm}
           >
@@ -315,14 +350,30 @@ export function ConfirmDialogBase({
  *   dialog, and the focus is never lost (the buttons become `aria-disabled`, not `disabled`).
  *   Resolved: `onOpenChange(false)`. Rejected: stays open; the error goes to `onError`, or is
  *   reported as uncaught without it.
+ * - `confirmDisabledReason`: the confirm button cannot be used right now; it is `aria-disabled`, still
+ *   focusable, and described by that reason (shown in the footer).
  * - The role stays `dialog` (not `alertdialog`).
  *
  * For an imperative `await confirm(...)` use `useConfirmDialog`.
  */
 export function ConfirmDialog(props: ConfirmDialogProps) {
   // Only the public props reach the implementation (`session` / `onConfirmed` are the hook's).
-  const { open, onOpenChange, title, description, confirmLabel, cancelLabel, tone, initialFocus, onConfirm, onCancel, onError, returnFocusRef, children } =
-    props;
+  const {
+    open,
+    onOpenChange,
+    title,
+    description,
+    confirmLabel,
+    cancelLabel,
+    tone,
+    initialFocus,
+    confirmDisabledReason,
+    onConfirm,
+    onCancel,
+    onError,
+    returnFocusRef,
+    children,
+  } = props;
   return (
     <ConfirmDialogBase
       open={open}
@@ -333,6 +384,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       cancelLabel={cancelLabel}
       tone={tone}
       initialFocus={initialFocus}
+      confirmDisabledReason={confirmDisabledReason}
       onConfirm={onConfirm}
       onCancel={onCancel}
       onError={onError}
