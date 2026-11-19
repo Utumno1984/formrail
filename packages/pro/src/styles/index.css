@@ -92,8 +92,8 @@
      wraps between words, and anywhere as a last resort, so it never leaves the box. */
   .rop-pro-change-summary__kind {
     @apply ml-2 rounded-rop-sm px-1 text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
-    background-color: color-mix(in srgb, var(--rop-pro-cs-tone) 12%, var(--color-rop-surface));
-    color: color-mix(in srgb, var(--rop-pro-cs-tone) 45%, black);
+    background-color: color-mix(in srgb, var(--_cs-tone) 12%, var(--color-rop-surface));
+    color: color-mix(in srgb, var(--_cs-tone) 45%, black);
     /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
     outline: 1px solid currentColor;
     outline-offset: -1px;
@@ -102,7 +102,7 @@
       @apply mr-1 inline-block size-[0.75em];
       content: '';
       background-color: currentColor;
-      clip-path: var(--rop-pro-cs-shape);
+      clip-path: var(--_cs-shape);
     }
   }
 
@@ -113,18 +113,18 @@
   }
 
   .rop-pro-change-summary__kind--added {
-    --rop-pro-cs-tone: var(--color-rop-success);
-    --rop-pro-cs-shape: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
+    --_cs-tone: var(--color-rop-success);
+    --_cs-shape: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
   }
 
   .rop-pro-change-summary__kind--removed {
-    --rop-pro-cs-tone: var(--color-rop-error);
-    --rop-pro-cs-shape: polygon(0 35%, 100% 35%, 100% 65%, 0 65%);
+    --_cs-tone: var(--color-rop-error);
+    --_cs-shape: polygon(0 35%, 100% 35%, 100% 65%, 0 65%);
   }
 
   .rop-pro-change-summary__kind--changed {
-    --rop-pro-cs-tone: var(--color-rop-primary);
-    --rop-pro-cs-shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    --_cs-tone: var(--color-rop-primary);
+    --_cs-shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   }
 
   /* Before / after: stacked on a narrow container, on one row from `@md` (28rem) up. */

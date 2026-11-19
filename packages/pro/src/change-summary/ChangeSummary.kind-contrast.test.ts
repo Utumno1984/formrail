@@ -29,7 +29,7 @@ function splitArgs(s: string): string[] {
   return out;
 }
 
-/** `scope` holds the per-badge custom properties (`--rop-pro-cs-tone`), which win over tokens.css. */
+/** `scope` holds the per-badge custom properties (`--_cs-tone`), which win over tokens.css. */
 function resolve(value: string, scope: Map<string, string>): Rgb {
   const v = value.trim();
   const hex = v.match(/^#([0-9a-f]{6})$/i);
@@ -83,7 +83,7 @@ function badge(kind: (typeof KINDS)[number], overrides: Record<string, string> =
   const base = ruleBody(BASE);
   const toneBody = ruleBody(`${BASE}--${kind}`);
   const scope = new Map<string, string>(Object.entries(overrides));
-  scope.set('--rop-pro-cs-tone', declaration(toneBody, '--rop-pro-cs-tone'));
+  scope.set('--_cs-tone', declaration(toneBody, '--_cs-tone'));
   return {
     fg: resolve(declaration(base, 'color'), scope),
     bg: resolve(declaration(base, 'background-color'), scope),
@@ -94,7 +94,7 @@ function badge(kind: (typeof KINDS)[number], overrides: Record<string, string> =
 describe('ChangeSummary kind badges: contrast (#485)', () => {
   it('each badge takes its tone from the matching semantic token, never a literal', () => {
     for (const kind of KINDS) {
-      expect(declaration(ruleBody(`${BASE}--${kind}`), '--rop-pro-cs-tone')).toBe(`var(${TONE_TOKEN[kind]})`);
+      expect(declaration(ruleBody(`${BASE}--${kind}`), '--_cs-tone')).toBe(`var(${TONE_TOKEN[kind]})`);
     }
     const base = ruleBody(BASE);
     expect(base).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
@@ -147,9 +147,9 @@ describe('ChangeSummary kind badges: styles that must stay (#485)', () => {
   });
 
   it('draws a different shape per kind, and the icon is a pseudo-element (no DOM node to name)', () => {
-    const shapes = KINDS.map((k) => declaration(ruleBody(`${BASE}--${k}`), '--rop-pro-cs-shape'));
+    const shapes = KINDS.map((k) => declaration(ruleBody(`${BASE}--${k}`), '--_cs-shape'));
     expect(new Set(shapes).size).toBe(3);
-    expect(proCss).toMatch(/&::before\s*\{[^}]*content:\s*'';[^}]*clip-path:\s*var\(--rop-pro-cs-shape\)/);
+    expect(proCss).toMatch(/&::before\s*\{[^}]*content:\s*'';[^}]*clip-path:\s*var\(--_cs-shape\)/);
   });
 
   it('has a forced-colors rule that gives the icon a system colour', () => {
