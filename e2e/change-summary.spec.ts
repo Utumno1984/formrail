@@ -301,3 +301,49 @@ test.describe('Pro/ChangeSummary: row labels and reorders (#424)', () => {
     await expectNoA11yViolations(page);
   });
 });
+
+test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
+  test('the Empty play function passes, also with a blank emptyLabel (default text)', async ({ page }) => {
+    await expectPlayToPass(page, EMPTY);
+    await expectPlayToPass(page, EMPTY, 'emptyLabel:+');
+    await expect(page.getByRole('group', { name: 'Changes' })).toHaveText('No changes');
+  });
+
+  test('the empty state is a named group with the text and a hidden icon (aria snapshot)', async ({ page }) => {
+    await gotoStory(page, EMPTY);
+    await expect(page.getByRole('group', { name: 'Changes' })).toMatchAriaSnapshot(`
+      - group "Changes":
+        - paragraph: No changes
+    `);
+    await expect(page.getByRole('group', { name: 'Changes' }).locator('svg')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('the box keeps its declared minimum height and matches a summary with one change', async ({ page }) => {
+    await expectPlayToPass(page, PLAYGROUND);
+    const root = page.locator('.rop-pro-change-summary');
+    const empty = (await root.boundingBox())!.height;
+    const minHeight = await root.evaluate((el) => parseFloat(getComputedStyle(el).minHeight));
+    expect(minHeight).toBeGreaterThan(0);
+    expect(empty).toBeGreaterThanOrEqual(minHeight);
+    await editAmount(page, '120');
+    await expect(page.getByRole('list', { name: 'Changes' })).toBeVisible();
+    const changed = (await root.boundingBox())!.height;
+    // The same height as a summary with one change, give or take the rounding of the line heights.
+    expect(Math.abs(empty - changed)).toBeLessThanOrEqual(8);
+    // Nothing is animated or shown as a loading placeholder.
+    expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+    // Back to empty: the group (with its name) returns, at the same height.
+    await page.getByRole('button', { name: 'Discard' }).click();
+    await expect(page.getByRole('group', { name: 'Changes' })).toHaveText('No changes');
+    expect((await root.boundingBox())!.height).toBe(empty);
+  });
+
+  test('a very long emptyLabel wraps inside the box, on a narrow container too', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expectPlayToPass(page, EMPTY, `emptyLabel:${'Nothing-to-save-yet-'.repeat(12)}`);
+    const box = page.locator('.rop-pro-change-summary');
+    const size = await box.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(size.scroll).toBeLessThanOrEqual(size.client);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+});
