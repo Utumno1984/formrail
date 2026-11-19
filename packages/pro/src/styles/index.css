@@ -43,7 +43,7 @@
     @apply flex min-w-0 items-center gap-2 text-rop-text-muted;
   }
 
-  .rop-pro-change-summary__empty-icon {
+  .rop-pro-change-summary__empty > svg {
     @apply shrink-0;
   }
 

@@ -138,7 +138,7 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
       {entries.length === 0 ? (
         // A group, not a status: static, never announced when the summary empties while typing.
         <div role="group" aria-label={label} className={`${CS}__empty`}>
-          <Icon size="md" className={`${CS}__empty-icon`}>
+          <Icon size="md">
             {CHECK_ICON}
           </Icon>
           <Text className={`${CS}__empty-text`}>{emptyText}</Text>
