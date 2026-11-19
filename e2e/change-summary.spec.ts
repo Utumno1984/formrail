@@ -318,7 +318,7 @@ test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
     await expect(page.getByRole('group', { name: 'Changes' }).locator('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  test('the box is never shorter than its declared minimum, nor than a summary with one change', async ({ page }) => {
+  test('the box keeps its declared minimum height and matches a summary with one change', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND);
     const root = page.locator('.rop-pro-change-summary');
     const empty = (await root.boundingBox())!.height;
@@ -328,7 +328,8 @@ test.describe('Pro/ChangeSummary: explicit empty state (#484)', () => {
     await editAmount(page, '120');
     await expect(page.getByRole('list', { name: 'Changes' })).toBeVisible();
     const changed = (await root.boundingBox())!.height;
-    expect(empty).toBeGreaterThanOrEqual(changed);
+    // The same height as a summary with one change, give or take the rounding of the line heights.
+    expect(Math.abs(empty - changed)).toBeLessThanOrEqual(8);
     // Nothing is animated or shown as a loading placeholder.
     expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
     // Back to empty: the group (with its name) returns, at the same height.

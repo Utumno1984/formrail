@@ -31,10 +31,12 @@
     border: 1px solid var(--color-rop-border);
   }
 
-  /* Same height as a summary with one entry (two lines), so the box does not jump between the empty
-     state and the first change. A `min-h-*` utility in `className` still wins. */
+  /* As tall as a summary with one entry (two lines: 44px of content, 78px with padding and border), so
+     the box does not jump when the first change appears (a long or stacked entry grows it, as any
+     content does). The box is `content-box` here (no preflight), hence the content height. A
+     `min-h-*` utility in `className` still wins. */
   .rop-pro-change-summary--empty {
-    @apply flex min-h-24 items-center;
+    @apply flex min-h-11 items-center;
   }
 
   .rop-pro-change-summary__empty {
