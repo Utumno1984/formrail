@@ -44,6 +44,23 @@ async function openOrder(page: Page, args = NO_DELAYS): Promise<void> {
 const orderStored = (page: Page) =>
   page.evaluate((id) => (window as unknown as StoresWindow).__ropShowcaseAppStores?.['sales-orders'].snapshot().find((o) => o.id === id), ORDER);
 
+type ChannelWindow = { __STORYBOOK_ADDONS_CHANNEL__: { emit: (event: string, payload: unknown) => void } };
+/** Changes the Control `module` of the mounted story, as the Controls panel does (the story re-renders, no play). */
+const setControl = (page: Page, module: string) =>
+  page.evaluate(
+    ([storyId, value]) => (window as unknown as ChannelWindow).__STORYBOOK_ADDONS_CHANNEL__.emit('updateStoryArgs', { storyId, updatedArgs: { module: value } }),
+    [APP, module] as const,
+  );
+type GoSpyWindow = { __ropGoCalls?: number[] };
+/** Replaces `history.go` with a recorder (the frame never leaves: a call is counted, not run). */
+const spyHistoryGo = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as GoSpyWindow;
+    w.__ropGoCalls = [];
+    window.history.go = (delta?: number) => void w.__ropGoCalls!.push(delta ?? 0);
+  });
+const historyGoCalls = (page: Page) => page.evaluate(() => (window as unknown as GoSpyWindow).__ropGoCalls);
+
 test.describe('Showcase/Record editing as an app: the stories play', () => {
   for (const id of PLAYS) {
     test(`${id.replace('showcase-record-editing--', '')}: the play function passes`, async ({ page }) => {
@@ -284,6 +301,133 @@ test.describe('Showcase/Record editing as an app: edge cases', () => {
     await page.goBack();
     await expect(reference(page)).toHaveValue('PO-525-FLIGHT');
     await expect(bar(page)).toBeHidden();
+  });
+});
+
+test.describe('Showcase/Record editing as an app: a modified click on the bar', () => {
+  test('Ctrl/Cmd, Shift or the middle button on "Customers" open its href elsewhere; the app stays where it was', async ({ page, context }) => {
+    await openApp(page);
+    const before = page.url();
+    const clicks: Parameters<Locator['click']>[0][] = [{ modifiers: ['ControlOrMeta'] }, { modifiers: ['Shift'] }, { button: 'middle' }];
+    for (const click of clicks) {
+      const opened = context.waitForEvent('page');
+      await modLink(page, 'Customers').click(click);
+      const tab = await opened;
+      await tab.waitForLoadState('domcontentloaded');
+      expect(new URL(tab.url()).searchParams.get('module'), JSON.stringify(click)).toBe('customers');
+      await tab.close();
+      expect(page.url(), JSON.stringify(click)).toBe(before);
+      await expect(modLink(page, 'Sales orders')).toHaveAttribute('aria-current', 'page');
+      await expect(modLink(page, 'Customers')).not.toHaveAttribute('aria-current');
+      await expect(page.getByRole('heading', { level: 2, name: /Sales orders/ })).toBeVisible();
+    }
+  });
+});
+
+test.describe('Showcase/Record editing as an app: the Control `module` changed while the app runs', () => {
+  test('on a dirty order it asks first; "Keep editing" leaves URL, order, edit and bar as they were; no history.go', async ({ page }) => {
+    await openOrder(page);
+    await spyHistoryGo(page);
+    await reference(page).fill('PO-525-EDIT');
+    await expect(bar(page)).toBeVisible();
+    await setControl(page, 'customers');
+    await expect(guard(page)).toBeVisible();
+    expect(params(page).get('module')).toBe('sales-orders');
+    expect(params(page).get('record')).toBe(ORDER);
+    await guard(page).getByRole('button', { name: 'Keep editing' }).click();
+    await expect(guard(page)).toBeHidden();
+    expect(params(page).get('module')).toBe('sales-orders');
+    expect(params(page).get('record')).toBe(ORDER);
+    await expect(page.getByRole('heading', { level: 1, name: /^SO-/ })).toBeVisible();
+    await expect(reference(page)).toHaveValue('PO-525-EDIT');
+    await expect(bar(page)).toBeVisible();
+    await expect(modLink(page, 'Sales orders')).toHaveAttribute('aria-current', 'page');
+    await expect(modLink(page, 'Customers')).not.toHaveAttribute('aria-current');
+    expect(await historyGoCalls(page)).toEqual([]);
+  });
+
+  test('an order opened from the list: "Discard changes" shows the list of the module chosen, the edit is not saved; no history.go', async ({ page }) => {
+    await openApp(page);
+    await spyHistoryGo(page);
+    await page.locator('a[data-record-id]').first().click();
+    await expect(reference(page)).toBeVisible();
+    const id = await page.evaluate(() => new URLSearchParams(window.location.search).get('record'));
+    const saved = await reference(page).inputValue();
+    await reference(page).fill('PO-525-EDIT');
+    await setControl(page, 'customers');
+    await guard(page).getByRole('button', { name: 'Discard changes' }).click();
+    await expect(page.getByRole('heading', { level: 2, name: /Customers/ })).toBeVisible();
+    expect(params(page).get('module')).toBe('customers');
+    expect(params(page).get('record')).toBeNull();
+    await expect(modLink(page, 'Customers')).toHaveAttribute('aria-current', 'page');
+    await expect(modLink(page, 'Sales orders')).not.toHaveAttribute('aria-current');
+    await expect(guard(page)).toHaveCount(0);
+    const stored = await page.evaluate(
+      (orderId) => (window as unknown as StoresWindow).__ropShowcaseAppStores?.['sales-orders'].snapshot().find((o) => o.id === orderId)?.customerReference,
+      id,
+    );
+    expect(stored).toBe(saved);
+    expect(await historyGoCalls(page)).toEqual([]);
+  });
+
+  test('with a save in flight it asks ("Leave anyway"): the list of the module chosen, the save still lands; no history.go', async ({ page }) => {
+    await openOrder(page, 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:1500');
+    await spyHistoryGo(page);
+    await reference(page).fill('PO-525-FLIGHT');
+    await bar(page).getByRole('button', { name: 'Save' }).click();
+    await expect(bar(page).getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true');
+    await setControl(page, 'customers');
+    await expect(guard(page)).toContainText('A save is still in progress');
+    expect(params(page).get('record')).toBe(ORDER);
+    await guard(page).getByRole('button', { name: 'Leave anyway' }).click();
+    await expect(page.getByRole('heading', { level: 2, name: /Customers/ })).toBeVisible();
+    expect(params(page).get('module')).toBe('customers');
+    expect(params(page).get('record')).toBeNull();
+    await expect(modLink(page, 'Customers')).toHaveAttribute('aria-current', 'page');
+    await expect.poll(async () => (await orderStored(page))?.customerReference, { timeout: 5000 }).toBe('PO-525-FLIGHT');
+    expect(await historyGoCalls(page)).toEqual([]);
+  });
+
+  test('the lists start over: scroll, pill and sort of the orders are gone when the control changes', async ({ page }) => {
+    await openApp(page);
+    // A scroll of the orders' list as it starts (saved under that list), then a pill and a sort.
+    await scrollerOf(page).evaluate((el) => (el.scrollTop = 420));
+    await expect.poll(() => scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(420);
+    await page.waitForTimeout(300); // the scroll reports itself on the next frame, saved after 150 ms
+    await page.getByRole('radio', { name: 'Confirmed' }).click();
+    await page.getByRole('button', { name: 'Total' }).click();
+    await expect(page.getByRole('columnheader', { name: /Total/ })).toHaveAttribute('aria-sort', 'descending');
+    expect(params(page).get('sales-orders.filter')).toBe('confirmed');
+    await setControl(page, 'customers');
+    await expect(page.getByRole('heading', { level: 2, name: /Customers/ })).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
+    expect(params(page).get('sales-orders.filter')).toBeNull();
+    expect(params(page).get('sales-orders.sort')).toBeNull();
+    await modLink(page, 'Sales orders').click();
+    await expect(page.getByRole('heading', { level: 2, name: /Sales orders/ })).toBeVisible();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
+    await expect(page.getByRole('columnheader', { name: /Total/ })).not.toHaveAttribute('aria-sort', 'descending');
+    await page.waitForTimeout(300); // a restoration would land with the rows
+    expect(await scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(0);
+  });
+
+  test('the control naming the module already on screen still starts its list over: pill and scroll', async ({ page }) => {
+    await openApp(page);
+    await modLink(page, 'Customers').click();
+    await expect(page.getByRole('heading', { level: 2, name: /Customers/ })).toBeVisible();
+    await page.getByRole('radio', { name: 'Active' }).click();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    await scrollerOf(page).evaluate((el) => (el.scrollTop = 420));
+    await expect.poll(() => scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(420);
+    await page.waitForTimeout(300);
+    await setControl(page, 'customers');
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
+    expect(params(page).get('customers.filter')).toBeNull();
+    await expect(page.getByRole('row').nth(5)).toBeVisible();
+    await expect(modLink(page, 'Customers')).toHaveAttribute('aria-current', 'page');
+    await page.waitForTimeout(300);
+    expect(await scrollerOf(page).evaluate((el) => el.scrollTop)).toBe(0);
   });
 });
 

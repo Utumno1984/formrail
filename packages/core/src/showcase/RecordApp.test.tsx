@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { setupCrudTests } from './modules/sales-orders/crud-test-kit';
@@ -264,5 +264,170 @@ describe('a customer that is not there, a save in flight (#525)', () => {
     await waitFor(() => expect(stores()['sales-orders'].snapshot().find((o) => o.id === ORDER)?.customerReference).toBe('PO-IN-FLIGHT'), { timeout: 8000 });
     await userEvent.click(bar().getByRole('link', { name: 'Sales orders' }));
     await listReady('Sales orders');
+  });
+});
+
+describe('a modified click on a link of the bar is the browser\'s (#525, round 2)', () => {
+  it('Ctrl, Meta, Shift, Alt or another button: no report, no navigation; a plain click is the app\'s', { timeout: BUDGET }, async () => {
+    const { onNavigate } = renderApp();
+    await listReady('Sales orders');
+    const link = bar().getByRole('link', { name: 'Customers' });
+    const before = window.location.search;
+    for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
+      fireEvent.click(link, init);
+      expect(onNavigate, JSON.stringify(init)).not.toHaveBeenCalled();
+      expect(window.location.search, JSON.stringify(init)).toBe(before);
+    }
+    expect(title()).toHaveTextContent('Sales orders');
+    expect(bar().getByRole('link', { name: 'Sales orders' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(link);
+    await listReady('Customers');
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenLastCalledWith({ to: 'module', module: 'customers' });
+  });
+});
+
+describe('the Control `module` changed while the app runs (#525, round 2)', () => {
+  /** The app with the `module` prop driven from outside, as the Storybook control drives it. */
+  const renderWithControl = (props: Partial<RecordAppProps> = {}) => {
+    const onNavigate = vi.fn();
+    const tree = (module: RecordAppProps['module']) => (
+      <StrictMode>
+        <RecordApp history="replace" listLoadDelayMs={0} recordLoadDelayMs={0} saveDelayMs={0} saveOutcome="success" onNavigate={onNavigate} {...props} module={module} />
+      </StrictMode>
+    );
+    const view = render(tree(props.module ?? 'sales-orders'));
+    return { onNavigate, setControl: (module: RecordAppProps['module']) => view.rerender(tree(module)) };
+  };
+  /**
+   * Which link of the bar is the current page. Read from the DOM, not by role: while the modal dialog is open the page
+   * behind it is `aria-hidden`, and a hidden element has no accessible name to query it by.
+   */
+  const current = (name: 'Sales orders' | 'Customers') => {
+    const links = [...document.querySelectorAll('nav[aria-label="Modules"] a')];
+    expect(links.map((a) => a.textContent)).toEqual(['Sales orders', 'Customers']);
+    expect(links.filter((a) => a.getAttribute('aria-current') === 'page').map((a) => a.textContent)).toEqual([name]);
+  };
+  const storedReference = () => stores()['sales-orders'].snapshot().find((o) => o.id === ORDER)?.customerReference;
+
+  it('on a dirty order it asks first; "Keep editing" leaves URL, order, edit and bar as they were; no history.go', { timeout: BUDGET }, async () => {
+    await openOrder();
+    const go = vi.spyOn(window.history, 'go');
+    const { onNavigate, setControl } = renderWithControl();
+    await editReference();
+    const before = window.location.search;
+    setControl('customers');
+    const ask = await dialog();
+    expect(window.location.search).toBe(before);
+    current('Sales orders');
+    await userEvent.click(within(ask).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(window.location.search).toBe(before);
+    expect(params().get('module')).toBe('sales-orders');
+    expect(params().get('record')).toBe(ORDER);
+    expect(screen.getByRole('heading', { level: 1, name: /^SO-/ })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Customer reference' })).toHaveValue('PO-525-EDIT');
+    expect(saveBar()).not.toBeNull();
+    current('Sales orders');
+    expect(go).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('"Discard changes" shows the list of the module chosen, the edit is not saved; no history.go', { timeout: BUDGET }, async () => {
+    await openOrder();
+    const go = vi.spyOn(window.history, 'go');
+    const { setControl } = renderWithControl();
+    const saved = ((await screen.findByRole('textbox', { name: 'Customer reference' })) as HTMLInputElement).value;
+    await editReference();
+    setControl('customers');
+    await userEvent.click(within(await dialog()).getByRole('button', { name: 'Discard changes' }));
+    await listReady('Customers');
+    expect(params().get('module')).toBe('customers');
+    expect(params().get('record')).toBeNull();
+    current('Customers');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(storedReference()).toBe(saved);
+    expect(go).not.toHaveBeenCalled();
+  });
+
+  it('a later value of the control while the dialog is open is the one "Discard changes" shows', { timeout: BUDGET }, async () => {
+    await openOrder();
+    const { setControl } = renderWithControl({ module: 'customers' });
+    await editReference();
+    setControl('sales-orders');
+    const ask = await dialog();
+    setControl('customers');
+    await userEvent.click(within(ask).getByRole('button', { name: 'Discard changes' }));
+    await listReady('Customers');
+    current('Customers');
+  });
+
+  it('with a save in flight it asks ("Leave anyway"): the list of the module chosen, the save still lands; no history.go', { timeout: BUDGET }, async () => {
+    await openOrder();
+    const go = vi.spyOn(window.history, 'go');
+    const { setControl } = renderWithControl({ saveDelayMs: 2500 });
+    await editReference('PO-IN-FLIGHT');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('aria-disabled', 'true'));
+    setControl('customers');
+    const ask = await dialog();
+    expect(ask).toHaveTextContent('A save is still in progress');
+    expect(params().get('record')).toBe(ORDER);
+    await userEvent.click(within(ask).getByRole('button', { name: 'Leave anyway' }));
+    await listReady('Customers');
+    expect(params().get('module')).toBe('customers');
+    expect(params().get('record')).toBeNull();
+    current('Customers');
+    await waitFor(() => expect(storedReference()).toBe('PO-IN-FLIGHT'), { timeout: 8000 });
+    expect(go).not.toHaveBeenCalled();
+  });
+
+  it('on a clean order it goes straight to the list of the module chosen, with no dialog', { timeout: BUDGET }, async () => {
+    await openOrder();
+    const { setControl } = renderWithControl();
+    await screen.findByRole('textbox', { name: 'Customer reference' });
+    setControl('customers');
+    await listReady('Customers');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(params().get('record')).toBeNull();
+    current('Customers');
+  });
+
+  it('the lists start over: no pill, sort or saved scroll of any module is kept (as at the start of a story)', { timeout: BUDGET }, async () => {
+    window.sessionStorage.clear();
+    const { setControl } = renderWithControl();
+    await listReady('Sales orders');
+    await userEvent.click(screen.getByRole('radio', { name: 'Confirmed' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Total' }));
+    expect(params().get('sales-orders.filter')).toBe('confirmed');
+    expect(params().get('sales-orders.sort')).toBe('total.desc');
+    window.sessionStorage.setItem('rop:list-report-scroll:sales-orders#/?', JSON.stringify({ top: 300, left: 0 }));
+    window.sessionStorage.setItem('not-the-app', 'kept');
+    setControl('customers');
+    await listReady('Customers');
+    expect([...params().keys()].filter((k) => k.startsWith('sales-orders.') || k.startsWith('customers.'))).toEqual([]);
+    expect(Object.keys(window.sessionStorage).filter((k) => k.startsWith('rop:list-report-scroll:'))).toEqual([]);
+    expect(window.sessionStorage.getItem('not-the-app')).toBe('kept');
+    await userEvent.click(bar().getByRole('link', { name: 'Sales orders' }));
+    await listReady('Sales orders');
+    expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
+    expect(screen.getByRole('columnheader', { name: /Total/ })).not.toHaveAttribute('aria-sort', 'descending');
+  });
+
+  it('the control naming the module already on screen still brings its list back to the start', { timeout: BUDGET }, async () => {
+    const { setControl } = renderWithControl();
+    await listReady('Sales orders');
+    await userEvent.click(bar().getByRole('link', { name: 'Customers' }));
+    await listReady('Customers');
+    await userEvent.click(screen.getByRole('radio', { name: 'On hold' }));
+    expect(params().get('customers.filter')).toBe('on-hold');
+    const table = screen.getByRole('table');
+    setControl('customers');
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'All' })).toBeChecked());
+    expect(params().get('customers.filter')).toBeNull();
+    current('Customers');
+    // A list mounted again (its scroll, restored once per mount, starts over too: see the e2e), not the same one re-read.
+    await listReady('Customers');
+    expect(screen.getByRole('table')).not.toBe(table);
   });
 });
