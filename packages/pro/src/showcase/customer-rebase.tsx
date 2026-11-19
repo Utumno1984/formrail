@@ -8,7 +8,7 @@
 // A customer archived on the server while it is open: the Free page disables every field of an archived customer
 // (its SAVED status); the user's changes stay in the form, are listed as text in a message (selectable, so they can be
 // copied) and can no longer be saved: the server of this showcase refuses a write to an archived customer other than
-// "Restore" (`withArchivedGuard`).
+// "Restore" (`withArchivedGuard`). The choices of a conflict still open are no longer offered then.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MessageStrip, Button } from '@formrail/core';
 import { deepEqual } from '../../../core/src/object-page/equal';
@@ -153,6 +153,9 @@ export const ARCHIVED_SAVED_TEXT = 'Its fields can no longer be changed. Nothing
 export const ARCHIVED_REVIEW_DESCRIPTION = 'This customer was archived on the server: these changes can no longer be saved.';
 export const UNSAVED_LIST_LABEL = 'Your unsaved changes';
 
+/** The conflicts the notice lists while the customer is archived on the server: none (see `useCustomerRebase`). */
+const NO_CONFLICTS: readonly RebaseConflict[] = [];
+
 /** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
 const NOTICE_MARGIN = { margin: '12px 16px' } as const;
 
@@ -230,9 +233,18 @@ export function useCustomerRebase({ form, record, store, toValues, scrollerRef }
     void store.updateFromServer(record.id, serverChangeOf(serverChange), serverUpdateDelayMs).catch(() => undefined);
   }, [store, record.id]);
 
-  // Archived by the server while open: the saved customer (the baseline) is a version the server announced, and it is
-  // archived. Archived by the user's own Save (the Free flow) or loaded archived, it is not: the Free page says so.
-  const archived = form.baseline.status === 'archived' && fromServer.has(form.baseline);
+  // Archived by the server while open: the saved customer (the baseline) went from not archived to archived with a
+  // version the server announced. Loaded archived, or archived by the user's own Save (the Free flow, the Free page
+  // says so), it is not, and a later server update of that archived customer does not make it so; archived by the
+  // server, a later server update keeps it so. Followed baseline by baseline (each one renders: a rebase queued during
+  // a save is applied in the render after the save's), adjusted during the render (no render shows the old answer).
+  const [archiving, setArchiving] = useState(() => ({ baseline: form.baseline, byServer: false }));
+  let archived = archiving.byServer;
+  if (archiving.baseline !== form.baseline) {
+    const wasArchived = archiving.baseline.status === 'archived';
+    archived = form.baseline.status === 'archived' && (wasArchived ? archiving.byServer : fromServer.has(form.baseline));
+    setArchiving({ baseline: form.baseline, byServer: archived });
+  }
   const { conflicts } = rebase;
 
   // The review dialog reads the form through this source while it is open: an update may land under it.
@@ -263,7 +275,8 @@ export function useCustomerRebase({ form, record, store, toValues, scrollerRef }
   );
 
   // The focus was in a field that the archiving just disabled (a disabled control loses the focus, which falls to the
-  // page): it goes to the message that says why, never left on `<body>`.
+  // page), or on a choice of a conflict that the archiving took away (the notice sends it to the field of the conflict,
+  // disabled): it goes to the message that says why, never left on `<body>`.
   const archivedRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const strip = archivedRef.current;
@@ -298,7 +311,10 @@ export function useCustomerRebase({ form, record, store, toValues, scrollerRef }
       ) : null}
       <RebaseNotice
         applied={rebase.applied}
-        conflicts={conflicts}
+        // Archived on the server, nothing can be saved: the choices of an open conflict are not offered. "Use server
+        // value" would change a field the user can no longer change and take their value out of the list above, where
+        // they copy it from (the server's value is there too: "from <server> to <mine>"). Restore clears them anyway.
+        conflicts={archived ? NO_CONFLICTS : conflicts}
         pending={rebase.isPending}
         onAcceptTheirs={rebase.acceptTheirs}
         onKeepMine={rebase.keepMine}

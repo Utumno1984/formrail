@@ -24,6 +24,7 @@ import {
   type CustomerServerChangeKind,
 } from './customer-rebase';
 import {
+  ARCHIVED,
   CUSTOMER,
   FOUR_CONTACTS,
   WITH_LINE_2,
@@ -465,5 +466,122 @@ describe('Record editing integrity, customers: archived on the server while open
     await waitFor(() => expect(textbox('City')).toBeDisabled());
     expect(archivedStrip()).toBeNull();
     expect(onServerChange).not.toHaveBeenCalled();
+  }, 30_000);
+});
+
+describe('Record editing integrity, customers: "archived on the server" only when the server archived it (#524)', () => {
+  it('loaded archived, then the server changes its account manager: no "archived on the server" message', async () => {
+    const { store } = renderCustomer(ARCHIVED);
+    await screen.findByRole('button', { name: 'Restore' });
+    await serverUpdate(store, serverChangeOf('account-manager'), ARCHIVED);
+    await waitFor(() => expect(notice()).toHaveTextContent('1 field was updated.'));
+    expect(screen.queryByText(ARCHIVED_TITLE)).toBeNull();
+  }, 30_000);
+
+  it('archived by my own Save, then a server update: no "archived on the server" message', async () => {
+    const { store } = renderCustomer();
+    await opened();
+    await pick(combobox('Status'), 'Archived');
+    await userEvent.click(await saveButton());
+    await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(textbox('City')).toBeDisabled());
+    await serverUpdate(store, serverChangeOf('account-manager'));
+    await waitFor(() => expect(notice()).toHaveTextContent('1 field was updated.'));
+    expect(screen.queryByText(ARCHIVED_TITLE)).toBeNull();
+  }, 30_000);
+
+  it('my own archiving Save in flight, a server update lands under it: no "archived on the server" message once both are in', async () => {
+    const held = gate();
+    const store = integrityStore({ saveDelayMs: held.promise });
+    renderCustomer(CUSTOMER, { store });
+    await opened();
+    await pick(combobox('Status'), 'Archived');
+    await userEvent.click(await saveButton());
+    await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Save changes' }));
+    await serverUpdate(store, serverChangeOf('account-manager'));
+    expect(notice()).toHaveTextContent('Applying server update after saving…');
+    await act(async () => {
+      held.release();
+      await held.promise;
+    });
+    await waitFor(() => expect(notice()).toHaveTextContent('1 field was updated.'));
+    expect(stored(store, CUSTOMER)).toMatchObject({ status: 'archived', accountManagerId: nextAccountManager(seed().accountManagerId) });
+    expect(textbox('City')).toBeDisabled();
+    expect(screen.queryByText(ARCHIVED_TITLE)).toBeNull();
+  }, 30_000);
+
+  it('archived on the server, then another server update: the message stays (it is still the server that archived it)', async () => {
+    const { store } = renderCustomer();
+    await opened();
+    await retype(textbox('City'), 'Modena');
+    await serverUpdate(store, serverChangeOf('archive'));
+    expect(archivedStrip()).toHaveTextContent(ARCHIVED_TEXT);
+    await serverUpdate(store, serverChangeOf('account-manager'));
+    await waitFor(() => expect(combobox('Account manager')).toHaveValue(managerName(nextAccountManager(seed().accountManagerId))));
+    expect(archivedStrip()).toHaveTextContent(ARCHIVED_TEXT);
+    expect(readItems(within(archivedStrip()!).getByRole('list', { name: UNSAVED_LIST_LABEL }))).toEqual(['Billing address > City, changed, from Bologna to Modena']);
+  }, 30_000);
+});
+
+describe('Record editing integrity, customers: a conflict open when the server archives the customer (#524)', () => {
+  const MINE = 'matteo@borgavella-tooling.example';
+
+  /** The primary contact's e-mail changed by both (a conflict), then the server archives the customer. */
+  async function conflictThenArchived(focusChoice: boolean) {
+    const setup = renderCustomer();
+    await opened();
+    await retype(textbox('Contact 1 e-mail'), MINE);
+    await serverUpdate(setup.store, serverChangeOf('primary-contact-email'));
+    expect(conflictTexts()).toHaveLength(1);
+    if (focusChoice) screen.getByRole('button', { name: /^Keep mine for / }).focus();
+    await serverUpdate(setup.store, serverChangeOf('archive'));
+    return setup;
+  }
+
+  it('the choices of the conflict are no longer offered: nothing changes an archived customer, my e-mail stays in the field and in the list to copy', async () => {
+    await conflictThenArchived(false);
+    const theirs = serverEmail(seed().contacts[0]!.email);
+    expect(archivedStrip()).toHaveTextContent(ARCHIVED_TEXT);
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Use server value/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Keep mine/ })).toBeNull();
+    expect(textbox('Contact 1 e-mail')).toBeDisabled();
+    expect(textbox('Contact 1 e-mail').value).toBe(MINE);
+    expect(readItems(within(archivedStrip()!).getByRole('list', { name: UNSAVED_LIST_LABEL }))).toEqual([
+      `Contacts > Contact 1 (Matteo Gatti) > E-mail, changed, from ${theirs} to ${MINE}`,
+    ]);
+    // The notice still says what the server changed (the status): only the choices are gone.
+    expect(notice()).toHaveTextContent('1 field was updated.');
+  }, 30_000);
+
+  it('two conflicts open: "Use all server values" is not offered either', async () => {
+    const { store } = renderCustomer();
+    await opened();
+    await retype(textbox('Contact 1 e-mail'), MINE);
+    await pick(combobox('Account manager'), managerName(nextAccountManager(nextAccountManager(seed().accountManagerId))));
+    await serverUpdate(store, (c) => serverChangeOf('account-manager')(serverChangeOf('primary-contact-email')(c)));
+    expect(conflictTexts()).toHaveLength(2);
+    await serverUpdate(store, serverChangeOf('archive'));
+    await screen.findByText(ARCHIVED_TITLE);
+    expect(screen.queryByRole('button', { name: 'Use all server values' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+  }, 30_000);
+
+  it('the focus on a choice of the conflict when the archiving lands: it goes to the message, never to <body>', async () => {
+    await conflictThenArchived(true);
+    const strip = archivedStrip();
+    expect(strip).not.toBeNull();
+    await waitFor(() => expect(strip).toHaveFocus());
+    expect(document.activeElement).not.toBe(document.body);
+  }, 30_000);
+
+  it('Restore: the customer active again, no conflict left to choose (my changes discarded, as the message said)', async () => {
+    const { store } = await conflictThenArchived(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(stored(store, CUSTOMER).status).toBe('active'));
+    await waitFor(() => expect(textbox('Contact 1 e-mail')).toBeEnabled());
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+    expect(textbox('Contact 1 e-mail').value).toBe(serverEmail(seed().contacts[0]!.email));
+    await clean();
   }, 30_000);
 });

@@ -438,4 +438,36 @@ test.describe('Pro/Showcase/Record editing integrity: a customer archived on the
     await archivedWhileInAField(page);
     await expectNoHorizontalOverflow(archivedStrip(page));
   });
+
+  test('archived by my own Save, then "Simulate server update": the update applies, no "archived on the server" message', async ({ page }) => {
+    await openCustomer(page, `${FAST};serverChange:account-manager`);
+    await choose(page, 'Status', 'Archived');
+    await saveButton(page).click();
+    await reviewDialog(page).getByRole('button', { name: 'Save changes' }).click();
+    await expect(textbox(page, 'City')).toBeDisabled();
+    await expect.poll(async () => (await stored(page))?.status).toBe('archived');
+    await simulate(page).click();
+    await expect(notice(page)).toContainText('1 field was updated.');
+    await expect(page.getByText(ARCHIVED_TITLE)).toHaveCount(0);
+  });
+
+  test('a conflict open when the archiving lands, the focus on "Keep mine": the choices are gone, the focus goes to the message (never <body>), my e-mail stays and is listed', async ({ page }) => {
+    const customer = await openCustomer(page, `${FAST};serverChange:primary-contact-email`);
+    const email = textbox(page, 'Contact 1 e-mail');
+    await email.fill('matteo@borgavella-tooling.example');
+    await simulate(page).click();
+    await expect(conflicts(page)).toHaveCount(1);
+    await page.getByRole('button', { name: 'Keep mine for Contacts > Contact 1 (Matteo Gatti) > E-mail' }).focus();
+    await page.evaluate((id) => {
+      void (window as unknown as ShowcaseWindow).__ropShowcaseStore!.updateFromServer(id, (c) => ({ ...c, status: 'archived' }));
+    }, customer.id);
+    await expect(archivedStrip(page)).toBeFocused();
+    await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^(Use server value|Keep mine|Use all server values)/ })).toHaveCount(0);
+    await expect(email).toBeDisabled();
+    await expect(email).toHaveValue('matteo@borgavella-tooling.example');
+    expect(await itemsOf(archivedStrip(page).getByRole('list', { name: 'Your unsaved changes' }))).toEqual([
+      `Contacts > Contact 1 (Matteo Gatti) > E-mail, changed, from orders.${customer.contacts[0]!.email} to matteo@borgavella-tooling.example`,
+    ]);
+  });
 });
