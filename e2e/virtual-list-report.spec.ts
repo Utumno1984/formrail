@@ -907,3 +907,140 @@ test.describe('#571 focus of a bulk action hidden without a resize', () => {
     await expect(nested).toBeFocused();
   });
 });
+
+// #582: follow-ups of the review of #571 (PR #577), in a real browser: a `focusout` that moves nothing (the one a
+// `Tooltip` closed by force dispatches on its trigger) keeps the control tracked; `prefers-reduced-motion` does not
+// change when the focus is read; `disabled`/`inert` on the focused control are not handled (the browser drops its
+// focus to body, where it is left). Tagged `@engines` where the engines may differ: Chromium, Firefox and WebKit all
+// drop the focus of a control made `disabled` or `inert` (measured for #582), so one expectation holds in the three.
+test.describe('#582 focus of a bulk action: a focusout that moves nothing, reduced motion, disabled/inert', () => {
+  /** A wrapper with a "Nested" button appended to the slot of the bulk actions, as a consumer's markup. */
+  async function nestedControl(page: Page): Promise<{ wrapper: Locator; nested: Locator }> {
+    await selectAllNode(page).evaluate((action) => {
+      const wrapper = document.createElement('div');
+      wrapper.setAttribute('data-e2e-wrapper', '');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Nested';
+      wrapper.append(button);
+      action.parentElement!.append(wrapper);
+    });
+    return { wrapper: page.locator('[data-e2e-wrapper]'), nested: page.getByRole('button', { name: 'Nested' }) };
+  }
+  const frames = (page: Page): Promise<void> =>
+    page.evaluate(() => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
+
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    test(`prefers-reduced-motion ${reducedMotion}: a nested control gets the focusout of a Tooltip closed by force (the focus stays on it), then its wrapper is hidden: the focus goes to the header checkbox @engines`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion });
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, SELECTION, 'withBulkActions:!true');
+      await pickRows(page, [2]);
+      const { wrapper, nested } = await nestedControl(page);
+      await nested.focus();
+      // What `Tooltip` dispatches on its trigger when it closes by force (`TruncatedText` whose text fits again).
+      await nested.evaluate((el) => el.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+      await frames(page);
+      await expect(nested).toBeFocused();
+      await wrapper.evaluate((el: HTMLElement) => {
+        el.style.visibility = 'hidden';
+      });
+      await expect(allBox(page)).toBeFocused();
+      expect(await activeIsBody(page)).toBe(false);
+    });
+
+    test(`prefers-reduced-motion ${reducedMotion}: 640 to 639 with the focus on "Select all N results": the focus goes to the header checkbox`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion });
+      await page.setViewportSize({ width: 640, height: 800 });
+      await gotoStory(page, SELECTION);
+      await pickRows(page, [2]);
+      await selectAllByRole(page).focus();
+      await page.setViewportSize({ width: 639, height: 800 });
+      await expect(allBox(page)).toBeFocused();
+      expect(await activeIsBody(page)).toBe(false);
+    });
+  }
+
+  for (const what of ['disabled on the control', 'inert on the control', 'inert on its wrapper', 'inert on the selection bar'] as const) {
+    test(`${what}: the browser drops the focus to body, where it is left; hiding the wrapper then moves nothing @engines`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await gotoStory(page, SELECTION, 'withBulkActions:!true');
+      await pickRows(page, [2]);
+      const { wrapper, nested } = await nestedControl(page);
+      await nested.focus();
+      await expect(nested).toBeFocused();
+      await nested.evaluate((el: HTMLButtonElement, how) => {
+        if (how === 'disabled on the control') el.disabled = true;
+        else if (how === 'inert on the control') el.inert = true;
+        else if (how === 'inert on its wrapper') el.parentElement!.inert = true;
+        else (el.closest('[data-rop-selection-bar]') as HTMLElement).inert = true;
+      }, what);
+      await expect.poll(() => activeIsBody(page)).toBe(true);
+      await wrapper.evaluate((el: HTMLElement) => {
+        el.style.visibility = 'hidden';
+      });
+      await frames(page);
+      expect(await activeIsBody(page)).toBe(true);
+      await expect(allBox(page)).not.toBeFocused();
+    });
+  }
+});
+
+// #582, second review: the frame in a same-origin iframe, the focus moved from an action of the bar to a field of the
+// parent page. The browser's `focusout` on the action ends its tracking, even in Firefox, which keeps the frame's
+// active element on the action once the focus is in the parent: hiding the action afterwards must not move the focus
+// back into the frame (the next key would be lost to the field).
+test.describe('#582 focus of a bulk action: the frame in an iframe, the focus moved to the parent page', () => {
+  const HOST = '/e2e-582-iframe-host.html';
+  const hostPage = (src: string): string =>
+    `<!doctype html><html lang="en"><head><title>Host</title></head><body style="margin:0">` +
+    `<label style="display:block;padding:8px">Parent field <input id="parent-field"></label>` +
+    `<iframe id="frame" title="Frame" src="${src}" style="display:block;width:1280px;height:760px;border:0"></iframe>` +
+    `</body></html>`;
+
+  for (const how of ['a click', 'focus()'] as const) {
+    test(`@engines the action has the focus, ${how} moves it to a field of the parent page, then the action is hidden: the field keeps the focus and the next key`, async ({ page }) => {
+      await page.setViewportSize({ width: 1300, height: 900 });
+      const src = `/iframe.html?id=${encodeURIComponent(SELECTION)}&viewMode=story&args=${encodeURIComponent('withBulkActions:!true')}`;
+      await page.route(`**${HOST}`, (route) => route.fulfill({ contentType: 'text/html', body: hostPage(src) }));
+      await page.goto(HOST);
+      const frame = page.frameLocator('#frame');
+      await frame.getByRole('checkbox', { name: 'Select INV-000002' }).click();
+      // A consumer's action of the bar (nested in a wrapper, as in the tests above).
+      await frame.locator('[data-rop-select-all-results]').evaluate((action) => {
+        const wrapper = action.ownerDocument.createElement('div');
+        wrapper.setAttribute('data-e2e-wrapper', '');
+        const button = action.ownerDocument.createElement('button');
+        button.type = 'button';
+        button.textContent = 'Nested';
+        wrapper.append(button);
+        action.parentElement!.append(wrapper);
+      });
+      const nested = frame.getByRole('button', { name: 'Nested' });
+      await nested.focus();
+      await expect(nested).toBeFocused();
+      const field = page.getByLabel('Parent field');
+      // Headless Firefox can drop the first focus move to the parent page while the frame is still taking the focus
+      // (seen with a click and with a script's `focus()`, never once the frame has settled): the move is repeated
+      // until it holds. What is under test comes after it.
+      await expect(async () => {
+        if (how === 'a click') await field.click();
+        else await field.focus();
+        await expect(field).toBeFocused({ timeout: 1000 });
+      }).toPass();
+      await page.keyboard.type('ab');
+      await expect(field).toHaveValue('ab');
+      // Something of the parent page hides the action (it clears the selection, say), two frames to be observed.
+      await frame.locator('[data-e2e-wrapper]').evaluate(async (el: HTMLElement) => {
+        el.style.visibility = 'hidden';
+        const win = el.ownerDocument.defaultView!;
+        await new Promise<void>((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(() => r())));
+      });
+      await page.keyboard.type('Z');
+      await expect(field).toHaveValue('abZ');
+      await expect(field).toBeFocused();
+      expect(await page.evaluate(() => document.activeElement?.id)).toBe('parent-field');
+      await expect(frame.getByRole('checkbox', { name: 'Select all results' })).not.toBeFocused();
+    });
+  }
+});

@@ -665,11 +665,29 @@ export const ValueTypes: Story = {
   },
 };
 
-/** No changes: the empty text, no list. */
+/**
+ * No changes: an explicit empty state (decorative icon + text, a group named by `label`, a minimum
+ * height equal to a summary with one change), not a list and not a placeholder. A blank `emptyLabel`
+ * gives the default text.
+ */
 export const Empty: Story = {
   tags: ['visual'],
   parameters: FIXED_FORMAT,
   render: (args) => <ChangeSummary entries={[]} {...fixed(args)} />,
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const group = canvas.getByRole('group', { name: args.label || 'Changes' });
+    await expect(group).toHaveTextContent(args.emptyLabel.trim() === '' ? 'No changes' : args.emptyLabel);
+    await expect(canvas.queryByRole('list')).toBeNull();
+    // The icon is decorative: hidden from the accessibility tree.
+    await expect(group.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    // The box keeps its declared minimum height (the same as a summary with one change) and nothing moves.
+    const root = canvasElement.firstElementChild as HTMLElement;
+    const minHeight = parseFloat(getComputedStyle(root).minHeight);
+    await expect(minHeight).toBeGreaterThan(0);
+    await expect(root.getBoundingClientRect().height).toBeGreaterThanOrEqual(minHeight);
+    await expect(document.getAnimations()).toHaveLength(0);
+  },
 };
 
 const longValue = 'x'.repeat(300);

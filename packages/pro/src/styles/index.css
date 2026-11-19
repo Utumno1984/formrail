@@ -31,8 +31,24 @@
     border: 1px solid var(--color-rop-border);
   }
 
+  /* As tall as a summary with one entry (two lines: 44px of content, 78px with padding and border), so
+     the box does not jump when the first change appears (a long or stacked entry grows it, as any
+     content does). The box is `content-box` here (no preflight), hence the content height. A
+     `min-h-*` utility in `className` still wins. */
+  .rop-pro-change-summary--empty {
+    @apply flex min-h-11 items-center;
+  }
+
   .rop-pro-change-summary__empty {
-    @apply text-rop-text-muted;
+    @apply flex min-w-0 items-center gap-2 text-rop-text-muted;
+  }
+
+  .rop-pro-change-summary__empty > svg {
+    @apply shrink-0;
+  }
+
+  .rop-pro-change-summary__empty-text {
+    @apply min-w-0 text-rop-text-muted [overflow-wrap:anywhere];
   }
 
   .rop-pro-change-summary__list {

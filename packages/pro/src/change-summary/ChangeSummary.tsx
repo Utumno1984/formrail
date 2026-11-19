@@ -1,5 +1,5 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
-import { cn, Text } from '@formrail/core';
+import { cn, Icon, Text } from '@formrail/core';
 import {
   DEFAULT_VALUE_LABELS,
   distinctValueTexts,
@@ -31,9 +31,20 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
    * build your own list on `useChangeSummary`.
    */
   renderValue?: (value: unknown, entry: ChangeEntry) => ReactNode;
-  /** Text shown when `entries` is empty. */
+  /**
+   * Text shown when `entries` is empty, next to a decorative check icon. An
+   * empty or blank string (`""`, `"  "`) also gives the default text: an empty box next to the
+   * icon would read as a summary that is still loading, which is what this state must not look like.
+   *
+   * @default 'No changes'
+   */
   emptyLabel?: string;
-  /** Accessible name of the list. */
+  /**
+   * Accessible name of the list, and of the group that holds `emptyLabel` when there is no entry
+   * (so the name does not disappear with the list).
+   *
+   * @default 'Changes'
+   */
   label?: string;
   /** BCP 47 locale of the default number and date formatting. Default: the runtime locale. */
   locale?: string;
@@ -47,6 +58,13 @@ export interface ChangeSummaryProps extends Omit<HTMLAttributes<HTMLDivElement>,
 // emitted by both pro and core collides by source order (see the header of that file). Nothing here
 // is animated. Plain literals at module level (a template literal there is not tree-shaken).
 const CS = 'rop-pro-change-summary';
+// Own drawing (24x24, `currentColor`): core's icon set is not part of its public API.
+const CHECK_ICON = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8 12.5l3 3 5-6" />
+  </svg>
+);
 const KIND_CLASS: Record<ChangeKind, string> = {
   added: 'rop-pro-change-summary__kind--added',
   removed: 'rop-pro-change-summary__kind--removed',
@@ -80,6 +98,7 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
   { entries, renderValue, emptyLabel = 'No changes', label = 'Changes', locale, timeZone, valueLabels, className, ...rest },
   ref,
 ) {
+  const emptyText = emptyLabel.trim() ? emptyLabel : 'No changes';
   const format: FormatChangeValueOptions = { locale, timeZone, labels: valueLabels };
   const labels = { ...DEFAULT_VALUE_LABELS, ...definedOnly(valueLabels) };
 
@@ -117,10 +136,16 @@ export const ChangeSummary = /* @__PURE__ */ forwardRef<HTMLDivElement, ChangeSu
       ref={ref}
       // A core utility in `className` (`p-0`) wins over the component's default, whatever the import
       // order: core's utilities sit directly in `rop.utilities`, pro's rules in `rop.utilities.pro`.
-      className={cn(CS, className)}
+      className={cn(CS, entries.length === 0 && `${CS}--empty`, className)}
     >
       {entries.length === 0 ? (
-        <Text className={`${CS}__empty`}>{emptyLabel}</Text>
+        // A group, not a status: static, never announced when the summary empties while typing.
+        <div role="group" aria-label={label} className={`${CS}__empty`}>
+          <Icon size="md">
+            {CHECK_ICON}
+          </Icon>
+          <Text className={`${CS}__empty-text`}>{emptyText}</Text>
+        </div>
       ) : (
         <ul aria-label={label} className={`${CS}__list`}>
           {entries.map((entry) => {
