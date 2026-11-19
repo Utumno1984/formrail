@@ -104,7 +104,7 @@ const SOURCE_FILES = showcaseFiles(SHOWCASE_FOLDER, SOURCES, {
   'record-api.ts': 'Fixture, not part of the library: the store as the pages call it. A write outlives the page that started it, so every read first waits for the writes still in flight: a list or a reopened order never shows a value older than the one the server is about to hold.',
 });
 
-const ORDER_OPTIONS = ['so-15', 'so-1', 'so-12', 'so-27', 'so-28', 'so-42', 'so-does-not-exist'];
+const ORDER_OPTIONS = ['so-15', 'so-1', 'so-30', 'so-25', 'so-14', 'so-12', 'so-27', 'so-28', 'so-42', 'so-does-not-exist'];
 
 const meta: Meta<RecordPageArgs> = {
   title: 'Showcase/Record editing',
