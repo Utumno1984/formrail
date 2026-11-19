@@ -137,6 +137,10 @@ describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
     ['true', true],
     ['an empty string', ''],
     ['a blank string', '   '],
+    ['0 (count && reason)', 0],
+    ['NaN', NaN],
+    ['an empty array', []],
+    ['an array of blanks', [null, false, '', 0]],
   ] as const)('%s: no reason, the button works as without the prop', async (_, value) => {
     const onConfirm = vi.fn();
     const { user, dialog, confirm } = await openHost({ onConfirm, confirmDisabledReason: value as ReactNode });
@@ -148,6 +152,16 @@ describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
     await user.click(confirm());
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('a non-zero number and an array with some text are reasons', async () => {
+    const first = await openHost({ confirmDisabledReason: 3 });
+    expect(first.confirm()).toHaveAttribute('aria-disabled', 'true');
+    expect(first.confirm()).toHaveAccessibleDescription('3');
+    first.unmount();
+    const second = await openHost({ confirmDisabledReason: [null, 'Deleted on the server.'] });
+    expect(second.confirm()).toHaveAttribute('aria-disabled', 'true');
+    expect(second.confirm()).toHaveAccessibleDescription('Deleted on the server.');
   });
 
   it('a reason that is an element: its text is the description of the button', async () => {

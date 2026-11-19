@@ -65,8 +65,10 @@ export interface ConfirmDialogProps {
    * (`aria-describedby`), shown in the footer above the buttons: a click, Enter or Space on it does nothing
    * (`onConfirm` is not called). It stays focusable (not `disabled`), so the focus never moves when the reason
    * appears or goes away while the dialog is open, and a keyboard user can reach the button and hear why.
-   * Cancel, Escape and the backdrop still cancel. `undefined`, `null`, a boolean or a blank string: no reason,
-   * the button works as without the prop (so `blocked && reason` can be passed as is).
+   * Cancel, Escape and the backdrop still cancel. `undefined`, `null`, a boolean, a blank string, `0`, `NaN`
+   * or an array made only of those: no reason, the button works as without the prop (so `blocked && reason` and
+   * `count && reason` can be passed as is). A fragment or a component that renders nothing cannot be told apart
+   * from one that renders text: it counts as a reason, so pass `undefined` when there is none.
    *
    * Read at every render: it may change while the dialog is open. The dialog does not announce it when it
    * appears (it is not a live region): announce the event that caused it if the user must hear it at once.
@@ -112,7 +114,14 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> =>
   typeof (value as { then?: unknown }).then === 'function';
 
 const isBlankLabel = (label: unknown): boolean =>
-  label === null || label === undefined || typeof label === 'boolean' || (typeof label === 'string' && label.trim() === '');
+  label === null ||
+  label === undefined ||
+  typeof label === 'boolean' ||
+  // `0` / `NaN`: what `count && reason` leaves behind when the count is 0.
+  label === 0 ||
+  (typeof label === 'number' && Number.isNaN(label)) ||
+  (typeof label === 'string' && label.trim() === '') ||
+  (Array.isArray(label) && label.every(isBlankLabel));
 
 /** Reports an error as uncaught without interrupting the caller (a window `error` event). */
 function reportUncaught(error: unknown): void {
