@@ -737,6 +737,9 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
   const NOTICE_MIN = 48;
   // The repository's stand-in for a keyboard: 45% of the height.
   const KEYBOARD = 225;
+  // #498: with the keyboard open the line a focused Field lands on is the keyboard's top (275px), the footer counted
+  // once: 275 - 160 = 115px of room, 40% of the 275px visible = 110px. The notice keeps 110px, not its 3rem minimum.
+  const KEYBOARD_CAP = 110;
   type KeyboardWindow = { __setKeyboard: (px: number) => void };
   const setKeyboard = (page: Page, px: number) => page.evaluate((n) => (window as unknown as KeyboardWindow).__setKeyboard(n), px);
 
@@ -827,7 +830,7 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
     const notesTop = await top(notes(page));
 
     await fourConflicts(page, order);
-    expect(Math.abs((await heightOf(noticeRow(page))) - NOTICE_MIN)).toBeLessThanOrEqual(1);
+    expect(Math.abs((await heightOf(noticeRow(page))) - KEYBOARD_CAP)).toBeLessThanOrEqual(1);
     expect(await visibleScroller(page)).toBeGreaterThanOrEqual(EDITOR_MIN);
     await expect(notes(page)).toBeFocused();
     expectFocusInView(await focusSpot(page));
@@ -841,10 +844,12 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
     const order = await editFour(page);
     await blur(page);
     await fourConflicts(page, order);
-    expect(await heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
+    expect(await heightOf(noticeRow(page))).toBeGreaterThan(KEYBOARD_CAP + 1);
     await focusNotesLow(page);
     await setKeyboard(page, KEYBOARD);
-    await expect.poll(() => heightOf(noticeRow(page))).toBeLessThanOrEqual(NOTICE_MIN + 1);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeLessThanOrEqual(KEYBOARD_CAP + 1);
+    // More than the 3rem floor: the room allows it (#498).
+    expect(await heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
     await expect.poll(async () => (await focusSpot(page)).bottom).toBeLessThanOrEqual(500 - KEYBOARD);
     await expect(notes(page)).toBeFocused();
     expectFocusInView(await focusSpot(page));
@@ -853,7 +858,7 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
 
     // The keyboard goes away: the notice takes its 40% again.
     await setKeyboard(page, 0);
-    await expect.poll(() => heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeGreaterThan(KEYBOARD_CAP + 1);
     expect(await visibleScroller(page)).toBeGreaterThanOrEqual(EDITOR_MIN);
   });
 
@@ -863,9 +868,9 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
     await fourConflicts(page, order);
     await focusNotesLow(page);
     await setKeyboard(page, KEYBOARD);
-    await expect.poll(() => heightOf(noticeRow(page))).toBeLessThanOrEqual(NOTICE_MIN + 1);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeLessThanOrEqual(KEYBOARD_CAP + 1);
     await setKeyboard(page, 0);
-    await expect.poll(() => heightOf(noticeRow(page))).toBeGreaterThan(NOTICE_MIN + 1);
+    await expect.poll(() => heightOf(noticeRow(page))).toBeGreaterThan(KEYBOARD_CAP + 1);
     await blur(page);
     const before = await fieldSpots(page);
     const rowBefore = await heightOf(noticeRow(page));

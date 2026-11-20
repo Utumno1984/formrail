@@ -44,15 +44,18 @@ export interface NoticeCapInput {
  * {@link EDITOR_MIN_REM} above the line under which a focused Field never stays, and never below
  * {@link NOTICE_MIN_REM}.
  *
- * That line is the scroller's bottom raised by the height the virtual keyboard covers: a focused Field scrolls
- * itself to end that far above the bottom of its scroll container (its `scroll-margin-bottom` is the keyboard's
- * height), so with the keyboard open a field the user starts typing in lands above it, and only the room between
- * the notice and that line keeps it in view. Without a keyboard the line is the scroller's bottom.
+ * That line is the scroller's bottom raised by the part of the virtual keyboard that covers the scroller: the
+ * keyboard covers the save bar under the scroller first, and the Object Page lowers a focused Field's scroll margin
+ * by that room (#498), so with the keyboard open a field the user starts typing in lands just above the keyboard,
+ * and only the room between the notice and that line keeps it in view. Without a keyboard (or with one shorter than
+ * the save bar) the line is the scroller's bottom.
  */
 export function noticeCap({ frameTop, frameBottom, footerTop, visibleBottom, viewportHeight, rem }: NoticeCapInput): number {
   const keyboard = Math.max(0, viewportHeight - visibleBottom);
+  // What the Object Page does in CSS (`use-bottom-gap.ts`): the room under the scroller is covered first.
+  const overScroller = Math.max(0, keyboard - Math.max(0, viewportHeight - footerTop));
   const visibleFrame = Math.max(0, Math.min(frameBottom, visibleBottom) - frameTop);
-  const editorRoom = footerTop - keyboard - frameTop - EDITOR_MIN_REM * rem;
+  const editorRoom = footerTop - overScroller - frameTop - EDITOR_MIN_REM * rem;
   return Math.max(NOTICE_MIN_REM * rem, Math.min(NOTICE_SHARE * visibleFrame, editorRoom));
 }
 
