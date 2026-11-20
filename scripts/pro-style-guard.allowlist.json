@@ -1,0 +1,8 @@
+[
+  {
+    "file": "packages/pro/src/styles/index.css",
+    "rule": "spacing-literal",
+    "value": "ps-[calc(0.5rem+0.75em)]",
+    "reason": "ChangeSummary kind badge: the leading padding is the shape's room (0.75em, follows the font size) plus the 0.5rem of the scale, which no scale step can express"
+  }
+]
