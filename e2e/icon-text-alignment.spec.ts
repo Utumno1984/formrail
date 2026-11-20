@@ -22,6 +22,19 @@ const PORTALED_STORIES = [
 // offsets this test guards against (WenQuanYi Zen Hei: +2px before the fix, Text icons: +1.2-2px).
 const TOLERANCE = 0.75;
 
+// StatusBadge moves its warning triangle up by 4% of the icon's own height (`[translate:0_-4%]` on
+// the svg): a deliberate optical correction calibrated on 05/11 (commit 087506b) and pinned by
+// e2e/status-badge-optical.spec.ts. This test checks the shared cap-height centring underneath, so
+// that declared shift is taken out of the measure: the declared fraction times the svg height
+// measured on the page (no px constant), and the tolerance stays the same as for every other case.
+const DECLARED_OPTICAL_SHIFT: Record<string, number> = { 'status-badge-warning': -0.04 };
+
+// Sub-pixel positions of the whole fixture (CSS px added to the top padding of #storybook-root).
+// Chromium snaps the text baseline to the pixel grid while an icon keeps its fractional position,
+// so the offset depends on where the line falls: measuring a single position can pass by chance
+// (#610: the warning badge passed on main at a near-integer top and failed when it moved to .5).
+const SUBPIXEL_SHIFTS = [0, 0.25, 0.5, 0.75];
+
 // Cases measured with the extreme-metrics font: every CapIconSlot consumer except the ones whose
 // own e2e covers them (badges, Text, Button).
 const CROSS_FONT_CASES = [
@@ -40,6 +53,7 @@ const CROSS_FONT_CASES = [
 interface Measure {
   name: string;
   iconCentre: number;
+  iconHeight: number;
   capCentre: number | null;
   capChar: string;
 }
@@ -124,6 +138,7 @@ async function measure(page: Page, dpr: number): Promise<Measure[]> {
         return {
           name: c.dataset.alignCase!,
           iconCentre: icon.top + icon.height / 2,
+          iconHeight: icon.height,
           capCentre: inkCentre({ left: ch.left, right: ch.right, top: Math.max(ch.top, t.top), bottom: Math.min(ch.bottom, t.bottom) }),
           capChar: s[idx]!,
         };
@@ -139,30 +154,49 @@ for (const dpr of [1, 2, 3]) {
 
     test('every icon is centred on the cap height of its text line', async ({ page }) => {
       await expectPlayToPass(page, STORY);
-      const rows = (await measure(page, dpr)).filter((r) => !r.name.startsWith('button-'));
-      expect(rows.map((r) => r.name)).toEqual([
-        'status-badge-info',
-        'status-badge-success',
-        'status-badge-warning',
-        'status-badge-error',
-        'checkbox',
-        'switch',
-        'radio',
-        'field-message-error',
-        'message-strip',
-        'list-report-sort-arrow',
-        'object-page-footer',
-        'text-caption-icon',
-        'text-body-icon',
-      ]);
-      const offsets = rows.map((r) => ({
-        name: r.name,
-        capChar: r.capChar,
-        offset: r.capCentre === null ? null : Math.round((r.iconCentre - r.capCentre) * 100) / 100,
+      const base = await page.evaluate(() => ({
+        padding: getComputedStyle(document.getElementById('storybook-root')!).paddingTop,
+        top: document.querySelector('[data-align-case]')!.getBoundingClientRect().top,
       }));
-      for (const o of offsets) {
-        expect(o.offset, `${o.name} (cap "${o.capChar}") at ${dpr}x: ${JSON.stringify(offsets)}`).not.toBeNull();
-        expect(Math.abs(o.offset!), `${o.name} (cap "${o.capChar}") at ${dpr}x: ${JSON.stringify(offsets)}`).toBeLessThanOrEqual(TOLERANCE);
+      for (const shift of SUBPIXEL_SHIFTS) {
+        const where = `at ${dpr}x, fixture shifted by +${shift}px`;
+        const top = await page.evaluate(
+          ({ padding, shift }) => {
+            document.getElementById('storybook-root')!.style.paddingTop = `calc(${padding} + ${shift}px)`;
+            return document.querySelector('[data-align-case]')!.getBoundingClientRect().top;
+          },
+          { padding: base.padding, shift },
+        );
+        // The sweep is real: the fixture moved by exactly the sub-pixel amount asked for.
+        expect(top - base.top, `fixture position ${where}`).toBeCloseTo(shift, 2);
+        const rows = (await measure(page, dpr)).filter((r) => !r.name.startsWith('button-'));
+        expect(rows.map((r) => r.name), where).toEqual([
+          'status-badge-info',
+          'status-badge-success',
+          'status-badge-warning',
+          'status-badge-error',
+          'checkbox',
+          'switch',
+          'radio',
+          'field-message-error',
+          'message-strip',
+          'list-report-sort-arrow',
+          'object-page-footer',
+          'text-caption-icon',
+          'text-body-icon',
+        ]);
+        const offsets = rows.map((r) => ({
+          name: r.name,
+          capChar: r.capChar,
+          offset:
+            r.capCentre === null
+              ? null
+              : Math.round((r.iconCentre - (DECLARED_OPTICAL_SHIFT[r.name] ?? 0) * r.iconHeight - r.capCentre) * 100) / 100,
+        }));
+        for (const o of offsets) {
+          expect(o.offset, `${o.name} (cap "${o.capChar}") ${where}: ${JSON.stringify(offsets)}`).not.toBeNull();
+          expect(Math.abs(o.offset!), `${o.name} (cap "${o.capChar}") ${where}: ${JSON.stringify(offsets)}`).toBeLessThanOrEqual(TOLERANCE);
+        }
       }
     });
   });

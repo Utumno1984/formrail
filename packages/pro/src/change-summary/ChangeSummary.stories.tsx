@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useFieldControl, useObjectPageForm } from '@formrail/core';
 import { exampleStory } from '../../../core/src/internal/example-story';
 import { storyControl, withoutControls } from '../../../core/src/internal/story-docs';
+import { BESIDE_INPUT } from '../internal/story-layout';
 import { ChangeSummary } from './ChangeSummary';
 import { formatChangeValue } from './format-change-value';
 import { inferSegmentLabel } from './infer-label';
@@ -448,12 +449,14 @@ function RowLabelsDemo({ emptyLabel, label, locale, timeZone, onSave, onDiscard,
                   onChange={(event) => update(line.id, { price: event.target.value })}
                 />
               </Field>
-              <Button variant="secondary" size="sm" onClick={() => setLines(movedUp(lines, index))} disabled={index === 0}>
-                {`Move ${line.description} up`}
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setLines(lines.filter((l) => l.id !== line.id))}>
-                {`Remove ${line.description}`}
-              </Button>
+              <div style={BESIDE_INPUT} data-testid="row-actions">
+                <Button variant="secondary" size="sm" onClick={() => setLines(movedUp(lines, index))} disabled={index === 0}>
+                  {`Move ${line.description} up`}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setLines(lines.filter((l) => l.id !== line.id))}>
+                  {`Remove ${line.description}`}
+                </Button>
+              </div>
             </div>
             <ul
               aria-label={`Taxes of ${line.description}`}
