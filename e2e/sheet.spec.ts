@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectNoA11yViolations } from './helpers/a11y';
+import { expectNoA11yViolations, settleMotion } from './helpers/a11y';
 import { expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass, gotoStory as openStory } from './helpers/story';
 
@@ -304,6 +304,11 @@ test.describe('edge cases', () => {
     await dialog.getByRole('button', { name: 'Open the detail' }).click();
     const sheet = sheetOf(page);
     await expect(sheet).toBeVisible();
+    // #579: the panel slides in from translate(100%), i.e. from beyond the right edge of the viewport, and
+    // `toBeVisible` passes from the first frame of the slide. A box read then starts at the viewport's width,
+    // so `elementFromPoint(box.x + 8, ...)` is off-screen and returns null (failed once in CI on #574). The
+    // hit-tests are about where the panel is drawn at rest: wait for its enter animation to end.
+    await settleMotion(page);
 
     // The element on top at the dialog's centre is the sheet's layer, not the dialog.
     const topIsSheetLayer = await page.evaluate(() => {
