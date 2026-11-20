@@ -117,16 +117,44 @@ describe('LEGACY_STORY_IDS (the real map)', () => {
   });
 
   it('a rename of the public Pro story the probe lands on fails the destination check, naming the probe entry to update', () => {
-    // The Pro index as it would be after a rename of `Pro/RebaseNotice` (e.g. by #531): the playground moved.
+    // The Pro index as it would be after a rename of `Pro/RebaseNotice` (e.g. by #531): the playground moved. The
+    // destinations of the real renames (#526 on) are in it as they are today: only the probe's target is missing.
+    const renamed = Object.fromEntries(
+      Object.entries(LEGACY_STORY_IDS)
+        .filter(([from]) => !from.startsWith('internal-legacy-redirect-probe--'))
+        .map(([, to]) => [to, {}]),
+    );
     const free = { name: 'storybook/index.json (Free)', entries: { 'internal-legacyredirecttarget--default': {}, 'internal-docsauditwrapper--docs': {} } };
-    const renamedPro = { name: 'pro/index.json (Pro)', entries: { 'pro-record-conflict-notice--playground': {} } };
+    const renamedPro = { name: 'pro/index.json (Pro)', entries: { 'pro-record-conflict-notice--playground': {}, ...renamed } };
     expect(legacyIndexProblems(LEGACY_STORY_IDS, [free, renamedPro])).toEqual([
       'new id "pro-rebasenotice--playground" (for "internal-legacy-redirect-probe--pro") exists in none of storybook/index.json (Free), pro/index.json (Pro): ' +
         '"internal-legacy-redirect-probe--pro" is a redirect probe (ticket #516) whose target was renamed or removed; update the probe entry in .storybook/legacy-story-ids.mjs to point at an existing story',
     ]);
     // And with the Pro story where it is today, the same check passes.
-    const pro = { name: 'pro/index.json (Pro)', entries: { 'pro-rebasenotice--playground': {} } };
+    const pro = { name: 'pro/index.json (Pro)', entries: { 'pro-rebasenotice--playground': {}, ...renamed } };
     expect(legacyIndexProblems(LEGACY_STORY_IDS, [free, pro])).toEqual([]);
+  });
+
+  // #526: the removed invoice showcase of the Pro demo.
+  it('the old ids of "Pro/Showcase/Invoices with Change Summary" land on the record-editing showcase, args and the rest kept', () => {
+    const PRO = 'https://utumno1984.github.io/formrail/pro/';
+    expect(resolveLegacyStory(`${PRO}?path=/docs/pro-showcase-invoices-with-change-summary--docs`)).toBe(
+      `${PRO}?path=/docs/pro-showcase-record-editing-integrity--docs`,
+    );
+    expect(resolveLegacyStory(`${PRO}iframe.html?id=pro-showcase-invoices-with-change-summary--server-update&viewMode=story&args=saveOutcome:error;serverUpdateDelayMs:0#x`)).toBe(
+      `${PRO}iframe.html?id=pro-showcase-record-editing-integrity--sales-order-server-update&viewMode=story&args=saveOutcome:error;serverUpdateDelayMs:0#x`,
+    );
+    expect(resolveLegacyStory(`${PRO}?args=saveDelayMs:0&path=/story/pro-showcase-invoices-with-change-summary--manual`)).toBe(
+      `${PRO}?args=saveDelayMs:0&path=/story/pro-showcase-record-editing-integrity--sales-order-manual`,
+    );
+    // No exact equivalent: the orders' review dialog (it shows line entries too).
+    expect(LEGACY_STORY_IDS['pro-showcase-invoices-with-change-summary--review-lines-dialog']).toBe('pro-showcase-record-editing-integrity--sales-order-review-dialog');
+    const old = Object.keys(LEGACY_STORY_IDS).filter((id) => id.startsWith('pro-showcase-invoices-with-change-summary--'));
+    expect(old.sort()).toEqual(
+      ['docs', 'manual', 'review-changes', 'review-dialog', 'review-line-items', 'review-lines-dialog', 'review-order-only', 'server-update'].map(
+        (name) => `pro-showcase-invoices-with-change-summary--${name}`,
+      ),
+    );
   });
 
   it('no new id of the real map is redirected again', () => {

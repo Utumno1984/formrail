@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { expectNoA11yViolations, settleMotion } from './helpers/a11y';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass } from './helpers/story';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 
 const STORY = (name: string) => `overlays-confirmdialog--${name}`;
 const TITLE = 'Delete invoice 2026/0142?';
@@ -163,7 +164,13 @@ test.describe('synchronous confirm and cancel (pendingMs 0)', () => {
   for (const [name, cancel] of [
     ['Cancel', (page: Page) => confirmDialog(page).getByRole('button', { name: 'Cancel' }).click()],
     ['Escape', (page: Page) => page.keyboard.press('Escape')],
-    ['the backdrop', (page: Page) => page.mouse.click(4, 4)],
+    [
+      'the backdrop',
+      async (page: Page) => {
+        await waitForOutsidePressArmed(page, confirmDialog(page));
+        await page.mouse.click(4, 4);
+      },
+    ],
   ] as const) {
     test(`${name} closes without confirming and returns the focus`, async ({ page }) => {
       await expectPlayToPass(page, STORY('delete-with-server-round-trip'), 'pendingMs:0');

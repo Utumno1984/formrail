@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectPlayToPass, gotoStory } from './helpers/story';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 
 // #130: "New" opens a Dialog/Sheet above a mounted List Report; closing it must leave the report as it
 // was (same DOM node, same scroll, pill, search, sort) and give the focus back to "New".
@@ -85,6 +86,7 @@ const CLOSERS: Record<string, Closer> = {
   },
   'click on the backdrop': async (page) => {
     // The top-left corner is outside the centred Dialog and outside a right-hand Sheet.
+    await waitForOutsidePressArmed(page, overlay(page));
     await page.mouse.click(4, 4);
   },
 };

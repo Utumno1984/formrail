@@ -22,6 +22,16 @@ export var LEGACY_STORY_IDS = {
   'internal-legacy-redirect-probe--default': 'internal-legacyredirecttarget--default',
   'internal-legacy-redirect-probe--docs': 'internal-docsauditwrapper--docs',
   'internal-legacy-redirect-probe--pro': 'pro-rebasenotice--playground',
+  // #526: "Pro/Showcase/Invoices with Change Summary" removed, replaced by "Pro/Showcase/Record editing integrity"
+  // (sales orders). `--review-lines-dialog` has no exact equivalent: the orders' review dialog shows line entries too.
+  'pro-showcase-invoices-with-change-summary--docs': 'pro-showcase-record-editing-integrity--docs',
+  'pro-showcase-invoices-with-change-summary--review-changes': 'pro-showcase-record-editing-integrity--sales-order-review-changes',
+  'pro-showcase-invoices-with-change-summary--manual': 'pro-showcase-record-editing-integrity--sales-order-manual',
+  'pro-showcase-invoices-with-change-summary--review-dialog': 'pro-showcase-record-editing-integrity--sales-order-review-dialog',
+  'pro-showcase-invoices-with-change-summary--review-line-items': 'pro-showcase-record-editing-integrity--sales-order-review-lines',
+  'pro-showcase-invoices-with-change-summary--review-order-only': 'pro-showcase-record-editing-integrity--sales-order-review-order-only',
+  'pro-showcase-invoices-with-change-summary--review-lines-dialog': 'pro-showcase-record-editing-integrity--sales-order-review-dialog',
+  'pro-showcase-invoices-with-change-summary--server-update': 'pro-showcase-record-editing-integrity--sales-order-server-update',
 };
 
 // `path` of the manager: `/story/<id>` or `/docs/<id>`, possibly followed by more segments (kept).

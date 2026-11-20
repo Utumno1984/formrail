@@ -272,6 +272,10 @@ export const Playground: Story = {
     const shade = (edge: 'start' | 'end') => scroller.querySelector(`[data-rop-overflow-edge="${edge}"]`) as HTMLElement | null;
     await expect(scroller).not.toHaveAttribute('data-rop-overflow-end');
     await expect(shade('end')).toBeNull();
+    // Still exactly the two sort changes, counted BEFORE the first `setArgs`: an args update makes Storybook
+    // render the story again, and that render's loaders restore every `fn()` spy (its calls go back to 0).
+    // So the spy is not read after `setArgs` (#579).
+    await expect(args.onSortChange).toHaveBeenCalledTimes(2);
     setArgs(id, { containerWidth: 360 });
     await waitFor(() => expect(scroller).toHaveAttribute('data-rop-overflow-end'));
     await expect(scroller).not.toHaveAttribute('data-rop-overflow-start');
@@ -289,7 +293,6 @@ export const Playground: Story = {
     setArgs(id, { containerWidth: args.containerWidth });
     await waitFor(() => expect(scroller).not.toHaveAttribute('data-rop-overflow-start'));
     await waitFor(() => expect(shade('start')).toBeNull());
-    await expect(args.onSortChange).toHaveBeenCalledTimes(2);
   },
 };
 

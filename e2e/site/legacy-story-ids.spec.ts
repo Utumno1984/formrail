@@ -108,3 +108,58 @@ test.describe('renamed story ids: Free and Pro deploy builds (#516)', () => {
     await expect(page.getByTestId('legacy-redirect-target')).toBeVisible({ timeout: 30_000 });
   });
 });
+
+// #526: "Pro/Showcase/Invoices with Change Summary" was removed; its published links (the landing /teams/, the Pro
+// introduction, issues and posts) land on "Pro/Showcase/Record editing integrity" in the Pro demo.
+test.describe('renamed story ids: the removed invoice showcase of the Pro demo (#526)', () => {
+  const OLD = 'pro-showcase-invoices-with-change-summary';
+  const NEW = 'pro-showcase-record-editing-integrity';
+
+  test.beforeEach(async ({ page }) => {
+    await recordHistory(page);
+  });
+
+  test('every old id of the showcase, its Docs page included, is in the map and points at a story of the Pro demo', async ({ page }) => {
+    const entries = await readEntries(page, 'pro');
+    const old = ['docs', 'review-changes', 'manual', 'review-dialog', 'review-line-items', 'review-order-only', 'review-lines-dialog', 'server-update'];
+    for (const name of old) {
+      const target = (LEGACY_STORY_IDS as Record<string, string>)[`${OLD}--${name}`];
+      expect(target, name).toMatch(new RegExp(`^${NEW}--`));
+      expect(entries[target!], `${name} -> ${target}`).toBeDefined();
+      expect(entries[`${OLD}--${name}`], name).toBeUndefined();
+    }
+    expect(Object.keys(entries).filter((id) => id.startsWith(`${OLD}--`))).toEqual([]);
+  });
+
+  test('manager: the old Docs URL opens the Docs page of the record-editing showcase, in place', async ({ page }) => {
+    await page.goto(`pro/?path=/docs/${OLD}--docs`);
+    const url = new URL(page.url());
+    expect((await historyCalls(page))[0]).toEqual(['replaceState', `${url.origin}${base}pro/?path=/docs/${NEW}--docs`]);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe(`/docs/${NEW}--docs`);
+    const frame = page.frameLocator('#storybook-preview-iframe');
+    await expect(frame.locator('.sbdocs-content')).toBeVisible({ timeout: 30_000 });
+    await expect(frame.getByRole('heading', { level: 1 }).first()).toHaveText('Record editing integrity');
+  });
+
+  test('iframe: the old "server update" story renders SalesOrderServerUpdate, its args kept', async ({ page }) => {
+    const query = 'viewMode=story&args=saveOutcome:error';
+    await page.goto(`pro/iframe.html?id=${OLD}--server-update&${query}`);
+    expect((await historyCalls(page))[0]).toEqual(['replaceState', `${new URL(page.url()).origin}${base}pro/iframe.html?id=${NEW}--sales-order-server-update&${query}`]);
+    expect(await initialHref(page)).toContain(`id=${OLD}--server-update&`);
+    await expect(page.locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('body.sb-show-errordisplay')).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.get('id')).toBe(`${NEW}--sales-order-server-update`);
+    expect(new URL(page.url()).searchParams.get('args')).toBe('saveOutcome:error');
+    // The new story, not the invoices: its play opens order so-1.
+    await expect(page.getByRole('heading', { level: 1, name: /SO-2026-147000001/ })).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('iframe: the old "manual" fixture with the args of the old e2e specs opens the orders with the same args', async ({ page }) => {
+    const args = 'listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:0;serverUpdateDelayMs:0';
+    await page.goto(`pro/iframe.html?id=${OLD}--manual&viewMode=story&args=${encodeURIComponent(args)}`);
+    await page.waitForURL((u) => u.searchParams.get('id') === `${NEW}--sales-order-manual`);
+    expect(new URL(page.url()).searchParams.get('args')).toBe(args);
+    await page.getByRole('link', { name: 'SO-2026-147000001' }).click();
+    await expect(page.getByRole('button', { name: 'Simulate server update' })).toBeVisible();
+  });
+});

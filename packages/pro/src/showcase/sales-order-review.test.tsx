@@ -2,7 +2,7 @@
 // and as the rendered list. Fast: no shell, no list of 200 orders.
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getProduct, type DemoCurrency } from '../../../core/src/internal/demo-data';
+import { DEMO_REFERENCE_POOL, formatDate, getProduct, makeProducts, type DemoCurrency } from '../../../core/src/internal/demo-data';
 import { SALES_ORDERS, sameValues, type SalesOrderValues } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';
 import type { OrderLineValues } from '../../../core/src/showcase/modules/sales-orders/order-lines';
 import { makeShowcaseSalesOrders } from '../../../core/src/showcase/sales-order-store';
@@ -404,5 +404,134 @@ describe('salesOrderEngine', () => {
     expect(empty).toHaveTextContent('Empty');
     expect(value).toHaveClass('rop-pro-change-summary__value');
     expect(value).not.toHaveClass('rop-pro-change-summary__value--muted');
+  });
+});
+
+// #526: the cases of the unit tests of the invoice showcase (invoice-review.test.tsx, invoice-review-engine.test.ts)
+// that the tests above did not assert, on the sales orders.
+describe('salesOrderReview: the cases of the invoice review (#526)', () => {
+  /** The text of each item as read by assistive technology (the arrow is `aria-hidden`). */
+  const rendered = (values: SalesOrderValues, baseline: SalesOrderValues): HTMLElement[] => {
+    cleanup();
+    const result = salesOrderSaveReview({ values, baseline });
+    if (!result) throw new Error('no review');
+    render(<>{result.children}</>);
+    return within(screen.getByRole('list', { name: 'Changes to save' })).getAllByRole('listitem');
+  };
+  const read = (el: Element): string => {
+    const copy = el.cloneNode(true) as Element;
+    for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+    return (copy.textContent ?? '').replace(/\s+/g, ' ').trim();
+  };
+  const texts = (values: SalesOrderValues, baseline: SalesOrderValues = EUR): string[] => rendered(values, baseline).map(read);
+
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  it.each(['UTC', 'America/Los_Angeles', 'Pacific/Kiritimati', 'Asia/Tokyo'])(
+    'dates: a localized date, never the ISO string, the same calendar day with TZ=%s',
+    (tz) => {
+      process.env.TZ = tz;
+      const baseline = { ...EUR, requestedDeliveryDate: '2026-03-05' };
+      const [item] = rendered({ ...baseline, requestedDeliveryDate: '2026-04-05' }, baseline);
+      expect(read(item!)).toBe('Requested delivery, changed, from Mar 5, 2026 to Apr 5, 2026');
+      expect(item).not.toHaveTextContent('2026-03-05');
+      expect(text('2026-01-01', { path: 'orderDate' })).toBe('Jan 1, 2026');
+      expect(text('2026-12-31', { path: 'requestedDeliveryDate' })).toBe('Dec 31, 2026');
+    },
+  );
+
+  it('a date emptied reads "Empty", muted, never blank', () => {
+    const [item] = rendered({ ...EUR, requestedDeliveryDate: '' }, EUR);
+    expect(read(item!)).toBe(`Requested delivery, changed, from ${formatDate(EUR.requestedDeliveryDate)} to Empty`);
+    expect(within(item!).getByText('Empty')).toHaveClass('rop-pro-change-summary__value--muted');
+  });
+
+  it('a quantity changed: ONE "changed" entry for that field of that line, its sides as typed, rendered as a number', () => {
+    const values = withLine(EUR, 1, { quantity: '3' });
+    const { entries } = review(values, EUR);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'changed', path: 'lines.1.quantity', before: EUR.lines[1]!.quantity, after: '3' });
+    expect(texts(values)).toEqual([`Lines > Line 2 (${nameOf(EUR.lines[1]!)}) > Quantity, changed, from 50 to 3`]);
+  });
+
+  it('quantities are rendered as numbers: 1000 -> "1,000", 007 -> "7", for a changed field and for a whole line', () => {
+    const third = nameOf(EUR.lines[2]!);
+    expect(texts(withLine(EUR, 2, { quantity: '1000' }))).toEqual([`Lines > Line 3 (${third}) > Quantity, changed, from 10 to 1,000`]);
+    expect(texts(withLine(EUR, 2, { quantity: '007' }))).toEqual([`Lines > Line 3 (${third}) > Quantity, changed, from 10 to 7`]);
+    const bulk: OrderLineValues = { id: 'new-1', productId: EUR.lines[0]!.productId, quantity: '1000', unitPrice: '1.00', discount: '0' };
+    expect(texts({ ...EUR, lines: [...EUR.lines, bulk] })).toEqual([`Lines > Line 4 (${nameOf(bulk)}), added, ${nameOf(bulk)}, 1,000 × €1.00`]);
+  });
+
+  it('a new line moved to the top is not a reorder of the existing lines: no note, "1 change will be saved."', () => {
+    const added: OrderLineValues = { id: 'new-1', productId: USD.lines[0]!.productId, quantity: '1', unitPrice: '99.00', discount: '0' };
+    const values = { ...EUR, lines: [added, ...EUR.lines] };
+    expect(review(values, EUR).reorders).toEqual([]);
+    const result = salesOrderSaveReview({ values, baseline: EUR })!;
+    expect(result.description).toBe('1 change will be saved.');
+    render(<>{result.children}</>);
+    expect(screen.queryByText(ORDER_ALSO_NOTE)).toBeNull();
+  });
+
+  // The invoice review bracketed the parentheses of a line's free-text description ("Repair (urgent)" -> "[urgent]")
+  // so that a label never nests them. An order line is named by its product, from the catalogue: no product name has
+  // parentheses, so the label of a line has exactly one pair, around the product.
+  it('a line label never nests parentheses: no product of the catalogue has any', () => {
+    const products = makeProducts(DEMO_REFERENCE_POOL.products);
+    expect(products.length).toBeGreaterThan(0);
+    expect(products.filter((p) => /[()]/.test(p.name)).map((p) => p.name)).toEqual([]);
+    for (const [index, line] of ORDERS.flatMap((o) => o.lines).entries()) {
+      const label = salesOrderLineLabel('lines', line, { path: `lines.${index}`, index, side: 'values', isLastSegment: false, defaultLabel: '' })!;
+      expect(label.match(/[()]/g)).toEqual(['(', ')']);
+    }
+  });
+
+  /** The id comparison the invoice review made before #424 (`lineOrderChanged`), restated as the oracle. */
+  function idOrderChanged(values: SalesOrderValues, baseline: SalesOrderValues): boolean {
+    const before = baseline.lines.map((l) => l.id);
+    const after = values.lines.map((l) => l.id);
+    const common = new Set(before.filter((id) => after.includes(id)));
+    const a = before.filter((id) => common.has(id));
+    const b = after.filter((id) => common.has(id));
+    return a.some((id, i) => id !== b[i]);
+  }
+
+  // The coherence rule of #379, on the three lines of so-1: whatever the combination, a dirty form always gets a review,
+  // with one entry per added, removed and changed line, unless it is the one declared exception (a mere reorder).
+  const combos = Array.from({ length: 32 }, (_, n) => ({
+    add: (n & 1) !== 0,
+    remove: (n & 2) !== 0,
+    change: (n & 4) !== 0,
+    reorder: (n & 8) !== 0,
+    addAtTop: (n & 16) !== 0,
+  }));
+  it.each(combos)('coherence: %o', ({ add, remove, change, reorder, addAtTop }) => {
+    const [l1, l2, l3] = EUR.lines as [OrderLineValues, OrderLineValues, OrderLineValues];
+    let lines = [l1, l2, l3];
+    if (change) lines = lines.map((l) => (l.id === l3.id ? { ...l, quantity: '9' } : l));
+    if (reorder) {
+      const [a, b] = [lines.findIndex((l) => l.id === l2.id), lines.findIndex((l) => l.id === l3.id)];
+      [lines[a], lines[b]] = [lines[b]!, lines[a]!];
+    }
+    if (remove) lines = lines.filter((l) => l.id !== l1.id);
+    const added: OrderLineValues = { id: 'new-1', productId: USD.lines[0]!.productId, quantity: '1', unitPrice: '60.00', discount: '0' };
+    if (add) lines = addAtTop ? [added, ...lines] : [...lines, added];
+    const values = { ...EUR, lines };
+    const { entries, reorders } = review(values, EUR);
+    const result = salesOrderSaveReview({ values, baseline: EUR });
+    const dirty = !sameValues(values, EUR);
+    expect(dirty).toBe(add || remove || change || reorder);
+    expect(result !== null).toBe(dirty);
+    expect(entries).toHaveLength(Number(add) + Number(remove) + Number(change));
+    if (dirty && entries.length === 0) {
+      // The one declared exception.
+      expect(reorder).toBe(true);
+      expect(result?.description).toBe(ORDER_ONLY_DESCRIPTION);
+    }
+    expect(reorders.length > 0).toBe(reorder);
+    expect(reorders.length > 0).toBe(idOrderChanged(values, EUR));
+    expect(reorders.map((r) => r.label)).toEqual(reorder ? ['Lines'] : []);
   });
 });

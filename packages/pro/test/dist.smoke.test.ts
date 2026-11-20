@@ -90,8 +90,9 @@ describe('built bundle (dist)', () => {
     }
   });
 
-  // #522: the story-only showcase (`src/showcase/`, Record editing integrity and the invoices' one) never reaches the
-  // published bundle. Each probe is first found in the showcase sources, so the check cannot pass on a typo.
+  // #522: the story-only showcase (`src/showcase/`, Record editing integrity) never reaches the published bundle. Each
+  // probe is first found in the showcase sources, so the check cannot pass on a typo. #526: the invoices' showcase was
+  // removed; its probe (the invoice notice title) is replaced by the customers' two titles.
   it('contains no text of the story-only showcase', () => {
     const showcaseDir = fileURLToPath(new URL('../src/showcase/', import.meta.url));
     const sources = readdirSync(showcaseDir)
@@ -105,7 +106,8 @@ describe('built bundle (dist)', () => {
       'Server changes you overwrite',
       'Only the order of the lines changed.',
       'srv-line-',
-      'This invoice was updated while you were editing.',
+      'This customer was updated while you were editing.',
+      'This customer was archived on the server',
     ];
     const distDir = fileURLToPath(new URL('../dist/', import.meta.url));
     const bundles = readdirSync(distDir).filter((name) => /\.(c?js|d\.c?ts)$/.test(name));
