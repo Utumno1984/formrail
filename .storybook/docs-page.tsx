@@ -26,7 +26,8 @@ function StylesReminder({ sheets }: { sheets: string[] }) {
     <p data-styles-reminder>
       To use the example in your app, import the stylesheets once, in this order:{' '}
       {sheets.map((sheet, index) => (
-        <span key={sheet}>
+        // fontSize inherit: Storybook's Docs stylesheet sets its own size on a bare span (16px inside a 14px paragraph, #610).
+        <span key={sheet} style={{ fontSize: 'inherit' }}>
           {index > 0 && ', then '}
           {line(sheet)}
         </span>

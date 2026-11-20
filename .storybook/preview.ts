@@ -2,6 +2,7 @@
 import type { Preview, ReactRenderer } from '@storybook/react-vite';
 // The SAME entry the package compiles into dist/styles.css (not a copy).
 import '../packages/core/src/styles/index.css';
+import './preview-base.css';
 import { transformSource } from './source-transform';
 import { ropTheme } from './theme';
 
