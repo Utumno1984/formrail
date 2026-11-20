@@ -71,6 +71,8 @@ async function choose(page: Page, field: string, option: string): Promise<void> 
 }
 
 /** The product of line `n` as the review names it (the option text without its SKU). */
+const productTextOf = async (page: Page, n: number): Promise<string> =>
+  ((await page.getByRole('combobox', { name: `Line ${n} product` }).textContent()) ?? '').replace(/\s+/g, ' ').trim();
 const productOf = async (page: Page, n: number): Promise<string> =>
   ((await page.getByRole('combobox', { name: `Line ${n} product` }).textContent()) ?? '').replace(/ \([^)]*\)$/, '');
 
@@ -329,7 +331,7 @@ test.describe('Pro/Showcase/Record editing integrity: the lines in the review (#
   test('only the order: the review opens with its own text and no list; nothing stored before "Save changes", which saves the new order', async ({ page }) => {
     const order = await openLines(page);
     const ids = order.lines.map((l) => l.id);
-    const third = await productOf(page, 3);
+    const third = await productTextOf(page, 3);
     await page.getByRole('button', { name: 'Move line 3 up' }).click();
     await saveButton(page).click();
     const dialog = reviewDialog(page);
@@ -342,7 +344,7 @@ test.describe('Pro/Showcase/Record editing integrity: the lines in the review (#
     await dialog.getByRole('button', { name: 'Save changes' }).click();
     await expect(footer(page)).toBeHidden({ timeout: 10_000 });
     expect(await lineIds(page)).toEqual([ids[0], ids[2], ids[1], ids[3]]);
-    await expect(page.getByRole('combobox', { name: 'Line 2 product' })).toContainText(third);
+    await expect(page.getByRole('combobox', { name: 'Line 2 product' })).toHaveText(third);
   });
 
   test('a reorder AND a change of the moved line: "1 change will be saved.", the line named at its new place, plus the note about the order', async ({ page }) => {

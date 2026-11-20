@@ -90,6 +90,7 @@ const serverRemovesLine = (page: Page, id: string, index: number) =>
 const laterBy = (iso: string, days: number): string => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** The product a line shows (the option text without its SKU). */
+const productText = async (page: Page, n: number): Promise<string> => ((await product(page, n).textContent()) ?? '').replace(/\s+/g, ' ').trim();
 const productName = async (page: Page, n: number): Promise<string> => ((await product(page, n).textContent()) ?? '').replace(/ \([^)]*\)$/, '');
 
 /** Text of an element as read by assistive technology (`aria-hidden` left out), white space collapsed. */
@@ -254,21 +255,21 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
   // On an order a line's first field is its product (on an invoice it was the description).
   test('"Use server value" on line 1, which the server removed: the focus goes to the product of the line that took its place', async ({ page }) => {
     const order = await openOrder(page);
-    const second = await productName(page, 2);
+    const second = await productText(page, 2);
     await quantity(page, 1).fill('8');
     await serverRemovesLine(page, order.id, 0);
     await expect(conflicts(page)).toHaveCount(1);
     await page.getByRole('button', { name: /^Use server value for Lines > Line 1 / }).click();
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     const heir = product(page, 1);
-    await expect(heir).toContainText(second);
+    await expect(heir).toHaveText(second);
     await expect(heir).toBeFocused();
   });
 
   test('"Use server value" with the keyboard on the LAST line, which the server removed: the focus goes to the product of the previous line', async ({ page }) => {
     const order = await openOrder(page);
     expect(order.lines).toHaveLength(3);
-    const second = await productName(page, 2);
+    const second = await productText(page, 2);
     await quantity(page, 3).fill('8');
     await serverRemovesLine(page, order.id, 2);
     await expect(conflicts(page)).toHaveCount(1);
@@ -277,14 +278,14 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(product(page, 3)).toHaveCount(0);
     const previous = product(page, 2);
-    await expect(previous).toContainText(second);
+    await expect(previous).toHaveText(second);
     await expect(previous).toBeFocused();
   });
 
   test('"Use server value" on line 2 of an order with two lines, which the server removed: the focus goes to the product of line 1', async ({ page }) => {
     const order = await openOrder(page, TWO_LINES);
     expect(order.lines).toHaveLength(2);
-    const firstName = await productName(page, 1);
+    const firstName = await productText(page, 1);
     await quantity(page, 2).fill('8');
     await serverRemovesLine(page, order.id, 1);
     await expect(conflicts(page)).toHaveCount(1);
@@ -292,7 +293,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(product(page, 2)).toHaveCount(0);
     const first = product(page, 1);
-    await expect(first).toContainText(firstName);
+    await expect(first).toHaveText(firstName);
     await expect(first).toBeFocused();
   });
 
@@ -765,11 +766,11 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
   const LONG_MINE = 'Checked by the sales team: the transport costs are included, as agreed in the framework contract.';
   const LONG_THEIRS = 'Confirmed by the warehouse after a call with the customer; the delivery notes are attached.';
 
-  /** Four of my edits: Requested delivery, Customer reference, Delivery instructions and Notes (two long texts). */
+  /** Four of my edits: Requested delivery, the quantity of line 1 (a row-level conflict, named by its product), Delivery instructions and Notes (two long texts). */
   async function editFour(page: Page): Promise<Stored> {
     const order = await openOrder(page);
     await delivery(page).fill('2026-07-01');
-    await page.getByRole('textbox', { name: 'Customer reference', exact: true }).fill('PO-1234-56');
+    await quantity(page, 1).fill('8');
     await page.getByRole('textbox', { name: 'Delivery instructions', exact: true }).fill(`${LONG_MINE} (delivery)`);
     await notes(page).fill(LONG_MINE);
     return order;
@@ -778,9 +779,9 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
   async function fourConflicts(page: Page, order: Stored): Promise<void> {
     await serverPatch(page, order.id, {
       requestedDeliveryDate: '2026-07-08',
-      customerReference: 'PO-9999-99',
       deliveryNotes: `${LONG_THEIRS} (delivery)`,
       notes: LONG_THEIRS,
+      lines: order.lines.map((line, i) => (i === 0 ? { ...line, quantity: 7 } : line)),
     });
     await expect(conflicts(page)).toHaveCount(4);
   }
@@ -874,9 +875,9 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
     await serverPatch(page, order.id, {
       status: NEXT_STATUS[order.status],
       requestedDeliveryDate: '2026-07-01',
-      customerReference: 'PO-1234-56',
       deliveryNotes: `${LONG_MINE} (delivery)`,
       notes: LONG_MINE,
+      lines: order.lines.map((line, i) => (i === 0 ? { ...line, quantity: 8 } : line)),
     });
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(notice(page)).toContainText('1 field was updated.');
