@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { ListReportFilterBar, ListReportTable, useListReport, type ListReportColumn, type ListReportFilter } from '@formrail/core';
+import {
+  ListReportFilterBar,
+  ListReportTable,
+  useListReport,
+  type ListReportColumn,
+  type ListReportFilter,
+} from '@formrail/core';
 
 interface Invoice {
   id: string;

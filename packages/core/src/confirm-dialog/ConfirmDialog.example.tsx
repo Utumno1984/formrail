@@ -12,7 +12,8 @@ export function DeleteInvoice() {
         Delete invoice…
       </Button>
       {/* The focus goes to a plain wrapper, the live region inside it speaks: one announcement, not two.
-          The wrapper has no focus style of its own, so it draws the focus ring of the controls (2px primary). */}
+          The wrapper has no focus style of its own, so it draws the focus ring of the controls
+          (2px primary). */}
       <span
         ref={outcomeRef}
         tabIndex={-1}
@@ -24,7 +25,8 @@ export function DeleteInvoice() {
       </span>
       {/* Closed until the button opens it. The action runs only on confirm; Cancel and Escape just close.
           The trigger is disabled once the invoice is gone, so it cannot take the focus back: `returnFocusRef`
-          points to the outcome message instead (a wrapper around the live region), and the focus is never lost. */}
+          points to the outcome message instead (a wrapper around the live region), and the focus is never
+          lost. */}
       <ConfirmDialog
         open={open}
         onOpenChange={setOpen}

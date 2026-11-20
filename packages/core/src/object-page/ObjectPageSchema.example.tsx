@@ -20,7 +20,8 @@ interface Order {
 }
 
 // `schema` takes any Standard Schema: with Zod (3.24+ / 4), Valibot or ArkType, pass the schema itself, e.g.
-// `z.object({ supplier: z.string().trim().min(1, 'Supplier is required'), amount: z.coerce.number().positive() })`.
+// `z.object({ supplier: z.string().trim().min(1, 'Supplier is required'),
+//   amount: z.coerce.number().positive() })`.
 // Written by hand here so the example needs no schema library: a validator that returns issues with a path.
 const orderSchema: StandardSchemaLike = {
   '~standard': {
@@ -28,7 +29,9 @@ const orderSchema: StandardSchemaLike = {
       const order = value as Order;
       const issues: StandardSchemaIssue[] = [];
       if (order.supplier.trim() === '') issues.push({ message: 'Supplier is required', path: ['supplier'] });
-      if (!(Number(order.amount) > 0)) issues.push({ message: 'Amount must be a positive number', path: ['amount'] });
+      if (!(Number(order.amount) > 0)) {
+        issues.push({ message: 'Amount must be a positive number', path: ['amount'] });
+      }
       return issues.length > 0 ? { issues } : { value };
     },
   },
@@ -49,14 +52,21 @@ export function NewOrder() {
           </Button>
         </ObjectPageFooter>
         <ObjectPageSection id="order" title="Order">
-          {/* The schema's issues land in `fieldErrors`, keyed by path: each Field reads its own by `name`. */}
+          {/* The schema's issues land in `fieldErrors`, keyed by path: each Field reads its own by
+              `name`. */}
           <ValidationProvider fieldErrors={form.fieldErrors}>
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
               <Field label="Supplier" name="supplier" required>
-                <Input value={form.values.supplier} onChange={(event) => form.setValue('supplier', event.target.value)} />
+                <Input
+                  value={form.values.supplier}
+                  onChange={(event) => form.setValue('supplier', event.target.value)}
+                />
               </Field>
               <Field label="Amount" name="amount" required>
-                <Input inputMode="decimal" value={form.values.amount} onChange={(event) => form.setValue('amount', event.target.value)} />
+                <Input
+                  inputMode="decimal" value={form.values.amount}
+                  onChange={(event) => form.setValue('amount', event.target.value)}
+                />
               </Field>
             </div>
           </ValidationProvider>

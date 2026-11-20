@@ -10,7 +10,16 @@ export function InvoiceSummary() {
       <section
         aria-label="Invoice summary"
         aria-busy={!loaded}
-        style={{ boxSizing: 'border-box', height: 132, padding: 16, display: 'grid', alignContent: 'start', gap: 8, border: '1px solid var(--color-rop-border)', borderRadius: 8 }}
+        style={{
+          boxSizing: 'border-box',
+          height: 132,
+          padding: 16,
+          display: 'grid',
+          alignContent: 'start',
+          gap: 8,
+          border: '1px solid var(--color-rop-border)',
+          borderRadius: 8,
+        }}
       >
         {loaded ? (
           <>

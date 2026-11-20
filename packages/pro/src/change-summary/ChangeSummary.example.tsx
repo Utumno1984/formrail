@@ -18,18 +18,29 @@ export function InvoiceChanges() {
   return (
     <div style={{ display: 'grid', gap: 16, maxWidth: 480 }}>
       <Field label="Supplier" name="supplier">
-        <Input value={form.values.supplier} onChange={(event) => form.setValue('supplier', event.target.value)} />
+        <Input
+          value={form.values.supplier}
+          onChange={(event) => form.setValue('supplier', event.target.value)}
+        />
       </Field>
       <Field label="Amount" name="amount">
-        <Input inputMode="decimal" value={form.values.amount} onChange={(event) => form.setValue('amount', event.target.value)} />
+        <Input
+          inputMode="decimal"
+          value={form.values.amount}
+          onChange={(event) => form.setValue('amount', event.target.value)}
+        />
       </Field>
       <Field label="Notes" name="notes">
         {/* An empty box writes `null` back, as saved: `''` and `null` are different values, and a cleared box
             would otherwise stay listed as a change. */}
-        <Input value={form.values.notes ?? ''} onChange={(event) => form.setValue('notes', event.target.value || null)} />
+        <Input
+          value={form.values.notes ?? ''}
+          onChange={(event) => form.setValue('notes', event.target.value || null)}
+        />
       </Field>
       <div style={{ display: 'flex', gap: 8 }}>
-        {/* Your API call goes inside `save`: what it returns becomes the new baseline, and the summary empties. */}
+        {/* Your API call goes inside `save`: what it returns becomes the new baseline, and the summary
+            empties. */}
         <Button variant="primary" onClick={() => void form.save(async (values) => values)}>
           Save
         </Button>

@@ -16,7 +16,8 @@ export function EditSupplierDialog() {
   const [saved, setSaved] = useState(false);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 24 }}>
-      {/* Closed until the trigger opens it. Focus is trapped inside; Escape closes it and returns the focus to the trigger. */}
+      {/* Closed until the trigger opens it. Focus is trapped inside; Escape closes it and returns the focus
+          to the trigger. */}
       <Dialog>
         <DialogTrigger asChild>
           <Button variant="primary">Edit supplier</Button>

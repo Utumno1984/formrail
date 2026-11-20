@@ -44,10 +44,16 @@ export function NewSupplier() {
           <ValidationProvider fieldErrors={form.fieldErrors}>
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
               <Field label="Name" name="name" required>
-                <Input value={form.values.name} onChange={(event) => form.setValue('name', event.target.value)} />
+                <Input
+                  value={form.values.name}
+                  onChange={(event) => form.setValue('name', event.target.value)}
+                />
               </Field>
               <Field label="City" name="city" required>
-                <Input value={form.values.city} onChange={(event) => form.setValue('city', event.target.value)} />
+                <Input
+                  value={form.values.city}
+                  onChange={(event) => form.setValue('city', event.target.value)}
+                />
               </Field>
             </div>
           </ValidationProvider>
