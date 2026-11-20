@@ -37,7 +37,7 @@ test.describe('Primitives copy-paste examples', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('button', { name: 'Dismiss message: Session expiring' })).toBeVisible();
     // The focus goes to a NON-live wrapper: the strip inside it is the live region, and speaks once.
-    const wrapper = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
+    const wrapper = page.getByTestId('notice');
     await expect(wrapper).toBeFocused();
     await expect(wrapper).toBeVisible();
     await expect(wrapper).not.toHaveAttribute('role', /.+/);
@@ -64,7 +64,7 @@ test.describe('Primitives copy-paste examples', () => {
     await gotoStory(page, 'primitives-messagestrip--example');
     const close = page.getByRole('button', { name: 'Dismiss message: Session expiring' });
     const show = page.getByRole('button', { name: 'Show the notice again' });
-    const wrapper = page.getByText('Save your work within five minutes.').locator('xpath=ancestor::*[@tabindex="-1"][1]');
+    const wrapper = page.getByTestId('notice');
     const outlineOf = (el: typeof wrapper) =>
       el.evaluate((n) => {
         const c = getComputedStyle(n);
@@ -94,7 +94,7 @@ test.describe('Primitives copy-paste examples', () => {
         await page.keyboard.press('Tab');
         await expect(close).toBeFocused();
         expect((await outlineOf(wrapper)).style).toBe('none');
-        // tabindex=-1 is not in the Tab order: Shift+Tab skips the wrapper, so the focus comes back to it by script.
+        // tabindex=-1 is not in the Tab order, so the focus comes back to the wrapper by script.
         await wrapper.focus();
         await expect(wrapper).toBeFocused();
         expect(await outlineOf(wrapper)).toEqual({ style: 'solid', width: '2px' });
@@ -112,6 +112,34 @@ test.describe('Primitives copy-paste examples', () => {
     await expect(close).toBeFocused();
     expect((await outlineOf(wrapper)).style).toBe('none');
     await page.mouse.up();
+  });
+
+  test('MessageStrip: a wrapper unmounted while focused comes back without a ring', async ({ page }) => {
+    await gotoStory(page, 'primitives-messagestrip--example');
+    const wrapper = page.getByTestId('notice');
+    const show = page.getByRole('button', { name: 'Show the notice again' });
+    // Record the outline of every wrapper the moment it enters the DOM, before the example moves the focus to it.
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      (window as unknown as { __rings: string[] }).__rings = seen;
+      new MutationObserver((records) => {
+        for (const node of records.flatMap((r) => [...r.addedNodes])) {
+          if (node instanceof HTMLElement && node.dataset.testid === 'notice') {
+            seen.push(getComputedStyle(node).outlineStyle);
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    for (let round = 0; round < 2; round++) {
+      await wrapper.focus();
+      await expect(wrapper).toBeFocused();
+      // A programmatic click closes the strip from the outside: the focus stays on the wrapper that is removed.
+      await page.getByRole('button', { name: 'Dismiss message: Session expiring' }).evaluate((b) => (b as HTMLElement).click());
+      await expect(wrapper).toHaveCount(0);
+      await show.press('Enter');
+      await expect(wrapper).toBeFocused();
+    }
+    expect(await page.evaluate(() => (window as unknown as { __rings: string[] }).__rings)).toEqual(['none', 'none']);
   });
 
   test('ProgressBar: named, and completes with an announcement', async ({ page }) => {

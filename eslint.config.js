@@ -38,6 +38,12 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
+    // The copy-paste examples are shown by "Show code" and pasted by readers: a line that scrolls sideways
+    // there is unreadable (ticket #493). 110 columns is the width the examples are already wrapped to.
+    files: ['**/*.example.tsx'],
+    rules: { 'max-len': ['error', { code: 110, ignoreUrls: true }] },
+  },
+  {
     // `packages/core/src/internal.ts` (the facade published at the `@formrail/core/internal`
     // subpath) is for @formrail/pro only (ticket #230: no semver guarantee, can change in a
     // patch release). Nothing inside the core package itself — including its own public story/MDX

@@ -21,7 +21,14 @@ export function InvoiceTable() {
     () => [
       { id: 'id', header: 'Number', accessor: (row) => row.id, width: 110 },
       { id: 'customer', header: 'Customer', accessor: (row) => row.customer, minWidth: 180 },
-      { id: 'amount', header: 'Amount', accessor: (row) => row.amount, cell: (row) => `€ ${row.amount.toFixed(2)}`, align: 'end', width: 120 },
+      {
+        id: 'amount',
+        header: 'Amount',
+        accessor: (row) => row.amount,
+        cell: (row) => `€ ${row.amount.toFixed(2)}`,
+        align: 'end',
+        width: 120,
+      },
       { id: 'date', header: 'Date', accessor: (row) => row.date, firstSortDirection: 'desc', width: 120 },
     ],
     [],

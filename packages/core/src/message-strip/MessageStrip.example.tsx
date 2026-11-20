@@ -7,12 +7,15 @@ export function DismissibleNotice() {
   const [focused, setFocused] = useState(false);
   const show = useRef<HTMLButtonElement>(null);
   const dismissed = useRef(false);
-  const reopened = useRef(false); // set on the first reopening and kept: every later reopening moves the focus too
-  // The strip never hides itself: you unmount it, and you decide where the focus goes next. Closed: to the
-  // button that brings it back. Reopened: to a plain wrapper around the strip, not to the strip, which is the live region
-  // (one announcement). The wrapper draws the focus ring of the controls (2px primary). That button is disabled
-  // while the strip is open.
+  // Set on the first reopening and kept: every later reopening moves the focus too.
+  const reopened = useRef(false);
+  // The strip never hides itself: you unmount it, and you decide where the focus goes next.
+  // Closed: to the button that brings it back, and the wrapper forgets it had the focus (a removed
+  // element fires no blur). Reopened: to a plain wrapper around the strip, not to the strip, which is
+  // the live region (one announcement). The wrapper draws the focus ring of the controls (2px primary).
+  // That button is disabled while the strip is open.
   useEffect(() => {
+    if (!open) setFocused(false);
     if (!open && dismissed.current) show.current?.focus();
     if (open && reopened.current) strip.current?.focus();
   }, [open]);
@@ -24,7 +27,11 @@ export function DismissibleNotice() {
           tabIndex={-1}
           onFocus={(e) => setFocused(e.target === e.currentTarget)}
           onBlur={(e) => e.target === e.currentTarget && setFocused(false)}
-          style={{ outline: focused ? '2px solid var(--color-rop-primary)' : 'none', outlineOffset: 2 }}
+          data-testid="notice"
+          style={{
+            outline: focused ? '2px solid var(--color-rop-primary)' : 'none',
+            outlineOffset: 2,
+          }}
         >
           <MessageStrip
             tone="warning"

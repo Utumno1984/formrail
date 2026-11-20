@@ -1,4 +1,12 @@
-import { Button, DescriptionList, DescriptionListItem, ObjectPage, ObjectPageHeader, ObjectPageSection, StatusBadge } from '@formrail/core';
+import {
+  Button,
+  DescriptionList,
+  DescriptionListItem,
+  ObjectPage,
+  ObjectPageHeader,
+  ObjectPageSection,
+  StatusBadge,
+} from '@formrail/core';
 
 export function InvoicePage() {
   // The page fills a parent with a bounded height and scrolls inside itself: the header stays in view and

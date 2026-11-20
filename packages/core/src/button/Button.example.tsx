@@ -13,7 +13,15 @@ export function SaveToolbar() {
       </Button>
       {/* An icon-only button must have an accessible name: `aria-label` (TypeScript requires it). */}
       <Button variant="ghost" size="icon-md" aria-label="Clear status" onClick={() => setStatus('')}>
-        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <svg
+          viewBox="0 0 16 16"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
           <path d="M3 3l10 10M13 3L3 13" />
         </svg>
       </Button>

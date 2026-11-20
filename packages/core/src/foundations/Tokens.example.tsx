@@ -18,14 +18,22 @@ export function TokenPanel() {
         lineHeight: 'var(--text-rop-body--line-height)',
       }}
     >
-      <strong style={{ fontSize: 'var(--text-rop-title-sm)', lineHeight: 'var(--text-rop-title-sm--line-height)' }}>
+      <strong
+        style={{
+          fontSize: 'var(--text-rop-title-sm)',
+          lineHeight: 'var(--text-rop-title-sm--line-height)',
+        }}
+      >
         Invoice INV-2026-00042
       </strong>
       <span style={{ color: 'var(--color-rop-text-muted)' }}>Northwind Components</span>
-      <code style={{ fontFamily: 'var(--font-rop-mono)', fontSize: 'var(--text-rop-caption)' }}>EUR 1,240.00</code>
+      <code style={{ fontFamily: 'var(--font-rop-mono)', fontSize: 'var(--text-rop-caption)' }}>
+        EUR 1,240.00
+      </code>
       <span style={{ color: 'var(--color-rop-error)' }}>Payment overdue</span>
       {/* Derived tokens (primary-hover, error-active, ...) are not set by default: do not read them with a
-          bare var(). Use the base colours above, or see "Derived colors" under "Tokens" in the package README. */}
+          bare var(). Use the base colours above, or see "Derived colors" under "Tokens" in the package
+          README. */}
     </div>
   );
 }

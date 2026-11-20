@@ -24,7 +24,8 @@ export function InvoiceRebase() {
 
   // A newer version of the record, saved meanwhile by someone else. In your app it comes from a poll, a push
   // message or the 409 response of a save: pass it to `rebase` and the user's draft is merged into it.
-  const receiveServerVersion = () => rebase({ ...form.baseline, supplier: 'Rossi Construction Ltd', amount: '1350' });
+  const receiveServerVersion = () =>
+    rebase({ ...form.baseline, supplier: 'Rossi Construction Ltd', amount: '1350' });
 
   // Resolving a conflict removes its buttons: the focus goes to the field it decided.
   const resolve = (path: string, choice: (path: string) => void) => {
@@ -54,7 +55,11 @@ export function InvoiceRebase() {
         </Button>
       </div>
       {/* The fields you did not touch take the server value: listed here. */}
-      <ChangeSummary entries={applied} label="Applied server changes" emptyLabel="No server changes applied" />
+      <ChangeSummary
+        entries={applied}
+        label="Applied server changes"
+        emptyLabel="No server changes applied"
+      />
       {/* The fields both of you changed keep your value until you decide. */}
       <section aria-labelledby={conflictsHeading}>
         <Title id={conflictsHeading} level={3} size="sm">
@@ -62,8 +67,13 @@ export function InvoiceRebase() {
         </Title>
         <ul style={{ display: 'grid', gap: 8, paddingLeft: 16 }}>
           {conflicts.map((conflict) => (
-            <li key={conflict.path} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-              <Text as="span">{`${conflict.label}: yours ${String(conflict.mine)}, server ${String(conflict.theirs)}`}</Text>
+            <li
+              key={conflict.path}
+              style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}
+            >
+              <Text as="span">
+                {`${conflict.label}: yours ${String(conflict.mine)}, server ${String(conflict.theirs)}`}
+              </Text>
               <Button size="sm" variant="secondary" onClick={() => resolve(conflict.path, acceptTheirs)}>
                 {`Use the server value for ${conflict.label}`}
               </Button>
