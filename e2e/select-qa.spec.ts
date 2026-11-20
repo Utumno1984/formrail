@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectPlayToPass, gotoStory } from './helpers/story';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 
 const STORY = (name: string) => `forms-select--${name}`;
 const combobox = (page: Page): Locator => page.locator('[role="combobox"]');
@@ -108,6 +109,9 @@ test.describe('select QA', () => {
     await expect(combobox(page)).not.toHaveText('Select');
     // Click outside the list but inside the dialog closes the list only.
     await combobox(page).click();
+    // #579: the press outside waits until the list is open and listens for it (it was dispatched before).
+    await expect(listbox(page)).toBeVisible();
+    await waitForOutsidePressArmed(page, listbox(page));
     const h = (await page.locator('[role="dialog"] h2').boundingBox())!;
     await page.mouse.click(h.x + 5, h.y + h.height / 2);
     await expect(listbox(page)).toHaveCount(0);
