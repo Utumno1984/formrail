@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass, gotoStory as openStory } from './helpers/story';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 
 const STORY = (name: string) => `overlays-dialog--${name}`;
 
@@ -90,6 +91,7 @@ for (const path of PATHS) {
       const opener = page.getByRole('button', { name: path.opener });
       await opener.click();
       await expect(dialogOf(page)).toBeVisible();
+      await waitForOutsidePressArmed(page, dialogOf(page));
       await page.mouse.click(4, 4);
       await expect(dialogOf(page)).toHaveCount(0);
       await expect(opener).toBeFocused();
@@ -132,6 +134,8 @@ test.describe('dismissible={false}', () => {
     const dialog = page.getByRole('dialog', { name: 'Delete the supplier?' });
     await expect(dialog).toBeVisible();
     await page.keyboard.press('Escape');
+    // Armed first: otherwise "the backdrop does nothing" would pass on a press the dialog never saw.
+    await waitForOutsidePressArmed(page, dialog);
     await page.mouse.click(4, 4);
     await expect(dialog).toBeVisible();
     await expectNoA11yViolations(page);

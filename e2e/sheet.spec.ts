@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations, settleMotion } from './helpers/a11y';
 import { expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass, gotoStory as openStory } from './helpers/story';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 
 const STORY = (name: string) => `overlays-sheet--${name}`;
 
@@ -82,6 +83,7 @@ for (const path of PATHS) {
       const opener = page.getByRole('button', { name: path.opener });
       await opener.click();
       await expect(sheetOf(page)).toBeVisible();
+      await waitForOutsidePressArmed(page, sheetOf(page));
       await page.mouse.click(4, 4);
       await expect(sheetOf(page)).toHaveCount(0);
       await expect(opener).toBeFocused();
@@ -121,6 +123,8 @@ test.describe('dismissible={false}', () => {
     const sheet = sheetOf(page);
     await expect(sheet).toBeVisible();
     await page.keyboard.press('Escape');
+    // Armed first: otherwise "the backdrop does nothing" would pass on a press the sheet never saw.
+    await waitForOutsidePressArmed(page, sheet);
     await page.mouse.click(4, 4);
     await expect(sheet).toBeVisible();
     await expectNoA11yViolations(page);
