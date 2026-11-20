@@ -150,8 +150,8 @@ test.describe('renamed story ids: the removed invoice showcase of the Pro demo (
     await expect(page.locator('body.sb-show-errordisplay')).toHaveCount(0);
     expect(new URL(page.url()).searchParams.get('id')).toBe(`${NEW}--sales-order-server-update`);
     expect(new URL(page.url()).searchParams.get('args')).toBe('saveOutcome:error');
-    // The order list of the new story, not the invoices.
-    await expect(page.getByRole('link', { name: 'SO-2026-147000001' })).toBeVisible({ timeout: 30_000 });
+    // The new story, not the invoices: its play opens order so-1.
+    await expect(page.getByRole('heading', { level: 1, name: /SO-2026-147000001/ })).toBeVisible({ timeout: 30_000 });
   });
 
   test('iframe: the old "manual" fixture with the args of the old e2e specs opens the orders with the same args', async ({ page }) => {
