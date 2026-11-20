@@ -31,6 +31,7 @@ describe('clearanceDelta', () => {
 // jsdom has no layout: the scroller spans 0-600, every input is 40 tall at its `data-top` minus the scroll.
 let scrollTop: number;
 let frames: FrameRequestCallback[];
+let cancelFrame: ReturnType<typeof vi.fn>;
 const flushFrames = () =>
   act(() => {
     const pending = frames;
@@ -42,9 +43,10 @@ beforeEach(() => {
   scrollTop = 0;
   frames = [];
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
-  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+  cancelFrame = vi.fn((id: number) => {
     frames[id - 1] = () => undefined;
   });
+  vi.stubGlobal('cancelAnimationFrame', cancelFrame);
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const rect = (top: number, height: number) => ({ top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top, toJSON: () => ({}) });
     if (this.hasAttribute('data-object-page-scroller')) return rect(0, 600);
@@ -131,6 +133,13 @@ describe('useFocusNotObscured (the Tab fallback of ObjectPage)', () => {
     act(() => field('first').focus());
     flushFrames();
     expect(scrollTop).toBe(254);
+    // A Tab whose key was never released (the window lost the focus) is over at the next key.
+    pressTab();
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
+    act(() => field('second').focus());
+    act(() => field('first').focus());
+    flushFrames();
+    expect(scrollTop).toBe(254);
     // The Tab is over once its key is released.
     pressTab();
     fireEvent.keyUp(document.activeElement!, { key: 'Tab' });
@@ -144,8 +153,11 @@ describe('useFocusNotObscured (the Tab fallback of ObjectPage)', () => {
     setup();
     scrollTop = 254;
     pressTab(true);
-    // The link (at the top of the scroller, inside the bar) would otherwise be "under" the top margin.
-    act(() => screen.getByRole('link', { name: 'Section A' }).focus());
+    // Given a top margin (the page's class leaves the bar out; a consumer's could not), the link at the top of
+    // the scroller would be "under" it: it is still left alone.
+    const link = screen.getByRole('link', { name: 'Section A' });
+    Object.assign(link.style, MARGINS);
+    act(() => link.focus());
     flushFrames();
     expect(scrollTop).toBe(254);
   });
@@ -171,7 +183,10 @@ describe('useFocusNotObscured (the Tab fallback of ObjectPage)', () => {
     scrollTop = 254;
     pressTab(true);
     act(() => field('first').focus());
+    // The fallback's frame is the last one requested.
+    const pending = frames.length;
     unmount();
+    expect(cancelFrame).toHaveBeenCalledWith(pending);
     for (const [type, handler, options] of added) {
       expect(removeDoc).toHaveBeenCalledWith(type, handler, options);
     }
