@@ -230,12 +230,12 @@ for (const [name, viewport] of VIEWPORTS) {
 // Anchor Bar or past the scroller's bottom edge (the save bar below it is shown: the form is dirty).
 type ShowcaseWindow = {
   __ropShowcaseStore?: {
-    snapshot: () => { id: string; number: string; lineItems: unknown[] }[];
+    snapshot: () => { id: string; number: string; requestedDeliveryDate: string; lines: unknown[] }[];
     updateFromServer: (id: string, change: (r: object) => object, delayMs?: number) => Promise<unknown>;
   };
 };
 const PRO_FIXTURE =
-  '/iframe.html?id=pro-showcase-invoices-with-change-summary--manual&viewMode=story&args=' +
+  '/iframe.html?id=pro-showcase-record-editing-integrity--sales-order-manual&viewMode=story&args=' +
   encodeURIComponent('listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:0;serverUpdateDelayMs:0');
 
 for (const [name, viewport] of VIEWPORTS) {
@@ -246,19 +246,19 @@ for (const [name, viewport] of VIEWPORTS) {
     await page.goto(PRO_FIXTURE);
     // The showcase's store exists once the list has mounted.
     await page.waitForFunction(() => !!(window as unknown as ShowcaseWindow).__ropShowcaseStore);
-    // The first stored record with three lines or more: a long editor.
+    // The first stored order with three lines or more: a long editor.
     const record = await page.evaluate(() => {
       const rows = (window as unknown as ShowcaseWindow).__ropShowcaseStore!.snapshot();
-      return rows.find((r) => r.lineItems.length >= 3)!.number;
+      return rows.find((r) => r.lines.length >= 3)!.number;
     });
-    await page.getByRole('link', { name: record, exact: true }).click();
+    await page.getByRole('link', { name: record }).click();
     await expect(page.getByRole('heading', { level: 1, name: new RegExp(record) })).toBeVisible();
-    await page.getByLabel('Due date', { exact: true }).fill('2026-03-05');
-    // Another user changes the same date: a conflict, the notice appears above the scroller.
+    await page.getByLabel(/^Requested delivery/).fill('2026-07-01');
+    // Another user changes the same delivery date: a conflict, the notice appears above the scroller.
     await page.evaluate((number) => {
       const store = (window as unknown as ShowcaseWindow).__ropShowcaseStore!;
       const id = store.snapshot().find((r) => r.number === number)!.id;
-      void store.updateFromServer(id, (r) => ({ ...r, dueDate: '2026-03-12' }));
+      void store.updateFromServer(id, (r) => ({ ...r, requestedDeliveryDate: '2026-07-08' }));
     }, record);
     await expect(page.getByRole('list', { name: 'Conflicts' }).getByRole('listitem')).toHaveCount(1);
     await expect(page.locator('.rop-pro-rebase-notice')).toBeVisible();
