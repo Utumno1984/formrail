@@ -21,8 +21,8 @@ export const rootClass = 'flex h-full min-h-0 min-w-0 max-w-full flex-col font-r
 export const scrollerClass =
   'grid min-h-0 flex-1 grid-cols-1 content-start gap-6 overflow-y-auto overflow-x-hidden px-4 pt-4 sm:px-6 ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px] ' +
-  '[&_:not([data-object-page-anchor-bar],[data-object-page-anchor-bar]_*)]:scroll-mt-[calc(var(--rop-object-page-sticky-offset,0px)+0.5rem)] ' +
-  '[&_:not([data-object-page-anchor-bar],[data-object-page-anchor-bar]_*)]:scroll-mb-[calc(var(--rop-keyboard-inset,0px)+0.5rem)]';
+  '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mt-[calc(var(--rop-object-page-sticky-offset,0px)+0.5rem)] ' +
+  '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mb-[calc(var(--rop-keyboard-inset,0px)+0.5rem)]';
 
 // Room below the last section: the virtual keyboard's height (published by Field) plus a margin, so the
 // last field can be scrolled above the keyboard.

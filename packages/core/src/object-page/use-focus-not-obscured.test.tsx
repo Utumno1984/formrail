@@ -200,10 +200,10 @@ describe('useFocusNotObscured (the Tab fallback of ObjectPage)', () => {
 describe('the scroller declares the room the browser keeps for a focused control', () => {
   it('a top margin of the sticky offset and a bottom margin of the keyboard inset, outside the Anchor Bar', () => {
     expect(scrollerClass).toContain(
-      '[&_:not([data-object-page-anchor-bar],[data-object-page-anchor-bar]_*)]:scroll-mt-[calc(var(--rop-object-page-sticky-offset,0px)+0.5rem)]',
+      '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mt-[calc(var(--rop-object-page-sticky-offset,0px)+0.5rem)]',
     );
     expect(scrollerClass).toContain(
-      '[&_:not([data-object-page-anchor-bar],[data-object-page-anchor-bar]_*)]:scroll-mb-[calc(var(--rop-keyboard-inset,0px)+0.5rem)]',
+      '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mb-[calc(var(--rop-keyboard-inset,0px)+0.5rem)]',
     );
     render(<Page />);
     expect(screen.getByRole('navigation')).toHaveAttribute('data-object-page-anchor-bar', '');
