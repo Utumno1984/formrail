@@ -3,12 +3,14 @@
     "file": "packages/pro/src/styles/index.css",
     "rule": "spacing-literal",
     "value": "ps-[calc(0.5rem+0.75em)]",
+    "context": "ps-[calc(0.5rem+0.75em)]",
     "reason": "ChangeSummary kind badge: the leading padding is the shape's room (0.75em, follows the font size) plus the 0.5rem of the scale, which no scale step can express"
   },
   {
     "file": "packages/pro/src/styles/index.css",
     "rule": "named-color",
     "value": "black",
+    "context": "color-mix(in srgb, var(--_cs-tone) 45%, black)",
     "reason": "ChangeSummary kind badge text: the tone is darkened with color-mix toward black for text contrast on its own tint, the same derivation the core uses for its hover/active tokens (tokens.css); the core has no pure-black token to name"
   }
 ]

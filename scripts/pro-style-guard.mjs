@@ -18,7 +18,8 @@
 //   unknown-token    a `var(--color-rop-x)` (or `--radius-rop-*`, `--text-rop-*`, ...) that `tokens.css` does not declare
 //   allowlist        an allowlist entry without a reason, or one that no longer matches anything
 //
-// An exception lives in `scripts/pro-style-guard.allowlist.json`: one entry per exception, `{ file, rule, value, reason }`.
+// An exception lives in `scripts/pro-style-guard.allowlist.json`: one entry per exception, `{ file, rule, value, context, count?, reason }`
+// (`context`: exact fragment of the source line, whitespace-normalised; `count` defaults to 1).
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,6 +81,7 @@ export function declaredTokens(tokensCss) {
   return new Set([...stripComments(tokensCss, 'css').matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
 }
 
+const normalizeLine = (s) => s.replace(/\s+/g, ' ').trim();
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
 /** The colour of an `outline` value is acceptable when it names a core token or a neutral keyword. */
@@ -97,7 +99,10 @@ export function checkSource(file, source, tokens) {
   const kind = file.endsWith('.css') ? 'css' : 'ts';
   const text = stripComments(source, kind);
   const found = [];
-  const add = (index, rule, value, message) => found.push({ file, line: lineOf(text, index), rule, value, message });
+  const add = (index, rule, value, message) => {
+    const line = lineOf(text, index);
+    found.push({ file, line, rule, value, message, source: normalizeLine(text.split('\n')[line - 1]) });
+  };
 
   for (const m of text.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/g)) {
     // In TS, an all-digit "#123" is an issue reference only when prose names it ("see ticket #470"); any other
@@ -165,20 +170,34 @@ export function checkSource(file, source, tokens) {
   return found;
 }
 
-/** Apply the allowlist: returns `{ violations, problems }` (problems: bad or stale allowlist entries). */
+/**
+ * Apply the allowlist: returns `{ violations, problems }` (problems: bad or stale allowlist entries).
+ * An entry covers the occurrences of (file, rule, value) whose source line, whitespace-normalised, contains its
+ * `context`, up to `count` (default 1). One more than `count` is reported as a violation.
+ */
 export function applyAllowlist(violations, allowlist) {
   const problems = [];
-  const used = new Set();
+  const valid = allowlist.map((e) => typeof e.context === 'string' && normalizeLine(e.context).length > 0);
+  const used = allowlist.map(() => 0);
   const left = violations.filter((v) => {
-    const idx = allowlist.findIndex((e) => e.file === v.file && e.rule === v.rule && e.value === v.value);
+    const idx = allowlist.findIndex(
+      (e, i) => valid[i] && e.file === v.file && e.rule === v.rule && e.value === v.value && (v.source ?? '').includes(normalizeLine(e.context)),
+    );
     if (idx === -1) return true;
-    used.add(idx);
+    used[idx]++;
+    const count = allowlist[idx].count ?? 1;
+    if (used[idx] > count) {
+      v.message += ` (allowlist entry ${idx} covers ${count} occurrence(s) of its context; this one is extra)`;
+      return true;
+    }
     return false;
   });
   allowlist.forEach((e, i) => {
     const label = `${ALLOWLIST}: entry ${i} (${e.file} ${e.rule} "${e.value}")`;
     if (typeof e.reason !== 'string' || e.reason.trim().length < 10) problems.push(`${label} has no reason (at least 10 characters)`);
-    else if (!used.has(i)) problems.push(`${label} matches nothing any more: remove it`);
+    else if (!valid[i]) problems.push(`${label} is invalid: "context" is required (an exact fragment of the source line)`);
+    else if (e.count !== undefined && !(Number.isInteger(e.count) && e.count >= 1)) problems.push(`${label} is invalid: "count" must be a positive integer`);
+    else if (used[i] === 0) problems.push(`${label} matches nothing any more: remove it`);
   });
   return { violations: left, problems };
 }

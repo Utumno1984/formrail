@@ -95,21 +95,55 @@ describe('pro style guard: allowlist', () => {
   const v = checkSource(CSS, '.a { outline: 2px solid CanvasText; }', TOKENS);
 
   it('an entry with a reason lets the exception through', () => {
-    const entry = { file: CSS, rule: 'outline-color', value: '2px solid CanvasText', reason: 'forced-colors: the system colour is the point' };
+    const entry = { file: CSS, rule: 'outline-color', value: '2px solid CanvasText', context: 'outline: 2px solid CanvasText', reason: 'forced-colors: the system colour is the point' };
     expect(applyAllowlist(v, [entry])).toEqual({ violations: [], problems: [] });
   });
 
   it('an entry without a reason fails the guard (and so does a blank one)', () => {
     for (const reason of [undefined, '', '   ', 'x']) {
-      const { problems } = applyAllowlist(v, [{ file: CSS, rule: 'outline-color', value: '2px solid CanvasText', reason }]);
+      const { problems } = applyAllowlist(v, [{ file: CSS, rule: 'outline-color', value: '2px solid CanvasText', context: 'outline: 2px solid CanvasText', reason }]);
       expect(problems).toHaveLength(1);
       expect(problems[0]).toMatch(/no reason/);
     }
   });
 
   it('a stale entry (matches nothing) fails the guard', () => {
-    const { problems } = applyAllowlist([], [{ file: CSS, rule: 'outline-color', value: 'gone', reason: 'a long enough reason' }]);
+    const { problems } = applyAllowlist([], [{ file: CSS, rule: 'outline-color', value: 'gone', context: 'gone', reason: 'a long enough reason' }]);
     expect(problems[0]).toMatch(/matches nothing/);
+  });
+});
+
+describe('pro style guard: allowlist context (#486 round 3)', () => {
+  const real = JSON.parse(read('scripts/pro-style-guard.allowlist.json')).find((e) => e.rule === 'named-color');
+  const line = '.badge { color: color-mix(in srgb, var(--_cs-tone) 45%, black); }';
+  const entry = { file: CSS, rule: 'named-color', value: 'black', context: real.context, reason: 'a long enough reason' };
+
+  it('the real entry still passes on its own line (whitespace-normalised)', () => {
+    const v = checkSource(CSS, line.replace(/ /g, '   '), TOKENS);
+    expect(applyAllowlist(v, [entry])).toEqual({ violations: [], problems: [] });
+  });
+
+  it('a second black in the same file, outside the context, is rejected', () => {
+    const v = checkSource(CSS, `${line}\n.a { border: 1px solid black; }`, TOKENS);
+    const { violations, problems } = applyAllowlist(v, [entry]);
+    expect(problems).toEqual([]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].line).toBe(2);
+  });
+
+  it('one occurrence more than count is rejected, and count raises the cap', () => {
+    const v = checkSource(CSS, `${line}\n${line}`, TOKENS);
+    const over = applyAllowlist(v, [entry]);
+    expect(over.violations).toHaveLength(1);
+    expect(over.violations[0].line).toBe(2);
+    expect(applyAllowlist(checkSource(CSS, `${line}\n${line}`, TOKENS), [{ ...entry, count: 2 }])).toEqual({ violations: [], problems: [] });
+  });
+
+  it('an entry without context is an invalid configuration', () => {
+    const noContext = { ...entry, context: undefined };
+    const { violations, problems } = applyAllowlist(checkSource(CSS, line, TOKENS), [noContext]);
+    expect(problems[0]).toMatch(/context.*required/);
+    expect(violations).toHaveLength(1);
   });
 });
 
