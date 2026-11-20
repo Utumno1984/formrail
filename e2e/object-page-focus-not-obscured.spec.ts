@@ -57,10 +57,43 @@ interface Probe {
   footerTop: number | null;
 }
 
+/**
+ * Resolves once the scroller has not moved for 2 animation frames. The Tab fallback acts one frame after the focus
+ * (before the next paint), and WebKit scrolls to a focused element after the key event: a probe taken right after
+ * the key press would see the state before them, which no user sees.
+ */
+const SETTLE = (selector: string) =>
+  new Promise<void>((resolve) => {
+    const el = document.querySelector(selector) as HTMLElement;
+    let last = -1;
+    let still = 0;
+    const tick = () => {
+      still = el.scrollTop === last ? still + 1 : 0;
+      last = el.scrollTop;
+      if (still >= 2) resolve();
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+
+const settle = (page: Page) => page.evaluate(SETTLE, SCROLLER);
+
 function probe(page: Page): Promise<Probe> {
-  return page.evaluate((selector) => {
-    const el = document.activeElement as HTMLElement;
+  return page.evaluate(async (selector) => {
     const scroller = document.querySelector(selector) as HTMLElement;
+    // Settled first, in the same round trip (see SETTLE).
+    await new Promise<void>((resolve) => {
+      let last = -1;
+      let still = 0;
+      const tick = () => {
+        still = scroller.scrollTop === last ? still + 1 : 0;
+        last = scroller.scrollTop;
+        if (still >= 2) resolve();
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    const el = document.activeElement as HTMLElement;
     const bar = scroller.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
     const footer = document.querySelector<HTMLElement>('[data-object-page-footer]');
     const box = el.getBoundingClientRect();
@@ -150,6 +183,7 @@ for (const [name, viewport] of VIEWPORTS) {
     for (const overlap of [1, 10, 30]) {
       test(`Tab onto a field ${overlap}px under the Anchor Bar brings it clear of the bar @engines`, async ({ page }) => {
         await page.getByRole('textbox', { name: 'Project code' }).focus();
+        await settle(page);
         const target = page.getByRole('textbox', { name: 'Currency' });
         const under = () =>
           target.evaluate((el) => {
@@ -161,8 +195,8 @@ for (const [name, viewport] of VIEWPORTS) {
           const bar = scroller.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
           scroller.scrollTop += el.getBoundingClientRect().top - bar.getBoundingClientRect().bottom + px;
         }, overlap);
-        // Two frames later the field is still where it was put: nothing else scrolled.
-        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        // A few frames later the field is still where it was put: nothing else scrolled.
+        await settle(page);
         expect(await under()).toBeCloseTo(overlap, 0);
         await page.keyboard.press('Tab');
         const p = await probe(page);
@@ -210,6 +244,8 @@ for (const [name, viewport] of VIEWPORTS) {
   }) => {
     await page.setViewportSize(viewport);
     await page.goto(PRO_FIXTURE);
+    // The showcase's store exists once the list has mounted.
+    await page.waitForFunction(() => !!(window as unknown as ShowcaseWindow).__ropShowcaseStore);
     // The first stored record with three lines or more: a long editor.
     const record = await page.evaluate(() => {
       const rows = (window as unknown as ShowcaseWindow).__ropShowcaseStore!.snapshot();
