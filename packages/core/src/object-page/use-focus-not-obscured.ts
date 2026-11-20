@@ -39,14 +39,15 @@ const px = (value: string): number => {
  * the bar (or partly past the bottom edge) where it is: this hook is the fallback for that. After a Tab
  * moved the focus into the scroller, one frame later (the browser has done its own scrolling by then,
  * and nothing has been painted yet) it scrolls the scroller by the least that clears the target, and
- * does nothing where the browser already did it. Only Tab counts: a focus moved by script (which may have
- * asked for `preventScroll`) or by a click is left alone.
+ * does nothing where the browser already did it. Only Tab counts: a focus moved by script outside a Tab key
+ * press (which may have asked for `preventScroll`) or by a click is left alone.
  */
 export function useFocusNotObscured(scrollerRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller || typeof requestAnimationFrame !== 'function') return undefined;
     const doc = scroller.ownerDocument;
+    const win = doc.defaultView;
     let tabbing = false;
     let frame = 0;
 
@@ -65,7 +66,9 @@ export function useFocusNotObscured(scrollerRef: RefObject<HTMLElement | null>):
     const onKeyDown = (event: KeyboardEvent) => {
       tabbing = event.key === 'Tab';
     };
-    const onKeyUp = () => {
+    // Released, or over without a release: a pointer press (its focus is a click's) or the window losing the
+    // focus (the Tab's keyup goes to another window).
+    const endTab = () => {
       tabbing = false;
     };
     const onFocusIn = (event: FocusEvent) => {
@@ -77,11 +80,15 @@ export function useFocusNotObscured(scrollerRef: RefObject<HTMLElement | null>):
     };
 
     doc.addEventListener('keydown', onKeyDown, true);
-    doc.addEventListener('keyup', onKeyUp, true);
+    doc.addEventListener('keyup', endTab, true);
+    doc.addEventListener('pointerdown', endTab, true);
+    win?.addEventListener('blur', endTab);
     scroller.addEventListener('focusin', onFocusIn);
     return () => {
       doc.removeEventListener('keydown', onKeyDown, true);
-      doc.removeEventListener('keyup', onKeyUp, true);
+      doc.removeEventListener('keyup', endTab, true);
+      doc.removeEventListener('pointerdown', endTab, true);
+      win?.removeEventListener('blur', endTab);
       scroller.removeEventListener('focusin', onFocusIn);
       if (frame) cancelAnimationFrame(frame);
     };

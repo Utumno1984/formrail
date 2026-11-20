@@ -31,6 +31,9 @@
 @source not '../multi-select/use-multi-select.ts';
 @source not '../multi-select/MultiSelect.tsx';
 @source not '../internal/keyboard-open.ts';
+/* The Object Page's focus-not-obscured hook: no class names, a window `blur` listener (read as the `blur`
+   utility). Its scroll margins are classes in object-page-styles.ts, which is still scanned. */
+@source not '../object-page/use-focus-not-obscured.ts';
 @source not '../internal/escape-key.ts';
 /* Same for the headless List Report (no class names, a `filter` option) and the text helper. */
 @source not '../list-report/use-list-report.ts';

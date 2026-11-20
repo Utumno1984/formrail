@@ -209,3 +209,48 @@ describe('the scroller declares the room the browser keeps for a focused control
     expect(screen.getByRole('navigation')).toHaveAttribute('data-object-page-anchor-bar', '');
   });
 });
+
+describe('useFocusNotObscured: a Tab is over without its keyup', () => {
+  it('at a pointer press: the focus that follows is a click, left alone', () => {
+    setup();
+    scrollTop = 254;
+    pressTab(true);
+    fireEvent.pointerDown(field('first'));
+    act(() => field('first').focus());
+    flushFrames();
+    expect(scrollTop).toBe(254);
+  });
+
+  it('when the window loses the focus (the keyup goes to another window)', () => {
+    setup();
+    scrollTop = 254;
+    pressTab(true);
+    act(() => {
+      window.dispatchEvent(new FocusEvent('blur'));
+    });
+    act(() => field('first').focus());
+    flushFrames();
+    expect(scrollTop).toBe(254);
+    // The next Tab counts again.
+    act(() => field('second').focus());
+    pressTab(true);
+    act(() => field('first').focus());
+    flushFrames();
+    expect(scrollTop).toBe(244);
+  });
+
+  it('removes the pointer and window listeners when unmounted', () => {
+    const addDoc = vi.spyOn(document, 'addEventListener');
+    const removeDoc = vi.spyOn(document, 'removeEventListener');
+    const addWin = vi.spyOn(window, 'addEventListener');
+    const removeWin = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = setup();
+    const pointer = addDoc.mock.calls.filter(([type]) => type === 'pointerdown');
+    const blur = addWin.mock.calls.filter(([type]) => type === 'blur');
+    expect(pointer).toHaveLength(1);
+    expect(blur).toHaveLength(1);
+    unmount();
+    for (const call of pointer) expect(removeDoc).toHaveBeenCalledWith(...call);
+    for (const call of blur) expect(removeWin).toHaveBeenCalledWith(...call);
+  });
+});
