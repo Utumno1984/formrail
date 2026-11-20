@@ -92,7 +92,7 @@ export function ObjectPageAnchorBar({ label }: ObjectPageAnchorBarProps) {
   };
 
   return (
-    <nav ref={barRef} aria-label={label} className={anchorBarClass}>
+    <nav ref={barRef} aria-label={label} data-object-page-anchor-bar="" className={anchorBarClass}>
       <ul ref={listRef} className={anchorBarListClass}>
         {sections.map(({ id, title }) => {
           const active = id === activeId;

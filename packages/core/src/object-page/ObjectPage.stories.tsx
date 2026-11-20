@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
@@ -316,6 +316,116 @@ export const TextAndWideContent: Story = {
       </ObjectPage>
     </div>
   ),
+};
+
+const GENERAL_FIELDS = [
+  'Invoice number',
+  'Issue date',
+  'Due date',
+  'Order reference',
+  'Cost center',
+  'Project code',
+  'Currency',
+  'Payment terms',
+  'Buyer',
+  'Approver',
+];
+const SUPPLIER_FIELDS = ['Supplier name', 'VAT number', 'Street', 'City', 'Postal code', 'Country'];
+const BANK_FIELDS = ['IBAN', 'BIC'];
+const NOTES_FIELDS = ['Internal notes', 'Notes for the supplier'];
+
+/** One labelled text field per name. */
+function TextFields({ names }: { names: readonly string[] }) {
+  return (
+    <>
+      {names.map((name) => (
+        <Field key={name} label={name}>
+          <Input />
+        </Field>
+      ))}
+    </>
+  );
+}
+
+/** The scroller's visible strip between the Anchor Bar's bottom edge and its own bottom edge. */
+function clearStrip(canvasElement: HTMLElement): { top: number; bottom: number } {
+  const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
+  const bar = scroller.querySelector('nav') as HTMLElement;
+  return { top: bar.getBoundingClientRect().bottom, bottom: scroller.getBoundingClientRect().bottom };
+}
+
+/**
+ * A form longer than the viewport: header actions, a long section of fields, a section with a nested
+ * section, fields at the very end, and a save bar. Every control the keyboard reaches is scrolled
+ * clear of the sticky Anchor Bar (and stays above the save bar, which sits below the scroller): WCAG
+ * 2.4.12 Focus Not Obscured (Enhanced).
+ *
+ * The play function tabs from the first field to the last one of "General data", then back up with
+ * Shift+Tab, and checks that each focused field is entirely in the clear strip. "Edit" shows the save
+ * bar, "Cancel" hides it: its room is always reserved, so nothing above it moves.
+ */
+export const LongForm: Story = {
+  parameters: NO_CONTROLS,
+  render: function Render() {
+    const [editing, setEditing] = useState(true);
+    return (
+      <div style={FRAME}>
+        <ObjectPage>
+          <ObjectPageHeader
+            title="Invoice 2026/0142"
+            subtitle="ACME srl"
+            actions={
+              <Button variant="secondary" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            }
+          />
+          <ObjectPageSection id="general" title="General data">
+            <TextFields names={GENERAL_FIELDS} />
+          </ObjectPageSection>
+          <ObjectPageSection id="supplier" title="Supplier">
+            <TextFields names={SUPPLIER_FIELDS} />
+            <ObjectPageSection id="bank" title="Bank details">
+              <TextFields names={BANK_FIELDS} />
+            </ObjectPageSection>
+          </ObjectPageSection>
+          <ObjectPageSection id="notes" title="Notes">
+            <TextFields names={NOTES_FIELDS} />
+          </ObjectPageSection>
+          <ObjectPageFooter visible={editing}>
+            <Button variant="secondary" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => setEditing(false)}>
+              Save
+            </Button>
+          </ObjectPageFooter>
+        </ObjectPage>
+      </div>
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const fields = GENERAL_FIELDS.map((name) => canvas.getByRole('textbox', { name }));
+    const expectClear = async (field: HTMLElement) => {
+      await expect(field).toHaveFocus();
+      await waitFor(() => {
+        const strip = clearStrip(canvasElement);
+        const box = field.getBoundingClientRect();
+        expect(box.top).toBeGreaterThanOrEqual(strip.top);
+        expect(box.bottom).toBeLessThanOrEqual(strip.bottom);
+      });
+    };
+    await userEvent.click(fields[0] as HTMLElement);
+    for (const field of fields.slice(1)) {
+      await userEvent.tab();
+      await expectClear(field);
+    }
+    for (const field of fields.slice(0, -1).reverse()) {
+      await userEvent.tab({ shift: true });
+      await expectClear(field);
+    }
+  },
 };
 
 /** No height on the parent: the page grows with its content and the document is the only scroller. */
