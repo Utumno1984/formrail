@@ -10,7 +10,12 @@ interface Invoice {
   status: 'pending' | 'approved';
 }
 
-const suppliers = ['Rossi Construction', 'Bianchi & Associates', 'Verdi Industrial Supplies', 'Gialli Transport'];
+const suppliers = [
+  'Rossi Construction',
+  'Bianchi & Associates',
+  'Verdi Industrial Supplies',
+  'Gialli Transport',
+];
 
 // 10,000 invoices: only the rows around the visible ones are in the DOM.
 const invoices: Invoice[] = Array.from({ length: 10_000 }, (_, index) => ({
@@ -32,23 +37,48 @@ export function InvoiceArchive() {
     () => [
       { id: 'number', header: 'Number', accessor: (row) => row.number, width: 130 },
       { id: 'supplier', header: 'Supplier', accessor: (row) => row.supplier, minWidth: 200 },
-      { id: 'amount', header: 'Amount', accessor: (row) => row.amount, cell: (row) => `€ ${row.amount.toFixed(2)}`, align: 'end', width: 130 },
-      { id: 'status', header: 'Status', accessor: (row) => (row.status === 'pending' ? 'To approve' : 'Approved'), width: 130 },
+      {
+        id: 'amount',
+        header: 'Amount',
+        accessor: (row) => row.amount,
+        cell: (row) => `€ ${row.amount.toFixed(2)}`,
+        align: 'end',
+        width: 130,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        accessor: (row) => (row.status === 'pending' ? 'To approve' : 'Approved'),
+        width: 130,
+      },
     ],
     [],
   );
-  // The same state hook as the Free `ListReport`: filters, search, sorting and selection work on all the rows.
-  const table = useListReport({ rows: invoices, columns, getRowId: (row) => row.id, filters, selectable: true });
+  // The same state hook as the Free `ListReport`: filters, search, sorting and selection work on all
+  // the rows.
+  const table = useListReport({
+    rows: invoices,
+    columns,
+    getRowId: (row) => row.id,
+    filters,
+    selectable: true,
+  });
   // Scrolls to a row by id, also when it is far from the mounted ones.
   const handle = useRef<VirtualListReportTableHandle>(null);
   const last = invoices[invoices.length - 1];
 
   // A parent with a bounded height: the table scrolls, not the page. Shift-click selects a range of rows.
-  // The height follows the viewport (at least 20rem, at most 40rem, always 4rem short of the viewport so the page
-  // can still be scrolled by a touch that starts outside the example). `maxHeight` repeats it in `dvh`, which
-  // follows a phone's address bar; a browser without `dvh` drops that line and keeps the `vh` height.
+  // The height follows the viewport (at least 20rem, at most 40rem, always 4rem short of the viewport
+  // so the page can still be scrolled by a touch that starts outside the example). `maxHeight` repeats it
+  // in `dvh`, which follows a phone's address bar; a browser without `dvh` drops that line and keeps the
+  // `vh` height.
   return (
-    <div style={{ height: 'clamp(20rem, calc(100vh - 4rem), 40rem)', maxHeight: 'clamp(20rem, calc(100dvh - 4rem), 40rem)' }}>
+    <div
+      style={{
+        height: 'clamp(20rem, calc(100vh - 4rem), 40rem)',
+        maxHeight: 'clamp(20rem, calc(100dvh - 4rem), 40rem)',
+      }}
+    >
       <VirtualListReport
         title="Invoices"
         table={table}
@@ -57,7 +87,10 @@ export function InvoiceArchive() {
         searchLabel="Search invoices"
         actions={
           last && (
-            <Button variant="secondary" onClick={() => handle.current?.scrollToRowId(last.id, { align: 'center' })}>
+            <Button
+              variant="secondary"
+              onClick={() => handle.current?.scrollToRowId(last.id, { align: 'center' })}
+            >
               Go to {last.number}
             </Button>
           )

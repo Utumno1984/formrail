@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { Button, Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@formrail/core';
+import {
+  Button,
+  Menu,
+  MenuContent,
+  MenuGroup,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  MenuTrigger,
+} from '@formrail/core';
 
 export function InvoiceActionsMenu() {
   const [last, setLast] = useState('');
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 24 }}>
-      {/* Closed until the trigger opens it (click, Enter, Space or ArrowDown). Arrow keys move between the items,
-          Escape closes it and returns the focus to the trigger. */}
+      {/* Closed until the trigger opens it (click, Enter, Space or ArrowDown). Arrow keys move between the
+          items, Escape closes it and returns the focus to the trigger. */}
       <Menu>
         <MenuTrigger asChild>
           <Button variant="secondary">More actions</Button>

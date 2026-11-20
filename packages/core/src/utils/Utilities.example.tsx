@@ -2,7 +2,8 @@ import { forwardRef, useRef, useState, type ComponentPropsWithoutRef } from 'rea
 import { cn, composeRefs } from '@formrail/core';
 
 // composeRefs: the component needs its own ref on the input AND must pass on the `ref` it is given.
-const MeasuredInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'input'>>(function MeasuredInput(props, ref) {
+type InputProps = ComponentPropsWithoutRef<'input'>;
+const MeasuredInput = forwardRef<HTMLInputElement, InputProps>(function MeasuredInput(props, ref) {
   const own = useRef<HTMLInputElement>(null);
   const [width, setWidth] = useState<number | null>(null);
   return (
@@ -21,7 +22,8 @@ export function UtilitiesExample({ isCode = true }: { isCode?: boolean }) {
   return (
     <div style={{ display: 'grid', gap: 16, justifyItems: 'start' }}>
       {/* cn: clsx syntax, and conflicting Tailwind classes are resolved (the last one wins). A component that
-          accepts a `className` puts its own classes first and the caller's after, so the caller can override. */}
+          accepts a `className` puts its own classes first and the caller's after, so the caller can
+          override. */}
       <code>{cn('px-2 py-1', 'px-4')}</code>
       <code>{cn('text-rop-body', 'text-rop-error', { 'font-rop-mono': isCode })}</code>
 

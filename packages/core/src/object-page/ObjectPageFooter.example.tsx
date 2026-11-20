@@ -1,4 +1,13 @@
-import { Button, Field, Input, ObjectPage, ObjectPageFooter, ObjectPageHeader, ObjectPageSection, useObjectPageForm } from '@formrail/core';
+import {
+  Button,
+  Field,
+  Input,
+  ObjectPage,
+  ObjectPageFooter,
+  ObjectPageHeader,
+  ObjectPageSection,
+  useObjectPageForm,
+} from '@formrail/core';
 
 interface Invoice {
   customer: string;
@@ -27,10 +36,16 @@ export function EditInvoice() {
         <ObjectPageSection id="general" title="General">
           <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
             <Field label="Customer" name="customer">
-              <Input value={form.values.customer} onChange={(event) => form.setValue('customer', event.target.value)} />
+              <Input
+                value={form.values.customer}
+                onChange={(event) => form.setValue('customer', event.target.value)}
+              />
             </Field>
             <Field label="Reference" name="reference">
-              <Input value={form.values.reference} onChange={(event) => form.setValue('reference', event.target.value)} />
+              <Input
+                value={form.values.reference}
+                onChange={(event) => form.setValue('reference', event.target.value)}
+              />
             </Field>
           </div>
         </ObjectPageSection>

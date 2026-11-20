@@ -53,7 +53,12 @@ export function InvoiceEditor({ onBack }: { onBack: () => void }) {
           }
         />
         {/* Shown while dirty or invalid; the summary ("2 fields need attention") sits in the bar itself. */}
-        <ObjectPageFooter visible={form.isDirty || summary !== undefined} label="Save actions" message={summary} messageTone="error">
+        <ObjectPageFooter
+          visible={form.isDirty || summary !== undefined}
+          label="Save actions"
+          message={summary}
+          messageTone="error"
+        >
           <Button variant="primary" onClick={() => void form.save(saveInvoice)}>
             Save
           </Button>
@@ -65,10 +70,16 @@ export function InvoiceEditor({ onBack }: { onBack: () => void }) {
           <ValidationProvider fieldErrors={form.fieldErrors}>
             <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
               <Field label="Customer" name="customer" required>
-                <Input value={form.values.customer} onChange={(event) => form.setValue('customer', event.target.value)} />
+                <Input
+                  value={form.values.customer}
+                  onChange={(event) => form.setValue('customer', event.target.value)}
+                />
               </Field>
               <Field label="Reference" name="reference" required>
-                <Input value={form.values.reference} onChange={(event) => form.setValue('reference', event.target.value)} />
+                <Input
+                  value={form.values.reference}
+                  onChange={(event) => form.setValue('reference', event.target.value)}
+                />
               </Field>
             </div>
           </ValidationProvider>

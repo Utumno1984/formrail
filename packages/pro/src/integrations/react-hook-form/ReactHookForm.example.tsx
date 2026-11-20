@@ -17,7 +17,8 @@ const fields: { name: keyof Invoice; label: string }[] = [
 ];
 
 // Your API. Here: the server stores what it receives, half a second later.
-const saveInvoice = (values: Invoice) => new Promise<Invoice>((resolve) => setTimeout(() => resolve(values), 500));
+const saveInvoice = (values: Invoice) =>
+  new Promise<Invoice>((resolve) => setTimeout(() => resolve(values), 500));
 
 export function InvoiceWithReactHookForm() {
   const form = useForm<Invoice>({ defaultValues: saved });
@@ -26,11 +27,13 @@ export function InvoiceWithReactHookForm() {
   const { entries, isEmpty } = useChangeSummary({ values: binding.values, baseline: binding.baseline });
   const { rebase, conflicts, keepMine, acceptTheirs, isPending } = useFormRebase(binding);
 
-  // Save: the stored record becomes the baseline, inside the handler, so an update queued meanwhile merges against it.
+  // Save: the stored record becomes the baseline, inside the handler, so an update queued meanwhile
+  // merges against it.
   const save = form.handleSubmit(async (values) => binding.reset(await saveInvoice(values)));
 
   // A newer version of the record, saved meanwhile by someone else (a poll, a push message, a 409 response).
-  const receiveServerVersion = () => rebase({ ...binding.baseline, supplier: 'Rossi Construction Ltd', amount: '1350' });
+  const receiveServerVersion = () =>
+    rebase({ ...binding.baseline, supplier: 'Rossi Construction Ltd', amount: '1350' });
 
   return (
     <form onSubmit={save} style={{ display: 'grid', gap: 12, maxWidth: 480 }}>
@@ -52,7 +55,11 @@ export function InvoiceWithReactHookForm() {
         </button>
       </div>
       {/* The save bar and the dirty guard follow the summary, not `formState.isDirty`. */}
-      <p role="status">{[isEmpty ? 'All saved' : 'Unsaved changes', isPending ? 'server update queued' : ''].filter(Boolean).join(', ')}</p>
+      <p role="status">
+        {[isEmpty ? 'All saved' : 'Unsaved changes', isPending ? 'server update queued' : '']
+          .filter(Boolean)
+          .join(', ')}
+      </p>
       {isEmpty ? (
         <p>No changes</p>
       ) : (
@@ -63,10 +70,21 @@ export function InvoiceWithReactHookForm() {
         </ul>
       )}
       {conflicts.map((conflict) => (
-        <div key={conflict.path} role="group" aria-label={`Conflict on ${conflict.label}`} style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <span>{`${conflict.label}: yours ${String(conflict.mine)}, server ${String(conflict.theirs)}`}</span>
-          <button type="button" onClick={() => acceptTheirs(conflict.path)}>{`Accept server value for ${conflict.label}`}</button>
-          <button type="button" onClick={() => keepMine(conflict.path)}>{`Keep my value for ${conflict.label}`}</button>
+        <div
+          key={conflict.path}
+          role="group"
+          aria-label={`Conflict on ${conflict.label}`}
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
+        >
+          <span>
+            {`${conflict.label}: yours ${String(conflict.mine)}, server ${String(conflict.theirs)}`}
+          </span>
+          <button type="button" onClick={() => acceptTheirs(conflict.path)}>
+            {`Accept server value for ${conflict.label}`}
+          </button>
+          <button type="button" onClick={() => keepMine(conflict.path)}>
+            {`Keep my value for ${conflict.label}`}
+          </button>
         </div>
       ))}
     </form>

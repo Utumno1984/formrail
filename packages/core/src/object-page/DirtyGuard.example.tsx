@@ -9,7 +9,18 @@ export function GuardedEditor() {
   // While `when` is true, `guard(action)` asks first; Back/Forward and a reload are intercepted too.
   const { guard, dialog } = useDirtyGuard({ when: name !== saved });
 
-  if (left) return <Button onClick={() => { setName(saved); setLeft(false); }}>Open the supplier again</Button>;
+  if (left) {
+    return (
+      <Button
+        onClick={() => {
+          setName(saved);
+          setLeft(false);
+        }}
+      >
+        Open the supplier again
+      </Button>
+    );
+  }
   return (
     <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
       <Field label="Supplier name" name="name">

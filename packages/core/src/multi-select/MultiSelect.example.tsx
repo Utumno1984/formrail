@@ -14,7 +14,12 @@ export function CostCentersMultiSelect() {
   return (
     <div style={{ display: 'grid', gap: 8, maxWidth: 320 }}>
       <Field label="Cost centers" help="Where the invoice is charged.">
-        <MultiSelect options={COST_CENTERS} value={centers} onValueChange={setCenters} placeholder="Add a cost center" />
+        <MultiSelect
+          options={COST_CENTERS}
+          value={centers}
+          onValueChange={setCenters}
+          placeholder="Add a cost center"
+        />
       </Field>
       <output>{centers.length} selected</output>
     </div>

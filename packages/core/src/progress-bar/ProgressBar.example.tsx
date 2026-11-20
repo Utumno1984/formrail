@@ -19,7 +19,11 @@ export function UploadProgress() {
     <div style={{ display: 'grid', gap: 12, width: 360, maxWidth: '100%' }}>
       {/* `label` is the bar's accessible name. The bar is not a live region: announce completion yourself
           (here, the status line below). */}
-      <ProgressBar label="Uploading invoices" value={progress} tone={progress === 100 ? 'success' : 'primary'} />
+      <ProgressBar
+        label="Uploading invoices"
+        value={progress}
+        tone={progress === 100 ? 'success' : 'primary'}
+      />
       <div>
         <Button variant="secondary" onClick={start}>
           Start upload

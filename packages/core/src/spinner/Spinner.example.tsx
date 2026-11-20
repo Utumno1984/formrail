@@ -23,7 +23,15 @@ export function RefreshPanel() {
       </div>
       {/* The spinner announces "Loading" in its own status region and rotates only when the user has
           not asked for reduced motion. The panel keeps its height whatever it shows. */}
-      <div aria-busy={loading} style={{ minHeight: 56, padding: 12, border: '1px solid var(--color-rop-border-subtle)', borderRadius: 8 }}>
+      <div
+        aria-busy={loading}
+        style={{
+          minHeight: 56,
+          padding: 12,
+          border: '1px solid var(--color-rop-border-subtle)',
+          borderRadius: 8,
+        }}
+      >
         {loading ? <Spinner /> : null}
         {!loading && rows ? (
           <ul style={{ margin: 0, paddingInlineStart: 20 }}>
