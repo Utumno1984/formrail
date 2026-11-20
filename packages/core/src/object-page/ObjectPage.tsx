@@ -20,6 +20,7 @@ import {
   type ObjectPageSectionInfo,
 } from './ObjectPageContext';
 import { footerSlotClass, rootClass, scrollerClass, scrollerStyle } from './object-page-styles';
+import { useFocusNotObscured } from './use-focus-not-obscured';
 
 export type ObjectPageProps = HTMLAttributes<HTMLDivElement> & {
   /** Level of the header's title (1-4); the sections' titles get the next one. */
@@ -56,6 +57,8 @@ export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageP
   const [footerSlot, setFooterSlot] = useState<HTMLDivElement | null>(null);
   const entries = useRef(new Map<string, ObjectPageSectionEntry>());
   const [sections, setSections] = useState<readonly ObjectPageSectionInfo[]>([]);
+  // Tab never leaves a control under the sticky Anchor Bar or past the bottom edge (see the scroller's class).
+  useFocusNotObscured(scrollerRef);
 
   // Recomputes the list in DOM order (the order of mounting says nothing about it) and keeps the previous
   // array when nothing changed, so a re-render of the page does not ripple through the consumers.
