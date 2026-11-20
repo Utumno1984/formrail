@@ -18,6 +18,7 @@ import {
   NOTHING_LEFT_DESCRIPTION,
   OverwrittenChanges,
   REVIEW_LOCALE,
+  ReviewAnnouncer,
   createReviewSource,
   reviewDescription,
   sameConflicts,
@@ -90,6 +91,14 @@ function productToAdd(order: StoredSalesOrder) {
  * The change of another user, as a function of the order the server holds when it lands. `newLineId` gives the id of
  * the line `add-line` adds: an id the server issues (see {@link serverLineIds}), so it never collides with a line the
  * user added in the editor and has not saved yet (`new-<n>`, made by the client).
+ *
+ * Idempotent (#583): the FIRST call fixes what the other user wrote, from the order it gets (the server's when the
+ * update lands): the next status and the delivery a week later, the quantity of the first line plus one, which line is
+ * removed (by id), the line added (its product and its id). A later call writes those same values, whatever order it
+ * gets: when the update lands during a save, the store applies it again on top of what the save wrote, and the result
+ * is what the server announced, never a value computed from the user's (their delivery plus a week, another product
+ * under the same `srv-line-<n>`, a second line added). Lines are found by id, never by position. One call of this
+ * function is one update: two clicks on "Simulate server update" are two updates, each from the order of its time.
  */
 export function serverChangeOf(
   kind: Exclude<SalesOrderServerChangeKind, 'delete-order'>,
@@ -97,23 +106,43 @@ export function serverChangeOf(
     throw new Error('sales-order-rebase: `add-line` needs a line id');
   },
 ): (order: StoredSalesOrder) => StoredSalesOrder {
+  let write: ((order: StoredSalesOrder) => StoredSalesOrder) | undefined;
+  return (order) => {
+    write ??= writeOf(kind, order, newLineId);
+    return write(order);
+  };
+}
+
+const unchanged = (order: StoredSalesOrder): StoredSalesOrder => order;
+
+/** What the other user writes, fixed from `first` (the order the update landed on), as a function of any order. */
+function writeOf(
+  kind: Exclude<SalesOrderServerChangeKind, 'delete-order'>,
+  first: StoredSalesOrder,
+  newLineId: () => string,
+): (order: StoredSalesOrder) => StoredSalesOrder {
   switch (kind) {
-    case 'line-1-quantity':
-      return (o) => ({ ...o, lines: o.lines.map((line, i) => (i === 0 ? { ...line, quantity: line.quantity + 1 } : line)) });
-    case 'remove-line-1':
-      return (o) => ({ ...o, lines: o.lines.slice(1) });
-    case 'add-line':
-      return (o) => {
-        const product = productToAdd(o);
-        const line: StoredOrderLine = { id: newLineId(), productId: product.id, quantity: 1, unitPriceMinor: product.listPriceMinor[o.currency], discountPercent: 0 };
-        return { ...o, lines: [...o.lines, line] };
-      };
-    default:
-      return (o) => ({
-        ...o,
-        status: NEXT_STATUS[o.status],
-        requestedDeliveryDate: addDays(o.requestedDeliveryDate, DELIVERY_SHIFT_DAYS) ?? o.requestedDeliveryDate,
-      });
+    case 'line-1-quantity': {
+      const target = first.lines[0];
+      if (!target) return unchanged;
+      const quantity = target.quantity + 1;
+      return (o) => ({ ...o, lines: o.lines.map((line) => (line.id === target.id ? { ...line, quantity } : line)) });
+    }
+    case 'remove-line-1': {
+      const target = first.lines[0];
+      if (!target) return unchanged;
+      return (o) => ({ ...o, lines: o.lines.filter((line) => line.id !== target.id) });
+    }
+    case 'add-line': {
+      const product = productToAdd(first);
+      const added: StoredOrderLine = { id: newLineId(), productId: product.id, quantity: 1, unitPriceMinor: product.listPriceMinor[first.currency], discountPercent: 0 };
+      return (o) => (o.lines.some((line) => line.id === added.id) ? o : { ...o, lines: [...o.lines, { ...added }] });
+    }
+    default: {
+      const status = NEXT_STATUS[first.status];
+      const requestedDeliveryDate = addDays(first.requestedDeliveryDate, DELIVERY_SHIFT_DAYS) ?? first.requestedDeliveryDate;
+      return (o) => ({ ...o, status, requestedDeliveryDate });
+    }
   }
 }
 
@@ -139,6 +168,11 @@ export const REMOVED_HELP = 'Removed on the server.';
 export const DELETED_TITLE = 'This sales order was deleted on the server';
 export const DELETED_TEXT = 'Your changes are still in the form, but they can no longer be saved. Copy what you need, then go back to the list.';
 export const DELETED_REVIEW_DESCRIPTION = 'This sales order was deleted on the server: these changes can no longer be saved.';
+/**
+ * #583: why "Save changes" of the review cannot be used once the order is deleted on the server (the reason the button
+ * is described by). Short, about the button: the dialog's description already says what happened to the changes.
+ */
+export const DELETED_SAVE_REASON = 'Unavailable: this sales order no longer exists on the server.';
 export { OVERWRITE_TITLE } from './record-integrity';
 
 /** The notice sits above the page (outside its padded scroller): the same side margins as the page's content. */
@@ -152,25 +186,36 @@ interface ReviewState {
   deleted: boolean;
 }
 
-/** The description of the review, recomputed when the form changes under the dialog. */
-function ReviewDescription({ source }: { source: ReviewSource<ReviewState> }) {
-  const { context, deleted } = useReview(source);
-  if (deleted) return <>{DELETED_REVIEW_DESCRIPTION}</>;
+/** The text of the review's description, for the state the dialog reads (#583: also what its live region says). */
+export function reviewDescriptionText({ context, deleted }: Pick<ReviewState, 'context' | 'deleted'>): string {
+  if (deleted) return DELETED_REVIEW_DESCRIPTION;
   const { entries, reorders } = salesOrderReview(context);
-  if (entries.length > 0) return <>{reviewDescription(entries.length)}</>;
-  return <>{reorders.length > 0 ? ORDER_ONLY_DESCRIPTION : NOTHING_LEFT_DESCRIPTION}</>;
+  if (entries.length > 0) return reviewDescription(entries.length);
+  return reorders.length > 0 ? ORDER_ONLY_DESCRIPTION : NOTHING_LEFT_DESCRIPTION;
 }
 
-/** The body of the review: the server changes the save would overwrite, then the changes to save. */
+/** The description of the review, recomputed when the form changes under the dialog. */
+function ReviewDescription({ source }: { source: ReviewSource<ReviewState> }) {
+  return <>{reviewDescriptionText(useReview(source))}</>;
+}
+
+/**
+ * The body of the review: the server changes the save would overwrite, then the changes to save; first, the live
+ * region that says the new description when it changes while the dialog is open (#583).
+ */
 function ReviewBody({ source }: { source: ReviewSource<ReviewState> }) {
-  const { context, conflicts } = useReview(source);
+  const state = useReview(source);
+  const { context, conflicts } = state;
   const { entries, reorders } = salesOrderReview(context);
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      <OverwrittenChanges conflicts={conflicts} />
-      {entries.length > 0 ? <SalesOrderChanges entries={entries} currency={context.baseline.currency} /> : null}
-      {reorders.length > 0 && entries.length > 0 ? <p style={{ margin: 0 }}>{ORDER_ALSO_NOTE}</p> : null}
-    </div>
+    <>
+      <ReviewAnnouncer text={reviewDescriptionText(state)} />
+      <div style={{ display: 'grid', gap: 12 }}>
+        <OverwrittenChanges conflicts={conflicts} />
+        {entries.length > 0 ? <SalesOrderChanges entries={entries} currency={context.baseline.currency} /> : null}
+        {reorders.length > 0 && entries.length > 0 ? <p style={{ margin: 0 }}>{ORDER_ALSO_NOTE}</p> : null}
+      </div>
+    </>
   );
 }
 
@@ -292,6 +337,10 @@ export function useSalesOrderRebase({ form, record, store, toValues, scrollerRef
     ) : null,
     fieldHelp,
     reviewSave,
+    // #583: one source, the deletion the store announced, whenever it landed: before Save was pressed (the review
+    // opens with "Save changes" unavailable) or while the review is open (the button turns unavailable under it).
+    // Read by the shell at every render, so both reach the dialog the same way; never a "not found" from a save.
+    confirmDisabledReason: deleted ? DELETED_SAVE_REASON : undefined,
   };
 }
 

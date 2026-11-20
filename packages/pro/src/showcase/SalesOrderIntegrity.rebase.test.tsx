@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { formatDate, getProduct } from '../../../core/src/internal/demo-data';
 import { createSalesOrderStore, type StoredSalesOrder } from '../../../core/src/showcase/sales-order-store';
-import { CONFLICT_HELP, DELETED_REVIEW_DESCRIPTION, NOTICE_TITLE, REMOVED_HELP, serverChangeOf, serverLineIds } from './sales-order-rebase';
+import { CONFLICT_HELP, DELETED_REVIEW_DESCRIPTION, DELETED_SAVE_REASON, NOTICE_TITLE, REMOVED_HELP, serverChangeOf, serverLineIds } from './sales-order-rebase';
 import {
   LINES_ORDER,
   ORDER,
@@ -285,7 +285,14 @@ describe('Record editing integrity, sales orders: a save in flight, a deleted or
     expect(store.snapshot().some((o) => o.id === ORDER)).toBe(false);
     await userEvent.click(await saveButton());
     await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Save changes' }));
-    await waitFor(() => expect(footer()).toHaveTextContent('not found'));
+    // #583, decision of Daniele (option A): "Save changes" is there but unavailable, described by the reason; no save.
+    const confirmButton = within(await reviewDialog()).getByRole('button', { name: 'Save changes' });
+    expect(confirmButton).toHaveAttribute('aria-disabled', 'true');
+    expect(confirmButton).toHaveAccessibleDescription(DELETED_SAVE_REASON);
+    expect(footer()).not.toHaveTextContent('not found');
+    // The review stays open (nothing was confirmed): back to the form, which the modal dialog hides meanwhile.
+    await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Review changes' })).toBeNull());
     expect(textbox('Customer reference').value).toBe('PO-lost');
   }, 30_000);
 

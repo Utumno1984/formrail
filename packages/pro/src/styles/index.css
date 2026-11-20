@@ -83,22 +83,55 @@
     @apply sr-only;
   }
 
+  /* The badge of the kind of change: a tint of the kind's token (12% on the box surface) behind text
+     mixed 45% with black, so the contrast stays above 4.5:1 for the default tokens and for a
+     redeclared `--color-rop-primary` (measured by ChangeSummary.kind-contrast.test.ts), plus a
+     decorative shape drawn in CSS (no node, no extra JS): `+` added, `-` removed, a diamond changed.
+     Left `inline` on purpose: an inline-block makes Chromium put a space around it in the accessible
+     name (`Amount, changed , from`). A one-word kind moves to the next line whole; a long custom text
+     wraps between words, and anywhere as a last resort, so it never leaves the box.
+     The icon is out of the text flow (absolute, in the left padding of the first line): an inline-block
+     next to the text would leave a break opportunity between the two, and the shape could end a line
+     with its word on the next. Padding and icon belong to the first fragment, so they never split.
+     Trade-off: when a long custom label wraps onto more lines, only the first line has the leading
+     padding, the next lines restart flush with the badge edge. Accepted over repeating the padding
+     (`box-decoration-break: clone` would also repeat the icon space and the outline).
+     Logical properties (ms/pe/ps/start): the icon follows the reading direction (right in RTL). */
   .rop-pro-change-summary__kind {
-    @apply ml-2 px-1 text-rop-caption capitalize;
+    @apply relative ms-2 rounded-rop-sm pe-1 ps-[calc(0.5rem+0.75em)] text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
+    background-color: color-mix(in srgb, var(--_cs-tone) 12%, var(--color-rop-surface));
+    color: color-mix(in srgb, var(--_cs-tone) 45%, black);
+    /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
     outline: 1px solid currentColor;
     outline-offset: -1px;
+
+    &::before {
+      @apply absolute top-[0.2em] start-1 size-[0.75em];
+      content: '';
+      background-color: currentColor;
+      clip-path: var(--_cs-shape);
+    }
+  }
+
+  @media (forced-colors: active) {
+    .rop-pro-change-summary__kind::before {
+      background-color: CanvasText;
+    }
   }
 
   .rop-pro-change-summary__kind--added {
-    @apply text-rop-success;
+    --_cs-tone: var(--color-rop-success);
+    --_cs-shape: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
   }
 
   .rop-pro-change-summary__kind--removed {
-    @apply text-rop-error;
+    --_cs-tone: var(--color-rop-error);
+    --_cs-shape: polygon(0 35%, 100% 35%, 100% 65%, 0 65%);
   }
 
   .rop-pro-change-summary__kind--changed {
-    @apply text-rop-primary;
+    --_cs-tone: var(--color-rop-primary);
+    --_cs-shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   }
 
   /* Before / after: stacked on a narrow container, on one row from `@md` (28rem) up. */

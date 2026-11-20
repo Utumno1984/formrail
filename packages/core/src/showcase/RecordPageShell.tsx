@@ -7,6 +7,7 @@
 // a loading state, never an editor that is hydrated afterwards (no render with empty values before the data).
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { Button } from '../button/Button';
+import { ConfirmDialog } from '../confirm-dialog/ConfirmDialog';
 import { useConfirmDialog, type ConfirmOptions } from '../confirm-dialog/use-confirm-dialog';
 import { ValidationProvider } from '../field/ValidationContext';
 import { getErrorSummary } from '../object-page/error-summary';
@@ -29,10 +30,14 @@ export interface RecordSaveReviewContext<V> {
   baseline: V;
 }
 
-/** The review dialog: the options of the editor's `confirm()` (#344) that the reviewer chooses. */
+/**
+ * The review dialog: the options of the editor's confirmation (#344) that the reviewer chooses. `confirmDisabledReason`
+ * (#583): "Save changes" cannot be used, for this reason, when the review opens (see also the live
+ * `RecordEditorAddons.confirmDisabledReason`).
+ */
 export type RecordSaveReview = Pick<
   ConfirmOptions,
-  'title' | 'description' | 'confirmLabel' | 'cancelLabel' | 'tone' | 'initialFocus' | 'children'
+  'title' | 'description' | 'confirmLabel' | 'cancelLabel' | 'tone' | 'initialFocus' | 'confirmDisabledReason' | 'children'
 >;
 
 /** Builds the review of a save, or `null` to save without one (nothing to review). */
@@ -63,6 +68,13 @@ export interface RecordEditorAddons<V> {
   fieldHelp?: (path: string) => ReactNode;
   /** Replaces the `reviewSave` prop. */
   reviewSave?: RecordSaveReviewer<V>;
+  /**
+   * #583: why the review dialog's "Save changes" cannot save right now (the record was deleted on the server). Read at
+   * every render, so it also reaches a review that is ALREADY open (what `reviewSave` returns is fixed when Save is
+   * pressed): the button turns `aria-disabled`, described by it, and confirms nothing. Wins over the review's own
+   * `confirmDisabledReason`; `undefined` leaves that one.
+   */
+  confirmDisabledReason?: ReactNode;
 }
 
 /**
@@ -85,6 +97,8 @@ export interface RecordAddons<T extends { id: string }, V extends object, D> {
 }
 
 const NO_ADDONS = {};
+/** The review dialog before the first review (never shown: a closed dialog renders nothing). */
+const NO_REVIEW: RecordSaveReview = { title: '', confirmLabel: 'Save changes' };
 function useNoAddons<V>(): RecordEditorAddons<V> {
   return NO_ADDONS;
 }
@@ -286,6 +300,11 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   const [deleted, setDeleted] = useState(false);
   const deleteBusy = deleting || deleted;
   const [confirm, confirmDialog] = useConfirmDialog();
+  // #583: the review of a save has a dialog of its own, controlled here (not `confirm()`, whose options are fixed when
+  // it is called): what the add-ons say at every render (`confirmDisabledReason`) reaches it while it is open. Always
+  // rendered, closed until the first review (a dialog mounted open has no opener to give the focus back to); the
+  // review stays after the close, so the panel animates out with its content.
+  const [review, setReview] = useState<{ options: RecordSaveReview; open: boolean }>({ options: NO_REVIEW, open: false });
   // Mounted hydrated: the baseline is the record (or the defaults of a creation) at the first render.
   const form = useObjectPageForm<V>({
     baseline: record ? definition.toValues(record) : creationDefaults(module, today),
@@ -424,12 +443,9 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
     // none of an invalid form: `commit` then fails the validation exactly as without a review.
     if (form.isSaving) return;
     if (hasErrors(definition.validate(form.values))) return commit();
-    const review = reviewSave({ values: form.values, baseline: form.baseline });
-    if (!review) return commit();
-    // No `onConfirm`: the dialog closes at once and the save shows its progress in the footer, as without it.
-    void confirm(review).then((ok) => {
-      if (ok) commit();
-    });
+    const options = reviewSave({ values: form.values, baseline: form.baseline });
+    if (!options) return commit();
+    setReview({ options, open: true });
   };
   const commit = () => {
     void form.save(async (v) => {
@@ -576,6 +592,17 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
       </ValidationProvider>
       {dialog}
       {confirmDialog}
+      <ConfirmDialog
+        {...review.options}
+        open={review.open}
+        confirmDisabledReason={addons.confirmDisabledReason ?? review.options.confirmDisabledReason}
+        // Synchronous: the dialog closes at once and the save shows its progress in the footer, as without a review.
+        // Never called while "Save changes" is unavailable (`confirmDisabledReason`): the dialog itself ignores it.
+        onConfirm={commit}
+        onOpenChange={(open) => {
+          if (!open) setReview((current) => ({ ...current, open: false }));
+        }}
+      />
     </div>
   );
 }
