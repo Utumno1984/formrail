@@ -16,10 +16,10 @@ const VIEWPORTS = [
 // "Bank details" section included), and the save bar's actions.
 const HEADER_ACTION = 'Edit';
 const FIELDS = [
-  'Invoice number',
-  'Issue date',
-  'Due date',
-  'Order reference',
+  'Order number',
+  'Order date',
+  'Requested delivery',
+  'Requisition reference',
   'Cost center',
   'Project code',
   'Currency',
@@ -196,7 +196,7 @@ for (const [name, viewport] of VIEWPORTS) {
 // Anchor Bar or past the scroller's bottom edge (the save bar below it is shown: the form is dirty).
 type ShowcaseWindow = {
   __ropShowcaseStore?: {
-    snapshot: () => { id: string; number: string }[];
+    snapshot: () => { id: string; number: string; lineItems: unknown[] }[];
     updateFromServer: (id: string, change: (r: object) => object, delayMs?: number) => Promise<unknown>;
   };
 };
@@ -210,15 +210,20 @@ for (const [name, viewport] of VIEWPORTS) {
   }) => {
     await page.setViewportSize(viewport);
     await page.goto(PRO_FIXTURE);
-    await page.getByRole('link', { name: 'FT-2026-0003' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: /FT-2026-0003/ })).toBeVisible();
+    // The first stored record with three lines or more: a long editor.
+    const record = await page.evaluate(() => {
+      const rows = (window as unknown as ShowcaseWindow).__ropShowcaseStore!.snapshot();
+      return rows.find((r) => r.lineItems.length >= 3)!.number;
+    });
+    await page.getByRole('link', { name: record, exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1, name: new RegExp(record) })).toBeVisible();
     await page.getByLabel('Due date', { exact: true }).fill('2026-03-05');
     // Another user changes the same date: a conflict, the notice appears above the scroller.
-    await page.evaluate(() => {
+    await page.evaluate((number) => {
       const store = (window as unknown as ShowcaseWindow).__ropShowcaseStore!;
-      const id = store.snapshot().find((r) => r.number === 'FT-2026-0003')!.id;
+      const id = store.snapshot().find((r) => r.number === number)!.id;
       void store.updateFromServer(id, (r) => ({ ...r, dueDate: '2026-03-12' }));
-    });
+    }, record);
     await expect(page.getByRole('list', { name: 'Conflicts' }).getByRole('listitem')).toHaveCount(1);
     await expect(page.locator('.rop-pro-rebase-notice')).toBeVisible();
 

@@ -319,10 +319,10 @@ export const TextAndWideContent: Story = {
 };
 
 const GENERAL_FIELDS = [
-  'Invoice number',
-  'Issue date',
-  'Due date',
-  'Order reference',
+  'Order number',
+  'Order date',
+  'Requested delivery',
+  'Requisition reference',
   'Cost center',
   'Project code',
   'Currency',
@@ -372,8 +372,8 @@ export const LongForm: Story = {
       <div style={FRAME}>
         <ObjectPage>
           <ObjectPageHeader
-            title="Invoice 2026/0142"
-            subtitle="ACME srl"
+            title="Purchase order PO-2026-0318"
+            subtitle="Harbourline Marine Parts"
             actions={
               <Button variant="secondary" onClick={() => setEditing(true)}>
                 Edit
