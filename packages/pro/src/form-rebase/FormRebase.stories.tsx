@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button, Field, Input, Text, useObjectPageForm } from '@formrail/core';
 import { exampleStory } from '../../../core/src/internal/example-story';
 import { storyControl, storyControls } from '../../../core/src/internal/story-docs';
+import { BESIDE_INPUT } from '../internal/story-layout';
 import type { ChangeSummaryOptions } from '../change-summary/types';
 import { computeRebase } from './compute-rebase';
 import { useFormRebase } from './use-form-rebase';
@@ -317,12 +318,14 @@ function RowConflictsDemo({ onServerUpdate, rowLabels = 'position' }: DemoArgs) 
             <Field label={`Quantity of line ${index + 1}`} name={`lineItems.${index}.quantity`}>
               <Input inputMode="numeric" value={row.quantity} onChange={(event) => update(row.id, { quantity: event.target.value })} />
             </Field>
-            <Button variant="secondary" size="sm" onClick={() => setLines(movedUp(lines, index))} disabled={index === 0}>
-              {`Move line ${index + 1} up`}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setLines(lines.filter((r) => r.id !== row.id))}>
-              {`Remove line ${index + 1}`}
-            </Button>
+            <div style={BESIDE_INPUT} data-testid="row-actions">
+              <Button variant="secondary" size="sm" onClick={() => setLines(movedUp(lines, index))} disabled={index === 0}>
+                {`Move line ${index + 1} up`}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => setLines(lines.filter((r) => r.id !== row.id))}>
+                {`Remove line ${index + 1}`}
+              </Button>
+            </div>
           </li>
         ))}
       </ul>

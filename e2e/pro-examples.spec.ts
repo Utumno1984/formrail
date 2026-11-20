@@ -195,6 +195,19 @@ test.describe('Pro examples on their Docs pages', () => {
     await expect(reminder.locator('code')).toHaveText(["import '@formrail/core/styles.css';", "import '@formrail/pro/styles.css';"]);
   });
 
+  // #610: Storybook's Docs stylesheet gave the spans inside the paragraph 16px under a 14px paragraph.
+  test('the stylesheet reminder has one font size for all its text (#610)', async ({ page }) => {
+    await page.goto('/iframe.html?id=pro-changesummary--docs&viewMode=docs');
+    const reminder = page.locator('.sbdocs-content [data-styles-reminder]');
+    await expect(reminder).toHaveCount(1);
+    const sizes = await reminder.evaluate((p) => ({
+      paragraph: getComputedStyle(p).fontSize,
+      spans: Array.from(p.querySelectorAll('span')).map((s) => getComputedStyle(s).fontSize),
+    }));
+    expect(sizes.spans.length).toBe(2);
+    expect(sizes.spans).toEqual([sizes.paragraph, sizes.paragraph]);
+  });
+
   // The served build is the complete one (playwright.config.ts builds it into storybook-static/): it carries
   // the text of every Pro example. The Free build and the Pro demo are checked in e2e/site/pro-examples.spec.ts.
   test('the complete build carries the text of every Pro example', () => {

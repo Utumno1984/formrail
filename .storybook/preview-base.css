@@ -1,0 +1,23 @@
+/*
+ * Base typography of the story canvas (#610), loaded by .storybook/preview.ts.
+ *
+ * A story renders in an iframe whose `body` has no font of its own, and Storybook's Docs page resets the font
+ * inside `.docs-story` too: any plain element a story renders (`<p>`, `<output>`, `<dd>`, a bare `<button>`)
+ * therefore fell back to the browser default (Times New Roman / Arial). Components of the library set their own
+ * font; this is the root of the CANVAS, the same font a consumer's app sets on its own root, so a story
+ * never needs `font-rop-sans` added by hand.
+ */
+body,
+.docs-story {
+  font-family: var(--font-rop-sans);
+}
+
+/*
+ * Form controls do not inherit the font by default. `:where` keeps the specificity at zero so a component's own class
+ * still wins. The rule covers the story canvas (`#storybook-root`, `.docs-story`) and the portals mounted on `body`
+ * (dialog, tooltip, popover), in story mode and in Docs mode, but NOT the Storybook UI of the Docs page (toolbar,
+ * Controls panel): everything under `.sbdocs` that is not inside `.docs-story` keeps Storybook's own fonts.
+ */
+:where(button, input, select, textarea):where(:not(.sbdocs *), .docs-story *) {
+  font-family: inherit;
+}
