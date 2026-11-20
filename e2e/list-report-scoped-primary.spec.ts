@@ -95,11 +95,12 @@ test.describe('Floorplans/List Report: selection follows a redeclared primary', 
     await expectPlayToPass(page, NO_PLAY);
     const pill = page.locator('[data-rop-count]');
     const rest = await colour(pill);
-    await page.getByRole('radio', { name: 'Open' }).click();
-    await expect(pill).toHaveAttribute('data-changed', '');
     // the flash is short (200ms): poll every frame for the final tinted fill and border
+    // #579: the poll starts BEFORE the click. The final colours hold only between the end of the 120ms
+    // transition and the end of the 200ms flash; a poll started after the click and the `data-changed`
+    // check began, under CPU load, after that window had closed (9/10 runs at load avg ~9).
     const [fill, border] = [tint(VIOLET, 8), tint(VIOLET, 50)];
-    await page.waitForFunction(
+    const tinted = page.waitForFunction(
       ([el, f, b]) => {
         const read = (prop: 'backgroundColor' | 'borderTopColor') => {
           const ctx = document.createElement('canvas').getContext('2d')!;
@@ -113,6 +114,9 @@ test.describe('Floorplans/List Report: selection follows a redeclared primary', 
       [await pill.elementHandle(), fill, border] as const,
       { polling: 'raf', timeout: 2_000 },
     );
+    await page.getByRole('radio', { name: 'Open' }).click();
+    await expect(pill).toHaveAttribute('data-changed', '');
+    await tinted;
     await expect(pill).not.toHaveAttribute('data-changed');
     await expect.poll(() => colour(pill)).toEqual(rest);
   });
