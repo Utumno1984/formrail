@@ -45,6 +45,22 @@ describe('pro style guard: what is rejected', () => {
   });
 });
 
+describe('pro style guard: #486 round 1 (all-digit colours, strings)', () => {
+  it.each(['#000000', '#111', '#123456', '#12345678'])('rejects the colour %s in a .tsx string', (hex) => {
+    expect(rules(TSX, `const c = "${hex}";`)).toEqual(['color-literal']);
+  });
+
+  it('does not ignore strings: a colour inside a style string or template is rejected', () => {
+    expect(rules(TSX, "const s = 'border: 1px solid #abc';")).toEqual(['color-literal']);
+    expect(rules(TSX, 'const s = `color: ${x}; background: #123456`;')).toEqual(['color-literal']);
+  });
+
+  it('an issue reference named by prose stays accepted, a bare quoted number does not', () => {
+    expect(rules(TSX, "const t = 'fixes #486';")).toEqual([]);
+    expect(rules(TSX, "const t = '#486';")).toEqual(['color-literal']);
+  });
+});
+
 describe('pro style guard: what is accepted', () => {
   it.each([
     ['core tokens in var()', CSS, '.a { border: 1px solid var(--color-rop-border); color: var(--color-rop-text); }'],

@@ -4,6 +4,8 @@
 // Runs as a vitest file (`scripts/pro-style-guard.test.mjs`), so `npm run check` and the CI `unit-test` job
 // (`npm run test:unit` -> `test:scripts`) run it; no extra job. Also runnable alone: `node scripts/pro-style-guard.mjs`.
 //
+// Strings are NOT ignored in TS (decision on #486): a colour literal inside a string or template is reported.
+//
 // Scope: `packages/pro/src/**/*.{css,ts,tsx}`, EXCEPT tests, stories, examples, test-kits, the story-only
 // `showcase/` and `test/` folders (those are demos, not what the package ships). Comments are ignored.
 //
@@ -86,8 +88,9 @@ export function checkSource(file, source, tokens) {
   const add = (index, rule, value, message) => found.push({ file, line: lineOf(text, index), rule, value, message });
 
   for (const m of text.matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/g)) {
-    // "#123" (all digits) in TS is an issue reference in text, not a colour.
-    if (kind === 'ts' && /^#\d+$/.test(m[0])) continue;
+    // In TS, an all-digit "#123" is an issue reference only when prose names it ("see ticket #470"); any other
+    // all-digit hex ("#000000", "#111", "#12345678") is a colour. Prefer a comment for references (ignored).
+    if (kind === 'ts' && /^#\d+$/.test(m[0]) && /\b(?:ticket|issue|PR|bug|see|fix(?:es)?|closes)\s+$/i.test(text.slice(0, m.index))) continue;
     add(m.index, 'color-literal', m[0].replace(/\($/, ''), `colour literal "${m[0]}": use a --color-rop-* token`);
   }
 
