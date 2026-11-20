@@ -45,16 +45,15 @@ const px = (value: string): number => {
 export function useFocusNotObscured(scrollerRef: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const scroller = scrollerRef.current;
-    const doc = scroller?.ownerDocument;
-    const view = doc?.defaultView;
-    if (!scroller || !doc || !view || typeof view.requestAnimationFrame !== 'function') return undefined;
+    if (!scroller || typeof requestAnimationFrame !== 'function') return undefined;
+    const doc = scroller.ownerDocument;
     let tabbing = false;
     let frame = 0;
 
     const clear = (target: HTMLElement) => {
       frame = 0;
       if (doc.activeElement !== target || !scroller.contains(target)) return;
-      const style = view.getComputedStyle(target);
+      const style = getComputedStyle(target);
       const delta = clearanceDelta(target.getBoundingClientRect(), scroller.getBoundingClientRect(), {
         top: px(style.scrollMarginTop),
         bottom: px(style.scrollMarginBottom),
@@ -71,10 +70,10 @@ export function useFocusNotObscured(scrollerRef: RefObject<HTMLElement | null>):
     };
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target;
-      if (!tabbing || !(target instanceof view.HTMLElement) || target === scroller) return;
+      if (!tabbing || !(target instanceof HTMLElement) || target === scroller) return;
       if (target.closest(`[${ANCHOR_BAR_ATTR}]`)) return;
-      if (frame) view.cancelAnimationFrame(frame);
-      frame = view.requestAnimationFrame(() => clear(target));
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => clear(target));
     };
 
     doc.addEventListener('keydown', onKeyDown, true);
@@ -84,7 +83,7 @@ export function useFocusNotObscured(scrollerRef: RefObject<HTMLElement | null>):
       doc.removeEventListener('keydown', onKeyDown, true);
       doc.removeEventListener('keyup', onKeyUp, true);
       scroller.removeEventListener('focusin', onFocusIn);
-      if (frame) view.cancelAnimationFrame(frame);
+      if (frame) cancelAnimationFrame(frame);
     };
   }, [scrollerRef]);
 }
