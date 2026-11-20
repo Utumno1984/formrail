@@ -5,9 +5,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { getProduct } from '../../../core/src/internal/demo-data';
-import { SALES_ORDERS_CRUD } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';
-import { RecordPage } from '../../../core/src/showcase/RecordPageShell';
-import { createSalesOrderStore } from '../../../core/src/showcase/sales-order-store';
+import { SALES_ORDERS } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';
+import { createSalesOrderStore, type SalesOrderStore } from '../../../core/src/showcase/sales-order-store';
+import { RecordCrud } from '../../../core/src/showcase/RecordCrud';
 import { salesOrderRebaseAddons, type SalesOrderRebaseOptions } from './sales-order-rebase';
 import { ORDER_ONLY_DESCRIPTION, salesOrderSaveReview } from './sales-order-review';
 import {
@@ -186,30 +186,33 @@ describe('Record editing integrity, sales orders: the review (#522)', () => {
 // #526: the cases of the unit tests of the invoice showcase (InvoicesChangeSummary.test.tsx) that the tests above did
 // not assert as strongly, on the sales orders.
 describe('Record editing integrity, sales orders: the review in the shell (#526, from the invoices)', () => {
-  /** The record page of so-1 under StrictMode (effects run twice), with or without the two add-ons. */
-  function renderStrict({ addons = true } = {}) {
-    const store = createSalesOrderStore();
+  /** The whole CRUD (list, then the record) under StrictMode (effects run twice); the add-ons are those of the story. Both are removed together: the rebase add-on supplies its own review step (sales-order-rebase.tsx, `reviewSave`), so `reviewSave` alone cannot be taken away. */
+  async function renderStrict({ addons = true } = {}) {
     const options = { current: { serverChange: 'status-and-delivery', serverUpdateDelayMs: 0, simulateServerUpdate: true } satisfies SalesOrderRebaseOptions };
     const onSaved = vi.fn();
+    window.history.replaceState(null, '', '/');
     render(
       <StrictMode>
-        <RecordPage
-          module={SALES_ORDERS_CRUD}
-          store={store}
-          recordId={ORDER}
-          onBack={vi.fn()}
+        <RecordCrud
+          module={SALES_ORDERS}
+          history="replace"
+          listLoadDelayMs={0}
+          recordLoadDelayMs={0}
+          saveDelayMs={0}
+          onNavigate={vi.fn()}
           onSaved={onSaved}
-          reviewSave={addons ? salesOrderSaveReview : undefined}
-          useAddons={addons ? salesOrderRebaseAddons(options) : undefined}
+          addons={addons ? { 'sales-orders': { reviewSave: salesOrderSaveReview, useAddons: salesOrderRebaseAddons(options) } } : undefined}
         />
       </StrictMode>,
     );
+    await userEvent.click(await screen.findByRole('link', { name: 'SO-2026-147000001' }));
+    await opened();
+    const store = (window as unknown as { __ropShowcaseStore: SalesOrderStore }).__ropShowcaseStore;
     return { store, onSaved };
   }
 
   it('in StrictMode: Status, Customer reference and Notes + Save: 3 entries in the order of the page, the store NOT called; confirm: ONE save with the edited values, the new baseline is what the store returned', async () => {
-    const { store, onSaved } = renderStrict();
-    await opened();
+    const { store, onSaved } = await renderStrict();
     const save = vi.spyOn(store, 'save');
     await pick(screen.getByRole('combobox', { name: 'Status' }), 'Confirmed');
     await typeInto(textbox('Customer reference'), 'PO-7781');
@@ -248,8 +251,7 @@ describe('Record editing integrity, sales orders: the review in the shell (#526,
   }, 30_000);
 
   it('without the add-ons (the Free shell) Save saves at once, once, with no dialog', async () => {
-    const { store } = renderStrict({ addons: false });
-    await opened();
+    const { store } = await renderStrict({ addons: false });
     const save = vi.spyOn(store, 'save');
     await userEvent.type(textbox('Notes'), '!');
     await userEvent.click(await saveButton());
