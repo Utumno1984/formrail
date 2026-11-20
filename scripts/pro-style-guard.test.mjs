@@ -113,6 +113,42 @@ describe('pro style guard: allowlist', () => {
   });
 });
 
+describe('pro style guard: #486 round 2 (TS style objects, named colours)', () => {
+  it.each([
+    ['outline in a TS style object', TSX, 'const s = { outline: "2px solid red" };', 'outline-color'],
+    ['outlineColor in a TS style object', TSX, 'const s = { outlineColor: "red" };', 'outline-color'],
+    ['outline in a template literal', TSX, 'const s = { outline: `2px solid red` };', 'outline-color'],
+    ['color: red in a TS style object', TSX, "const s = { color: 'red' };", 'named-color'],
+    ['border: 1px solid black', TSX, "const s = { border: '1px solid black' };", 'named-color'],
+    ['background-color in CSS', CSS, '.a { background-color: white; }', 'named-color'],
+    ['a named colour in a box-shadow', CSS, '.a { box-shadow: 0 0 2px red, 0 0 4px blue; }', 'named-color'],
+    ['bg-[red]', TSX, "const c = 'bg-[red] p-4';", 'named-color'],
+    ['shadow-[0_0_4px_red]', TSX, "const c = 'shadow-[0_0_4px_red]';", 'named-color'],
+    ['fill="red" on a JSX attribute', TSX, 'const a = <svg fill="red" />;', 'named-color'],
+    ['color-mix with named colours', CSS, '.a { x: color-mix(in srgb, red 50%, blue); }', 'named-color'],
+  ])('rejects %s', (_name, file, source, rule) => {
+    expect(rules(file, source)).toContain(rule);
+  });
+
+  it('reports every named colour of color-mix', () => {
+    const v = checkSource(CSS, '.a { x: color-mix(in srgb, red 50%, blue); }', TOKENS);
+    expect(v.map((x) => x.value)).toEqual(['red', 'blue']);
+  });
+
+  it.each([
+    ['outline in a TS style object with a core token', TSX, 'const s = { outline: "2px solid var(--color-rop-primary)" };'],
+    ['outline none / currentColor in a TS style object', TSX, "const s = { outline: 'none', outlineColor: 'currentColor' };"],
+    ['whiteSpace: nowrap', TSX, "const s = { whiteSpace: 'nowrap' };"],
+    ['white-space: nowrap', CSS, '.a { white-space: nowrap; }'],
+    ['a Tailwind palette class', TSX, "const c = 'text-red-500 bg-white';"],
+    ['a colour word in prose', TSX, "const t = 'Mark the field red when invalid';"],
+    ['colour keywords and tokens', CSS, '.a { color: inherit; background: transparent; border-color: currentColor; fill: var(--color-rop-text); }'],
+    ['fill="none" and a token in color-mix', TSX, 'const a = <svg fill="none" style={{ x: "color-mix(in srgb, var(--color-rop-primary) 50%, transparent)" }} />;'],
+  ])('accepts %s', (_name, file, source) => {
+    expect(checkSource(file, source, TOKENS)).toEqual([]);
+  });
+});
+
 describe('pro style guard: the repository', () => {
   it('packages/pro/src is clean (with the versioned allowlist)', () => {
     expect(runGuard()).toEqual([]);

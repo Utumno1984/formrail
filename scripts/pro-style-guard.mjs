@@ -13,6 +13,7 @@
 //   color-literal    `#hex`, `rgb(`/`rgba(`, `hsl(`/`hsla(`, `hwb(`, `lab(`, `lch(`, `oklab(`, `oklch(`
 //   radius-literal   a `border-radius` (or `borderRadius`) that is not a `var(--radius-rop-*)`/`inherit`, and `rounded-[...]`
 //   outline-color    an `outline` whose colour is not `var(--color-rop-*)`, `currentColor`, `transparent` or `inherit`
+//   named-color     a CSS named colour (`red`, `black`) in a colour property, `fill`/`stroke`, a `bg-[red]`-style utility or color-mix()
 //   spacing-literal  an arbitrary px/rem spacing utility off the Tailwind scale (`p-[13px]`); `p-4` is fine
 //   unknown-token    a `var(--color-rop-x)` (or `--radius-rop-*`, `--text-rop-*`, ...) that `tokens.css` does not declare
 //   allowlist        an allowlist entry without a reason, or one that no longer matches anything
@@ -30,6 +31,17 @@ const ALLOWLIST = 'scripts/pro-style-guard.allowlist.json';
 const SKIP_FILE = /\.(test|stories|example|test-kit)\.[cm]?[jt]sx?$/;
 const SKIP_DIR = new Set(['showcase', 'test', 'node_modules']);
 const ACCEPTED_COLOR_WORDS = /^(currentcolor|transparent|inherit|initial|unset)$/i;
+// Closed list of the CSS named colours (the keywords currentColor/transparent/inherit/initial/unset/none are not in it).
+const NAMED_COLORS = 'aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen'.split(' ');
+const NAMED_COLOR_RE = new RegExp(`(?<![\\w-])(?:${NAMED_COLORS.join('|')})(?![\\w-])`, 'gi');
+const COLOR_PROPS = [
+  'color', 'background', 'background-color', 'backgroundColor', 'box-shadow', 'boxShadow', 'text-decoration-color',
+  'textDecorationColor', 'caret-color', 'caretColor', 'accent-color', 'accentColor', 'fill', 'stroke', 'column-rule-color',
+  'columnRuleColor',
+  'border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?|-(?:start|end)-(?:start|end))?(?:-color)?',
+  'border(?:Top|Right|Bottom|Left|Block|Inline)?(?:Start|End)?(?:Color)?',
+].join('|');
+const TW_COLOR_UTILITY = '(?:bg|text|border(?:-[trblxyse])?|ring|ring-offset|outline|shadow|fill|stroke|from|via|to|decoration|accent|caret|divide|placeholder)';
 const THEME_NAMESPACE = '(?:color|radius|text|font|z-index|motion|icon|container|animate)';
 
 /** Replace comments with spaces (newlines kept, so line numbers hold). `ts`: also `//`; strings are respected. */
@@ -103,10 +115,42 @@ export function checkSource(file, source, tokens) {
     add(m.index, 'radius-literal', m[0], `arbitrary radius "${m[0]}": use a rounded-rop-* class`);
   }
 
-  for (const m of text.matchAll(/(?<![\w-])outline(?:-color)?\s*:\s*([^;}\n"'`\]]*)/g)) {
+  // `outline: 2px solid red`, `outlineColor: "red"`, `outline: \`...\``: the value may sit inside quotes (TS style objects).
+  for (const m of text.matchAll(/(?<![\w-])outline(?:-color|Color)?\s*:\s*["'`]?([^;}\n"'`\]]*)/g)) {
     const value = m[1].trim();
     if (!value) continue;
     if (!outlineColorOk(value)) add(m.index, 'outline-color', value, `outline "${value}": the colour must be var(--color-rop-*) or currentColor`);
+  }
+
+  // Named colours (`red`, `black`) only where a colour lives: colour properties, fill/stroke, Tailwind arbitrary colour
+  // utilities and color-mix(). Anywhere else ("white-space", `text-red-500`, prose) is not a colour.
+  const seen = new Set();
+  const addNamed = (base, chunk) => {
+    for (const n of chunk.matchAll(NAMED_COLOR_RE)) {
+      const at = base + n.index;
+      if (seen.has(at)) continue;
+      seen.add(at);
+      add(at, 'named-color', n[0].toLowerCase(), `named colour "${n[0]}": use a --color-rop-* token`);
+    }
+  };
+  const propValue = kind === 'css' ? '([^;}\\]]*)' : `(?:"([^"\\n]*)"|'([^'\\n]*)'|\`([^\`]*)\`|([^;},"'\`\\]\\n]*))`;
+  for (const m of text.matchAll(new RegExp(`(?<![\\w-])(?:${COLOR_PROPS})\\s*:\\s*${propValue}`, 'g'))) {
+    const value = m.slice(1).find((g) => g !== undefined);
+    if (value) addNamed(m.index + m[0].lastIndexOf(value), value);
+  }
+  for (const m of text.matchAll(/(?<![\w-])(?:fill|stroke)\s*=\s*\{?\s*["'`]([^"'`]*)["'`]/g)) {
+    addNamed(m.index + m[0].indexOf(m[1]), m[1]);
+  }
+  for (const m of text.matchAll(new RegExp(`(?<![\\w])-?${TW_COLOR_UTILITY}-\\[([^\\]]*)\\]`, 'g'))) {
+    // `_` is a space in a Tailwind arbitrary value; swap it for a space so word boundaries hold (same length)
+    addNamed(m.index + m[0].indexOf('[') + 1, m[1].replace(/_/g, ' ').replace(/url\([^)]*\)/g, (u) => ' '.repeat(u.length)));
+  }
+  for (const m of text.matchAll(/color-mix\(/g)) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    const start = i;
+    for (; i < text.length && depth > 0; i++) depth += text[i] === '(' ? 1 : text[i] === ')' ? -1 : 0;
+    addNamed(start, text.slice(start, i));
   }
 
   for (const m of text.matchAll(/(?<![\w-])-?(?:p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|gap|gap-x|gap-y|space-x|space-y)-\[[^\]]*\d(?:px|rem)[^\]]*\]/g)) {
