@@ -12,7 +12,12 @@ body,
   font-family: var(--font-rop-sans);
 }
 
-/* Form controls do not inherit the font by default; `:where` keeps the specificity at zero so a component's own class still wins. */
-:where(.docs-story, body) :where(button, input, select, textarea) {
+/*
+ * Form controls do not inherit the font by default. `:where` keeps the specificity at zero so a component's own class
+ * still wins. The rule covers the story canvas (`#storybook-root`, `.docs-story`) and the portals mounted on `body`
+ * (dialog, tooltip, popover), in story mode and in Docs mode, but NOT the Storybook UI of the Docs page (toolbar,
+ * Controls panel): everything under `.sbdocs` that is not inside `.docs-story` keeps Storybook's own fonts.
+ */
+:where(button, input, select, textarea):where(:not(.sbdocs *), .docs-story *) {
   font-family: inherit;
 }
