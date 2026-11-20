@@ -118,28 +118,29 @@ test.describe('Primitives copy-paste examples', () => {
     await gotoStory(page, 'primitives-messagestrip--example');
     const wrapper = page.getByTestId('notice');
     const show = page.getByRole('button', { name: 'Show the notice again' });
-    // Record the outline of every wrapper the moment it enters the DOM, before the example moves the focus to it.
+    // Record the outline the wrapper has at the moment the example moves the focus to it (before it takes it).
     await page.evaluate(() => {
       const seen: string[] = [];
       (window as unknown as { __rings: string[] }).__rings = seen;
-      new MutationObserver((records) => {
-        for (const node of records.flatMap((r) => [...r.addedNodes])) {
-          if (node instanceof HTMLElement && node.dataset.testid === 'notice') {
-            seen.push(getComputedStyle(node).outlineStyle);
-          }
-        }
-      }).observe(document.body, { childList: true, subtree: true });
+      const focus = HTMLElement.prototype.focus;
+      HTMLElement.prototype.focus = function (this: HTMLElement, options?: FocusOptions) {
+        if (this.dataset.testid === 'notice' && this.isConnected) seen.push(getComputedStyle(this).outlineStyle);
+        focus.call(this, options);
+      };
     });
+    const ringsOnReopen: string[] = [];
     for (let round = 0; round < 2; round++) {
       await wrapper.focus();
       await expect(wrapper).toBeFocused();
       // A programmatic click closes the strip from the outside: the focus stays on the wrapper that is removed.
       await page.getByRole('button', { name: 'Dismiss message: Session expiring' }).evaluate((b) => (b as HTMLElement).click());
       await expect(wrapper).toHaveCount(0);
+      await page.evaluate(() => ((window as unknown as { __rings: string[] }).__rings.length = 0));
       await show.press('Enter');
       await expect(wrapper).toBeFocused();
+      ringsOnReopen.push(...(await page.evaluate(() => (window as unknown as { __rings: string[] }).__rings)));
     }
-    expect(await page.evaluate(() => (window as unknown as { __rings: string[] }).__rings)).toEqual(['none', 'none']);
+    expect(ringsOnReopen).toEqual(['none', 'none']);
   });
 
   test('ProgressBar: named, and completes with an announcement', async ({ page }) => {
