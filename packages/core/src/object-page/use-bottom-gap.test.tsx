@@ -2,7 +2,7 @@ import { act, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ObjectPage } from './ObjectPage';
 import { rootStyle, scrollerStyle } from './object-page-styles';
-import { BOTTOM_GAP_VAR, bottomGap, keyboardOverScroller } from './use-bottom-gap';
+import { BOTTOM_GAP_VAR, bottomGap, keyboardOverScroller, scrollsItself } from './use-bottom-gap';
 
 // The phone of #498: 390x500, a save bar of 89px under the scroller, a keyboard of 225px.
 describe('bottomGap and keyboardOverScroller (#498)', () => {
@@ -45,21 +45,71 @@ describe('bottomGap and keyboardOverScroller (#498)', () => {
   });
 });
 
+describe('scrollsItself (#498, QA round 1)', () => {
+  it('a scrollable overflow with more content than room: the scroller scrolls its content', () => {
+    expect(scrollsItself('auto', 2000, 411)).toBe(true);
+    expect(scrollsItself('scroll', 2000, 411)).toBe(true);
+    expect(scrollsItself('overlay', 2000, 411)).toBe(true);
+  });
+
+  it('no height from the parent (it grows with its content, the document scrolls) or nothing to scroll: it does not', () => {
+    expect(scrollsItself('auto', 1400, 1400)).toBe(false);
+    expect(scrollsItself('auto', 0, 0)).toBe(false);
+    expect(scrollsItself('visible', 2000, 411)).toBe(false);
+    expect(scrollsItself('hidden', 2000, 411)).toBe(false);
+  });
+});
+
 describe('useBottomGap', () => {
+  let sheet: HTMLStyleElement | null = null;
   afterEach(() => {
     vi.restoreAllMocks();
     delete (window as { visualViewport?: unknown }).visualViewport;
+    sheet?.remove();
+    sheet = null;
   });
 
   const scrollerOf = (container: HTMLElement) => container.querySelector('[data-object-page-scroller]') as HTMLElement;
+
+  /** jsdom has no layout: the scroller of a page with a height from its parent, scrolling 2000px of content in 411px. */
+  const scrollingScroller = () => {
+    sheet = document.createElement('style');
+    sheet.textContent = '[data-object-page-scroller] { overflow-y: auto; }';
+    document.head.append(sheet);
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(2000);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(411);
+  };
 
   it('writes nothing without a visual viewport (no keyboard height is ever published)', () => {
     const { container } = render(<ObjectPage />);
     expect(scrollerOf(container).style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('');
   });
 
+  it('the document scrolls (the scroller grows with its content): 0, though it ends inside the window above a save bar', () => {
+    Object.defineProperty(window, 'visualViewport', { value: new EventTarget(), configurable: true });
+    sheet = document.createElement('style');
+    sheet.textContent = '[data-object-page-scroller] { overflow-y: auto; }';
+    document.head.append(sheet);
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(1400);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(1400);
+    const bottom = window.innerHeight - 89;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: 0, bottom, left: 0, right: 0, width: 0, height: bottom, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect,
+    );
+    const { container } = render(<ObjectPage />);
+    const scroller = scrollerOf(container);
+    expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('0px');
+    // Scrolled to the end, or the keyboard's padding grew it: still 0.
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('0px');
+  });
+
   it('writes the room below the scroller, follows a window resize, and removes it on unmount', () => {
     Object.defineProperty(window, 'visualViewport', { value: new EventTarget(), configurable: true });
+    scrollingScroller();
     let bottom = window.innerHeight - 89;
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
       () => ({ top: 0, bottom, left: 0, right: 0, width: 0, height: bottom, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect,

@@ -73,6 +73,27 @@ async function focusLow(page: Page, name: string): Promise<void> {
   await input.focus();
 }
 
+/** Replaces the visual viewport with one whose bottom `__setKeyboard(px)` raises (one `resize` per call). */
+const installKeyboard = (page: Page) =>
+  page.addInitScript(() => {
+    const target = new EventTarget();
+    let height = 0;
+    const vv = Object.defineProperties(target, {
+      offsetTop: { value: 0 },
+      offsetLeft: { value: 0 },
+      pageTop: { value: 0 },
+      pageLeft: { value: 0 },
+      scale: { value: 1 },
+      height: { get: () => window.innerHeight - height },
+      width: { get: () => window.innerWidth },
+    });
+    Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+    (window as unknown as KeyboardWindow).__setKeyboard = (px) => {
+      height = px;
+      target.dispatchEvent(new Event('resize'));
+    };
+  });
+
 for (const viewport of [
   { width: 390, height: 500 },
   { width: 390, height: 844 },
@@ -84,24 +105,7 @@ for (const viewport of [
     test.use({ viewport, hasTouch: true });
 
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript(() => {
-        const target = new EventTarget();
-        let height = 0;
-        const vv = Object.defineProperties(target, {
-          offsetTop: { value: 0 },
-          offsetLeft: { value: 0 },
-          pageTop: { value: 0 },
-          pageLeft: { value: 0 },
-          scale: { value: 1 },
-          height: { get: () => window.innerHeight - height },
-          width: { get: () => window.innerWidth },
-        });
-        Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
-        (window as unknown as KeyboardWindow).__setKeyboard = (px) => {
-          height = px;
-          target.dispatchEvent(new Event('resize'));
-        };
-      });
+      await installKeyboard(page);
       await gotoStory(page, STORY);
       await expect(page.getByRole('region', { name: 'Save actions' })).toBeVisible();
       await page.locator(SCROLLER).evaluate((el) => {
@@ -158,3 +162,102 @@ for (const viewport of [
     });
   });
 }
+
+// QA round 1 of #498: with no height on the page's parent the page grows with its content and the DOCUMENT scrolls.
+// The scroller is no scroll container then: a focused control is brought above the keyboard by the window, whose
+// bottom edge the keyboard covers whole. The room under the scroller (the save bar, and the window below a short
+// page) must not lower the margin, or the control lands under the keyboard (it did: 296..332, keyboard from 275).
+test.describe('Object Page whose document scrolls (no height on the parent), virtual keyboard of 225px (390x500): the whole keyboard counts (#498)', () => {
+  const viewport = { width: 390, height: 500 } as const;
+  const keyboard = 225;
+  const LAST = 'Notes for the supplier';
+  test.use({ viewport, hasTouch: true });
+
+  test.beforeEach(async ({ page }) => {
+    await installKeyboard(page);
+    await gotoStory(page, STORY);
+    await expect(page.getByRole('region', { name: 'Save actions' })).toBeVisible();
+    // The story's frame without its height: the page grows with its content.
+    await page.locator(SCROLLER).evaluate((el) => {
+      (el.parentElement!.parentElement as HTMLElement).style.height = 'auto';
+    });
+  });
+
+  /** Waits until neither the window nor the scroller has moved for 2 frames, then measures the focused control. */
+  const settled = (page: Page) =>
+    page.evaluate(async (selector) => {
+      const scroller = document.querySelector(selector) as HTMLElement;
+      await new Promise<void>((resolve) => {
+        let last = '';
+        let still = 0;
+        const tick = () => {
+          const now = `${window.scrollY}/${scroller.scrollTop}`;
+          still = now === last ? still + 1 : 0;
+          last = now;
+          if (still >= 2) resolve();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      const control = document.activeElement as HTMLElement;
+      const field = control.closest('[data-state]') as HTMLElement;
+      const vv = window.visualViewport!;
+      return {
+        fieldBottom: field.getBoundingClientRect().bottom,
+        controlTop: control.getBoundingClientRect().top,
+        controlBottom: control.getBoundingClientRect().bottom,
+        visibleBottom: vv.offsetTop + vv.height,
+        scrollerScrolls: scroller.scrollHeight > scroller.clientHeight,
+        marginBottom: parseFloat(getComputedStyle(control).scrollMarginBottom),
+      };
+    }, SCROLLER);
+
+  /** Focuses the last field, opens the keyboard with one resize, and checks the field lands just above it. */
+  async function expectLastFieldAboveKeyboard(page: Page): Promise<void> {
+    const before = await page.locator(SCROLLER).evaluate((scroller) => ({
+      bottom: scroller.getBoundingClientRect().bottom,
+      scrolls: scroller.scrollHeight > scroller.clientHeight,
+    }));
+    // The case under test: the scroller ends inside the window (room under it) and does not scroll itself.
+    expect(before.scrolls).toBe(false);
+    expect(before.bottom).toBeLessThan(viewport.height);
+    const input = page.getByRole('textbox', { name: LAST, exact: true });
+    // In view, but below the line the keyboard will cover.
+    const box = (await input.boundingBox())!;
+    expect(box.y + box.height).toBeGreaterThan(viewport.height - keyboard);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    await input.focus();
+    await setKeyboard(page, keyboard);
+    const s = await settled(page);
+    expect(s.visibleBottom).toBe(viewport.height - keyboard);
+    expect(s.scrollerScrolls).toBe(false);
+    // Entirely above the keyboard, and just above it: the Field's own 0.5rem over the whole keyboard.
+    expect(s.controlBottom, `control ${s.controlTop}..${s.controlBottom}, keyboard at ${s.visibleBottom}`).toBeLessThanOrEqual(s.visibleBottom);
+    expect(Math.abs(s.fieldBottom - (s.visibleBottom - MARGIN)), `Field bottom ${s.fieldBottom}, keyboard at ${s.visibleBottom}`).toBeLessThanOrEqual(1);
+    expect(Math.abs(s.marginBottom - (keyboard + MARGIN))).toBeLessThanOrEqual(1);
+  }
+
+  test('scrolled to the end, the last field lands just above the keyboard: the save bar is not subtracted', async ({ page }) => {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await expectLastFieldAboveKeyboard(page);
+  });
+
+  test('a page shorter than the window, ending above its bottom edge: the last field lands just above the keyboard', async ({ page }) => {
+    // Only the Anchor Bar and the Notes section (no header), and the page pushed down so it ends 20px above the bottom
+    // of the window.
+    await page.locator(SCROLLER).evaluate((scroller) => {
+      const hidden = [scroller.querySelector(':scope > div'), scroller.querySelector('#general'), scroller.querySelector('#supplier')];
+      for (const el of hidden) (el as HTMLElement).style.display = 'none';
+      const root = scroller.parentElement as HTMLElement;
+      (root.parentElement as HTMLElement).style.paddingTop = `${window.innerHeight - 20 - root.getBoundingClientRect().bottom}px`;
+    });
+    const layout = await page.locator(SCROLLER).evaluate((scroller) => ({
+      rootBottom: (scroller.parentElement as HTMLElement).getBoundingClientRect().bottom,
+      documentScrolls: document.documentElement.scrollHeight > window.innerHeight,
+    }));
+    expect(Math.abs(layout.rootBottom - (viewport.height - 20))).toBeLessThanOrEqual(1);
+    expect(layout.documentScrolls).toBe(false);
+    await expectLastFieldAboveKeyboard(page);
+  });
+});
