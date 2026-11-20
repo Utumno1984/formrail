@@ -820,7 +820,7 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
     expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
   });
 
-  test('keyboard open on Notes, then four long conflicts: the notice keeps 3rem, the scroller 10rem above the keyboard, Notes stays visible and does not move', async ({ page }) => {
+  test('keyboard open on Notes, then four long conflicts: the notice keeps the room above the keyboard (110px), the scroller 10rem above the keyboard, Notes stays visible and does not move', async ({ page }) => {
     const order = await editFour(page);
     await focusNotesLow(page);
     await setKeyboard(page, KEYBOARD);
