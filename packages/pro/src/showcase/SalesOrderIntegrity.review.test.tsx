@@ -1,11 +1,15 @@
 // #522: "Review changes" on a sales order, on the record page of the shell with the Pro add-ons: what the dialog
 // lists, against which saved order, and what Save, "Save changes" and "Keep editing" do.
-import { screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getProduct } from '../../../core/src/internal/demo-data';
+import { SALES_ORDERS_CRUD } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';
+import { RecordPage } from '../../../core/src/showcase/RecordPageShell';
 import { createSalesOrderStore } from '../../../core/src/showcase/sales-order-store';
-import { ORDER_ONLY_DESCRIPTION } from './sales-order-review';
+import { salesOrderRebaseAddons, type SalesOrderRebaseOptions } from './sales-order-rebase';
+import { ORDER_ONLY_DESCRIPTION, salesOrderSaveReview } from './sales-order-review';
 import {
   LINES_ORDER,
   ORDER,
@@ -176,5 +180,82 @@ describe('Record editing integrity, sales orders: the review (#522)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     // No server-update action on a creation page: the add-ons are for an existing order.
     expect(screen.queryByRole('button', { name: 'Simulate server update' })).toBeNull();
+  }, 30_000);
+});
+
+// #526: the cases of the unit tests of the invoice showcase (InvoicesChangeSummary.test.tsx) that the tests above did
+// not assert as strongly, on the sales orders.
+describe('Record editing integrity, sales orders: the review in the shell (#526, from the invoices)', () => {
+  /** The record page of so-1 under StrictMode (effects run twice), with or without the two add-ons. */
+  function renderStrict({ addons = true } = {}) {
+    const store = createSalesOrderStore();
+    const options = { current: { serverChange: 'status-and-delivery', serverUpdateDelayMs: 0, simulateServerUpdate: true } satisfies SalesOrderRebaseOptions };
+    const onSaved = vi.fn();
+    render(
+      <StrictMode>
+        <RecordPage
+          module={SALES_ORDERS_CRUD}
+          store={store}
+          recordId={ORDER}
+          onBack={vi.fn()}
+          onSaved={onSaved}
+          reviewSave={addons ? salesOrderSaveReview : undefined}
+          useAddons={addons ? salesOrderRebaseAddons(options) : undefined}
+        />
+      </StrictMode>,
+    );
+    return { store, onSaved };
+  }
+
+  it('in StrictMode: Status, Customer reference and Notes + Save: 3 entries in the order of the page, the store NOT called; confirm: ONE save with the edited values, the new baseline is what the store returned', async () => {
+    const { store, onSaved } = renderStrict();
+    await opened();
+    const save = vi.spyOn(store, 'save');
+    await pick(screen.getByRole('combobox', { name: 'Status' }), 'Confirmed');
+    await typeInto(textbox('Customer reference'), 'PO-7781');
+    await userEvent.type(textbox('Notes'), ' Checked.');
+    await userEvent.click(await saveButton());
+
+    const dialog = await reviewDialog();
+    expect(dialog).toHaveAccessibleDescription('3 changes will be saved.');
+    expect(changesIn(dialog).map((text) => text.split(',')[0])).toEqual(['Status', 'Customer reference', 'Notes']);
+    expect(changesIn(dialog)[0]).toBe('Status, changed, from Invoiced to Confirmed');
+    expect(save).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Keep editing' })));
+
+    // Confirm: the shell's own save, once, with the edited values.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0]![0]).toMatchObject({ id: ORDER, status: 'confirmed', customerReference: 'PO-7781' });
+    await waitFor(() => expect(footer()).toBeNull());
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    // The new baseline is what the store returned.
+    expect(stored(store)).toMatchObject({ status: 'confirmed', customerReference: 'PO-7781' });
+    expect(stored(store).notes.endsWith(' Checked.')).toBe(true);
+  }, 30_000);
+
+  it('an invalid form (a line quantity of 0) never opens the review: the error count, and the focus on the invalid field, as without it', async () => {
+    const { store } = renderOrder();
+    await opened();
+    const save = vi.spyOn(store, 'save');
+    const quantity = textbox('Line 1 quantity');
+    await typeInto(quantity, '0');
+    await userEvent.click(await saveButton());
+    await waitFor(() => expect(within(footer()!).getByText('1 invalid field')).toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(quantity));
+    expect(save).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it('without the add-ons (the Free shell) Save saves at once, once, with no dialog', async () => {
+    const { store } = renderStrict({ addons: false });
+    await opened();
+    const save = vi.spyOn(store, 'save');
+    await userEvent.type(textbox('Notes'), '!');
+    await userEvent.click(await saveButton());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(footer()).toBeNull());
+    expect(save).toHaveBeenCalledTimes(1);
   }, 30_000);
 });
