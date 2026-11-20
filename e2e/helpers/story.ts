@@ -91,25 +91,66 @@ async function installPlayErrorRecorder(page: Page): Promise<void> {
 
 /** Render phases in which the play function (if any) has ended and the story has settled. */
 const PLAY_END_PHASES = ['played', 'completed', 'finished', 'errored', 'aborted'];
+/** Phases that only the render running the play reaches, and only once its play has returned or thrown. */
+const PLAY_OUTCOME_PHASES = ['played', 'errored', 'aborted'];
+
+const phaseRecorderInstalled = new WeakSet<Page>();
 
 /**
- * Waits until the story's play function has ended, whatever its outcome (the render phase is
- * terminal: played / completed / finished / errored / aborted). `completing` is NOT terminal: it is
- * the phase in which Storybook waits for the animations started by the render/play to finish, and
- * the story is only settled once it reaches `completed`. Use it, after `gotoStory`, for a
- * story whose play cannot pass under the args the test needs (so `expectPlayToPass` would fail)
- * but whose play still clicks the controls the test is about to drive.
+ * Records every render phase the preview announces (`storyRenderPhaseChanged`) in `window.__ropPhases`,
+ * from the start of every page load. `waitForPlayEnd` needs the history, not only the current phase: see there.
+ */
+async function installPhaseRecorder(page: Page): Promise<void> {
+  if (phaseRecorderInstalled.has(page)) return;
+  phaseRecorderInstalled.add(page);
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      __STORYBOOK_ADDONS_CHANNEL__?: { on: (event: string, cb: (payload: unknown) => void) => void };
+      __ropPhases?: string[];
+    };
+    w.__ropPhases = [];
+    const timer = setInterval(() => {
+      const channel = w.__STORYBOOK_ADDONS_CHANNEL__;
+      if (!channel) return;
+      clearInterval(timer);
+      channel.on('storyRenderPhaseChanged', (payload) => {
+        const phase = (payload as { newPhase?: unknown } | null)?.newPhase;
+        if (typeof phase === 'string') w.__ropPhases?.push(phase);
+      });
+    }, 1);
+  });
+}
+
+/**
+ * Waits until the story's play function has ended, whatever its outcome, and the story has settled
+ * (the current render phase is terminal: played / completed / finished / errored / aborted).
+ * `completing` is NOT terminal: it is the phase in which Storybook waits for the animations started by
+ * the render/play to finish, and the story is only settled once it reaches `completed`.
+ *
+ * A terminal phase alone is not enough (#579): an args update during the play (`updateStoryArgs`, as the
+ * Controls panel does) makes Storybook render the story again with the same render id while the play keeps
+ * running, and that render goes through `completed` and `finished` of its own. So once a `playing` phase
+ * has been announced, this also waits for the play's own outcome (`played`, `errored` or `aborted`, which
+ * only the render running the play reaches) after it. Without that, a play failing after an args update
+ * was reported as passed whenever the check landed between the two.
+ *
+ * Use it, after `gotoStory`, for a story whose play cannot pass under the args the test needs (so
+ * `expectPlayToPass` would fail) but whose play still clicks the controls the test is about to drive.
  */
 export async function waitForPlayEnd(page: Page): Promise<void> {
   await page.waitForFunction(
-    (terminal) => {
-      const render = (
-        window as unknown as { __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } } }
-      ).__STORYBOOK_PREVIEW__?.currentRender;
-      const p = render?.phase;
-      return !!p && terminal.includes(p);
+    ([terminal, outcome]) => {
+      const w = window as unknown as {
+        __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } };
+        __ropPhases?: string[];
+      };
+      const p = w.__STORYBOOK_PREVIEW__?.currentRender?.phase;
+      if (!p || !terminal.includes(p)) return false;
+      const phases = w.__ropPhases ?? [];
+      const playing = phases.lastIndexOf('playing');
+      return playing < 0 || phases.slice(playing + 1).some((phase) => outcome.includes(phase));
     },
-    PLAY_END_PHASES,
+    [PLAY_END_PHASES, PLAY_OUTCOME_PHASES] as const,
     { timeout: 10_000 },
   );
 }
@@ -180,6 +221,7 @@ function recordCensus(storyId: string, args: string | undefined, hasPlay: boolea
 }
 
 async function openStory(page: Page, storyId: string, args?: string): Promise<void> {
+  await installPhaseRecorder(page);
   const res = await page.request.get('/index.json');
   if (!res.ok()) {
     throw new Error(`gotoStory: cannot read /index.json (HTTP ${res.status()})`);
