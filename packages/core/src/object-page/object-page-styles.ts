@@ -24,9 +24,22 @@ export const scrollerClass =
   '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mt-[calc(var(--rop-object-page-sticky-offset,0px)+0.5rem)] ' +
   '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mb-[calc(var(--rop-keyboard-inset,0px)+0.5rem)]';
 
-// Room below the last section: the virtual keyboard's height (published by Field) plus a margin, so the
-// last field can be scrolled above the keyboard.
-export const scrollerStyle = { paddingBottom: 'calc(var(--rop-keyboard-inset, 0px) + 1rem)' } as const;
+// The virtual keyboard counted once (#498). `--rop-keyboard-inset` (published on the document's root by a
+// focused Field) is the keyboard's height from the bottom of the window, but the scroller ends above the save
+// bar, which the keyboard covers first. Inside the scroller the variable is lowered by the room under it,
+// `--rop-object-page-bottom-gap` (written on the scroller by `use-bottom-gap.ts`), never below 0: the scroll
+// margins built on it (a Field's own, and the scroller's above) make a focused field land just above the
+// keyboard, not a save bar's height higher. The page's root relays the window's value as
+// `--rop-object-page-keyboard-inset` (a property cannot read itself on the element that declares it): the
+// scroller's bottom padding keeps it. Inline, not in the class: the shipped CSS declares no new property.
+export const rootStyle = { '--rop-object-page-keyboard-inset': 'var(--rop-keyboard-inset, 0px)' } as const;
+
+// Room below the last section: the virtual keyboard's height (published by Field, the window's value relayed
+// by the root) plus a margin, so the last field can be scrolled above the keyboard.
+export const scrollerStyle = {
+  paddingBottom: 'calc(var(--rop-object-page-keyboard-inset, var(--rop-keyboard-inset, 0px)) + 1rem)',
+  '--rop-keyboard-inset': 'max(0px, var(--rop-object-page-keyboard-inset, 0px) - var(--rop-object-page-bottom-gap, 0px))',
+} as const;
 
 // Where the footer goes. Never inside the scroller; empty (zero height) until a footer is mounted.
 export const footerSlotClass = 'shrink-0';

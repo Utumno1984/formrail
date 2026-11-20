@@ -1,0 +1,5 @@
+---
+'@formrail/core': patch
+---
+
+`ObjectPage`: with the virtual keyboard open, a focused `Field` inside the page now lands just above the keyboard instead of a save bar's height higher (#498). The keyboard's height (`--rop-keyboard-inset`, published on `<html>` by a focused `Field`) is measured from the bottom of the window, but the page's scroller ends above the save bar, which the keyboard covers first: the scroll margins of the scroller's content (the `Field`'s own, and those of #497 used by the browser's focus scrolling and the Tab fallback) counted the save bar twice. Inside the scroller the variable is now lowered by the room below the scroller (measured by the page, `--rop-object-page-bottom-gap` on the scroller), never below 0; the value on `<html>` and the scroller's own bottom padding are unchanged (the root relays the window's value as an inline `--rop-object-page-keyboard-inset`; a `style` passed to `ObjectPage` is merged with it). The shipped CSS declares no new property. No public API change.

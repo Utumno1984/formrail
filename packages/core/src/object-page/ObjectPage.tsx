@@ -19,7 +19,8 @@ import {
   type ObjectPageSectionEntry,
   type ObjectPageSectionInfo,
 } from './ObjectPageContext';
-import { footerSlotClass, rootClass, scrollerClass, scrollerStyle } from './object-page-styles';
+import { footerSlotClass, rootClass, rootStyle, scrollerClass, scrollerStyle } from './object-page-styles';
+import { useBottomGap } from './use-bottom-gap';
 import { useFocusNotObscured } from './use-focus-not-obscured';
 
 export type ObjectPageProps = HTMLAttributes<HTMLDivElement> & {
@@ -46,7 +47,7 @@ const sameSections = (a: readonly ObjectPageSectionInfo[], b: readonly ObjectPag
  * page grows with its content and the document is the single scroller.
  */
 export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageProps>(function ObjectPage(
-  { headingLevel = 1, sectionNavigation = 'anchors', labels, children, className, ...rest },
+  { headingLevel = 1, sectionNavigation = 'anchors', labels, children, className, style, ...rest },
   ref,
 ) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -59,6 +60,8 @@ export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageP
   const [sections, setSections] = useState<readonly ObjectPageSectionInfo[]>([]);
   // Tab never leaves a control under the sticky Anchor Bar or past the bottom edge (see the scroller's class).
   useFocusNotObscured(scrollerRef);
+  // The virtual keyboard covers the save bar first: the scroll margins inside the scroller count it once (#498).
+  useBottomGap(scrollerRef);
 
   // Recomputes the list in DOM order (the order of mounting says nothing about it) and keeps the previous
   // array when nothing changed, so a re-render of the page does not ripple through the consumers.
@@ -157,7 +160,7 @@ export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageP
 
   return (
     <ObjectPageContext.Provider value={context}>
-      <div {...rest} ref={mergedRef} className={cn(rootClass, className)}>
+      <div {...rest} ref={mergedRef} className={cn(rootClass, className)} style={{ ...rootStyle, ...style }}>
         {/* Focusable on purpose: a scroll area with only text in it would otherwise be out of reach of the keyboard.
             It has no role or name: it is one extra Tab stop, announced as a bare group by some screen readers. */}
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
