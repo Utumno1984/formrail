@@ -13,18 +13,19 @@ async function restricted(filePath, source) {
   return result.messages.filter((m) => m.ruleId === 'no-restricted-imports').map((m) => m.message);
 }
 
-const CORE_SHOWCASE = "import { InvoiceCrud } from '../../core/src/showcase/InvoiceCrud';\nexport { InvoiceCrud };\n";
+// #526: the paths and imports cite the files of the record-editing showcase (the invoice one was removed); same cases.
+const CORE_SHOWCASE = "import { RecordCrud } from '../../core/src/showcase/RecordCrud';\nexport { RecordCrud };\n";
 
 // The first lint loads the whole config (typescript-eslint, plugins): seconds, not milliseconds.
 describe('lint: the story-only showcase stays out of the Pro package (#377)', { timeout: 60_000 }, () => {
   it.each([
     ['packages/pro/src/index.ts', CORE_SHOWCASE],
-    ['packages/pro/src/change-summary/ChangeSummary.tsx', "export { STATUS_LABEL } from '../../../core/src/showcase/showcase-data';\n"],
+    ['packages/pro/src/change-summary/ChangeSummary.tsx', "export { SALES_ORDERS_CRUD } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';\n"],
     // A Pro story outside src/showcase/ is not allowed either.
-    ['packages/pro/src/list-report/Other.stories.tsx', "export { CRUD_ARGS } from '../../../core/src/showcase/crud-story-args';\n"],
+    ['packages/pro/src/list-report/Other.stories.tsx', "export { CRUD_ARGS } from '../../../core/src/showcase/sales-order-story-args';\n"],
     // pro's own story-only folder is not reachable from the package code.
-    ['packages/pro/src/index.ts', "export { invoiceSaveReview } from './showcase/invoice-review';\n"],
-    ['packages/pro/test/some.test.ts', "export { InvoiceCrud } from '../../core/src/showcase/InvoiceCrud';\n"],
+    ['packages/pro/src/index.ts', "export { salesOrderSaveReview } from './showcase/sales-order-review';\n"],
+    ['packages/pro/test/some.test.ts', "export { RecordCrud } from '../../core/src/showcase/RecordCrud';\n"],
   ])('%s: the import is an error', async (file, source) => {
     const messages = await restricted(file, source);
     expect(messages).toHaveLength(1);
@@ -32,9 +33,9 @@ describe('lint: the story-only showcase stays out of the Pro package (#377)', { 
   });
 
   it.each([
-    ['packages/pro/src/showcase/InvoicesChangeSummary.stories.tsx', "export { InvoiceCrud } from '../../../core/src/showcase/InvoiceCrud';\n"],
-    ['packages/pro/src/showcase/invoice-review.tsx', "export { STATUS_LABEL } from '../../../core/src/showcase/showcase-data';\n"],
-    ['packages/pro/src/showcase/invoice-review.test.tsx', "export { InvoiceCrud } from '../../../core/src/showcase/InvoiceCrud';\n"],
+    ['packages/pro/src/showcase/RecordEditingIntegrity.stories.tsx', "export { RecordCrud } from '../../../core/src/showcase/RecordCrud';\n"],
+    ['packages/pro/src/showcase/sales-order-review.tsx', "export { SALES_ORDERS_CRUD } from '../../../core/src/showcase/modules/sales-orders/sales-orders-module';\n"],
+    ['packages/pro/src/showcase/sales-order-review.test.tsx', "export { RecordCrud } from '../../../core/src/showcase/RecordCrud';\n"],
   ])('%s: the import is allowed', async (file, source) => {
     expect(await restricted(file, source)).toEqual([]);
   });

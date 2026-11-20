@@ -89,7 +89,7 @@ describe('lint: library code does not import internal/demo-data (#515)', { timeo
     ['core test', 'packages/core/src/list-report/ListReport.test.tsx'],
     ['pro test', 'packages/pro/src/list-report/VirtualListReport.test.ts'],
     ['core showcase', 'packages/core/src/showcase/InvoiceCrud.tsx'],
-    ['pro showcase', 'packages/pro/src/showcase/invoice-review.tsx'],
+    ['pro showcase', 'packages/pro/src/showcase/sales-order-review.tsx'],
     ['the demo universe itself', 'packages/core/src/internal/demo-data/customers.ts'],
   ])('%s is allowed', async (_label, file) => {
     expect(await boundary(file, IMPORT)).toEqual([]);

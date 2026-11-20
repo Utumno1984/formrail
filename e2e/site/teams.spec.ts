@@ -143,6 +143,22 @@ test.describe('Pro page for teams: content', () => {
     }
   });
 
+  // #526: the Change Summary card's example is the record-editing showcase (sales orders and customers), never the
+  // removed invoice one; the link opens its Docs page in the Pro build.
+  test('the Change Summary example opens the record-editing showcase of the Pro build', async ({ page }) => {
+    await page.goto('teams/');
+    const card = page.locator('.card', { has: page.getByRole('heading', { level: 3, name: 'Change Summary' }) });
+    const example = card.getByRole('link', { name: 'Record editing example', exact: true });
+    await expect(example).toHaveAttribute('href', '../pro/?path=/docs/pro-showcase-record-editing-integrity--docs');
+    await expect(page.locator('a[href*="invoices-with-change-summary"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText(/Invoices example|Invoices with Change Summary/);
+    await example.click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe('/docs/pro-showcase-record-editing-integrity--docs');
+    const frame = page.frameLocator('#storybook-preview-iframe');
+    await expect(frame.locator('.sbdocs-content')).toBeVisible({ timeout: 30_000 });
+    await expect(frame.getByRole('heading', { level: 1 }).first()).toHaveText('Record editing integrity');
+  });
+
   test('the Free/Pro comparison is a real table: column and row headers, caption, a cell for every header', async ({ page }) => {
     await page.goto('teams/');
     const table = page.getByRole('table', {
