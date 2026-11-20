@@ -2,6 +2,7 @@ import { expect, test, type Dialog, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { browserBack, browserForward } from './helpers/history';
 import { expectPlayToPass, gotoStory as rawGotoStory } from './helpers/story';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 
 const PLAYGROUND = 'patterns-dirtyguard--playground';
 const OPEN = 'patterns-dirtyguard--dialog-open';
@@ -101,7 +102,11 @@ test.describe('guard with changes', () => {
     const closers: Array<() => Promise<void>> = [
       () => page.getByRole('button', { name: 'Keep editing' }).click(),
       () => page.keyboard.press('Escape'),
-      () => page.mouse.click(4, 4),
+      async () => {
+        // #579: in CI this press came 3-6 ms after the dialog appeared, before it listened for outside presses.
+        await waitForOutsidePressArmed(page, confirmDialog(page));
+        await page.mouse.click(4, 4);
+      },
       () => page.getByRole('button', { name: 'Close: Unsaved changes' }).click(),
     ];
     for (const close of closers) {
