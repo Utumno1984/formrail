@@ -8,9 +8,21 @@ export const rootClass = 'flex h-full min-h-0 min-w-0 max-w-full flex-col font-r
 
 // The one scroller: header and sections scroll together inside it. A single-column grid with a zero
 // minimum column width: a wide child scrolls inside its own section, never widens the page.
+//
+// Focus not obscured (WCAG 2.4.12): every element of the scroller outside the Anchor Bar (marked with
+// `data-object-page-anchor-bar`) has a scroll margin, honoured by the browser's own focus scrolling and by
+// `scrollIntoView`: at the top, the bar's published height plus 0.5rem (the focus indicator reaches 4px out,
+// and air); at the bottom, the virtual keyboard's height plus the same 0.5rem (the same margins a Field gives
+// itself). Margins on the elements, not padding on the scroller: a scroll padding would add up with the
+// sections' own margin (which already holds the bar's height) and stop a section twice as low. The bar's own
+// links are left out: they are stuck at the top, and a margin there would make the browser scroll the
+// page to "reveal" them. `use-focus-not-obscured.ts` covers the engine that ignores these margins for a
+// control already partly in view.
 export const scrollerClass =
   'grid min-h-0 flex-1 grid-cols-1 content-start gap-6 overflow-y-auto overflow-x-hidden px-4 pt-4 sm:px-6 ' +
-  'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px]';
+  'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px] ' +
+  '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mt-[calc(var(--rop-object-page-sticky-offset,0px)+0.5rem)] ' +
+  '[&_:not([data-object-page-anchor-bar]):not([data-object-page-anchor-bar]_*)]:scroll-mb-[calc(var(--rop-keyboard-inset,0px)+0.5rem)]';
 
 // Room below the last section: the virtual keyboard's height (published by Field) plus a margin, so the
 // last field can be scrolled above the keyboard.
