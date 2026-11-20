@@ -305,3 +305,46 @@ describe('Record editing integrity, sales orders: a save in flight, a deleted or
     expect(notice()).toBeNull();
   }, 30_000);
 });
+
+// #526: the cases of the unit tests of the invoice showcase (invoice-rebase.test.tsx) that the tests above did not
+// assert, on the sales orders.
+describe('Record editing integrity, sales orders: a conflict follows its line, the Free shell (#526, from the invoices)', () => {
+  it('a conflict on a line follows the line (by id) when lines move or a line above it is removed', async () => {
+    const { store } = renderOrder();
+    await opened();
+    const first = productOf(ORDER, 0);
+    const quantity = (n: number) => textbox(`Line ${n} quantity`);
+    await typeInto(quantity(1), '8');
+    await serverUpdate(store, (o) => ({ ...o, lines: o.lines.map((l, i) => (i === 0 ? { ...l, quantity: 5 } : l)) }));
+    const item = () => within(screen.getByRole('list', { name: 'Conflicts' })).getByRole('listitem');
+    const label = (n: number) => `Lines > Line ${n} (${first}) > Quantity`;
+    const starting = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+    expect(item()).toHaveTextContent(starting(`${label(1)} Yours: 8 Server: 5`));
+    // Line 1 moves down: the conflict, its explanation and its choices follow it.
+    await userEvent.click(screen.getByRole('button', { name: 'Move line 1 down' }));
+    expect(item()).toHaveTextContent(starting(`${label(2)} Yours: 8 Server: 5`));
+    expect(quantity(2)).toHaveAccessibleDescription(CONFLICT_HELP);
+    expect(quantity(1)).not.toHaveAccessibleDescription(CONFLICT_HELP);
+    expect(screen.getByRole('button', { name: `Use server value for ${label(2)}` })).toBeTruthy();
+    // The line above it removed: the same row again, now first.
+    await userEvent.click(screen.getByRole('button', { name: 'Remove line 1' }));
+    expect(item()).toHaveTextContent(starting(label(1)));
+    expect(quantity(1)).toHaveAccessibleDescription(CONFLICT_HELP);
+    await userEvent.click(screen.getByRole('button', { name: `Use server value for ${label(1)}` }));
+    expect(quantity(1).value).toBe('5');
+    expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
+  }, 30_000);
+
+  it('the Free shell (no useAddons) has no "Simulate server update" and ignores server changes', async () => {
+    const { store } = renderOrder(ORDER, { rebase: false });
+    await opened();
+    expect(screen.queryByRole('button', { name: 'Simulate server update' })).toBeNull();
+    const before = dateField('Requested delivery').value;
+    await serverUpdate(store, statusAndDelivery);
+    // The server did change the order: the page ignored it.
+    expect(stored(store).requestedDeliveryDate).not.toBe(before);
+    expect(dateField('Requested delivery').value).toBe(before);
+    expect(notice()).toBeNull();
+    expect(footer()).toBeNull();
+  }, 30_000);
+});
