@@ -225,3 +225,28 @@ describe('focus ring: the Pro RebaseNotice uses the very value of the core', () 
     expect([pro[1], pro[2], pro[3], pro[4]]).toEqual([core.ring[1], core.ring[2], core.ring[3], `${Number(core.offset[1])}`]);
   });
 });
+
+describe('pro style guard: #486 round 3 (coverage of count, camelCase borders, template literals, case)', () => {
+  const line = '.a { border: 1px solid black; }';
+  const entry = { file: CSS, rule: 'named-color', value: 'black', context: 'border: 1px solid black', reason: 'a reason long enough' };
+
+  it.each(['all', 0, 1.5, '2'])('an invalid count (%j) is an invalid configuration', (count) => {
+    const { problems } = applyAllowlist(checkSource(CSS, line, TOKENS), [{ ...entry, count }]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/count.*must be a positive integer/);
+  });
+
+  it.each(['borderTopColor', 'borderInlineStartColor', 'borderBlockEndColor'])('%s: red is rejected as a named colour', (prop) => {
+    expect(rules(TSX, `const s = { ${prop}: 'red' };`)).toEqual(['named-color']);
+  });
+
+  it('named colours inside a template literal are rejected', () => {
+    expect(rules(TSX, 'const s = { border: `1px solid black` };')).toEqual(['named-color']);
+    expect(rules(TSX, 'const s = { color: `red` };')).toEqual(['named-color']);
+  });
+
+  it('named colours are matched case-insensitively', () => {
+    expect(rules(CSS, '.a { color: RED; }')).toEqual(['named-color']);
+    expect(rules(TSX, "const s = { color: 'Red' };")).toEqual(['named-color']);
+  });
+});
