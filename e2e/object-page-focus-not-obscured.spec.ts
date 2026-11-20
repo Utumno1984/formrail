@@ -61,7 +61,7 @@ function probe(page: Page): Promise<Probe> {
   return page.evaluate((selector) => {
     const el = document.activeElement as HTMLElement;
     const scroller = document.querySelector(selector) as HTMLElement;
-    const bar = scroller.querySelector('nav') as HTMLElement;
+    const bar = scroller.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
     const footer = document.querySelector<HTMLElement>('[data-object-page-footer]');
     const box = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
@@ -153,12 +153,12 @@ for (const [name, viewport] of VIEWPORTS) {
         const target = page.getByRole('textbox', { name: 'Currency' });
         const under = () =>
           target.evaluate((el) => {
-            const bar = el.closest('[data-object-page-scroller]')!.querySelector('nav') as HTMLElement;
+            const bar = el.closest('[data-object-page-scroller]')!.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
             return bar.getBoundingClientRect().bottom - el.getBoundingClientRect().top;
           });
         await target.evaluate((el, px) => {
           const scroller = el.closest('[data-object-page-scroller]') as HTMLElement;
-          const bar = scroller.querySelector('nav') as HTMLElement;
+          const bar = scroller.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
           scroller.scrollTop += el.getBoundingClientRect().top - bar.getBoundingClientRect().bottom + px;
         }, overlap);
         // Two frames later the field is still where it was put: nothing else scrolled.
@@ -190,3 +190,123 @@ for (const [name, viewport] of VIEWPORTS) {
     });
   });
 }
+
+// The Pro showcase editor with the RebaseNotice visible (it sits right above the scroller and takes its room
+// from the scroller's top): walking the whole editor with Shift+Tab, then Tab, never leaves a control under the
+// Anchor Bar or past the scroller's bottom edge (the save bar below it is shown: the form is dirty).
+type ShowcaseWindow = {
+  __ropShowcaseStore?: {
+    snapshot: () => { id: string; number: string }[];
+    updateFromServer: (id: string, change: (r: object) => object, delayMs?: number) => Promise<unknown>;
+  };
+};
+const PRO_FIXTURE =
+  '/iframe.html?id=pro-showcase-invoices-with-change-summary--manual&viewMode=story&args=' +
+  encodeURIComponent('listLoadDelayMs:0;recordLoadDelayMs:0;saveDelayMs:0;serverUpdateDelayMs:0');
+
+for (const [name, viewport] of VIEWPORTS) {
+  test(`Pro showcase, RebaseNotice visible (${name}): Shift+Tab and Tab through the editor keep every control clear of both bars @engines`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto(PRO_FIXTURE);
+    await page.getByRole('link', { name: 'FT-2026-0003' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: /FT-2026-0003/ })).toBeVisible();
+    await page.getByLabel('Due date', { exact: true }).fill('2026-03-05');
+    // Another user changes the same date: a conflict, the notice appears above the scroller.
+    await page.evaluate(() => {
+      const store = (window as unknown as ShowcaseWindow).__ropShowcaseStore!;
+      const id = store.snapshot().find((r) => r.number === 'FT-2026-0003')!.id;
+      void store.updateFromServer(id, (r) => ({ ...r, dueDate: '2026-03-12' }));
+    });
+    await expect(page.getByRole('list', { name: 'Conflicts' }).getByRole('listitem')).toHaveCount(1);
+    await expect(page.locator('.rop-pro-rebase-notice')).toBeVisible();
+
+    await page.getByRole('region', { name: 'Save actions' }).getByRole('button', { name: 'Save' }).focus();
+    const seen: string[] = [];
+    // Up to the first control above the scroller's content (the header actions are in it; the notice is not).
+    for (let i = 0; i < 60; i++) {
+      await page.keyboard.press('Shift+Tab');
+      const p = await probe(page);
+      if (!p.inContent) break;
+      seen.push(p.name);
+      expectClear(p, `Shift+Tab ${i + 1}`);
+    }
+    expect(seen.length, 'controls reached in the scroller').toBeGreaterThanOrEqual(8);
+    // And back down to the save bar.
+    for (let i = 0; i < 60; i++) {
+      await page.keyboard.press('Tab');
+      const p = await probe(page);
+      if (p.inFooter) break;
+      if (!p.inContent) continue;
+      expectClear(p, `Tab ${i + 1}`);
+    }
+    expect((await probe(page)).inFooter, 'Tab reaches the save bar').toBe(true);
+  });
+}
+
+type KeyboardWindow = { __setKeyboard: (px: number) => void };
+
+// The virtual keyboard, with the visual viewport replaced by a controllable stand-in (the technique of
+// e2e/field.spec.ts and e2e/object-page-layout.spec.ts: chromium only, like every keyboard stand-in in the
+// repo). With the keyboard open, each field reached with Tab or Shift+Tab is below the Anchor Bar and above the
+// keyboard, and only the inner scroller moves.
+test.describe('Object Page: the focus is never under the Anchor Bar nor the virtual keyboard (phone 390x844)', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+  const KEYBOARD = 380;
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      const target = new EventTarget();
+      let keyboard = 0;
+      const vv = Object.defineProperties(target, {
+        offsetTop: { value: 0 },
+        offsetLeft: { value: 0 },
+        pageTop: { value: 0 },
+        pageLeft: { value: 0 },
+        scale: { value: 1 },
+        height: { get: () => window.innerHeight - keyboard },
+        width: { get: () => window.innerWidth },
+      });
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+      (window as unknown as KeyboardWindow).__setKeyboard = (px) => {
+        keyboard = px;
+        target.dispatchEvent(new Event('resize'));
+      };
+    });
+    await gotoStory(page, STORY);
+    await page.locator(SCROLLER).evaluate((el) => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      el.scrollTop = 0;
+    });
+  });
+
+  test('Tab down and Shift+Tab back up with the keyboard open', async ({ page }) => {
+    const visibleBottom = 844 - KEYBOARD;
+    await page.getByRole('textbox', { name: 'Supplier name' }).focus();
+    await page.evaluate((px) => (window as unknown as KeyboardWindow).__setKeyboard(px), KEYBOARD);
+    const check = async (where: string) => {
+      const p = await probe(page);
+      expect(p.inContent, `${where}: the focus is in the content`).toBe(true);
+      expect(p.top - p.ring, `${where}: "${p.name}" and its focus indicator are below the Anchor Bar`).toBeGreaterThanOrEqual(
+        p.barBottom - 0.5,
+      );
+      expect(p.bottom + p.ring, `${where}: "${p.name}" is above the keyboard`).toBeLessThanOrEqual(visibleBottom + 0.5);
+      expect(await page.evaluate(() => window.scrollY), `${where}: the document did not scroll`).toBe(0);
+      return p.name;
+    };
+    await expect.poll(async () => (await probe(page)).bottom).toBeLessThanOrEqual(visibleBottom);
+    const start = FIELDS.indexOf('Supplier name');
+    for (const field of FIELDS.slice(start + 1)) {
+      await page.keyboard.press('Tab');
+      // The Field brings itself above the keyboard on its own visual-viewport work: wait for it, then measure.
+      await expect.poll(async () => (await probe(page)).bottom).toBeLessThanOrEqual(visibleBottom);
+      expect(await check(`Tab to ${field}`)).toBe(field);
+    }
+    for (const field of [...FIELDS.slice(0, -1)].reverse()) {
+      await page.keyboard.press('Shift+Tab');
+      await expect.poll(async () => (await probe(page)).bottom).toBeLessThanOrEqual(visibleBottom);
+      expect(await check(`Shift+Tab to ${field}`)).toBe(field);
+    }
+  });
+});

@@ -350,7 +350,7 @@ function TextFields({ names }: { names: readonly string[] }) {
 /** The scroller's visible strip between the Anchor Bar's bottom edge and its own bottom edge. */
 function clearStrip(canvasElement: HTMLElement): { top: number; bottom: number } {
   const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
-  const bar = scroller.querySelector('nav') as HTMLElement;
+  const bar = scroller.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
   return { top: bar.getBoundingClientRect().bottom, bottom: scroller.getBoundingClientRect().bottom };
 }
 
