@@ -2,11 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
+import { Dialog, DialogBody, DialogClose, DialogContent, DialogHeader, DialogTitle } from '../dialog/Dialog';
 import { exampleStory } from '../internal/example-story';
 import { CLASS_NAME_ARG, storyControl, withoutControls } from '../internal/story-docs';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
 import { AppLauncher, type AppLauncherProps } from './AppLauncher';
-import type { AppDescriptor } from './types';
+import type { AppDescriptor, AppLauncherExtraGroup, AppLauncherExtraItem } from './types';
 
 // Neutral data only: the launcher knows nothing about what the apps are.
 const NAMES = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -42,7 +43,7 @@ function makeApps(count: number): AppDescriptor[] {
 
 const DISABLED_REASON = 'You do not have access to this app';
 
-interface DemoArgs extends Omit<AppLauncherProps, 'apps' | 'onNavigate'> {
+interface DemoArgs extends Omit<AppLauncherProps, 'apps' | 'onNavigate' | 'onExtraItemActivate'> {
   /** Number of apps in the list (story control). */
   count: number;
   /** Position (1-based) of the app shown as disabled, 0 for none (story control). */
@@ -50,10 +51,71 @@ interface DemoArgs extends Omit<AppLauncherProps, 'apps' | 'onNavigate'> {
   /** Pass `onNavigate` (story control): off, the tiles are plain links the browser follows. */
   routed: boolean;
   onNavigate: NonNullable<AppLauncherProps['onNavigate']>;
+  /** Number of extra groups after the apps (story control). */
+  extraGroupCount: 0 | 1 | 2;
+  /** Whether the extra items have an `href` (story control): off, they are buttons. */
+  extraWithHref: boolean;
+  /** `badge` of the first item of each extra group (story control). */
+  extraBadge: string;
+  onExtraItemActivate: NonNullable<AppLauncherProps['onExtraItemActivate']>;
 }
 
 function appsOf({ count, disabledApp }: Pick<DemoArgs, 'count' | 'disabledApp'>): AppDescriptor[] {
   return makeApps(count).map((app, i) => (i + 1 === disabledApp ? { ...app, disabled: true, disabledReason: DISABLED_REASON } : app));
+}
+
+// Neutral extra entries: they do not open an app (content of the page, or a page at an href).
+const EXTRA_GROUPS: { id: string; label: string; items: { id: string; label: string; description: string }[] }[] = [
+  {
+    id: 'more',
+    label: 'More modules',
+    items: [
+      { id: 'module-x', label: 'Module X', description: 'Learn what module X adds' },
+      { id: 'module-y', label: 'Module Y', description: 'Learn what module Y adds' },
+    ],
+  },
+  {
+    id: 'help',
+    label: 'Help and information',
+    items: [{ id: 'guide', label: 'Getting started', description: 'A short tour of the apps' }],
+  },
+];
+
+function extraGroupsOf({
+  extraGroupCount,
+  extraWithHref,
+  extraBadge,
+}: Pick<DemoArgs, 'extraGroupCount' | 'extraWithHref' | 'extraBadge'>): AppLauncherExtraGroup[] {
+  return EXTRA_GROUPS.slice(0, extraGroupCount).map((group) => ({
+    ...group,
+    items: group.items.map((item, i) => ({
+      ...item,
+      href: extraWithHref ? `#${item.id}` : undefined,
+      badge: i === 0 ? extraBadge : undefined,
+      icon: icon(i + 3),
+    })),
+  }));
+}
+
+/** The args of the story controls taken apart from those passed straight to the launcher. */
+function launcherProps({
+  count,
+  disabledApp,
+  routed,
+  onNavigate,
+  extraGroupCount,
+  extraWithHref,
+  extraBadge,
+  onExtraItemActivate,
+  ...args
+}: DemoArgs): AppLauncherProps {
+  return {
+    ...args,
+    apps: appsOf({ count, disabledApp }),
+    onNavigate: routed ? onNavigate : undefined,
+    extraGroups: extraGroupsOf({ extraGroupCount, extraWithHref, extraBadge }),
+    onExtraItemActivate,
+  };
 }
 
 const meta: Meta<DemoArgs> = {
@@ -81,11 +143,34 @@ const meta: Meta<DemoArgs> = {
       control: 'boolean',
       description: 'Pass `onNavigate` (a router takes over a plain click or Enter). Off: no `onNavigate`, the tiles are plain links the browser follows.',
     }),
+    ...withoutControls('extraGroups'),
+    onExtraItemActivate: { control: false },
+    extraGroupCount: storyControl({
+      control: 'select',
+      options: [0, 1, 2],
+      description: 'Number of groups in `extraGroups` ("More modules", then "Help and information"), shown after the apps.',
+    }),
+    extraWithHref: storyControl({
+      control: 'boolean',
+      description: 'Give the extra items an `href` (links: Ctrl/Cmd+click opens a new tab). Off: buttons, every click goes to `onExtraItemActivate`.',
+    }),
+    extraBadge: storyControl({
+      control: 'text',
+      description: '`badge` of the first item of each extra group; empty or only spaces: no badge.',
+    }),
   },
-  args: { count: 4, disabledApp: 3, routed: true, loading: false, onNavigate: fn() },
-  render: ({ count, disabledApp, routed, onNavigate, ...args }) => (
-    <AppLauncher {...args} onNavigate={routed ? onNavigate : undefined} apps={appsOf({ count, disabledApp })} />
-  ),
+  args: {
+    count: 4,
+    disabledApp: 3,
+    routed: true,
+    loading: false,
+    onNavigate: fn(),
+    extraGroupCount: 0,
+    extraWithHref: true,
+    extraBadge: 'New',
+    onExtraItemActivate: fn(),
+  },
+  render: (args) => <AppLauncher {...launcherProps(args)} />,
 };
 
 export default meta;
@@ -173,8 +258,9 @@ export const LongNamesNoIcons: Story = {
 export const LoadingToData: Story = {
   args: { count: 6, disabledApp: 0, loadingCount: 6 },
   argTypes: { loading: { table: { disable: true } } },
-  render: function Render({ count, disabledApp, routed, onNavigate, ...args }) {
+  render: function Render(args) {
     const [loading, setLoading] = useState(true);
+    const props = launcherProps(args);
     return (
       <div style={{ ...frame, display: 'grid', gap: 12 }}>
         <div>
@@ -183,12 +269,7 @@ export const LoadingToData: Story = {
           </Button>
         </div>
         <div data-testid="launcher-frame">
-          <AppLauncher
-            {...args}
-            onNavigate={routed ? onNavigate : undefined}
-            loading={loading}
-            apps={loading ? [] : appsOf({ count, disabledApp })}
-          />
+          <AppLauncher {...props} loading={loading} apps={loading ? [] : props.apps} />
         </div>
       </div>
     );
@@ -236,8 +317,9 @@ export const ManyApps: Story = {
 export const ListChanges: Story = {
   args: { count: 4, disabledApp: 0 },
   parameters: { controls: { disable: true } },
-  render: function Render({ count, disabledApp, routed, onNavigate, ...args }) {
-    const [apps, setApps] = useState(() => appsOf({ count, disabledApp }));
+  render: function Render(args) {
+    const props = launcherProps(args);
+    const [apps, setApps] = useState(() => props.apps);
     const [pending, setPending] = useState(false);
     useEffect(() => {
       if (!pending) return undefined;
@@ -254,7 +336,7 @@ export const ListChanges: Story = {
             Remove App two in 1 s
           </Button>
         </div>
-        <AppLauncher {...args} onNavigate={routed ? onNavigate : undefined} apps={apps} />
+        <AppLauncher {...props} apps={apps} />
       </div>
     );
   },
@@ -267,14 +349,13 @@ export const ListChanges: Story = {
 export const WithDirtyGuard: Story = {
   args: { count: 4, disabledApp: 0 },
   parameters: { controls: { disable: true } },
-  render: function Render({ count, disabledApp, routed, onNavigate, ...args }) {
+  render: function Render(args) {
     const { guard, dialog } = useDirtyGuard({ when: true });
     return (
       <div style={frame}>
         <AppLauncher
-          {...args}
-          apps={appsOf({ count, disabledApp })}
-          onNavigate={routed ? (app, event) => guard(() => onNavigate(app, event)) : undefined}
+          {...launcherProps(args)}
+          onNavigate={args.routed ? (app, event) => guard(() => args.onNavigate(app, event)) : undefined}
         />
         {dialog}
       </div>
@@ -292,5 +373,121 @@ export const WithDirtyGuard: Story = {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
     await waitFor(() => expect(two).toHaveFocus());
     await expect(args.onNavigate).not.toHaveBeenCalled();
+  },
+};
+
+/**
+ * One extra group after the apps: "More modules" does not open an app, it opens content of the page (here, the
+ * Actions panel shows `onExtraItemActivate`). The play function uses the keyboard only: Tab past the last app into
+ * the group, whose list is named by its visible label, then Enter on Module X reaches `onExtraItemActivate` with
+ * that item, and never `onNavigate`.
+ */
+export const WithExtraGroup: Story = {
+  tags: ['visual'],
+  args: { count: 4, disabledApp: 0, extraGroupCount: 1 },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('list', { name: 'Apps' })).toBeInTheDocument();
+    for (let i = 0; i < args.count; i++) await userEvent.tab();
+    await expect(canvas.getByRole('link', { name: 'App four' })).toHaveFocus();
+    await userEvent.tab();
+    const group = canvas.getByRole('list', { name: 'More modules' });
+    const x = within(group).getByRole('link', { name: 'Module X' });
+    await expect(x).toHaveFocus();
+    await expect(x).toHaveAccessibleDescription('Learn what module X adds New');
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onExtraItemActivate).toHaveBeenCalledTimes(1);
+    await expect(args.onExtraItemActivate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'module-x' }),
+      expect.objectContaining({ id: 'more' }),
+      expect.anything(),
+    );
+    await expect(args.onNavigate).not.toHaveBeenCalled();
+  },
+};
+
+/**
+ * An extra item opens a dialog of the consumer (a controlled `Dialog`): it is opened from `onExtraItemActivate`,
+ * while the tile has the focus, so closing it (Escape, or its button) returns the focus to the tile.
+ */
+export const ExtraItemOpensDialog: Story = {
+  args: { count: 2, disabledApp: 0, extraGroupCount: 1, extraWithHref: false },
+  parameters: { controls: { disable: true } },
+  render: function Render(args) {
+    const [open, setOpen] = useState<AppLauncherExtraItem | null>(null);
+    return (
+      <div style={frame}>
+        <AppLauncher
+          {...launcherProps(args)}
+          onExtraItemActivate={(item, group, event) => {
+            args.onExtraItemActivate(item, group, event);
+            setOpen(item);
+          }}
+        />
+        <Dialog open={open !== null} onOpenChange={(next) => (next ? undefined : setOpen(null))}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{open?.label}</DialogTitle>
+              <DialogClose />
+            </DialogHeader>
+            <DialogBody>{open?.description}</DialogBody>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const y = canvas.getByRole('button', { name: 'Module Y' });
+    y.focus();
+    await userEvent.keyboard('{Enter}');
+    const dialog = await body.findByRole('dialog', { name: 'Module Y' });
+    await expect(dialog).toHaveTextContent('Learn what module Y adds');
+    await expect(args.onExtraItemActivate).toHaveBeenCalledTimes(1);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(y).toHaveFocus());
+    await expect(args.onNavigate).not.toHaveBeenCalled();
+  },
+};
+
+const LONG_GROUP_LABEL = 'Help and information about every app of this space, and how to reach the people who run it';
+
+/**
+ * The extra groups change while the user is on the launcher: "Show the extra groups" adds them after the mount (the
+ * apps do not move), "Remove More modules in 1 s" takes the first group away a second later. If one of its items
+ * has the focus then, the focus moves to the next tile, not to the page. The second group has a long label, cut
+ * with an ellipsis.
+ */
+export const ExtraGroupsChange: Story = {
+  args: { count: 4, disabledApp: 0, extraGroupCount: 2 },
+  parameters: { controls: { disable: true } },
+  render: function Render(args) {
+    const props = launcherProps(args);
+    const all = (props.extraGroups ?? []).map((group, i) => (i === 1 ? { ...group, label: LONG_GROUP_LABEL } : group));
+    const [groups, setGroups] = useState<readonly AppLauncherExtraGroup[]>([]);
+    const [pending, setPending] = useState(false);
+    useEffect(() => {
+      if (!pending) return undefined;
+      const timer = setTimeout(() => {
+        setGroups((list) => list.filter((group) => group.id !== 'more'));
+        setPending(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }, [pending]);
+    return (
+      <div style={{ ...frame, display: 'grid', gap: 12 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <Button variant="secondary" onClick={() => setGroups(all)}>
+            Show the extra groups
+          </Button>
+          <Button variant="secondary" onClick={() => setPending(true)} disabled={pending}>
+            Remove More modules in 1 s
+          </Button>
+        </div>
+        <AppLauncher {...props} extraGroups={groups} />
+      </div>
+    );
   },
 };

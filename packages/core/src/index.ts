@@ -214,4 +214,4 @@ export type {
 } from './menu/Menu';
 export { AppLauncher } from './app-shell/AppLauncher';
 export type { AppLauncherProps, AppLauncherLabels, AppLauncherTileElement } from './app-shell/AppLauncher';
-export type { AppDescriptor } from './app-shell/types';
+export type { AppDescriptor, AppLauncherExtraGroup, AppLauncherExtraItem } from './app-shell/types';

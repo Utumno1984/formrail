@@ -24,4 +24,12 @@ describe('AppLauncher: markup without extra groups', () => {
   it.each(CASES)('%s: unchanged', (_, props) => {
     expect(renderToStaticMarkup(<AppLauncher {...props} />)).toMatchSnapshot();
   });
+
+  it.each(CASES)('%s: the same markup with extraGroups absent, empty, or only groups without items, and labels.appsGroup', (_, props) => {
+    const plain = renderToStaticMarkup(<AppLauncher {...props} />);
+    const labels = { ...props.labels, appsGroup: 'Not used' };
+    for (const extraGroups of [undefined, [], [{ id: 'empty', label: 'Empty', items: [] }]]) {
+      expect(renderToStaticMarkup(<AppLauncher {...props} extraGroups={extraGroups} labels={labels} onExtraItemActivate={() => {}} />)).toBe(plain);
+    }
+  });
 });

@@ -10,14 +10,16 @@ import {
   type FocusEvent,
   type HTMLAttributes,
   type MouseEvent,
+  type ReactNode,
 } from 'react';
 import { isDev } from '../internal/is-dev';
 import { handleNavigationClick, hasNavigableHref, isAppNavigationClick } from '../internal/navigation';
 import { Skeleton } from '../skeleton/Skeleton';
+import { StatusBadge } from '../status-badge/StatusBadge';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
-import type { AppDescriptor } from './types';
+import type { AppDescriptor, AppLauncherExtraGroup, AppLauncherExtraItem } from './types';
 
 export interface AppLauncherLabels {
   /** Accessible name of the region (`<nav>`). Default `Apps`. */
@@ -32,6 +34,12 @@ export interface AppLauncherLabels {
    * Default `Loading apps`.
    */
   loading: string;
+  /**
+   * Accessible name of the list of the apps, used only when `extraGroups` shows at least one group: the region then
+   * holds several lists, and each one is named (the apps have no visible heading, so their grid does not move).
+   * Without extra groups the list of the apps has no name of its own. Default `Apps`.
+   */
+  appsGroup: string;
 }
 
 /** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
@@ -39,6 +47,7 @@ export const DEFAULT_LABELS: AppLauncherLabels = {
   region: 'Apps',
   empty: 'No apps available',
   loading: 'Loading apps',
+  appsGroup: 'Apps',
 };
 
 /** Placeholders shown while loading when there is no list yet and no `loadingCount`. */
@@ -78,6 +87,30 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
    * not a finite integer of at least 0 (`2.5`, `-1`, `NaN`, `Infinity`) is ignored: the default is used.
    */
   loadingCount?: number;
+  /**
+   * Extra groups of entries that can be activated but do not open an app (content of yours, such as a dialog, or a
+   * page at an `href`), already filtered by you. Shown after the apps in the same region, each with its visible
+   * label over a list named by it, with the same tiles, the same Tab order and the same navigation rule as the apps
+   * (`onExtraItemActivate`). A group without entries is not shown; with none to show, the launcher is exactly as
+   * without this prop. While `loading` they are not shown either (one loading state for the whole region): they
+   * appear together with the apps. With no apps, the empty text takes the place of the apps and the groups follow
+   * it. Duplicate ids (of groups, or of entries among themselves and with the apps), empty labels and entries that
+   * open nothing are errors in development.
+   */
+  extraGroups?: readonly AppLauncherExtraGroup[];
+  /**
+   * Acts on an extra entry, with the same rule as `onNavigate`: called once, synchronously, for a plain primary
+   * click or Enter, the browser's own navigation to the `href` cancelled first; on an entry with an `href`, never
+   * called for Ctrl/Cmd/Shift/Alt+click or the middle button (left to the browser); on an entry without an `href` (a
+   * button) every click is handed to it, modifiers included, and so are Enter and Space. The tile has the focus when
+   * it is called, so a dialog opened from here returns the focus to it. Never called for an app, and an extra entry
+   * never reaches `onNavigate`. Without it an entry with an `href` is a plain link.
+   */
+  onExtraItemActivate?: (
+    item: AppLauncherExtraItem,
+    group: AppLauncherExtraGroup,
+    event: MouseEvent<AppLauncherTileElement>,
+  ) => void;
   /** Texts for localization; every key falls back to the English default. */
   labels?: Partial<AppLauncherLabels>;
 }
@@ -143,32 +176,175 @@ export function placeholderCount(loadingCount: number | undefined, knownApps: nu
   return knownApps || DEFAULT_LOADING_COUNT;
 }
 
-/** Key of each app: its `id`, made unique for a duplicate (already reported in development) so React keeps working. */
-function keysOf(apps: readonly AppDescriptor[]): string[] {
+/**
+ * Key of each app: its `id`, made unique for a duplicate (already reported in development) so React keeps working.
+ * `prefix` keeps the keys of the extra items apart from those of the apps (an item may share an app's `id`).
+ */
+function keysOf(entries: readonly { id: string }[], prefix = ''): string[] {
   const seen = new Map<string, number>();
-  return apps.map((app) => {
-    const n = seen.get(app.id) ?? 0;
-    seen.set(app.id, n + 1);
-    return n === 0 ? app.id : `${app.id}\u0000${n}`;
+  return entries.map((entry) => {
+    const n = seen.get(entry.id) ?? 0;
+    seen.set(entry.id, n + 1);
+    return n === 0 ? `${prefix}${entry.id}` : `${prefix}${entry.id}\u0000${n}`;
   });
 }
 
-/** @internal Not public API: the development errors of a list, one message per problem (exported for the unit test). */
-export function appLauncherProblems(apps: readonly AppDescriptor[], hasOnNavigate: boolean): string[] {
+const isEmptyLabel = (label: unknown) => typeof label !== 'string' || label.trim() === '';
+
+/** @internal Not public API: the groups that are shown, those with at least one item (exported for the unit test). */
+export function shownExtraGroups(groups: readonly AppLauncherExtraGroup[] | undefined): readonly AppLauncherExtraGroup[] {
+  return groups ? groups.filter((group) => group.items.length > 0) : [];
+}
+
+/**
+ * @internal Not public API: the development errors of a list, one message per problem (exported for the unit test).
+ * The ids of the apps and of the extra items share one space: a tile of the region is found by it.
+ */
+export function appLauncherProblems(
+  apps: readonly AppDescriptor[],
+  hasOnNavigate: boolean,
+  extraGroups: readonly AppLauncherExtraGroup[] = [],
+  hasOnExtraItemActivate = false,
+): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
   for (const app of apps) {
     if (seen.has(app.id)) problems.push(`two apps have the id ${JSON.stringify(app.id)}: ids must be unique`);
     seen.add(app.id);
-    if (typeof app.label !== 'string' || app.label.trim() === '') {
+    if (isEmptyLabel(app.label)) {
       problems.push(`the app ${JSON.stringify(app.id)} has an empty label: its tile has no accessible name`);
     }
     if (!app.disabled && !hasNavigableHref(app.href) && !hasOnNavigate) {
       problems.push(`the app ${JSON.stringify(app.id)} has no href and there is no onNavigate: its tile opens nothing`);
     }
   }
+  const groupIds = new Set<string>();
+  for (const group of extraGroups) {
+    if (groupIds.has(group.id)) problems.push(`two extra groups have the id ${JSON.stringify(group.id)}: ids must be unique`);
+    groupIds.add(group.id);
+    if (isEmptyLabel(group.label)) {
+      problems.push(`the extra group ${JSON.stringify(group.id)} has an empty label: its list has no accessible name`);
+    }
+    for (const item of group.items) {
+      if (seen.has(item.id)) {
+        problems.push(`the extra item ${JSON.stringify(item.id)} has the id of another app or extra item: ids must be unique`);
+      }
+      seen.add(item.id);
+      if (isEmptyLabel(item.label)) {
+        problems.push(`the extra item ${JSON.stringify(item.id)} has an empty label: its tile has no accessible name`);
+      }
+      if (!hasNavigableHref(item.href) && !hasOnExtraItemActivate) {
+        problems.push(
+          `the extra item ${JSON.stringify(item.id)} has no href and there is no onExtraItemActivate: its tile does nothing`,
+        );
+      }
+    }
+  }
   return problems;
 }
+
+/**
+ * Applies the navigation rule (`internal/navigation`) to a click on a tile: a click handed to `callback` gives the
+ * tile the focus first (Safari does not focus a clicked link), so a dialog opened from it returns the focus there.
+ * Only a link has a native navigation to leave modified clicks to: on a button every click is the callback's.
+ */
+function runTileRule(
+  event: MouseEvent<AppLauncherTileElement>,
+  href: string | undefined,
+  callback: (event: MouseEvent<AppLauncherTileElement>) => void,
+): void {
+  const tile = event.currentTarget;
+  const rule = { native: hasNavigableHref(href) };
+  if (isAppNavigationClick(event, rule) && tile.ownerDocument.activeElement !== tile) {
+    tile.focus({ preventScroll: true });
+  }
+  handleNavigationClick(event, callback, rule);
+}
+
+/** What a tile is made of: the frame shared by the apps and the extra items. */
+interface TileParts {
+  key: string;
+  /** Base of the ids of the tile's texts. */
+  id: string;
+  label: string;
+  icon: ReactNode;
+  href: string | undefined;
+  disabled: boolean;
+  current: boolean;
+  describedBy: string;
+  /** The `data-*` attribute that names the tile (`data-rop-app-id` for an app). */
+  data: Record<string, string>;
+  /** The description and the second line (a disabled app's reason, an item's badge), drawn over the tile. */
+  details: ReactNode;
+  ref: (element: HTMLElement | null) => void;
+  onClick: (event: MouseEvent<AppLauncherTileElement>) => void;
+  onFocus: (event: FocusEvent<HTMLElement>) => void;
+  onBlur: (event: FocusEvent<HTMLElement>) => void;
+}
+
+/** One tile in its `<li>`: a link with an `href`, a button without one. The markup of the apps' tiles. */
+function renderTile(t: TileParts) {
+  const common = {
+    ref: t.ref,
+    'aria-labelledby': `${t.id}-label`,
+    'aria-describedby': t.describedBy || undefined,
+    'aria-current': t.current ? ('true' as const) : undefined,
+    'aria-disabled': t.disabled ? ('true' as const) : undefined,
+    ...t.data,
+    onClick: t.onClick,
+    onFocus: t.onFocus,
+    onBlur: t.onBlur,
+    className: cn(TILE, t.disabled ? TILE_DISABLED : TILE_ENABLED, t.current && TILE_CURRENT),
+  };
+  const hasIcon = t.icon !== undefined && t.icon !== null;
+  const body = (
+    <>
+      {hasIcon ? (
+        <span aria-hidden="true" className={cn(ICON, t.disabled && 'opacity-60')}>
+          {t.icon}
+        </span>
+      ) : null}
+      {/* The name line, then the room the description and the reason are drawn over. */}
+      <span className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
+        <TruncatedText id={`${t.id}-label`} className="font-semibold">
+          {t.label}
+        </TruncatedText>
+      </span>
+    </>
+  );
+  // The description and the reason are NOT inside the link: its visible text is then exactly its name
+  // (WCAG 2.5.3, "label in name"), and they are read once, as its description (`aria-describedby` reads
+  // hidden text; `aria-hidden` keeps them from being read again as list content). They are drawn over the
+  // tile, under the name; `pointer-events: none` hands every click on them to the tile below.
+  const details = t.details ? (
+    <span aria-hidden="true" data-rop-app-details="" className={cn(DETAILS, hasIcon ? DETAILS_AFTER_ICON : DETAILS_NO_ICON)}>
+      {t.details}
+    </span>
+  ) : null;
+  return (
+    <li key={t.key} className="relative flex min-w-0 flex-col">
+      {hasNavigableHref(t.href) ? (
+        // An empty `href` counts as none (a button). A disabled app keeps its `<a>` (the focus stays on it
+        // if it gets disabled while focused) but loses its `href`: `role="link"` and `tabIndex` keep it a
+        // named, focusable link that leads nowhere.
+        <a {...common} href={t.disabled ? undefined : t.href} role={t.disabled ? 'link' : undefined} tabIndex={t.disabled ? 0 : undefined}>
+          {body}
+        </a>
+      ) : (
+        <button {...common} type="button">
+          {body}
+        </button>
+      )}
+      {details}
+    </li>
+  );
+}
+
+// The label of an extra group, over its list: one line, cut with an ellipsis inside the real width of the region.
+// Not a heading element: the launcher does not know the heading level of the page it is put in; the label names
+// the list (`aria-labelledby`), which is what a screen reader announces when it enters the list.
+const GROUP = 'mt-6 flex min-w-0 flex-col gap-2';
+const GROUP_LABEL = 'block max-w-full font-semibold text-rop-text-muted';
 
 /**
  * The choice of an app in a product made of several apps behind one login: a grid of tiles, one per app, from a
@@ -190,6 +366,8 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
     currentAppId,
     loading = false,
     loadingCount,
+    extraGroups,
+    onExtraItemActivate,
     labels: labelsProp,
     className,
     'aria-label': ariaLabel,
@@ -204,10 +382,20 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
   const composedRef = useMemo(() => composeRefs<HTMLElement>(root, ref), [ref]);
 
   const keys = useMemo(() => keysOf(apps), [apps]);
-  const shownKeys = loading ? [] : keys;
+  // The extra groups that are shown (none while loading) and the keys of their items: one key space for all the
+  // items of the region, apart from the apps' (prefixed), so that an item moved to another group keeps its key.
+  const groups = loading ? [] : shownExtraGroups(extraGroups);
+  const groupKeys = keysOf(groups);
+  const flatItemKeys = keysOf(
+    groups.flatMap((group) => group.items),
+    '\u0001',
+  );
+  let itemAt = 0;
+  const itemKeys = groups.map((group) => flatItemKeys.slice(itemAt, (itemAt += group.items.length)));
+  const shownKeys = loading ? [] : [...keys, ...itemKeys.flat()];
 
   // Development errors, once per distinct list (not at every render).
-  const problems = appLauncherProblems(apps, !!onNavigate).join('\n');
+  const problems = appLauncherProblems(apps, !!onNavigate, extraGroups, !!onExtraItemActivate).join('\n');
   useEffect(() => {
     if (!problems || !isDev()) return;
     for (const problem of problems.split('\n')) console.error(`[formrail] <AppLauncher>: ${problem}.`);
@@ -278,16 +466,14 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
       return;
     }
     if (!onNavigate) return;
-    const tile = event.currentTarget;
-    // Only a link has a native navigation to leave modified clicks to: on a button every click is the app's.
-    const rule = { native: hasNavigableHref(app.href) };
-    // A click handed to `onNavigate` gives the tile the focus first (Safari does not focus a clicked link), so a
-    // dialog opened from `onNavigate` returns the focus to it.
-    if (isAppNavigationClick(event, rule) && tile.ownerDocument.activeElement !== tile) {
-      tile.focus({ preventScroll: true });
-    }
-    handleNavigationClick(event, (e) => onNavigate(app, e), rule);
+    runTileRule(event, app.href, (e) => onNavigate(app, e));
   };
+  // An extra item is never disabled; it never reaches `onNavigate`, and an app never reaches `onExtraItemActivate`.
+  const activateItem = (item: AppLauncherExtraItem, group: AppLauncherExtraGroup) => (event: MouseEvent<AppLauncherTileElement>) => {
+    if (!onExtraItemActivate) return;
+    runTileRule(event, item.href, (e) => onExtraItemActivate(item, group, e));
+  };
+  const hasGroups = groups.length > 0;
 
   const count = loading ? placeholderCount(loadingCount, apps.length) : 0;
 
@@ -329,99 +515,106 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
             <p className="m-0 text-center text-rop-text-muted">{labels.empty}</p>
           </div>
         ) : (
-          <ul className={GRID}>
+          // Named only when extra groups follow: the region then holds several lists, each with its name.
+          <ul className={GRID} aria-label={hasGroups ? labels.appsGroup : undefined}>
             {apps.map((app, i) => {
               const key = keys[i]!;
               const id = `${baseId}-${i}`;
-              const current = currentAppId !== undefined && app.id === currentAppId;
               const disabled = !!app.disabled;
               const reason = disabled && app.disabledReason ? app.disabledReason : undefined;
-              const describedBy = [app.description ? `${id}-description` : '', reason ? `${id}-reason` : '']
-                .filter(Boolean)
-                .join(' ');
-              const common = {
+              return renderTile({
+                key,
+                id,
+                label: app.label,
+                icon: app.icon,
+                href: app.href,
+                disabled,
+                current: currentAppId !== undefined && app.id === currentAppId,
+                describedBy: [app.description ? `${id}-description` : '', reason ? `${id}-reason` : ''].filter(Boolean).join(' '),
+                data: { 'data-rop-app-id': app.id },
+                details:
+                  app.description || reason ? (
+                    <>
+                      {app.description ? (
+                        <span
+                          id={`${id}-description`}
+                          className={cn('overflow-hidden text-rop-text-muted', reason ? 'line-clamp-1' : 'line-clamp-2')}
+                        >
+                          {app.description}
+                        </span>
+                      ) : null}
+                      {reason ? (
+                        <span
+                          id={`${id}-reason`}
+                          data-rop-app-disabled-reason=""
+                          className={cn('overflow-hidden italic text-rop-text', app.description ? 'line-clamp-1' : 'line-clamp-2')}
+                        >
+                          {reason}
+                        </span>
+                      ) : null}
+                    </>
+                  ) : null,
                 ref: tileRef(key),
-                'aria-labelledby': `${id}-label`,
-                'aria-describedby': describedBy || undefined,
-                'aria-current': current ? ('true' as const) : undefined,
-                'aria-disabled': disabled ? ('true' as const) : undefined,
-                'data-rop-app-id': app.id,
                 onClick: activate(app),
                 onFocus: onTileFocus(key),
                 onBlur: onTileBlur,
-                className: cn(TILE, disabled ? TILE_DISABLED : TILE_ENABLED, current && TILE_CURRENT),
-              };
-              const hasIcon = app.icon !== undefined && app.icon !== null;
-              const body = (
-                <>
-                  {hasIcon ? (
-                    <span aria-hidden="true" className={cn(ICON, disabled && 'opacity-60')}>
-                      {app.icon}
-                    </span>
-                  ) : null}
-                  {/* The name line, then the room the description and the reason are drawn over. */}
-                  <span className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
-                    <TruncatedText id={`${id}-label`} className="font-semibold">
-                      {app.label}
-                    </TruncatedText>
-                  </span>
-                </>
-              );
-              // The description and the reason are NOT inside the link: its visible text is then exactly its name
-              // (WCAG 2.5.3, "label in name"), and they are read once, as its description (`aria-describedby` reads
-              // hidden text; `aria-hidden` keeps them from being read again as list content). They are drawn over the
-              // tile, under the name; `pointer-events: none` hands every click on them to the tile below.
-              const details =
-                app.description || reason ? (
-                  <span
-                    aria-hidden="true"
-                    data-rop-app-details=""
-                    className={cn(DETAILS, hasIcon ? DETAILS_AFTER_ICON : DETAILS_NO_ICON)}
-                  >
-                    {app.description ? (
-                      <span
-                        id={`${id}-description`}
-                        className={cn('overflow-hidden text-rop-text-muted', reason ? 'line-clamp-1' : 'line-clamp-2')}
-                      >
-                        {app.description}
-                      </span>
-                    ) : null}
-                    {reason ? (
-                      <span
-                        id={`${id}-reason`}
-                        data-rop-app-disabled-reason=""
-                        className={cn('overflow-hidden italic text-rop-text', app.description ? 'line-clamp-1' : 'line-clamp-2')}
-                      >
-                        {reason}
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null;
-              return (
-                <li key={key} className="relative flex min-w-0 flex-col">
-                  {hasNavigableHref(app.href) ? (
-                    // An empty `href` counts as none (a button). A disabled app keeps its `<a>` (the focus stays on it
-                    // if it gets disabled while focused) but loses its `href`: `role="link"` and `tabIndex` keep it a
-                    // named, focusable link that leads nowhere.
-                    <a
-                      {...common}
-                      href={disabled ? undefined : app.href}
-                      role={disabled ? 'link' : undefined}
-                      tabIndex={disabled ? 0 : undefined}
-                    >
-                      {body}
-                    </a>
-                  ) : (
-                    <button {...common} type="button">
-                      {body}
-                    </button>
-                  )}
-                  {details}
-                </li>
-              );
+              });
             })}
           </ul>
         )}
+        {groups.map((group, g) => {
+          const labelId = `${baseId}-g${g}-label`;
+          return (
+            <div key={groupKeys[g]} data-rop-app-launcher-group="" className={GROUP}>
+              <TruncatedText as="div" id={labelId} className={GROUP_LABEL}>
+                {group.label}
+              </TruncatedText>
+              <ul className={GRID} aria-labelledby={labelId}>
+                {group.items.map((item, i) => {
+                  const key = itemKeys[g]![i]!;
+                  const id = `${baseId}-g${g}-${i}`;
+                  const badge = typeof item.badge === 'string' ? item.badge.trim() : '';
+                  return renderTile({
+                    key,
+                    id,
+                    label: item.label,
+                    icon: item.icon,
+                    href: item.href,
+                    disabled: false,
+                    current: false,
+                    describedBy: [item.description ? `${id}-description` : '', badge ? `${id}-badge` : ''].filter(Boolean).join(' '),
+                    data: { 'data-rop-app-launcher-item-id': item.id },
+                    details:
+                      item.description || badge ? (
+                        <>
+                          {item.description ? (
+                            <span
+                              id={`${id}-description`}
+                              className={cn('overflow-hidden text-rop-text-muted', badge ? 'line-clamp-1' : 'line-clamp-2')}
+                            >
+                              {item.description}
+                            </span>
+                          ) : null}
+                          {/* One line of the tile, the badge centred in it: neutral tone, its text is the cue. */}
+                          {badge ? (
+                            <span data-rop-app-launcher-badge="" className="flex min-h-[1lh] min-w-0 items-center overflow-hidden">
+                              <StatusBadge id={`${id}-badge`} tone="neutral">
+                                {badge}
+                              </StatusBadge>
+                            </span>
+                          ) : null}
+                        </>
+                      ) : null,
+                    ref: tileRef(key),
+                    onClick: activateItem(item, group),
+                    onFocus: onTileFocus(key),
+                    onBlur: onTileBlur,
+                  });
+                })}
+              </ul>
+            </div>
+          );
+        })}
       {/* Inside the region (one root node), but outside the `aria-busy` placeholders, where its change would be
           withheld. If the launcher is hidden (`hidden`, `display: none`) it is not announced either. */}
       <span role="status" data-rop-app-launcher-status="" className="sr-only">
