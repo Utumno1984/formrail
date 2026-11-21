@@ -248,8 +248,9 @@ export interface AppShellNavLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnch
    * Opens the page with your router. Called once, synchronously, for a plain primary click or Enter on an enabled
    * link; the browser's own navigation to the `href` is cancelled first. On a link with an `href`, never called for
    * Ctrl/Cmd/Shift/Alt+click or the middle button (the browser opens the real `href`). On a link without one,
-   * called for every click, modifiers included. Not called when an `onClick` (or the `asChild` child, such as a
-   * router's link) has already cancelled the click. The link has the focus when it is called.
+   * called for every click, modifiers included. Not called when an `onClick` has already cancelled the click. The
+   * link has the focus when it is called. Not used with `asChild`: the child (your router's link) navigates by
+   * itself, and passing both is an error in development.
    */
   onNavigate?: (event: MouseEvent<AppShellNavLinkElement>) => void;
   /** Called first, for every click (also on a disabled link). Cancel the event to keep `onNavigate` from running. */
@@ -265,9 +266,8 @@ export interface AppShellNavLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnch
   icon?: ReactNode;
   /**
    * Render the single child element (the link component of your router) instead of an `<a>`, giving it the
-   * classes, `aria-current`, the click handling and the ref. The child must forward its ref and spread unknown
-   * props; its own `href` and `onClick` are kept (a router's link cancels the click it handles, so `onNavigate` is
-   * then not called).
+   * classes, `aria-current`, `onClick` and the ref. The child must forward its ref and spread unknown props; it
+   * keeps its own `href` and does the navigation itself (so `onNavigate` is not used with `asChild`).
    */
   asChild?: boolean;
   children?: ReactNode;
@@ -275,14 +275,17 @@ export interface AppShellNavLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnch
 
 /** @internal Not public API: the development errors of a link, one message per problem (exported for the unit test). */
 export function navLinkProblems(props: { href?: string; asChild?: boolean; disabled?: boolean; hasOnNavigate: boolean }): string[] {
-  if (props.disabled || props.asChild || hasNavigableHref(props.href) || props.hasOnNavigate) return [];
+  if (props.asChild) {
+    return props.hasOnNavigate ? ['onNavigate is not used with asChild: the child (your router\'s link) navigates by itself'] : [];
+  }
+  if (props.disabled || hasNavigableHref(props.href) || props.hasOnNavigate) return [];
   return ['a link with no href and no onNavigate opens nothing'];
 }
 
 /**
  * A link of the navigation, in a list item of `AppShellNav`. With an `href` it is a real link, and a plain click
  * or Enter goes to `onNavigate` (any router) while a modified click opens a new tab; with `asChild` it is the
- * router's own link component. `active` marks the current page (`aria-current="page"`); `disabled` keeps the link
+ * router's own link component, which navigates by itself. `active` marks the current page (`aria-current="page"`); `disabled` keeps the link
  * in place, focusable, but leading nowhere. The text is cut with an ellipsis at the column's width.
  */
 export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement, AppShellNavLinkProps>(
@@ -332,6 +335,9 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
       // named, focusable link that leads nowhere, so the user can still find it.
       const text = asChild && isValidElement(children) ? (children as ReactElement<{ children?: ReactNode }>).props.children : children;
       element = (
+        // A link that leads nowhere: Enter on it does nothing by design (no `href`), so there is no key handler;
+        // the click handler only runs the consumer's `onClick` and cancels the click.
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events
         <a
           {...rest}
           ref={ref as Ref<HTMLAnchorElement>}
@@ -359,7 +365,7 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
           ref={ref as Ref<HTMLElement>}
           aria-current={current}
           data-rop-app-shell-nav-link=""
-          onClick={activate(hasNavigableHref(child.props.href) || child.props.href === undefined)}
+          onClick={onClick}
         >
           {merged}
         </Slot>
