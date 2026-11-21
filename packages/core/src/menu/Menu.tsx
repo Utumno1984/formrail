@@ -504,12 +504,38 @@ const ITEM_LINK = 'text-inherit no-underline';
 
 /**
  * A navigation item: a `role="menuitem"` rendered as a real `<a href>`. Enter or a click navigates (with the browser,
- * or through `onNavigate`); Space does nothing, as on any link. Same focus, typeahead and `disabled` rules as `MenuItem`.
+ * or through `onNavigate`); Space does nothing, as on any link (typed during a typeahead search it is part of the
+ * search, as on a `MenuItem`). A middle click opens the `href` in a new tab and closes the menu. Same focus, typeahead
+ * and `disabled` rules as `MenuItem`.
+ *
+ * Known limits:
+ * - Ctrl/Cmd/Shift+Enter does not open a new tab or window: the menu turns Enter into a click without modifiers, so it
+ *   navigates like a plain Enter (through `onNavigate` when given). Use Ctrl/Cmd/Shift+click or the middle button.
+ * - With a menu opened from state (`open` / `defaultOpen`), `onNavigate` finds the focus on the menu's trigger, not on
+ *   the element that set the state.
+ * - The focus is on the trigger before `onNavigate` only when the panel unmounts at once on close. An exit animation
+ *   on `MenuContent` keeps it mounted: the focus has not moved yet when `onNavigate` runs.
  */
 export const MenuLinkItem = /* @__PURE__ */ forwardRef<HTMLAnchorElement, MenuLinkItemProps>(
   function MenuLinkItem(props, ref) {
-    const { tone = 'default', disabled = false, href, onNavigate, textValue, className, onClick, onKeyDown, children, ...rest } = props;
+    const {
+      tone = 'default',
+      disabled = false,
+      href,
+      onNavigate,
+      textValue,
+      className,
+      onClick,
+      onKeyDown,
+      onAuxClick,
+      children,
+      ...rest
+    } = props;
     const { setOpen, triggerRef, contentRef } = useMenuContext('MenuLinkItem');
+    // Radix turns Space (outside a typeahead search) into a click on the item, after this item's keydown handler.
+    // Cancelling the keydown would also drop the Space from a typeahead search, so the click is stopped instead.
+    // Cleared after the keydown's dispatch: a Space that started no click (typeahead) never blocks a later click.
+    const activatedBySpace = useRef(false);
     const missingHref = !disabled && !hasNavigableHref(href);
     useEffect(() => {
       if (missingHref && isDev()) {
@@ -524,8 +550,17 @@ export const MenuLinkItem = /* @__PURE__ */ forwardRef<HTMLAnchorElement, MenuLi
           href={disabled ? undefined : href}
           data-tone={tone === 'danger' ? 'danger' : undefined}
           onClick={(event) => {
+            const bySpace = activatedBySpace.current;
+            activatedBySpace.current = false;
             if (disabled) {
               event.preventDefault();
+              return;
+            }
+            if (bySpace) {
+              // Space does not navigate on a link: no browser navigation, no `onNavigate`, the menu stays open (Radix
+              // skips a cancelled click), and the click Radix made up does not reach the page as a user's click.
+              event.preventDefault();
+              event.stopPropagation();
               return;
             }
             onClick?.(event);
@@ -544,8 +579,19 @@ export const MenuLinkItem = /* @__PURE__ */ forwardRef<HTMLAnchorElement, MenuLi
           }}
           onKeyDown={(event) => {
             onKeyDown?.(event);
-            // Space does not navigate on a link: Radix would turn it into a click.
-            if (event.key === ' ') event.preventDefault();
+            activatedBySpace.current = event.key === ' ';
+            if (activatedBySpace.current) {
+              queueMicrotask(() => {
+                activatedBySpace.current = false;
+              });
+            }
+          }}
+          // The middle button opens the `href` in a new tab (`auxclick`, never handed to Radix): the menu closes as
+          // for any click on an item, and the browser's navigation is left alone.
+          onAuxClick={(event) => {
+            onAuxClick?.(event);
+            if (event.defaultPrevented || disabled || event.button !== 1 || !hasNavigableHref(href)) return;
+            setOpen(false);
           }}
           className={cn(ITEM, ITEM_LINK, tone === 'danger' && ITEM_DANGER, className)}
         >

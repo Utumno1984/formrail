@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dialog, DialogContent, DialogTitle } from '../dialog/Dialog';
 import { overlayLayer } from '../overlay/layers';
@@ -160,9 +160,105 @@ describe('MenuLinkItem', () => {
     render(<Demo link={{ onNavigate }} />);
     await openWithKeyboard(user);
     const item = screen.getByRole('menuitem', { name: 'Orders' });
+    // A browser that still sends `click` for the middle button: left to the browser, never cancelled.
     fireEvent.click(item, { button: 1 });
+    expect(clicks).toEqual([{ defaultPrevented: false }]);
     fireEvent.contextMenu(item);
     expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  describe('middle click (auxclick, what browsers send for the middle button)', () => {
+    const auxClicks: { button: number; defaultPrevented: boolean }[] = [];
+    const recordAux = (event: MouseEvent) => {
+      auxClicks.push({ button: event.button, defaultPrevented: event.defaultPrevented });
+      event.preventDefault();
+    };
+    const auxClick = (element: Element, button: number) =>
+      fireEvent(element, new MouseEvent('auxclick', { bubbles: true, cancelable: true, button }));
+    beforeEach(() => {
+      auxClicks.length = 0;
+      document.addEventListener('auxclick', recordAux);
+    });
+    afterEach(() => document.removeEventListener('auxclick', recordAux));
+
+    it('closes the menu, leaves the new tab to the browser and never calls onNavigate', async () => {
+      const onNavigate = vi.fn();
+      const user = userEvent.setup();
+      render(<Demo link={{ onNavigate }} />);
+      await openWithKeyboard(user);
+      auxClick(screen.getByRole('menuitem', { name: 'Orders' }), 1);
+      expect(auxClicks).toEqual([{ button: 1, defaultPrevented: false }]);
+      expect(onNavigate).not.toHaveBeenCalled();
+      expect(clicks).toEqual([]);
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
+    });
+
+    it('a right button auxclick keeps the menu open', async () => {
+      const user = userEvent.setup();
+      render(<Demo />);
+      await openWithKeyboard(user);
+      auxClick(screen.getByRole('menuitem', { name: 'Orders' }), 2);
+      expect(auxClicks).toEqual([{ button: 2, defaultPrevented: false }]);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+    });
+
+    it('on a disabled item (no href) it keeps the menu open', async () => {
+      const user = userEvent.setup();
+      render(<Demo link={{ disabled: true }} />);
+      await openWithKeyboard(user);
+      auxClick(screen.getByRole('menuitem', { name: 'Orders' }), 1);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+    });
+
+    it("calls the consumer's onAuxClick; when it cancels the event the menu stays open", async () => {
+      const onAuxClick = vi.fn((event: ReactMouseEvent) => event.preventDefault());
+      const user = userEvent.setup();
+      render(<Demo link={{ onAuxClick }} />);
+      await openWithKeyboard(user);
+      auxClick(screen.getByRole('menuitem', { name: 'Orders' }), 1);
+      expect(onAuxClick).toHaveBeenCalledTimes(1);
+      expect(auxClicks).toEqual([{ button: 1, defaultPrevented: true }]);
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+    });
+  });
+
+  describe("the consumer's own handlers", () => {
+    it('an onClick that cancels the click: no onNavigate, the menu stays open', async () => {
+      const onNavigate = vi.fn();
+      const onClick = vi.fn((event: ReactMouseEvent) => event.preventDefault());
+      const user = userEvent.setup();
+      render(<Demo link={{ onNavigate, onClick }} />);
+      await openWithKeyboard(user);
+      await user.click(screen.getByRole('menuitem', { name: 'Orders' }));
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(onNavigate).not.toHaveBeenCalled();
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+    });
+
+    it('onClick is called once, before onNavigate', async () => {
+      const calls: string[] = [];
+      const onClick = vi.fn(() => calls.push('onClick'));
+      const onNavigate = vi.fn(() => calls.push('onNavigate'));
+      const user = userEvent.setup();
+      render(<Demo link={{ onNavigate, onClick }} />);
+      await openWithKeyboard(user);
+      await user.click(screen.getByRole('menuitem', { name: 'Orders' }));
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(calls).toEqual(['onClick', 'onNavigate']);
+    });
+
+    it('onKeyDown is called on Enter', async () => {
+      const onKeyDown = vi.fn();
+      const onNavigate = vi.fn();
+      const user = userEvent.setup();
+      render(<Demo link={{ onKeyDown, onNavigate }} />);
+      await openWithKeyboard(user);
+      await user.keyboard('{ArrowDown}');
+      expect(screen.getByRole('menuitem', { name: 'Orders' })).toHaveFocus();
+      await user.keyboard('{Enter}');
+      expect(onKeyDown).toHaveBeenCalledWith(expect.objectContaining({ key: 'Enter' }));
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('a disabled item has no href, aria-disabled, and never navigates', async () => {
@@ -227,6 +323,60 @@ describe('MenuLinkItem', () => {
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
+  it.each([
+    ['MenuLinkItem', true],
+    ['MenuItem', false],
+  ])('%s: a Space typed in a typeahead search is part of the search (sales r reaches "Sales report")', async (_name, link) => {
+    const onNavigate = vi.fn();
+    const onSelect = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Menu>
+        <MenuTrigger>Apps</MenuTrigger>
+        <MenuContent>
+          <MenuItem>Overview</MenuItem>
+          {link ? (
+            <>
+              <MenuLinkItem href="/pipeline" onNavigate={onNavigate}>
+                Sales pipeline
+              </MenuLinkItem>
+              <MenuLinkItem href="/report" onNavigate={onNavigate}>
+                Sales report
+              </MenuLinkItem>
+            </>
+          ) : (
+            <>
+              <MenuItem onSelect={onSelect}>Sales pipeline</MenuItem>
+              <MenuItem onSelect={onSelect}>Sales report</MenuItem>
+            </>
+          )}
+        </MenuContent>
+      </Menu>,
+    );
+    await openWithKeyboard(user);
+    expect(screen.getByRole('menuitem', { name: 'Overview' })).toHaveFocus();
+    await user.keyboard('sales');
+    expect(screen.getByRole('menuitem', { name: 'Sales pipeline' })).toHaveFocus();
+    await user.keyboard(' r');
+    expect(screen.getByRole('menuitem', { name: 'Sales report' })).toHaveFocus();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(clicks).toEqual([]);
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('a Space swallowed by a typeahead search does not block a later click on the item', async () => {
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(<Demo link={{ onNavigate }} />);
+    await openWithKeyboard(user);
+    await user.keyboard('o ');
+    const orders = screen.getByRole('menuitem', { name: 'Orders' });
+    expect(orders).toHaveFocus();
+    await user.click(orders);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
+
   it('typeahead does not land on a disabled link item', async () => {
     const user = userEvent.setup();
     render(<Demo />);
@@ -265,6 +415,14 @@ describe('MenuLinkItem', () => {
     render(<Demo link={{ href: '' }} />);
     await openWithKeyboard(user);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('<MenuLinkItem>'));
+  });
+
+  it('a disabled item with an empty href is not a development error (it leads nowhere on purpose)', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    render(<Demo link={{ href: '', disabled: true }} />);
+    await openWithKeyboard(user);
+    expect(error).not.toHaveBeenCalledWith(expect.stringContaining('<MenuLinkItem>'));
   });
 
   it('an onNavigate that throws: the menu is already closed and the error is not swallowed', async () => {
