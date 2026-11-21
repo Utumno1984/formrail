@@ -507,7 +507,7 @@ const ITEM_LINK = 'text-inherit no-underline';
  */
 export const MenuLinkItem = /* @__PURE__ */ forwardRef<HTMLAnchorElement, MenuLinkItemProps>(
   function MenuLinkItem(props, ref) {
-    const { tone = 'default', disabled, href, onNavigate, textValue, className, onClick, onKeyDown, children, ...rest } = props;
+    const { tone = 'default', disabled = false, href, onNavigate, textValue, className, onClick, onKeyDown, children, ...rest } = props;
     const { setOpen, triggerRef, contentRef } = useMenuContext('MenuLinkItem');
     const missingHref = !disabled && !hasNavigableHref(href);
     useEffect(() => {
