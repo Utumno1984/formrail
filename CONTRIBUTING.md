@@ -127,10 +127,17 @@ it on a generic record first; a domain appears afterwards, as an example that sa
    must run in their project, so its data is short and inline).
 2. **Examples are declared.** A domain appears only in a `use-case` story: tag `use-case` and exactly one
    `vertical:<id>` tag (`erp`, `b2b`, `e-commerce`, `e-learning`, `helpdesk`, `hr`), name `Example: configured for ...`,
-   at the bottom of the file. Write it with `useCaseStory({ vertical, problem?, configuration? })` from
-   `packages/core/src/internal/story-example.ts` (use its `.parameters` for the description; write the tags literally, because
-   Storybook's indexer reads tags statically). The page template shows these stories last, after every other one, under
-   "Examples" (Free) or "Use cases" (Pro, title `Pro/...`), with a fixed introductory sentence.
+   at the bottom of the file, after at least one neutral story. Write the tags literally on the story (Storybook's
+   indexer reads tags statically) and spread `useCaseStory({ vertical, problem?, configuration? })` from
+   `packages/core/src/internal/story-example.ts`, which returns the description only (`parameters`, never `tags`):
+   `{ name: 'Example: configured for ...', tags: ['use-case', 'vertical:erp'], args, ...useCaseStory({ vertical: 'erp', ... }) }`.
+   That description replaces the story's JSDoc, so a use case has none. The page template shows these stories last,
+   after every other one, under "Examples" (Free) or "Use cases" (Pro, title `Pro/...`), with a fixed introductory
+   sentence; the rest of the page renders exactly as it would without them (on a page without a copy-paste example,
+   Storybook's own template, "Stories" list and single-story rule included).
+   **Limit:** a story is recognised by its tag and by the exact prefix `Example: ` (capital E, colon, space). A name
+   written another way (`example: ...`, `Example - ...`, `Examples: ...`) on a story without the tag is not caught by
+   the guard and stays among the neutral stories: use the exact prefix.
 3. **Never in the library.** No domain in props, types, names, defaults, runtime messages or code of the library. In
    TSDoc the sentence that teaches a rule is neutral; an example with a real record is introduced by "e.g." and varies
    the vertical.
@@ -157,11 +164,16 @@ it on a generic record first; a domain appears afterwards, as an example that sa
 (`packages/core/src/internal/use-case-guard.ts`, with negative unit tests for every rule) on the `index.json` of the
 build. It fails, naming the story, when: a `use-case` story is not named `Example: ...` or has no (or more than one)
 `vertical:<id>` tag, or an unknown id; a public story named `Example: ...` is not a `use-case`; a `use-case` story comes
-before a story that is not one on the same page; a page with `n` public use cases has fewer than `min(n, 3)` distinct
-verticals; a Pro use case lacks `**Problem.**` or `**Configuration.**`. The Pro ratchet (`PRO_USE_CASES_PENDING`) lists
-the Pro pages that do not have their 3 verticals yet: a new Pro page outside it must comply, a page that complies must
-be removed from it, and an entry that matches no page fails. Fixture: `Internal/DocsUseCases` (Free); the Pro
-branch of the template is covered by unit tests (no internal fixture may reach the public Pro demo).
+before a story that is not one on the same page, or a page has no neutral story before its first use case; a page with
+`n` public use cases has fewer than `min(n, 3)` distinct verticals; a Pro use case lacks `**Problem.**` or
+`**Configuration.**`. (On a page made only of `internal` fixtures every story counts as visible.) It also loads every
+story and fails on a page whose `use-case`/`vertical:*` tags at runtime differ from the ones in `index.json`. The Pro
+ratchet (`PRO_USE_CASES_PENDING`) lists the Pro pages that do not have their 3 verticals yet: a new Pro page outside
+it must comply, a page that complies must be removed from it, and an entry that matches no page fails. Fixtures:
+`Internal/DocsUseCases` (a page with a copy-paste example), `Internal/DocsUseCasesPlain` and
+`Internal/DocsUseCasesSingle` (pages without one, each compared with its twin without use cases,
+`...PlainNeutral` and `...SingleNeutral`); the Pro branch of the template is covered by unit tests (no internal
+fixture may reach the public Pro demo).
 
 **The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
 `npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a

@@ -12,15 +12,14 @@ interface IndexEntry {
   type?: string;
   title: string;
   name: string;
+  importPath: string;
   tags?: string[];
 }
 
-async function storyEntries(request: APIRequestContext): Promise<IndexedStory[]> {
+async function storyEntries(request: APIRequestContext): Promise<IndexEntry[]> {
   const res = await request.get('/index.json');
   const index = (await res.json()) as { entries: Record<string, IndexEntry> };
-  return Object.values(index.entries)
-    .filter((entry) => entry.type === 'story')
-    .map(({ id, title, name, tags }) => ({ id, title, name, tags }));
+  return Object.values(index.entries).filter((entry) => entry.type === 'story');
 }
 
 /** The story's `id` anchors of the Docs page, in document order, plus the section (if any). */
@@ -37,6 +36,37 @@ async function readPage(page: Page, docsId: string) {
       sectionText: section?.textContent ?? '',
     };
   });
+}
+
+/**
+ * What a Docs page shows outside its use-case section, with the page's own id prefix replaced by `<page>` so two
+ * pages can be compared: the story anchors as they are (`anchor--primary--...` for the primary, then the
+ * "Stories" list), the h2/h3 headings (the h1 is the title, which differs), the paragraphs that are not inside a
+ * story or a table (the descriptions). And the section: its anchors, its heading, its intro, its text, and
+ * whether every neutral anchor comes before it.
+ */
+async function pageShape(page: Page, docsId: string) {
+  await page.goto(`/iframe.html?id=${docsId}&viewMode=docs`);
+  await page.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+  await page.waitForFunction(() => [...document.querySelectorAll('.docs-story')].every((story) => story.querySelector('*')), undefined, { timeout: 15_000 });
+  return page.evaluate((prefix) => {
+    const content = document.querySelector('.sbdocs-content')!;
+    const section = content.querySelector('[data-use-cases]');
+    const outside = (el: Element) => !section?.contains(el);
+    const norm = (text: string) => text.split(`${prefix}--`).join('<page>--');
+    const anchors = [...content.querySelectorAll('[id^="anchor--"]')];
+    const neutralAnchors = anchors.filter(outside);
+    return {
+      neutralAnchors: neutralAnchors.map((a) => norm(a.id)),
+      neutralHeadings: [...content.querySelectorAll('h2, h3')].filter(outside).map((h) => `${h.tagName}:${h.textContent?.trim()}`),
+      neutralText: [...content.querySelectorAll('p')].filter((p) => outside(p) && !p.closest('.docs-story, table')).map((p) => p.textContent?.trim()),
+      sectionAnchors: anchors.filter((a) => !outside(a)).map((a) => norm(a.id)),
+      sectionHeading: section?.querySelector('h2')?.textContent?.trim() ?? null,
+      sectionIntro: section?.querySelector('[data-use-cases-intro]')?.textContent ?? null,
+      sectionText: section?.textContent ?? '',
+      sectionLast: section ? neutralAnchors.every((a) => !!(a.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING)) : null,
+    };
+  }, docsId.replace(/--docs$/, ''));
 }
 
 test.describe('Docs page: neutral first, then Examples / Use cases', () => {
@@ -63,6 +93,52 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     });
     expect(order).toContain('Stories');
     expect(order.indexOf('Stories')).toBeLessThan(order.indexOf('Examples'));
+    // The section is a region named by its heading (aria-labelledby, not a copy of the text).
+    const region = page.getByRole('region', { name: 'Examples', exact: true });
+    await expect(region).toHaveCount(1);
+    await expect(region).toHaveAttribute('aria-labelledby', 'examples');
+    await expect(region.locator('h2#examples')).toHaveText('Examples');
+  });
+
+  test('Free page WITHOUT a copy-paste example: Storybook\'s own template, unchanged by its use cases, then "Examples"', async ({ page }) => {
+    // The twin page (same neutral stories, no use case) is rendered by Storybook's `DocsPage` untouched.
+    const twin = await pageShape(page, 'internal-docsusecasesplainneutral--docs');
+    // Not vacuous: the primary, then "Stories" with the primary included and the other story.
+    expect(twin.neutralAnchors).toEqual(['anchor--primary--<page>--default', 'anchor--<page>--default', 'anchor--<page>--disabled']);
+    expect(twin.neutralHeadings).toEqual(['H2:Stories', 'H3:Default', 'H3:Disabled']);
+    expect(twin.neutralText).toEqual(expect.arrayContaining(['The neutral component on a generic record.', 'A state of the neutral component.']));
+    expect(twin.sectionHeading).toBeNull();
+
+    const docs = await pageShape(page, 'internal-docsusecasesplain--docs');
+    // Adding the use cases did not change the neutral part.
+    expect(docs.neutralAnchors).toEqual(twin.neutralAnchors);
+    expect(docs.neutralHeadings).toEqual(twin.neutralHeadings);
+    expect(docs.neutralText).toEqual(twin.neutralText);
+    // The section: after every neutral story, its heading and intro, the use cases in order with their descriptions.
+    expect(docs.sectionLast).toBe(true);
+    expect(docs.sectionAnchors).toEqual(['anchor--<page>--use-case-hr-leave-request', 'anchor--<page>--use-case-helpdesk-ticket']);
+    expect(docs.sectionHeading).toBe('Examples');
+    expect(docs.sectionIntro).toBe(USE_CASES_INTRO);
+    expect(docs.sectionText).toContain('A manager approves the days off an employee asked for.');
+    expect(docs.sectionText).toContain('An agent closes a support ticket once it is answered.');
+    await expect(page.getByRole('region', { name: 'Examples', exact: true })).toHaveCount(1);
+  });
+
+  test('a single-story page stays a single-story page when it gains a use case', async ({ page }) => {
+    const twin = await pageShape(page, 'internal-docsusecasessingleneutral--docs');
+    // Storybook's single-story rule: the story's description under the page's, no "Stories" list.
+    expect(twin.neutralAnchors).toEqual(['anchor--primary--<page>--default']);
+    expect(twin.neutralHeadings).toEqual([]);
+    expect(twin.neutralText).toContain('The only neutral story: on a single-story page this sentence sits under the page\'s description.');
+
+    const docs = await pageShape(page, 'internal-docsusecasessingle--docs');
+    expect(docs.neutralAnchors).toEqual(twin.neutralAnchors);
+    expect(docs.neutralHeadings).toEqual(twin.neutralHeadings);
+    expect(docs.neutralText).toEqual(twin.neutralText);
+    expect(docs.sectionLast).toBe(true);
+    expect(docs.sectionAnchors).toEqual(['anchor--<page>--use-case-b-2-b-price-list']);
+    expect(docs.sectionHeading).toBe('Examples');
+    expect(docs.sectionIntro).toBe(USE_CASES_INTRO);
   });
 
   // The Pro branch of the template ("Use cases", Problem and Configuration per case) has no e2e on a real page
@@ -72,34 +148,56 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
 });
 
 test.describe('Use-case guard on the real index', () => {
-  test('every page of the build is in shape, and the Pro ratchet holds', async ({ page, request }) => {
-    const stories = await storyEntries(request);
+  test('every page of the build is in shape, its runtime tags are the index\'s, and the Pro ratchet holds', async ({ page, request }) => {
+    // Loads every CSF file of the build once, in one page.
+    test.setTimeout(120_000);
+    const entries = await storyEntries(request);
+    const stories: IndexedStory[] = entries.map(({ id, title, name, tags }) => ({ id, title, name, tags }));
     const useCases = stories.filter((story) => story.tags?.includes(USE_CASE_TAG));
     // Not vacuous: the fixtures are in every build that has them.
     expect(useCases.length).toBeGreaterThanOrEqual(2);
 
-    // The descriptions of the Pro use cases, and the tags the stories really carry once loaded (the index reads them statically;
-    // they must be the same).
+    // The tags every story really carries once loaded, and its description. The index reads tags statically: a
+    // tag added at runtime only (or dropped) would escape the guard, so both directions are compared, per page.
     await page.goto(`/iframe.html?id=${useCases[0]!.id}&viewMode=story`);
-    await page.waitForFunction(() => !!(window as unknown as { __STORYBOOK_PREVIEW__?: unknown }).__STORYBOOK_PREVIEW__);
-    const loaded = await page.evaluate(async (ids) => {
-      type Loaded = { tags: string[]; parameters: { docs?: { description?: { story?: string } } } };
-      const preview = (window as unknown as { __STORYBOOK_PREVIEW__: { storyStoreValue: { loadStory: (a: { storyId: string }) => Promise<Loaded> } } }).__STORYBOOK_PREVIEW__;
-      const out: Record<string, { tags: string[]; description?: string }> = {};
-      for (const id of ids) {
-        const story = await preview.storyStoreValue.loadStory({ storyId: id });
-        out[id] = { tags: story.tags, description: story.parameters.docs?.description?.story };
-      }
-      return out;
-    }, useCases.map((story) => story.id));
+    await page.waitForFunction(() => !!(window as unknown as { __STORYBOOK_PREVIEW__?: { storyStoreValue?: unknown } }).__STORYBOOK_PREVIEW__?.storyStoreValue);
+    const loaded = await page.evaluate(
+      async (list) => {
+        type Loaded = { tags: string[]; parameters: { docs?: { description?: { story?: string } } } };
+        type Store = {
+          loadAllCSFFiles: () => Promise<Record<string, unknown>>;
+          storyFromCSFFile: (a: { storyId: string; csfFile: unknown }) => Loaded;
+        };
+        const store = (window as unknown as { __STORYBOOK_PREVIEW__: { storyStoreValue: Store } }).__STORYBOOK_PREVIEW__.storyStoreValue;
+        const files = await store.loadAllCSFFiles();
+        const out: Record<string, { tags: string[]; description?: string }> = {};
+        for (const { id, importPath } of list) {
+          const story = store.storyFromCSFFile({ storyId: id, csfFile: files[importPath] });
+          out[id] = { tags: story.tags, description: story.parameters.docs?.description?.story };
+        }
+        return out;
+      },
+      entries.map(({ id, importPath }) => ({ id, importPath })),
+    );
+    expect(Object.keys(loaded).length).toBe(entries.length);
+
+    const caseTags = (tags: readonly string[] | undefined) => (tags ?? []).filter((tag) => tag === USE_CASE_TAG || tag.startsWith(VERTICAL_TAG_PREFIX)).sort();
+    const pages = new Map<string, { index: string[]; runtime: string[] }>();
+    for (const story of stories) {
+      const facts = pages.get(story.title) ?? { index: [], runtime: [] };
+      facts.index.push(...caseTags(story.tags).map((tag) => `${story.id} ${tag}`));
+      facts.runtime.push(...caseTags(loaded[story.id]!.tags).map((tag) => `${story.id} ${tag}`));
+      pages.set(story.title, facts);
+    }
+    const mismatches = [...pages].filter(([, facts]) => facts.index.join('\n') !== facts.runtime.join('\n'));
+    expect(
+      mismatches.map(([title, facts]) => ({ title, index: facts.index, runtime: facts.runtime })),
+      'pages whose "use-case"/"vertical:*" tags differ between index.json and the loaded stories (write the tags literally on the story)',
+    ).toEqual([]);
+    // Not vacuous: the runtime side sees the fixtures' use cases too.
+    expect([...pages.values()].flatMap((facts) => facts.runtime).filter((tag) => tag.endsWith(` ${USE_CASE_TAG}`)).length).toBe(useCases.length);
 
     const descriptions = Object.fromEntries(Object.entries(loaded).map(([id, facts]) => [id, facts.description]));
-    for (const story of useCases) {
-      const indexed = (story.tags ?? []).filter((tag) => tag === USE_CASE_TAG || tag.startsWith(VERTICAL_TAG_PREFIX)).sort();
-      const runtime = loaded[story.id]!.tags.filter((tag) => tag === USE_CASE_TAG || tag.startsWith(VERTICAL_TAG_PREFIX)).sort();
-      expect(runtime, `${story.id}: the tags in index.json differ from the ones the loaded story carries`).toEqual(indexed);
-    }
-
     expect(auditUseCaseStructure(stories, descriptions)).toEqual([]);
     expect(auditProRatchet(stories)).toEqual([]);
   });
