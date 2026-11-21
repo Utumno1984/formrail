@@ -56,9 +56,9 @@ function appsOf({ count, disabledApp }: Pick<DemoArgs, 'count' | 'disabledApp'>)
   return makeApps(count).map((app, i) => (i + 1 === disabledApp ? { ...app, disabled: true, disabledReason: DISABLED_REASON } : app));
 }
 
-const meta = {
+const meta: Meta<DemoArgs> = {
   title: 'Navigation/AppLauncher',
-  component: AppLauncher,
+  component: AppLauncher as never,
   parameters: { layout: 'padded' },
   argTypes: {
     currentAppId: {
@@ -86,10 +86,10 @@ const meta = {
   render: ({ count, disabledApp, routed, onNavigate, ...args }) => (
     <AppLauncher {...args} onNavigate={routed ? onNavigate : undefined} apps={appsOf({ count, disabledApp })} />
   ),
-} satisfies Meta<DemoArgs>;
+};
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<DemoArgs>;
 
 export const Example: Story = { tags: ['example', '!visual'], ...exampleStory('AppLauncher.example.tsx') };
 
