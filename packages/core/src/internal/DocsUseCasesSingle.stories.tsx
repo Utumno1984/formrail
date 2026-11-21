@@ -12,6 +12,8 @@ const meta = {
   component: Button,
   tags: ['internal', '!visual'],
   argTypes: { variant: { control: 'radio', options: ['primary', 'secondary', 'ghost', 'danger'] }, children: { control: 'text' } },
+  // A subtitle, so the e2e can tell that a template keeps it (#646).
+  parameters: { componentSubtitle: 'A neutral subtitle.' },
   args: { variant: 'secondary', children: 'Save' },
 } satisfies Meta<typeof Button>;
 export default meta;
