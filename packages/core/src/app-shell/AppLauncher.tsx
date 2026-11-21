@@ -25,9 +25,10 @@ export interface AppLauncherLabels {
   /** Text shown when the list is empty and nothing is loading. Default `No apps available`. */
   empty: string;
   /**
-   * Announced by assistive technology when the apps start loading. It lives in a polite status region next to the
-   * navigation region (outside its `aria-busy`, which may hold back the announcement), always mounted empty and
-   * filled after the mount, so that a launcher mounted already loading is announced too. Emptied once loaded.
+   * Announced by assistive technology when the apps start loading. It lives in a polite status region inside the
+   * navigation region (outside the `aria-busy` placeholders, which may hold back the announcement), always mounted
+   * empty and filled after the mount, so that a launcher mounted already loading is announced too. Emptied once
+   * loaded. A hidden launcher (`hidden`, `display: none`) announces nothing.
    * Default `Loading apps`.
    */
   loading: string;
@@ -66,7 +67,7 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   /** `id` of the app the user is in: its tile gets `aria-current="true"` and a visible marker, and can still be opened. */
   currentAppId?: string;
   /**
-   * Shows placeholder tiles (same size and columns as the real ones) instead of the list, and marks the region
+   * Shows placeholder tiles (same size and columns as the real ones) instead of the list, and marks them
    * `aria-busy`.
    * @default false
    */
@@ -179,8 +180,8 @@ export function appLauncherProblems(apps: readonly AppDescriptor[], hasOnNavigat
  * Columns follow the width of the launcher, not of the window (container query: 1 to 4). The launcher fills the
  * width of its parent; give a shrink-to-fit parent a real width. Loading, empty and loaded keep the same footprint
  * for the same number of tiles. If the tile with the focus disappears (the list changes), the focus moves to the
- * next app, or the previous one, or the region itself, never to the page. The region is followed by a visually
- * hidden status element (the loading announcement); `ref`, `className` and the other attributes go to the region.
+ * next app, or the previous one, or the region itself, never to the page. The region is the only root node: it holds a
+ * visually hidden status element (the loading announcement); `ref`, `className` and the other attributes go to it.
  */
 export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherProps>(function AppLauncher(
   {
@@ -296,14 +297,12 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
   useEffect(() => setMounted(true), []);
 
   return (
-    <>
-      <nav
+    <nav
         {...rest}
         ref={composedRef}
         tabIndex={-1}
         aria-label={ariaLabelledBy ? ariaLabel : ariaLabel ?? labels.region}
         aria-labelledby={ariaLabelledBy}
-        aria-busy={loading || undefined}
         data-rop-app-launcher=""
         className={cn(
           'relative block min-w-0 max-w-full p-1 font-rop-sans text-rop-body text-rop-text @container',
@@ -312,7 +311,7 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
         )}
       >
         {loading ? (
-          <div aria-hidden="true" data-rop-app-launcher-placeholders="" className={cn(GRID, ROW_MIN_HEIGHT)}>
+          <div aria-hidden="true" aria-busy="true" data-rop-app-launcher-placeholders="" className={cn(GRID, ROW_MIN_HEIGHT)}>
             {Array.from({ length: count }, (_, i) => (
               <div key={i} className="flex min-w-0 flex-col">
                 <div className={cn(TILE, 'pointer-events-none')}>
@@ -423,11 +422,11 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
             })}
           </ul>
         )}
-      </nav>
-      {/* A sibling after the region, not a child: inside the `aria-busy` element its change may be withheld. */}
+      {/* Inside the region (one root node), but outside the `aria-busy` placeholders, where its change would be
+          withheld. If the launcher is hidden (`hidden`, `display: none`) it is not announced either. */}
       <span role="status" data-rop-app-launcher-status="" className="sr-only">
         {mounted && loading ? labels.loading : ''}
       </span>
-    </>
+    </nav>
   );
 });
