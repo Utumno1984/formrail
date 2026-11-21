@@ -301,6 +301,41 @@ describe('enrolments', () => {
     }
     expect(kinds).toEqual(new Set(['customer-contact', 'employee']));
   });
+
+  it('never enrol a learner before the learner existed (account opened, employee hired)', () => {
+    const problems: string[] = [];
+    for (const e of rows) {
+      const since =
+        e.learner.kind === 'employee'
+          ? getEmployee(e.learner.id)?.hireDate
+          : getCustomer(e.learner.id.replace(/-con-\d+$/, ''))?.createdOn;
+      if (since === undefined) problems.push(`${e.id}: learner ${e.learner.id} not found`);
+      else if (e.enrolledOn < since) problems.push(`${e.id}: enrolled on ${e.enrolledOn} before ${e.learner.id} existed (${since})`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('enrol in a retired course at least 150 days before today, unless the course or the learner is younger than that', () => {
+    const today = isoToDayNumber(DEMO_TODAY);
+    const age = (iso: string) => today - isoToDayNumber(iso);
+    const retiredIds = new Set(courses.filter((c) => c.status === 'retired').map((c) => c.id));
+    const retiredRows = rows.filter((e) => retiredIds.has(e.courseId));
+    expect(retiredRows.length).toBeGreaterThan(0);
+    const problems: string[] = [];
+    let atLeast150 = 0;
+    for (const e of retiredRows) {
+      const since =
+        e.learner.kind === 'employee'
+          ? getEmployee(e.learner.id)!.hireDate
+          : getCustomer(e.learner.id.replace(/-con-\d+$/, ''))!.createdOn;
+      // The enrolment cannot be older than the course or the learner, so a young one caps the minimum age.
+      const required = Math.min(150, age(courseById.get(e.courseId)!.publishedOn!), age(since));
+      if (age(e.enrolledOn) < required) problems.push(`${e.id}: enrolled ${e.enrolledOn} in retired ${e.courseId}, needs ${required} days`);
+      if (age(e.enrolledOn) >= 150) atLeast150 += 1;
+    }
+    expect(problems).toEqual([]);
+    expect(atLeast150).toBeGreaterThan(0);
+  });
 });
 
 describe('carts', () => {

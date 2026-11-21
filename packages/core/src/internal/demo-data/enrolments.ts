@@ -69,9 +69,9 @@ interface Prepared {
   /** Course pool indexes that can be enrolled in, with the age in days of their publication. */
   readonly courses: readonly { readonly index: number; readonly id: string; readonly retired: boolean; readonly age: number }[];
   /** Pool indexes of non-archived customers, and the age in days of the account. */
-  readonly customers: readonly { readonly index: number; readonly age: number }[];
+  readonly customers: readonly { readonly index: number; readonly age: number; readonly contacts: readonly { readonly id: string; readonly fullName: string }[] }[];
   /** Pool indexes of active employees, and the days since hire. */
-  readonly employees: readonly { readonly index: number; readonly age: number }[];
+  readonly employees: readonly { readonly index: number; readonly age: number; readonly id: string; readonly fullName: string }[];
 }
 
 let prepared: Prepared | undefined;
@@ -84,11 +84,11 @@ function prepare(): Prepared {
   });
   const customers: Prepared['customers'][number][] = [];
   makeCustomers(DEMO_REFERENCE_POOL.customers).forEach((customer, index) => {
-    if (customer.status !== 'archived') customers.push({ index, age: daysBetween(customer.createdOn, DEMO_TODAY) });
+    if (customer.status !== 'archived') customers.push({ index, age: daysBetween(customer.createdOn, DEMO_TODAY), contacts: customer.contacts });
   });
   const employees: Prepared['employees'][number][] = [];
   makeEmployees(DEMO_REFERENCE_POOL.employees).forEach((employee, index) => {
-    if (employee.status === 'active') employees.push({ index, age: daysBetween(employee.hireDate, DEMO_TODAY) });
+    if (employee.status === 'active') employees.push({ index, age: daysBetween(employee.hireDate, DEMO_TODAY), id: employee.id, fullName: employee.fullName });
   });
   return (prepared = { courses, customers, employees });
 }
@@ -101,13 +101,11 @@ function makeEnrolment(index: number): DemoEnrolment {
   let learnerAge: number;
   if (rng.chance(EMPLOYEE_SHARE)) {
     const entry = employees[rng.int(0, employees.length - 1)]!;
-    const employee = makeEmployees(DEMO_REFERENCE_POOL.employees)[entry.index]!;
-    learner = Object.freeze({ kind: 'employee', id: employee.id, name: employee.fullName });
+    learner = Object.freeze({ kind: 'employee', id: entry.id, name: entry.fullName });
     learnerAge = entry.age;
   } else {
     const entry = customers[rng.int(0, customers.length - 1)]!;
-    const customer = makeCustomers(DEMO_REFERENCE_POOL.customers)[entry.index]!;
-    const contact = customer.contacts[rng.int(0, customer.contacts.length - 1)]!;
+    const contact = entry.contacts[rng.int(0, entry.contacts.length - 1)]!;
     learner = Object.freeze({ kind: 'customer-contact', id: contact.id, name: contact.fullName });
     learnerAge = entry.age;
   }
