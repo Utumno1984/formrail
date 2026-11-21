@@ -512,3 +512,64 @@ describe('the creation page: a Create that overlaps a navigation (#527)', () => 
     expect(window.history.length).toBe(entries);
   }, 40_000);
 });
+
+describe('a save that outlives the page it started on (#527)', () => {
+  const edit = async (): Promise<string> => {
+    const link = (await screen.findAllByRole('link'))[0]!;
+    const number = link.textContent!;
+    await userEvent.click(link);
+    const quantity = await screen.findByRole('textbox', { name: 'Line 1 quantity' });
+    await userEvent.clear(quantity);
+    await userEvent.type(quantity, '88');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    return number;
+  };
+  const stored = (number: string) => store().snapshot().find((o) => o.number === number)!;
+
+  it('save in flight + Back + Leave anyway: leaves at once, the store gets the saved value, no React warning', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const onSaved = vi.fn();
+    const { promise, release } = gate();
+    renderCrud({ saveDelayMs: promise, onSaved });
+    const number = await edit();
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
+    await waitFor(() => expect(window.location.search).not.toContain('record='));
+    expect(onSaved).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(stored(number).lines[0]!.quantity).toBe(88);
+    // The list reloading after the return is async and outside `act`: a harness notice, not a React warning about the
+    // save resolving after the page is gone.
+    expect(errors.mock.calls.filter(([message]) => !String(message).includes('not wrapped in act'))).toEqual([]);
+    errors.mockRestore();
+  }, 40_000);
+
+  it('leaving during a save and re-opening the order: it shows the saved value, a second save keeps it', async () => {
+    const { promise, release } = gate();
+    let number = '';
+    try {
+      renderCrud({ saveDelayMs: promise });
+      number = await edit();
+      await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Leave anyway' }));
+      await waitFor(() => expect(window.location.search).not.toContain('record='));
+      // The list read waits for the save in flight: with the gate closed it cannot settle, however many task turns pass.
+      for (let turn = 0; turn < 5; turn += 1) {
+        await act(async () => {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        });
+      }
+      expect(screen.queryByRole('link', { name: number })).toBeNull();
+    } finally {
+      release();
+    }
+    await userEvent.click(await screen.findByRole('link', { name: number }, { timeout: 5000 }));
+    const reopened = await screen.findByRole('textbox', { name: 'Line 1 quantity' }, { timeout: 5000 });
+    expect(reopened).toHaveProperty('value', '88');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), ' x');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(stored(number).notes).toContain(' x'), { timeout: 5000 });
+    expect(stored(number).lines[0]!.quantity).toBe(88);
+  }, 40_000);
+});
