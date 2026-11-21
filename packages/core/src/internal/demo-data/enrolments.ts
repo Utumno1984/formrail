@@ -59,7 +59,7 @@ const STATUS_WEIGHTS: readonly (readonly [DemoEnrolmentStatus, number])[] = [
 ];
 /** Enrolments older than this are no longer waiting or ongoing: they ended one way or the other. */
 const OPEN_MAX_AGE = 120;
-/** A retired course takes no new enrolment: its enrolments are old. */
+/** A retired course takes no new enrolment: its enrolments are old, unless the learner or the course is younger than that. */
 const RETIRED_MIN_AGE = 150;
 const EMPLOYEE_SHARE = 0.35;
 

@@ -217,6 +217,7 @@ describe('internal icons', () => {
       'AccordionContent',
       'AccordionItem',
       'AccordionTrigger',
+      'AppLauncher',
       'Avatar',
       'Breadcrumb',
       'BreadcrumbItem',
