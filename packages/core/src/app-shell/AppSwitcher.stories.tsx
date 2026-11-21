@@ -153,13 +153,15 @@ export const Mobile: Story = {
 
 /**
  * `onNavigate` goes through `useDirtyGuard`: after a change in the field, choosing another app asks first. "Keep
- * editing" returns the focus to the trigger and nothing happens; "Leave without saving" calls `onNavigate`.
+ * editing" returns the focus to the trigger and nothing happens; "Leave without saving" calls `onNavigate` (the
+ * line under the field shows the last app opened).
  */
 export const WithDirtyGuard: Story = {
   args: { disabledApp: false },
   parameters: { controls: { disable: true } },
   render: function Render({ disabledApp, onNavigate, ...args }) {
     const [value, setValue] = useState('First value');
+    const [opened, setOpened] = useState('none');
     const { guard, dialog } = useDirtyGuard({ when: value !== 'First value' });
     return (
       <>
@@ -167,13 +169,19 @@ export const WithDirtyGuard: Story = {
           <AppSwitcher
             {...args}
             apps={appsOf(disabledApp)}
-            onNavigate={(app, event) => guard(() => onNavigate(app, event))}
+            onNavigate={(app, event) =>
+              guard(() => {
+                setOpened(app.label);
+                onNavigate(app, event);
+              })
+            }
           />
         </div>
         <div style={{ padding: 16, maxWidth: 320 }}>
           <Field label="Name" name="name">
             <Input value={value} onChange={(event) => setValue(event.target.value)} />
           </Field>
+          <p style={{ margin: '12px 0 0' }}>Last app opened: {opened}</p>
         </div>
         {dialog}
       </>
@@ -185,7 +193,9 @@ export const WithDirtyGuard: Story = {
     await userEvent.type(canvas.getByRole('textbox', { name: 'Name' }), ' changed');
     const trigger = canvas.getByRole('button', { name: /^Switch app/ });
     await userEvent.click(trigger);
-    await userEvent.click(await body.findByRole('menuitem', { name: 'App two' }));
+    // A menu item with `menu`, a link of the Sheet with `sheet` (or `auto` on a narrow canvas).
+    const two = await waitFor(() => body.queryByRole('menuitem', { name: 'App two' }) ?? body.getByRole('link', { name: 'App two' }));
+    await userEvent.click(two);
     const dialog = await body.findByRole('dialog', { name: 'Unsaved changes' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Keep editing' }));
     await waitFor(() => expect(trigger).toHaveFocus());
