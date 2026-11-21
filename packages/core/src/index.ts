@@ -211,3 +211,6 @@ export type {
   MenuLabelProps,
   MenuSeparatorProps,
 } from './menu/Menu';
+export { AppLauncher } from './app-shell/AppLauncher';
+export type { AppLauncherProps, AppLauncherLabels, AppLauncherTileElement } from './app-shell/AppLauncher';
+export type { AppDescriptor } from './app-shell/types';

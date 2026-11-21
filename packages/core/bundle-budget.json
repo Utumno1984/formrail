@@ -18,6 +18,10 @@
       "baseline": 17917,
       "limit": 19709
     },
+    "AppLauncher": {
+      "baseline": 34569,
+      "limit": 38026
+    },
     "Avatar": {
       "baseline": 11901,
       "limit": 13092
