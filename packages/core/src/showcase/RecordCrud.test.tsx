@@ -226,7 +226,6 @@ describe('RecordCrud (#519): the shell holds no word of a domain', () => {
   // is scanned the day it is added, a new domain file must be added to this list on purpose.
   const DOMAIN_FILES = new Set([
     'app-story-args.ts',
-    'crud-story-args.ts',
     'customer-store.ts',
     'customer-story-args.ts',
     'notice-cap.ts',

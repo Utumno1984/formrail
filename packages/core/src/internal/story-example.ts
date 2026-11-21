@@ -58,7 +58,7 @@ export function githubSource(repoPath: string): string {
 
 /** One source file shown on a showcase's Docs page, in a `Source` block with its GitHub link. */
 export interface SourceFile {
-  /** Repository path (`packages/core/src/showcase/InvoiceCrud.tsx`): the heading and the GitHub link. */
+  /** Repository path (`packages/core/src/showcase/RecordCrud.tsx`): the heading and the GitHub link. */
   path: string;
   /** The file's text, imported with `?raw`. */
   code: string;
