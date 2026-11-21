@@ -106,6 +106,21 @@ export {
   type DemoInvoiceStatus,
 } from './invoices';
 export {
+  DOMAIN_TERMS,
+  RECORD_CATEGORY_LABEL,
+  RECORD_STATUS_LABEL,
+  RECORD_STATUS_TONE,
+  findDomainTerm,
+  getRecord,
+  getRecordDetail,
+  makeRecords,
+  type DemoRecord,
+  type DemoRecordCategory,
+  type DemoRecordDetail,
+  type DemoRecordItem,
+  type DemoRecordStatus,
+} from './records';
+export {
   SUPPORT_CASE_PRIORITY_LABEL,
   SUPPORT_CASE_PRIORITY_TONE,
   SUPPORT_CASE_STATUS_LABEL,
