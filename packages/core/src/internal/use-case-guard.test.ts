@@ -46,7 +46,28 @@ describe('auditUseCaseStructure (#624)', () => {
   });
 
   it('the order is per page: another page does not matter', () => {
-    expect(auditUseCaseStructure([useCase('X/A', 'erp'), neutral('X/B')])).toEqual([]);
+    expect(auditUseCaseStructure([neutral('X/A'), useCase('X/A', 'erp'), neutral('X/B')])).toEqual([]);
+  });
+
+  it('rule: a page opens on a neutral story, never on a use case (alone, or only use cases)', () => {
+    const alone = useCase('X/A', 'erp');
+    expect(auditUseCaseStructure([alone])).toEqual([expect.stringContaining(`X/A / Example: configured for something (${alone.id}): no neutral story before the first use case`)]);
+    const firstOfTwo = useCase('X/B', 'erp');
+    expect(auditUseCaseStructure([firstOfTwo, useCase('X/B', 'hr')])).toEqual([expect.stringContaining(`(${firstOfTwo.id}): no neutral story before the first use case`)]);
+    // An internal neutral story does not count: the reader of a public page sees the domain example first.
+    const afterHidden = useCase('X/C', 'erp');
+    expect(auditUseCaseStructure([neutral('X/C', 'Hidden', ['internal']), afterHidden])).toEqual([expect.stringContaining(`(${afterHidden.id}): no neutral story before the first use case`)]);
+  });
+
+  it('a page made only of fixtures (internal) is checked too: order, verticals and neutral first', () => {
+    const fixture = (name = 'Default') => neutral('F/A', name, ['internal']);
+    const useCaseFixture = (vertical: string) => useCase('F/A', vertical, 'Example: configured for a fixture', ['internal']);
+    const late = fixture('Late');
+    expect(auditUseCaseStructure([fixture(), useCaseFixture('erp'), late])).toEqual([expect.stringContaining(`F/A / Late (${late.id}): comes after the use case`)]);
+    expect(auditUseCaseStructure([fixture(), useCaseFixture('erp'), useCaseFixture('erp')])).toEqual([expect.stringContaining('F/A: 2 use cases but only 1 distinct verticals (at least 2 needed)')]);
+    const first = useCaseFixture('erp');
+    expect(auditUseCaseStructure([first])).toEqual([expect.stringContaining(`(${first.id}): no neutral story before the first use case`)]);
+    expect(auditUseCaseStructure([fixture(), useCaseFixture('erp'), useCaseFixture('hr')])).toEqual([]);
   });
 
   it('rule: n use cases cover min(n, 3) distinct verticals', () => {

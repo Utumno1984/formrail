@@ -79,6 +79,12 @@ export function auditUseCaseStructure(stories: readonly IndexedStory[], descript
 
   for (const [title, page] of byPage(stories)) {
     const visible = visibleStories(page);
+    // The page opens on the neutral component: at least one story that is not a use case comes before them, so
+    // the primary story (the first one) is never a domain example.
+    const first = visible[0];
+    if (first && isUseCase(first)) {
+      problems.push(`${label(first)}: no neutral story before the first use case; a page shows the neutral component first (a story that is not "${USE_CASE_TAG}")`);
+    }
     let seen: IndexedStory | undefined;
     for (const story of visible) {
       if (isUseCase(story)) seen ??= story;
