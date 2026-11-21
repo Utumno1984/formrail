@@ -204,6 +204,29 @@ describe('MenuLinkItem', () => {
     expect(screen.getByRole('menuitem', { name: 'Reports' })).toHaveFocus();
   });
 
+  it('Space typed in the middle of a typeahead search is a search character, not an activation', async () => {
+    const onNavigate = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Menu>
+        <MenuTrigger>Apps</MenuTrigger>
+        <MenuContent>
+          <MenuLinkItem href="/a" onNavigate={onNavigate}>
+            Sales report
+          </MenuLinkItem>
+          <MenuLinkItem href="/b" onNavigate={onNavigate}>
+            Sales pipeline
+          </MenuLinkItem>
+        </MenuContent>
+      </Menu>,
+    );
+    await openWithKeyboard(user);
+    await user.keyboard('sales p');
+    expect(screen.getByRole('menuitem', { name: 'Sales pipeline' })).toHaveFocus();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
   it('typeahead does not land on a disabled link item', async () => {
     const user = userEvent.setup();
     render(<Demo />);
