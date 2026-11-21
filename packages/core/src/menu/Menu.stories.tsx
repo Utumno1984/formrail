@@ -15,7 +15,7 @@ import {
 import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
-import { Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from './Menu';
+import { Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuLinkItem, MenuSeparator, MenuTrigger } from './Menu';
 
 type Side = 'top' | 'right' | 'bottom' | 'left';
 type Align = 'start' | 'center' | 'end';
@@ -39,7 +39,7 @@ const meta: Meta<DemoArgs> = {
   // The stories drive the menu through a demo wrapper (`Meta<DemoArgs>`): `never` keeps the props table of
   // the real component; the Menu props the demo does not take from the args have no Control.
   component: Menu as never,
-  subcomponents: { MenuTrigger, MenuContent, MenuItem, MenuGroup, MenuLabel, MenuSeparator },
+  subcomponents: { MenuTrigger, MenuContent, MenuItem, MenuLinkItem, MenuGroup, MenuLabel, MenuSeparator },
   // Overlays opened at mount (`defaultOpen`) would take over the Docs page if the stories were rendered
   // inline: each story gets its own iframe there.
   parameters: { layout: 'fullscreen', docs: { story: { inline: false, height: '420px' } } },
@@ -696,5 +696,91 @@ export const MenuInDialogFromMenu: Story = {
     await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
     await expect(dialog).toBeInTheDocument();
     await waitFor(() => expect(inner).toHaveFocus());
+  },
+};
+
+interface NavigationArgs {
+  disabled: boolean;
+  href: string;
+  onNavigate: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+}
+
+const navigationArgTypes = {
+  disabled: storyControl({
+    control: 'boolean',
+    description: 'Prop of `MenuLinkItem`: disables the "Billing" item (no `href` in the DOM, skipped by the arrows).',
+  }),
+  href: storyControl({ control: 'text', description: 'Prop of `MenuLinkItem`: the destination of the "Reports" item.' }),
+  onNavigate: storyControl({
+    control: false,
+    description:
+      'Prop of `MenuLinkItem`: called once on a plain click or Enter, after the menu closed and the focus returned to the trigger.',
+  }),
+};
+
+function NavigationMenu({ args, defaultOpen }: { args: NavigationArgs; defaultOpen?: boolean }) {
+  return (
+    <Page>
+      <Menu defaultOpen={defaultOpen} modal={!defaultOpen}>
+        <MenuTrigger asChild>
+          <Button variant="secondary">Switch workspace</Button>
+        </MenuTrigger>
+        <MenuContent>
+          <MenuLinkItem href="/overview" aria-current="page" onNavigate={args.onNavigate}>
+            Overview
+          </MenuLinkItem>
+          <MenuLinkItem href="/billing" disabled={args.disabled} onNavigate={args.onNavigate}>
+            Billing
+          </MenuLinkItem>
+          <MenuLinkItem href={args.href} onNavigate={args.onNavigate}>
+            Reports
+          </MenuLinkItem>
+          <MenuItem>Settings</MenuItem>
+        </MenuContent>
+      </Menu>
+    </Page>
+  );
+}
+
+/**
+ * `MenuLinkItem`: a menu item that is a real `<a href>`. A plain click or Enter goes to `onNavigate` (any router; the
+ * browser's navigation is cancelled), a click with Ctrl, Cmd or Shift opens the `href` in the browser untouched. Controls:
+ * `disabled` and `href`; `onNavigate` is in Actions. The play function opens the menu from the keyboard, goes down past
+ * the disabled item, presses Enter and checks the call and the focus back on the trigger.
+ */
+export const NavigationItems: StoryObj<NavigationArgs> = {
+  argTypes: navigationArgTypes,
+  args: { disabled: true, href: '/reports', onNavigate: fn() },
+  render: (args) => <NavigationMenu args={args} />,
+  play: async ({ args, canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', { name: 'Switch workspace' });
+    trigger.focus();
+    await userEvent.keyboard('{ArrowDown}');
+    const body = within(canvasElement.ownerDocument.body);
+    const overview = await body.findByRole('menuitem', { name: 'Overview' });
+    await waitFor(() => expect(overview).toHaveFocus());
+    await expect(overview).toHaveAttribute('href', '/overview');
+    await expect(overview).toHaveAttribute('aria-current', 'page');
+    // "Billing" is disabled: the arrow skips it and lands on "Reports".
+    await userEvent.keyboard('{ArrowDown}');
+    const reports = body.getByRole('menuitem', { name: 'Reports' });
+    await expect(reports).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onNavigate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(body.queryByRole('menu')).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+
+/** The open menu with link items: current page, a disabled item and a plain action (visual baseline). */
+export const NavigationItemsOpen: StoryObj<NavigationArgs> = {
+  tags: ['visual'],
+  argTypes: navigationArgTypes,
+  args: { disabled: true, href: '/reports', onNavigate: fn() },
+  render: (args) => <NavigationMenu args={args} defaultOpen />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByRole('menu', { name: 'Switch workspace' })).toBeVisible();
+    await expect(body.getByRole('menuitem', { name: 'Billing' })).not.toHaveAttribute('href');
   },
 };

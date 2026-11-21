@@ -71,6 +71,7 @@ const EXPORTS = [
   'MenuGroup',
   'MenuItem',
   'MenuLabel',
+  'MenuLinkItem',
   'MenuSeparator',
   'MenuTrigger',
   'MessageStrip',

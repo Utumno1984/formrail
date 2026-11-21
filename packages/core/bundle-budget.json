@@ -226,6 +226,10 @@
       "baseline": 17252,
       "limit": 18978
     },
+    "MenuLinkItem": {
+      "baseline": 19486,
+      "limit": 21435
+    },
     "MenuSeparator": {
       "baseline": 17189,
       "limit": 18908
