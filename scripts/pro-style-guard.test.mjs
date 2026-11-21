@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { applyAllowlist, checkSource, declaredTokens, runGuard, stripComments } from './pro-style-guard.mjs';
+import { NAMED_COLOR_LIST, applyAllowlist, checkSource, declaredTokens, runGuard, stripComments } from './pro-style-guard.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -248,5 +248,98 @@ describe('pro style guard: #486 round 3 (coverage of count, camelCase borders, t
   it('named colours are matched case-insensitively', () => {
     expect(rules(CSS, '.a { color: RED; }')).toEqual(['named-color']);
     expect(rules(TSX, "const s = { color: 'Red' };")).toEqual(['named-color']);
+  });
+});
+
+describe('pro style guard: #614 false negatives', () => {
+  it.each([
+    ['ternary in a style object', 'const s = { color: err ? "red" : "green" };', ['red', 'green']],
+    ['ternary with an identifier head', "const s = { color: err ? tone : 'red' };", ['red']],
+    ['&& in a style object', "const s = { color: err && 'red' };", ['red']],
+    ['a multi-line ternary', "const s = {\n  color: err\n    ? 'var(--color-rop-error)'\n    : 'orange',\n};", ['orange']],
+  ])('TS: %s', (_n, source, values) => {
+    expect(checkSource(TSX, source, TOKENS).filter((v) => v.rule === 'named-color').map((v) => v.value)).toEqual(values);
+  });
+
+  it('a ternary of tokens is accepted, and the next property is not swept in', () => {
+    expect(rules(TSX, "const s = { color: err ? 'var(--color-rop-error)' : 'currentColor', whiteSpace: 'nowrap' };")).toEqual([]);
+    expect(rules(TSX, "const s = { color: err ? 'var(--color-rop-error)' : 'inherit', label: 'red' };")).toEqual([]);
+  });
+
+  it('a custom property with a named colour is rejected, with file:line', () => {
+    const [v] = checkSource(CSS, '.a {\n  --_cs-tone: orange;\n}\n', TOKENS);
+    expect(v).toMatchObject({ file: CSS, line: 2, rule: 'named-color', value: 'orange' });
+    expect(rules(TSX, "const s = { '--_cs-tone': 'orange' };")).toEqual(['named-color']);
+    expect(rules(TSX, "const s = { '--_cs-tone': err ? 'red' : 'var(--color-rop-error)' };")).toEqual(['named-color']);
+  });
+
+  it('a custom property with a token or a non-colour is accepted', () => {
+    expect(checkSource(CSS, '.a { --_cs-tone: var(--color-rop-error); --_gap: 4px; --_cs-font: inherit; }', TOKENS)).toEqual([]);
+  });
+
+  it.each([
+    ['text-decoration', CSS, '.a { text-decoration: underline red; }'],
+    ['textDecoration', TSX, "const s = { textDecoration: 'underline red' };"],
+    ['linear-gradient in background-image', CSS, '.a { background-image: linear-gradient(red, blue); }'],
+    ['gradient anywhere (a custom property value)', CSS, '.a { --x: radial-gradient(circle, white, var(--color-rop-border)); }'],
+    ['gradient in a Tailwind arbitrary value', TSX, "const c = 'bg-[linear-gradient(to_right,red,blue)]';"],
+    ['conic-gradient outside a colour property', CSS, '.a { mask: conic-gradient(red, blue); }'],
+    ['drop-shadow()', CSS, '.a { filter: drop-shadow(0 0 2px red); }'],
+  ])('rejects %s', (_n, file, source) => {
+    expect(rules(file, source)).toContain('named-color');
+  });
+
+  it('text-decoration with a token or a plain style is accepted', () => {
+    expect(checkSource(CSS, '.a { text-decoration: underline; text-decoration-color: currentColor; }', TOKENS)).toEqual([]);
+    expect(checkSource(CSS, '.a { background-image: linear-gradient(var(--color-rop-border), transparent); }', TOKENS)).toEqual([]);
+  });
+
+  it('outline with an identifier is ignored, with a ternary only its literals are judged', () => {
+    expect(rules(TSX, 'const s = { outline: ring };')).toEqual([]);
+    expect(rules(TSX, "const s = { outline: f ? 'var(--color-rop-primary)' : 'none' };")).toEqual([]);
+    const v = checkSource(TSX, "const s = { outline: f ? '2px solid red' : 'none' };", TOKENS).filter((x) => x.rule === 'outline-color');
+    expect(v.map((x) => x.value)).toEqual(['2px solid red']);
+    expect(v[0].message).not.toMatch(/"f \?"/);
+  });
+
+  it('outline: red as a bare word is still rejected', () => {
+    expect(rules(TSX, 'const s = { outline: red };')).toContain('outline-color');
+  });
+});
+
+describe('pro style guard: #614 coverage (name list, one test per colour property)', () => {
+  it('the list of colour names is the full CSS list (148, no duplicates)', () => {
+    expect(NAMED_COLOR_LIST).toHaveLength(148);
+    expect(new Set(NAMED_COLOR_LIST).size).toBe(148);
+  });
+
+  it.each([
+    'aliceblue', 'aqua', 'black', 'blueviolet', 'chartreuse', 'cornflowerblue', 'darkgrey', 'darkslategrey', 'deepskyblue', 'dimgrey',
+    'fuchsia', 'gainsboro', 'goldenrod', 'greenyellow', 'hotpink', 'indigo', 'khaki', 'lightgoldenrodyellow', 'lime', 'maroon',
+    'mediumvioletred', 'navy', 'olivedrab', 'papayawhip', 'rebeccapurple', 'rosybrown', 'seashell', 'sienna', 'snow', 'tan', 'thistle',
+    'whitesmoke', 'yellowgreen',
+  ])('the name %s is a colour', (name) => {
+    expect(rules(CSS, `.a { color: ${name}; }`)).toEqual(['named-color']);
+  });
+
+  const KEBAB = [
+    'color', 'background', 'background-color', 'background-image', 'box-shadow', 'text-shadow', 'text-decoration', 'text-decoration-color',
+    'caret-color', 'accent-color', 'fill', 'stroke', 'column-rule', 'column-rule-color', 'stop-color', 'flood-color', 'lighting-color',
+    'scrollbar-color', 'text-emphasis', 'text-emphasis-color', '-webkit-text-stroke', '-webkit-text-stroke-color',
+    '-webkit-text-fill-color', '-webkit-tap-highlight-color', 'border', 'border-color', 'border-top-color', 'border-inline-start-color',
+    'border-block-end-color', 'border-start-start-color',
+  ];
+  it.each(KEBAB)('CSS %s carries a colour', (prop) => {
+    expect(rules(CSS, `.a { ${prop}: red; }`)).toEqual(['named-color']);
+  });
+
+  const CAMEL = [
+    'color', 'background', 'backgroundColor', 'backgroundImage', 'boxShadow', 'textShadow', 'textDecoration', 'textDecorationColor',
+    'caretColor', 'accentColor', 'fill', 'stroke', 'columnRule', 'columnRuleColor', 'stopColor', 'floodColor', 'lightingColor',
+    'scrollbarColor', 'textEmphasis', 'textEmphasisColor', 'WebkitTextStroke', 'webkitTextStrokeColor', 'WebkitTextFillColor',
+    'WebkitTapHighlightColor', 'border', 'borderColor', 'borderTopColor', 'borderInlineStartColor',
+  ];
+  it.each(CAMEL)('TS %s carries a colour', (prop) => {
+    expect(rules(TSX, `const s = { ${prop}: 'red' };`)).toEqual(['named-color']);
   });
 });

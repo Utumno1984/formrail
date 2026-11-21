@@ -13,7 +13,9 @@
 //   color-literal    `#hex`, `rgb(`/`rgba(`, `hsl(`/`hsla(`, `hwb(`, `lab(`, `lch(`, `oklab(`, `oklch(`
 //   radius-literal   a `border-radius` (or `borderRadius`) that is not a `var(--radius-rop-*)`/`inherit`, and `rounded-[...]`
 //   outline-color    an `outline` whose colour is not `var(--color-rop-*)`, `currentColor`, `transparent` or `inherit`
-//   named-color     a CSS named colour (`red`, `black`) in a colour property, `fill`/`stroke`, a `bg-[red]`-style utility or color-mix()
+//   named-color     a CSS named colour (`red`, `black`) in a colour property (also text-decoration, gradients, stop-color, scrollbar-color,
+//                   -webkit-text-stroke), a custom property (`--_cs-tone: orange`), a ternary/`&&` in a TS style object, `fill`/`stroke`,
+//                   a `bg-[red]`-style utility, color-mix(), a gradient or drop-shadow()
 //   spacing-literal  an arbitrary px/rem spacing utility off the Tailwind scale (`p-[13px]`); `p-4` is fine
 //   unknown-token    a `var(--color-rop-x)` (or `--radius-rop-*`, `--text-rop-*`, ...) that `tokens.css` does not declare
 //   allowlist        an allowlist entry without a reason, or one that no longer matches anything
@@ -34,11 +36,18 @@ const SKIP_DIR = new Set(['showcase', 'test', 'node_modules']);
 const ACCEPTED_COLOR_WORDS = /^(currentcolor|transparent|inherit|initial|unset)$/i;
 // Closed list of the CSS named colours (the keywords currentColor/transparent/inherit/initial/unset/none are not in it).
 const NAMED_COLORS = 'aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen'.split(' ');
+export const NAMED_COLOR_LIST = NAMED_COLORS;
+const NAMED_COLOR_WORD = new RegExp(`^(?:${NAMED_COLORS.join('|')})$`, 'i');
+const OUTLINE_KEYWORD = /^(?:solid|dashed|dotted|double|groove|ridge|inset|outset|auto|thin|medium|thick|invert|hidden)$/i;
 const NAMED_COLOR_RE = new RegExp(`(?<![\\w-])(?:${NAMED_COLORS.join('|')})(?![\\w-])`, 'gi');
 const COLOR_PROPS = [
   'color', 'background', 'background-color', 'backgroundColor', 'box-shadow', 'boxShadow', 'text-decoration-color',
   'textDecorationColor', 'caret-color', 'caretColor', 'accent-color', 'accentColor', 'fill', 'stroke', 'column-rule-color',
-  'columnRuleColor',
+  'columnRuleColor', 'column-rule', 'columnRule', 'text-decoration(?:-color)?', 'textDecoration(?:Color)?', 'text-shadow', 'textShadow',
+  'background-image', 'backgroundImage', 'stop-color', 'stopColor', 'flood-color', 'floodColor', 'lighting-color', 'lightingColor',
+  'scrollbar-color', 'scrollbarColor', 'text-emphasis(?:-color)?', 'textEmphasis(?:Color)?',
+  '-webkit-text-stroke(?:-color)?', '[Ww]ebkitTextStroke(?:Color)?', '-webkit-text-fill-color', '[Ww]ebkitTextFillColor',
+  '-webkit-tap-highlight-color', '[Ww]ebkitTapHighlightColor',
   'border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?|-(?:start|end)-(?:start|end))?(?:-color)?',
   'border(?:Top|Right|Bottom|Left|Block|Inline)?(?:Start|End)?(?:Color)?',
 ].join('|');
@@ -84,6 +93,27 @@ export function declaredTokens(tokensCss) {
 const normalizeLine = (s) => s.replace(/\s+/g, ' ').trim();
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
+const CUSTOM_PROP = `--[\\w-]+["']?`;
+
+/** End index of the JS expression that starts at `from` (top-level `,` `;` or closing bracket; newlines continue a ternary/`&&`). */
+function exprEnd(text, from) {
+  let depth = 0;
+  let quote = null;
+  for (let i = from; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+    else if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) {
+      if (--depth < 0) return i;
+    } else if (depth === 0 && (ch === ',' || ch === ';')) return i;
+    else if (depth === 0 && ch === '\n' && !/^\s*[?:&|]/.test(text.slice(i + 1, i + 40))) return i;
+  }
+  return text.length;
+}
+
 /** The colour of an `outline` value is acceptable when it names a core token or a neutral keyword. */
 function outlineColorOk(value) {
   if (/var\(\s*--color-rop-[\w-]+\s*\)/.test(value)) return true;
@@ -121,9 +151,22 @@ export function checkSource(file, source, tokens) {
   }
 
   // `outline: 2px solid red`, `outlineColor: "red"`, `outline: \`...\``: the value may sit inside quotes (TS style objects).
-  for (const m of text.matchAll(/(?<![\w-])outline(?:-color|Color)?\s*:\s*["'`]?([^;}\n"'`\]]*)/g)) {
-    const value = m[1].trim();
+  for (const m of text.matchAll(/(?<![\w-])outline(?:-color|Color)?\s*:\s*(["'`]?)([^;}\n"'`\]]*)/g)) {
+    const value = m[2].trim();
     if (!value) continue;
+    if (kind === 'ts' && m[1] === '') {
+      const from = m.index + m[0].length;
+      // `outline: f ? '2px solid red' : 'none'`: only the string literals can carry a colour; judge those.
+      if (/\?|&&|\|\|/.test(value) && /["'`]/.test(text[from] ?? '')) {
+        for (const lit of text.slice(from, exprEnd(text, from)).matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g)) {
+          const v = lit[2].trim();
+          if (v && !outlineColorOk(v)) add(from + lit.index + 1, 'outline-color', v, `outline "${v}": the colour must be var(--color-rop-*) or currentColor`);
+        }
+        continue;
+      }
+      // `outline: ring`: an identifier, no literal to judge.
+      if (/^[A-Za-z_$][\w$.]*$/.test(value) && !NAMED_COLOR_WORD.test(value) && !OUTLINE_KEYWORD.test(value)) continue;
+    }
     if (!outlineColorOk(value)) add(m.index, 'outline-color', value, `outline "${value}": the colour must be var(--color-rop-*) or currentColor`);
   }
 
@@ -139,9 +182,19 @@ export function checkSource(file, source, tokens) {
     }
   };
   const propValue = kind === 'css' ? '([^;}\\]]*)' : `(?:"([^"\\n]*)"|'([^'\\n]*)'|\`([^\`]*)\`|([^;},"'\`\\]\\n]*))`;
-  for (const m of text.matchAll(new RegExp(`(?<![\\w-])(?:${COLOR_PROPS})\\s*:\\s*${propValue}`, 'g'))) {
-    const value = m.slice(1).find((g) => g !== undefined);
-    if (value) addNamed(m.index + m[0].lastIndexOf(value), value);
+  // Custom properties are colour carriers too: `--_cs-tone: orange;`.
+  for (const prefix of [COLOR_PROPS, CUSTOM_PROP]) {
+    for (const m of text.matchAll(new RegExp(`(?<![\\w-])(?:${prefix})\\s*:\\s*${propValue}`, 'g'))) {
+      const value = m.slice(1).find((g) => g !== undefined);
+      if (value) addNamed(m.index + m[0].lastIndexOf(value), value);
+      // `color: err ? 'red' : 'green'`, `color: ok && 'red'`: the unquoted head stops at the first quote; judge the rest.
+      const from = m.index + m[0].length;
+      const quoteNext = /(?:\?|&&|\|\||:|\()\s*$/.test(m[4] ?? '') && /["'`]/.test(text[from] ?? '');
+      const operatorNextLine = m[4] !== undefined && /^\s*\n\s*[?:&|]/.test(text.slice(from, from + 80));
+      if (kind === 'ts' && (quoteNext || operatorNextLine)) {
+        addNamed(from, text.slice(from, exprEnd(text, from)));
+      }
+    }
   }
   for (const m of text.matchAll(/(?<![\w-])(?:fill|stroke)\s*=\s*\{?\s*["'`]([^"'`]*)["'`]/g)) {
     addNamed(m.index + m[0].indexOf(m[1]), m[1]);
@@ -150,7 +203,7 @@ export function checkSource(file, source, tokens) {
     // `_` is a space in a Tailwind arbitrary value; swap it for a space so word boundaries hold (same length)
     addNamed(m.index + m[0].indexOf('[') + 1, m[1].replace(/_/g, ' ').replace(/url\([^)]*\)/g, (u) => ' '.repeat(u.length)));
   }
-  for (const m of text.matchAll(/color-mix\(/g)) {
+  for (const m of text.matchAll(/(?:color-mix|(?:repeating-)?(?:linear|radial|conic)-gradient|drop-shadow)\(/g)) {
     let depth = 1;
     let i = m.index + m[0].length;
     const start = i;
