@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planUseCasesSection, USE_CASES_INTRO, VERTICALS, parseUseCaseDescription, splitUseCases, useCaseStory, sectionHeadingOf, verticalTags } from './story-example';
+import { isSingleNeutralStory, planUseCasesSection, USE_CASES_INTRO, VERTICALS, parseUseCaseDescription, splitUseCases, useCaseStory, sectionHeadingOf, verticalTags } from './story-example';
 
 describe('VERTICALS (#624)', () => {
   it('is the closed list, with the labels the reader sees', () => {
@@ -15,14 +15,15 @@ describe('VERTICALS (#624)', () => {
 });
 
 describe('useCaseStory (#624)', () => {
-  it('produces the tags and the description with both parts', () => {
+  it('produces the description with both parts, and nothing but `parameters` (no tags a spread could carry)', () => {
     const story = useCaseStory({ vertical: 'erp', problem: 'Two operators edit one record.', configuration: 'Pass `itemLabel`.' });
-    expect(story.tags).toEqual(['use-case', 'vertical:erp']);
-    expect(story.parameters).toEqual({ docs: { description: { story: '**Problem.** Two operators edit one record.\n\n**Configuration.** Pass `itemLabel`.' } } });
+    expect(story).toEqual({ parameters: { docs: { description: { story: '**Problem.** Two operators edit one record.\n\n**Configuration.** Pass `itemLabel`.' } } } });
+    // The tags are written literally on the story (the indexer reads them statically): a spread must not bring any.
+    expect(Object.keys(story)).toEqual(['parameters']);
   });
 
   it('a Free example may carry no description at all', () => {
-    expect(useCaseStory({ vertical: 'hr' })).toEqual({ tags: ['use-case', 'vertical:hr'], parameters: {} });
+    expect(useCaseStory({ vertical: 'hr' })).toEqual({ parameters: {} });
   });
 
   it('throws on a vertical outside the list, naming the allowed ids', () => {
@@ -68,6 +69,13 @@ describe('page helpers (#624)', () => {
     expect(split.neutral.map((s) => s.id)).toEqual(['a', 'd']);
     // the internal use case is a hidden variant on a public page: in neither list
     expect(split.useCases.map((s) => s.id)).toEqual(['b']);
+  });
+
+  it('a file is a single-story page when ONE story is left without its use cases (Storybook counts the whole file)', () => {
+    expect(isSingleNeutralStory([{ id: 'default', tags: [] }])).toBe(true);
+    expect(isSingleNeutralStory([{ id: 'default' }, { id: 'erp', tags: ['use-case', 'vertical:erp'] }, { id: 'hr', tags: ['use-case', 'vertical:hr'] }])).toBe(true);
+    expect(isSingleNeutralStory([{ id: 'default' }, { id: 'disabled', tags: ['internal'] }, { id: 'erp', tags: ['use-case'] }])).toBe(false);
+    expect(isSingleNeutralStory([{ id: 'erp', tags: ['use-case'] }])).toBe(false);
   });
 
   it('on a page of fixtures (internal) every use case counts', () => {

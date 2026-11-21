@@ -192,23 +192,40 @@ export function verticalTags(tags: readonly string[] | undefined): string[] {
   return (tags ?? []).filter((tag) => tag.startsWith(VERTICAL_TAG_PREFIX));
 }
 
+/** What {@link useCaseStory} returns: the description of the story, nothing else (no `tags`, see there). */
+export interface UseCaseStoryParts {
+  parameters: { docs?: { description: { story: string } } };
+}
+
 /**
- * What a use-case story carries, from one place: the tags and the description shown under the story. The
- * Pro pages need both parts: the concrete problem the case solves, and the configuration that solves it.
- * Throws on a vertical outside {@link VERTICALS}. Storybook's indexer reads tags statically (like
- * `EXAMPLE_TAG`), so the story writes `tags: ['use-case', 'vertical:erp']` itself and takes the description
- * from `useCaseStory(...).parameters`; the guard reads the tags through `index.json`. (Spreading the whole
- * result would repeat `tags`, which TypeScript refuses.)
+ * The description shown under a use-case story, from one place. The Pro pages need both parts: the concrete
+ * problem the case solves, and the configuration that solves it. Throws on a vertical outside
+ * {@link VERTICALS}, so the id written in the tag is checked once more where the description is built.
+ *
+ * It returns `parameters` only, never `tags`: Storybook's indexer reads tags statically (like `EXAMPLE_TAG`), so
+ * a tag that came from a function call would be on the story at runtime and missing from `index.json`, where the
+ * guard reads it. The story writes `tags: ['use-case', 'vertical:<id>']` literally and spreads the result:
+ * `{ name: 'Example: configured for ...', tags: ['use-case', 'vertical:erp'], ...useCaseStory({ vertical: 'erp', ... }) }`.
+ * The description replaces the story's JSDoc, which Storybook would otherwise show there.
  */
-export function useCaseStory(options: { vertical: VerticalId; problem?: string; configuration?: string }) {
+export function useCaseStory(options: { vertical: VerticalId; problem?: string; configuration?: string }): UseCaseStoryParts {
   const { vertical, problem, configuration } = options;
   if (!VERTICAL_IDS.includes(vertical)) {
     throw new Error(`Unknown vertical "${String(vertical)}": use one of ${VERTICAL_IDS.join(', ')}.`);
   }
   const parts = [problem && `**Problem.** ${problem}`, configuration && `**Configuration.** ${configuration}`].filter(Boolean);
-  const tags = [USE_CASE_TAG, `${VERTICAL_TAG_PREFIX}${vertical}`];
-  if (parts.length === 0) return { tags, parameters: {} };
-  return { tags, parameters: { docs: { description: { story: parts.join('\n\n') } } } };
+  if (parts.length === 0) return { parameters: {} };
+  return { parameters: { docs: { description: { story: parts.join('\n\n') } } } };
+}
+
+/**
+ * Storybook's own template (`DocsPage`) treats a CSF file with one story as a single-story page: the story's
+ * description under the page's, no "Stories" list. The template applies the same rule to the file WITHOUT its
+ * `use-case` stories, so adding a use case to a page never changes its neutral part. `stories` are the story
+ * annotations of the CSF file (`csfFile.stories`), whose `tags` are the ones written on each story.
+ */
+export function isSingleNeutralStory(stories: readonly TaggedStory[]): boolean {
+  return stories.filter((story) => !story.tags?.includes(USE_CASE_TAG)).length === 1;
 }
 
 /** The two parts of a Pro use case's description (empty string when missing or blank). */
