@@ -14,6 +14,7 @@ export const DEMO_REFERENCE_POOL = Object.freeze({
   customers: 1000,
   suppliers: 200,
   products: 1000,
+  courses: 300,
 });
 
 /** Throws unless `n` is a non-negative integer (a silent `[]` would hide the bug). */

@@ -118,3 +118,26 @@ export {
   type DemoSupportCasePriority,
   type DemoSupportCaseStatus,
 } from './support-cases';
+export {
+  COURSE_CATEGORY_LABEL,
+  COURSE_FORMAT_LABEL,
+  COURSE_STATUS_LABEL,
+  COURSE_STATUS_TONE,
+  getCourse,
+  makeCourses,
+  type DemoCourse,
+  type DemoCourseCategory,
+  type DemoCourseFormat,
+  type DemoCourseModule,
+  type DemoCourseStatus,
+} from './courses';
+export {
+  ENROLMENT_STATUS_LABEL,
+  ENROLMENT_STATUS_TONE,
+  getEnrolment,
+  makeEnrolments,
+  type DemoEnrolment,
+  type DemoEnrolmentStatus,
+  type DemoLearner,
+} from './enrolments';
+export { CART_STATUS_LABEL, CART_STATUS_TONE, getCart, makeCarts, type DemoCart, type DemoCartStatus } from './carts';
