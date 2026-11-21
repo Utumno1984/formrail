@@ -24,7 +24,7 @@ export const UseCaseErpPurchaseOrder: Story = {
   name: 'Example: configured for an ERP purchase order',
   tags: ['use-case', 'vertical:erp'],
   args: { children: 'Approve purchase order' },
-  ...describeUseCase({ vertical: 'erp', problem: 'Two operators edit the same order.', configuration: 'The label names the record.' }),
+  parameters: describeUseCase({ vertical: 'erp', problem: 'Two operators edit the same order.', configuration: 'The label names the record.' }).parameters,
 };
 
 /** Use case two. */
@@ -32,7 +32,7 @@ export const UseCaseB2bPriceList: Story = {
   name: 'Example: configured for a B2B price list',
   tags: ['use-case', 'vertical:b2b'],
   args: { children: 'Publish price list' },
-  ...describeUseCase({ vertical: 'b2b', problem: 'Two account managers edit the same price list.', configuration: 'Only the label changes.' }),
+  parameters: describeUseCase({ vertical: 'b2b', problem: 'Two account managers edit the same price list.', configuration: 'Only the label changes.' }).parameters,
 };
 
 /** Use case three. */
@@ -40,5 +40,5 @@ export const UseCaseElearningCourse: Story = {
   name: 'Example: configured for an e-learning course',
   tags: ['use-case', 'vertical:e-learning'],
   args: { children: 'Enrol learner' },
-  ...describeUseCase({ vertical: 'e-learning', problem: 'A tutor enrols a learner in a course.', configuration: 'Only the label changes.' }),
+  parameters: describeUseCase({ vertical: 'e-learning', problem: 'A tutor enrols a learner in a course.', configuration: 'Only the label changes.' }).parameters,
 };

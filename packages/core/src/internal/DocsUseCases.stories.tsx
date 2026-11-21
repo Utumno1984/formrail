@@ -32,7 +32,7 @@ export const UseCaseErpPurchaseOrder: Story = {
   name: 'Example: configured for an ERP purchase order',
   tags: ['use-case', 'vertical:erp'],
   args: { variant: 'primary', children: 'Approve purchase order' },
-  ...describeUseCase({ vertical: 'erp', problem: 'A buyer approves an order before it is sent to the supplier.', configuration: 'The label names the record.' }),
+  parameters: describeUseCase({ vertical: 'erp', problem: 'A buyer approves an order before it is sent to the supplier.', configuration: 'The label names the record.' }).parameters,
 };
 
 /** The same button, for another kind of record. */
@@ -40,5 +40,5 @@ export const UseCaseEcommerceCart: Story = {
   name: 'Example: configured for an e-commerce cart',
   tags: ['use-case', 'vertical:e-commerce'],
   args: { variant: 'secondary', children: 'Add to cart' },
-  ...describeUseCase({ vertical: 'e-commerce', problem: 'A shopper keeps a product for later.', configuration: 'Only the label changes.' }),
+  parameters: describeUseCase({ vertical: 'e-commerce', problem: 'A shopper keeps a product for later.', configuration: 'Only the label changes.' }).parameters,
 };

@@ -88,8 +88,8 @@ test.describe('Use-case guard on the real index', () => {
     // Not vacuous: the fixtures are in every build that has them.
     expect(useCases.length).toBeGreaterThanOrEqual(2);
 
-    // The descriptions of the Pro use cases, and the tags the stories really carry once loaded (the tags
-    // are written next to `useCaseStory(...)`: they must be the ones it names).
+    // The descriptions of the Pro use cases, and the tags the stories really carry once loaded (the index reads them statically;
+    // they must be the same).
     await page.goto(`/iframe.html?id=${useCases[0]!.id}&viewMode=story`);
     await page.waitForFunction(() => !!(window as unknown as { __STORYBOOK_PREVIEW__?: unknown }).__STORYBOOK_PREVIEW__);
     const loaded = await page.evaluate(async (ids) => {
@@ -107,7 +107,7 @@ test.describe('Use-case guard on the real index', () => {
     for (const story of useCases) {
       const indexed = (story.tags ?? []).filter((tag) => tag === USE_CASE_TAG || tag.startsWith(VERTICAL_TAG_PREFIX)).sort();
       const runtime = loaded[story.id]!.tags.filter((tag) => tag === USE_CASE_TAG || tag.startsWith(VERTICAL_TAG_PREFIX)).sort();
-      expect(runtime, `${story.id}: the tags written in the story differ from the ones of useCaseStory`).toEqual(indexed);
+      expect(runtime, `${story.id}: the tags in index.json differ from the ones the loaded story carries`).toEqual(indexed);
     }
 
     expect(auditUseCaseStructure(stories, descriptions)).toEqual([]);

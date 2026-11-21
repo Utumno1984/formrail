@@ -128,7 +128,7 @@ it on a generic record first; a domain appears afterwards, as an example that sa
 2. **Examples are declared.** A domain appears only in a `use-case` story: tag `use-case` and exactly one
    `vertical:<id>` tag (`erp`, `b2b`, `e-commerce`, `e-learning`, `helpdesk`, `hr`), name `Example: configured for ...`,
    at the bottom of the file. Write it with `useCaseStory({ vertical, problem?, configuration? })` from
-   `packages/core/src/internal/story-example.ts` (it gives the description; write the tags literally next to it, because
+   `packages/core/src/internal/story-example.ts` (use its `.parameters` for the description; write the tags literally, because
    Storybook's indexer reads tags statically). The page template shows these stories last, after every other one, under
    "Examples" (Free) or "Use cases" (Pro, title `Pro/...`), with a fixed introductory sentence.
 3. **Never in the library.** No domain in props, types, names, defaults, runtime messages or code of the library. In

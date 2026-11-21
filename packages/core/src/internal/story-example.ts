@@ -196,8 +196,9 @@ export function verticalTags(tags: readonly string[] | undefined): string[] {
  * What a use-case story carries, from one place: the tags and the description shown under the story. The
  * Pro pages need both parts: the concrete problem the case solves, and the configuration that solves it.
  * Throws on a vertical outside {@link VERTICALS}. Storybook's indexer reads tags statically (like
- * `EXAMPLE_TAG`), so the story writes `tags: ['use-case', 'vertical:erp']` itself and spreads this next to
- * it: the `parameters` come from here, the tags are checked by the guard through `index.json`.
+ * `EXAMPLE_TAG`), so the story writes `tags: ['use-case', 'vertical:erp']` itself and takes the description
+ * from `useCaseStory(...).parameters`; the guard reads the tags through `index.json`. (Spreading the whole
+ * result would repeat `tags`, which TypeScript refuses.)
  */
 export function useCaseStory(options: { vertical: VerticalId; problem?: string; configuration?: string }) {
   const { vertical, problem, configuration } = options;
