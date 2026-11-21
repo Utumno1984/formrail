@@ -98,13 +98,13 @@ const TILE_ENABLED =
   'motion-safe:[transition-property:background-color,border-color] motion-safe:duration-[var(--motion-rop-feedback-duration)] ' +
   'motion-safe:ease-[var(--motion-rop-feedback-easing)]';
 
-// Disabled: a dashed outline (a cue that does not rely on colour) and muted content; the reason is visible text.
+// Disabled: a dashed border (a cue that does not rely on colour) and muted content; the reason is visible text.
 const TILE_DISABLED = 'cursor-not-allowed border-dashed bg-rop-surface-subtle text-rop-text-muted';
 
-// Current app: a primary outline twice as thick (inset shadow, no change of size) and a bar on the inline start
+// Current app: a primary border twice as thick (drawn inside the box, no change of size) and a bar on the inline start
 // edge, which is a shape, not only a colour. `forced-colors`: the bar keeps a system colour.
 const TILE_CURRENT =
-  'border-rop-primary shadow-[inset_0_0_0_1px_var(--color-rop-primary)] ' +
+  'border-rop-primary [box-shadow:inset_0_0_0_1px_var(--color-rop-primary)] ' +
   "before:absolute before:inset-y-2 before:start-0 before:w-1 before:rounded-e-full before:bg-rop-primary before:content-[''] " +
   'forced-colors:before:bg-[Highlight]';
 
@@ -203,8 +203,8 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
   const onTileFocus = (key: string) => (event: FocusEvent<HTMLElement>) => {
     focused.current = { key, element: event.currentTarget };
   };
-  // A real blur (the user moved on, or clicked the page) forgets the tile. A tile removed from the page may also
-  // fire a blur (Chromium does, during the removal): it is told apart after the commit, when the element is no
+  // A real loss of focus (the user moved on, or clicked the page) forgets the tile. A tile removed from the page
+  // may also fire a `focusout` (Chromium does, during the removal): it is told apart after the commit, when the element is no
   // longer connected; the layout effect below, which runs first, has already moved the focus.
   const onTileBlur = (event: FocusEvent<HTMLElement>) => {
     const element = event.currentTarget;
