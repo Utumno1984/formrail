@@ -24,6 +24,36 @@ describe('findDomainTerms', () => {
     expect(terms('Customerize')).toEqual([]);
   });
 
+  it('finds compound terms joined by hyphens, underscores or dashes', () => {
+    expect(terms('purchase-order')).toEqual(['purchase order']);
+    expect(terms('Support-cases')).toEqual(['support case']);
+    expect(terms('sales_order')).toEqual(['sales order']);
+    expect(terms('sales‑order and purchase–orders')).toEqual(['purchase order', 'sales order']);
+  });
+
+  it('does not match a term after other letters or digits (initial word boundary)', () => {
+    expect(terms('Discourse')).toEqual([]);
+    expect(terms('Subcart')).toEqual([]);
+    expect(terms('myinvoice')).toEqual([]);
+    expect(terms('2cart')).toEqual([]);
+    expect(terms('a cart')).toEqual(['cart']);
+  });
+
+  it('allows the closed list of phrases for "course" only', () => {
+    expect(terms('Of course, it works')).toEqual([]);
+    expect(terms('In the course of a session')).toEqual([]);
+    expect(terms('over the course of a week')).toEqual([]);
+    expect(terms('of course, and then the course starts')).toEqual(['course']);
+    expect(terms('Of courses')).toEqual(['course']);
+    expect(terms('the course of action')).toEqual(['course']);
+    expect(terms('3 courses')).toEqual(['course']);
+  });
+
+  it('keeps "stock" forbidden, even in everyday phrases', () => {
+    expect(terms('in stock')).toEqual(['stock']);
+    expect(terms('a stock photo')).toEqual(['stock']);
+  });
+
   it('ignores person names and right-to-left text', () => {
     expect(terms('Maria Rossi, Ahmed Al-Farsi')).toEqual([]);
     expect(terms('مرحبا بالعالم שלום עולם')).toEqual([]);

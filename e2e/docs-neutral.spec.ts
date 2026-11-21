@@ -19,6 +19,10 @@ import { gotoStory } from './helpers/story';
 // they run on the real build. Pages not migrated yet are in scripts/neutral-docs.baseline.json, a ratchet that
 // can only shrink (no command adds to it). Each neutral story is opened alone in its own iframe: its canvas AND
 // the portals it opens (Dialog, Sheet, Toast) are the whole body, and a use case of the same page can never leak in.
+// Limit: a portal is read only if the story's `play` (or its render) opens it; a Dialog that needs a click the
+// story does not script is not read. Declared in CONTRIBUTING.md ("The neutral-docs guard").
+// The build of this suite (webServer of playwright.config.ts) is the complete one, Free + Pro: the `Pro/` pages are
+// in it, so the baseline is checked for them too, like for any other page.
 
 interface IndexEntry extends NeutralIndexStory {
   type?: string;
@@ -41,8 +45,7 @@ test.describe('Neutral Docs guard', () => {
   test('the baseline lists only public Docs pages of this build, with known terms', async ({ request }) => {
     const { pages } = await readIndex(request);
     expect(pages.size).toBeGreaterThan(10);
-    // The Pro pages only exist in the Pro build: an entry for one is read in that build only.
-    const missing = Object.keys(baseline.pages).filter((title) => !pages.has(title) && !title.startsWith('Pro/'));
+    const missing = Object.keys(baseline.pages).filter((title) => !pages.has(title));
     expect(missing, `${BASELINE_FILE} lists pages that are not public Docs pages: remove them`).toEqual([]);
     for (const [title, terms] of Object.entries(baseline.pages)) {
       expect(terms.length, `${title}: an entry without terms`).toBeGreaterThan(0);
@@ -66,9 +69,13 @@ test.describe('Neutral Docs guard', () => {
             const parts: string[] = [];
             const walk = (node: Element) => {
               if (skip.has(node.tagName) || node.id === 'storybook-docs') return;
-              for (const attr of ['aria-label', 'aria-description', 'placeholder', 'title', 'alt']) {
+              for (const attr of ['aria-label', 'aria-description', 'aria-valuetext', 'aria-placeholder', 'aria-roledescription', 'placeholder', 'title', 'alt']) {
                 const value = node.getAttribute(attr);
                 if (value) parts.push(value);
+              }
+              // The typed value is a property, not an attribute: `textContent` and `getAttribute` do not see it.
+              if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+                if (node.value) parts.push(node.value);
               }
               for (const child of node.childNodes) {
                 if (child.nodeType === Node.TEXT_NODE) parts.push(child.textContent ?? '');

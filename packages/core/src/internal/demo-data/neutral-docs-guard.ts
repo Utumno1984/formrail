@@ -24,23 +24,54 @@ export interface DomainFinding {
 /** Titles that are not component pages: the reference applications and the introductions. */
 const EXCLUDED_TITLES: readonly RegExp[] = [/^Showcase(\/|$)/, /^Pro\/Showcase(\/|$)/, /^Introduction$/, /^Pro introduction$/, /^Pro\/Introduction$/];
 
+/** What separates the words of a compound term: spaces, hyphens (ASCII, U+2010, U+2011, en dash) and underscores. */
+const SEPARATOR = '[\\s\\-‐‑–_]+';
+
 /**
  * One matcher per term. `findDomainTerm` (#622) looks for whole words and does not see plurals, which would let
  * "Invoices" through: here a term may be followed by a plural `s` or `es` (`invoices`, `SKUs`, `support cases`,
- * `checkouts`), and still only as a whole word, so "Productivity" and "carton" do not match.
+ * `checkouts`), and still only as a whole word, so "Productivity", "Discourse" and "myinvoice" do not match. The
+ * words of a compound term are joined by {@link SEPARATOR}: `purchase-order` and `sales_order` count.
  */
 const MATCHERS: readonly { term: string; pattern: RegExp }[] = DOMAIN_TERMS.map((term) => ({
   term: term.toLowerCase(),
-  pattern: new RegExp(`(?<![\\p{L}\\p{N}])${term.replace(/ /g, '\\s+')}(?:e?s)?(?![\\p{L}\\p{N}])`, 'iu'),
+  pattern: new RegExp(`(?<![\\p{L}\\p{N}])${term.replace(/ /g, SEPARATOR)}(?:e?s)?(?![\\p{L}\\p{N}])`, 'giu'),
 }));
 
+/**
+ * The closed list of everyday phrases in which a term is not the business word: only `course`, and only these
+ * three. Nothing else is allowed: `stock` stays forbidden even in "in stock" or "stock photo" (commercial
+ * language), and "courses" is always the domain. Adding a phrase is a change to this list and to its test.
+ */
+export const ALLOWED_PHRASES: Readonly<Record<string, readonly RegExp[]>> = {
+  course: [
+    /(?<![\p{L}\p{N}])of\s+course(?![\p{L}\p{N}])/giu,
+    /(?<![\p{L}\p{N}])in\s+the\s+course\s+of(?![\p{L}\p{N}])/giu,
+    /(?<![\p{L}\p{N}])over\s+the\s+course\s+of(?![\p{L}\p{N}])/giu,
+  ],
+};
+
 const EXCERPT_RADIUS = 30;
+
+/** The first match of `term` that is not inside an allowed phrase, or `undefined`. */
+function firstMatch(text: string, term: string, pattern: RegExp): RegExpExecArray | undefined {
+  const allowed: [number, number][] = [];
+  for (const phrase of ALLOWED_PHRASES[term] ?? []) {
+    for (const m of text.matchAll(phrase)) allowed.push([m.index, m.index + m[0].length]);
+  }
+  pattern.lastIndex = 0;
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+    const end = match.index + match[0].length;
+    if (!allowed.some(([from, to]) => from <= match.index && end <= to)) return match;
+  }
+  return undefined;
+}
 
 /** Every distinct domain term in `text` (one finding per term, the first match), in `DOMAIN_TERMS` order. */
 export function findDomainTerms(text: string): DomainFinding[] {
   const findings: DomainFinding[] = [];
   for (const { term, pattern } of MATCHERS) {
-    const match = pattern.exec(text);
+    const match = firstMatch(text, term, pattern);
     if (!match) continue;
     const from = Math.max(0, match.index - EXCERPT_RADIUS);
     const to = Math.min(text.length, match.index + match[0].length + EXCERPT_RADIUS);

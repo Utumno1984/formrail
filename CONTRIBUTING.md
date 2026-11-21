@@ -178,9 +178,19 @@ fixture may reach the public Pro demo).
 **The neutral-docs guard (#625).** `e2e/docs-neutral.spec.ts` opens every neutral story of every public Docs page (the
 ones left after the `use-case` and `internal` ones; not `Showcase/*`, `Pro/Showcase/*`, the introductions) alone in its
 iframe, waits for its `play`, and reads the whole body (`textContent`, so text out of view counts, with the portals the
-story opened, plus `aria-label`, `placeholder`, `title` and `alt`). It fails when the text holds a term of `DOMAIN_TERMS`
-(`packages/core/src/internal/demo-data/records.ts`), as a whole word in any case **and in the plural**
-(`invoices`, `SKUs`, `support cases`; "Productivity" does not count), naming the story, the term and an excerpt. The prose
+story opened, plus `aria-label`, `aria-description`, `aria-valuetext`, `aria-placeholder`, `aria-roledescription`,
+`placeholder`, `title`, `alt` and the `value` property of inputs and textareas). It fails when the text holds a term of
+`DOMAIN_TERMS` (`packages/core/src/internal/demo-data/records.ts`), as a whole word in any case **and in the plural**
+(`invoices`, `SKUs`, `support cases`; "Productivity", "Discourse" and "myinvoice" do not count), with the words of a
+compound term joined by a space, a hyphen or an underscore (`purchase-order`, `sales_order`), naming the story, the term
+and an excerpt. **Allowed phrases**: a closed list, only for `course` (`of course`, `in the course of`, `over the course
+of`; "courses" is always the domain), in `ALLOWED_PHRASES` with its test. `stock` stays forbidden even in "in stock" or
+"stock photo": it is commercial language, write "available" or "in the warehouse of the example" in a `use-case` story.
+**Limit**: a portal (Dialog, Sheet, Popover) is read only if the story renders it open or its `play` opens it; text of a
+portal that needs a click nobody scripts is not seen, so script it in the `play` when the story teaches it. **Pro pages**:
+the e2e job runs on the complete Storybook build (Free + Pro, the `webServer` of `playwright.config.ts`), so the `Pro/`
+pages are scanned like the others and their baseline entries must exist and shrink there; the public deploy builds
+without Pro, but it does not run this guard. The prose
 of the page (TSDoc, props table) is not read. Pages not migrated yet are in
 [`scripts/neutral-docs.baseline.json`](scripts/neutral-docs.baseline.json), each with the terms found: a ratchet that
 only shrinks. A page outside it with a term, or a term not listed, fails; a listed page with no term left fails with
