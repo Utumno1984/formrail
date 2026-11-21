@@ -69,6 +69,19 @@ async function pageShape(page: Page, docsId: string) {
   }, docsId.replace(/--docs$/, ''));
 }
 
+/**
+ * The section is a region named by its own heading (`aria-labelledby`, not a copy of the text). Storybook's
+ * `Heading` puts its "Copy heading URL to address bar" link inside the `<h2>`, so the name is that label plus
+ * the heading text: the test pins the reference and the ending, not Storybook's link label.
+ */
+async function expectRegionLabelledByHeading(page: Page, id: string, heading: string) {
+  const section = page.locator('section[data-use-cases]');
+  await expect(section).toHaveCount(1);
+  await expect(section).toHaveAttribute('aria-labelledby', id);
+  await expect(section.locator(`h2#${id}`)).toHaveText(heading);
+  await expect(page.getByRole('region').filter({ has: page.locator(`h2#${id}`) })).toHaveAccessibleName(new RegExp(`${heading}$`));
+}
+
 test.describe('Docs page: neutral first, then Examples / Use cases', () => {
   test('Free page with a copy-paste example: example, Playground and states, then "Examples" with the two use cases, each with its description', async ({ page }) => {
     const docs = await readPage(page, 'internal-docsusecases--docs');
@@ -93,11 +106,7 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     });
     expect(order).toContain('Stories');
     expect(order.indexOf('Stories')).toBeLessThan(order.indexOf('Examples'));
-    // The section is a region named by its heading (aria-labelledby, not a copy of the text).
-    const region = page.getByRole('region', { name: 'Examples', exact: true });
-    await expect(region).toHaveCount(1);
-    await expect(region).toHaveAttribute('aria-labelledby', 'examples');
-    await expect(region.locator('h2#examples')).toHaveText('Examples');
+    await expectRegionLabelledByHeading(page, 'examples', 'Examples');
   });
 
   test('Free page WITHOUT a copy-paste example: Storybook\'s own template, unchanged by its use cases, then "Examples"', async ({ page }) => {
@@ -121,7 +130,7 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     expect(docs.sectionIntro).toBe(USE_CASES_INTRO);
     expect(docs.sectionText).toContain('A manager approves the days off an employee asked for.');
     expect(docs.sectionText).toContain('An agent closes a support ticket once it is answered.');
-    await expect(page.getByRole('region', { name: 'Examples', exact: true })).toHaveCount(1);
+    await expectRegionLabelledByHeading(page, 'examples', 'Examples');
   });
 
   test('a single-story page stays a single-story page when it gains a use case', async ({ page }) => {
@@ -149,8 +158,6 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
 
 test.describe('Use-case guard on the real index', () => {
   test('every page of the build is in shape, its runtime tags are the index\'s, and the Pro ratchet holds', async ({ page, request }) => {
-    // Loads every CSF file of the build once, in one page.
-    test.setTimeout(120_000);
     const entries = await storyEntries(request);
     const stories: IndexedStory[] = entries.map(({ id, title, name, tags }) => ({ id, title, name, tags }));
     const useCases = stories.filter((story) => story.tags?.includes(USE_CASE_TAG));
