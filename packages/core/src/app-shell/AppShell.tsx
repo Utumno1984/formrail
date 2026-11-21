@@ -203,8 +203,6 @@ export const AppShellHeader = /* @__PURE__ */ forwardRef<HTMLElement, AppShellHe
 });
 
 export interface AppShellNavProps extends HTMLAttributes<HTMLElement> {
-  /** Accessible name of the landmark. Default: `labels.nav` of the `AppShell` (`Main`). */
-  'aria-label'?: string;
   /** `AppShellNavLink`s, in the order of the Tab key. */
   children?: ReactNode;
 }
@@ -213,6 +211,9 @@ export interface AppShellNavProps extends HTMLAttributes<HTMLElement> {
  * The navigation of the app: a named `<nav>` landmark holding a list of `AppShellNavLink`. From the breakpoint
  * up it is a column beside the content; below it, it is not displayed (see `AppShell`, "Layout and sizing"). It
  * scrolls on its own only when its links are taller than the room it has, and never with the content.
+ *
+ * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
+ * `aria-labelledby` takes the place of that name.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
   { className, children, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
@@ -270,6 +271,7 @@ export interface AppShellNavLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnch
    * keeps its own `href` and does the navigation itself (so `onNavigate` is not used with `asChild`).
    */
   asChild?: boolean;
+  /** The text of the link (its accessible name), cut with an ellipsis; with `asChild`, the single router link element. */
   children?: ReactNode;
 }
 
