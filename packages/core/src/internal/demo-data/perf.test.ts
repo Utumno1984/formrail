@@ -93,4 +93,17 @@ describe('demo-data performance (plain Node, fresh process)', () => {
   it(`makeSupportCases(100000) runs in under ${BUDGET_MS} ms`, () => {
     expect(timeInFreshProcess('makeSupportCases', 100_000)).toBeLessThan(BUDGET_MS);
   });
+
+  // Academy and webshop (ticket #623).
+  it(`makeCourses(100000) runs in under ${BUDGET_MS} ms`, () => {
+    expect(timeInFreshProcess('makeCourses', 100_000)).toBeLessThan(BUDGET_MS);
+  });
+
+  it(`makeEnrolments(100000) runs in under ${BUDGET_MS} ms`, () => {
+    expect(timeInFreshProcess('makeEnrolments', 100_000)).toBeLessThan(BUDGET_MS);
+  });
+
+  it(`makeCarts(100000) runs in under ${BUDGET_MS} ms`, () => {
+    expect(timeInFreshProcess('makeCarts', 100_000)).toBeLessThan(BUDGET_MS);
+  });
 });
