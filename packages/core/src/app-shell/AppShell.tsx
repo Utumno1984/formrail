@@ -24,6 +24,7 @@ import { handleNavigationClick, hasNavigableHref, isAppNavigationClick } from '.
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
 import {
+  boxStyle,
   headerCenterClass,
   headerClass,
   headerEndClass,
@@ -184,11 +185,11 @@ export interface AppShellHeaderProps extends Omit<HTMLAttributes<HTMLElement>, '
  * sizing"). The three parts are always there, so `end` stays at the end whatever is empty.
  */
 export const AppShellHeader = /* @__PURE__ */ forwardRef<HTMLElement, AppShellHeaderProps>(function AppShellHeader(
-  { start, center, end, className, ...rest },
+  { start, center, end, className, style, ...rest },
   ref,
 ) {
   return (
-    <header {...rest} ref={ref} data-rop-app-shell-header="" className={cn(headerClass, className)}>
+    <header {...rest} ref={ref} data-rop-app-shell-header="" className={cn(headerClass, className)} style={{ ...boxStyle, ...style }}>
       <div data-rop-app-shell-header-start="" className={headerStartClass}>
         {start}
       </div>
@@ -216,7 +217,7 @@ export interface AppShellNavProps extends HTMLAttributes<HTMLElement> {
  * `aria-labelledby` takes the place of that name.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
-  { className, children, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
+  { className, style, children, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
   ref,
 ) {
   const shell = useContext(AppShellContext);
@@ -229,6 +230,7 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
       aria-labelledby={ariaLabelledBy}
       data-rop-app-shell-nav=""
       className={cn(navClass, className)}
+      style={{ ...boxStyle, ...style }}
     >
       <ul className={navListClass}>{children}</ul>
     </nav>

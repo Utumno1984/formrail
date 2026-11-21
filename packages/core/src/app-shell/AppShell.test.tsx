@@ -166,6 +166,21 @@ describe('AppShell: layout contract', () => {
     expect(main.style.paddingBottom).toBe('var(--rop-app-shell-keyboard-inset, 0px)');
   });
 
+  it('header and nav: their size is the whole footprint (inline border-box, never a rule of the shipped CSS)', () => {
+    render(
+      <AppShell>
+        <AppShellHeader style={{ color: 'red' }} />
+        <AppShellNav style={{ color: 'blue' }} />
+      </AppShell>,
+    );
+    const header = screen.getByRole('banner');
+    const nav = screen.getByRole('navigation');
+    expect(header.style.boxSizing).toBe('border-box');
+    expect(header.style.color).toBe('red');
+    expect(nav.style.boxSizing).toBe('border-box');
+    expect(nav.style.color).toBe('blue');
+  });
+
   it('forwards the refs to the root, the header, the nav and the main', () => {
     const root = createRef<HTMLDivElement>();
     const header = createRef<HTMLElement>();

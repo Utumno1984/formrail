@@ -24,10 +24,10 @@ export const rootParentClass = 'h-full';
 
 // The header: first row, both columns. Its height is a component-owned variable with a default (overridable on
 // any ancestor or on the header itself), never the height of what the slots hold: empty slots, slots filled after
-// the mount and a long text leave it unchanged. The variable is the whole footprint, its bottom rule included (the
-// package ships no global box-sizing reset, so the box sizing is set here; the same for the navigation and links).
+// the mount and a long text leave it unchanged. The variable is the whole footprint, its 1px bottom rule included,
+// with or without a consumer's box-sizing reset: see `boxStyle`.
 export const headerClass =
-  'col-span-full row-start-1 box-border flex h-[var(--rop-app-shell-header-height,3.5rem)] min-w-0 items-center gap-3 ' +
+  'col-span-full row-start-1 flex h-[var(--rop-app-shell-header-height,3.5rem)] min-w-0 items-center gap-3 ' +
   'border-0 border-b border-solid border-rop-border bg-rop-surface px-4';
 // The three parts of the header. Every part shrinks (zero minimum): a long text inside a truncating child is cut
 // at the real width of its part, never pushes the page wider. Every part starts from the width of its content and,
@@ -42,16 +42,17 @@ export const headerEndClass = 'flex min-w-0 shrink items-center justify-end gap-
 // breakpoint it is not displayed and the content takes the whole width. It scrolls on its own only when its links
 // are taller than the room it has; it never scrolls with the content.
 export const navClass =
-  'col-start-1 row-start-2 box-border hidden min-h-0 w-[var(--rop-app-shell-nav-width,16rem)] overflow-y-auto overflow-x-hidden ' +
+  'col-start-1 row-start-2 hidden min-h-0 w-[var(--rop-app-shell-nav-width,16rem)] overflow-y-auto overflow-x-hidden ' +
   'border-0 border-e border-solid border-rop-border bg-rop-surface-subtle min-[64rem]:block';
 export const navListClass = 'm-0 flex list-none flex-col gap-0.5 p-2';
 export const navItemClass = 'flex min-w-0 flex-col';
 
-// A link of the navigation: one line, truncated at the column's width (the focus indicator is drawn inside the
+// A link of the navigation: one line, truncated at the column's width, 2.5rem tall with or without a consumer's
+// box-sizing reset (no vertical padding: the minimum height alone sets it, the text is centred in it) (the focus indicator is drawn inside the
 // box, so the scroll container of the navigation never clips it). Hover and pressed feedback only on a link that
 // can be followed.
 export const navLinkClass =
-  'relative m-0 box-border flex min-h-10 min-w-0 items-center gap-2 rounded-rop-md border-0 bg-transparent px-3 py-2 ' +
+  'relative m-0 flex min-h-10 min-w-0 items-center gap-2 rounded-rop-md border-0 bg-transparent px-3 py-0 ' +
   'text-start font-rop-sans text-rop-body text-rop-text no-underline ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px]';
 export const navLinkEnabledClass =
@@ -89,6 +90,10 @@ export const skipLinkClass =
 // resets the variable to zero for what it holds: a Field inside then keeps only its own small margin, and a
 // floorplan inside (shorter by that padding, its save bar above the keyboard) does not add the keyboard a second
 // time. Inline, not in a class: the shipped CSS declares no new property.
+// The header's height and the navigation's width are their whole footprint, the 1px rule included, whether or not
+// the consumer's page has a box-sizing reset. Inline on those two elements only: the shipped CSS sets no box-sizing
+// at all (no preflight; a guard in test/styles.test.ts rejects any box-sizing rule in it).
+export const boxStyle = { boxSizing: 'border-box' } as const;
 export const rootStyle = { '--rop-app-shell-keyboard-inset': 'var(--rop-keyboard-inset, 0px)' } as const;
 export const mainStyle = {
   paddingBottom: 'var(--rop-app-shell-keyboard-inset, 0px)',
