@@ -70,6 +70,13 @@ describe('AppLauncher: structure', () => {
     setup();
     const one = tile('App one');
     expect(one).toHaveAccessibleName('App one');
+    // Label in name (WCAG 2.5.3): the visible text inside the link is exactly its name.
+    expect(one.textContent).toBe('App one');
+    // Not read twice: outside the link, hidden from the list content, still the link's description.
+    const description = document.getElementById(one.getAttribute('aria-describedby')!)!;
+    expect(one.contains(description)).toBe(false);
+    expect(description.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(description.closest('[data-rop-app-details]')!.className).toContain('pointer-events-none');
     expect(one).toHaveAccessibleDescription('First app');
     expect(descriptionOf(tile('App two'))).toBe('');
     expect(tile('App two')).not.toHaveAttribute('aria-describedby');
@@ -249,8 +256,8 @@ describe('AppLauncher: disabled apps', () => {
     expect(three).toHaveAttribute('role', 'link');
     expect(three.tabIndex).toBe(0);
     expect(three).toHaveAccessibleDescription('Third app Not enabled for you');
-    // The reason is visible text on the tile, not only an attribute.
-    expect(within(three).getByText('Not enabled for you')).toBeInTheDocument();
+    // The reason is visible text on the tile (drawn over it, outside the link), not only an attribute.
+    expect(within(three.closest('li')!).getByText('Not enabled for you')).toBeInTheDocument();
   });
 
   it('click, Enter and Space do nothing (no onNavigate, the click is cancelled)', async () => {

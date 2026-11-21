@@ -36,12 +36,12 @@ test.describe('Navigation/AppLauncher', () => {
     }
   });
 
-  test('every story is free of a11y violations', async ({ page }) => {
-    for (const id of ['apps', 'disabled-app', 'loading', 'empty', 'long-names-no-icons', 'many-apps', 'list-changes', 'example']) {
+  for (const id of ['apps', 'disabled-app', 'loading', 'empty', 'long-names-no-icons', 'many-apps', 'list-changes', 'example']) {
+    test(`${id}: free of a11y violations`, async ({ page }) => {
       await gotoStory(page, `${ID}${id}`);
       await expectNoA11yViolations(page);
-    }
-  });
+    });
+  }
 
   for (const [name, width, height] of VIEWPORTS) {
     test(`${name}: Tab from the start of the page visits the apps in list order, which is also the visual order`, async ({ page }) => {
@@ -130,12 +130,15 @@ test.describe('Navigation/AppLauncher', () => {
     await expect(third).toHaveAttribute('aria-disabled', 'true');
     await expect(third).not.toHaveAttribute('href');
     await expect(third).toHaveAccessibleDescription('Short description of app three You do not have access to this app');
-    await expect(third.getByText('You do not have access to this app')).toBeVisible();
+    // Visible on the tile (drawn over it, outside the link: the link's text is exactly its name).
+    await expect(page.locator('li').filter({ has: third }).getByText('You do not have access to this app')).toBeVisible();
     for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
     expect(await focusedApp(page)).toBe('three');
     await page.keyboard.press('Enter');
     await page.keyboard.press(' ');
-    await third.click();
+    // A real mouse click: Playwright's `click()` would wait forever for an `aria-disabled` element to be enabled.
+    const box = (await third.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     expect(await navigations(page)).toEqual(['three:prevented']);
     expect(await page.evaluate(() => location.hash)).toBe('');
     // Distinguishable without colour: a dashed outline.
@@ -198,7 +201,7 @@ test.describe('Navigation/AppLauncher', () => {
 
   test('every tile has the same height: no icon, no description, long name, disabled with a reason', async ({ page }) => {
     await gotoStory(page, `${ID}long-names-no-icons`);
-    const heights = await page.locator('nav li > *').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10));
+    const heights = await page.locator('nav li > a, nav li > button').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10));
     expect(new Set(heights).size).toBe(1);
   });
 
@@ -238,7 +241,7 @@ test.describe('Navigation/AppLauncher', () => {
     await expectFocusRingVisible(page.getByRole('link', { name: 'App three' }));
     await page.setViewportSize({ width: 375, height: 667 });
     await gotoStory(page, `${ID}many-apps`);
-    for (const name of ['App 1', 'App 40']) await expectFocusRingVisible(page.getByRole('link', { name }));
+    for (const name of ['App 1', 'App 40']) await expectFocusRingVisible(page.getByRole('link', { name, exact: true }));
   });
 
   test('the focused app leaves the list: the focus moves to the next app, not to the page', async ({ page }) => {

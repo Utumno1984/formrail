@@ -110,6 +110,14 @@ const TILE_CURRENT =
 
 const ICON = 'flex size-10 shrink-0 items-center justify-center text-rop-primary';
 
+// The description and the reason, drawn over the tile under the name line: the tile's border (1px) and padding
+// (0.75rem) on each side, after the icon (2.5rem plus the 0.75rem gap) when there is one. Logical insets only.
+const DETAILS =
+  'pointer-events-none absolute end-[calc(0.75rem+1px)] top-[calc(0.75rem+1px+var(--text-rop-body--line-height))] ' +
+  'flex h-[calc(2*var(--text-rop-body--line-height))] min-w-0 flex-col font-rop-sans text-rop-body';
+const DETAILS_AFTER_ICON = 'start-[calc(4rem+1px)]';
+const DETAILS_NO_ICON = 'start-[calc(0.75rem+1px)]';
+
 /** Key of each app: its `id`, made unique for a duplicate (already reported in development) so React keeps working. */
 function keysOf(apps: readonly AppDescriptor[]): string[] {
   const seen = new Map<string, number>();
@@ -314,17 +322,33 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
               onBlur: onTileBlur,
               className: cn(TILE, disabled ? TILE_DISABLED : TILE_ENABLED, current && TILE_CURRENT),
             };
+            const hasIcon = app.icon !== undefined && app.icon !== null;
             const body = (
               <>
-                {app.icon !== undefined && app.icon !== null ? (
+                {hasIcon ? (
                   <span aria-hidden="true" className={cn(ICON, disabled && 'opacity-60')}>
                     {app.icon}
                   </span>
                 ) : null}
+                {/* The name line, then the room the description and the reason are drawn over. */}
                 <span className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
                   <TruncatedText id={`${id}-label`} className="font-semibold">
                     {app.label}
                   </TruncatedText>
+                </span>
+              </>
+            );
+            // The description and the reason are NOT inside the link: its visible text is then exactly its name
+            // (WCAG 2.5.3, "label in name"), and they are read once, as its description (`aria-describedby` reads
+            // hidden text; `aria-hidden` keeps them from being read again as list content). They are drawn over the
+            // tile, under the name; `pointer-events: none` hands every click on them to the tile below.
+            const details =
+              app.description || reason ? (
+                <span
+                  aria-hidden="true"
+                  data-rop-app-details=""
+                  className={cn(DETAILS, hasIcon ? DETAILS_AFTER_ICON : DETAILS_NO_ICON)}
+                >
                   {app.description ? (
                     <span
                       id={`${id}-description`}
@@ -343,10 +367,9 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
                     </span>
                   ) : null}
                 </span>
-              </>
-            );
+              ) : null;
             return (
-              <li key={key} className="flex min-w-0 flex-col">
+              <li key={key} className="relative flex min-w-0 flex-col">
                 {app.href !== undefined && app.href !== '' ? (
                   // A disabled app keeps its `<a>` (the focus stays on it if it gets disabled while focused) but loses
                   // its `href`: `role="link"` and `tabIndex` keep it a named, focusable link that leads nowhere.
@@ -363,6 +386,7 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
                     {body}
                   </button>
                 )}
+                {details}
               </li>
             );
           })}
