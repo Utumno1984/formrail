@@ -157,6 +157,31 @@ describe('LEGACY_STORY_IDS (the real map)', () => {
     );
   });
 
+  // #527: the removed invoice showcase of the Free build.
+  it('the old ids of "Showcase/Invoices" land on the sales-order stories of "Showcase/Record editing", args and the rest kept', () => {
+    const FREE = 'https://utumno1984.github.io/formrail/storybook/';
+    expect(resolveLegacyStory(`${FREE}?path=/docs/showcase-invoices--docs`)).toBe(`${FREE}?path=/docs/showcase-record-editing--docs`);
+    expect(resolveLegacyStory(`${FREE}iframe.html?id=showcase-invoices--crud-manual&viewMode=story&args=saveOutcome:error;saveDelayMs:0#x`)).toBe(
+      `${FREE}iframe.html?id=showcase-record-editing--sales-order-crud-manual&viewMode=story&args=saveOutcome:error;saveDelayMs:0#x`,
+    );
+    expect(resolveLegacyStory(`${FREE}?args=listLoadDelayMs:0&path=/story/showcase-invoices--manual`)).toBe(
+      `${FREE}?args=listLoadDelayMs:0&path=/story/showcase-record-editing--sales-order-record-page-manual`,
+    );
+    // The story the visual suite photographed as "lines" is the order page with lines.
+    expect(LEGACY_STORY_IDS['showcase-invoices--record-line-items']).toBe('showcase-record-editing--sales-order-record-lines');
+    const old = Object.keys(LEGACY_STORY_IDS).filter((id) => id.startsWith('showcase-invoices--'));
+    expect(old.sort()).toEqual(
+      [
+        'docs', 'record-page', 'manual', 'record-line-items', 'list-to-record', 'list-to-record-manual', 'edit-flow', 'edit-flow-manual',
+        'record-open', 'record-dirty', 'leave-guard-open', 'list-after-save', 'crud', 'crud-delete', 'crud-bulk-delete', 'crud-manual',
+        'create-empty', 'create-invalid', 'create-saving', 'delete-confirm-list', 'bulk-delete-idle', 'bulk-delete-selected',
+        'bulk-delete-confirm', 'delete-confirm-record-pending',
+      ]
+        .map((name) => `showcase-invoices--${name}`)
+        .sort(),
+    );
+  });
+
   it('no new id of the real map is redirected again', () => {
     for (const to of Object.values(LEGACY_STORY_IDS)) {
       expect(resolveLegacyStory(`${SB}?path=/story/${to}`)).toBeNull();

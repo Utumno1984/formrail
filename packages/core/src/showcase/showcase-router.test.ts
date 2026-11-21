@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { updateSearch } from '../list-report/use-list-report-url-state';
 import {
-  DEFAULT_MODULE,
+  FIRST_MODULE,
   isLeaving,
   isShowcaseModule,
   leaveRoute,
@@ -19,163 +19,172 @@ import {
   type Route,
 } from './showcase-router';
 
-// #518: the route carries a module. The default module (the invoices) keeps the URLs it had before.
-const TWO_MODULES = ['invoices', 'tasks'] as const;
+// #527: no module is special. Every module is written with its own `module` and its own list parameters; a URL with
+// no `module` opens the FIRST registered one. The tests use two neutral modules, never the ones of a story.
+vi.mock('./showcase-modules', () => ({ SHOWCASE_MODULES: ['alpha', 'beta'] }));
+const TWO_MODULES = ['alpha', 'beta'] as const;
 
-describe('parseRoute (#518)', () => {
-  it('the default module is the invoices, the first of the registered ones (sales orders since #520, customers since #523)', () => {
-    expect(SHOWCASE_MODULES).toEqual(['invoices', 'sales-orders', 'customers']);
-    expect(DEFAULT_MODULE).toBe('invoices');
+describe('parseRoute (#518, #527)', () => {
+  it('the first registered module is what a URL with no `module` opens', () => {
+    expect(SHOWCASE_MODULES).toEqual(['alpha', 'beta']);
+    expect(FIRST_MODULE).toBe('alpha');
   });
 
-  it('the invoice URLs of before #518 parse to the invoices module, `record` winning over `create`', () => {
-    expect(parseRoute('')).toEqual({ module: 'invoices', kind: 'list' });
-    expect(parseRoute('?filter=paid&q=x&sort=amount.desc')).toEqual({ module: 'invoices', kind: 'list' });
-    expect(parseRoute('?filter=paid&record=inv-12')).toEqual({ module: 'invoices', kind: 'record', id: 'inv-12' });
-    expect(parseRoute('?create=1')).toEqual({ module: 'invoices', kind: 'create' });
-    expect(parseRoute('?create=1&record=inv-3')).toEqual({ module: 'invoices', kind: 'record', id: 'inv-3' });
-    expect(parseRoute('?create=0')).toEqual({ module: 'invoices', kind: 'list' });
-    expect(parseRoute('?record=')).toEqual({ module: 'invoices', kind: 'list' });
+  it('a URL with no `module` parses to the first module, `record` winning over `create`', () => {
+    expect(parseRoute('')).toEqual({ module: 'alpha', kind: 'list' });
+    expect(parseRoute('?filter=paid&q=x&sort=amount.desc')).toEqual({ module: 'alpha', kind: 'list' });
+    expect(parseRoute('?filter=paid&record=a-12')).toEqual({ module: 'alpha', kind: 'record', id: 'a-12' });
+    expect(parseRoute('?create=1')).toEqual({ module: 'alpha', kind: 'create' });
+    expect(parseRoute('?create=1&record=a-3')).toEqual({ module: 'alpha', kind: 'record', id: 'a-3' });
+    expect(parseRoute('?create=0')).toEqual({ module: 'alpha', kind: 'list' });
+    expect(parseRoute('?record=')).toEqual({ module: 'alpha', kind: 'list' });
   });
 
   it('a second module: its list, its records and its creation page', () => {
-    expect(parseRoute('?module=tasks', TWO_MODULES)).toEqual({ module: 'tasks', kind: 'list' });
-    expect(parseRoute('?q=brief&module=tasks&record=task-7', TWO_MODULES)).toEqual({ module: 'tasks', kind: 'record', id: 'task-7' });
-    expect(parseRoute('?module=tasks&create=1', TWO_MODULES)).toEqual({ module: 'tasks', kind: 'create' });
-    expect(parseRoute('?module=invoices&record=inv-1', TWO_MODULES)).toEqual({ module: 'invoices', kind: 'record', id: 'inv-1' });
-    // No `module` (or an empty one): the default module, the first of the list.
-    expect(parseRoute('?record=inv-1', TWO_MODULES)).toEqual({ module: 'invoices', kind: 'record', id: 'inv-1' });
-    expect(parseRoute('?module=&create=1', TWO_MODULES)).toEqual({ module: 'invoices', kind: 'create' });
-    expect(parseRoute('?create=1', ['tasks', 'invoices'])).toEqual({ module: 'tasks', kind: 'create' });
+    expect(parseRoute('?module=beta', TWO_MODULES)).toEqual({ module: 'beta', kind: 'list' });
+    expect(parseRoute('?q=brief&module=beta&record=b-7', TWO_MODULES)).toEqual({ module: 'beta', kind: 'record', id: 'b-7' });
+    expect(parseRoute('?module=beta&create=1', TWO_MODULES)).toEqual({ module: 'beta', kind: 'create' });
+    expect(parseRoute('?module=alpha&record=a-1', TWO_MODULES)).toEqual({ module: 'alpha', kind: 'record', id: 'a-1' });
+    // No `module` (or an empty one): the first module of the list.
+    expect(parseRoute('?record=a-1', TWO_MODULES)).toEqual({ module: 'alpha', kind: 'record', id: 'a-1' });
+    expect(parseRoute('?module=&create=1', TWO_MODULES)).toEqual({ module: 'alpha', kind: 'create' });
+    expect(parseRoute('?create=1', ['beta', 'alpha'])).toEqual({ module: 'beta', kind: 'create' });
   });
 
-  it('an unknown module is the LIST of the default module, whatever else the URL asks', () => {
-    expect(parseRoute('?module=nope', TWO_MODULES)).toEqual({ module: 'invoices', kind: 'list' });
-    expect(parseRoute('?module=nope&record=task-7', TWO_MODULES)).toEqual({ module: 'invoices', kind: 'list' });
-    expect(parseRoute('?module=nope&create=1', TWO_MODULES)).toEqual({ module: 'invoices', kind: 'list' });
-    // A module not registered yet is unknown: with the default registry, `tasks` too.
-    expect(parseRoute('?module=tasks&record=inv-1')).toEqual({ module: 'invoices', kind: 'list' });
-    expect(parseRoute('?module=Invoices&record=inv-1')).toEqual({ module: 'invoices', kind: 'list' });
+  it('an unknown module is the LIST of the first module, whatever else the URL asks', () => {
+    expect(parseRoute('?module=nope', TWO_MODULES)).toEqual({ module: 'alpha', kind: 'list' });
+    expect(parseRoute('?module=nope&record=b-7', TWO_MODULES)).toEqual({ module: 'alpha', kind: 'list' });
+    expect(parseRoute('?module=nope&create=1', TWO_MODULES)).toEqual({ module: 'alpha', kind: 'list' });
+    // A module not registered is unknown: with the registry of this file, `gamma` too.
+    expect(parseRoute('?module=gamma&record=a-1')).toEqual({ module: 'alpha', kind: 'list' });
+    expect(parseRoute('?module=Alpha&record=a-1')).toEqual({ module: 'alpha', kind: 'list' });
   });
 
   it('routeKey: one key per route, distinct across modules and between a record named "new" and a creation page', () => {
     const routes: Route[] = [
-      { module: 'invoices', kind: 'list' },
-      { module: 'tasks', kind: 'list' },
-      { module: 'invoices', kind: 'record', id: 'new' },
-      { module: 'invoices', kind: 'create' },
-      { module: 'tasks', kind: 'record', id: 'new' },
-      { module: 'tasks', kind: 'create' },
+      { module: 'alpha', kind: 'list' },
+      { module: 'beta', kind: 'list' },
+      { module: 'alpha', kind: 'record', id: 'new' },
+      { module: 'alpha', kind: 'create' },
+      { module: 'beta', kind: 'record', id: 'new' },
+      { module: 'beta', kind: 'create' },
     ];
     expect(new Set(routes.map(routeKey)).size).toBe(routes.length);
-    expect(routeKey({ module: 'tasks', kind: 'record', id: 'a' })).toBe(routeKey(parseRoute('?module=tasks&record=a', TWO_MODULES)));
+    expect(routeKey({ module: 'beta', kind: 'record', id: 'a' })).toBe(routeKey(parseRoute('?module=beta&record=a', TWO_MODULES)));
   });
 });
 
-describe('routeSearch (#518)', () => {
-  // What the router wrote before #518: only `record` and `create`, everything else byte for byte.
-  const before = (search: string, route: Route) =>
-    updateSearch(search, { record: route.kind === 'record' ? route.id : null, create: route.kind === 'create' ? '1' : null });
+describe('routeSearch (#518, #527)', () => {
   const SEARCHES = [
     '',
-    '?id=showcase-invoices--crud&viewMode=story',
+    '?id=showcase-alpha--crud&viewMode=story',
     '?filter=paid&q=a%20b&sort=amount.desc',
-    '?record=inv-3&filter=draft',
+    '?record=a-3&filter=draft',
     '?create=1&q=x',
-    '?q=x&record=inv-1&record=inv-2&create=1',
+    '?q=x&record=a-1&record=a-2&create=1',
     '?args=saveDelayMs:2000&sort=date.asc',
   ];
-  const INVOICE_ROUTES: Route[] = [
-    { module: 'invoices', kind: 'list' },
-    { module: 'invoices', kind: 'record', id: 'inv-12' },
-    { module: 'invoices', kind: 'record', id: 'a b&c' },
-    { module: 'invoices', kind: 'create' },
+  const ROUTES: Route[] = [
+    { module: 'alpha', kind: 'list' },
+    { module: 'alpha', kind: 'record', id: 'a-12' },
+    { module: 'alpha', kind: 'record', id: 'a b&c' },
+    { module: 'alpha', kind: 'create' },
+    { module: 'beta', kind: 'list' },
+    { module: 'beta', kind: 'record', id: 'b-7' },
   ];
 
-  it('the invoice URLs are the same as before #518, byte for byte', () => {
+  it('every module is written with its `module`, and every other parameter is kept byte for byte', () => {
     for (const search of SEARCHES) {
-      for (const route of INVOICE_ROUTES) expect(routeSearch(search, route), `${search} -> ${routeKey(route)}`).toBe(before(search, route));
+      for (const route of ROUTES) {
+        // Whatever is not a route parameter is untouched: with the three removed, both sides are the same string.
+        const written = routeSearch(search, route);
+        expect(updateSearch(written, { module: null, record: null, create: null }), `${search} -> ${routeKey(route)}`).toBe(
+          updateSearch(search, { module: null, record: null, create: null }),
+        );
+        expect(new URLSearchParams(written).get('module')).toBe(route.module);
+        expect(parseRoute(routeSearch(search, route), TWO_MODULES), `${search} -> ${routeKey(route)}`).toEqual(route);
+      }
     }
   });
 
-  it('another module adds `module`, keeps it on its list, and drops it going back to the default module', () => {
-    expect(routeSearch('?filter=paid', { module: 'tasks', kind: 'record', id: 'task-7' })).toBe('?filter=paid&module=tasks&record=task-7');
-    expect(routeSearch('?filter=paid&module=tasks&record=task-7', { module: 'tasks', kind: 'list' })).toBe('?filter=paid&module=tasks');
-    expect(routeSearch('?module=tasks&record=task-7', { module: 'tasks', kind: 'create' })).toBe('?module=tasks&create=1');
-    expect(routeSearch('?module=tasks&q=x', { module: 'invoices', kind: 'list' })).toBe('?q=x');
-    expect(routeSearch('?module=nope&record=x', { module: 'invoices', kind: 'record', id: 'inv-1' })).toBe('?record=inv-1');
+  it('a module adds `module`, keeps it on its list, and the first module has no special treatment', () => {
+    expect(routeSearch('?filter=paid', { module: 'beta', kind: 'record', id: 'b-7' })).toBe('?filter=paid&module=beta&record=b-7');
+    expect(routeSearch('?filter=paid&module=beta&record=b-7', { module: 'beta', kind: 'list' })).toBe('?filter=paid&module=beta');
+    expect(routeSearch('?module=beta&record=b-7', { module: 'beta', kind: 'create' })).toBe('?module=beta&create=1');
+    expect(routeSearch('?module=beta&q=x', { module: 'alpha', kind: 'list' })).toBe('?module=alpha&q=x');
+    expect(routeSearch('?module=nope&record=x', { module: 'alpha', kind: 'record', id: 'a-1' })).toBe('?module=alpha&record=a-1');
     // Each route parses back to itself.
-    const route: Route = { module: 'tasks', kind: 'record', id: 'task-7' };
+    const route: Route = { module: 'beta', kind: 'record', id: 'b-7' };
     expect(parseRoute(routeSearch('?q=x', route), TWO_MODULES)).toEqual(route);
   });
 });
 
-describe('the router on the window (#518): the invoices keep their URLs', () => {
+describe('the router on the window (#518, #527): every module writes its `module`', () => {
   afterEach(() => {
     // `leaveRoute` waits for the `popstate` of its `history.back()` before navigating again.
     if (isLeaving()) window.dispatchEvent(new PopStateEvent('popstate'));
     window.history.replaceState(null, '', '/');
   });
 
-  it('opening a record and the creation page writes the same URLs as before', () => {
+  it('opening a record and the creation page writes the module and the route', () => {
     window.history.replaceState(null, '', '/iframe.html?filter=paid');
-    expect(recordHref('inv-4')).toBe('/iframe.html?filter=paid&record=inv-4');
-    openRecord('inv-4');
-    expect(window.location.search).toBe('?filter=paid&record=inv-4');
-    expect(readRecord()).toBe('inv-4');
-    expect(readCreate()).toBe(false);
+    expect(recordHref('a-4', 'alpha')).toBe('/iframe.html?filter=paid&module=alpha&record=a-4');
+    openRecord('a-4', 'alpha');
+    expect(window.location.search).toBe('?filter=paid&module=alpha&record=a-4');
+    expect(readRecord('alpha')).toBe('a-4');
+    expect(readCreate('alpha')).toBe(false);
     window.history.replaceState(null, '', '/iframe.html?filter=paid');
-    openCreate();
-    expect(window.location.search).toBe('?filter=paid&create=1');
-    expect(readCreate()).toBe(true);
-    expect(readRecord()).toBeNull();
+    openCreate('alpha');
+    expect(window.location.search).toBe('?filter=paid&module=alpha&create=1');
+    expect(readCreate('alpha')).toBe(true);
+    expect(readRecord('alpha')).toBeNull();
   });
 
-  it('readRecord/readCreate answer for one module: an unknown module is the default list', () => {
-    window.history.replaceState(null, '', '/iframe.html?module=nope&record=inv-4&create=1');
-    expect(readRoute()).toEqual({ module: 'invoices', kind: 'list' });
-    expect(readRecord()).toBeNull();
-    expect(readCreate()).toBe(false);
-    window.history.replaceState(null, '', '/iframe.html?record=inv-4');
-    expect(readRecord('tasks')).toBeNull();
-    expect(readRecord(DEFAULT_MODULE)).toBe('inv-4');
+  it('readRecord/readCreate answer for one module: an unknown module is the first list', () => {
+    window.history.replaceState(null, '', '/iframe.html?module=nope&record=a-4&create=1');
+    expect(readRoute()).toEqual({ module: 'alpha', kind: 'list' });
+    expect(readRecord('alpha')).toBeNull();
+    expect(readCreate('alpha')).toBe(false);
+    window.history.replaceState(null, '', '/iframe.html?record=a-4');
+    expect(readRecord('beta')).toBeNull();
+    expect(readRecord(FIRST_MODULE)).toBe('a-4');
   });
 
-  it('readCreate answers for one module: with `?create=1` only the default module is creating', () => {
+  it('readCreate answers for one module: with `?create=1` and no `module` only the first module is creating', () => {
     window.history.replaceState(null, '', '/iframe.html?create=1');
-    expect(readCreate('tasks')).toBe(false);
-    expect(readCreate()).toBe(true);
-    expect(readCreate(DEFAULT_MODULE)).toBe(true);
+    expect(readCreate('beta')).toBe(false);
+    expect(readCreate('alpha')).toBe(true);
+    expect(readCreate(FIRST_MODULE)).toBe(true);
   });
 
-  it('opening a record from an unknown module drops the stray `module`; a deep link leaves to the list URL with no route parameter', () => {
+  it('opening a record from an unknown module replaces the stray `module`; a deep link leaves to the list URL of its module', () => {
     window.history.replaceState(null, '', '/iframe.html?module=nope&q=x');
-    openRecord('inv-2');
-    expect(window.location.search).toBe('?q=x&record=inv-2');
+    openRecord('a-2', 'alpha');
+    expect(window.location.search).toBe('?module=alpha&q=x&record=a-2');
     // Deep link: no list entry before this one.
-    window.history.replaceState(null, '', '/iframe.html?q=x&record=inv-2#top');
+    window.history.replaceState(null, '', '/iframe.html?q=x&module=alpha&record=a-2#top');
     leaveRoute();
-    expect(`${window.location.search}${window.location.hash}`).toBe('?q=x#top');
+    expect(`${window.location.search}${window.location.hash}`).toBe('?q=x&module=alpha#top');
   });
 });
 
-describe('the module registry (#519, B3 of #518)', () => {
+describe('the module registry (#519, B3 of #518, #527)', () => {
   afterEach(() => window.history.replaceState(null, '', '/'));
 
   it('reading and writing use the same list: an unregistered module is never written', () => {
-    expect(isShowcaseModule('invoices')).toBe(true);
-    expect(isShowcaseModule('tasks')).toBe(false);
+    expect(isShowcaseModule('alpha')).toBe(true);
+    expect(isShowcaseModule('gamma')).toBe(false);
     window.history.replaceState(null, '', '/iframe.html?q=x');
     const entries = window.history.length;
-    expect(() => openRecord('task-7', 'tasks')).toThrow('unknown module "tasks"');
-    expect(() => openCreate('tasks')).toThrow('unknown module "tasks"');
-    expect(() => recordHref('task-7', 'tasks')).toThrow('unknown module "tasks"');
+    expect(() => openRecord('g-7', 'gamma')).toThrow('unknown module "gamma"');
+    expect(() => openCreate('gamma')).toThrow('unknown module "gamma"');
+    expect(() => recordHref('g-7', 'gamma')).toThrow('unknown module "gamma"');
     expect(window.location.search).toBe('?q=x');
     expect(window.history.length).toBe(entries);
   });
 
-  it('the list parameters of the default module have no prefix (the URLs of before #519), any other has its name', () => {
-    expect(listParamPrefix(DEFAULT_MODULE)).toBeUndefined();
-    expect(listParamPrefix('tasks')).toBe('tasks');
+  it('the list parameters of every module have its name as a prefix, the first one included', () => {
+    expect(listParamPrefix(FIRST_MODULE)).toBe('alpha');
+    expect(listParamPrefix('beta')).toBe('beta');
   });
 });

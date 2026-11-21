@@ -15,8 +15,8 @@ import {
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import type { DemoInvoice } from '../internal/demo-invoices';
-import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from '../showcase/invoice-list-shared';
-import { makeShowcaseInvoices } from '../showcase/showcase-data';
+import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
+import { makeShowcaseInvoices } from './showcase-data';
 import { repositionAfterMotion, settleMotion } from '../internal/settle-motion';
 import {
   Sheet,

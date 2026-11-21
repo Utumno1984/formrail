@@ -163,3 +163,48 @@ test.describe('renamed story ids: the removed invoice showcase of the Pro demo (
     await expect(page.getByRole('button', { name: 'Simulate server update' })).toBeVisible();
   });
 });
+
+// #527: "Showcase/Invoices" was removed; its published links (the Introduction, issues and posts) land on
+// "Showcase/Record editing" (sales orders and customers) in the Free build.
+test.describe('renamed story ids: the removed invoice showcase of the Free build (#527)', () => {
+  const OLD = 'showcase-invoices';
+  const NEW = 'showcase-record-editing';
+
+  test.beforeEach(async ({ page }) => {
+    await recordHistory(page);
+  });
+
+  test('every old id of the showcase, its Docs page included, is in the map, points at a story of the Free build and exists no more', async ({ page }) => {
+    const entries = await readEntries(page, 'storybook');
+    const old = Object.keys(LEGACY_STORY_IDS).filter((id) => id.startsWith(`${OLD}--`));
+    expect(old).toHaveLength(24);
+    for (const id of old) {
+      const target = (LEGACY_STORY_IDS as Record<string, string>)[id];
+      expect(target, id).toMatch(new RegExp(`^${NEW}--`));
+      expect(entries[target!], `${id} -> ${target}`).toBeDefined();
+      expect(entries[id], id).toBeUndefined();
+    }
+    expect(Object.keys(entries).filter((id) => id.startsWith(`${OLD}--`))).toEqual([]);
+  });
+
+  test('manager: the old Docs URL opens the Docs page of the record-editing showcase, in place', async ({ page }) => {
+    await page.goto(`storybook/?path=/docs/${OLD}--docs`);
+    const url = new URL(page.url());
+    expect((await historyCalls(page))[0]).toEqual(['replaceState', `${url.origin}${base}storybook/?path=/docs/${NEW}--docs`]);
+    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe(`/docs/${NEW}--docs`);
+    const frame = page.frameLocator('#storybook-preview-iframe');
+    await expect(frame.locator('.sbdocs-content')).toBeVisible({ timeout: 30_000 });
+    await expect(frame.getByRole('heading', { level: 1 }).first()).toBeVisible();
+  });
+
+  test('iframe: the old "crud manual" story renders the sales-order CRUD, its args kept', async ({ page }) => {
+    const query = 'viewMode=story&args=saveOutcome:error';
+    await page.goto(`storybook/iframe.html?id=${OLD}--crud-manual&${query}`);
+    expect((await historyCalls(page))[0]).toEqual(['replaceState', `${new URL(page.url()).origin}${base}storybook/iframe.html?id=${NEW}--sales-order-crud-manual&${query}`]);
+    expect(await initialHref(page)).toContain(`id=${OLD}--crud-manual&`);
+    await expect(page.locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
+    await expect(page.locator('body.sb-show-errordisplay')).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.get('id')).toBe(`${NEW}--sales-order-crud-manual`);
+    expect(new URL(page.url()).searchParams.get('args')).toBe('saveOutcome:error');
+  });
+});

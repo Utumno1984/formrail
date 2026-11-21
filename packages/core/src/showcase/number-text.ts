@@ -1,4 +1,4 @@
-// Story-only: number-as-text rules shared by the invoice form and its line items. Not exported by the package.
+// Story-only: number-as-text rules shared by the record forms and their line items. Not exported by the package.
 
 export const INTEGER = /^\d+$/;
 export const DECIMAL = /^\d+(\.\d+)?$/;
