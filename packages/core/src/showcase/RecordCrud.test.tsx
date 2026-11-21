@@ -12,9 +12,10 @@ import { createRecordStore } from './record-store';
 import { RecordCrud, type RecordCrudProps } from './RecordCrud';
 import { isLeaving, openCreate, openRecord, readRoute, recordHref, subscribeRoute } from './showcase-router';
 
-// #519: the shell with two made-up modules, none of them the invoices. The registry is the ONE static list of the
-// showcase (`showcase-modules.ts`); this file registers its own two modules there, `people` first (the default
-// module: plain `filter`/`q`/`sort`) and `tasks` (its list parameters under `tasks.`).
+// #519: the shell with two made-up modules, none of them a real domain. The registry is the ONE static list of the
+// showcase (`showcase-modules.ts`); this file registers its own two modules there, `people` first (what a URL
+// with no `module` opens) and `tasks`; each module writes its own `module` and its list parameters under its name
+// (`people.sort`, `tasks.sort`, #527).
 vi.mock('./showcase-modules', () => ({ SHOWCASE_MODULES: ['people', 'tasks'] }));
 
 /* -------------------------------------------------------------------------- the made-up modules */
@@ -222,24 +223,22 @@ function switchTo(search: string) {
 
 describe('RecordCrud (#519): the shell holds no word of a domain', () => {
   // Every source file of the showcase folder is part of the shell UNLESS it is named here as a domain's file (the
-  // invoices' own files, the registry that names the modules, the data and helpers of a story): a new shell file
+  // registry that names the modules, the data and helpers of a story): a new shell file
   // is scanned the day it is added, a new domain file must be added to this list on purpose.
   const DOMAIN_FILES = new Set([
     'app-story-args.ts',
-    'crud-story-args.ts',
     'customer-store.ts',
     'customer-story-args.ts',
     'notice-cap.ts',
     'number-text.ts',
     'sales-order-store.ts',
     'sales-order-story-args.ts',
-    'showcase-data.ts',
     'showcase-modules.ts',
   ]);
   const shellFiles = () =>
     readdirSync(import.meta.dirname)
       .filter((file) => /\.tsx?$/.test(file) && !/\.(test|stories)\.tsx?$/.test(file))
-      .filter((file) => !/^invoice/i.test(file) && !DOMAIN_FILES.has(file));
+      .filter((file) => !DOMAIN_FILES.has(file));
 
   it('the shell files (every source file of the folder that is not a domain file) are the ones expected', () => {
     expect(shellFiles().sort()).toEqual([
@@ -392,12 +391,12 @@ describe('RecordCrud (#519): list parameters and scroll per module, never shared
     const restore = scrollableElements();
     try {
       render(<TwoModules />);
-      // People (the default module): sort by name, descending, then scroll.
+      // People (the first module): sort by name, descending, then scroll.
       await screen.findByRole('link', { name: 'Ada Rivers' });
       await sortBy('Name');
       await sortBy('Name');
       expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'descending');
-      expect(window.location.search).toBe('?sort=name.desc');
+      expect(window.location.search).toBe('?people.sort=name.desc');
       await scrollList(120);
       await userEvent.click(screen.getByRole('link', { name: 'Ben Okafor' }));
       await screen.findByRole('heading', { level: 1, name: /Ben Okafor/ });
@@ -407,7 +406,7 @@ describe('RecordCrud (#519): list parameters and scroll per module, never shared
       expect(scroller().scrollTop).toBe(120);
 
       // Tasks, in the same iframe: neither the sort nor the scroll of the people.
-      switchTo('?sort=name.desc&module=tasks');
+      switchTo('?people.sort=name.desc&module=tasks');
       await screen.findByRole('link', { name: 'Write the brief' });
       expect(screen.getByRole('columnheader', { name: 'Title' })).not.toHaveAttribute('aria-sort', 'descending');
       expect(screen.getByRole('columnheader', { name: 'Title' })).not.toHaveAttribute('aria-sort', 'ascending');
@@ -415,18 +414,18 @@ describe('RecordCrud (#519): list parameters and scroll per module, never shared
       await sortBy('Title');
       expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'ascending');
       // Its own parameter: the people's is kept byte for byte.
-      expect(window.location.search).toBe('?sort=name.desc&module=tasks&tasks.sort=title.asc');
+      expect(window.location.search).toBe('?people.sort=name.desc&module=tasks&tasks.sort=title.asc');
       await scrollList(40);
       await userEvent.click(screen.getByRole('link', { name: 'Archive the notes' }));
       await screen.findByRole('heading', { level: 1, name: /Archive the notes/ });
-      expect(window.location.search).toBe('?sort=name.desc&module=tasks&tasks.sort=title.asc&record=task-3');
+      expect(window.location.search).toBe('?people.sort=name.desc&module=tasks&tasks.sort=title.asc&record=task-3');
       await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
       await screen.findByRole('link', { name: 'Archive the notes' });
       expect(screen.getByRole('columnheader', { name: 'Title' })).toHaveAttribute('aria-sort', 'ascending');
       expect(scroller().scrollTop).toBe(40);
 
       // Back to the people: their own sort and scroll, not the tasks'.
-      switchTo('?sort=name.desc&tasks.sort=title.asc');
+      switchTo('?people.sort=name.desc&tasks.sort=title.asc');
       await screen.findByRole('link', { name: 'Ada Rivers' });
       expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute('aria-sort', 'descending');
       expect(scroller().scrollTop).toBe(120);
@@ -439,14 +438,14 @@ describe('RecordCrud (#519): list parameters and scroll per module, never shared
 });
 
 describe('RecordCrud (#519, B3 of #518): one registry for reading and writing', () => {
-  it('a registered module writes a URL that reads back as itself; the default module carries no `module`', () => {
+  it('a registered module writes a URL that reads back as itself; every module, the first included, carries its `module`', () => {
     window.history.replaceState(null, '', '/?q=x');
     openRecord('task-2', 'tasks');
     expect(window.location.search).toBe('?q=x&module=tasks&record=task-2');
     expect(readRoute()).toEqual({ module: 'tasks', kind: 'record', id: 'task-2' });
     window.history.replaceState(null, '', '/?q=x');
     openCreate('people');
-    expect(window.location.search).toBe('?q=x&create=1');
+    expect(window.location.search).toBe('?q=x&module=people&create=1');
     expect(readRoute()).toEqual({ module: 'people', kind: 'create' });
   });
 

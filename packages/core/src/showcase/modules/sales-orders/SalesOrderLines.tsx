@@ -1,8 +1,7 @@
 // Story-only (#520): the "Lines" section of the sales order page (add, remove, move up/down, product, quantity,
 // unit price, discount, per-line total). Not exported by the package. The lines are controlled by the form of the
 // page; this component only decides which control takes the focus after an action (the control that had it may be
-// gone or moved in the DOM). It is the invoices' line editor (`InvoiceLineItems`) with the fields of an order line:
-// copy whichever of the two is closer to your record.
+// gone or moved in the DOM).
 import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '../../../button/Button';
 import { Field } from '../../../field/Field';

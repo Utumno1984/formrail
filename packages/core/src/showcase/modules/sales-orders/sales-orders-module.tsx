@@ -1,5 +1,5 @@
 // Story-only (#520): the Sales orders module of the record-editing shell (`RecordCrud`), the second `RecordModule`
-// after the invoices (modules/invoices/invoices-module.tsx, the file this one follows). Everything here belongs to
+// the first module of the record-editing showcase (#520). Everything here belongs to
 // sales orders only: their words, their list (columns and pills), their form (values, validation, the sections of the
 // record page as explicit JSX) and their store. The flow (navigation, dirty-guard, toasts, confirmations, focus,
 // scroll) is the shell's; `SALES_ORDERS_CRUD` (#521) adds the creation page, the deletion from the row and from the
@@ -375,7 +375,7 @@ export const SALES_ORDERS: RecordModule<StoredSalesOrder, SalesOrderValues, Sale
 
 /**
  * The same module with creation, deletion from the row and from the page, and bulk deletion (#521). A separate
- * object, as the invoices' `INVOICES` is for `InvoiceListToRecord`: the read-and-edit stories of #520 keep their
+ * object: the read-and-edit stories of #520 keep their
  * list without the selection column and their page without "Delete".
  */
 export const SALES_ORDERS_CRUD: RecordModule<StoredSalesOrder, SalesOrderValues, SalesOrderDraft> = {

@@ -1,4 +1,4 @@
-// Story-only (#470): how tall the notice row of the invoice editor may be (the `notice` of `useAddons`, rendered above
+// Story-only (#470): how tall the notice row of a record editor may be (the `notice` of `useAddons`, rendered above
 // the page's scroller). Not exported by the package.
 import { useLayoutEffect, type RefObject } from 'react';
 
@@ -18,7 +18,7 @@ export const EDITOR_MIN_REM = 10;
 
 /**
  * The least the notice keeps, in rem: 3rem (48px). Its top margin (12px), its padding (12px) and the first line of
- * its title (20px): the warning icon and "Warning: This invoice was…" stay in view, the rest scrolls inside the row.
+ * its title (20px): the warning icon and "Warning: This order was…" stay in view, the rest scrolls inside the row.
  * When the room runs out (a short screen with the virtual keyboard open) the notice keeps this and the editor the rest.
  */
 export const NOTICE_MIN_REM = 3;

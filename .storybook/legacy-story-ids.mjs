@@ -32,6 +32,32 @@ export var LEGACY_STORY_IDS = {
   'pro-showcase-invoices-with-change-summary--review-order-only': 'pro-showcase-record-editing-integrity--sales-order-review-order-only',
   'pro-showcase-invoices-with-change-summary--review-lines-dialog': 'pro-showcase-record-editing-integrity--sales-order-review-dialog',
   'pro-showcase-invoices-with-change-summary--server-update': 'pro-showcase-record-editing-integrity--sales-order-server-update',
+  // #527: "Showcase/Invoices" removed, replaced by "Showcase/Record editing" (sales orders and customers). Every story of the
+  // old one has its sales-order twin; `record-line-items` (the lines, seen by the visual suite) is `sales-order-record-lines`.
+  'showcase-invoices--docs': 'showcase-record-editing--docs',
+  'showcase-invoices--record-page': 'showcase-record-editing--sales-order-record-page',
+  'showcase-invoices--manual': 'showcase-record-editing--sales-order-record-page-manual',
+  'showcase-invoices--record-line-items': 'showcase-record-editing--sales-order-record-lines',
+  'showcase-invoices--list-to-record': 'showcase-record-editing--sales-order-list-to-record',
+  'showcase-invoices--list-to-record-manual': 'showcase-record-editing--sales-order-list-to-record-manual',
+  'showcase-invoices--edit-flow': 'showcase-record-editing--sales-order-edit-flow',
+  'showcase-invoices--edit-flow-manual': 'showcase-record-editing--sales-order-edit-flow-manual',
+  'showcase-invoices--record-open': 'showcase-record-editing--sales-order-record-open',
+  'showcase-invoices--record-dirty': 'showcase-record-editing--sales-order-record-dirty',
+  'showcase-invoices--leave-guard-open': 'showcase-record-editing--sales-order-leave-guard-open',
+  'showcase-invoices--list-after-save': 'showcase-record-editing--sales-order-list-after-save',
+  'showcase-invoices--crud': 'showcase-record-editing--sales-order-crud',
+  'showcase-invoices--crud-delete': 'showcase-record-editing--sales-order-crud-delete',
+  'showcase-invoices--crud-bulk-delete': 'showcase-record-editing--sales-order-crud-bulk-delete',
+  'showcase-invoices--crud-manual': 'showcase-record-editing--sales-order-crud-manual',
+  'showcase-invoices--create-empty': 'showcase-record-editing--sales-order-create-empty',
+  'showcase-invoices--create-invalid': 'showcase-record-editing--sales-order-create-invalid',
+  'showcase-invoices--create-saving': 'showcase-record-editing--sales-order-create-saving',
+  'showcase-invoices--delete-confirm-list': 'showcase-record-editing--sales-order-delete-confirm-list',
+  'showcase-invoices--bulk-delete-idle': 'showcase-record-editing--sales-order-bulk-delete-idle',
+  'showcase-invoices--bulk-delete-selected': 'showcase-record-editing--sales-order-bulk-delete-selected',
+  'showcase-invoices--bulk-delete-confirm': 'showcase-record-editing--sales-order-bulk-delete-confirm',
+  'showcase-invoices--delete-confirm-record-pending': 'showcase-record-editing--sales-order-delete-confirm-record-pending',
 };
 
 // `path` of the manager: `/story/<id>` or `/docs/<id>`, possibly followed by more segments (kept).

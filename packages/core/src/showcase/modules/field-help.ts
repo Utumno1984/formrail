@@ -1,4 +1,4 @@
-// Story-only (#384): shared by the record-editing modules (invoices, sales orders). Not exported by the package.
+// Story-only (#384): shared by the record-editing modules (sales orders, customers). Not exported by the package.
 import type { ReactNode } from 'react';
 
 /**

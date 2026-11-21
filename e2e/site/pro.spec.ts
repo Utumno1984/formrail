@@ -108,10 +108,10 @@ test.describe('Pro demo: manager and index', () => {
   test('the Free Storybook has no Pro entry and no banner', async ({ page }) => {
     const entries = await readIndex(page, 'storybook');
     expect(entries.filter((e) => e.title.startsWith('Pro')).map((e) => e.id)).toEqual([]);
-    await page.goto('storybook/iframe.html?id=showcase-invoices--docs&viewMode=docs');
+    await page.goto('storybook/iframe.html?id=showcase-record-editing--docs&viewMode=docs');
     await expect(page.locator('.sbdocs-content')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('.rop-pro-banner')).toHaveCount(0);
-    await page.goto('storybook/iframe.html?id=showcase-invoices--crud-manual&viewMode=story');
+    await page.goto('storybook/iframe.html?id=showcase-record-editing--sales-order-crud-manual&viewMode=story');
     await expect(page.locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
     await expect(page.locator('.rop-pro-banner')).toHaveCount(0);
   });

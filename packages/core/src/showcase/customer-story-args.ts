@@ -64,7 +64,7 @@ export const CUSTOMER_PAGE_ARGTYPES = {
     control: 'select',
     options: CUSTOMER_OPTIONS,
     description:
-      'The customer to open: `cus-4` active with two contacts, `cus-1` has a single contact (it cannot be removed), `cus-6` is invoiced in yen, `cus-9` has an account manager who left the company, `cus-11` is archived (read-only, with Restore), `cus-17` is on hold, `cus-34` has four contacts. `cus-does-not-exist` shows the not-found state. Changing it mounts a fresh editor.',
+      'The customer to open: `cus-4` active with two contacts, `cus-1` has a single contact (it cannot be removed), `cus-6` is billed in yen, `cus-9` has an account manager who left the company, `cus-11` is archived (read-only, with Restore), `cus-17` is on hold, `cus-34` has four contacts. `cus-does-not-exist` shows the not-found state. Changing it mounts a fresh editor.',
   },
   loadDelayMs: { control: DELAY_RANGE, description: 'How long the customer takes to arrive. Until then there is a loading state and no field.' },
   saveDelayMs: { control: DELAY_RANGE, description: 'How long a save (or a Restore) takes. While it runs, "Save" (or "Restore") is aria-disabled.' },

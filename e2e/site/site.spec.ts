@@ -8,7 +8,7 @@ import { gotoAndStay } from '../helpers/no-redirect';
 // keep reaching the same page after the Storybook moved to storybook/.
 
 const base = SITE_BASE as string;
-const DOCS = 'showcase-invoices--docs';
+const DOCS = 'showcase-record-editing--docs';
 const DOCS_PATH = `/docs/${DOCS}`;
 
 /** The manager (sidebar + preview frame) shows the docs page of `id`. */
@@ -43,8 +43,8 @@ test.describe('old deep links reach the same page under storybook/', () => {
   });
 
   test('iframe.html?id=…&viewMode=story: redirected, the story renders', async ({ page }) => {
-    await page.goto('iframe.html?id=showcase-invoices--crud-manual&viewMode=story');
-    await page.waitForURL(`**${base}storybook/iframe.html?id=showcase-invoices--crud-manual&viewMode=story`);
+    await page.goto('iframe.html?id=showcase-record-editing--sales-order-crud-manual&viewMode=story');
+    await page.waitForURL(`**${base}storybook/iframe.html?id=showcase-record-editing--sales-order-crud-manual&viewMode=story`);
     await expect(page.locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
     await expect(page.locator('body.sb-show-errordisplay')).toHaveCount(0);
   });
@@ -106,8 +106,8 @@ test.describe('links inside the Storybook work under storybook/', () => {
     await page.goto(`storybook/?path=/docs/introduction--docs`);
     const preview = page.frameLocator('#storybook-preview-iframe');
     await expect(preview.locator('.sbdocs-content')).toBeVisible({ timeout: 30_000 });
-    await preview.getByRole('link', { name: 'Showcase: Invoices', exact: true }).first().click();
-    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe('/docs/showcase-invoices--docs');
+    await preview.getByRole('link', { name: 'Showcase: sales orders and customers', exact: true }).first().click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('path')).toBe('/docs/showcase-record-editing--docs');
     expect(new URL(page.url()).pathname).toBe(`${base}storybook/`);
     await expect(preview.getByRole('heading', { level: 1 }).first()).toBeVisible();
   });

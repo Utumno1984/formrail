@@ -62,7 +62,7 @@ const DELIVERY_NOTES = [
   'Call the site manager one hour before arrival.',
   'Pallets must not be stacked.',
 ];
-const NOTES = ['Repeat order: same specification as the previous one.', 'Customer asked for a single invoice.'];
+const NOTES = ['Repeat order: same specification as the previous one.', 'Customer asked for a single bill.'];
 
 function extend(index: number, id: string): StoredSalesOrder {
   const order = getSalesOrder(id);

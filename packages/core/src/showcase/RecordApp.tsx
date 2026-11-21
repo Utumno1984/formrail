@@ -22,7 +22,7 @@ import { SALES_ORDERS_CRUD } from './modules/sales-orders/sales-orders-module';
 import { RecordAppContext, type PageGuard, type RecordAppContextValue } from './record-app-context';
 import { RecordCrud, type RecordCrudProps } from './RecordCrud';
 import type { SaveOutcome } from './record-store';
-import { moduleHref, openModule, openRelated, readRoute, recordHref, replaceRoute, subscribeRoute } from './showcase-router';
+import { moduleHref, openModule, openRelated, recordHref, replaceRoute, subscribeRoute } from './showcase-router';
 
 /** The modules of the app, in the order of the bar: the router name and the text of the link. */
 export const APP_MODULES = [
@@ -77,10 +77,12 @@ const linkStyle = (active: boolean): CSSProperties => ({
   outlineOffset: -2,
 });
 
-/** The module of the URL when it is one of the app's, `null` otherwise (no `module`, or another record type). */
+/** The module the URL names when it is one of the app's, `null` otherwise (no `module`, or another record type). */
 const readAppModule = (): AppModuleName | null => {
-  const { module } = readRoute();
-  return isAppModule(module) ? module : null;
+  // The raw parameter, not `readRoute()`: a URL with no `module` parses to the router's first module, but here it
+  // means "the URL names none", so the `module` prop decides (#527).
+  const module = new URLSearchParams(window.location.search).get('module');
+  return module !== null && isAppModule(module) ? module : null;
 };
 const readNoModule = (): null => null;
 

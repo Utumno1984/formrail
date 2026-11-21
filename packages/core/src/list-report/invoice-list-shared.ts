@@ -1,10 +1,11 @@
-// Story-only: the invoice list definition (pills, columns, labels, page frame) shared by the List Report
-// showcase (#132) and the Invoices module of the record-editing shell (#150, #519: modules/invoices), so the
-// second one reuses the first instead of copying it. Not exported by the package.
+// Story-only: the invoice list definition (pills, columns, labels, page frame) of the List Report showcase
+// (`ListReportShowcase.stories.tsx`, #132). It lived in `showcase/` while the invoices' record-editing showcase
+// shared it; #527 removed that one and moved this here (the story goes with the demo-data migration of #528).
+// Not exported by the package.
 import type { CSSProperties } from 'react';
 import { formatEuro, type DemoInvoice } from '../internal/demo-invoices';
-import type { ListReportColumn, ListReportFilter } from '../list-report/types';
-import { LIST_PAGE } from './list-page';
+import type { ListReportColumn, ListReportFilter } from './types';
+import { LIST_PAGE } from '../showcase/list-page';
 import { STATUS_LABEL } from './showcase-data';
 
 export const LABELS = {
