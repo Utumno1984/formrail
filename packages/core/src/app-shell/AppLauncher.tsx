@@ -117,9 +117,9 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   ) => void;
   /**
    * Level (2 to 6) of a heading element (`<h2>`…`<h6>`) around the label of each extra group, so that the groups can
-   * be reached by heading navigation: pass the level that fits the outline of your page. The label keeps its look and
-   * still names its list. Without it, or with another value, the label is plain text that names its list (the
-   * launcher does not know the outline of the page it is in).
+   * be reached by heading navigation: pass the level that fits the heading structure of your page. The label keeps
+   * its look and still names its list. Without it, or with another value, the label is plain text that names its
+   * list (the launcher does not know the heading structure of the page it is in).
    */
   groupHeadingLevel?: AppLauncherGroupHeadingLevel;
   /** Texts for localization; every key falls back to the English default. */
