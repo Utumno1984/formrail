@@ -456,9 +456,9 @@ const LONG_GROUP_LABEL = 'Help and information about every app of this space, an
 
 /**
  * The extra groups change while the user is on the launcher: "Show the extra groups" adds them after the mount (the
- * apps do not move), "Remove More modules in 1 s" takes the first group away a second later. If one of its items
- * has the focus then, the focus moves to the next tile, not to the page. The second group has a long label, cut
- * with an ellipsis.
+ * apps do not move), "Remove More modules in 1 s" takes the first group away a second later, "Remove the last group
+ * in 1 s" the last one. If one of its items has the focus then, the focus moves to the next tile, or to the previous
+ * one when there is none after it, never to the page. The second group has a long label, cut with an ellipsis.
  */
 export const ExtraGroupsChange: Story = {
   args: { count: 4, disabledApp: 0, extraGroupCount: 2 },
@@ -467,12 +467,13 @@ export const ExtraGroupsChange: Story = {
     const props = launcherProps(args);
     const all = (props.extraGroups ?? []).map((group, i) => (i === 1 ? { ...group, label: LONG_GROUP_LABEL } : group));
     const [groups, setGroups] = useState<readonly AppLauncherExtraGroup[]>([]);
-    const [pending, setPending] = useState(false);
+    // The id of the group to remove a second later.
+    const [pending, setPending] = useState<string | null>(null);
     useEffect(() => {
       if (!pending) return undefined;
       const timer = setTimeout(() => {
-        setGroups((list) => list.filter((group) => group.id !== 'more'));
-        setPending(false);
+        setGroups((list) => list.filter((group) => group.id !== pending));
+        setPending(null);
       }, 1000);
       return () => clearTimeout(timer);
     }, [pending]);
@@ -482,8 +483,11 @@ export const ExtraGroupsChange: Story = {
           <Button variant="secondary" onClick={() => setGroups(all)}>
             Show the extra groups
           </Button>
-          <Button variant="secondary" onClick={() => setPending(true)} disabled={pending}>
+          <Button variant="secondary" onClick={() => setPending('more')} disabled={pending !== null}>
             Remove More modules in 1 s
+          </Button>
+          <Button variant="secondary" onClick={() => setPending('help')} disabled={pending !== null}>
+            Remove the last group in 1 s
           </Button>
         </div>
         <AppLauncher {...props} extraGroups={groups} />
