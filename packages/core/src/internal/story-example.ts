@@ -144,3 +144,90 @@ export function selectPageStories<T extends PageStory>(
   if (others.some(autodocs)) others = others.filter((story) => autodocs(story) && !story.usesMount);
   return { primary, others: others.filter((story) => story !== primary) };
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Domain examples ("use cases", ticket #624). A component is neutral: its Docs page explains it on a generic
+// record. A domain appears only in a story that DECLARES itself an example, at the bottom of the page.
+// ---------------------------------------------------------------------------------------------------------
+
+/** Tag of a story that shows the component configured for one kind of record (a domain example). */
+export const USE_CASE_TAG = 'use-case';
+
+/** A use-case story is tagged `vertical:<id>` with an id of {@link VERTICALS}: tags are in `index.json`, so the guard reads it without rendering. */
+export const VERTICAL_TAG_PREFIX = 'vertical:';
+
+/** The name of every use-case story (and of no other public story) starts with this. */
+export const USE_CASE_NAME_PREFIX = 'Example: ';
+
+/** The closed list of verticals a use case can be declared for, with the label shown to the reader. */
+export const VERTICALS = [
+  { id: 'erp', label: 'ERP' },
+  { id: 'b2b', label: 'B2B' },
+  { id: 'e-commerce', label: 'E-commerce' },
+  { id: 'e-learning', label: 'E-learning' },
+  { id: 'helpdesk', label: 'Helpdesk' },
+  { id: 'hr', label: 'HR' },
+] as const;
+
+export type VerticalId = (typeof VERTICALS)[number]['id'];
+
+/** The ids of {@link VERTICALS}. */
+export const VERTICAL_IDS: readonly string[] = VERTICALS.map((vertical) => vertical.id);
+
+/** Sentence under the heading of the section, on every page (Free "Examples", Pro "Use cases"). */
+export const USE_CASES_INTRO = 'The same component, configured for different kinds of records. The domain lives in the configuration, never in the component.';
+
+/** The Pro pages are the ones whose title starts with `Pro/`. */
+export function isProTitle(title: string): boolean {
+  return title.startsWith('Pro/');
+}
+
+/** Heading of the section of a page: "Use cases" on the Pro pages, "Examples" on the others. */
+export function useCasesHeading(title: string): 'Use cases' | 'Examples' {
+  return isProTitle(title) ? 'Use cases' : 'Examples';
+}
+
+/** The `vertical:<id>` tags of a story, as written (ids not validated). */
+export function verticalTags(tags: readonly string[] | undefined): string[] {
+  return (tags ?? []).filter((tag) => tag.startsWith(VERTICAL_TAG_PREFIX));
+}
+
+/**
+ * What a use-case story carries, from one place: the tags and the description shown under the story. The
+ * Pro pages need both parts: the concrete problem the case solves, and the configuration that solves it.
+ * Throws on a vertical outside {@link VERTICALS}. Storybook's indexer reads tags statically (like
+ * `EXAMPLE_TAG`), so the story writes `tags: ['use-case', 'vertical:erp']` itself and spreads this next to
+ * it: the `parameters` come from here, the tags are checked by the guard through `index.json`.
+ */
+export function useCaseStory(options: { vertical: VerticalId; problem?: string; configuration?: string }) {
+  const { vertical, problem, configuration } = options;
+  if (!VERTICAL_IDS.includes(vertical)) {
+    throw new Error(`Unknown vertical "${String(vertical)}": use one of ${VERTICAL_IDS.join(', ')}.`);
+  }
+  const parts = [problem && `**Problem.** ${problem}`, configuration && `**Configuration.** ${configuration}`].filter(Boolean);
+  const tags = [USE_CASE_TAG, `${VERTICAL_TAG_PREFIX}${vertical}`];
+  if (parts.length === 0) return { tags, parameters: {} };
+  return { tags, parameters: { docs: { description: { story: parts.join('\n\n') } } } };
+}
+
+/** The two parts of a Pro use case's description (empty string when missing or blank). */
+export function parseUseCaseDescription(description: string | undefined): { problem: string; configuration: string } {
+  const text = description ?? '';
+  const part = (name: string, other: string) =>
+    new RegExp(`\\*\\*${name}\\.\\*\\*([\\s\\S]*?)(?=\\*\\*${other}\\.\\*\\*|$)`).exec(text)?.[1]?.trim() ?? '';
+  return { problem: part('Problem', 'Configuration'), configuration: part('Configuration', 'Problem') };
+}
+
+/**
+ * Splits the stories of a Docs page (after `selectPageStories`) into the neutral ones, in order, and the use
+ * cases, in order. A use case tagged `internal` on a page that is public is a hidden variant of an example:
+ * in neither list. On a page whose own stories are `internal` (a fixture) they all count.
+ */
+export function splitUseCases<T extends TaggedStory>(stories: readonly T[], pagePublic: boolean): { neutral: T[]; useCases: T[] } {
+  const isUseCase = (story: T) => !!story.tags?.includes(USE_CASE_TAG);
+  const visible = (story: T) => !pagePublic || !story.tags?.includes('internal');
+  return {
+    neutral: stories.filter((story) => !isUseCase(story)),
+    useCases: stories.filter((story) => isUseCase(story) && visible(story)),
+  };
+}
