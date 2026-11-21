@@ -487,3 +487,92 @@ describe('pro style guard: #614 round 3 (casts in a computed key, unrecognised v
     expect(rules(TSX, source)).toEqual([]);
   });
 });
+
+describe('pro style guard: #614 critic round 1 (real JSX, +, comma, outline templates, IIFE)', () => {
+  const named = (file, source) => checkSource(file, source, TOKENS).filter((v) => v.rule === 'named-color').map((v) => [v.value, v.line]);
+  const outline = (source) => checkSource(TSX, source, TOKENS).filter((v) => v.rule === 'outline-color').map((v) => [v.value, v.line]);
+
+  // A real component, as Prettier formats it: the AST must be parsed as TSX, or the JSX is a syntax error and the style
+  // object is never seen.
+  const COMPONENT = [
+    "import type { ReactNode } from 'react';", // 1
+    '', // 2
+    'export function Badge({ ok, err, on, children }: { ok: boolean; err: boolean; on: boolean; children: ReactNode }) {', // 3
+    '  return (', // 4
+    '    <div', // 5
+    '      className="inline-flex items-center"', // 6
+    '      style={{', // 7
+    '        color: ok', // 8
+    "          ? 'red'", // 9
+    "          : 'blue',", // 10
+    '        background:', // 11
+    '          err &&', // 12
+    "          'green',", // 13
+    '      }}', // 14
+    '    >', // 15
+    '      <svg', // 16
+    '        aria-hidden', // 17
+    '        fill={', // 18
+    '          on ?', // 19
+    "            'orange'", // 20
+    "          : 'none'", // 21
+    '        }', // 22
+    '      />', // 23
+    '      <span>{children}</span>', // 24
+    '    </div>', // 25
+    '  );', // 26
+    '}', // 27
+  ].join('\n');
+
+  it('point 1, a multi-line style={{...}} with a ternary and && in a real .tsx component', () => {
+    expect(named(TSX, COMPONENT)).toEqual([['red', 9], ['blue', 10], ['green', 13], ['orange', 20]]);
+  });
+
+  it('point 1, a multi-line fill={...} inside a real .tsx component', () => {
+    const svg = [
+      'export const Dot = ({ on }: { on: boolean }) => (', // 1
+      '  <svg viewBox="0 0 8 8">', // 2
+      '    <circle', // 3
+      '      cx={4}', // 4
+      '      fill={', // 5
+      '        on', // 6
+      "          ? 'red'", // 7
+      "          : 'var(--color-rop-text)'", // 8
+      '      }', // 9
+      '    />', // 10
+      '  </svg>', // 11
+      ');', // 12
+    ].join('\n');
+    expect(named(TSX, svg)).toEqual([['red', 7]]);
+  });
+
+  it.each([
+    ['on one line', "const s = { boxShadow: '0 0 0 1px ' + 'red' };", [['red', 1]]],
+    ['on several lines (Prettier)', "const s = {\n  boxShadow: '0 0 0 1px ' +\n    'red',\n};", [['red', 3]]],
+  ])('point 2, a + concatenation %s', (_n, source, expected) => {
+    expect(named(TSX, source)).toEqual(expected);
+  });
+
+  it('point 3, the comma operator: the last operand is the value', () => {
+    expect(named(TSX, "const s = { color: (x(), 'red') };")).toEqual([['red', 1]]);
+  });
+
+  it('point 4, outline with a template with substitutions is judged whole', () => {
+    expect(outline('const s = { outline: `${a} solid ${b} var(--color-rop-x)` };')).toEqual([]);
+    expect(outline('const s = { outline: `2px solid ${c} var(--color-rop-focus)` };')).toEqual([]);
+    expect(outline('const s = { outline: `2px solid ${c}` };')).toEqual([['2px solid ${c}', 1]]);
+  });
+
+  it.each([
+    ['an arrow IIFE', "const s = { color: (() => 'red')() };", [['red', 1]]],
+    ['a function IIFE', "const s = { color: (function(){ return 'red' })() };", [['red', 1]]],
+    ['an IIFE behind a cast', "const s = { color: ((() => 'red') as () => string)() };", [['red', 1]]],
+    ['an arrow IIFE in fill={...} in real JSX', "export const Dot = ({ on }: { on: boolean }) => (\n  <svg fill={((x) => (x ? 'red' : 'none'))(on)} />\n);", [['red', 2]]],
+  ])('point 5, %s has its literals judged', (_n, source, expected) => {
+    expect(named(TSX, source)).toEqual(expected);
+  });
+
+  it('point 5, a callee that is a name does not fire', () => {
+    expect(rules(TSX, 'const s = { color: (red)(tone), background: (white as Pick)(), borderColor: black!() };')).toEqual([]);
+  });
+});

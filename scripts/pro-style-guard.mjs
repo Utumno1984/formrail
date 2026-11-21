@@ -141,7 +141,8 @@ function conditionOf(node) {
  * What a property value can evaluate to: the string/template literals (`{ at, text, whole?, inTemplate? }`, `at` = index
  * of the first character of `text` in the source; a template with substitutions gives its head with `whole` = the full raw
  * template, then its other pieces with `inTemplate`) and the bare identifiers (`{ at, text }`). Walks the branches of ternaries, `&&`/`||`/`??`/`+`, parentheses, casts, `{...}[key]`
- * maps, arrays, call arguments and the receiver of a method call (`'red'.trim()`) at any depth; never the condition of a ternary, nor a callee.
+ * maps, arrays, call arguments, the receiver of a method call (`'red'.trim()`) and an IIFE callee (`(() => 'red')()`) at any
+ * depth; never the condition of a ternary, nor a callee that is a name.
  *
  * Any other node (a callback `(row) => ...` with an expression or a block body, a property access, `await`, ...) is not
  * trusted to be colour-free (#614 round 3, decision of 2026-11-21): its descendant string/template literals are collected
@@ -182,6 +183,11 @@ function valueLeaves(sf, node, out = { literals: [], identifiers: [] }, bare = t
     // `color: 'red'.trim()`: the receiver of a method call is a value (its literals only); the method name is not.
     const callee = node.expression;
     if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) walk(callee.expression, false);
+    // `color: (() => 'red')()`: an IIFE callee is a function written in place, its literals are values (#614, critic
+    // round 1); a callee that is a name (`pick(tone)`, `(red)()`) stays unjudged.
+    let fn = callee;
+    while (isTransparent(fn)) fn = fn.expression;
+    if (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) walk(fn, false);
   } else if (ts.isObjectLiteralExpression(node)) {
     for (const p of node.properties) {
       if (ts.isPropertyAssignment(p)) walk(p.initializer);
