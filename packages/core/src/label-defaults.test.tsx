@@ -5,6 +5,7 @@ import { useState } from 'react';
 import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import { checkLabelDefaults, readLabelRows, REPO_ROOT, type LabelException, type LabelExample, type LabelRow, type LabelSource } from '../test/label-defaults';
+import { DEFAULT_LABELS as APP_LAUNCHER_DEFAULT_LABELS } from './app-shell/AppLauncher';
 import { DEFAULT_LABELS as CALENDAR_DEFAULT_LABELS } from './calendar/Calendar';
 import { DEFAULT_LABELS as DATE_PICKER_DEFAULT_LABELS } from './date-picker/DatePicker';
 import { DEFAULT_LABELS as FILE_UPLOAD_DEFAULT_LABELS } from './file-upload/FileUpload';
@@ -274,6 +275,7 @@ async function labelSources(): Promise<LabelSource[]> {
   const tableTexts: Partial<typeof TABLE_DEFAULT_LABELS> = { ...TABLE_DEFAULT_LABELS };
   delete tableTexts.resultCount;
   return [
+    { iface: 'AppLauncherLabels', from: 'DEFAULT_LABELS of app-shell/AppLauncher.tsx', values: APP_LAUNCHER_DEFAULT_LABELS },
     { iface: 'CalendarLabels', from: 'DEFAULT_LABELS of calendar/Calendar.tsx', values: CALENDAR_DEFAULT_LABELS },
     {
       iface: 'DatePickerLabels',
