@@ -59,6 +59,29 @@ describe('auditUseCaseStructure (#624)', () => {
     expect(auditUseCaseStructure([neutral('X/C', 'Hidden', ['internal']), afterHidden])).toEqual([expect.stringContaining(`(${afterHidden.id}): no neutral story before the first use case`)]);
   });
 
+  it('rule: the first story is the first `autodocs` one, the template\'s primary (a use case cannot become it)', () => {
+    // Every neutral story is `!autodocs` (no `autodocs` tag in the index), the use case is the only documented one.
+    const hidden = { ...neutral('X/A', 'Default'), tags: [] as string[] };
+    const uc = useCase('X/A', 'erp');
+    expect(auditUseCaseStructure([hidden, uc])).toEqual([expect.stringContaining(`(${uc.id}): no neutral story before the first use case`)]);
+    // With a documented neutral story before it the page is in order, whatever the hidden ones.
+    expect(auditUseCaseStructure([hidden, neutral('X/A', 'Documented'), uc])).toEqual([]);
+    // A page with no `autodocs` story at all has no Docs page: the first visible story decides, as before.
+    expect(auditUseCaseStructure([hidden, { ...uc, tags: ['use-case', 'vertical:erp'] }])).toEqual([]);
+  });
+
+  it('rule: no neutral story named like the section heading (duplicate id "examples" / "use-cases") on a page with use cases', () => {
+    const clash = neutral('X/A', 'Examples');
+    expect(auditUseCaseStructure([neutral('X/A'), clash, useCase('X/A', 'erp')])).toEqual([expect.stringContaining(`(${clash.id}): a page with use cases cannot have a story named "Examples"`)]);
+    // Same slug from another spelling, and the Pro id.
+    const spelled = neutral('Pro/Z', 'Use  Cases!');
+    expect(auditUseCaseStructure([neutral('Pro/Z'), spelled, useCase('Pro/Z', 'erp', 'Example: configured for a Pro thing')])).toContainEqual(expect.stringContaining(`(${spelled.id}): a page with use cases cannot have a story named "Use  Cases!"`));
+    // A page without use cases may have such a story: there is no section.
+    expect(auditUseCaseStructure([neutral('X/B', 'Examples')])).toEqual([]);
+    // "Examples" is not the Pro section's id: no clash on a Pro page.
+    expect(auditUseCaseStructure([neutral('Pro/Y', 'Examples'), useCase('Pro/Y', 'erp')]).filter((p) => p.includes('cannot have a story'))).toEqual([]);
+  });
+
   it('a page made only of fixtures (internal) is checked too: order, verticals and neutral first', () => {
     const fixture = (name = 'Default') => neutral('F/A', name, ['internal']);
     const useCaseFixture = (vertical: string) => useCase('F/A', vertical, 'Example: configured for a fixture', ['internal']);

@@ -32,6 +32,9 @@ export const PRO_USE_CASES_PENDING: readonly string[] = [
 const isInternal = (story: IndexedStory) => !!story.tags?.includes('internal');
 const isUseCase = (story: IndexedStory) => !!story.tags?.includes(USE_CASE_TAG);
 
+/** The id Storybook's `Heading` derives from a text (lower case, runs of non-alphanumerics become one dash). */
+const slugOf = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 /** The stories of each page (title), in index order: the index lists the files of one title one after the other. */
 function byPage(stories: readonly IndexedStory[]): Map<string, IndexedStory[]> {
   const pages = new Map<string, IndexedStory[]>();
@@ -81,7 +84,11 @@ export function auditUseCaseStructure(stories: readonly IndexedStory[], descript
     const visible = visibleStories(page);
     // The page opens on the neutral component: at least one story that is not a use case comes before them, so
     // the primary story (the first one) is never a domain example.
-    const first = visible[0];
+    // The template's primary is the first `autodocs` story (selectPageStories): that is the "first" here too, so a
+    // page whose neutral stories are all `!autodocs` and then has a use case is caught. A page with no `autodocs`
+    // story has no Docs page: its first visible story stands in.
+    const documented = visible.filter((story) => !!story.tags?.includes('autodocs'));
+    const first = (documented.length > 0 ? documented : visible)[0];
     if (first && isUseCase(first)) {
       problems.push(`${label(first)}: no neutral story before the first use case; a page shows the neutral component first (a story that is not "${USE_CASE_TAG}")`);
     }
@@ -89,6 +96,14 @@ export function auditUseCaseStructure(stories: readonly IndexedStory[], descript
     for (const story of visible) {
       if (isUseCase(story)) seen ??= story;
       else if (seen) problems.push(`${label(story)}: comes after the use case "${seen.name}" (${seen.id}); the "${USE_CASE_TAG}" stories go last on the page`);
+    }
+    // The section's heading takes the id `examples` (Free) or `use-cases` (Pro), and Storybook gives a story's own
+    // heading the slug of its name: a neutral story with that name would repeat the id on the page.
+    const sectionId = isProTitle(title) ? 'use-cases' : 'examples';
+    if (visible.some(isUseCase)) {
+      for (const story of visible.filter((s) => !isUseCase(s) && slugOf(s.name) === sectionId)) {
+        problems.push(`${label(story)}: a page with use cases cannot have a story named "${story.name}": its heading id "${sectionId}" is the one of the use-cases section`);
+      }
     }
     const count = visible.filter(isUseCase).length;
     const needed = Math.min(count, PRO_MIN_USE_CASE_VERTICALS);

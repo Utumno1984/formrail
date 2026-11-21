@@ -102,7 +102,11 @@ function UseCases({ stories, title }: { stories: PreparedStory[]; title: string 
 function NeutralDocsPage() {
   const context = useContext(DocsContext);
   // Object.create: the context is a class instance (methods on its prototype, state in its fields); only
-  // `componentStories` changes, everything else is read through the prototype.
+  // `componentStories` changes, everything else is read through the prototype. This works because DocsContext
+  // (@storybook/addon-docs 10.6.3, verified) has no `#private` fields: a method called on this object would throw
+  // a TypeError on a private field read through the wrapper. On a Storybook upgrade the e2e of the neutral part
+  // (e2e/docs-use-cases.spec.ts) fails if that stops being true; the use-case guard also keeps the id of the
+  // section's heading unique on the page (use-case-guard.ts).
   const neutral = useMemo(() => {
     const stories = context.componentStories().filter((story) => !story.tags?.includes(USE_CASE_TAG));
     return Object.create(context, { componentStories: { value: () => stories } }) as typeof context;
