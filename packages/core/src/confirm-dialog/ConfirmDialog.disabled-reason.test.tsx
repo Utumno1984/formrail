@@ -139,6 +139,7 @@ describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
     ['a blank string', '   '],
     ['0 (count && reason)', 0],
     ['NaN', NaN],
+    ['0n (bigint zero)', 0n],
     ['an empty array', []],
     ['an array of blanks', [null, false, '', 0]],
   ] as const)('%s: no reason, the button works as without the prop', async (_, value) => {

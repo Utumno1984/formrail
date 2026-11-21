@@ -552,6 +552,17 @@ describe('ConfirmDialog: confirmLabel', () => {
     expect(errors).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['0', 0],
+    ['NaN', NaN],
+    ['0n', 0n],
+    ['an empty array', []],
+  ] as const)('a %s confirmLabel counts as blank: it logs an error in development', (_, value) => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(<Host initialOpen confirmLabel={value as unknown as string} />);
+    expect(errors.mock.calls.some(([m]) => String(m).includes('needs a confirmLabel'))).toBe(true);
+  });
+
   it('a missing confirmLabel (JS consumer) logs an error; nothing is logged while closed', () => {
     const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const props = { title: 'Delete?', onConfirm: () => undefined } as unknown as ConfirmDialogProps;

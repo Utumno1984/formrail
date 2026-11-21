@@ -34,7 +34,8 @@ export interface ConfirmDialogProps {
   description?: ReactNode;
   /**
    * The confirm button's label. Required: it must name the action ("Delete invoice"), never a
-   * generic "OK" / "Confirm". A blank string logs a `console.error` in development.
+   * generic "OK" / "Confirm". A blank label logs a `console.error` ("needs a confirmLabel") in development:
+   * an empty or whitespace-only string, `0`, `0n`, `NaN`, or an array made only of those.
    */
   confirmLabel: RequiredLabel;
   /**
@@ -65,7 +66,7 @@ export interface ConfirmDialogProps {
    * (`aria-describedby`), shown in the footer above the buttons: a click, Enter or Space on it does nothing
    * (`onConfirm` is not called). It stays focusable (not `disabled`), so the focus never moves when the reason
    * appears or goes away while the dialog is open, and a keyboard user can reach the button and hear why.
-   * Cancel, Escape and the backdrop still cancel. `undefined`, `null`, a boolean, a blank string, `0`, `NaN`
+   * Cancel, Escape and the backdrop still cancel. `undefined`, `null`, a boolean, a blank string, `0`, `0n`, `NaN`
    * or an array made only of those: no reason, the button works as without the prop (so `blocked && reason` and
    * `count && reason` can be passed as is). A fragment or a component that renders nothing cannot be told apart
    * from one that renders text: it counts as a reason, so pass `undefined` when there is none.
@@ -117,8 +118,9 @@ const isBlankLabel = (label: unknown): boolean =>
   label === null ||
   label === undefined ||
   typeof label === 'boolean' ||
-  // `0` / `NaN`: what `count && reason` leaves behind when the count is 0.
+  // `0` / `0n` / `NaN`: what `count && reason` leaves behind when the count is 0.
   label === 0 ||
+  label === BigInt(0) ||
   (typeof label === 'number' && Number.isNaN(label)) ||
   (typeof label === 'string' && label.trim() === '') ||
   (Array.isArray(label) && label.every(isBlankLabel));
