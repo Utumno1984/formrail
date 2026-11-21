@@ -167,7 +167,8 @@ test.describe('Navigation/AppLauncher', () => {
       // The play already loaded the data: load again, measure, finish.
       await page.getByRole('button', { name: 'Load again' }).click();
       const nav = page.getByRole('navigation', { name: 'Apps' });
-      await expect(nav).toHaveAttribute('aria-busy', 'true');
+      await expect(nav.locator('[data-rop-app-launcher-placeholders]')).toHaveAttribute('aria-busy', 'true');
+      await expect(nav).toMatchAriaSnapshot('- navigation "Apps":\n  - status: Loading apps');
       const before = await nav.evaluate((el) => el.getBoundingClientRect().toJSON() as DOMRect);
       await page.getByRole('button', { name: 'Finish loading' }).click();
       await expect(nav.getByRole('link')).toHaveCount(6);
