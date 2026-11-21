@@ -4,7 +4,18 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { SALES_ORDER_STATUS_LABEL } from '../internal/demo-data';
 import { SALES_ORDERS } from './modules/sales-orders/sales-orders-module';
-import { setupCrudTests, renderCrud, store, shownNumbers, listReady, gate, type Props } from './modules/sales-orders/crud-test-kit';
+import {
+  setupCrudTests,
+  renderCrud,
+  store,
+  shownNumbers,
+  listReady,
+  gate,
+  openCreation,
+  fillValid,
+  createButton,
+  type Props,
+} from './modules/sales-orders/crud-test-kit';
 import { RecordCrud } from './RecordCrud';
 
 // #527: the cases of the CRUD unit tests of the Free showcase that #527 removed (see the table in the pull request) that
@@ -401,4 +412,103 @@ describe('deleting several sales orders while other deletes are in flight (#527)
     expect(window.location.href).toBe(url);
     expect(window.history.length).toBe(entries);
   }, 30_000);
+});
+
+describe('the creation page: a Create that overlaps a navigation (#527)', () => {
+  it('a Create hidden by the filters says so and focuses the title', async () => {
+    window.history.replaceState(null, '', '/?module=sales-orders&sales-orders.filter=shipped');
+    renderCrud();
+    await userEvent.click(await screen.findByRole('button', { name: 'New sales order' }));
+    await fillValid();
+    await userEvent.click(createButton());
+    expect(await screen.findByText('Not shown with the current filters.')).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'SO-NEW-0201' })).toBeNull();
+    await waitFor(() => expect(document.activeElement?.tagName).toBe('H2'));
+  }, 40_000);
+
+  it('with edits, Cancel asks; "Keep editing" keeps them, "Discard changes" leaves without creating', async () => {
+    await openCreation();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), 'draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveProperty('value', 'draft');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(window.location.search).not.toContain('create='));
+    expect(await screen.findByRole('table')).toBeTruthy();
+    expect(store().snapshot()).toHaveLength(200);
+  }, 40_000);
+
+  it('leaving with a Create in flight ("Leave anyway"): the list shows the new order, onCreated once', async () => {
+    const { promise, release } = gate();
+    const onCreated = vi.fn();
+    await openCreation({ saveDelayMs: promise, onCreated });
+    await fillValid();
+    await userEvent.click(createButton());
+    expect(createButton().getAttribute('aria-disabled')).toBe('true');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByText(/A save is still in progress/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Leave anyway' }));
+    await waitFor(() => expect(window.location.search).not.toContain('create='));
+    expect(onCreated).not.toHaveBeenCalled();
+    await act(async () => release());
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('link', { name: 'SO-NEW-0201' }, { timeout: 5000 })).toBeTruthy();
+  }, 40_000);
+
+  it('typing during the save: the guard asks about the newer edits and a second Create never makes a second order', async () => {
+    const { promise, release } = gate();
+    const onCreated = vi.fn();
+    await openCreation({ saveDelayMs: promise, onCreated });
+    await fillValid();
+    await userEvent.click(createButton());
+    await userEvent.type(screen.getByRole('textbox', { name: 'Notes' }), 'after the click');
+    await act(async () => release());
+    // The order exists, the form is dirty again with edits that were not part of it: the guard asks.
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+    expect(window.location.search).toContain('create=1');
+    await userEvent.click(createButton());
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep editing' }));
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(store().snapshot()).toHaveLength(201);
+    // "Discard changes" finally leaves (the order stays created).
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard changes' }));
+    await waitFor(() => expect(window.location.search).not.toContain('create='));
+    expect(store().snapshot()).toHaveLength(201);
+  }, 40_000);
+
+  it('a URL with BOTH record and create (record wins): "Back to list" clears both and shows the list', async () => {
+    window.history.replaceState(null, '', '/?module=sales-orders&record=so-15&create=1');
+    renderCrud();
+    await screen.findByRole('heading', { level: 1, name: /SO-/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Back to list' }));
+    expect(await screen.findByRole('table')).toBeTruthy();
+    expect(screen.queryByRole('heading', { level: 1, name: 'New sales order' })).toBeNull();
+    expect(window.location.search).toBe('?module=sales-orders');
+  }, 40_000);
+
+  it('leaving for another page before the list after a Create has loaded: the confirmation is shown anyway', async () => {
+    await openCreation({ listLoadDelayMs: 800 });
+    await fillValid();
+    await userEvent.click(createButton());
+    await waitFor(() => expect(window.location.search).not.toContain('create='));
+    expect(screen.queryByText('Sales order SO-NEW-0201 created')).toBeNull(); // the list is still loading
+    // ...and the user starts another navigation right away: the list that was to announce is unmounted.
+    await userEvent.click(await screen.findByRole('button', { name: 'New sales order' }));
+    expect(await screen.findByText('Sales order SO-NEW-0201 created')).toBeTruthy();
+    expect(window.location.search).toContain('create=1');
+    expect(store().snapshot()).toHaveLength(201);
+  }, 40_000);
+
+  it('deep link ?create=1: Cancel replaces the entry with the list (no history entry added or lost)', async () => {
+    window.history.replaceState(null, '', '/?module=sales-orders&create=1');
+    const entries = window.history.length;
+    renderCrud();
+    await screen.findByRole('heading', { level: 1, name: 'New sales order' });
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('table')).toBeTruthy();
+    expect(window.location.search).toBe('?module=sales-orders');
+    expect(window.history.length).toBe(entries);
+  }, 40_000);
 });
