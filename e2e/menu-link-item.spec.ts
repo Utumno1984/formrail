@@ -38,9 +38,9 @@ test.describe('Menu: MenuLinkItem', () => {
 
   test('a plain click is handed to the app: cancelled for the browser, menu closed, focus on the trigger', async ({ page }) => {
     await expectPlayToPass(page, STORY);
-    await recordClicks(page);
     await trigger(page).click();
     await expect(page.getByRole('menu')).toBeVisible();
+    await recordClicks(page);
     await item(page, 'Reports').click();
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(trigger(page)).toBeFocused();
@@ -64,8 +64,9 @@ test.describe('Menu: MenuLinkItem', () => {
 
   test('a Ctrl+click is the browser\'s: not cancelled, href intact, the menu closes', async ({ page }) => {
     await expectPlayToPass(page, STORY);
-    await recordClicks(page);
     await trigger(page).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await recordClicks(page);
     await item(page, 'Reports').click({ modifiers: ['Control'] });
     await expect(page.getByRole('menu')).toHaveCount(0);
     expect(await clicks(page)).toEqual([false]);
