@@ -161,8 +161,8 @@ const meta: Meta<DemoArgs> = {
     // A union of levels: a select; "(none)" leaves the prop out (the labels are plain text).
     groupHeadingLevel: {
       control: 'select',
-      options: ['(none)', '2', '3', '4', '5', '6'],
-      mapping: { '(none)': undefined, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6 },
+      options: ['(none)', 2, 3, 4, 5, 6],
+      mapping: { '(none)': undefined },
     },
   },
   args: {
