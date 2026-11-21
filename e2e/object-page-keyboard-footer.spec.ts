@@ -261,3 +261,98 @@ test.describe('Object Page whose document scrolls (no height on the parent), vir
     await expectLastFieldAboveKeyboard(page);
   });
 });
+
+// QA round 2 of #498: a page WITH a height from its parent (the default layout) whose content fits. The scroller
+// overflows only once the keyboard's bottom padding is in, so whether it scrolls itself, and with it the room under
+// it, depends on the keyboard's height; and on Tab the Field losing the focus removes that height before `focusin`
+// reaches the scroller, the Field taking it publishes it after. The gap read then (0: nothing to scroll) must not be
+// the one the Field's scroll uses, or the save bar counts twice and the field lands a save bar's height too high
+// (it did: Field at 178 and 367 instead of 267 and 456).
+for (const { viewport, keyboard, push } of [
+  // The tester's D3: the Notes section alone (no header, no General data, no Supplier) at 390x500.
+  { viewport: { width: 390, height: 500 }, keyboard: 225, push: false },
+  // The tester's G: a short form at 390x844, its last field low in the page, but no overflow.
+  { viewport: { width: 390, height: 844 }, keyboard: 380, push: true },
+] as const) {
+  test.describe(`Object Page with a height whose content fits, virtual keyboard of ${keyboard}px (${viewport.width}x${viewport.height}): the save bar is counted once on every focus (#498)`, () => {
+    const LAST = 'Notes for the supplier';
+    test.use({ viewport, hasTouch: true });
+
+    test.beforeEach(async ({ page }) => {
+      await installKeyboard(page);
+      await gotoStory(page, STORY);
+      await expect(page.getByRole('region', { name: 'Save actions' })).toBeVisible();
+      await page.locator(SCROLLER).evaluate(
+        (scroller, pushDown) => {
+          (document.activeElement as HTMLElement | null)?.blur();
+          const hidden = [scroller.querySelector(':scope > div'), scroller.querySelector('#general'), scroller.querySelector('#supplier')];
+          for (const el of hidden) (el as HTMLElement).style.display = 'none';
+          if (pushDown) {
+            // The last field ends 20px above the scroller's bottom edge: low in the page, still no overflow.
+            const fields = scroller.querySelectorAll('[data-state]');
+            const last = fields[fields.length - 1] as HTMLElement;
+            const room = scroller.getBoundingClientRect().bottom - 20 - last.getBoundingClientRect().bottom;
+            (scroller.querySelector('#notes') as HTMLElement).style.marginTop = `${room}px`;
+          }
+        },
+        push,
+      );
+    });
+
+    /** Measures the focused control once settled, with the gap the page wrote on its scroller. */
+    const measure = async (page: Page) => ({
+      ...(await spot(page)),
+      gap: await page.locator(SCROLLER).evaluate((el) => el.style.getPropertyValue('--rop-object-page-bottom-gap')),
+    });
+
+    const expectJustAbove = (s: Awaited<ReturnType<typeof measure>>, what: string) => {
+      expect(s.visibleBottom).toBe(viewport.height - keyboard);
+      expect(s.controlBottom, `${what}: control bottom ${s.controlBottom}, keyboard at ${s.visibleBottom}`).toBeLessThanOrEqual(s.visibleBottom);
+      // Its own 0.5rem above the keyboard, not the save bar's height on top of it.
+      expect(Math.abs(s.fieldBottom - (s.visibleBottom - MARGIN)), `${what}: Field bottom ${s.fieldBottom}, keyboard at ${s.visibleBottom}`).toBeLessThanOrEqual(1);
+      expect(s.gap, what).toBe(`${s.footer}px`);
+      expect(Math.abs(s.marginBottom - (keyboard - s.footer + MARGIN)), what).toBeLessThanOrEqual(1);
+      expect(s.scrollY, what).toBe(0);
+    };
+
+    /** Checks the case under test, focuses the last field and opens the keyboard (one resize). */
+    async function focusLastAndOpen(page: Page) {
+      // The content fits: nothing to scroll before the keyboard.
+      expect(await page.locator(SCROLLER).evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(false);
+      const input = page.getByRole('textbox', { name: LAST, exact: true });
+      // Its Field in view, but ending below the line the keyboard will cover.
+      const fieldBottom = await input.evaluate((el) => (el.closest('[data-state]') as HTMLElement).getBoundingClientRect().bottom);
+      expect(fieldBottom).toBeGreaterThan(viewport.height - keyboard);
+      expect(fieldBottom).toBeLessThanOrEqual(viewport.height);
+      await input.focus();
+      await setKeyboard(page, keyboard);
+      return input;
+    }
+
+    test('first focus: the keyboard opens on the last field, which lands just above it', async ({ page }) => {
+      await focusLastAndOpen(page);
+      expectJustAbove(await measure(page), 'first focus');
+    });
+
+    test('Shift+Tab then Tab with the keyboard open: the field lands just above the keyboard again', async ({ page }) => {
+      const input = await focusLastAndOpen(page);
+      await measure(page);
+      await page.keyboard.press('Shift+Tab');
+      await expect(page.getByRole('textbox', { name: 'Internal notes', exact: true })).toBeFocused();
+      const previous = await measure(page);
+      expect(previous.controlBottom, 'Shift+Tab').toBeLessThanOrEqual(previous.visibleBottom);
+
+      await page.keyboard.press('Tab');
+      await expect(input).toBeFocused();
+      expectJustAbove(await measure(page), 'Tab back');
+    });
+
+    test('`overflow-y: hidden` from the consumer: still the scroller `scrollIntoView` scrolls, the save bar counted once', async ({ page }) => {
+      await page.locator(SCROLLER).evaluate((el) => {
+        el.style.overflowY = 'hidden';
+      });
+      await focusLastAndOpen(page);
+      expectJustAbove(await measure(page), 'overflow-y hidden');
+    });
+  });
+}

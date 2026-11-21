@@ -1,5 +1,8 @@
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Field } from '../field/Field';
+import { Input } from '../input/Input';
+import { KEYBOARD_INSET_EVENT } from '../internal/keyboard-inset';
 import { ObjectPage } from './ObjectPage';
 import { rootStyle, scrollerStyle } from './object-page-styles';
 import { BOTTOM_GAP_VAR, bottomGap, keyboardOverScroller, scrollsItself } from './use-bottom-gap';
@@ -52,11 +55,15 @@ describe('scrollsItself (#498, QA round 1)', () => {
     expect(scrollsItself('overlay', 2000, 411)).toBe(true);
   });
 
+  it('`hidden` from the consumer is still a scroll container: `scrollIntoView` scrolls it (QA round 2)', () => {
+    expect(scrollsItself('hidden', 2000, 411)).toBe(true);
+  });
+
   it('no height from the parent (it grows with its content, the document scrolls) or nothing to scroll: it does not', () => {
     expect(scrollsItself('auto', 1400, 1400)).toBe(false);
     expect(scrollsItself('auto', 0, 0)).toBe(false);
     expect(scrollsItself('visible', 2000, 411)).toBe(false);
-    expect(scrollsItself('hidden', 2000, 411)).toBe(false);
+    expect(scrollsItself('clip', 2000, 411)).toBe(false);
   });
 });
 
@@ -132,5 +139,83 @@ describe('useBottomGap', () => {
 
     unmount();
     expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('');
+  });
+
+  describe('a page with a height whose content fits: it overflows only with the keyboard (QA round 2)', () => {
+    const KEYBOARD = 225;
+    const keyboardOn = () => parseFloat(document.documentElement.style.getPropertyValue('--rop-keyboard-inset')) > 0;
+    const original = Element.prototype.scrollIntoView;
+    afterEach(() => {
+      Element.prototype.scrollIntoView = original;
+      document.documentElement.style.removeProperty('--rop-keyboard-inset');
+    });
+
+    /** 411px of room above a save bar of 89px; the keyboard's bottom padding makes 528px of content, 411 without. */
+    const fittingPage = () => {
+      Object.defineProperty(window, 'visualViewport', {
+        value: Object.assign(new EventTarget(), { height: window.innerHeight - KEYBOARD, offsetTop: 0, scale: 1 }),
+        configurable: true,
+      });
+      sheet = document.createElement('style');
+      sheet.textContent = '[data-object-page-scroller] { overflow-y: auto; }';
+      document.head.append(sheet);
+      vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => (keyboardOn() ? 528 : 411));
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(411);
+      const bottom = window.innerHeight - 89;
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+        () => ({ top: bottom - 40, bottom, left: 0, right: 0, width: 0, height: 40, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect,
+      );
+    };
+
+    it('the Field scrolls itself with the gap of the keyboard it has just published, not the 0 read before it', () => {
+      fittingPage();
+      const gapAtScroll: string[] = [];
+      const { container } = render(
+        <ObjectPage>
+          <Field label="Notes">
+            <Input />
+          </Field>
+        </ObjectPage>,
+      );
+      const scroller = scrollerOf(container);
+      Element.prototype.scrollIntoView = vi.fn(() => {
+        gapAtScroll.push(scroller.style.getPropertyValue(BOTTOM_GAP_VAR));
+      });
+      // No keyboard yet: the content fits, nothing to scroll.
+      expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('0px');
+      act(() => screen.getByRole('textbox').focus());
+      expect(document.documentElement.style.getPropertyValue('--rop-keyboard-inset')).toBe(`${KEYBOARD}px`);
+      // The Field's scroll (its control under the keyboard) read the gap measured with the keyboard's padding in.
+      expect(gapAtScroll).toEqual(['89px']);
+      expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('89px');
+    });
+
+    it('on Tab the height is gone when focusin reaches the scroller: the gap measured then is replaced when it is back', () => {
+      fittingPage();
+      const { container } = render(
+        <ObjectPage>
+          <div data-testid="field" />
+        </ObjectPage>,
+      );
+      const scroller = scrollerOf(container);
+      const field = screen.getByTestId('field');
+      document.documentElement.style.setProperty('--rop-keyboard-inset', `${KEYBOARD}px`);
+      act(() => {
+        field.dispatchEvent(new Event(KEYBOARD_INSET_EVENT, { bubbles: true }));
+      });
+      expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('89px');
+      // The Field losing the focus removes the height, then focusin reaches the scroller: no overflow, 0.
+      document.documentElement.style.removeProperty('--rop-keyboard-inset');
+      act(() => {
+        field.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      });
+      expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('0px');
+      // The Field taking the focus publishes it again: measured again, before that Field scrolls.
+      document.documentElement.style.setProperty('--rop-keyboard-inset', `${KEYBOARD}px`);
+      act(() => {
+        field.dispatchEvent(new Event(KEYBOARD_INSET_EVENT, { bubbles: true }));
+      });
+      expect(scroller.style.getPropertyValue(BOTTOM_GAP_VAR)).toBe('89px');
+    });
   });
 });
