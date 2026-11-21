@@ -29,6 +29,7 @@ import {
   headerClass,
   headerEndClass,
   headerStartClass,
+  mainBottomBorderKeys,
   mainClass,
   mainStyle,
   navClass,
@@ -111,9 +112,17 @@ export interface AppShellProps extends HTMLAttributes<HTMLDivElement> {
  *   at the first paint or at hydration.
  * - **No horizontal overflow**: every part of the header shrinks; put long text in a `TruncatedText` (or any
  *   child with a zero minimum width and an ellipsis) and it is cut at the part's real width.
- * - **Virtual keyboard** (a focused `Field`): `AppShellMain` adds the keyboard's height below its content and
- *   keeps a focused field above it; the header stays at the top. The keyboard is counted once: a floorplan inside
- *   becomes shorter by the keyboard's height (an Object Page's save bar stays above the keyboard) and adds nothing.
+ * - **Virtual keyboard** (a focused `Field`): `AppShellMain` ends above the keyboard (a transparent bottom border
+ *   of the keyboard's height) and keeps a focused field above it; the header stays at the top. The keyboard is
+ *   counted once: a floorplan inside becomes shorter by the keyboard's height (an Object Page's save bar stays above
+ *   the keyboard) and adds nothing.
+ * - **Padding of the content**: `AppShellMain` has none of its own. Give it yours with `style` (`padding: 24`) or a
+ *   class (`p-6`): it is kept whole, the bottom one too, and the keyboard's room is added below it, never in its
+ *   place. The bottom border of `AppShellMain` is the shell's (the keyboard's room): a bottom border of yours goes
+ *   on a child (one in `style` is an error in development, one in a class is not drawn).
+ * - **One `main`**: the shell is the frame of the page, with one `AppShellMain` (the page's `main` landmark). Do
+ *   not nest it in a page that already has a `main` (two `main` landmarks, one inside the other, are invalid): the
+ *   shell goes at the top of the page, and the page's own content goes in `AppShellMain`.
  * - **Layers**: the shell adds no layer of its own (the skip link aside, at the sticky level while focused):
  *   toasts, dialogs and popovers opened from the content are above the header, as everywhere else.
  *
@@ -144,11 +153,10 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
   );
 
   const skip = (event: MouseEvent<HTMLAnchorElement>) => {
-    const main = event.currentTarget.ownerDocument.getElementById(mainId);
-    if (!main) return;
-    // The focus moves without touching the URL: a fragment would be read as a route by a hash router.
+    // The focus moves without touching the URL: a fragment would be read as a route by a hash router. Cancelled
+    // even when there is no content to focus (no AppShellMain yet), for the same reason.
     event.preventDefault();
-    main.focus({ preventScroll: true });
+    event.currentTarget.ownerDocument.getElementById(mainId)?.focus({ preventScroll: true });
   };
 
   return (
@@ -271,6 +279,10 @@ export interface AppShellNavLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnch
    * Render the single child element (the link component of your router) instead of an `<a>`, giving it the
    * classes, `aria-current`, `onClick` and the ref. The child must forward its ref and spread unknown props; it
    * keeps its own `href` and does the navigation itself (so `onNavigate` is not used with `asChild`).
+   *
+   * A router link that styles itself from the URL (react-router's `NavLink`) is yours to keep in step: it sets its
+   * own `aria-current` from its match, so pass `active` from the same match (or use the plain `Link`), and give it a
+   * string `className` (a function `className` is not called: the active look comes from `active`).
    */
   asChild?: boolean;
   /** The text of the link (its accessible name), cut with an ellipsis; with `asChild`, the single router link element. */
@@ -414,9 +426,11 @@ export interface AppShellMainProps extends HTMLAttributes<HTMLElement> {
 
 /**
  * The content of the shell: a `<main>` landmark, the target of the skip link (it takes the focus, `tabIndex`
- * -1). It adds no padding: a floorplan brings its own, a plain page adds its own. It scrolls a plain page; a
- * floorplan that takes the height of its parent fills it and scrolls by itself (see `AppShell`, "Layout and
- * sizing").
+ * -1). It adds no padding: a floorplan brings its own, a plain page adds its own, on a child or on `AppShellMain`
+ * itself (`style={{ padding: 24 }}` or a class): that padding is kept whole, and the virtual keyboard's room is
+ * added below it (the bottom border of `AppShellMain` is that room: a bottom border in `style` is an error in
+ * development). It scrolls a plain page; a floorplan that takes the height of its parent fills it and scrolls by
+ * itself (see `AppShell`, "Layout and sizing"). One per shell, never inside another `main`.
  */
 export const AppShellMain = /* @__PURE__ */ forwardRef<HTMLElement, AppShellMainProps>(function AppShellMain(
   { id: idProp, className, style, children, ...rest },
@@ -426,6 +440,14 @@ export const AppShellMain = /* @__PURE__ */ forwardRef<HTMLElement, AppShellMain
   const generatedId = useId();
   const id = idProp ?? shell?.mainId ?? `${generatedId}-main`;
   const setMainId = shell?.setMainId;
+  const borderKeys = mainBottomBorderKeys(style).join(', ');
+  useEffect(() => {
+    if (!borderKeys || !isDev()) return;
+    console.error(
+      `[formrail] <AppShellMain>: its bottom border holds the room of the virtual keyboard, so ${borderKeys} in its style ` +
+        'is replaced there. Put a border on a child of AppShellMain, or use the other sides only (borderTop, borderLeft, borderRight).',
+    );
+  }, [borderKeys]);
   // The skip link follows an `id` of the consumer's (the first render, on the server too, has the shell's own).
   useIsomorphicLayoutEffect(() => {
     setMainId?.(id);
@@ -438,7 +460,8 @@ export const AppShellMain = /* @__PURE__ */ forwardRef<HTMLElement, AppShellMain
       tabIndex={-1}
       data-rop-app-shell-main=""
       className={cn(mainClass, className)}
-      style={{ ...(mainStyle as CSSProperties), ...style }}
+      // The keyboard's room last: the consumer's padding composes with it, its bottom border cannot remove it.
+      style={{ ...style, ...(mainStyle as CSSProperties) }}
     >
       {children}
     </main>

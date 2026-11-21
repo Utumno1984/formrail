@@ -14,7 +14,7 @@ import {
   navLinkProblems,
   type AppShellProps,
 } from './AppShell';
-import { APP_SHELL_NAV_BREAKPOINT, mainStyle, navClass, rootStyle } from './app-shell-styles';
+import { APP_SHELL_NAV_BREAKPOINT, mainBottomBorderKeys, mainStyle, navClass, rootStyle } from './app-shell-styles';
 
 afterEach(() => {
   cleanup();
@@ -67,6 +67,17 @@ describe('AppShell: landmarks and skip link', () => {
     await userEvent.keyboard('{Enter}');
     expect(screen.getByRole('main')).toHaveFocus();
     expect(window.location.href).toBe(before);
+  });
+
+  it('with no content to focus, the skip link still cancels the navigation to its fragment', () => {
+    render(
+      <AppShell>
+        <AppShellHeader />
+      </AppShell>,
+    );
+    const skip = screen.getByRole('link', { name: 'Skip to content' });
+    // fireEvent returns false when a handler cancelled the event.
+    expect(fireEvent.click(skip)).toBe(false);
   });
 
   it('follows an id given to AppShellMain', async () => {
@@ -152,9 +163,12 @@ describe('AppShell: layout contract', () => {
 
   it('the virtual keyboard is relayed by the root and counted once by the main (reset to zero inside it)', () => {
     expect(rootStyle).toEqual({ '--rop-app-shell-keyboard-inset': 'var(--rop-keyboard-inset, 0px)' });
+    // The room of the keyboard is a transparent bottom border (the scrolled area ends above the keyboard), never a
+    // padding: the padding is the consumer's.
     expect(mainStyle).toEqual({
-      paddingBottom: 'var(--rop-app-shell-keyboard-inset, 0px)',
-      scrollPaddingBottom: 'var(--rop-app-shell-keyboard-inset, 0px)',
+      borderBottomWidth: 'var(--rop-app-shell-keyboard-inset, 0px)',
+      borderBottomStyle: 'solid',
+      borderBottomColor: 'transparent',
       '--rop-keyboard-inset': '0px',
     });
     render(<Shell style={{ color: 'red' }} />);
@@ -163,7 +177,121 @@ describe('AppShell: layout contract', () => {
     expect(root.style.color).toBe('red');
     const main = screen.getByRole('main');
     expect(main.style.getPropertyValue('--rop-keyboard-inset')).toBe('0px');
-    expect(main.style.paddingBottom).toBe('var(--rop-app-shell-keyboard-inset, 0px)');
+    expect(main.style.getPropertyValue('border-bottom-width')).toBe('var(--rop-app-shell-keyboard-inset, 0px)');
+    expect(main.style.borderBottomStyle).toBe('solid');
+    expect(main.style.borderBottomColor).toBe('transparent');
+    expect(main.style.paddingBottom).toBe('');
+  });
+
+  describe("the consumer's padding on AppShellMain composes with the keyboard's room", () => {
+    const keyboardRoom = (main: HTMLElement) => ({
+      width: main.style.getPropertyValue('border-bottom-width'),
+      reset: main.style.getPropertyValue('--rop-keyboard-inset'),
+    });
+    const KEYBOARD = { width: 'var(--rop-app-shell-keyboard-inset, 0px)', reset: '0px' };
+
+    it('no padding: none inline, the keyboard on the bottom border', () => {
+      render(
+        <AppShell>
+          <AppShellMain />
+        </AppShell>,
+      );
+      const main = screen.getByRole('main');
+      expect(main.style.padding).toBe('');
+      expect(main.style.paddingBottom).toBe('');
+      expect(keyboardRoom(main)).toEqual(KEYBOARD);
+    });
+
+    it('padding in style: kept whole, the bottom one too, and the keyboard is still counted', () => {
+      render(
+        <AppShell>
+          <AppShellMain style={{ padding: 24, color: 'red' }} />
+        </AppShell>,
+      );
+      const main = screen.getByRole('main');
+      expect(main.style.padding).toBe('24px');
+      expect(main.style.paddingBottom).toBe('24px');
+      expect(main.style.color).toBe('red');
+      expect(keyboardRoom(main)).toEqual(KEYBOARD);
+    });
+
+    it('paddingBottom in style: kept, and the keyboard is still counted', () => {
+      render(
+        <AppShell>
+          <AppShellMain style={{ paddingBottom: 40 }} />
+        </AppShell>,
+      );
+      const main = screen.getByRole('main');
+      expect(main.style.paddingBottom).toBe('40px');
+      expect(keyboardRoom(main)).toEqual(KEYBOARD);
+    });
+
+    it('padding in a class: no inline padding overrides it, and the keyboard is still counted', () => {
+      render(
+        <AppShell>
+          <AppShellMain className="p-6" />
+        </AppShell>,
+      );
+      const main = screen.getByRole('main');
+      expect(main).toHaveClass('p-6');
+      expect(main.style.padding).toBe('');
+      expect(main.style.paddingBottom).toBe('');
+      expect(keyboardRoom(main)).toEqual(KEYBOARD);
+    });
+
+    it('a consumer cannot reset the keyboard to zero for the content: the reset to zero stays the shell\'s', () => {
+      render(
+        <AppShell>
+          <AppShellMain style={{ ['--rop-keyboard-inset' as string]: '120px' }} />
+        </AppShell>,
+      );
+      expect(keyboardRoom(screen.getByRole('main'))).toEqual(KEYBOARD);
+    });
+
+    it('a bottom border in style: the keyboard keeps it, and it is an error in development that names the keys', () => {
+      expect(mainBottomBorderKeys(undefined)).toEqual([]);
+      expect(
+        mainBottomBorderKeys({
+          border: 0,
+          borderWidth: 0,
+          borderStyle: 0,
+          borderColor: 0,
+          borderBottom: 0,
+          borderBottomWidth: 0,
+          borderBlock: 0,
+          borderBlockEnd: 0,
+          borderBlockEndWidth: 0,
+          borderTop: 0,
+          borderLeft: 0,
+          borderRight: 0,
+          borderRadius: 0,
+          borderInlineStart: 0,
+          padding: 0,
+        }),
+      ).toEqual(['border', 'borderWidth', 'borderStyle', 'borderColor', 'borderBottom', 'borderBottomWidth', 'borderBlock', 'borderBlockEnd', 'borderBlockEndWidth']);
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(
+        <AppShell>
+          <AppShellMain style={{ borderBottom: '2px solid red', borderTop: '1px solid red' }} />
+        </AppShell>,
+      );
+      const main = screen.getByRole('main');
+      expect(keyboardRoom(main)).toEqual(KEYBOARD);
+      expect(main.style.borderBottomColor).toBe('transparent');
+      expect(main.style.borderTop).toBe('1px solid red');
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(String(error.mock.calls[0]![0])).toMatch(/^\[formrail\] <AppShellMain>: .*keyboard.*borderBottom in its style/);
+    });
+
+    it('a style with no bottom border is no error', () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(
+        <AppShell>
+          <AppShellMain style={{ padding: 24, borderTop: '1px solid red', borderRadius: 4 }} />
+        </AppShell>,
+      );
+      expect(error).not.toHaveBeenCalled();
+    });
   });
 
   it('header and nav: their size is the whole footprint (inline border-box, never a rule of the shipped CSS)', () => {
@@ -179,6 +307,17 @@ describe('AppShell: layout contract', () => {
     expect(header.style.color).toBe('red');
     expect(nav.style.boxSizing).toBe('border-box');
     expect(nav.style.color).toBe('blue');
+  });
+
+  it("header and nav: the consumer's style wins over the shell's box-sizing", () => {
+    render(
+      <AppShell>
+        <AppShellHeader style={{ boxSizing: 'content-box' }} />
+        <AppShellNav style={{ boxSizing: 'content-box' }} />
+      </AppShell>,
+    );
+    expect(screen.getByRole('banner').style.boxSizing).toBe('content-box');
+    expect(screen.getByRole('navigation').style.boxSizing).toBe('content-box');
   });
 
   it('forwards the refs to the root, the header, the nav and the main', () => {
@@ -242,6 +381,28 @@ describe('AppShellNavLink', () => {
     expect(onNavigate.mock.results[0]!.value).toBe(true);
     expect(link).toHaveFocus();
     await userEvent.keyboard('{Enter}');
+    expect(onNavigate).toHaveBeenCalledTimes(2);
+  });
+
+  it('the link has the focus when onNavigate is called, also after a click that does not focus it (Safari)', () => {
+    // fireEvent.click dispatches the click alone, with no mousedown: the link is not focused by it, as in Safari.
+    let active: Element | null = null;
+    const onNavigate = vi.fn(() => (active = document.activeElement));
+    nav(
+      <>
+        <AppShellNavLink href="/a" onNavigate={onNavigate}>
+          Section A
+        </AppShellNavLink>
+        <AppShellNavLink onNavigate={onNavigate}>Section B</AppShellNavLink>
+      </>,
+    );
+    for (const link of [screen.getByRole('link', { name: 'Section A' }), screen.getByRole('button', { name: 'Section B' })]) {
+      active = null;
+      expect(link).not.toHaveFocus();
+      fireEvent.click(link);
+      expect(active).toBe(link);
+      (document.activeElement as HTMLElement | null)?.blur();
+    }
     expect(onNavigate).toHaveBeenCalledTimes(2);
   });
 

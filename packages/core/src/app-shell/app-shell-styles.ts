@@ -85,18 +85,29 @@ export const skipLinkClass =
 
 // The virtual keyboard (spec §1.10), counted once. A focused Field publishes the keyboard's height on the
 // document's root (`--rop-keyboard-inset`). The shell's root relays it (a property cannot read itself on the
-// element that declares it); the content cell turns it into room below its content (its bottom padding) and into
-// a scroll padding of the same height (the browser's focus scrolling and `scrollIntoView` stop above it), and
-// resets the variable to zero for what it holds: a Field inside then keeps only its own small margin, and a
-// floorplan inside (shorter by that padding, its save bar above the keyboard) does not add the keyboard a second
-// time. Inline, not in a class: the shipped CSS declares no new property.
+// element that declares it); the content cell turns it into a transparent bottom border of that height and resets
+// the variable to zero for what it holds. A border, not a padding: the scrolled area (the padding box) then ends
+// above the keyboard, so the browser's focus scrolling and `scrollIntoView` stop above it,
+// and the consumer's own padding (a `style` or a class) is neither replaced by the keyboard's room nor
+// replaces it. A Field inside keeps only its own small margin, and a floorplan inside (shorter by that border, its
+// save bar above the keyboard) does not add the keyboard a second time. Inline, not in a class: the shipped CSS
+// declares no new property, and an inline width wins over any class of the consumer.
 // The header's height and the navigation's width are their whole footprint, the 1px rule included, whether or not
 // the consumer's page has a box-sizing reset. Inline on those two elements only: the shipped CSS sets no box-sizing
 // at all (no preflight; a guard in test/styles.test.ts rejects any box-sizing rule in it).
 export const boxStyle = { boxSizing: 'border-box' } as const;
 export const rootStyle = { '--rop-app-shell-keyboard-inset': 'var(--rop-keyboard-inset, 0px)' } as const;
 export const mainStyle = {
-  paddingBottom: 'var(--rop-app-shell-keyboard-inset, 0px)',
-  scrollPaddingBottom: 'var(--rop-app-shell-keyboard-inset, 0px)',
+  borderBottomWidth: 'var(--rop-app-shell-keyboard-inset, 0px)',
+  borderBottomStyle: 'solid',
+  borderBottomColor: 'transparent',
   '--rop-keyboard-inset': '0px',
 } as const;
+
+/**
+ * The keys of a `style` given to `AppShellMain` that would set its bottom border, which holds the virtual keyboard's
+ * room (the shell's own inline values win over them). The shorthands of every side count too.
+ */
+export function mainBottomBorderKeys(style: object | undefined): string[] {
+  return style ? Object.keys(style).filter((key) => /^border(Bottom|Block|BlockEnd)?(Width|Style|Color)?$/.test(key)) : [];
+}

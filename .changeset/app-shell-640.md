@@ -12,5 +12,6 @@ its parent's (`fill="parent"`); the document itself never scrolls. A "Skip to co
 and moves the focus to the content without touching the URL. `AppShellNavLink` is a real link (a plain click or
 Enter goes to `onNavigate`, a modified click opens a new tab), a button without an `href`, or your router's link
 with `asChild`; `active` sets `aria-current="page"` with a marker that is not only a colour, `disabled` keeps its
-place and focus stop. The virtual keyboard of a focused `Field` is counted once, by the content. The shell adds no
+place and focus stop. The virtual keyboard of a focused `Field` is counted once, by the content, which ends above it (its bottom
+border); a padding you give `AppShellMain` (`style` or a class) is kept whole beside it. The shell adds no
 layer of its own: dialogs, popovers and toasts stay above the header.
