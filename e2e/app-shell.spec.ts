@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectFocusRingVisible, expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
@@ -194,18 +194,162 @@ test.describe('Floorplans/App Shell', () => {
     expect(restored).toBe(scrolled);
   });
 
-  test('a dialog and a toast opened from the content are above the header', async ({ page }) => {
+  test('a toast, a menu and a dialog opened from the content are above the header', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, `${ID}overlays-above-the-header`);
+    const header = await rect(page, 'header');
+    // Whether the element drawn at a point belongs to `owner` (and not, say, to the header over it).
+    const drawnBy = (owner: Locator, x: number, y: number) =>
+      owner.evaluate((el, [px, py]) => {
+        const hit = document.elementFromPoint(px!, py!);
+        return !!hit && el.contains(hit);
+      }, [x, y]);
+
+    // The toast: shown, outside the shell, and nothing is drawn over it.
     await page.getByRole('button', { name: 'Show toast' }).click();
+    const toast = page.getByRole('status').filter({ hasText: 'A toast over the shell' });
+    const text = toast.getByText('A toast over the shell');
+    await expect(text).toBeVisible();
+    const t = (await text.boundingBox())!;
+    expect(await drawnBy(toast, t.x + t.width / 2, t.y + t.height / 2)).toBe(true);
+    expect(await toast.evaluate((el) => !!el.closest('[data-rop-app-shell]'))).toBe(false);
+
+    // The menu opens upwards, over the header: where both are, the menu is drawn.
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    const m = (await menu.boundingBox())!;
+    expect(m.y).toBeLessThan(header.bottom - 8);
+    expect(await drawnBy(menu, m.x + m.width / 2, (Math.max(m.y, header.top) + header.bottom) / 2)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+
+    // The dialog and its backdrop cover the header.
     await page.getByRole('button', { name: 'Open dialog' }).click();
     const dialog = page.getByRole('dialog', { name: 'Dialog over the shell' });
     await expect(dialog).toBeVisible();
     const top = await page.evaluate(() => {
-      const header = document.querySelector('header')!.getBoundingClientRect();
-      const el = document.elementFromPoint(header.left + 10, header.top + header.height / 2);
+      const box = document.querySelector('header')!.getBoundingClientRect();
+      const el = document.elementFromPoint(box.left + 10, box.top + box.height / 2);
       return el?.closest('header') ? 'header' : 'overlay';
     });
     expect(top).toBe('overlay');
+  });
+
+  test('the breakpoint is exact: no column at 1023px, a column at 1024px (64rem)', async ({ page }) => {
+    await page.setViewportSize({ width: 1023, height: 800 });
+    await gotoStory(page, `${ID}long-page`);
+    const nav = page.getByRole('navigation', { name: 'Main' });
+    await expect(nav).toBeHidden();
+    expect((await rect(page, 'main')).left).toBe(0);
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await expect(nav).toBeVisible();
+    expect((await rect(page, 'main')).left).toBeCloseTo(256, 0);
+  });
+});
+
+// Virtual keyboard (spec §1.10): a desktop browser has no on-screen keyboard, so the visual viewport is a
+// controllable stand-in (same technique as e2e/sheet.spec.ts). A focused Field publishes the keyboard's height as
+// `--rop-keyboard-inset`; the shell counts it once: the content ends above it, nothing inside adds it again.
+test.describe('Floorplans/App Shell: virtual keyboard', () => {
+  test.use({ viewport: { width: 375, height: 667 }, hasTouch: true });
+
+  // 20% and 45% of the 667px window, in whole px.
+  const KEYBOARDS = [133, 300];
+
+  const emulateKeyboard = (page: Page) =>
+    page.addInitScript(() => {
+      const target = new EventTarget();
+      let keyboard = 0;
+      const vv = Object.defineProperties(target, {
+        offsetTop: { value: 0 },
+        offsetLeft: { value: 0 },
+        pageTop: { value: 0 },
+        pageLeft: { value: 0 },
+        scale: { value: 1 },
+        height: { get: () => window.innerHeight - keyboard },
+        width: { get: () => window.innerWidth },
+      });
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+      (window as unknown as { __setKeyboard: (px: number) => void }).__setKeyboard = (px) => {
+        keyboard = px;
+        target.dispatchEvent(new Event('resize'));
+      };
+    });
+  const setKeyboard = (page: Page, px: number) =>
+    page.evaluate((n) => (window as unknown as { __setKeyboard: (k: number) => void }).__setKeyboard(n), px);
+  const visualHeight = (page: Page) => page.evaluate(() => window.visualViewport!.height);
+  const published = (page: Page) =>
+    page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--rop-keyboard-inset').trim());
+  const bottom = async (locator: Locator) => {
+    const box = (await locator.boundingBox())!;
+    return box.y + box.height;
+  };
+  /** The bottom scroll margin of a Field (on its root, which holds the focused control). */
+  const fieldScrollMargin = (input: Locator) =>
+    input.evaluate((el) => getComputedStyle(el.closest('[style*="scroll-margin"]')!).scrollMarginBottom);
+
+  for (const [id, padding] of [
+    ['form-at-the-bottom', 0],
+    ['form-in-a-padded-content', 24],
+  ] as const) {
+    test(`${id}: the last field stays above the keyboard, the header at the top, the keyboard counted once`, async ({ page }) => {
+      await emulateKeyboard(page);
+      await gotoStory(page, `${ID}${id}`);
+      const main = page.getByRole('main');
+      const input = page.getByRole('textbox', { name: 'Last field' });
+      await input.focus();
+      for (const keyboard of KEYBOARDS) {
+        await setKeyboard(page, keyboard);
+        await expect.poll(() => published(page)).toBe(`${keyboard}px`);
+        const limit = await visualHeight(page);
+        expect(limit).toBe(667 - keyboard);
+        // The field is scrolled into view above the keyboard, below the header.
+        await expect.poll(() => bottom(input)).toBeLessThanOrEqual(limit);
+        expect((await input.boundingBox())!.y).toBeGreaterThanOrEqual((await rect(page, 'header')).bottom);
+        // The header stays at the top, the document does not scroll.
+        expect((await rect(page, 'header')).top).toBe(0);
+        expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0);
+        const style = await main.evaluate((el) => {
+          const cs = getComputedStyle(el);
+          return { border: cs.borderBottomWidth, padding: cs.paddingBottom, inset: cs.getPropertyValue('--rop-keyboard-inset').trim() };
+        });
+        // The keyboard's room is the main's bottom border, its whole height, once: the scrolled area ends at the
+        // top of the keyboard. The consumer's padding is kept whole above it.
+        expect(parseFloat(style.border)).toBe(keyboard);
+        expect(parseFloat(style.padding)).toBe(padding);
+        expect((await rect(page, 'main')).bottom).toBe(667);
+        expect(await main.evaluate((el) => el.getBoundingClientRect().top + el.clientTop + el.clientHeight)).toBe(limit);
+        // Inside the content the keyboard is zero: the field keeps only its own small margin (0.5rem).
+        expect(style.inset).toBe('0px');
+        expect(await fieldScrollMargin(input)).toBe('8px');
+      }
+      await setKeyboard(page, 0);
+      await expect.poll(async () => parseFloat(await main.evaluate((el) => getComputedStyle(el).borderBottomWidth))).toBe(0);
+      expect(parseFloat(await main.evaluate((el) => getComputedStyle(el).paddingBottom))).toBe(padding);
+    });
+  }
+
+  test('with-object-page: the save bar stays right above the keyboard, which is counted once', async ({ page }) => {
+    await emulateKeyboard(page);
+    await gotoStory(page, `${ID}with-object-page`);
+    const input = page.getByRole('textbox', { name: 'Last field' });
+    const saveBar = page.locator('[data-object-page-footer]');
+    await expect(saveBar).toBeVisible();
+    await input.focus();
+    for (const keyboard of KEYBOARDS) {
+      await setKeyboard(page, keyboard);
+      await expect.poll(() => published(page)).toBe(`${keyboard}px`);
+      const limit = 667 - keyboard;
+      expect(await visualHeight(page)).toBe(limit);
+      // On the keyboard's top edge: not under it, and not a keyboard higher (counted twice).
+      await expect.poll(async () => Math.round(await bottom(saveBar))).toBe(limit);
+      expect((await rect(page, 'header')).top).toBe(0);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollTop)).toBe(0);
+      // The field is scrolled above the save bar.
+      await expect.poll(async () => (await bottom(input)) <= (await saveBar.boundingBox())!.y).toBe(true);
+      // Inside the shell the keyboard is zero: the field's margin does not add it again.
+      expect(await fieldScrollMargin(input)).toBe('8px');
+    }
   });
 });

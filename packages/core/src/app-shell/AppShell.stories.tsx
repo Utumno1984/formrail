@@ -18,6 +18,7 @@ import { Input } from '../input/Input';
 import { exampleStory } from '../internal/example-story';
 import { CLASS_NAME_ARG, storyControl, withoutControls } from '../internal/story-docs';
 import { ListReport } from '../list-report/ListReport';
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
 import type { ListReportColumn } from '../list-report/types';
 import { useListReport } from '../list-report/use-list-report';
 import { useListReportScrollRestoration } from '../list-report/use-list-report-scroll-restoration';
@@ -380,6 +381,20 @@ export const WithObjectPage: Story = {
   ),
 };
 
+function FormFields() {
+  return (
+    <>
+      <h1 style={TITLE}>Form</h1>
+      <Filler height={420}>Content above the form</Filler>
+      {['First field', 'Second field', 'Last field'].map((label) => (
+        <Field key={label} label={label}>
+          <Input />
+        </Field>
+      ))}
+    </>
+  );
+}
+
 /**
  * A form whose last field is at the bottom of a page taller than the window: with the virtual keyboard open
  * (a phone), the focused field is kept above the keyboard and the header stays at the top.
@@ -390,14 +405,23 @@ export const FormAtTheBottom: Story = {
       <AppShellHeader {...headerSlots({})} />
       <AppShellMain>
         <div style={PAGE}>
-          <h1 style={TITLE}>Form</h1>
-          <Filler height={420}>Content above the form</Filler>
-          {['First field', 'Second field', 'Last field'].map((label) => (
-            <Field key={label} label={label}>
-              <Input />
-            </Field>
-          ))}
+          <FormFields />
         </div>
+      </AppShellMain>
+    </AppShell>
+  ),
+};
+
+/**
+ * The same form with the padding on `AppShellMain` itself (`style={{ padding: 24 }}`): the padding is kept whole,
+ * the bottom one too, and the virtual keyboard's room is added below it.
+ */
+export const FormInAPaddedContent: Story = {
+  render: () => (
+    <AppShell>
+      <AppShellHeader {...headerSlots({})} />
+      <AppShellMain style={PAGE}>
+        <FormFields />
       </AppShellMain>
     </AppShell>
   ),
@@ -429,11 +453,23 @@ function Overlays() {
       <Button variant="secondary" onClick={() => toast.show({ tone: 'info', description: 'A toast over the shell' })}>
         Show toast
       </Button>
+      <Menu>
+        <MenuTrigger asChild>
+          <Button variant="secondary">Open menu</Button>
+        </MenuTrigger>
+        {/* Opens upwards, over the header (no flip to the free side below). */}
+        <MenuContent side="top" avoidCollisions={false}>
+          <MenuItem>Action over the header</MenuItem>
+        </MenuContent>
+      </Menu>
     </div>
   );
 }
 
-/** A dialog and a toast opened from the content are above the header: the shell adds no layer of its own. */
+/**
+ * A dialog, a toast and a menu opened from the content are above the header (the menu opens upwards, over it): the
+ * shell adds no layer of its own.
+ */
 export const OverlaysAboveTheHeader: Story = {
   render: () => (
     <ToastProvider>
