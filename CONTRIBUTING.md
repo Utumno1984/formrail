@@ -160,8 +160,8 @@ build. It fails, naming the story, when: a `use-case` story is not named `Exampl
 before a story that is not one on the same page; a page with `n` public use cases has fewer than `min(n, 3)` distinct
 verticals; a Pro use case lacks `**Problem.**` or `**Configuration.**`. The Pro ratchet (`PRO_USE_CASES_PENDING`) lists
 the Pro pages that do not have their 3 verticals yet: a new Pro page outside it must comply, a page that complies must
-be removed from it, and an entry that matches no page fails. Fixtures: `Internal/DocsUseCases` (Free) and
-`Pro/Internal/DocsUseCases` (Pro).
+be removed from it, and an entry that matches no page fails. Fixture: `Internal/DocsUseCases` (Free); the Pro
+branch of the template is covered by unit tests (no internal fixture may reach the public Pro demo).
 
 **The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
 `npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a

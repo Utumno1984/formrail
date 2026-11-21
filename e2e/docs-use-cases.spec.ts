@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import { USE_CASES_INTRO, USE_CASE_TAG, VERTICAL_TAG_PREFIX, isProTitle } from '../packages/core/src/internal/story-example';
+import { USE_CASES_INTRO, USE_CASE_TAG, VERTICAL_TAG_PREFIX } from '../packages/core/src/internal/story-example';
 import { auditProRatchet, auditUseCaseStructure, type IndexedStory } from '../packages/core/src/internal/use-case-guard';
 
 // Ticket #624: the Docs pages show the neutral component first and the domain examples (`use-case` stories)
@@ -65,20 +65,10 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     expect(order.indexOf('Stories')).toBeLessThan(order.indexOf('Examples'));
   });
 
-  test('Pro page without a copy-paste example: the section appears all the same, last, titled "Use cases", with Problem and Configuration per case', async ({ page }) => {
-    const docs = await readPage(page, 'pro-internal-docsusecases--docs');
-    expect(docs.anchors.map((a) => a.id)).toEqual([
-      'pro-internal-docsusecases--playground',
-      'pro-internal-docsusecases--use-case-erp-purchase-order',
-      'pro-internal-docsusecases--use-case-b-2-b-price-list',
-      'pro-internal-docsusecases--use-case-elearning-course',
-    ]);
-    expect(docs.anchors.map((a) => a.inSection)).toEqual([false, true, true, true]);
-    expect(docs.heading).toBe('Use cases');
-    expect(docs.intro).toBe(USE_CASES_INTRO);
-    expect(docs.sectionText.match(/Problem\./g)).toHaveLength(3);
-    expect(docs.sectionText.match(/Configuration\./g)).toHaveLength(3);
-  });
+  // The Pro branch of the template ("Use cases", Problem and Configuration per case) has no e2e on a real page
+  // yet: no Pro fixture may reach the public Pro demo (e2e/site/pro.spec.ts). It is covered by the unit tests of
+  // `planUseCasesSection` (use-case.test.ts); the e2e on a real Pro page arrives with #531, the first Pro page
+  // with real use cases.
 });
 
 test.describe('Use-case guard on the real index', () => {
@@ -112,6 +102,5 @@ test.describe('Use-case guard on the real index', () => {
 
     expect(auditUseCaseStructure(stories, descriptions)).toEqual([]);
     expect(auditProRatchet(stories)).toEqual([]);
-    expect(stories.some((story) => isProTitle(story.title))).toBe(true);
   });
 });

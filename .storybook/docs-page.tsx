@@ -26,7 +26,7 @@ import {
   exampleStylesheets,
   githubSource,
   selectPageStories,
-  splitUseCases,
+  planUseCasesSection,
   sectionHeadingOf,
   type SourceFile,
 } from '../packages/core/src/internal/story-example';
@@ -98,7 +98,8 @@ export function FormrailDocsPage() {
   if (!primary) return <DocsPage />;
   // Use cases leave the page's own lists and go to their section; a page of fixtures (`internal`) keeps them all.
   const hasUseCases = selected.some((story) => story.tags?.includes(USE_CASE_TAG));
-  const { neutral, useCases } = splitUseCases(selected, !primary.tags?.includes('internal'));
+  const { neutral, section } = planUseCasesSection(primary.title, selected, !primary.tags?.includes('internal'));
+  const useCases = section?.stories ?? [];
   if (!isExample && !isShowcase) {
     if (!hasUseCases) return <DocsPage />;
     // Storybook's own template (title, description, primary with its Controls, the other stories), then the section.

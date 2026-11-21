@@ -232,3 +232,13 @@ export function splitUseCases<T extends TaggedStory>(stories: readonly T[], page
     useCases: stories.filter((story) => isUseCase(story) && visible(story)),
   };
 }
+
+/**
+ * The whole plan of the use-case part of a Docs page, from the title and the page's stories (after
+ * `selectPageStories`): the neutral stories, then the section (heading by edition, fixed intro, use cases in
+ * order). Pure, so the template (.storybook/docs-page.tsx) and the unit tests share the same decision.
+ */
+export function planUseCasesSection<T extends TaggedStory>(title: string, stories: readonly T[], pagePublic: boolean) {
+  const { neutral, useCases } = splitUseCases(stories, pagePublic);
+  return { neutral, section: useCases.length > 0 ? { heading: sectionHeadingOf(title), intro: USE_CASES_INTRO, stories: useCases } : null };
+}

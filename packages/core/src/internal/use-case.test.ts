@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { USE_CASES_INTRO, VERTICALS, parseUseCaseDescription, splitUseCases, useCaseStory, sectionHeadingOf, verticalTags } from './story-example';
+import { planUseCasesSection, USE_CASES_INTRO, VERTICALS, parseUseCaseDescription, splitUseCases, useCaseStory, sectionHeadingOf, verticalTags } from './story-example';
 
 describe('VERTICALS (#624)', () => {
   it('is the closed list, with the labels the reader sees', () => {
@@ -73,5 +73,41 @@ describe('page helpers (#624)', () => {
   it('on a page of fixtures (internal) every use case counts', () => {
     const stories = [{ id: 'b', tags: ['use-case', 'internal'] }];
     expect(splitUseCases(stories, false).useCases.map((s) => s.id)).toEqual(['b']);
+  });
+});
+
+describe('planUseCasesSection on a Pro page (#624)', () => {
+  const story = (id: string, vertical?: string, description?: string) => ({
+    id,
+    tags: vertical ? ['use-case', `vertical:${vertical}`] : [],
+    description,
+  });
+  const stories = [
+    story('playground'),
+    story('erp', 'erp', useCaseStory({ vertical: 'erp', problem: 'p1', configuration: 'c1' }).parameters.docs?.description.story),
+    story('b2b', 'b2b', useCaseStory({ vertical: 'b2b', problem: 'p2', configuration: 'c2' }).parameters.docs?.description.story),
+    story('hr', 'hr', useCaseStory({ vertical: 'hr', problem: 'p3', configuration: 'c3' }).parameters.docs?.description.story),
+  ];
+
+  it('titles the section "Use cases", with the fixed intro, the three cases last and the neutral story apart', () => {
+    const plan = planUseCasesSection('Pro/Patterns/Form rebase', stories, true);
+    expect(plan.neutral.map((s) => s.id)).toEqual(['playground']);
+    expect(plan.section?.heading).toBe('Use cases');
+    expect(plan.section?.intro).toBe(USE_CASES_INTRO);
+    expect(plan.section?.stories.map((s) => s.id)).toEqual(['erp', 'b2b', 'hr']);
+  });
+
+  it('each case carries its Problem and its Configuration', () => {
+    const plan = planUseCasesSection('Pro/X', stories, true);
+    expect(plan.section?.stories.map((s) => parseUseCaseDescription(s.description))).toEqual([
+      { problem: 'p1', configuration: 'c1' },
+      { problem: 'p2', configuration: 'c2' },
+      { problem: 'p3', configuration: 'c3' },
+    ]);
+  });
+
+  it('a Free title says "Examples"; a page without use cases has no section', () => {
+    expect(planUseCasesSection('Floorplans/X', stories, true).section?.heading).toBe('Examples');
+    expect(planUseCasesSection('Pro/X', [story('a')], true).section).toBeNull();
   });
 });
