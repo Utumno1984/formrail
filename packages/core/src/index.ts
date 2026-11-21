@@ -215,3 +215,5 @@ export type {
 export { AppLauncher } from './app-shell/AppLauncher';
 export type { AppLauncherProps, AppLauncherLabels, AppLauncherTileElement } from './app-shell/AppLauncher';
 export type { AppDescriptor } from './app-shell/types';
+export { AppSwitcher } from './app-shell/AppSwitcher';
+export type { AppSwitcherProps, AppSwitcherLabels, AppSwitcherPresentation } from './app-shell/AppSwitcher';

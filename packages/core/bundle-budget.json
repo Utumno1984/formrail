@@ -22,6 +22,10 @@
       "baseline": 34569,
       "limit": 38026
     },
+    "AppSwitcher": {
+      "baseline": 51729,
+      "limit": 56902
+    },
     "Avatar": {
       "baseline": 11901,
       "limit": 13092

@@ -20,6 +20,7 @@ const EXPORTS = [
   'AccordionItem',
   'AccordionTrigger',
   'AppLauncher',
+  'AppSwitcher',
   'Avatar',
   'Breadcrumb',
   'BreadcrumbItem',
