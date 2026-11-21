@@ -183,7 +183,7 @@ export function isProTitle(title: string): boolean {
 }
 
 /** Heading of the section of a page: "Use cases" on the Pro pages, "Examples" on the others. */
-export function useCasesHeading(title: string): 'Use cases' | 'Examples' {
+export function sectionHeadingOf(title: string): 'Use cases' | 'Examples' {
   return isProTitle(title) ? 'Use cases' : 'Examples';
 }
 

@@ -118,29 +118,50 @@ suppliers, products, sales and purchase orders, support cases and documents, gen
 by `src/index.ts` nor by the `/internal` facade, never in `dist`. Library code (`packages/*/src`, outside stories, tests,
 `showcase/` and `internal/demo-data/` itself) must not import it: ESLint fails the build (ticket #515).
 
-**Which domain for which story.**
+**Neutral components, domain only in declared examples.** A component does not belong to a domain. Its Docs page explains
+it on a generic record first; a domain appears afterwards, as an example that says so (rules agreed on 21/11/2026).
 
-| Family of components | Recommended domains |
-| --- | --- |
-| List Report and tables | sales orders, products / stock, employees, support tickets |
-| Virtual List Report (Pro) | product catalogue or stock movements (100k rows) |
-| Object Page and forms | customer, employee, purchase order |
-| Confirm dialogs | destructive actions on different records ("Archive customer", "Cancel purchase order") |
-| Toast, MessageStrip | outcomes of operations from several domains |
-| DatePicker | delivery date, hire date |
-| FileUpload | attachments of a support ticket, supplier documents |
-| Change Summary and Form Rebase (Pro) | at least two domains with a different shape |
+1. **Neutral first.** The copy-paste story (`*.example.tsx`), the Playground and every public story that is not a
+   `use-case` use generic data and labels ("Record", "Item", "Name", "Status", "Amount", "Owner", "Date"), from the
+   neutral dataset of `demo-data` or inline (a copy-paste example cannot import internal modules: what the reader copies
+   must run in their project, so its data is short and inline).
+2. **Examples are declared.** A domain appears only in a `use-case` story: tag `use-case` and exactly one
+   `vertical:<id>` tag (`erp`, `b2b`, `e-commerce`, `e-learning`, `helpdesk`, `hr`), name `Example: configured for ...`,
+   at the bottom of the file. Write it with `useCaseStory({ vertical, problem?, configuration? })` from
+   `packages/core/src/internal/story-example.ts` (it gives the description; write the tags literally next to it, because
+   Storybook's indexer reads tags statically). The page template shows these stories last, after every other one, under
+   "Examples" (Free) or "Use cases" (Pro, title `Pro/...`), with a fixed introductory sentence.
+3. **Never in the library.** No domain in props, types, names, defaults, runtime messages or code of the library. In
+   TSDoc the sentence that teaches a rule is neutral; an example with a real record is introduced by "e.g." and varies
+   the vertical.
+4. **Pro.** The "Use cases" section is mandatory on every Pro component or engine page: at least 3 distinct verticals,
+   and each use case describes the concrete `**Problem.**` it solves and its `**Configuration.**`, both non-empty, in the
+   story description.
+5. **Verticals and their `demo-data` entities.**
 
-**Rules.**
+   | Vertical | Entities of `demo-data` |
+   | --- | --- |
+   | ERP (`erp`) | sales and purchase orders, invoices, suppliers, stock |
+   | B2B (`b2b`) | customers, price lists (from the per-currency prices of the products) |
+   | E-commerce (`e-commerce`) | product catalogue, carts |
+   | E-learning (`e-learning`) | courses, enrolments |
+   | Helpdesk (`helpdesk`) | support tickets |
+   | HR (`hr`) | employees |
 
-- **No domain is the default.** Pick the domain that fits the component, not the one of the story you copied.
-  Supplier invoices are one allowed domain among the others, never the default.
-- **Balance inside a family.** A family of stories (the stories of one component, or of one Docs page) does not use the
-  same domain in more than a third of its stories. The reviewer checks it; there is no automatic check, because a regex
-  cannot tell a fitting use from a lazy one.
-- **Copy-paste examples (`*.example.tsx`)** have short inline data, in the same universe (same company, same formats:
-  currency, dates, names), because they cannot import internal modules: what the reader copies must run in their project.
-- **English only** in every visible string of a story or fixture.
+6. **Exceptions.** The showcases (`Showcase/*`, `Pro/Showcase/*`) are reference applications, with their domain declared in
+   the title; the unit tests of the engines use test data, not demo data.
+
+**English only** in every visible string of a story or fixture.
+
+**The use-case guard.** `e2e/docs-use-cases.spec.ts` runs `auditUseCaseStructure` and `auditProRatchet`
+(`packages/core/src/internal/use-case-guard.ts`, with negative unit tests for every rule) on the `index.json` of the
+build. It fails, naming the story, when: a `use-case` story is not named `Example: ...` or has no (or more than one)
+`vertical:<id>` tag, or an unknown id; a public story named `Example: ...` is not a `use-case`; a `use-case` story comes
+before a story that is not one on the same page; a page with `n` public use cases has fewer than `min(n, 3)` distinct
+verticals; a Pro use case lacks `**Problem.**` or `**Configuration.**`. The Pro ratchet (`PRO_USE_CASES_PENDING`) lists
+the Pro pages that do not have their 3 verticals yet: a new Pro page outside it must comply, a page that complies must
+be removed from it, and an entry that matches no page fails. Fixtures: `Internal/DocsUseCases` (Free) and
+`Pro/Internal/DocsUseCases` (Pro).
 
 **The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
 `npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a

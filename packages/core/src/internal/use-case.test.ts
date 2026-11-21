@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { USE_CASES_INTRO, VERTICALS, parseUseCaseDescription, splitUseCases, useCaseStory, useCasesHeading, verticalTags } from './story-example';
+import { USE_CASES_INTRO, VERTICALS, parseUseCaseDescription, splitUseCases, useCaseStory, sectionHeadingOf, verticalTags } from './story-example';
 
 describe('VERTICALS (#624)', () => {
   it('is the closed list, with the labels the reader sees', () => {
@@ -46,9 +46,9 @@ describe('parseUseCaseDescription (#624)', () => {
 
 describe('page helpers (#624)', () => {
   it('names the section by the edition of the page, and keeps the intro sentence fixed', () => {
-    expect(useCasesHeading('Floorplans/List Report')).toBe('Examples');
-    expect(useCasesHeading('Pro/Patterns/Form rebase')).toBe('Use cases');
-    expect(useCasesHeading('Production/X')).toBe('Examples');
+    expect(sectionHeadingOf('Floorplans/List Report')).toBe('Examples');
+    expect(sectionHeadingOf('Pro/Patterns/Form rebase')).toBe('Use cases');
+    expect(sectionHeadingOf('Production/X')).toBe('Examples');
     expect(USE_CASES_INTRO).toBe('The same component, configured for different kinds of records. The domain lives in the configuration, never in the component.');
   });
 

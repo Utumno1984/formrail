@@ -10,10 +10,26 @@
 //   4. the other stories.
 // A showcase page (first story tagged `showcase-source`) also lists its main source files, each with its
 // GitHub link. Every other page renders exactly Storybook's own template (`DocsPage`), untouched.
+//
+// Ticket #624: whatever the page, its `use-case` stories (domain examples, see story-example.ts) are NOT in
+// the lists above: they come last, after every other story, under "Examples" (Free) or "Use cases" (Pro, title
+// `Pro/...`), with a fixed introductory sentence. A page without `use-case` stories renders as before.
 import { useContext } from 'react';
 import { Controls, Description, DocsContext, DocsPage, DocsStory, Heading, Primary, Source, Subheading, Subtitle, Title } from '@storybook/addon-docs/blocks';
 import type { PreparedStory } from 'storybook/internal/types';
-import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, exampleStylesheets, githubSource, selectPageStories, type SourceFile } from '../packages/core/src/internal/story-example';
+import {
+  EXAMPLE_TAG,
+  SHOWCASE_SOURCE_TAG,
+  USE_CASES_INTRO,
+  USE_CASE_TAG,
+  controlsStory,
+  exampleStylesheets,
+  githubSource,
+  selectPageStories,
+  splitUseCases,
+  sectionHeadingOf,
+  type SourceFile,
+} from '../packages/core/src/internal/story-example';
 
 /**
  * The stylesheets the pasted example needs (ticket #403; the Pro ones, #447): the core one, then the Pro one
@@ -54,6 +70,20 @@ function SourceFiles({ files }: { files: SourceFile[] }) {
   );
 }
 
+/** The section of the domain examples (ticket #624): last on the page, after every neutral story. */
+function UseCases({ stories, title }: { stories: PreparedStory[]; title: string }) {
+  if (stories.length === 0) return null;
+  return (
+    <section data-use-cases aria-label={sectionHeadingOf(title)}>
+      <Heading>{sectionHeadingOf(title)}</Heading>
+      <p data-use-cases-intro>{USE_CASES_INTRO}</p>
+      {stories.map((story) => (
+        <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
+      ))}
+    </section>
+  );
+}
+
 export function FormrailDocsPage() {
   const { componentStories, projectAnnotations, getStoryContext, filterByAutodocs } = useContext(DocsContext);
   // The same selection as Storybook's `Primary` / `Stories` blocks, including `parameters.docs.stories.filter`
@@ -65,12 +95,33 @@ export function FormrailDocsPage() {
   });
   const isExample = !!primary?.tags?.includes(EXAMPLE_TAG);
   const isShowcase = !!primary?.tags?.includes(SHOWCASE_SOURCE_TAG);
-  if (!primary || (!isExample && !isShowcase)) return <DocsPage />;
+  if (!primary) return <DocsPage />;
+  // Use cases leave the page's own lists and go to their section; a page of fixtures (`internal`) keeps them all.
+  const hasUseCases = selected.some((story) => story.tags?.includes(USE_CASE_TAG));
+  const { neutral, useCases } = splitUseCases(selected, !primary.tags?.includes('internal'));
+  if (!isExample && !isShowcase) {
+    if (!hasUseCases) return <DocsPage />;
+    // Storybook's own template (title, description, primary with its Controls, the other stories), then the section.
+    return (
+      <>
+        <Title />
+        <Subtitle />
+        <Description of="meta" />
+        <Primary />
+        <Controls />
+        {neutral.length > 0 && <Heading>Stories</Heading>}
+        {neutral.map((story) => (
+          <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
+        ))}
+        <UseCases stories={useCases} title={primary.title} />
+      </>
+    );
+  }
 
   // The Controls' story: the Playground after an example (the same rule the props-table guard reads).
-  const target = controlsStory([primary, ...selected]);
+  const target = controlsStory([primary, ...neutral]);
   const playground = target !== primary ? target : undefined;
-  const others = selected.filter((s) => s !== playground);
+  const others = neutral.filter((s) => s !== playground);
   const files = (primary.parameters?.docs as { sourceFiles?: SourceFile[] } | undefined)?.sourceFiles ?? [];
   return (
     <>
@@ -104,6 +155,7 @@ export function FormrailDocsPage() {
         <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
       ))}
       {files.length > 0 && <SourceFiles files={files} />}
+      <UseCases stories={useCases} title={primary.title} />
     </>
   );
 }
