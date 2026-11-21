@@ -17,7 +17,8 @@ export interface AppDescriptor {
   /**
    * Where the app lives. With an `href` the tile is a real link: Ctrl/Cmd/Shift+click and the middle button open
    * it in a new tab or window, whatever `onNavigate` does. Without one the tile is a button, and only
-   * `onNavigate` can open the app.
+   * `onNavigate` can open the app: every click on it, modifiers included, goes to `onNavigate`. An empty string
+   * (`href: ''`) counts as no `href`: the tile is a button (an `<a href="">` would reload the current page).
    */
   href?: string;
   /** The app is visible but cannot be opened. It stays focusable, so that `disabledReason` can be read. */

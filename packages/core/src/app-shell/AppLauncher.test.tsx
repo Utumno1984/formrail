@@ -1,10 +1,10 @@
-import { createRef, useState } from 'react';
+import { createRef, useLayoutEffect, useRef, useState } from 'react';
 import { renderToString } from 'react-dom/server';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
-import { AppLauncher, appLauncherProblems, DEFAULT_LABELS, type AppLauncherProps } from './AppLauncher';
+import { AppLauncher, appLauncherProblems, DEFAULT_LABELS, placeholderCount, type AppLauncherProps } from './AppLauncher';
 import type { AppDescriptor } from './types';
 
 afterEach(() => {
@@ -66,6 +66,25 @@ describe('AppLauncher: structure', () => {
     expect(button).toHaveAttribute('type', 'button');
   });
 
+  it('an empty href counts as no href: a button, not an <a href=""> that would reload the page', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    setup({ apps: [{ id: 'e', label: 'Empty href', href: '' }], onNavigate });
+    expect(screen.queryByRole('link')).toBeNull();
+    const button = screen.getByRole('button', { name: 'Empty href' });
+    expect(button.tagName).toBe('BUTTON');
+    expect(button).not.toHaveAttribute('href');
+    await user.click(button);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate.mock.calls[0]![0]).toMatchObject({ id: 'e', href: '' });
+  });
+
+  it('an empty href and no onNavigate is reported like a missing href (its tile opens nothing)', () => {
+    expect(appLauncherProblems([{ id: 'e', label: 'E', href: '' }], false)).toEqual([
+      'the app "e" has no href and there is no onNavigate: its tile opens nothing',
+    ]);
+  });
+
   it('the accessible name is the label alone; the description is a description, not part of the name', () => {
     setup();
     const one = tile('App one');
@@ -80,6 +99,18 @@ describe('AppLauncher: structure', () => {
     expect(one).toHaveAccessibleDescription('First app');
     expect(descriptionOf(tile('App two'))).toBe('');
     expect(tile('App two')).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('WCAG 1.4.12: minimum heights in lh (the line height in use), never fixed ones; every grid row equally tall', () => {
+    setup();
+    const one = tile('App one');
+    const textBlock = document.getElementById(one.getAttribute('aria-labelledby')!)!.parentElement!;
+    expect(textBlock.className.split(' ')).toContain('min-h-[3lh]');
+    expect(textBlock.className).not.toMatch(/(^|\s)h-\[/);
+    const details = one.closest('li')!.querySelector('[data-rop-app-details]')!;
+    expect(details.className).not.toMatch(/(^|\s)h-\[/);
+    expect(details.className).toContain('top-[calc(0.75rem+1px+1lh)]');
+    expect(screen.getByRole('list').className.split(' ')).toContain('auto-rows-fr');
   });
 
   it('the icon is hidden from assistive technology', () => {
@@ -171,6 +202,45 @@ describe('AppLauncher: navigation rule', () => {
     await user.keyboard('{Enter}');
     await user.keyboard(' ');
     expect(onNavigate).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    ['Ctrl', { ctrlKey: true }],
+    ['Cmd', { metaKey: true }],
+    ['Shift', { shiftKey: true }],
+    ['Alt', { altKey: true }],
+  ])('a click with %s on a button tile (no href): like a plain click, onNavigate called once, the tile focused first', (_, init) => {
+    let active: Element | null = null;
+    const onNavigate = vi.fn(() => (active = document.activeElement));
+    setup({ apps: [{ id: 'b', label: 'Button app' }, { id: 'e', label: 'Empty href', href: '' }], onNavigate });
+    for (const name of ['Button app', 'Empty href']) {
+      onNavigate.mockClear();
+      active = null;
+      const button = screen.getByRole('button', { name });
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init });
+      button.dispatchEvent(event);
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      expect((onNavigate.mock.calls[0] as unknown[])[0]).toMatchObject({ label: name });
+      expect(active).toBe(button);
+    }
+  });
+
+  it('a modified click on a button tile that another handler already cancelled: onNavigate not called', () => {
+    const onNavigate = vi.fn();
+    render(
+      <div onClickCapture={(e) => e.preventDefault()}>
+        <AppLauncher apps={[{ id: 'b', label: 'Button app' }]} onNavigate={onNavigate} />
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Button app' }), { ctrlKey: true });
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('a modified click on a disabled button tile does nothing', () => {
+    const onNavigate = vi.fn();
+    setup({ apps: [{ id: 'b', label: 'Locked', disabled: true }], onNavigate });
+    fireEvent.click(screen.getByRole('button', { name: 'Locked' }), { shiftKey: true });
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('the tile has the focus when onNavigate runs (a click that did not focus it, as in Safari)', () => {
@@ -342,7 +412,7 @@ describe('AppLauncher: loading and empty', () => {
     const nav = screen.getByRole('navigation', { name: 'Apps' });
     expect(nav).toHaveAttribute('aria-busy', 'true');
     expect(within(nav).queryByRole('list')).toBeNull();
-    expect(within(nav).getByRole('status')).toHaveTextContent(DEFAULT_LABELS.loading);
+    expect(screen.getByRole('status')).toHaveTextContent(DEFAULT_LABELS.loading);
     const placeholders = nav.querySelector('[data-rop-app-launcher-placeholders]')!;
     expect(placeholders).toHaveAttribute('aria-hidden', 'true');
     // As many placeholders as the apps already known.
@@ -357,8 +427,33 @@ describe('AppLauncher: loading and empty', () => {
     expect(count()).toBe(2);
     rerender(<AppLauncher apps={[]} loading loadingCount={7} />);
     expect(count()).toBe(7);
-    rerender(<AppLauncher apps={[]} loading loadingCount={2.9} />);
-    expect(count()).toBe(2);
+    rerender(<AppLauncher apps={[]} loading loadingCount={0} />);
+    expect(count()).toBe(0);
+  });
+
+  it.each([
+    ['a fraction', 2.9],
+    ['a negative number', -1],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['-Infinity', Number.NEGATIVE_INFINITY],
+  ])('loadingCount that is %s: ignored, the default is used (no RangeError)', (_, loadingCount) => {
+    const count = () => document.querySelector('[data-rop-app-launcher-placeholders]')!.children.length;
+    const { rerender } = render(<AppLauncher apps={[]} loading loadingCount={loadingCount} />);
+    expect(count()).toBe(4);
+    rerender(<AppLauncher apps={APPS.slice(0, 3)} loading loadingCount={loadingCount} />);
+    expect(count()).toBe(3);
+  });
+
+  it('placeholderCount: only a finite integer of at least 0 is taken', () => {
+    expect(placeholderCount(5, 2)).toBe(5);
+    expect(placeholderCount(0, 2)).toBe(0);
+    expect(placeholderCount(undefined, 2)).toBe(2);
+    expect(placeholderCount(undefined, 0)).toBe(4);
+    expect(placeholderCount(1.5, 2)).toBe(2);
+    expect(placeholderCount(-3, 0)).toBe(4);
+    expect(placeholderCount(Number.NaN, 6)).toBe(6);
+    expect(placeholderCount(Number.POSITIVE_INFINITY, 0)).toBe(4);
   });
 
   it('placeholders use the same grid and the same tile frame as the real tiles', () => {
@@ -378,7 +473,51 @@ describe('AppLauncher: loading and empty', () => {
     rerender(<AppLauncher apps={APPS} />);
     const nav = screen.getByRole('navigation');
     expect(nav).not.toHaveAttribute('aria-busy');
-    expect(within(nav).getByRole('status')).toHaveTextContent('');
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+
+  it('the status region is outside the aria-busy region, right after it (its change is not withheld)', () => {
+    setup({ loading: true });
+    const nav = screen.getByRole('navigation');
+    const status = screen.getByRole('status');
+    expect(nav.contains(status)).toBe(false);
+    expect(status.closest('[aria-busy]')).toBeNull();
+    expect(nav.nextElementSibling).toBe(status);
+    expect(status.className.split(' ')).toContain('sr-only');
+  });
+
+  it('mounted already loading: the status region is mounted empty, then filled after the mount', () => {
+    // What the first commit puts in the DOM, read by a layout effect of a sibling rendered after the launcher
+    // (it runs after the launcher's own commit, before any passive effect).
+    const firstCommit: (string | null)[] = [];
+    function Probe() {
+      useLayoutEffect(() => {
+        firstCommit.push(document.querySelector('[role="status"]')?.textContent ?? null);
+      }, []);
+      return null;
+    }
+    render(
+      <>
+        <AppLauncher apps={[]} loading />
+        <Probe />
+      </>,
+    );
+    expect(firstCommit).toEqual(['']);
+    expect(screen.getByRole('status')).toHaveTextContent(DEFAULT_LABELS.loading);
+    // On the server too it starts empty (no hydration mismatch, the client fills it).
+    expect(renderToString(<AppLauncher apps={[]} loading />)).toMatch(/role="status"[^>]*><\/span>/);
+  });
+
+  it('the same status element stays mounted across loading, loaded, empty and loading again (labels.loading)', () => {
+    const { rerender } = render(<AppLauncher apps={APPS} labels={{ loading: 'Fetching' }} />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('');
+    rerender(<AppLauncher apps={APPS} loading labels={{ loading: 'Fetching' }} />);
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toHaveTextContent('Fetching');
+    rerender(<AppLauncher apps={[]} labels={{ loading: 'Fetching' }} />);
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toHaveTextContent('');
   });
 
   it('empty list after loading: the empty text, no list; never a grid in between', () => {
@@ -481,6 +620,79 @@ describe('AppLauncher: the focus when the list changes', () => {
     expect(document.activeElement).toBe(document.body);
     update(APPS.filter((a) => a.id !== 'two'));
     expect(document.activeElement).toBe(document.body);
+  });
+
+  it('the window loses the focus (blur, the tile stays the active element), then the tile disappears: the focus goes to the next app', async () => {
+    const update = mount();
+    const two = tile('App two');
+    two.focus();
+    // What a browser does when the user switches window or tab: `focusout` on the tile, `activeElement` unchanged.
+    act(() => {
+      two.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
+    await Promise.resolve();
+    expect(document.activeElement).toBe(two);
+    update(APPS.filter((a) => a.id !== 'two'));
+    expect(document.activeElement).toBe(tile('App three'));
+  });
+
+  it('a focusout fired by the removal of the tile from the page is not a real loss of focus: the tile is remembered', async () => {
+    // Chromium fires `focusout` on a focused element while removing it from the page. Here the whole launcher is
+    // taken off the page (a consumer that detaches a hidden panel instead of unmounting it) and put back later.
+    const host = document.createElement('div');
+    document.body.append(host);
+    let set!: (apps: AppDescriptor[]) => void;
+    function Detachable() {
+      const [apps, setApps] = useState(APPS);
+      set = setApps;
+      return <AppLauncher apps={apps} />;
+    }
+    render(<Detachable />, { container: host });
+    const two = tile('App two');
+    two.focus();
+    act(() => {
+      two.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      host.remove();
+    });
+    // The microtask of the blur handler runs while the tile is off the page.
+    await Promise.resolve();
+    expect(two.isConnected).toBe(false);
+    document.body.append(host);
+    expect(document.activeElement).toBe(document.body);
+    // The remembered tile then disappears from the list: the focus, lost to the page, goes to the next app.
+    act(() => set(APPS.filter((a) => a.id !== 'two')));
+    expect(document.activeElement).toBe(tile('App three'));
+    host.remove();
+  });
+
+  it('the tile disappears in the same commit in which another element takes the focus (a dialog focusing its field): the focus stays there', () => {
+    let setStep!: (step: number) => void;
+    // Takes the focus at mount, in a layout effect, as a dialog moves the focus to its first field (or `autoFocus`).
+    function SearchDialog() {
+      const input = useRef<HTMLInputElement>(null);
+      useLayoutEffect(() => input.current?.focus(), []);
+      return (
+        <div role="dialog" aria-label="Search">
+          <input ref={input} aria-label="Search" />
+        </div>
+      );
+    }
+    function WithSearch() {
+      const [step, set] = useState(0);
+      setStep = set;
+      return (
+        <>
+          {/* Before the launcher: it takes the focus in the commit before the launcher's layout effect runs. */}
+          {step === 1 ? <SearchDialog /> : null}
+          <AppLauncher apps={step === 1 ? APPS.filter((a) => a.id !== 'two') : APPS} />
+        </>
+      );
+    }
+    render(<WithSearch />);
+    tile('App two').focus();
+    act(() => setStep(1));
+    expect(screen.queryByRole('link', { name: 'App two' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Search' }));
   });
 
   it('an unrelated change of the list does not move the focus', () => {

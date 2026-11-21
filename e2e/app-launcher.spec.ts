@@ -205,6 +205,71 @@ test.describe('Navigation/AppLauncher', () => {
     expect(new Set(heights).size).toBe(1);
   });
 
+  // WCAG 1.4.12 (text spacing): the user's own stylesheet sets these four values; nothing may be cut or overlap.
+  const TEXT_SPACING =
+    '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }' +
+    ' p { margin-bottom: 2em !important; }';
+
+  for (const [name, width, height] of VIEWPORTS) {
+    test(`${name}: with the WCAG 1.4.12 text spacing no text of a tile is cut or overlapping, and every tile keeps the same height`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height });
+      for (const id of ['apps', 'disabled-app', 'long-names-no-icons']) {
+        await gotoStory(page, `${ID}${id}`);
+        await expect(page.locator('nav li').first()).toBeVisible();
+        await page.addStyleTag({ content: TEXT_SPACING });
+        const report = await page.evaluate(() => {
+          const problems: string[] = [];
+          const lineHeightOf = (el: Element) => parseFloat(getComputedStyle(el).lineHeight);
+          const heights: number[] = [];
+          for (const li of document.querySelectorAll('nav li')) {
+            const tile = li.querySelector<HTMLElement>(':scope > a, :scope > button')!;
+            const app = tile.getAttribute('data-rop-app-id');
+            const t = tile.getBoundingClientRect();
+            heights.push(Math.round(t.height * 10) / 10);
+            const style = getComputedStyle(tile);
+            // The content box of the tile: where its text may be drawn.
+            const inner = {
+              top: t.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop),
+              bottom: t.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom),
+            };
+            const label = document.getElementById(tile.getAttribute('aria-labelledby')!)!;
+            const l = label.getBoundingClientRect();
+            if (label.scrollHeight > label.clientHeight + 0.5) problems.push(`${app}: the name is cut vertically`);
+            if (l.height + 0.5 < lineHeightOf(label)) problems.push(`${app}: the name line is shorter than its line height`);
+            if (l.top < inner.top - 0.5 || l.bottom > inner.bottom + 0.5) problems.push(`${app}: the name leaves the tile`);
+            const details = li.querySelector('[data-rop-app-details]');
+            if (!details) continue;
+            let previousBottom = l.bottom;
+            for (const part of details.children) {
+              const p = part.getBoundingClientRect();
+              const lines = p.height / lineHeightOf(part);
+              // A line clamp cuts at a line boundary (ellipsis), never through a line: a whole number of lines.
+              if (Math.abs(lines - Math.round(lines)) > 0.05) problems.push(`${app}: "${part.textContent}" cut through a line (${lines} lines)`);
+              if (p.top < previousBottom - 0.5) problems.push(`${app}: "${part.textContent}" overlaps the text above it`);
+              if (p.bottom > inner.bottom + 0.5) problems.push(`${app}: "${part.textContent}" leaves the tile`);
+              previousBottom = p.bottom;
+            }
+          }
+          return { problems, heights };
+        });
+        expect(report.problems, id).toEqual([]);
+        expect(new Set(report.heights).size, `${id}: tile heights ${report.heights.join(', ')}`).toBe(1);
+      }
+    });
+  }
+
+  test('with the WCAG 1.4.12 text spacing the empty text stays inside the empty state', async ({ page }) => {
+    await gotoStory(page, `${ID}empty`);
+    await page.addStyleTag({ content: TEXT_SPACING });
+    const nav = page.getByRole('navigation', { name: 'Apps' });
+    const text = (await nav.getByText('No apps available').boundingBox())!;
+    const box = (await nav.locator('[data-rop-app-launcher-empty]').boundingBox())!;
+    expect(text.y).toBeGreaterThanOrEqual(box.y - 0.5);
+    expect(text.y + text.height).toBeLessThanOrEqual(box.y + box.height + 0.5);
+  });
+
   test('a long name is cut with an ellipsis inside a real max-width; its full text is the accessible name; no tooltip at mount', async ({
     page,
   }) => {

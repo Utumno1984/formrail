@@ -197,7 +197,8 @@ export const LoadingToData: Story = {
     const canvas = within(canvasElement);
     const nav = canvas.getByRole('navigation', { name: 'Apps' });
     await expect(nav).toHaveAttribute('aria-busy', 'true');
-    await expect(canvas.getByRole('status')).toHaveTextContent('Loading apps');
+    // The status region is mounted empty and filled just after the mount (so that it is announced).
+    await waitFor(() => expect(canvas.getByRole('status')).toHaveTextContent('Loading apps'));
     const before = nav.getBoundingClientRect().height;
     await userEvent.click(canvas.getByRole('button', { name: 'Finish loading' }));
     await expect(canvas.queryAllByRole('link')).toHaveLength(args.count);

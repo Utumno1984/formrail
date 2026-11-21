@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleNavigationClick, isModifiedClick, type NavigationClickLike } from './navigation';
+import {
+  handleNavigationClick,
+  hasNavigableHref,
+  isAppNavigationClick,
+  isModifiedClick,
+  type NavigationClickLike,
+} from './navigation';
 
 const click = (over: Partial<NavigationClickLike> = {}) => {
   const event = {
@@ -31,6 +37,31 @@ describe('isModifiedClick', () => {
     ['the secondary button', { button: 2 }],
   ])('a click with %s belongs to the browser', (_, over) => {
     expect(isModifiedClick(click(over))).toBe(true);
+  });
+});
+
+describe('hasNavigableHref', () => {
+  it('a non-empty string is an href; undefined, null and the empty string are not', () => {
+    expect(hasNavigableHref('/a')).toBe(true);
+    expect(hasNavigableHref('#')).toBe(true);
+    expect(hasNavigableHref('')).toBe(false);
+    expect(hasNavigableHref(undefined)).toBe(false);
+    expect(hasNavigableHref(null)).toBe(false);
+  });
+});
+
+describe('isAppNavigationClick', () => {
+  it('with a native navigation (default): only a plain primary click nobody cancelled is the app’s', () => {
+    expect(isAppNavigationClick(click())).toBe(true);
+    expect(isAppNavigationClick(click({ shiftKey: true }))).toBe(false);
+    expect(isAppNavigationClick(click({ button: 1 }))).toBe(false);
+    expect(isAppNavigationClick(click({ defaultPrevented: true }))).toBe(false);
+  });
+
+  it('without a native navigation: every click nobody cancelled is the app’s, modifiers included', () => {
+    expect(isAppNavigationClick(click({ shiftKey: true }), { native: false })).toBe(true);
+    expect(isAppNavigationClick(click({ metaKey: true, altKey: true }), { native: false })).toBe(true);
+    expect(isAppNavigationClick(click({ ctrlKey: true, defaultPrevented: true }), { native: false })).toBe(false);
   });
 });
 
@@ -77,6 +108,39 @@ describe('handleNavigationClick', () => {
     const event = click({ defaultPrevented: true });
     const onNavigate = vi.fn();
     expect(handleNavigationClick(event, onNavigate)).toBe(false);
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a plain click', {}],
+    ['Ctrl', { ctrlKey: true }],
+    ['Cmd', { metaKey: true }],
+    ['Shift', { shiftKey: true }],
+    ['Alt', { altKey: true }],
+    ['the middle button', { button: 1 }],
+  ])('without a native navigation (no href), %s goes to the callback: nothing is left to the browser', (_, over) => {
+    const event = click(over);
+    const onNavigate = vi.fn();
+    expect(handleNavigationClick(event, onNavigate, { native: false })).toBe(true);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith(event);
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it('without a native navigation, a click already cancelled or no callback: nothing happens', () => {
+    const cancelled = click({ ctrlKey: true, defaultPrevented: true });
+    const onNavigate = vi.fn();
+    expect(handleNavigationClick(cancelled, onNavigate, { native: false })).toBe(false);
+    expect(onNavigate).not.toHaveBeenCalled();
+    const noCallback = click({ ctrlKey: true });
+    expect(handleNavigationClick(noCallback, undefined, { native: false })).toBe(false);
+    expect(noCallback.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('native defaults to true: an explicit native: true is the link rule', () => {
+    const onNavigate = vi.fn();
+    expect(handleNavigationClick(click({ ctrlKey: true }), onNavigate, { native: true })).toBe(false);
+    expect(handleNavigationClick(click({ ctrlKey: true }), onNavigate, {})).toBe(false);
     expect(onNavigate).not.toHaveBeenCalled();
   });
 

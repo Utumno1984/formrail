@@ -6,12 +6,13 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type FocusEvent,
   type HTMLAttributes,
   type MouseEvent,
 } from 'react';
 import { isDev } from '../internal/is-dev';
-import { handleNavigationClick, isModifiedClick } from '../internal/navigation';
+import { handleNavigationClick, hasNavigableHref, isAppNavigationClick } from '../internal/navigation';
 import { Skeleton } from '../skeleton/Skeleton';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
@@ -23,7 +24,12 @@ export interface AppLauncherLabels {
   region: string;
   /** Text shown when the list is empty and nothing is loading. Default `No apps available`. */
   empty: string;
-  /** Text read by assistive technology while the apps are loading. Default `Loading apps`. */
+  /**
+   * Announced by assistive technology when the apps start loading. It lives in a polite status region next to the
+   * navigation region (outside its `aria-busy`, which may hold back the announcement), always mounted empty and
+   * filled after the mount, so that a launcher mounted already loading is announced too. Emptied once loaded.
+   * Default `Loading apps`.
+   */
   loading: string;
 }
 
@@ -49,10 +55,12 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   apps: readonly AppDescriptor[];
   /**
    * Opens an app with your router. Called once, synchronously, for a plain primary click or Enter on an enabled
-   * tile; the browser's own navigation to the `href` is cancelled first. Never called for Ctrl/Cmd/Shift/Alt+click
-   * or the middle button: those are left to the browser (a new tab or window on the real `href`). The tile has the
-   * focus when it is called, so a dirty guard opened from here (`useDirtyGuard().guard`) returns the focus to it.
-   * Without `onNavigate` a tile with an `href` is a plain link.
+   * tile; the browser's own navigation to the `href` is cancelled first. On a tile with an `href`, never called for
+   * Ctrl/Cmd/Shift/Alt+click or the middle button: those are left to the browser (a new tab or window on the real
+   * `href`). On a tile without an `href` (a button) there is nothing for the browser to open, so a click is always
+   * handed to `onNavigate`, modifiers included. The tile has the focus when it is called, so a dirty guard opened
+   * from here (`useDirtyGuard().guard`) returns the focus to it. Without `onNavigate` a tile with an `href` is a
+   * plain link.
    */
   onNavigate?: (app: AppDescriptor, event: MouseEvent<AppLauncherTileElement>) => void;
   /** `id` of the app the user is in: its tile gets `aria-current="true"` and a visible marker, and can still be opened. */
@@ -65,7 +73,8 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   loading?: boolean;
   /**
    * Number of placeholder tiles while `loading`: pass the number of apps you expect, so that the region keeps its
-   * height when they arrive. Default: the number of `apps` already known, or 4 when there are none.
+   * height when they arrive. Default: the number of `apps` already known, or 4 when there are none. A value that is
+   * not a finite integer of at least 0 (`2.5`, `-1`, `NaN`, `Infinity`) is ignored: the default is used.
    */
   loadingCount?: number;
   /** Texts for localization; every key falls back to the English default. */
@@ -73,16 +82,20 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
 }
 
 // The tiles: as many columns as the width of the launcher itself allows (a container query, never the window),
-// so a launcher in a narrow side panel of a wide page has one column. Full literals (Tailwind scan).
+// so a launcher in a narrow side panel of a wide page has one column. Every row is as tall as the tallest tile
+// (`auto-rows-fr`), so all the tiles keep the same height even if the text of one of them needs more room.
+// Full literals (Tailwind scan).
 const GRID =
-  'm-0 grid list-none grid-cols-1 gap-3 p-0 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4';
+  'm-0 grid list-none auto-rows-fr grid-cols-1 gap-3 p-0 @min-[32rem]:grid-cols-2 @min-[48rem]:grid-cols-3 @min-[64rem]:grid-cols-4';
 
-// Every tile is exactly this tall, whatever it carries (no icon, no description, a reason): the name takes one
-// line, the description and the reason share the two lines under it. The placeholder tile and the empty state use
-// the same height, so the region does not move between loading, empty and loaded.
-const TEXT_BLOCK = 'h-[calc(3*var(--text-rop-body--line-height))]';
+// Every tile is at least this tall, whatever it carries (no icon, no description, a reason): the name takes one
+// line, the description and the reason share the two lines under it. A minimum in `lh` (the line height actually
+// used, not the token), never a fixed height: with the user's own text spacing (WCAG 1.4.12: line height 1.5 and
+// more) the tile grows instead of cutting the text. The placeholder tile and the empty state use the same minimum,
+// so the region does not move between loading, empty and loaded.
+const TEXT_BLOCK = 'min-h-[3lh]';
 // A tile's outer height (padding 0.75rem on each side, 1px border on each side): the minimum of the empty state.
-const ROW_MIN_HEIGHT = 'min-h-[calc(3*var(--text-rop-body--line-height)+1.5rem+2px)]';
+const ROW_MIN_HEIGHT = 'min-h-[calc(3lh+1.5rem+2px)]';
 
 // Content-box like every box of the library: the tile has no width (a block-level flex box in a flex-column `li`
 // stretches with its padding inside the cell), so the padding never pushes it out of the grid.
@@ -112,11 +125,22 @@ const ICON = 'flex size-10 shrink-0 items-center justify-center text-rop-primary
 
 // The description and the reason, drawn over the tile under the name line: the tile's border (1px) and padding
 // (0.75rem) on each side, after the icon (2.5rem plus the 0.75rem gap) when there is one. Logical insets only.
+// Under the name line by `1lh` (same font, so the name's real line height) and no fixed height: the line clamps
+// below keep them to the two lines the tile reserves, whatever the line height.
 const DETAILS =
-  'pointer-events-none absolute end-[calc(0.75rem+1px)] top-[calc(0.75rem+1px+var(--text-rop-body--line-height))] ' +
-  'flex h-[calc(2*var(--text-rop-body--line-height))] min-w-0 flex-col font-rop-sans text-rop-body';
+  'pointer-events-none absolute end-[calc(0.75rem+1px)] top-[calc(0.75rem+1px+1lh)] ' +
+  'flex min-w-0 flex-col font-rop-sans text-rop-body';
 const DETAILS_AFTER_ICON = 'start-[calc(4rem+1px)]';
 const DETAILS_NO_ICON = 'start-[calc(0.75rem+1px)]';
+
+/**
+ * @internal Not public API: the number of placeholder tiles (exported for the unit test). `loadingCount` when it is a
+ * finite integer of at least 0, otherwise the number of apps already known, or 4 when there are none.
+ */
+export function placeholderCount(loadingCount: number | undefined, knownApps: number): number {
+  if (typeof loadingCount === 'number' && Number.isInteger(loadingCount) && loadingCount >= 0) return loadingCount;
+  return knownApps || DEFAULT_LOADING_COUNT;
+}
 
 /** Key of each app: its `id`, made unique for a duplicate (already reported in development) so React keeps working. */
 function keysOf(apps: readonly AppDescriptor[]): string[] {
@@ -138,7 +162,7 @@ export function appLauncherProblems(apps: readonly AppDescriptor[], hasOnNavigat
     if (typeof app.label !== 'string' || app.label.trim() === '') {
       problems.push(`the app ${JSON.stringify(app.id)} has an empty label: its tile has no accessible name`);
     }
-    if (!app.disabled && !app.href && !hasOnNavigate) {
+    if (!app.disabled && !hasNavigableHref(app.href) && !hasOnNavigate) {
       problems.push(`the app ${JSON.stringify(app.id)} has no href and there is no onNavigate: its tile opens nothing`);
     }
   }
@@ -155,7 +179,8 @@ export function appLauncherProblems(apps: readonly AppDescriptor[], hasOnNavigat
  * Columns follow the width of the launcher, not of the window (container query: 1 to 4). The launcher fills the
  * width of its parent; give a shrink-to-fit parent a real width. Loading, empty and loaded keep the same footprint
  * for the same number of tiles. If the tile with the focus disappears (the list changes), the focus moves to the
- * next app, or the previous one, or the region itself, never to the page.
+ * next app, or the previous one, or the region itself, never to the page. The region is followed by a visually
+ * hidden status element (the loading announcement); `ref`, `className` and the other attributes go to the region.
  */
 export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherProps>(function AppLauncher(
   {
@@ -253,145 +278,156 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
     }
     if (!onNavigate) return;
     const tile = event.currentTarget;
-    // A plain click hands the tile the focus before `onNavigate` runs (Safari does not focus a clicked link), so a
+    // Only a link has a native navigation to leave modified clicks to: on a button every click is the app's.
+    const rule = { native: hasNavigableHref(app.href) };
+    // A click handed to `onNavigate` gives the tile the focus first (Safari does not focus a clicked link), so a
     // dialog opened from `onNavigate` returns the focus to it.
-    if (!event.defaultPrevented && !isModifiedClick(event) && tile.ownerDocument.activeElement !== tile) {
+    if (isAppNavigationClick(event, rule) && tile.ownerDocument.activeElement !== tile) {
       tile.focus({ preventScroll: true });
     }
-    handleNavigationClick(event, (e) => onNavigate(app, e));
+    handleNavigationClick(event, (e) => onNavigate(app, e), rule);
   };
 
-  const count = loading ? Math.max(0, Math.floor(loadingCount ?? (apps.length || DEFAULT_LOADING_COUNT))) : 0;
+  const count = loading ? placeholderCount(loadingCount, apps.length) : 0;
+
+  // The loading announcement: the status region is always mounted, empty at the first render (also on the server)
+  // and filled only after the mount, because a live region inserted already filled is not reliably announced.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
-    <nav
-      {...rest}
-      ref={composedRef}
-      tabIndex={-1}
-      aria-label={ariaLabelledBy ? ariaLabel : ariaLabel ?? labels.region}
-      aria-labelledby={ariaLabelledBy}
-      aria-busy={loading || undefined}
-      data-rop-app-launcher=""
-      className={cn(
-        'relative block min-w-0 max-w-full p-1 font-rop-sans text-rop-body text-rop-text @container',
-        'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2',
-        className,
-      )}
-    >
-      <span role="status" className="sr-only">
-        {loading ? labels.loading : ''}
-      </span>
-      {loading ? (
-        <div aria-hidden="true" data-rop-app-launcher-placeholders="" className={cn(GRID, ROW_MIN_HEIGHT)}>
-          {Array.from({ length: count }, (_, i) => (
-            <div key={i} className="flex min-w-0 flex-col">
-              <div className={cn(TILE, 'pointer-events-none')}>
-                <Skeleton variant="rect" width="2.5rem" height="2.5rem" className="shrink-0" />
-                <div className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
-                  <Skeleton textVariant="body" width="60%" />
-                  <Skeleton textVariant="body" lines={2} />
+    <>
+      <nav
+        {...rest}
+        ref={composedRef}
+        tabIndex={-1}
+        aria-label={ariaLabelledBy ? ariaLabel : ariaLabel ?? labels.region}
+        aria-labelledby={ariaLabelledBy}
+        aria-busy={loading || undefined}
+        data-rop-app-launcher=""
+        className={cn(
+          'relative block min-w-0 max-w-full p-1 font-rop-sans text-rop-body text-rop-text @container',
+          'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2',
+          className,
+        )}
+      >
+        {loading ? (
+          <div aria-hidden="true" data-rop-app-launcher-placeholders="" className={cn(GRID, ROW_MIN_HEIGHT)}>
+            {Array.from({ length: count }, (_, i) => (
+              <div key={i} className="flex min-w-0 flex-col">
+                <div className={cn(TILE, 'pointer-events-none')}>
+                  <Skeleton variant="rect" width="2.5rem" height="2.5rem" className="shrink-0" />
+                  <div className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
+                    <Skeleton textVariant="body" width="60%" />
+                    <Skeleton textVariant="body" lines={2} />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : apps.length === 0 ? (
-        <div data-rop-app-launcher-empty="" className={cn('flex items-center justify-center', ROW_MIN_HEIGHT)}>
-          <p className="m-0 text-center text-rop-text-muted">{labels.empty}</p>
-        </div>
-      ) : (
-        <ul className={GRID}>
-          {apps.map((app, i) => {
-            const key = keys[i]!;
-            const id = `${baseId}-${i}`;
-            const current = currentAppId !== undefined && app.id === currentAppId;
-            const disabled = !!app.disabled;
-            const reason = disabled && app.disabledReason ? app.disabledReason : undefined;
-            const describedBy = [app.description ? `${id}-description` : '', reason ? `${id}-reason` : '']
-              .filter(Boolean)
-              .join(' ');
-            const common = {
-              ref: tileRef(key),
-              'aria-labelledby': `${id}-label`,
-              'aria-describedby': describedBy || undefined,
-              'aria-current': current ? ('true' as const) : undefined,
-              'aria-disabled': disabled ? ('true' as const) : undefined,
-              'data-rop-app-id': app.id,
-              onClick: activate(app),
-              onFocus: onTileFocus(key),
-              onBlur: onTileBlur,
-              className: cn(TILE, disabled ? TILE_DISABLED : TILE_ENABLED, current && TILE_CURRENT),
-            };
-            const hasIcon = app.icon !== undefined && app.icon !== null;
-            const body = (
-              <>
-                {hasIcon ? (
-                  <span aria-hidden="true" className={cn(ICON, disabled && 'opacity-60')}>
-                    {app.icon}
+            ))}
+          </div>
+        ) : apps.length === 0 ? (
+          <div data-rop-app-launcher-empty="" className={cn('flex items-center justify-center', ROW_MIN_HEIGHT)}>
+            <p className="m-0 text-center text-rop-text-muted">{labels.empty}</p>
+          </div>
+        ) : (
+          <ul className={GRID}>
+            {apps.map((app, i) => {
+              const key = keys[i]!;
+              const id = `${baseId}-${i}`;
+              const current = currentAppId !== undefined && app.id === currentAppId;
+              const disabled = !!app.disabled;
+              const reason = disabled && app.disabledReason ? app.disabledReason : undefined;
+              const describedBy = [app.description ? `${id}-description` : '', reason ? `${id}-reason` : '']
+                .filter(Boolean)
+                .join(' ');
+              const common = {
+                ref: tileRef(key),
+                'aria-labelledby': `${id}-label`,
+                'aria-describedby': describedBy || undefined,
+                'aria-current': current ? ('true' as const) : undefined,
+                'aria-disabled': disabled ? ('true' as const) : undefined,
+                'data-rop-app-id': app.id,
+                onClick: activate(app),
+                onFocus: onTileFocus(key),
+                onBlur: onTileBlur,
+                className: cn(TILE, disabled ? TILE_DISABLED : TILE_ENABLED, current && TILE_CURRENT),
+              };
+              const hasIcon = app.icon !== undefined && app.icon !== null;
+              const body = (
+                <>
+                  {hasIcon ? (
+                    <span aria-hidden="true" className={cn(ICON, disabled && 'opacity-60')}>
+                      {app.icon}
+                    </span>
+                  ) : null}
+                  {/* The name line, then the room the description and the reason are drawn over. */}
+                  <span className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
+                    <TruncatedText id={`${id}-label`} className="font-semibold">
+                      {app.label}
+                    </TruncatedText>
                   </span>
-                ) : null}
-                {/* The name line, then the room the description and the reason are drawn over. */}
-                <span className={cn('flex min-w-0 flex-1 flex-col', TEXT_BLOCK)}>
-                  <TruncatedText id={`${id}-label`} className="font-semibold">
-                    {app.label}
-                  </TruncatedText>
-                </span>
-              </>
-            );
-            // The description and the reason are NOT inside the link: its visible text is then exactly its name
-            // (WCAG 2.5.3, "label in name"), and they are read once, as its description (`aria-describedby` reads
-            // hidden text; `aria-hidden` keeps them from being read again as list content). They are drawn over the
-            // tile, under the name; `pointer-events: none` hands every click on them to the tile below.
-            const details =
-              app.description || reason ? (
-                <span
-                  aria-hidden="true"
-                  data-rop-app-details=""
-                  className={cn(DETAILS, hasIcon ? DETAILS_AFTER_ICON : DETAILS_NO_ICON)}
-                >
-                  {app.description ? (
-                    <span
-                      id={`${id}-description`}
-                      className={cn('overflow-hidden text-rop-text-muted', reason ? 'line-clamp-1' : 'line-clamp-2')}
-                    >
-                      {app.description}
-                    </span>
-                  ) : null}
-                  {reason ? (
-                    <span
-                      id={`${id}-reason`}
-                      data-rop-app-disabled-reason=""
-                      className={cn('overflow-hidden italic text-rop-text', app.description ? 'line-clamp-1' : 'line-clamp-2')}
-                    >
-                      {reason}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null;
-            return (
-              <li key={key} className="relative flex min-w-0 flex-col">
-                {app.href !== undefined && app.href !== '' ? (
-                  // A disabled app keeps its `<a>` (the focus stays on it if it gets disabled while focused) but loses
-                  // its `href`: `role="link"` and `tabIndex` keep it a named, focusable link that leads nowhere.
-                  <a
-                    {...common}
-                    href={disabled ? undefined : app.href}
-                    role={disabled ? 'link' : undefined}
-                    tabIndex={disabled ? 0 : undefined}
+                </>
+              );
+              // The description and the reason are NOT inside the link: its visible text is then exactly its name
+              // (WCAG 2.5.3, "label in name"), and they are read once, as its description (`aria-describedby` reads
+              // hidden text; `aria-hidden` keeps them from being read again as list content). They are drawn over the
+              // tile, under the name; `pointer-events: none` hands every click on them to the tile below.
+              const details =
+                app.description || reason ? (
+                  <span
+                    aria-hidden="true"
+                    data-rop-app-details=""
+                    className={cn(DETAILS, hasIcon ? DETAILS_AFTER_ICON : DETAILS_NO_ICON)}
                   >
-                    {body}
-                  </a>
-                ) : (
-                  <button {...common} type="button">
-                    {body}
-                  </button>
-                )}
-                {details}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </nav>
+                    {app.description ? (
+                      <span
+                        id={`${id}-description`}
+                        className={cn('overflow-hidden text-rop-text-muted', reason ? 'line-clamp-1' : 'line-clamp-2')}
+                      >
+                        {app.description}
+                      </span>
+                    ) : null}
+                    {reason ? (
+                      <span
+                        id={`${id}-reason`}
+                        data-rop-app-disabled-reason=""
+                        className={cn('overflow-hidden italic text-rop-text', app.description ? 'line-clamp-1' : 'line-clamp-2')}
+                      >
+                        {reason}
+                      </span>
+                    ) : null}
+                  </span>
+                ) : null;
+              return (
+                <li key={key} className="relative flex min-w-0 flex-col">
+                  {hasNavigableHref(app.href) ? (
+                    // An empty `href` counts as none (a button). A disabled app keeps its `<a>` (the focus stays on it
+                    // if it gets disabled while focused) but loses its `href`: `role="link"` and `tabIndex` keep it a
+                    // named, focusable link that leads nowhere.
+                    <a
+                      {...common}
+                      href={disabled ? undefined : app.href}
+                      role={disabled ? 'link' : undefined}
+                      tabIndex={disabled ? 0 : undefined}
+                    >
+                      {body}
+                    </a>
+                  ) : (
+                    <button {...common} type="button">
+                      {body}
+                    </button>
+                  )}
+                  {details}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </nav>
+      {/* A sibling after the region, not a child: inside the `aria-busy` element its change may be withheld. */}
+      <span role="status" data-rop-app-launcher-status="" className="sr-only">
+        {mounted && loading ? labels.loading : ''}
+      </span>
+    </>
   );
 });
