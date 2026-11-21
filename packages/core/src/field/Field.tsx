@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState, t
 import { FieldMessage } from '../field-message/FieldMessage';
 import { defineHidden } from '../internal/define-hidden';
 import { isDev } from '../internal/is-dev';
+import { KEYBOARD_INSET_EVENT } from '../internal/keyboard-inset';
 import { hasContent } from '../internal/react-nodes';
 import { errorAt } from '../object-page/field-errors';
 import { cn } from '../utils/cn';
@@ -122,6 +123,8 @@ function useKeyboardSafe(active: boolean, ref: RefObject<HTMLElement | null>, on
       if (covered !== published) {
         published = covered;
         root.style.setProperty(KEYBOARD_INSET, covered);
+        // The Object Page re-measures the room under its scroller now, before the scroll below reads the margins.
+        el.dispatchEvent(new Event(KEYBOARD_INSET_EVENT, { bubbles: true }));
       }
       const rect = el.getBoundingClientRect();
       if (rect.top < vv.offsetTop || rect.bottom > vv.offsetTop + vv.height) {

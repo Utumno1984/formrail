@@ -28,13 +28,20 @@ describe('noticeCap (#470)', () => {
     expect(noticeCap({ ...PHONE, frameBottom: 360, footerTop: 300, visibleBottom: 360, viewportHeight: 360 })).toBe(140);
   });
 
-  it('the virtual keyboard (225px of 500): the scroller keeps 10rem above the line a focused Field lands on, else the notice its 3rem', () => {
-    // The line is 411 - 225 = 186px: 186 - 160 = 26px left, below the notice's minimum.
-    expect(noticeCap({ ...PHONE, visibleBottom: 275 })).toBe(NOTICE_MIN_REM * 16);
+  it('the virtual keyboard (225px of 500): the scroller keeps 10rem above the line a focused Field lands on, the footer counted once (#498)', () => {
+    // The keyboard covers the 89px footer first: the line is 411 - (225 - 89) = 275px, just above the keyboard.
+    // 275 - 160 = 115px left; 40% of the 275px visible is 110px.
+    expect(noticeCap({ ...PHONE, visibleBottom: 275 })).toBe(110);
+  });
+
+  it('no room left: the notice its 3rem', () => {
+    // A keyboard of 300px: the line is 200px, 200 - 160 = 40px, below the notice's minimum.
+    expect(noticeCap({ ...PHONE, visibleBottom: 200 })).toBe(NOTICE_MIN_REM * 16);
   });
 
   it('a small keyboard leaves the notice more than its minimum, and never more than 40% of what is visible', () => {
-    // Keyboard of 60px: the line is 351px, 351 - 160 = 191px; 40% of the 440px visible is 176px.
+    // Keyboard of 60px, under the 89px footer: the line is the scroller's bottom, 411px, 411 - 160 = 251px; 40% of the
+    // 440px visible is 176px.
     expect(noticeCap({ ...PHONE, visibleBottom: 440 })).toBe(176);
   });
 

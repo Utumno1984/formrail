@@ -2,6 +2,7 @@ import { useState, type ButtonHTMLAttributes } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Input } from '../input/Input';
+import { KEYBOARD_INSET_EVENT } from '../internal/keyboard-inset';
 import { Field } from './Field';
 import type { FieldControlProps } from './FieldContext';
 import { useFieldControl } from './useFieldControl';
@@ -410,6 +411,35 @@ describe('keyboard-safe focus', () => {
     act(() => screen.getByRole('button').focus());
     expect(count()).toBe(0);
     expect(document.documentElement.style.getPropertyValue('--rop-keyboard-inset')).toBe('');
+  });
+
+  it('announces each new height with a bubbling event, after publishing it and before scrolling (#498)', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+    const { vv, fire } = installVisualViewport({ height: 800 });
+    const order: string[] = [];
+    Element.prototype.scrollIntoView = vi.fn(() => order.push('scroll'));
+    const { container } = render(
+      <div>
+        <Field label="Nome">
+          <Input />
+        </Field>
+      </div>,
+    );
+    const host = container.firstElementChild as HTMLElement;
+    host.addEventListener(KEYBOARD_INSET_EVENT, () =>
+      order.push(`event ${document.documentElement.style.getPropertyValue('--rop-keyboard-inset')}`),
+    );
+    const input = screen.getByRole('textbox');
+    (input.closest('[data-state]') as HTMLElement).getBoundingClientRect = () => ({ top: 600, bottom: 650 }) as DOMRect;
+    act(() => input.focus());
+    expect(order).toEqual(['event 0px']);
+
+    vv.height = 500;
+    act(() => fire());
+    expect(order).toEqual(['event 0px', 'event 300px', 'scroll']);
+    // Measured again with the same keyboard: nothing new to announce.
+    act(() => fire());
+    expect(order).toEqual(['event 0px', 'event 300px', 'scroll', 'scroll']);
   });
 
   it('does not scroll a field that is already inside the visual viewport', () => {
