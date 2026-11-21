@@ -16,7 +16,8 @@
 //   named-color     a CSS named colour (`red`, `black`) in a colour property (also text-decoration, gradients, stop-color, scrollbar-color,
 //                   -webkit-text-stroke), a custom property (`--_cs-tone: orange`), `fill`/`stroke`, a `bg-[red]`-style utility,
 //                   color-mix(), a gradient or drop-shadow(). In TS/TSX the style objects are read on the TypeScript AST:
-//                   every branch of a value (ternary, `&&`/`||`/`??`, parentheses, computed key) whatever the formatting
+//                   every branch of a value (ternary, `&&`/`||`/`??`, parentheses, computed key, also with a cast) whatever
+//                   the formatting; any other form of value (a callback, `'red'.trim()`) still has its string literals judged
 //   spacing-literal  an arbitrary px/rem spacing utility off the Tailwind scale (`p-[13px]`); `p-4` is fine
 //   unknown-token    a `var(--color-rop-x)` (or `--radius-rop-*`, `--text-rop-*`, ...) that `tokens.css` does not declare
 //   allowlist        an allowlist entry without a reason, or one that no longer matches anything
@@ -113,52 +114,90 @@ const OUTLINE_PROP_NAME = /^outline(?:-color|Color)?$/;
 const SVG_PAINT_ATTR = /^(?:fill|stroke)$/;
 const VALUE_OPERATORS = new Set([ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.PlusToken]);
 
-/** The static name of an object key: `color`, `'--x'`, `` `--x` ``, `['--x']`, `` [`--x`] ``; null when it is computed from a variable. */
+/** A wrapper that does not change the value: parentheses, `as T`, `satisfies T`, `<T>x`, `x!`. */
+const isTransparent = (n) =>
+  ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isNonNullExpression(n) || ts.isTypeAssertionExpression(n);
+
+/**
+ * The static name of an object key: `color`, `'--x'`, `` `--x` ``, `['--x']`, `` [`--x`] ``, also behind casts and parentheses at
+ * any depth (`['--x' as string]`, `['color' as const]`, `[('--x' as any)!]`); null when it is computed from a variable.
+ */
 function keyName(name) {
   let n = ts.isComputedPropertyName(name) ? name.expression : name;
-  while (ts.isParenthesizedExpression(n)) n = n.expression;
+  while (isTransparent(n)) n = n.expression;
   return ts.isIdentifier(n) || ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) ? n.text : null;
+}
+
+const isAssignment = (kind) => kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+
+/** The condition of a control-flow statement: never a value, skipped like the condition of a ternary. */
+function conditionOf(node) {
+  if (ts.isIfStatement(node) || ts.isWhileStatement(node) || ts.isDoStatement(node) || ts.isSwitchStatement(node) || ts.isCaseClause(node)) return node.expression;
+  if (ts.isForStatement(node)) return node.condition;
+  return undefined;
 }
 
 /**
  * What a property value can evaluate to: the string/template literals (`{ at, text, whole?, inTemplate? }`, `at` = index
  * of the first character of `text` in the source; a template with substitutions gives its head with `whole` = the full raw
  * template, then its other pieces with `inTemplate`) and the bare identifiers (`{ at, text }`). Walks the branches of ternaries, `&&`/`||`/`??`/`+`, parentheses, casts, `{...}[key]`
- * maps, arrays and call arguments at any depth; never the condition of a ternary, nor a callee.
+ * maps, arrays, call arguments and the receiver of a method call (`'red'.trim()`) at any depth; never the condition of a ternary, nor a callee.
+ *
+ * Any other node (a callback `(row) => ...` with an expression or a block body, a property access, `await`, ...) is not
+ * trusted to be colour-free (#614 round 3, decision of 2026-11-21): its descendant string/template literals are collected
+ * all the same, except the conditions (`if`/`while`/`for`/`switch`/`case`, ternary) and the types. Below such a node `bare`
+ * is false: identifiers and numbers are no longer judged (`(row) => row.red`, a parameter called `red`, are not colours).
  */
-function valueLeaves(sf, node, out = { literals: [], identifiers: [] }) {
+function valueLeaves(sf, node, out = { literals: [], identifiers: [] }, bare = true) {
   const src = sf.text;
   const piece = (lit, closer) => {
     const start = lit.getStart(sf) + 1;
     return { at: start, text: src.slice(start, lit.end - closer) };
   };
+  const walk = (n, b = bare) => valueLeaves(sf, n, out, b);
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) out.literals.push(piece(node, 1));
-  else if (ts.isNumericLiteral(node)) out.literals.push({ at: node.getStart(sf), text: node.getText(sf) });
-  else if (ts.isTemplateExpression(node)) {
+  else if (ts.isNumericLiteral(node)) {
+    if (bare) out.literals.push({ at: node.getStart(sf), text: node.getText(sf) });
+  } else if (ts.isTemplateExpression(node)) {
     const whole = piece(node, 1).text;
     out.literals.push({ ...piece(node.head, 2), whole });
     for (const span of node.templateSpans) {
-      valueLeaves(sf, span.expression, out);
+      walk(span.expression);
       out.literals.push({ ...piece(span.literal, ts.isTemplateTail(span.literal) ? 1 : 2), inTemplate: true });
     }
-  } else if (ts.isIdentifier(node)) out.identifiers.push({ at: node.getStart(sf), text: node.text });
-  else if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isNonNullExpression(node) || ts.isTypeAssertionExpression(node)) {
-    valueLeaves(sf, node.expression, out);
-  } else if (ts.isConditionalExpression(node)) {
-    valueLeaves(sf, node.whenTrue, out);
-    valueLeaves(sf, node.whenFalse, out);
+  } else if (ts.isIdentifier(node)) {
+    if (bare) out.identifiers.push({ at: node.getStart(sf), text: node.text });
+  } else if (isTransparent(node)) walk(node.expression);
+  else if (ts.isConditionalExpression(node)) {
+    walk(node.whenTrue);
+    walk(node.whenFalse);
   } else if (ts.isBinaryExpression(node)) {
-    if (VALUE_OPERATORS.has(node.operatorToken.kind)) valueLeaves(sf, node.left, out);
-    if (VALUE_OPERATORS.has(node.operatorToken.kind) || node.operatorToken.kind === ts.SyntaxKind.CommaToken) valueLeaves(sf, node.right, out);
-  } else if (ts.isElementAccessExpression(node)) valueLeaves(sf, node.expression, out);
+    const op = node.operatorToken.kind;
+    if (VALUE_OPERATORS.has(op)) walk(node.left);
+    if (VALUE_OPERATORS.has(op) || op === ts.SyntaxKind.CommaToken || isAssignment(op)) walk(node.right);
+  } else if (ts.isElementAccessExpression(node)) walk(node.expression);
   else if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
     // `color: tone('red')`: a colour literal handed to a helper still ends up in the style (the callee is not judged).
-    for (const a of node.arguments ?? []) valueLeaves(sf, a, out);
+    for (const a of node.arguments ?? []) walk(a);
+    // `color: 'red'.trim()`: the receiver of a method call is a value (its literals only); the method name is not.
+    const callee = node.expression;
+    if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) walk(callee.expression, false);
   } else if (ts.isObjectLiteralExpression(node)) {
-    for (const p of node.properties) if (ts.isPropertyAssignment(p)) valueLeaves(sf, p.initializer, out);
+    for (const p of node.properties) {
+      if (ts.isPropertyAssignment(p)) walk(p.initializer);
+      else if (ts.isSpreadAssignment(p)) walk(p.expression);
+      else walk(p, false);
+    }
   } else if (ts.isArrayLiteralExpression(node)) {
-    for (const e of node.elements) valueLeaves(sf, ts.isSpreadElement(e) ? e.expression : e, out);
-  } else if (ts.isJsxExpression(node) && node.expression) valueLeaves(sf, node.expression, out);
+    for (const e of node.elements) walk(ts.isSpreadElement(e) ? e.expression : e);
+  } else if (ts.isJsxExpression(node) && node.expression) walk(node.expression);
+  else {
+    const condition = conditionOf(node);
+    ts.forEachChild(node, (child) => {
+      if (child === condition || ts.isTypeNode(child) || ts.isTypeParameterDeclaration(child)) return;
+      walk(child, false);
+    });
+  }
   return out;
 }
 

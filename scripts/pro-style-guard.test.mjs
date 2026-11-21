@@ -421,3 +421,69 @@ describe('pro style guard: #614 round 2 (TS values read on the AST, whatever the
     expect(outline("const s = {\n  ['outlineColor']:\n    f && 'red',\n};")).toEqual([['red', 3]]);
   });
 });
+
+describe('pro style guard: #614 round 3 (casts in a computed key, unrecognised value forms)', () => {
+  const named = (file, source) => checkSource(file, source, TOKENS).filter((v) => v.rule === 'named-color').map((v) => [v.value, v.line]);
+  const outline = (source) => checkSource(TSX, source, TOKENS).filter((v) => v.rule === 'outline-color').map((v) => [v.value, v.line]);
+  const TS = 'packages/pro/src/x/thing.ts';
+
+  it.each([
+    ['as string (the Toast.stories form)', "const s = { ['--_cs-tone' as string]: 'orange' };", [['orange', 1]]],
+    ['as any', "const s = { ['--x' as any]: 'red' };", [['red', 1]]],
+    ['as keyof React.CSSProperties', "const s = { ['color' as keyof React.CSSProperties]: 'red' };", [['red', 1]]],
+    ['as const', "const s = { ['color' as const]: 'red' };", [['red', 1]]],
+    ['satisfies', "const s = { ['--x' satisfies string]: 'red' };", [['red', 1]]],
+    ['non-null', "const s = { ['backgroundColor'!]: 'red' };", [['red', 1]]],
+    ['nested: parentheses, as, satisfies and !', "const s = { [(('--x' as string) satisfies string)!]: 'red' };", [['red', 1]]],
+    ['as string with a ternary (Prettier)', "const s = {\n  ['--_cs-tone' as string]:\n    err ?\n      'red'\n    : 'blue',\n};", [['red', 4], ['blue', 5]]],
+    ['as string with a ternary (Prettier default)', "const s = {\n  ['--x' as string]: err\n    ? 'red'\n    : 'blue',\n};", [['red', 3], ['blue', 4]]],
+  ])('case 1, a computed key with a cast: %s', (_n, source, expected) => {
+    expect(named(TSX, source)).toEqual(expected);
+  });
+
+  it('case 1, a <T> type assertion in the key (.ts)', () => {
+    expect(named(TS, "const s = { [<string>'--x']: 'red' };")).toEqual([['red', 1]]);
+  });
+
+  it('case 1, an outline key with a cast is judged on its value', () => {
+    expect(outline("const s = { ['outlineColor' as const]: 'red' };")).toEqual([['red', 1]]);
+    expect(outline("const s = { ['outline' as string]: '2px solid var(--color-rop-primary)' };")).toEqual([]);
+  });
+
+  it('case 1, a cast key that does not carry a colour, or a value that is no literal, is not reported', () => {
+    expect(rules(TSX, "const s = { ['label' as string]: 'red' };")).toEqual([]);
+    expect(rules(TSX, "const s = { ['--rop-slot-index' as string]: i, bottom: 'auto' };")).toEqual([]);
+  });
+
+  it.each([
+    ['.trim()', "const s = { color: 'red'.trim() };", [['red', 1]]],
+    ['a method chain', "const s = { color: ' Red '.trim().toLowerCase() };", [['red', 1]]],
+    ['a method on a ternary', "const s = { color: (err ? 'red' : 'blue').trim() };", [['red', 1], ['blue', 1]]],
+    ['an arrow callback with an expression body', "const c = { color: (row) => (row.overdue ? 'red' : undefined) };", [['red', 1]]],
+    ['an arrow callback with an expression body (Prettier)', "const c = {\n  color: (row) =>\n    row.overdue ?\n      'red'\n    : undefined,\n};", [['red', 4]]],
+    ['an arrow callback with a block body', "const c = {\n  color: (row) => {\n    if (row.overdue) {\n      return 'red';\n    }\n    return 'var(--color-rop-text)';\n  },\n};", [['red', 4]]],
+    ['a function expression', "const c = { color: function (row) { return row.overdue ? 'red' : 'inherit'; } };", [['red', 1]]],
+    ['a literal held in a local of the block', "const c = {\n  color: (row) => {\n    const tone = 'red';\n    return row.overdue ? tone : undefined;\n  },\n};", [['red', 3]]],
+    ['a default parameter', "const c = { color: (tone = 'red') => tone };", [['red', 1]]],
+    ['await and an assignment', "const c = { color: async () => await load('red'), background: (last = 'blue') };", [['red', 1], ['blue', 1]]],
+    ['an object method', "const c = { color: { pick() { return 'red'; } }.pick() };", [['red', 1]]],
+  ])('case 2, an unrecognised value form still has its literals judged: %s', (_n, source, expected) => {
+    expect(named(TSX, source)).toEqual(expected);
+  });
+
+  it('case 2, an outline callback is judged on its literals', () => {
+    expect(outline("const c = { outline: (f) => (f ? '2px solid red' : 'none') };")).toEqual([['2px solid red', 1]]);
+    expect(outline('const c = { outline: (f) => focusRing(f, 2) };')).toEqual([]);
+  });
+
+  it.each([
+    ['the condition of a ternary in a callback', "const c = { color: (row) => (row.tone === 'red' ? 'var(--color-rop-error)' : 'inherit') };"],
+    ['if/while/for conditions in a block', "const c = {\n  color: (row) => {\n    if (row.tags.includes('red')) return 'var(--color-rop-error)';\n    while (is(row, 'white')) row = row.next;\n    do row = row.next; while (is(row, 'gray'));\n    for (let i = 0; is(row, 'black'); i++) row = row.next;\n    return 'inherit';\n  },\n};"],
+    ['switch/case conditions in a block', "const c = {\n  color: (row) => {\n    switch (row.tone) {\n      case 'red':\n        return 'var(--color-rop-error)';\n      default:\n        return 'inherit';\n    }\n  },\n};"],
+    ['identifiers below a callback or a property access', 'const c = { color: (red) => red, background: (row) => row.white, borderColor: theme.red.trim() };'],
+    ['a callee, and an identifier receiver of a method', 'const c = { color: red(tone), background: palette.white.toString(), borderColor: white.trim() };'],
+    ['the types of a callback', "const c = { color: <T extends 'red'>(row: { kind: 'white' }): Tone<'black'> => pick<T>(row) };"],
+  ])('case 2, what does not fire: %s', (_n, source) => {
+    expect(rules(TSX, source)).toEqual([]);
+  });
+});
