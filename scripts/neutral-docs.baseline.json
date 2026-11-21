@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "pages": {
+    "Data/DescriptionList": [
+      "customer",
+      "invoice",
+      "supplier",
+      "vat"
+    ],
+    "Data/ListReportFilterBar": [
+      "customer",
+      "invoice",
+      "supplier"
+    ],
+    "Data/ListReportTable": [
+      "customer",
+      "invoice"
+    ],
+    "Data/TruncatedText": [
+      "invoice",
+      "supplier"
+    ],
+    "Floorplans/List Report": [
+      "customer",
+      "invoice",
+      "supplier"
+    ],
+    "Floorplans/Object Page with Validation": [
+      "customer",
+      "invoice",
+      "supplier"
+    ],
+    "Floorplans/Object Page/Anchor Bar": [
+      "invoice",
+      "supplier"
+    ],
+    "Floorplans/Object Page/Footer": [
+      "customer",
+      "invoice",
+      "supplier",
+      "vat"
+    ],
+    "Floorplans/Object Page/Layout": [
+      "customer",
+      "invoice",
+      "purchase order",
+      "supplier",
+      "vat"
+    ],
+    "Floorplans/Object Page/Schema validation": [
+      "purchase order",
+      "supplier"
+    ],
+    "Floorplans/Object Page/Validation": [
+      "supplier"
+    ],
+    "Forms/Checkbox": [
+      "invoice"
+    ],
+    "Forms/Combobox": [
+      "customer",
+      "supplier"
+    ],
+    "Forms/DatePicker": [
+      "invoice"
+    ],
+    "Forms/Field": [
+      "customer",
+      "invoice",
+      "vat"
+    ],
+    "Forms/FileUpload": [
+      "invoice",
+      "supplier"
+    ],
+    "Forms/Input": [
+      "customer",
+      "invoice",
+      "vat"
+    ],
+    "Forms/MultiSelect": [
+      "invoice"
+    ],
+    "Forms/NumberInput": [
+      "invoice",
+      "vat"
+    ],
+    "Forms/Select": [
+      "customer",
+      "supplier"
+    ],
+    "Forms/Switch": [
+      "invoice",
+      "supplier"
+    ],
+    "Forms/Textarea": [
+      "invoice",
+      "purchase order",
+      "supplier",
+      "vat"
+    ],
+    "Foundations/Theming": [
+      "invoice",
+      "supplier"
+    ],
+    "Foundations/Tokens": [
+      "invoice"
+    ],
+    "Foundations/Typography": [
+      "invoice",
+      "supplier"
+    ],
+    "Foundations/Utilities": [
+      "supplier"
+    ],
+    "Navigation/Accordion": [
+      "invoice"
+    ],
+    "Navigation/Breadcrumb": [
+      "invoice",
+      "purchase order",
+      "supplier"
+    ],
+    "Navigation/Tabs": [
+      "invoice"
+    ],
+    "Overlays/ConfirmDialog": [
+      "invoice",
+      "sales order",
+      "supplier"
+    ],
+    "Overlays/Dialog": [
+      "supplier"
+    ],
+    "Overlays/Sheet": [
+      "supplier"
+    ],
+    "Overlays/Toast": [
+      "invoice",
+      "supplier"
+    ],
+    "Overlays/Tooltip": [
+      "invoice",
+      "supplier"
+    ],
+    "Patterns/DirtyGuard": [
+      "supplier"
+    ],
+    "Primitives/Card": [
+      "invoice",
+      "vat"
+    ],
+    "Primitives/FieldMessage": [
+      "invoice"
+    ],
+    "Primitives/ProgressBar": [
+      "invoice"
+    ],
+    "Primitives/Skeleton": [
+      "invoice"
+    ],
+    "Primitives/Spinner": [
+      "invoice"
+    ],
+    "Primitives/StatusBadge": [
+      "customer"
+    ],
+    "Pro/ChangeSummary": [
+      "supplier",
+      "vat"
+    ],
+    "Pro/Floorplans/Virtual List Report": [
+      "invoice",
+      "supplier"
+    ],
+    "Pro/Integrations/React Hook Form": [
+      "supplier"
+    ],
+    "Pro/Integrations/TanStack Form": [
+      "supplier"
+    ],
+    "Pro/Patterns/Form rebase": [
+      "supplier"
+    ],
+    "Pro/RebaseNotice": [
+      "invoice",
+      "purchase order",
+      "supplier"
+    ]
+  }
+}

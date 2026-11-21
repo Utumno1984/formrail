@@ -58,7 +58,10 @@ async function pageShape(page: Page, docsId: string) {
     const neutralAnchors = anchors.filter(outside);
     return {
       neutralAnchors: neutralAnchors.map((a) => norm(a.id)),
-      neutralHeadings: [...content.querySelectorAll('h2, h3')].filter(outside).map((h) => `${h.tagName}:${h.textContent?.trim()}`),
+      neutralHeadings: [...content.querySelectorAll('h2:not(.sbdocs-subtitle), h3')].filter(outside).map((h) => `${h.tagName}:${h.textContent?.trim()}`),
+      // The Subtitle block and the Controls' table (#646): a template that drops either must not pass as its twin.
+      subtitle: content.querySelector('.sbdocs-subtitle')?.textContent?.trim() ?? null,
+      argNames: [...content.querySelectorAll('.docblock-argstable tbody tr')].filter(outside).map((row) => row.querySelector('td')?.textContent?.trim() ?? ''),
       neutralText: [...content.querySelectorAll('p')].filter((p) => outside(p) && !p.closest('.docs-story, table')).map((p) => p.textContent?.trim()),
       sectionAnchors: anchors.filter((a) => !outside(a)).map((a) => norm(a.id)),
       sectionHeading: section?.querySelector('h2')?.textContent?.trim() ?? null,
@@ -67,6 +70,14 @@ async function pageShape(page: Page, docsId: string) {
       sectionLast: section ? neutralAnchors.every((a) => !!(a.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING)) : null,
     };
   }, docsId.replace(/--docs$/, ''));
+}
+
+/** The ids that appear more than once in the page's content (#646: the section's heading id must not repeat). */
+function duplicateIds(page: Page) {
+  return page.evaluate(() => {
+    const ids = [...document.querySelectorAll('.sbdocs-content [id]')].map((el) => el.id);
+    return [...new Set(ids.filter((id, index) => ids.indexOf(id) !== index))];
+  });
 }
 
 /**
@@ -117,12 +128,17 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     expect(twin.neutralHeadings).toEqual(['H2:Stories', 'H3:Default', 'H3:Disabled']);
     expect(twin.neutralText).toEqual(expect.arrayContaining(['The neutral component on a generic record.', 'A state of the neutral component.']));
     expect(twin.sectionHeading).toBeNull();
+    // Not vacuous (#646): the Subtitle and the Controls' table are really on the twin.
+    expect(twin.subtitle).toBe('A neutral subtitle.');
+    expect(twin.argNames).toEqual(expect.arrayContaining(['variant', 'children']));
 
     const docs = await pageShape(page, 'internal-docsusecasesplain--docs');
     // Adding the use cases did not change the neutral part.
     expect(docs.neutralAnchors).toEqual(twin.neutralAnchors);
     expect(docs.neutralHeadings).toEqual(twin.neutralHeadings);
     expect(docs.neutralText).toEqual(twin.neutralText);
+    expect(docs.subtitle).toBe(twin.subtitle);
+    expect(docs.argNames).toEqual(twin.argNames);
     // The section: after every neutral story, its heading and intro, the use cases in order with their descriptions.
     expect(docs.sectionLast).toBe(true);
     expect(docs.sectionAnchors).toEqual(['anchor--<page>--use-case-hr-leave-request', 'anchor--<page>--use-case-helpdesk-ticket']);
@@ -131,6 +147,7 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     expect(docs.sectionText).toContain('A manager approves the days off an employee asked for.');
     expect(docs.sectionText).toContain('An agent closes a support ticket once it is answered.');
     await expectRegionLabelledByHeading(page, 'examples', 'Examples');
+    expect(await duplicateIds(page)).toEqual([]);
   });
 
   test('a single-story page stays a single-story page when it gains a use case', async ({ page }) => {
@@ -144,10 +161,15 @@ test.describe('Docs page: neutral first, then Examples / Use cases', () => {
     expect(docs.neutralAnchors).toEqual(twin.neutralAnchors);
     expect(docs.neutralHeadings).toEqual(twin.neutralHeadings);
     expect(docs.neutralText).toEqual(twin.neutralText);
+    expect(twin.subtitle).toBe('A neutral subtitle.');
+    expect(twin.argNames).toEqual(expect.arrayContaining(['variant', 'children']));
+    expect(docs.subtitle).toBe(twin.subtitle);
+    expect(docs.argNames).toEqual(twin.argNames);
     expect(docs.sectionLast).toBe(true);
     expect(docs.sectionAnchors).toEqual(['anchor--<page>--use-case-b-2-b-price-list']);
     expect(docs.sectionHeading).toBe('Examples');
     expect(docs.sectionIntro).toBe(USE_CASES_INTRO);
+    expect(await duplicateIds(page)).toEqual([]);
   });
 
   // The Pro branch of the template ("Use cases", Problem and Configuration per case) has no e2e on a real page
