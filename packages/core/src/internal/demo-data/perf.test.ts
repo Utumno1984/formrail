@@ -86,6 +86,10 @@ describe('demo-data performance (plain Node, fresh process)', () => {
     expect(timeInFreshProcess('makePurchaseOrders', 100_000)).toBeLessThan(BUDGET_MS);
   });
 
+  it(`makeRecords(100000) runs in under ${BUDGET_MS} ms`, () => {
+    expect(timeInFreshProcess('makeRecords', 100_000)).toBeLessThan(BUDGET_MS);
+  });
+
   it(`makeSupportCases(100000) runs in under ${BUDGET_MS} ms`, () => {
     expect(timeInFreshProcess('makeSupportCases', 100_000)).toBeLessThan(BUDGET_MS);
   });
