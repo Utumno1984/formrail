@@ -57,6 +57,12 @@ describe('makeRecords: variety of the first 200 records', () => {
     expect(rows.some((r) => (r.dueOn as unknown) === '')).toBe(false);
   });
 
+  it('has about one due date in five absent over the first 1,000 records (15% to 30%)', () => {
+    const share = makeRecords(1000).filter((r) => r.dueOn === null).length / 1000;
+    expect(share).toBeGreaterThanOrEqual(0.15);
+    expect(share).toBeLessThanOrEqual(0.3);
+  });
+
   it('uses all four currencies, every status and every category', () => {
     expect(new Set(rows.map((r) => r.currency))).toEqual(new Set(DEMO_CURRENCIES));
     expect(new Set(rows.map((r) => r.status))).toEqual(new Set(Object.keys(RECORD_STATUS_LABEL)));
@@ -91,6 +97,20 @@ describe('getRecordDetail', () => {
     expect(counts.every((c) => c >= 0 && c <= 8)).toBe(true);
     expect(counts.slice(0, 50)).toContain(0);
     expect(counts).toContain(8);
+  });
+
+  it('gives each record tags without duplicates (they end up in a change summary)', () => {
+    for (const row of makeRecords(1000)) {
+      const { tags } = getRecordDetail(row.id);
+      expect(new Set(tags).size, row.id).toBe(tags.length);
+    }
+  });
+
+  it('labels items without logistics or training flavour', () => {
+    const flavoured = /\b(delivery|shipping|transport|packaging|storage|training|dock)\b/i;
+    const labels = new Set<string>();
+    for (const row of makeRecords(1000)) for (const item of getRecordDetail(row.id).items) labels.add(item.label);
+    expect([...labels].filter((label) => flavoured.test(label))).toEqual([]);
   });
 
   it('gives items ids that are unique per record and stable between calls', () => {
