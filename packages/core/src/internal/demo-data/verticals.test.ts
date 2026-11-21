@@ -266,12 +266,13 @@ describe('enrolments', () => {
   });
 
   it('point at published or retired courses within the reference pool, enrolled after their publication', () => {
+    const problems: string[] = [];
     for (const e of rows) {
       const course = courseById.get(e.courseId);
-      expect(course, e.id).toBeDefined();
-      expect(course!.status, e.id).not.toBe('draft');
-      expect(e.enrolledOn >= course!.publishedOn!, `${e.id} enrolled before the course existed`).toBe(true);
+      if (!course || course.status === 'draft') problems.push(`${e.id}: course ${e.courseId}`);
+      else if (e.enrolledOn < course.publishedOn!) problems.push(`${e.id}: enrolled before the course existed`);
     }
+    expect(problems).toEqual([]);
   });
 
   it('never reference a draft course, and the pool has drafts', () => {
@@ -311,28 +312,32 @@ describe('carts', () => {
   });
 
   it('has 0 to 15 lines of active products at list price in the customer currency, and a total that adds up', () => {
+    // Problems are collected, not asserted one by one: 5,000 carts x 15 lines of `expect` calls are slow.
+    const problems: string[] = [];
     for (const cart of rows) {
       const customer = getCustomer(cart.customerId)!;
-      expect(cart.currency, cart.id).toBe(customer.currency);
-      expect(customer.contacts.map((c) => c.fullName), cart.id).toContain(cart.buyerName);
-      expect(cart.lines.length).toBeLessThanOrEqual(15);
+      if (cart.currency !== customer.currency) problems.push(`${cart.id}: currency`);
+      if (!customer.contacts.some((c) => c.fullName === cart.buyerName)) problems.push(`${cart.id}: buyer`);
+      if (cart.lines.length > 15) problems.push(`${cart.id}: ${cart.lines.length} lines`);
       const percent = cart.couponCode === null ? 0 : Number(cart.couponCode.replace(/\D+/g, ''));
       let total = 0;
       const products = new Set<string>();
       cart.lines.forEach((line, k) => {
         const product = getProduct(line.productId)!;
-        expect(product.status, line.id).toBe('active');
-        expect(line.id).toBe(`${cart.id}-line-${k + 1}`);
-        expect(line.unitPriceMinor).toBe(product.listPriceMinor[cart.currency]);
-        expect(line.discountPercent).toBe(percent);
-        expect(line.lineTotalMinor).toBe(lineTotalMinor(line.quantity, line.unitPriceMinor, percent));
-        expect(line.lineTotalMinor).toBe(line.quantity * line.unitPriceMinor - discountMinor(line.quantity * line.unitPriceMinor, percent));
+        const gross = line.quantity * line.unitPriceMinor;
+        if (product.status !== 'active') problems.push(`${line.id}: product ${product.status}`);
+        if (line.id !== `${cart.id}-line-${k + 1}`) problems.push(`${line.id}: id`);
+        if (line.unitPriceMinor !== product.listPriceMinor[cart.currency]) problems.push(`${line.id}: price`);
+        if (line.discountPercent !== percent) problems.push(`${line.id}: discount`);
+        if (line.lineTotalMinor !== lineTotalMinor(line.quantity, line.unitPriceMinor, percent)) problems.push(`${line.id}: total`);
+        if (line.lineTotalMinor !== gross - discountMinor(gross, percent)) problems.push(`${line.id}: total (discountMinor)`);
         products.add(line.productId);
         total += line.lineTotalMinor;
       });
-      expect(products.size).toBe(cart.lines.length);
-      expect(cart.totalMinor, cart.id).toBe(total);
+      if (products.size !== cart.lines.length) problems.push(`${cart.id}: repeated product`);
+      if (cart.totalMinor !== total) problems.push(`${cart.id}: total ${cart.totalMinor} vs ${total}`);
     }
+    expect(problems).toEqual([]);
   });
 
   it('only has a coupon on a non-empty cart, and a checked-out cart is never empty', () => {
