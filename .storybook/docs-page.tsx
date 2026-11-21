@@ -10,10 +10,29 @@
 //   4. the other stories.
 // A showcase page (first story tagged `showcase-source`) also lists its main source files, each with its
 // GitHub link. Every other page renders exactly Storybook's own template (`DocsPage`), untouched.
-import { useContext } from 'react';
-import { Controls, Description, DocsContext, DocsPage, DocsStory, Heading, Primary, Source, Subheading, Subtitle, Title } from '@storybook/addon-docs/blocks';
+//
+// Ticket #624: whatever the page, its `use-case` stories (domain examples, see story-example.ts) are NOT in
+// the lists above: they come last, after every other story, under "Examples" (Free) or "Use cases" (Pro, title
+// `Pro/...`), with a fixed introductory sentence. A page without `use-case` stories renders as before. A page
+// without a copy-paste example that has use cases renders Storybook's own template on the page WITHOUT them
+// (`NeutralDocsPage`), then the section: adding a use case never changes the neutral part of a page.
+import { useContext, useMemo, type ComponentType, type PropsWithChildren } from 'react';
+import { Controls, Description, DocsContext, DocsPage, DocsStory, Heading, Primary, Source, Stories, Subheading, Subtitle, Title, useOf } from '@storybook/addon-docs/blocks';
 import type { PreparedStory } from 'storybook/internal/types';
-import { EXAMPLE_TAG, SHOWCASE_SOURCE_TAG, controlsStory, exampleStylesheets, githubSource, selectPageStories, type SourceFile } from '../packages/core/src/internal/story-example';
+import {
+  EXAMPLE_TAG,
+  SHOWCASE_SOURCE_TAG,
+  USE_CASES_INTRO,
+  USE_CASE_TAG,
+  controlsStory,
+  exampleStylesheets,
+  githubSource,
+  isSingleNeutralStory,
+  selectPageStories,
+  planUseCasesSection,
+  sectionHeadingOf,
+  type SourceFile,
+} from '../packages/core/src/internal/story-example';
 
 /**
  * The stylesheets the pasted example needs (ticket #403; the Pro ones, #447): the core one, then the Pro one
@@ -54,6 +73,55 @@ function SourceFiles({ files }: { files: SourceFile[] }) {
   );
 }
 
+// Storybook's `Heading` passes its other props to the `<h2>` after its own slug id, so `id` sets the id the
+// section's `aria-labelledby` points to (its props type only declares `disableAnchor`).
+const HeadingWithId = Heading as ComponentType<PropsWithChildren<{ id: string }>>;
+
+/** The section of the domain examples (ticket #624): last on the page, after every neutral story. */
+function UseCases({ stories, title }: { stories: PreparedStory[]; title: string }) {
+  if (stories.length === 0) return null;
+  const heading = sectionHeadingOf(title);
+  const headingId = heading === 'Use cases' ? 'use-cases' : 'examples';
+  return (
+    <section data-use-cases aria-labelledby={headingId}>
+      <HeadingWithId id={headingId}>{heading}</HeadingWithId>
+      <p data-use-cases-intro>{USE_CASES_INTRO}</p>
+      {stories.map((story) => (
+        <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
+      ))}
+    </section>
+  );
+}
+
+/**
+ * Storybook's own template (`DocsPage` of @storybook/addon-docs: the same blocks, in the same order) on the
+ * page WITHOUT its `use-case` stories: the blocks read `componentStories()` from a context that leaves them out
+ * (`Primary`, `Controls`, `Stories` with the primary included and its own heading), and the single-story rule
+ * counts the CSF file without them. So a page that gains a use case keeps exactly its neutral part.
+ */
+function NeutralDocsPage() {
+  const context = useContext(DocsContext);
+  // Object.create: the context is a class instance (methods on its prototype, state in its fields); only
+  // `componentStories` changes, everything else is read through the prototype.
+  const neutral = useMemo(() => {
+    const stories = context.componentStories().filter((story) => !story.tags?.includes(USE_CASE_TAG));
+    return Object.create(context, { componentStories: { value: () => stories } }) as typeof context;
+  }, [context]);
+  const { csfFile } = useOf('meta', ['meta']);
+  const isSingleStory = isSingleNeutralStory(Object.values(csfFile.stories));
+  return (
+    <DocsContext.Provider value={neutral}>
+      <Title />
+      <Subtitle />
+      <Description of="meta" />
+      {isSingleStory ? <Description of="story" /> : null}
+      <Primary />
+      <Controls />
+      {isSingleStory ? null : <Stories />}
+    </DocsContext.Provider>
+  );
+}
+
 export function FormrailDocsPage() {
   const { componentStories, projectAnnotations, getStoryContext, filterByAutodocs } = useContext(DocsContext);
   // The same selection as Storybook's `Primary` / `Stories` blocks, including `parameters.docs.stories.filter`
@@ -65,12 +133,25 @@ export function FormrailDocsPage() {
   });
   const isExample = !!primary?.tags?.includes(EXAMPLE_TAG);
   const isShowcase = !!primary?.tags?.includes(SHOWCASE_SOURCE_TAG);
-  if (!primary || (!isExample && !isShowcase)) return <DocsPage />;
+  if (!primary) return <DocsPage />;
+  // Use cases leave the page's own lists and go to their section; a page of fixtures (`internal`) keeps them all.
+  // A page with no section (no use case, or only hidden `internal` variants of one) is not touched.
+  const { neutral, section } = planUseCasesSection(primary.title, selected, !primary.tags?.includes('internal'));
+  const useCases = section?.stories ?? [];
+  if (!isExample && !isShowcase) {
+    if (!section) return <DocsPage />;
+    return (
+      <>
+        <NeutralDocsPage />
+        <UseCases stories={useCases} title={primary.title} />
+      </>
+    );
+  }
 
   // The Controls' story: the Playground after an example (the same rule the props-table guard reads).
-  const target = controlsStory([primary, ...selected]);
+  const target = controlsStory([primary, ...neutral]);
   const playground = target !== primary ? target : undefined;
-  const others = selected.filter((s) => s !== playground);
+  const others = neutral.filter((s) => s !== playground);
   const files = (primary.parameters?.docs as { sourceFiles?: SourceFile[] } | undefined)?.sourceFiles ?? [];
   return (
     <>
@@ -104,6 +185,7 @@ export function FormrailDocsPage() {
         <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
       ))}
       {files.length > 0 && <SourceFiles files={files} />}
+      <UseCases stories={useCases} title={primary.title} />
     </>
   );
 }
