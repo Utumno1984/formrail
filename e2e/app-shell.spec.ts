@@ -53,8 +53,11 @@ test.describe('Floorplans/App Shell', () => {
       const main = await rect(page, 'main');
       if (width >= 1024) {
         await expect(nav).toBeVisible();
+        // 16rem, the inline-end rule included (the variable is the whole footprint).
         const n = await rect(page, 'nav');
         expect(n.width).toBeCloseTo(256, 0);
+        // A one-line link is as tall as its minimum (2.5rem), its padding included.
+        expect((await rect(page, '[data-rop-app-shell-nav-link]')).height).toBeCloseTo(40, 0);
         expect(main.left).toBeCloseTo(n.left + n.width, 0);
       } else {
         await expect(nav).toBeHidden();
@@ -68,8 +71,18 @@ test.describe('Floorplans/App Shell', () => {
       await gotoStory(page, `${ID}long-texts`);
       await expectNoHorizontalOverflow(shell(page));
       expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= window.innerWidth)).toBe(true);
+      // The variable is the whole footprint: 3.5rem, the bottom rule included.
       const header = await rect(page, 'header');
-      expect(header.height).toBeCloseTo(57, 0);
+      expect(header.height).toBeCloseTo(56, 0);
+      // Every part keeps a share of the row and cuts its text with an ellipsis: none is squeezed to nothing.
+      for (const part of ['start', 'center', 'end']) {
+        const box = await rect(page, `[data-rop-app-shell-header-${part}]`);
+        expect(box.width, part).toBeGreaterThan(24);
+        const text = page.locator(`[data-rop-app-shell-header-${part}] span`).first();
+        await expect(text).toBeVisible();
+        expect(await text.evaluate((el) => el.scrollWidth > el.clientWidth), `${part} is cut`).toBe(true);
+        expect(await text.evaluate((el) => getComputedStyle(el).textOverflow)).toBe('ellipsis');
+      }
     });
 
     test(`${name}: a List Report and an Object Page inside: one scroller, no horizontal overflow`, async ({ page }) => {

@@ -16,7 +16,7 @@ import {
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { exampleStory } from '../internal/example-story';
-import { CLASS_NAME_ARG, storyControl, withoutControls } from '../internal/story-docs';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReport } from '../list-report/ListReport';
 import type { ListReportColumn } from '../list-report/types';
 import { useListReport } from '../list-report/use-list-report';
@@ -75,7 +75,7 @@ function headerSlots({ long = false }: { long?: boolean }) {
   };
 }
 
-interface DemoArgs extends Pick<AppShellProps, 'fill' | 'labels' | 'className'> {
+interface DemoArgs extends Pick<AppShellProps, 'fill' | 'labels'> {
   /** Number of links in the navigation (story control). */
   navCount: number;
   /** The link of the current page (story control). */
@@ -129,7 +129,6 @@ const meta: Meta<DemoArgs> = {
   argTypes: {
     fill: { control: 'radio', options: ['viewport', 'parent'] },
     labels: { control: 'object' },
-    className: CLASS_NAME_ARG,
     ...withoutControls('children'),
     navCount: storyControl({
       control: { type: 'range', min: 0, max: 20, step: 1 },

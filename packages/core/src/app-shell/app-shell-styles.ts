@@ -24,22 +24,25 @@ export const rootParentClass = 'h-full';
 
 // The header: first row, both columns. Its height is a component-owned variable with a default (overridable on
 // any ancestor or on the header itself), never the height of what the slots hold: empty slots, slots filled after
-// the mount and a long text leave it unchanged. The border is drawn below that height.
+// the mount and a long text leave it unchanged. The variable is the whole footprint, its bottom rule included (the
+// package ships no global box-sizing reset, so the box sizing is set here; the same for the navigation and links).
 export const headerClass =
-  'col-span-full row-start-1 flex h-[var(--rop-app-shell-header-height,3.5rem)] min-w-0 items-center gap-3 ' +
+  'col-span-full row-start-1 box-border flex h-[var(--rop-app-shell-header-height,3.5rem)] min-w-0 items-center gap-3 ' +
   'border-0 border-b border-solid border-rop-border bg-rop-surface px-4';
 // The three parts of the header. Every part shrinks (zero minimum): a long text inside a truncating child is cut
-// at the real width of its part, never pushes the page wider. The middle part takes the free room, so the end
-// part stays at the end even when the others are empty.
+// at the real width of its part, never pushes the page wider. Every part starts from the width of its content and,
+// when the row is short of room, the three shrink in proportion to it: none of them is squeezed to nothing while
+// the others keep their text (a middle part with a zero basis would vanish on a phone). The middle part also takes
+// the free room, so the end part stays at the end even when the others are empty.
 export const headerStartClass = 'flex min-w-0 shrink items-center gap-2';
-export const headerCenterClass = 'flex min-w-0 flex-1 items-center justify-center gap-2';
+export const headerCenterClass = 'flex min-w-0 flex-auto items-center justify-center gap-2';
 export const headerEndClass = 'flex min-w-0 shrink items-center justify-end gap-2';
 
 // The navigation: second row, first column, a set width (component-owned variable with a default). Below the
 // breakpoint it is not displayed and the content takes the whole width. It scrolls on its own only when its links
 // are taller than the room it has; it never scrolls with the content.
 export const navClass =
-  'col-start-1 row-start-2 hidden min-h-0 w-[var(--rop-app-shell-nav-width,16rem)] overflow-y-auto overflow-x-hidden ' +
+  'col-start-1 row-start-2 box-border hidden min-h-0 w-[var(--rop-app-shell-nav-width,16rem)] overflow-y-auto overflow-x-hidden ' +
   'border-0 border-e border-solid border-rop-border bg-rop-surface-subtle min-[64rem]:block';
 export const navListClass = 'm-0 flex list-none flex-col gap-0.5 p-2';
 export const navItemClass = 'flex min-w-0 flex-col';
@@ -48,7 +51,7 @@ export const navItemClass = 'flex min-w-0 flex-col';
 // box, so the scroll container of the navigation never clips it). Hover and pressed feedback only on a link that
 // can be followed.
 export const navLinkClass =
-  'relative m-0 flex min-h-10 min-w-0 items-center gap-2 rounded-rop-md border-0 bg-transparent px-3 py-2 ' +
+  'relative m-0 box-border flex min-h-10 min-w-0 items-center gap-2 rounded-rop-md border-0 bg-transparent px-3 py-2 ' +
   'text-start font-rop-sans text-rop-body text-rop-text no-underline ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px]';
 export const navLinkEnabledClass =

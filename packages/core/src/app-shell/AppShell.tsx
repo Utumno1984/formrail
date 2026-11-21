@@ -101,8 +101,8 @@ export interface AppShellProps extends HTMLAttributes<HTMLDivElement> {
  *   them (a router outlet) needs `height: 100%`; without it the floorplan grows with its rows and `AppShellMain`
  *   scrolls instead (still one scroller, but the List Report's own scroll restoration and the Object Page's save
  *   bar at the bottom of the window are lost).
- * - **Stable footprint**: the header's height is `--rop-app-shell-header-height` (default 3.5rem, plus a 1px rule
- *   below) and the navigation's width is `--rop-app-shell-nav-width` (default 16rem, plus a 1px rule), set on any
+ * - **Stable footprint**: the header's height is `--rop-app-shell-header-height` (default 3.5rem, its 1px rule
+ *   included) and the navigation's width is `--rop-app-shell-nav-width` (default 16rem, rule included), set on any
  *   ancestor to change them. Neither depends on what the slots hold: empty slots, slots filled after the mount (a
  *   user loaded asynchronously) and long texts leave the content where it is.
  * - **Breakpoint**: from 64rem (1024px with the default font size) the navigation is a column beside the content;
