@@ -214,3 +214,13 @@ export type {
 export { AppLauncher } from './app-shell/AppLauncher';
 export type { AppLauncherProps, AppLauncherLabels, AppLauncherTileElement } from './app-shell/AppLauncher';
 export type { AppDescriptor } from './app-shell/types';
+export { AppShell, AppShellHeader, AppShellMain, AppShellNav, AppShellNavLink } from './app-shell/AppShell';
+export type {
+  AppShellProps,
+  AppShellLabels,
+  AppShellHeaderProps,
+  AppShellNavProps,
+  AppShellNavLinkProps,
+  AppShellNavLinkElement,
+  AppShellMainProps,
+} from './app-shell/AppShell';

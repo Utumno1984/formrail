@@ -22,6 +22,26 @@
       "baseline": 34569,
       "limit": 38026
     },
+    "AppShell": {
+      "baseline": 11390,
+      "limit": 12530
+    },
+    "AppShellHeader": {
+      "baseline": 11040,
+      "limit": 12145
+    },
+    "AppShellMain": {
+      "baseline": 11100,
+      "limit": 12211
+    },
+    "AppShellNav": {
+      "baseline": 11084,
+      "limit": 12193
+    },
+    "AppShellNavLink": {
+      "baseline": 33010,
+      "limit": 36311
+    },
     "Avatar": {
       "baseline": 11901,
       "limit": 13092
