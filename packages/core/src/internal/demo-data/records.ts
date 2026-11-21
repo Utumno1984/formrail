@@ -171,8 +171,8 @@ const SENTENCES = [
 ];
 
 const ITEM_LABELS = [
-  'Setup', 'Review', 'Handling', 'Extra copy', 'Revision', 'Packaging', 'Delivery', 'Assembly', 'Training', 'Consulting',
-  'Inspection', 'Repair', 'Upgrade', 'Cleaning', 'Transport', 'Storage fee',
+  'Setup', 'Review', 'Handling', 'Extra copy', 'Revision', 'Part', 'Step', 'Assembly', 'Extra', 'Consulting',
+  'Inspection', 'Repair', 'Upgrade', 'Cleaning', 'Adjustment', 'Service fee',
 ];
 const TAGS = ['urgent', 'internal', 'draft', 'reviewed', 'recurring', 'external', 'priority', 'archived-soon', 'pilot', 'seasonal'];
 const NOTES = [
