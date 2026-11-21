@@ -143,9 +143,42 @@ describe('AppLauncher extra groups: structure', () => {
   });
 
   it('no non-DOM prop leaks on the region', () => {
-    setup();
+    setup({ groupHeadingLevel: 3 });
     const nav = screen.getByRole('navigation');
-    for (const attr of ['extragroups', 'onextraitemactivate']) expect(nav.hasAttribute(attr)).toBe(false);
+    for (const attr of ['extragroups', 'onextraitemactivate', 'groupheadinglevel']) expect(nav.hasAttribute(attr)).toBe(false);
+  });
+
+  it('without groupHeadingLevel the label of a group is not a heading', () => {
+    setup();
+    expect(screen.queryAllByRole('heading')).toHaveLength(0);
+  });
+
+  it.each([2, 3, 4, 5, 6] as const)('groupHeadingLevel %i: each group label is an <h%i> that still names its list', (level) => {
+    setup({ groupHeadingLevel: level });
+    const headings = screen.getAllByRole('heading', { level });
+    expect(headings.map((h) => h.textContent)).toEqual(['More modules', 'Other entries']);
+    for (const heading of headings) expect(heading.tagName).toBe(`H${level}`);
+    const list = listNamed('More modules');
+    expect(list.getAttribute('aria-labelledby')).toBe(headings[0]!.id);
+    // The heading draws like the plain label: no margin, the body text, cut inside the region.
+    expect(headings[0]!.className.split(' ')).toEqual(expect.arrayContaining(['m-0', 'min-w-0', 'text-rop-body']));
+    expect(headings[0]!.firstElementChild!.className.split(' ')).toEqual(expect.arrayContaining(['max-w-full', 'overflow-hidden', 'text-ellipsis']));
+  });
+
+  it('a groupHeadingLevel outside 2..6 (a value not allowed by the type): no heading, the plain label', () => {
+    for (const level of [1, 7, 0, Number.NaN, '3']) {
+      const { unmount } = setup({ groupHeadingLevel: level as never });
+      expect(screen.queryAllByRole('heading')).toHaveLength(0);
+      expect(listNamed('More modules')).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('groupHeadingLevel with no group to show: nothing changes', () => {
+    const { container, rerender } = render(<AppLauncher apps={APPS} />);
+    const plain = container.innerHTML;
+    rerender(<AppLauncher apps={APPS} groupHeadingLevel={2} extraGroups={[]} />);
+    expect(container.innerHTML).toBe(plain);
   });
 });
 
@@ -440,6 +473,20 @@ describe('AppLauncher extra groups: the focus when the lists change', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Module X' }));
     update({ groups: GROUPS });
     expect(document.activeElement).toBe(itemTile('Module X'));
+  });
+
+  it('an item with the id of an app survives that app: the focus moves to the item, not to the region', () => {
+    // The keys of the items are apart from those of the apps: the tile of the app `x` going away must not take the
+    // item `x` out of the tiles the focus can move to.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const apps: AppDescriptor[] = [
+      { id: 'a', label: 'App a', href: '/a' },
+      { id: 'x', label: 'App x', href: '/x' },
+    ];
+    const update = mount(apps, [{ id: 'g', label: 'Group g', items: [{ id: 'x', label: 'Item x', href: '/item-x' }] }]);
+    screen.getByRole('link', { name: 'App a' }).focus();
+    update({ apps: [] });
+    expect(document.activeElement).toBe(itemTile('Item x'));
   });
 
   it('groups that arrive after the mount do not move the focus on an app', () => {

@@ -30,6 +30,7 @@ describe('AppLauncher: markup without extra groups', () => {
     const labels = { ...props.labels, appsGroup: 'Not used' };
     for (const extraGroups of [undefined, [], [{ id: 'empty', label: 'Empty', items: [] }]]) {
       expect(renderToStaticMarkup(<AppLauncher {...props} extraGroups={extraGroups} labels={labels} onExtraItemActivate={() => {}} />)).toBe(plain);
+      expect(renderToStaticMarkup(<AppLauncher {...props} extraGroups={extraGroups} groupHeadingLevel={3} />)).toBe(plain);
     }
   });
 });

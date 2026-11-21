@@ -12,4 +12,5 @@ optional neutral `badge` read as part of the description; they are never disable
 reach `onNavigate`, and an app never reaches `onExtraItemActivate`. A group without items is not shown, the groups are
 not shown while `loading`, and without groups to show the markup is unchanged. `AppDescriptor` is unchanged. Duplicate
 ids (among groups, and among the apps and the items), empty labels and items that do nothing are reported in
-development.
+development. `groupHeadingLevel` (2 to 6, new type `AppLauncherGroupHeadingLevel`) makes the label of each group a heading
+of that level (`<h2>`…`<h6>`), still naming its list; without it the label is plain text.

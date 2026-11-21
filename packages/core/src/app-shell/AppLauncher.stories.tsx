@@ -158,6 +158,12 @@ const meta: Meta<DemoArgs> = {
       control: 'text',
       description: '`badge` of the first item of each extra group; empty or only spaces: no badge.',
     }),
+    // A union of levels: a select; "(none)" leaves the prop out (the labels are plain text).
+    groupHeadingLevel: {
+      control: 'select',
+      options: ['(none)', '2', '3', '4', '5', '6'],
+      mapping: { '(none)': undefined, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6 },
+    },
   },
   args: {
     count: 4,
@@ -415,15 +421,20 @@ export const ExtraItemOpensDialog: Story = {
   parameters: { controls: { disable: true } },
   render: function Render(args) {
     const [open, setOpen] = useState<AppLauncherExtraItem | null>(null);
+    const [activations, setActivations] = useState(0);
     return (
-      <div style={frame}>
+      <div style={{ ...frame, display: 'grid', gap: 12 }}>
         <AppLauncher
           {...launcherProps(args)}
           onExtraItemActivate={(item, group, event) => {
             args.onExtraItemActivate(item, group, event);
+            setActivations((n) => n + 1);
             setOpen(item);
           }}
         />
+        <p data-testid="activations" style={{ margin: 0 }}>
+          Items activated: {activations}
+        </p>
         <Dialog open={open !== null} onOpenChange={(next) => (next ? undefined : setOpen(null))}>
           <DialogContent>
             <DialogHeader>
@@ -439,7 +450,7 @@ export const ExtraItemOpensDialog: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
-    const y = canvas.getByRole('button', { name: 'Module Y' });
+    const y = canvas.getByRole(args.extraWithHref ? 'link' : 'button', { name: 'Module Y' });
     y.focus();
     await userEvent.keyboard('{Enter}');
     const dialog = await body.findByRole('dialog', { name: 'Module Y' });
@@ -453,19 +464,27 @@ export const ExtraItemOpensDialog: Story = {
 };
 
 const LONG_GROUP_LABEL = 'Help and information about every app of this space, and how to reach the people who run it';
+const LONG_DESCRIPTION =
+  'Learn what module X adds to the apps you already use, how it is set up, who can turn it on, and where to find its guide';
 
 /**
  * The extra groups change while the user is on the launcher: "Show the extra groups" adds them after the mount (the
  * apps do not move), "Remove More modules in 1 s" takes the first group away a second later, "Remove the last group
  * in 1 s" the last one. If one of its items has the focus then, the focus moves to the next tile, or to the previous
- * one when there is none after it, never to the page. The second group has a long label, cut with an ellipsis.
+ * one when there is none after it, never to the page. The second group has a long label, cut with an ellipsis; Module X
+ * has a long description over its badge, cut to one line so that the badge stays inside the tile.
  */
 export const ExtraGroupsChange: Story = {
   args: { count: 4, disabledApp: 0, extraGroupCount: 2 },
   parameters: { controls: { disable: true } },
   render: function Render(args) {
     const props = launcherProps(args);
-    const all = (props.extraGroups ?? []).map((group, i) => (i === 1 ? { ...group, label: LONG_GROUP_LABEL } : group));
+    // The second group has a long label; the first item (with the badge) a description far longer than its line.
+    const all = (props.extraGroups ?? []).map((group, i) =>
+      i === 1
+        ? { ...group, label: LONG_GROUP_LABEL }
+        : { ...group, items: group.items.map((item, j) => (j === 0 ? { ...item, description: LONG_DESCRIPTION } : item)) },
+    );
     const [groups, setGroups] = useState<readonly AppLauncherExtraGroup[]>([]);
     // The id of the group to remove a second later.
     const [pending, setPending] = useState<string | null>(null);

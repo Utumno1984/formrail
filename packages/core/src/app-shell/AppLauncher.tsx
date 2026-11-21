@@ -53,7 +53,10 @@ export const DEFAULT_LABELS: AppLauncherLabels = {
 /** Placeholders shown while loading when there is no list yet and no `loadingCount`. */
 const DEFAULT_LOADING_COUNT = 4;
 
-/** The element an app's tile is rendered as: a link with an `href`, a button without one. */
+/**
+ * The element a tile is rendered as, for an app and for an item of `extraGroups` alike: a link with an `href`, a
+ * button without one.
+ */
 export type AppLauncherTileElement = HTMLAnchorElement | HTMLButtonElement;
 
 export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
@@ -84,7 +87,8 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
   /**
    * Number of placeholder tiles while `loading`: pass the number of apps you expect, so that the region keeps its
    * height when they arrive. Default: the number of `apps` already known, or 4 when there are none. A value that is
-   * not a finite integer of at least 0 (`2.5`, `-1`, `NaN`, `Infinity`) is ignored: the default is used.
+   * not a finite integer of at least 0 (`2.5`, `-1`, `NaN`, `Infinity`) is ignored: the default is used. The items
+   * of `extraGroups` are not counted: the groups are not shown while loading and appear under the apps with them.
    */
   loadingCount?: number;
   /**
@@ -111,6 +115,13 @@ export interface AppLauncherProps extends Omit<HTMLAttributes<HTMLElement>, 'chi
     group: AppLauncherExtraGroup,
     event: MouseEvent<AppLauncherTileElement>,
   ) => void;
+  /**
+   * Level (2 to 6) of a heading element (`<h2>`…`<h6>`) around the label of each extra group, so that the groups can
+   * be reached by heading navigation: pass the level that fits the outline of your page. The label keeps its look and
+   * still names its list. Without it, or with another value, the label is plain text that names its list (the
+   * launcher does not know the outline of the page it is in).
+   */
+  groupHeadingLevel?: AppLauncherGroupHeadingLevel;
   /** Texts for localization; every key falls back to the English default. */
   labels?: Partial<AppLauncherLabels>;
 }
@@ -345,6 +356,15 @@ function renderTile(t: TileParts) {
 // the list (`aria-labelledby`), which is what a screen reader announces when it enters the list.
 const GROUP = 'mt-6 flex min-w-0 flex-col gap-2';
 const GROUP_LABEL = 'block max-w-full font-semibold text-rop-text-muted';
+// The heading around the label (`groupHeadingLevel`): no margin and the body text, whatever the level, so that a
+// heading draws exactly like the plain label.
+const GROUP_HEADING = 'm-0 min-w-0 font-rop-sans text-rop-body font-semibold';
+
+/** The level of the group headings: 2 to 6, anything else is no heading (the plain label). */
+export type AppLauncherGroupHeadingLevel = 2 | 3 | 4 | 5 | 6;
+
+const headingTagOf = (level: unknown): 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | undefined =>
+  level === 2 || level === 3 || level === 4 || level === 5 || level === 6 ? `h${level}` : undefined;
 
 /**
  * The choice of an app in a product made of several apps behind one login: a grid of tiles, one per app, from a
@@ -368,6 +388,7 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
     loadingCount,
     extraGroups,
     onExtraItemActivate,
+    groupHeadingLevel,
     labels: labelsProp,
     className,
     'aria-label': ariaLabel,
@@ -474,6 +495,7 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
     runTileRule(event, item.href, (e) => onExtraItemActivate(item, group, e));
   };
   const hasGroups = groups.length > 0;
+  const HeadingTag = headingTagOf(groupHeadingLevel);
 
   const count = loading ? placeholderCount(loadingCount, apps.length) : 0;
 
@@ -566,9 +588,16 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
           const labelId = `${baseId}-g${g}-label`;
           return (
             <div key={groupKeys[g]} data-rop-app-launcher-group="" className={GROUP}>
-              <TruncatedText as="div" id={labelId} className={GROUP_LABEL}>
-                {group.label}
-              </TruncatedText>
+              {HeadingTag ? (
+                // A real heading when the consumer says which level fits the page; the list keeps its name from it.
+                <HeadingTag id={labelId} className={GROUP_HEADING}>
+                  <TruncatedText className={GROUP_LABEL}>{group.label}</TruncatedText>
+                </HeadingTag>
+              ) : (
+                <TruncatedText as="div" id={labelId} className={GROUP_LABEL}>
+                  {group.label}
+                </TruncatedText>
+              )}
               <ul className={GRID} aria-labelledby={labelId}>
                 {group.items.map((item, i) => {
                   const key = itemKeys[g]![i]!;

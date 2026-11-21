@@ -136,6 +136,82 @@ test.describe('Navigation/AppLauncher: extra groups', () => {
     expect((await clicks(page)).at(-1)).toBe('app:two:prevented');
   });
 
+  test('the callback itself: once per Enter and per plain click on a link item, never for Ctrl/Cmd+click or an app', async ({
+    page,
+    context,
+  }) => {
+    // The dialog story counts the calls of its `onExtraItemActivate` on the page (Actions cannot be read here).
+    await gotoStory(page, `${ID}extra-item-opens-dialog`, 'extraWithHref:!true');
+    const counter = page.getByTestId('activations');
+    // The play function activated Module Y once.
+    await expect(counter).toHaveText('Items activated: 1');
+    const url = page.url();
+    const x = page.getByRole('link', { name: 'Module X' });
+    const dialog = page.getByRole('dialog', { name: 'Module X' });
+    await x.focus();
+    await page.keyboard.press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(counter).toHaveText('Items activated: 2');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await x.click();
+    await expect(dialog).toBeVisible();
+    await expect(counter).toHaveText('Items activated: 3');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+    const tab = context.waitForEvent('page');
+    await x.click({ modifiers: [modifier] });
+    await (await tab).close();
+    await page.getByRole('link', { name: 'App one' }).click();
+    await expect(counter).toHaveText('Items activated: 3');
+    await expect(dialog).toHaveCount(0);
+    expect(page.url()).toBe(url);
+  });
+
+  test('a long description with a badge: cut so that the description and the badge stay inside the tile', async ({ page }) => {
+    for (const [, width, height] of VIEWPORTS) {
+      await page.setViewportSize({ width, height });
+      await gotoStory(page, `${ID}extra-groups-change`);
+      await page.getByRole('button', { name: 'Show the extra groups' }).click();
+      const x = page.getByRole('link', { name: 'Module X' });
+      await expect(x).toHaveAccessibleDescription(/^Learn what module X adds to the apps .* New$/);
+      const m = await x.evaluate((tile) => {
+        const t = tile.getBoundingClientRect();
+        const style = getComputedStyle(tile);
+        const innerBottom = t.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom);
+        const details = tile.closest('li')!.querySelector('[data-rop-app-details]')!;
+        const badge = details.querySelector('[data-rop-app-launcher-badge]')!;
+        return { innerBottom, details: details.getBoundingClientRect().bottom, badge: badge.getBoundingClientRect().bottom };
+      });
+      expect(m.details, `${width}px: details bottom ${m.details} vs inner bottom ${m.innerBottom}`).toBeLessThanOrEqual(m.innerBottom + 0.5);
+      expect(m.badge, `${width}px`).toBeLessThanOrEqual(m.innerBottom + 0.5);
+    }
+  });
+
+  test('groupHeadingLevel: each group label is a heading of that level that names its list', async ({ page }) => {
+    await gotoStory(page, `${ID}apps`, 'extraGroupCount:2;groupHeadingLevel:3');
+    const nav = page.getByRole('navigation', { name: 'Apps' });
+    await expect(nav.getByRole('heading', { level: 3 })).toHaveText(['More modules', 'Help and information']);
+    await expect(nav.getByRole('list', { name: 'More modules' })).toBeVisible();
+    // The heading draws like the plain label: same height and font size.
+    const heading = await nav.getByRole('heading', { name: 'More modules' }).evaluate((el) => ({
+      size: getComputedStyle(el).fontSize,
+      margin: getComputedStyle(el).marginTop,
+      height: el.getBoundingClientRect().height,
+    }));
+    await gotoStory(page, `${ID}apps`, 'extraGroupCount:2');
+    await expect(nav.getByRole('heading')).toHaveCount(0);
+    const label = await nav.getByText('More modules', { exact: true }).evaluate((el) => ({
+      size: getComputedStyle(el).fontSize,
+      height: el.getBoundingClientRect().height,
+    }));
+    expect(heading).toEqual({ size: label.size, margin: '0px', height: label.height });
+    await gotoStory(page, `${ID}apps`, 'extraGroupCount:2;groupHeadingLevel:3');
+    await expect(nav.getByRole('heading', { level: 3 })).toHaveCount(2);
+    await expectNoA11yViolations(page);
+  });
+
   test('Ctrl/Cmd/Shift+click and middle click on an item with an href: native, the href opens, the callback is not called', async ({
     page,
     context,
