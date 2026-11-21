@@ -4,7 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
 import { exampleStory } from '../internal/example-story';
-import { CLASS_NAME_ARG, storyControl, withoutControls } from '../internal/story-docs';
+import { storyControl, withoutControls } from '../internal/story-docs';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
 import { AppSwitcher, type AppSwitcherProps } from './AppSwitcher';
 import type { AppDescriptor } from './types';
@@ -64,7 +64,7 @@ const meta: Meta<DemoArgs> = {
       mapping: { '(none)': undefined },
     },
     labels: { control: 'object' },
-    className: CLASS_NAME_ARG,
+    className: { control: 'text' },
     ...withoutControls('apps'),
     onNavigate: { control: false },
     disabledApp: storyControl({
