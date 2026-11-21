@@ -14,8 +14,9 @@
 //   radius-literal   a `border-radius` (or `borderRadius`) that is not a `var(--radius-rop-*)`/`inherit`, and `rounded-[...]`
 //   outline-color    an `outline` whose colour is not `var(--color-rop-*)`, `currentColor`, `transparent` or `inherit`
 //   named-color     a CSS named colour (`red`, `black`) in a colour property (also text-decoration, gradients, stop-color, scrollbar-color,
-//                   -webkit-text-stroke), a custom property (`--_cs-tone: orange`), a ternary/`&&` in a TS style object, `fill`/`stroke`,
-//                   a `bg-[red]`-style utility, color-mix(), a gradient or drop-shadow()
+//                   -webkit-text-stroke), a custom property (`--_cs-tone: orange`), `fill`/`stroke`, a `bg-[red]`-style utility,
+//                   color-mix(), a gradient or drop-shadow(). In TS/TSX the style objects are read on the TypeScript AST:
+//                   every branch of a value (ternary, `&&`/`||`/`??`, parentheses, computed key) whatever the formatting
 //   spacing-literal  an arbitrary px/rem spacing utility off the Tailwind scale (`p-[13px]`); `p-4` is fine
 //   unknown-token    a `var(--color-rop-x)` (or `--radius-rop-*`, `--text-rop-*`, ...) that `tokens.css` does not declare
 //   allowlist        an allowlist entry without a reason, or one that no longer matches anything
@@ -25,6 +26,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PRO_SRC = 'packages/pro/src';
@@ -95,30 +97,96 @@ const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
 const CUSTOM_PROP = `--[\\w-]+["']?`;
 
-/** End index of the JS expression that starts at `from` (top-level `,` `;` or closing bracket; newlines continue a ternary/`&&`). */
-function exprEnd(text, from) {
-  let depth = 0;
-  let quote = null;
-  for (let i = from; i < text.length; i++) {
-    const ch = text[i];
-    if (quote) {
-      if (ch === '\\') i++;
-      else if (ch === quote) quote = null;
-    } else if (ch === '"' || ch === "'" || ch === '`') quote = ch;
-    else if ('([{'.includes(ch)) depth++;
-    else if (')]}'.includes(ch)) {
-      if (--depth < 0) return i;
-    } else if (depth === 0 && (ch === ',' || ch === ';')) return i;
-    else if (depth === 0 && ch === '\n' && !/^\s*[?:&|]/.test(text.slice(i + 1, i + 40))) return i;
-  }
-  return text.length;
-}
-
 /** The colour of an `outline` value is acceptable when it names a core token or a neutral keyword. */
 function outlineColorOk(value) {
   if (/var\(\s*--color-rop-[\w-]+\s*\)/.test(value)) return true;
   const words = value.trim().split(/[\s_]+/);
   return words.some((w) => ACCEPTED_COLOR_WORDS.test(w)) || /^(none|0)$/.test(value.trim());
+}
+
+// TS/TSX style objects are read through the TypeScript AST, not by regex on lines (#614 round 2): a value may be
+// split by Prettier anywhere (`ok &&⏎ 'red'`, `err ?⏎ 'red' :⏎ 'green'`), nested (`a ? (b ? 'red' : 'blue') : 'green'`)
+// or sit behind a computed key (`['--x']: 'red'`). The AST sees the same expression whatever the formatting.
+const COLOR_PROP_NAME = new RegExp(`^(?:${COLOR_PROPS})$`);
+const CUSTOM_PROP_NAME = /^--[\w-]+$/;
+const OUTLINE_PROP_NAME = /^outline(?:-color|Color)?$/;
+const SVG_PAINT_ATTR = /^(?:fill|stroke)$/;
+const VALUE_OPERATORS = new Set([ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.PlusToken]);
+
+/** The static name of an object key: `color`, `'--x'`, `` `--x` ``, `['--x']`, `` [`--x`] ``; null when it is computed from a variable. */
+function keyName(name) {
+  let n = ts.isComputedPropertyName(name) ? name.expression : name;
+  while (ts.isParenthesizedExpression(n)) n = n.expression;
+  return ts.isIdentifier(n) || ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n) ? n.text : null;
+}
+
+/**
+ * What a property value can evaluate to: the string/template literals (`{ at, text, whole?, inTemplate? }`, `at` = index
+ * of the first character of `text` in the source; a template with substitutions gives its head with `whole` = the full raw
+ * template, then its other pieces with `inTemplate`) and the bare identifiers (`{ at, text }`). Walks the branches of ternaries, `&&`/`||`/`??`/`+`, parentheses, casts, `{...}[key]`
+ * maps, arrays and call arguments at any depth; never the condition of a ternary, nor a callee.
+ */
+function valueLeaves(sf, node, out = { literals: [], identifiers: [] }) {
+  const src = sf.text;
+  const piece = (lit, closer) => {
+    const start = lit.getStart(sf) + 1;
+    return { at: start, text: src.slice(start, lit.end - closer) };
+  };
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) out.literals.push(piece(node, 1));
+  else if (ts.isNumericLiteral(node)) out.literals.push({ at: node.getStart(sf), text: node.getText(sf) });
+  else if (ts.isTemplateExpression(node)) {
+    const whole = piece(node, 1).text;
+    out.literals.push({ ...piece(node.head, 2), whole });
+    for (const span of node.templateSpans) {
+      valueLeaves(sf, span.expression, out);
+      out.literals.push({ ...piece(span.literal, ts.isTemplateTail(span.literal) ? 1 : 2), inTemplate: true });
+    }
+  } else if (ts.isIdentifier(node)) out.identifiers.push({ at: node.getStart(sf), text: node.text });
+  else if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node) || ts.isNonNullExpression(node) || ts.isTypeAssertionExpression(node)) {
+    valueLeaves(sf, node.expression, out);
+  } else if (ts.isConditionalExpression(node)) {
+    valueLeaves(sf, node.whenTrue, out);
+    valueLeaves(sf, node.whenFalse, out);
+  } else if (ts.isBinaryExpression(node)) {
+    if (VALUE_OPERATORS.has(node.operatorToken.kind)) valueLeaves(sf, node.left, out);
+    if (VALUE_OPERATORS.has(node.operatorToken.kind) || node.operatorToken.kind === ts.SyntaxKind.CommaToken) valueLeaves(sf, node.right, out);
+  } else if (ts.isElementAccessExpression(node)) valueLeaves(sf, node.expression, out);
+  else if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+    // `color: tone('red')`: a colour literal handed to a helper still ends up in the style (the callee is not judged).
+    for (const a of node.arguments ?? []) valueLeaves(sf, a, out);
+  } else if (ts.isObjectLiteralExpression(node)) {
+    for (const p of node.properties) if (ts.isPropertyAssignment(p)) valueLeaves(sf, p.initializer, out);
+  } else if (ts.isArrayLiteralExpression(node)) {
+    for (const e of node.elements) valueLeaves(sf, ts.isSpreadElement(e) ? e.expression : e, out);
+  } else if (ts.isJsxExpression(node) && node.expression) valueLeaves(sf, node.expression, out);
+  return out;
+}
+
+/**
+ * The colour-bearing properties of a TS/TSX source, from its AST: `[{ kind, name, leaves }]`, `kind` = 'color'
+ * (colour property, custom property, SVG `fill`/`stroke` attribute) or 'outline'; `name` = `[start, end)` of the key.
+ */
+function styleProperties(file, source) {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const props = [];
+  const visit = (node) => {
+    let key = null;
+    let value = null;
+    if (ts.isPropertyAssignment(node)) {
+      key = keyName(node.name);
+      value = node.initializer;
+    } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && SVG_PAINT_ATTR.test(node.name.text) && node.initializer) {
+      key = node.name.text;
+      value = node.initializer;
+    }
+    if (key !== null) {
+      const kind = COLOR_PROP_NAME.test(key) || CUSTOM_PROP_NAME.test(key) ? 'color' : OUTLINE_PROP_NAME.test(key) ? 'outline' : null;
+      if (kind) props.push({ kind, name: [node.name.getStart(sf), node.name.end], leaves: valueLeaves(sf, value) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return props;
 }
 
 /**
@@ -150,24 +218,35 @@ export function checkSource(file, source, tokens) {
     add(m.index, 'radius-literal', m[0], `arbitrary radius "${m[0]}": use a rounded-rop-* class`);
   }
 
+  // TS/TSX: the style objects are judged on the AST (`styleProperties`); the regexes below keep covering what is not an
+  // object property (CSS inside a string, a Tailwind arbitrary value, a type literal) and skip the keys the AST judged.
+  const props = kind === 'ts' ? styleProperties(file, source) : [];
+  const inJudgedKey = (index) => props.some(({ name: [start, end] }) => index >= start && index < end);
+  const outlineMessage = (v) => `outline "${v}": the colour must be var(--color-rop-*) or currentColor`;
+
   // `outline: 2px solid red`, `outlineColor: "red"`, `outline: \`...\``: the value may sit inside quotes (TS style objects).
   for (const m of text.matchAll(/(?<![\w-])outline(?:-color|Color)?\s*:\s*(["'`]?)([^;}\n"'`\]]*)/g)) {
+    if (inJudgedKey(m.index)) continue;
     const value = m[2].trim();
     if (!value) continue;
-    if (kind === 'ts' && m[1] === '') {
-      const from = m.index + m[0].length;
-      // `outline: f ? '2px solid red' : 'none'`: only the string literals can carry a colour; judge those.
-      if (/\?|&&|\|\|/.test(value) && /["'`]/.test(text[from] ?? '')) {
-        for (const lit of text.slice(from, exprEnd(text, from)).matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g)) {
-          const v = lit[2].trim();
-          if (v && !outlineColorOk(v)) add(from + lit.index + 1, 'outline-color', v, `outline "${v}": the colour must be var(--color-rop-*) or currentColor`);
-        }
-        continue;
-      }
-      // `outline: ring`: an identifier, no literal to judge.
-      if (/^[A-Za-z_$][\w$.]*$/.test(value) && !NAMED_COLOR_WORD.test(value) && !OUTLINE_KEYWORD.test(value)) continue;
+    // `outline: ring`: an identifier, no literal to judge.
+    if (kind === 'ts' && m[1] === '' && /^[A-Za-z_$][\w$.]*$/.test(value) && !NAMED_COLOR_WORD.test(value) && !OUTLINE_KEYWORD.test(value)) continue;
+    if (!outlineColorOk(value)) add(m.index, 'outline-color', value, outlineMessage(value));
+  }
+  const outlineSeen = new Set();
+  for (const { kind: k, leaves } of props) {
+    if (k !== 'outline') continue;
+    // Only the literals can carry a colour (`outline: f ? '2px solid red' : 'none'`), a template judged whole; a bare
+    // identifier counts only when it spells a colour or an outline keyword (`outline: red`, an unquoted value).
+    const judged = [
+      ...leaves.literals.filter((l) => !l.inTemplate).map((l) => ({ at: l.at, value: (l.whole ?? l.text).trim() })),
+      ...leaves.identifiers.filter((i) => NAMED_COLOR_WORD.test(i.text) || OUTLINE_KEYWORD.test(i.text)).map((i) => ({ at: i.at, value: i.text })),
+    ];
+    for (const { at, value } of judged) {
+      if (!value || outlineSeen.has(at) || outlineColorOk(value)) continue;
+      outlineSeen.add(at);
+      add(at, 'outline-color', value, outlineMessage(value));
     }
-    if (!outlineColorOk(value)) add(m.index, 'outline-color', value, `outline "${value}": the colour must be var(--color-rop-*) or currentColor`);
   }
 
   // Named colours (`red`, `black`) only where a colour lives: colour properties, fill/stroke, Tailwind arbitrary colour
@@ -181,19 +260,19 @@ export function checkSource(file, source, tokens) {
       add(at, 'named-color', n[0].toLowerCase(), `named colour "${n[0]}": use a --color-rop-* token`);
     }
   };
+  for (const { kind: k, leaves } of props) {
+    if (k !== 'color') continue;
+    for (const l of leaves.literals) addNamed(l.at, l.text);
+    // `color: red` unquoted: an identifier that spells a colour is one; any other identifier is not judged.
+    for (const i of leaves.identifiers) if (NAMED_COLOR_WORD.test(i.text)) addNamed(i.at, i.text);
+  }
   const propValue = kind === 'css' ? '([^;}\\]]*)' : `(?:"([^"\\n]*)"|'([^'\\n]*)'|\`([^\`]*)\`|([^;},"'\`\\]\\n]*))`;
   // Custom properties are colour carriers too: `--_cs-tone: orange;`.
   for (const prefix of [COLOR_PROPS, CUSTOM_PROP]) {
     for (const m of text.matchAll(new RegExp(`(?<![\\w-])(?:${prefix})\\s*:\\s*${propValue}`, 'g'))) {
+      if (inJudgedKey(m.index)) continue;
       const value = m.slice(1).find((g) => g !== undefined);
       if (value) addNamed(m.index + m[0].lastIndexOf(value), value);
-      // `color: err ? 'red' : 'green'`, `color: ok && 'red'`: the unquoted head stops at the first quote; judge the rest.
-      const from = m.index + m[0].length;
-      const quoteNext = /(?:\?|&&|\|\||:|\()\s*$/.test(m[4] ?? '') && /["'`]/.test(text[from] ?? '');
-      const operatorNextLine = m[4] !== undefined && /^\s*\n\s*[?:&|]/.test(text.slice(from, from + 80));
-      if (kind === 'ts' && (quoteNext || operatorNextLine)) {
-        addNamed(from, text.slice(from, exprEnd(text, from)));
-      }
     }
   }
   for (const m of text.matchAll(/(?<![\w-])(?:fill|stroke)\s*=\s*\{?\s*["'`]([^"'`]*)["'`]/g)) {

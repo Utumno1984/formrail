@@ -343,3 +343,81 @@ describe('pro style guard: #614 coverage (name list, one test per colour propert
     expect(rules(TSX, `const s = { ${prop}: 'red' };`)).toEqual(['named-color']);
   });
 });
+
+describe('pro style guard: #614 round 2 (TS values read on the AST, whatever the formatting)', () => {
+  // [value, line] of each named-color violation: the line is the one of the literal, not of the key.
+  const named = (source) => checkSource(TSX, source, TOKENS).filter((v) => v.rule === 'named-color').map((v) => [v.value, v.line]);
+
+  it.each([
+    ['&& inline', "const s = { color: ok && 'red' };", [['red', 1]]],
+    ['&& at the end of the line (Prettier)', "const s = {\n  color: ok &&\n    'red',\n};", [['red', 3]]],
+    ['|| at the end of the line (Prettier)', "const s = {\n  color: tone ||\n    'red',\n};", [['red', 3]]],
+    ['?? at the end of the line (Prettier)', "const s = {\n  color: tone ??\n    'red',\n};", [['red', 3]]],
+    ['&& in a long Prettier chain', "const s = {\n  color:\n    isError &&\n    isTouched &&\n    'red',\n};", [['red', 5]]],
+  ])('case 1, %s', (_n, source, expected) => {
+    expect(named(source)).toEqual(expected);
+  });
+
+  it.each([
+    ['? and : at the end of the line', "const s = {\n  color: ok ?\n    'red' :\n    'green',\n};", [['red', 3], ['green', 4]]],
+    ['? and : at the start of the line (Prettier default)', "const s = {\n  color: ok\n    ? 'red'\n    : 'green',\n};", [['red', 3], ['green', 4]]],
+    ['experimental ternaries (Prettier --experimental-ternaries)', "const s = {\n  color:\n    ok ? 'red'\n    : 'green',\n};", [['red', 3], ['green', 4]]],
+  ])('case 2, %s', (_n, source, expected) => {
+    expect(named(source)).toEqual(expected);
+  });
+
+  it.each([
+    ["['--x']", "const s = { ['--x']: 'red' };", [['red', 1]]],
+    ['[`--x`]', "const s = { [`--x`]: 'red' };", [['red', 1]]],
+    ["['--x'] with a ternary", "const s = { ['--x']: err ? 'red' : 'blue' };", [['red', 1], ['blue', 1]]],
+    ["['--x'] (Prettier)", "const s = {\n  ['--x']:\n    err ?\n      'red'\n    : 'blue',\n};", [['red', 4], ['blue', 5]]],
+    ["['backgroundColor'] and a quoted kebab key", "const s = { ['backgroundColor']: 'red', 'border-top-color': 'blue' };", [['red', 1], ['blue', 1]]],
+  ])('case 3, a computed key: %s', (_n, source, expected) => {
+    expect(named(source)).toEqual(expected);
+  });
+
+  it.each([
+    ['with parentheses', "const s = { color: err ? (x ? 'red' : 'blue') : 'green' };", [['red', 1], ['blue', 1], ['green', 1]]],
+    ['as Prettier writes it (parentheses dropped)', "const s = {\n  color: err\n    ? x\n      ? 'red'\n      : 'blue'\n    : 'green',\n};", [['red', 4], ['blue', 5], ['green', 6]]],
+    ['nested in the false branch', "const s = { color: err ? 'green' : (x ? 'red' : 'blue') };", [['green', 1], ['red', 1], ['blue', 1]]],
+  ])('case 4, a nested ternary %s', (_n, source, expected) => {
+    expect(named(source)).toEqual(expected);
+  });
+
+  it('the condition of a ternary and an identifier are not values', () => {
+    expect(rules(TSX, "const s = { color: tone === 'red' ? 'var(--color-rop-error)' : 'inherit' };")).toEqual([]);
+    expect(rules(TSX, "const s = { color: red ? 'var(--color-rop-error)' : 'inherit' };")).toEqual([]);
+    expect(rules(TSX, "const s = {\n  color: ok &&\n    tone,\n  background: ok ?\n    theme.red :\n    fallback,\n};")).toEqual([]);
+    expect(rules(TSX, 'const s = { color: theme.red, borderColor: palette.white };')).toEqual([]);
+  });
+
+  it('a bare identifier that spells a colour is still one', () => {
+    expect(named('const s = { color: red };')).toEqual([['red', 1]]);
+  });
+
+  it('the next property is not swept in, whatever the formatting', () => {
+    expect(rules(TSX, "const s = {\n  color: ok ?\n    'var(--color-rop-error)' :\n    'inherit',\n  label: 'red',\n};")).toEqual([]);
+  });
+
+  it('a value map, a cast, a helper call and a template substitution are read too', () => {
+    expect(named("const s = { color: { error: 'red', ok: 'var(--color-rop-success)' }[tone] };")).toEqual([['red', 1]]);
+    expect(named("const s = { color: ('red' as const) };")).toEqual([['red', 1]]);
+    expect(named("const s = { color: tone(\n  'red',\n) };")).toEqual([['red', 2]]);
+    expect(named("const s = { border: `1px solid ${err ? 'red' : tone}` };")).toEqual([['red', 1]]);
+  });
+
+  it('var(--x, red) is still rejected', () => {
+    expect(named("const s = { color: 'var(--x, red)' };")).toEqual([['red', 1]]);
+  });
+
+  it('fill/stroke on a JSX element, with a multi-line expression', () => {
+    expect(named('const a = (\n  <svg\n    fill={\n      err ?\n        "red"\n      : "none"\n    }\n  />\n);')).toEqual([['red', 5]]);
+  });
+
+  it('outline: only the literals of every branch are judged, whatever the formatting', () => {
+    const outline = (source) => checkSource(TSX, source, TOKENS).filter((v) => v.rule === 'outline-color').map((v) => [v.value, v.line]);
+    expect(outline("const s = {\n  outline: f\n    ? '2px solid red'\n    : 'none',\n};")).toEqual([['2px solid red', 3]]);
+    expect(outline("const s = {\n  outline: f ?\n    '2px solid var(--color-rop-primary)' :\n    'none',\n};")).toEqual([]);
+    expect(outline("const s = {\n  ['outlineColor']:\n    f && 'red',\n};")).toEqual([['red', 3]]);
+  });
+});
