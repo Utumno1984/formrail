@@ -840,7 +840,7 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
 
-  test('four long conflicts, then the keyboard opens on Notes: the notice shrinks to 3rem, Notes ends above the keyboard, uncovered; closing it gives the room back', async ({ page }) => {
+  test('four long conflicts, then the keyboard opens on Notes: the notice shrinks to the keyboard cap (110px), above the 3rem floor, Notes ends above the keyboard, uncovered; closing it gives the room back', async ({ page }) => {
     const order = await editFour(page);
     await blur(page);
     await fourConflicts(page, order);
