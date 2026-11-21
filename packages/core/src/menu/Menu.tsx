@@ -496,6 +496,7 @@ export interface MenuLinkItemProps
   disabled?: boolean;
   /** The text typeahead matches for this item. Default: the item's text content (set it when the content is not plain text). */
   textValue?: string;
+  /** The item's content: its text, which names the link and is what typeahead matches (unless `textValue` is set). */
   children?: ReactNode;
 }
 
