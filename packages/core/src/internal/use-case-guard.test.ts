@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PRO_MIN_USE_CASE_VERTICALS, PRO_USE_CASES_PENDING, auditProRatchet, auditUseCaseStructure, type IndexedStory } from './use-case-guard';
+import { GITHUB_SLUGGER_REMOVED } from './github-slugger-regex';
+import { PRO_MIN_USE_CASE_VERTICALS, PRO_USE_CASES_PENDING, auditProRatchet, auditUseCaseStructure, slugOf, type IndexedStory } from './use-case-guard';
 
 let n = 0;
 const neutral = (title: string, name = 'Default', tags: string[] = []): IndexedStory => ({ id: `s${++n}`, title, name, tags: ['autodocs', ...tags] });
@@ -57,6 +60,59 @@ describe('auditUseCaseStructure (#624)', () => {
     // An internal neutral story does not count: the reader of a public page sees the domain example first.
     const afterHidden = useCase('X/C', 'erp');
     expect(auditUseCaseStructure([neutral('X/C', 'Hidden', ['internal']), afterHidden])).toEqual([expect.stringContaining(`(${afterHidden.id}): no neutral story before the first use case`)]);
+  });
+
+  it('rule: the first story is the first `autodocs` one, the template\'s primary (a use case cannot become it)', () => {
+    // Every neutral story is `!autodocs` (no `autodocs` tag in the index), the use case is the only documented one.
+    const hidden = { ...neutral('X/A', 'Default'), tags: [] as string[] };
+    const uc = useCase('X/A', 'erp');
+    expect(auditUseCaseStructure([hidden, uc])).toEqual([expect.stringContaining(`(${uc.id}): no neutral story before the first use case`)]);
+    // With a documented neutral story before it the page is in order, whatever the hidden ones.
+    expect(auditUseCaseStructure([hidden, neutral('X/A', 'Documented'), uc])).toEqual([]);
+    // A page with no `autodocs` story at all has no Docs page: the first visible story decides, as before.
+    expect(auditUseCaseStructure([hidden, { ...uc, tags: ['use-case', 'vertical:erp'] }])).toEqual([]);
+  });
+
+  it('rule: no neutral story named like the section heading (duplicate id "examples" / "use-cases") on a page with use cases', () => {
+    const clash = neutral('X/A', 'Examples');
+    expect(auditUseCaseStructure([neutral('X/A'), clash, useCase('X/A', 'erp')])).toEqual([expect.stringContaining(`(${clash.id}): a page with use cases cannot have a story named "Examples"`)]);
+    // Same slug from another spelling, and the Pro id.
+    const spelled = neutral('Pro/Z', 'Use Cases!');
+    expect(auditUseCaseStructure([neutral('Pro/Z'), spelled, useCase('Pro/Z', 'erp', 'Example: configured for a Pro thing')])).toContainEqual(expect.stringContaining(`(${spelled.id}): a page with use cases cannot have a story named "Use Cases!"`));
+    // A page without use cases may have such a story: there is no section.
+    expect(auditUseCaseStructure([neutral('X/B', 'Examples')])).toEqual([]);
+    // "Examples" is not the Pro section's id: no clash on a Pro page.
+    expect(auditUseCaseStructure([neutral('Pro/Y', 'Examples'), useCase('Pro/Y', 'erp')]).filter((p) => p.includes('cannot have a story'))).toEqual([]);
+  });
+
+  it.each(['Exam.ples', "Ex'amples", "Example's", 'EXAMPLES'])('rule: "%s" has the slug "examples" in Storybook, so it clashes', (name) => {
+    const clash = neutral('X/A', name);
+    expect(auditUseCaseStructure([neutral('X/A'), clash, useCase('X/A', 'erp')])).toContainEqual(expect.stringContaining(`(${clash.id}): a page with use cases cannot have a story named`));
+  });
+
+  it.each(['Use_Cases', 'Use  Cases', 'examples '])('rule: "%s" does not have the slug of a section heading, so it is not a clash', (name) => {
+    expect(auditUseCaseStructure([neutral('Pro/Z'), neutral('Pro/Z', name), useCase('Pro/Z', 'erp')]).filter((p) => p.includes('cannot have a story'))).toEqual([]);
+    expect(auditUseCaseStructure([neutral('X/A'), neutral('X/A', name), useCase('X/A', 'erp')]).filter((p) => p.includes('cannot have a story'))).toEqual([]);
+  });
+
+  it('rule: the name rule does not apply to a page of one neutral story (no heading is rendered for it)', () => {
+    // `isSingleNeutralStory` pages (one neutral story, then the use cases) show no heading for the neutral story.
+    expect(auditUseCaseStructure([neutral('X/A', 'Examples'), useCase('X/A', 'erp')])).toEqual([]);
+    const pro = useCase('Pro/Z', 'erp');
+    expect(auditUseCaseStructure([neutral('Pro/Z', 'Use cases'), pro], { [pro.id]: good })).toEqual([]);
+  });
+
+  it('slugOf uses the github-slugger regex bundled in the installed Storybook (the copy is verbatim)', () => {
+    const bundle = readFileSync(resolve(process.cwd(), '../../node_modules/@storybook/addon-docs/dist/blocks.js'), 'utf8');
+    const line = bundle.split('\n').find((l) => l.startsWith('var regex = /'));
+    expect(line).toBeDefined();
+    const source = /^var regex = \/(.*)\/g?;?$/.exec(line!.trim());
+    expect(source).not.toBeNull();
+    expect(GITHUB_SLUGGER_REMOVED.source).toBe(new RegExp(source![1]!, 'g').source);
+    const reference = (text: string) => text.toLowerCase().replace(new RegExp(source![1]!, 'g'), '').replace(/ /g, '-');
+    for (const text of ['Exam.ples', "Example's", 'Use_Cases', 'Use  Cases', 'examples ', 'Use Cases!', '\u24b6 Circled']) expect(slugOf(text)).toBe(reference(text));
+    expect(slugOf("Example's")).toBe('examples');
+    expect(slugOf('Use  Cases')).toBe('use--cases');
   });
 
   it('a page made only of fixtures (internal) is checked too: order, verticals and neutral first', () => {
