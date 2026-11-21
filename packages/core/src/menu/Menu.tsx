@@ -12,11 +12,15 @@ import {
   type ComponentPropsWithoutRef,
   type ElementRef,
   type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
+import { flushSync } from 'react-dom';
 import * as RadixMenu from '@radix-ui/react-dropdown-menu';
 import { adjacentTabbable } from '../internal/focus';
+import { isDev } from '../internal/is-dev';
+import { handleNavigationClick, hasNavigableHref } from '../internal/navigation';
 import { useTouchOutsideSwallow } from '../internal/outside-interaction';
 import { composeRefs } from '../utils/compose-refs';
 import { overlayLayer } from '../overlay/layers';
@@ -465,6 +469,88 @@ export const MenuItem = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixMenu.I
         }}
         className={cn(ITEM, tone === 'danger' && ITEM_DANGER, className)}
       />
+    );
+  },
+);
+
+export interface MenuLinkItemProps
+  extends Omit<ComponentPropsWithoutRef<'a'>, 'href' | 'onSelect' | 'children'> {
+  /** Where the item leads: it is rendered as a real `<a href>`. Without one the item is meaningless: use a `MenuItem` for an action. Not rendered while `disabled`. */
+  href: string;
+  /**
+   * Hands a plain click (primary button, no modifier) or Enter to your router instead of the browser: the browser's
+   * navigation is cancelled, the menu closes and the focus is back on the trigger, then `onNavigate` is called once.
+   * A click with Ctrl, Cmd, Shift or Alt, or with another button, is left to the browser (new tab or window) and
+   * never calls it. Never called while `disabled`. If it throws, the menu is already closed and the error propagates.
+   */
+  onNavigate?: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
+  /**
+   * `danger`: marked with a bar besides the colour.
+   * @default 'default'
+   */
+  tone?: MenuItemTone;
+  /**
+   * Skipped by arrow keys and typeahead; has no `href` in the DOM and never navigates nor calls `onNavigate`.
+   * @default false
+   */
+  disabled?: boolean;
+  /** The text typeahead matches for this item. Default: the item's text content (set it when the content is not plain text). */
+  textValue?: string;
+  children?: ReactNode;
+}
+
+const ITEM_LINK = 'text-inherit no-underline';
+
+/**
+ * A navigation item: a `role="menuitem"` rendered as a real `<a href>`. Enter or a click navigates (with the browser,
+ * or through `onNavigate`); Space does nothing, as on any link. Same focus, typeahead and `disabled` rules as `MenuItem`.
+ */
+export const MenuLinkItem = /* @__PURE__ */ forwardRef<HTMLAnchorElement, MenuLinkItemProps>(
+  function MenuLinkItem(props, ref) {
+    const { tone = 'default', disabled, href, onNavigate, textValue, className, onClick, onKeyDown, children, ...rest } = props;
+    const { setOpen, triggerRef, contentRef } = useMenuContext('MenuLinkItem');
+    const missingHref = !disabled && !hasNavigableHref(href);
+    useEffect(() => {
+      if (missingHref && isDev()) {
+        console.error('[formrail] <MenuLinkItem>: an item without an `href` leads nowhere; use a <MenuItem> for an action.');
+      }
+    }, [missingHref]);
+    return (
+      <RadixMenu.Item asChild disabled={disabled} textValue={textValue}>
+        <a
+          {...rest}
+          ref={ref}
+          href={disabled ? undefined : href}
+          data-tone={tone === 'danger' ? 'danger' : undefined}
+          onClick={(event) => {
+            if (disabled) {
+              event.preventDefault();
+              return;
+            }
+            onClick?.(event);
+            // The menu closes and the focus returns to the trigger before the app is told: a dirty-guard called from
+            // `onNavigate` then remembers the trigger as the element to return to.
+            handleNavigationClick(
+              event,
+              onNavigate &&
+                ((navigation) => {
+                  flushSync(() => setOpen(false));
+                  if (!contentRef.current) triggerRef.current?.focus();
+                  onNavigate(navigation);
+                }),
+              { native: hasNavigableHref(href) },
+            );
+          }}
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            // Space does not navigate on a link: Radix would turn it into a click.
+            if (event.key === ' ') event.preventDefault();
+          }}
+          className={cn(ITEM, ITEM_LINK, tone === 'danger' && ITEM_DANGER, className)}
+        >
+          {children}
+        </a>
+      </RadixMenu.Item>
     );
   },
 );

@@ -65,6 +65,7 @@ const EXPORTS = [
   'MenuContent',
   'MenuGroup',
   'MenuItem',
+  'MenuLinkItem',
   'MenuLabel',
   'MenuSeparator',
   'MenuTrigger',
