@@ -175,6 +175,19 @@ it must comply, a page that complies must be removed from it, and an entry that 
 `...PlainNeutral` and `...SingleNeutral`); the Pro branch of the template is covered by unit tests (no internal
 fixture may reach the public Pro demo).
 
+**The neutral-docs guard (#625).** `e2e/docs-neutral.spec.ts` opens every neutral story of every public Docs page (the
+ones left after the `use-case` and `internal` ones; not `Showcase/*`, `Pro/Showcase/*`, the introductions) alone in its
+iframe, waits for its `play`, and reads the whole body (`textContent`, so text out of view counts, with the portals the
+story opened, plus `aria-label`, `placeholder`, `title` and `alt`). It fails when the text holds a term of `DOMAIN_TERMS`
+(`packages/core/src/internal/demo-data/records.ts`), as a whole word in any case **and in the plural**
+(`invoices`, `SKUs`, `support cases`; "Productivity" does not count), naming the story, the term and an excerpt. The prose
+of the page (TSDoc, props table) is not read. Pages not migrated yet are in
+[`scripts/neutral-docs.baseline.json`](scripts/neutral-docs.baseline.json), each with the terms found: a ratchet that
+only shrinks. A page outside it with a term, or a term not listed, fails; a listed page with no term left fails with
+"remove it from the baseline", and so does a term that is gone. There is no command that adds to it: to get out, use a
+generic word, or move the domain into a `use-case` story. Rules and negative tests:
+`packages/core/src/internal/demo-data/neutral-docs-guard.test.ts`.
+
 **The legacy-data guard.** Until the migration ends (ticket #532) the old strings still exist in many files.
 `npm run legacy-demo:check` (part of `npm run test:unit`, so of `npm run check` and of the CI job `unit test`) is a
 ratchet: it counts them per file (the whole supplier names of the old fixtures such as `Rossi Construction Ltd`, `Acme`, `Northwind`,
