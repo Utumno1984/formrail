@@ -192,6 +192,23 @@ describe('AppLauncher: navigation rule', () => {
     expect(tile('App one')).toHaveAttribute('href', '/one');
   });
 
+  it.each([
+    ['Ctrl', { ctrlKey: true }],
+    ['Cmd', { metaKey: true }],
+    ['the middle button', { button: 1 }],
+  ])('a click with %s on a link tile that has no focus: the focus does not move to it', (_, init) => {
+    render(
+      <>
+        <button type="button">Elsewhere</button>
+        <AppLauncher apps={APPS} onNavigate={vi.fn()} />
+      </>,
+    );
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    elsewhere.focus();
+    tile('App one').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ...init }));
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
   it('a button tile (no href) calls onNavigate on click, Enter and Space', async () => {
     const user = userEvent.setup();
     const onNavigate = vi.fn();
@@ -410,10 +427,11 @@ describe('AppLauncher: loading and empty', () => {
   it('loading: aria-busy region, placeholders hidden from assistive technology, the loading text, no list', () => {
     setup({ loading: true });
     const nav = screen.getByRole('navigation', { name: 'Apps' });
-    expect(nav).toHaveAttribute('aria-busy', 'true');
+    expect(nav).not.toHaveAttribute('aria-busy');
     expect(within(nav).queryByRole('list')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent(DEFAULT_LABELS.loading);
     const placeholders = nav.querySelector('[data-rop-app-launcher-placeholders]')!;
+    expect(placeholders).toHaveAttribute('aria-busy', 'true');
     expect(placeholders).toHaveAttribute('aria-hidden', 'true');
     // As many placeholders as the apps already known.
     expect(placeholders.children).toHaveLength(4);
@@ -471,19 +489,29 @@ describe('AppLauncher: loading and empty', () => {
   it('the loading text is no longer read once loaded; aria-busy goes away', () => {
     const { rerender } = setup({ loading: true });
     rerender(<AppLauncher apps={APPS} />);
-    const nav = screen.getByRole('navigation');
-    expect(nav).not.toHaveAttribute('aria-busy');
+    expect(document.querySelector('[aria-busy]')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('');
   });
 
-  it('the status region is outside the aria-busy region, right after it (its change is not withheld)', () => {
-    setup({ loading: true });
+  it('the status region is inside the nav (one root node) but outside the aria-busy placeholders (its change is not withheld)', () => {
+    const { container } = setup({ loading: true });
     const nav = screen.getByRole('navigation');
     const status = screen.getByRole('status');
-    expect(nav.contains(status)).toBe(false);
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild).toBe(nav);
+    expect(nav.contains(status)).toBe(true);
     expect(status.closest('[aria-busy]')).toBeNull();
-    expect(nav.nextElementSibling).toBe(status);
     expect(status.className.split(' ')).toContain('sr-only');
+  });
+
+  it('a hidden launcher that is loading does not announce: the status is inside the hidden region', () => {
+    const { container } = setup({ loading: true, hidden: true });
+    const nav = container.firstElementChild as HTMLElement;
+    expect(nav).toHaveAttribute('hidden');
+    expect(nav.contains(document.querySelector('[role="status"]'))).toBe(true);
+    // Nothing of it is in the accessibility tree, the status region included.
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('navigation')).toBeNull();
   });
 
   it('mounted already loading: the status region is mounted empty, then filled after the mount', () => {

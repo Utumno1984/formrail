@@ -196,13 +196,13 @@ export const LoadingToData: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const nav = canvas.getByRole('navigation', { name: 'Apps' });
-    await expect(nav).toHaveAttribute('aria-busy', 'true');
+    await expect(nav.querySelector('[data-rop-app-launcher-placeholders]')).toHaveAttribute('aria-busy', 'true');
     // The status region is mounted empty and filled just after the mount (so that it is announced).
     await waitFor(() => expect(canvas.getByRole('status')).toHaveTextContent('Loading apps'));
     const before = nav.getBoundingClientRect().height;
     await userEvent.click(canvas.getByRole('button', { name: 'Finish loading' }));
     await expect(canvas.queryAllByRole('link')).toHaveLength(args.count);
-    await expect(nav).not.toHaveAttribute('aria-busy');
+    await expect(nav.querySelector('[aria-busy]')).toBeNull();
     // As many placeholders as apps: the launcher keeps its height.
     if (args.count === args.loadingCount) await expect(Math.abs(nav.getBoundingClientRect().height - before)).toBeLessThanOrEqual(0.5);
     if (args.count === 0) await expect(canvas.getByText('No apps available')).toBeVisible();
