@@ -91,6 +91,7 @@ describe('helpers', () => {
   it('the breakpoint is the one of the app shell, 64rem', () => {
     expect(APP_SHELL_NAV_BREAKPOINT).toBe('64rem');
     expect(APP_SHELL_WIDE_QUERY).toBe('(min-width: 64rem)');
+    expect(APP_SHELL_WIDE_QUERY).toBe(`(min-width: ${APP_SHELL_NAV_BREAKPOINT})`);
   });
 
   it('survivingFocusKey: the next candidate, else the previous one, else null', () => {

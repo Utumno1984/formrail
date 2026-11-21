@@ -9,5 +9,9 @@
  */
 export const APP_SHELL_NAV_BREAKPOINT = '64rem';
 
-/** The media query that is true on a wide viewport (at or above {@link APP_SHELL_NAV_BREAKPOINT}). */
-export const APP_SHELL_WIDE_QUERY = `(min-width: ${APP_SHELL_NAV_BREAKPOINT})`;
+/**
+ * The media query that is true on a wide viewport (at or above {@link APP_SHELL_NAV_BREAKPOINT}). A plain literal,
+ * not a template built from the constant: a module-level template literal is not dropped by the bundler, so it
+ * would weigh on every import of the package. A unit test pins the two together.
+ */
+export const APP_SHELL_WIDE_QUERY = '(min-width: 64rem)';

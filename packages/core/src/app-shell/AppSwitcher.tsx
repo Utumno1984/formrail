@@ -168,10 +168,12 @@ const ITEM_REASON = 'text-rop-caption italic';
 const ITEM_CHECK = 'shrink-0 text-rop-primary';
 
 // An app in the Sheet: a full-width row with the same parts; the current app also has a bar on the start edge (a
-// shape, not only a colour; a system colour under forced colours).
+// shape, not only a colour; a system colour under forced colours). Content-box (the library ships no box-sizing
+// reset): no width, the row stretches in its flex-column `li` with the padding inside; the minimum height is 1.75rem
+// of content plus 0.5rem of padding on each side, a 44px touch target.
 const SHEET_LIST = 'm-0 flex list-none flex-col gap-0.5 p-0';
 const SHEET_ITEM =
-  'relative box-border flex min-h-11 w-full min-w-0 items-center gap-2 rounded-rop-md border-0 bg-transparent px-3 py-2 ' +
+  'relative flex min-h-7 min-w-0 items-center gap-2 rounded-rop-md border-0 bg-transparent px-3 py-2 ' +
   'text-start font-rop-sans text-rop-body text-rop-text no-underline ' +
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:[outline-offset:-2px]';
 const SHEET_ITEM_ENABLED =
