@@ -5,8 +5,8 @@ import { SALES_ORDERS, SALES_ORDERS_CRUD, type SalesOrderValues } from './module
 import { RecordEditor, type UseRecordEditorAddons } from './RecordPageShell';
 import { createSalesOrderStore, type SalesOrderDraft, type StoredSalesOrder } from './sales-order-store';
 
-// #527: the story-only `useAddons` extension point of the editor (#384, #470), tested on a sales order. The cases come
-// from the tests of the invoices' editor (`InvoiceEditor`), which went with the invoices' showcase: the shell is the same.
+// #527: the story-only `useAddons` extension point of the editor (#384, #470), tested on a sales order. The cases
+// are ported from the removed showcase (the tests of its editor, which went with it): the shell is the same.
 type UseAddons = UseRecordEditorAddons<StoredSalesOrder, SalesOrderValues, SalesOrderDraft>;
 
 beforeAll(() => {

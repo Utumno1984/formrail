@@ -49,7 +49,7 @@ export interface StoredCustomer {
   contacts: StoredContact[];
   /** Carried, not edited by the showcase. */
   website: string;
-  /** The currency the customer is invoiced in: the credit limit is in it. */
+  /** The currency the customer is billed in: the credit limit is in it. */
   currency: DemoCurrency;
   paymentTerms: DemoPaymentTerms;
   /** Minor units of `currency`. */

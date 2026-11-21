@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRecordStore, RecordNetworkError, RecordNotFoundError, type RecordServerChange, type RecordStoreConfig } from './record-store';
 
-// #527: the store cases of the invoices' store tests (invoice-store.test.ts, removed with the invoices' showcase) that
+// #527: the store cases ported from the removed showcase (its own store tests, removed with that showcase) that
 // `record-store.test.ts` did not cover: delete and deleteMany, a create held by its delay, and the server updates around
 // a save. Same made-up record type as `record-store.test.ts`; the delays are promises (no timer, no clock).
 interface Task {
@@ -40,7 +40,7 @@ async function isSettled(promise: Promise<unknown>): Promise<boolean> {
 }
 const ids = (store: ReturnType<typeof makeStore>) => store.snapshot().map((t) => t.id);
 
-describe('createRecordStore: delete (#527, from the invoices #365)', () => {
+describe('createRecordStore: delete (#527, ported from the removed showcase, #365)', () => {
   it('removes the record when its delay is over; a second delete of the same id is RecordNotFoundError', async () => {
     const held = gate();
     const store = makeStore({ saveDelayMs: held.promise });
@@ -82,7 +82,7 @@ describe('createRecordStore: delete (#527, from the invoices #365)', () => {
   });
 });
 
-describe('createRecordStore: deleteMany (#527, from the invoices #366)', () => {
+describe('createRecordStore: deleteMany (#527, ported from the removed showcase, #366)', () => {
   it('removes every id in one operation when its delay is over (nothing before); repeated ids count once', async () => {
     const held = gate();
     const store = makeStore({ saveDelayMs: held.promise });
@@ -122,7 +122,7 @@ describe('createRecordStore: deleteMany (#527, from the invoices #366)', () => {
   });
 });
 
-describe('createRecordStore: a create honours the save delay (#527, from the invoices #363)', () => {
+describe('createRecordStore: a create honours the save delay (#527, ported from the removed showcase, #363)', () => {
   it('create waits for saveDelayMs like save: nothing is stored before', async () => {
     const held = gate();
     const store = makeStore({ saveDelayMs: held.promise });
@@ -135,7 +135,7 @@ describe('createRecordStore: a create honours the save delay (#527, from the inv
   });
 });
 
-describe('createRecordStore: server updates around a save (#527, from the invoices #384)', () => {
+describe('createRecordStore: server updates around a save (#527, ported from the removed showcase, #384)', () => {
   it('updateFromServer changes the record when its delay is over, normalized, and tells the subscribers once', async () => {
     const held = gate();
     const store = makeStore({}, (t) => ({ ...t, estimate: Math.round(t.estimate * 100) / 100 }));

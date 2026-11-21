@@ -5,7 +5,7 @@ import { SALES_ORDERS } from './modules/sales-orders/sales-orders-module';
 import { RecordPage } from './RecordPageShell';
 import { createSalesOrderStore } from './sales-order-store';
 
-// #527: the cases of the line items of the invoices' page (InvoiceRecordPage.lines.test.tsx, removed with the invoices'
+// #527: the cases of the line items ported from the removed showcase (its record page line tests, removed with the
 // showcase) that no unit test of the sales orders covered: the focus on a button that became aria-disabled, and the
 // errors of the lines after a removal or a reorder. so-15: EUR, confirmed, 2 lines.
 beforeAll(() => {
