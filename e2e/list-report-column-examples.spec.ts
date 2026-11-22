@@ -73,6 +73,8 @@ test.describe('the six examples: every play passes, with two values of their Con
     ['helpdesk, priority descending (default)', QUEUE, undefined],
     ['helpdesk, priority ascending', QUEUE, 'priorityFirstDirection:asc'],
     ['helpdesk, sorted by opening date at mount', QUEUE, 'defaultSort:opened'],
+    ['helpdesk, sorted by reply due at mount', QUEUE, 'defaultSort:sla'],
+    ['helpdesk, sorted by priority ascending at mount', QUEUE, 'defaultSort:priority;priorityFirstDirection:asc'],
   ];
   for (const [title, id, args] of cases) {
     test(title, async ({ page }) => {
@@ -259,6 +261,14 @@ test.describe('dates and status (e-learning)', () => {
     await gotoStory(page, ENROLMENTS_NP, 'locale:ja-JP');
     const japanese = (await columnTexts(page, 'Completed'))[completed]!;
     expect(japanese).not.toBe(british);
+    // Each is exactly what `Intl.DateTimeFormat` writes for that locale (default `dateStyle` medium, in UTC),
+    // computed by the browser's own `Intl` so the comparison does not depend on Node's ICU.
+    const iso = ENROL[completed]!.completedOn!;
+    const expected = await page.evaluate(
+      (date) => ['en-GB', 'ja-JP'].map((locale) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(date))),
+      iso,
+    );
+    expect([british, japanese]).toEqual(expected);
   });
 });
 

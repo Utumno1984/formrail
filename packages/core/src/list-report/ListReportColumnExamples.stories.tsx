@@ -744,6 +744,20 @@ export const UseCaseHelpdeskSupportQueue: StoryObj<QueueArgs> = {
     if (args.defaultSort !== 'none') {
       const mounted = { priority: ['Priority', args.priorityFirstDirection], opened: ['Opened', 'desc'], sla: ['Reply due', 'asc'] }[args.defaultSort];
       await expect(canvas.getByRole('columnheader', { name: mounted[0]! })).toHaveAttribute('aria-sort', mounted[1] === 'asc' ? 'ascending' : 'descending');
+      // The rows are in that order too, not only the header's state: the whole column, top to bottom, against the
+      // fixture sorted by the same key (ties show the same text, so their relative order does not matter).
+      const by: Record<Exclude<CaseSortChoice, 'none'>, { key: (c: DemoSupportCase) => number | string; text: (c: DemoSupportCase) => string }> = {
+        priority: { key: (c) => PRIORITY_RANK[c.priority], text: (c) => SUPPORT_CASE_PRIORITY_LABEL[c.priority] },
+        opened: { key: (c) => c.openedOn, text: (c) => expectedDay(c.openedOn, 'en-GB', 'medium') },
+        sla: { key: (c) => c.slaDueDate, text: (c) => expectedDay(c.slaDueDate, 'en-GB', 'medium') },
+      };
+      const { key, text } = by[args.defaultSort];
+      const ascending = [...SUPPORT_CASES].sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+      const expected = (mounted[1] === 'asc' ? ascending : ascending.reverse()).map(text);
+      // The fixture is not already in that order, or the check would prove nothing.
+      await expect(SUPPORT_CASES.map(text)).not.toEqual(expected);
+      const index = columnIndex(canvas, mounted[0]!);
+      await expect(rowsOf(canvas).map((row) => within(row).getAllByRole('cell')[index]!.textContent?.trim())).toEqual(expected);
       return;
     }
     const ranks = SUPPORT_CASES.map((c) => PRIORITY_RANK[c.priority]);
