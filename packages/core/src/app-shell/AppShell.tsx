@@ -414,14 +414,14 @@ function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProp
     leavingPanel.current = null;
   }, [open]);
   // An `AppShellNav` unmounted while the Sheet is on screen takes it away with no closing, so the Sheet's own return
-  // of the focus never runs. Run here, before the panel leaves the DOM: a focus in the panel (or lost to `body` during
-  // its exit) goes back to the trigger in the next frame, unless something else has taken it by then (a focus that was
-  // elsewhere, in a dialog of the app, is left alone).
+  // of the focus never runs. Run here, before the panel leaves the DOM: in the next frame the focus goes back to the
+  // trigger if it is on `body` (it was in the panel, lost during its exit, or elsewhere and removed in the same commit),
+  // and is left alone if something else has it by then (a focus in a dialog of the app).
   useIsomorphicLayoutEffect(
     () => () => {
       const panel = panelNode.current;
       const doc = panel?.ownerDocument;
-      if (!panel || !doc || !(panel.contains(doc.activeElement) || doc.activeElement === doc.body)) return;
+      if (!panel || !doc) return;
       doc.defaultView?.requestAnimationFrame(() => {
         if (doc.activeElement === doc.body) trigger.current?.focus();
       });

@@ -477,6 +477,21 @@ describe('AppShellNavTrigger', () => {
       expect(signIn).toHaveFocus();
     });
 
+    it('a focus that was outside the Sheet (a dialog of the app) and is removed in the same commit as the nav goes to the trigger', async () => {
+      const user = userEvent.setup();
+      render(<Removable />);
+      await openWithKeyboard(user);
+      act(() => showDialog(true));
+      const signIn = await screen.findByRole('button', { name: 'Sign in again' });
+      await waitFor(() => expect(signIn).toHaveFocus());
+      act(() => {
+        showNav(false);
+        showDialog(false);
+      });
+      expect(screen.queryByRole('button', { name: 'Sign in again' })).toBeNull();
+      await waitFor(() => expect(trigger()).toHaveFocus());
+    });
+
     it('two shells on one page: the focus goes back to the trigger of the shell whose nav left', async () => {
       const user = userEvent.setup();
       function Two() {
