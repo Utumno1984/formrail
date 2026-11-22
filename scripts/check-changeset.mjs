@@ -6,6 +6,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_RE = /^packages\/[^/]+\//;
+const PACKAGE_JSON_RE = /^packages\/[^/]+\/package\.json$/;
+const PACKAGE_CHANGELOG_RE = /^packages\/[^/]+\/CHANGELOG\.md$/;
 const CHANGESET_RE = /^\.changeset\/(?!README\.md$)[^/]+\.md$/;
 
 export const GUIDANCE = [
@@ -28,7 +30,149 @@ export function hasValidFrontmatter(content) {
   return typeof content === 'string' && /^---\r?\n(?:[\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/.test(content);
 }
 
-export function evaluateChangesetGate(changedFiles, readContent) {
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, canonical(value[k])]));
+  }
+  return value;
+}
+
+const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
+// The only range shapes `changeset version` rewrites for a bumped workspace package: exact, caret, tilde.
+const RANGE_PREFIXES = ['', '^', '~'];
+const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function parseJson(text) {
+  if (typeof text !== 'string') return null;
+  try {
+    const value = JSON.parse(text);
+    return isObject(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Semver precedence of two valid versions (-1, 0, 1); build metadata is ignored. */
+function compareSemver(a, b) {
+  const [, ...x] = SEMVER_RE.exec(a);
+  const [, ...y] = SEMVER_RE.exec(b);
+  for (let i = 0; i < 3; i++) {
+    if (Number(x[i]) !== Number(y[i])) return Number(x[i]) < Number(y[i]) ? -1 : 1;
+  }
+  if (x[3] === undefined && y[3] === undefined) return 0;
+  if (x[3] === undefined) return 1;
+  if (y[3] === undefined) return -1;
+  const pa = x[3].split('.');
+  const pb = y[3].split('.');
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if (pa[i] === undefined) return -1;
+    if (pb[i] === undefined) return 1;
+    if (pa[i] === pb[i]) continue;
+    const na = /^\d+$/.test(pa[i]);
+    const nb = /^\d+$/.test(pb[i]);
+    if (na && nb) return Number(pa[i]) < Number(pb[i]) ? -1 : 1;
+    if (na !== nb) return na ? -1 : 1;
+    return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+/** True when `to` is a valid semver strictly greater than the valid semver `from`. */
+export function isVersionBump(from, to) {
+  return typeof from === 'string' && typeof to === 'string' && SEMVER_RE.test(from) && SEMVER_RE.test(to) && compareSemver(from, to) < 0;
+}
+
+/** `{ name, from, to }` of a package whose package.json carries a valid version bump (null otherwise). */
+export function bumpedPackage(baseText, headText) {
+  const base = parseJson(baseText);
+  const head = parseJson(headText);
+  if (!base || !head || typeof head.name !== 'string' || !isVersionBump(base.version, head.version)) return null;
+  return { name: head.name, from: base.version, to: head.version };
+}
+
+/**
+ * True when the two package.json texts parse to JSON differing only in a valid version bump and in
+ * workspace-internal ranges (dependencies/devDependencies/peerDependencies entries naming a package of
+ * `bumps`, a name -> { from, to } map). Such an entry is accepted only as `prefix + from` -> `prefix + to` with
+ * prefix in '', '^', '~' (what `changeset version` writes). Entries added or removed, external packages,
+ * other range shapes and any other field disqualify.
+ */
+export function onlyVersionChanged(baseText, headText, bumps = {}) {
+  const base = parseJson(baseText);
+  const head = parseJson(headText);
+  if (!base || !head) return false;
+  if (!isVersionBump(base.version, head.version)) return false;
+  const restBase = { ...base };
+  const restHead = { ...head };
+  delete restBase.version;
+  delete restHead.version;
+  for (const field of DEP_FIELDS) {
+    const b = restBase[field];
+    const h = restHead[field];
+    delete restBase[field];
+    delete restHead[field];
+    if (b === undefined && h === undefined) continue;
+    if (!isObject(b) || !isObject(h)) return false;
+    const names = Object.keys(b);
+    if (names.length !== Object.keys(h).length) return false;
+    for (const name of names) {
+      if (!(name in h)) return false;
+      if (b[name] === h[name]) continue;
+      const bump = Object.hasOwn(bumps, name) ? bumps[name] : undefined;
+      if (!bump) return false;
+      if (!RANGE_PREFIXES.some((p) => b[name] === `${p}${bump.from}` && h[name] === `${p}${bump.to}`)) return false;
+    }
+  }
+  return JSON.stringify(canonical(restBase)) === JSON.stringify(canonical(restHead));
+}
+
+export const EXEMPTION_HEADLINE = 'Changeset exemption applied (release PR): the diff is a version bump, not a change to be released.';
+
+function exemptionMessage(bumps) {
+  return [
+    EXEMPTION_HEADLINE,
+    '  - inside packages/* only the `version` field of package.json (plus workspace-internal dependency ranges aligned to the new versions) and CHANGELOG.md files changed;',
+    '  - existing changesets (.changeset/*.md) were consumed (deleted);',
+    '  - no changeset was added.',
+    'Bumped packages:',
+    ...Object.entries(bumps).map(([name, { from, to }]) => `  - ${name} ${from} \u2192 ${to}`),
+  ].join('\n');
+}
+
+/** Exemption decided from the diff content only (never from branch name, author or labels). */
+/** Returns the bumped packages (name -> { from, to }) when the diff is a release bump, null otherwise. */
+function releaseBumps(entries, packageFiles, readContent, readBaseContent) {
+  if (!readContent || !readBaseContent || packageFiles.length === 0) return null;
+  const changesetEntries = entries.filter((e) => CHANGESET_RE.test(e.path));
+  if (changesetEntries.some((e) => e.status === 'A')) return null;
+  if (!changesetEntries.some((e) => e.status === 'D')) return null;
+  // At least one package must actually be version-bumped: a CHANGELOG alone is not a release.
+  if (!entries.some((e) => PACKAGE_JSON_RE.test(e.path))) return null;
+  const bumps = {};
+  for (const e of entries) {
+    if (!PACKAGE_JSON_RE.test(e.path) || e.status !== 'M') continue;
+    const bumped = bumpedPackage(readBaseContent(e.path), readContent(e.path));
+    if (bumped) bumps[bumped.name] = { from: bumped.from, to: bumped.to };
+  }
+  const valid = entries
+    .filter((e) => PACKAGE_RE.test(e.path))
+    .every((e) => {
+      if (PACKAGE_CHANGELOG_RE.test(e.path)) return e.status === 'A' || e.status === 'M';
+      if (PACKAGE_JSON_RE.test(e.path)) {
+        return e.status === 'M' && onlyVersionChanged(readBaseContent(e.path), readContent(e.path), bumps);
+      }
+      return false;
+    });
+  return valid ? bumps : null;
+}
+
+/**
+ * @param {(path: string) => string | null} [readBaseContent] returns a file's content at the merge-base;
+ *   without it the release-PR exemption is never applied.
+ */
+export function evaluateChangesetGate(changedFiles, readContent, readBaseContent) {
   const entries = changedFiles.map((f) => (typeof f === 'string' ? { path: f, status: 'A' } : { status: 'A', ...f }));
   const packageFiles = entries.filter((e) => PACKAGE_RE.test(e.path)).map((e) => e.path);
   // Only ADDED changesets count: a modified one already existed on the base branch.
@@ -39,6 +183,10 @@ export function evaluateChangesetGate(changedFiles, readContent) {
 
   if (packageFiles.length === 0) {
     return { ok: true, message: 'No file under packages/* touched: no changeset required.', packageFiles, changesets };
+  }
+  const bumps = releaseBumps(entries, packageFiles, readContent, readBaseContent);
+  if (bumps) {
+    return { ok: true, exempt: true, message: exemptionMessage(bumps), packageFiles, changesets };
   }
   if (changesets.length === 0) {
     return {
@@ -63,8 +211,12 @@ function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' });
 }
 
+export function mergeBase(baseRef, headRef = 'HEAD') {
+  return git(['merge-base', baseRef, headRef]).trim();
+}
+
 export function collectChangedFiles(baseRef, headRef = 'HEAD') {
-  const base = git(['merge-base', baseRef, headRef]).trim();
+  const base = mergeBase(baseRef, headRef);
   return parseNameStatus(git(['diff', '--name-status', '--no-renames', '-z', base, headRef]));
 }
 
@@ -79,14 +231,16 @@ export function readAtRef(path, ref = 'HEAD') {
 function main() {
   const baseRef = process.env.BASE_REF || 'origin/main';
   let files;
+  let base;
   try {
+    base = mergeBase(baseRef);
     files = collectChangedFiles(baseRef);
   } catch (error) {
     console.error(`Cannot compute the merge-base with ${baseRef} (is the checkout shallow? use fetch-depth: 0).`);
     console.error(String(error.message ?? error));
     process.exit(2);
   }
-  const result = evaluateChangesetGate(files, (p) => readAtRef(p));
+  const result = evaluateChangesetGate(files, (p) => readAtRef(p), (p) => readAtRef(p, base));
   if (result.ok) {
     console.log(result.message);
   } else {
