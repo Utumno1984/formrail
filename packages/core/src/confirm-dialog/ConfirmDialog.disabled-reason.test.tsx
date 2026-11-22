@@ -142,6 +142,7 @@ describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
     ['0n (bigint zero)', 0n],
     ['an empty array', []],
     ['an array of blanks', [null, false, '', 0]],
+    ['a nested array of blanks', [[null, 0n]]],
   ] as const)('%s: no reason, the button works as without the prop', async (_, value) => {
     const onConfirm = vi.fn();
     const { user, dialog, confirm } = await openHost({ onConfirm, confirmDisabledReason: value as ReactNode });
@@ -163,6 +164,12 @@ describe('ConfirmDialog: confirmDisabledReason (#583)', () => {
     const second = await openHost({ confirmDisabledReason: [null, 'Deleted on the server.'] });
     expect(second.confirm()).toHaveAttribute('aria-disabled', 'true');
     expect(second.confirm()).toHaveAccessibleDescription('Deleted on the server.');
+  });
+
+  it('a non-zero bigint is a reason', async () => {
+    const { confirm } = await openHost({ confirmDisabledReason: 1n });
+    expect(confirm()).toHaveAttribute('aria-disabled', 'true');
+    expect(confirm()).toHaveAccessibleDescription('1');
   });
 
   it('a reason that is an element: its text is the description of the button', async () => {

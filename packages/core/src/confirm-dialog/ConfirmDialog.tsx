@@ -120,7 +120,7 @@ const isBlankLabel = (label: unknown): boolean =>
   typeof label === 'boolean' ||
   // `0` / `0n` / `NaN`: what `count && reason` leaves behind when the count is 0.
   label === 0 ||
-  label === BigInt(0) ||
+  (typeof label === 'bigint' && label === BigInt(0)) ||
   (typeof label === 'number' && Number.isNaN(label)) ||
   (typeof label === 'string' && label.trim() === '') ||
   (Array.isArray(label) && label.every(isBlankLabel));
