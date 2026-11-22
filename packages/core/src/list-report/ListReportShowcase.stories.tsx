@@ -77,7 +77,6 @@ const COLUMNS: ListReportColumn<DemoEmployee>[] = [
   { id: 'code', header: 'Number', accessor: (e) => e.code, width: 120 },
   { id: 'name', header: 'Name', accessor: (e) => e.fullName, minWidth: 200 },
   { id: 'department', header: 'Department', accessor: (e) => DEPARTMENT_LABEL[e.department], searchable: false, minWidth: 150 },
-  { id: 'status', header: 'Status', accessor: (e) => EMPLOYEE_STATUS_LABEL[e.status], searchable: false, width: 130 },
   {
     id: 'hired',
     header: 'Hire date',
@@ -87,6 +86,7 @@ const COLUMNS: ListReportColumn<DemoEmployee>[] = [
     searchable: false,
     width: 150,
   },
+  { id: 'status', header: 'Status', accessor: (e) => EMPLOYEE_STATUS_LABEL[e.status], searchable: false, width: 130 },
 ];
 const SORTABLE = COLUMNS.map((c) => c.id);
 
@@ -362,7 +362,7 @@ export const SmartFilterBarShowcaseNoPlay: Story = {
 /** Visual variant: the "Active" pill selected and the table sorted by hire date. */
 export const SmartFilterBarShowcaseActiveFilter: Story = {
   name: 'Example: configured for an HR employee directory, Active pill',
-  tags: ['use-case', 'vertical:hr', 'visual'],
+  tags: ['use-case', 'vertical:hr', 'visual', 'internal'],
   parameters: { controls: { disable: true } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -384,7 +384,7 @@ export const SmartFilterBarShowcaseActiveFilter: Story = {
  */
 export const SmartFilterBarShowcaseOverlayOpen: Story = {
   name: 'Example: configured for an HR employee directory, New employee open',
-  tags: ['use-case', 'vertical:hr', 'visual', 'visual-viewport-only'],
+  tags: ['use-case', 'vertical:hr', 'visual', 'visual-viewport-only', 'internal'],
   args: { overlay: 'dialog' },
   parameters: { controls: { disable: true } },
   play: async ({ canvasElement }) => {

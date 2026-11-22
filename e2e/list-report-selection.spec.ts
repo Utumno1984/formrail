@@ -13,6 +13,8 @@ const FIRST_OPEN = ROWS.find((r) => r.status === 'pending')!;
 const SCENARIO = [FIRST_OPEN, ...ROWS.filter((r) => r.status !== 'pending').slice(0, 2)];
 
 const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
+// The table of the ListReportTable stories (#626 migrates them): still named "Invoices".
+const tableStoryTable = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
 const scroller = (page: Page): Locator => table(page).locator('..');
 const bar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Records' });
 const allBox = (page: Page): Locator => page.getByRole('checkbox', { name: 'Select all results' });
@@ -133,7 +135,7 @@ for (const vp of VIEWPORTS) {
       const thBox = await box(th);
       const headerBox = await box(allBox(page));
       // Square column (as wide as a row is tall) and the box centred in it.
-      const firstCell = table(page).locator('tbody tr').first().locator('td').first();
+      const firstCell = tableStoryTable(page).locator('tbody tr').first().locator('td').first();
       const cellBox = await box(firstCell);
       const bodyBox = await box(rowBox(page, 'F-0001'));
       close(thBox.width, cellBox.width, 'column width');
@@ -143,12 +145,12 @@ for (const vp of VIEWPORTS) {
       close(bodyBox.y + bodyBox.height / 2, cellBox.y + cellBox.height / 2, 'row box centred vertically');
       close(headerBox.x, bodyBox.x, 'header and body boxes aligned');
 
-      const tableBox = await box(table(page));
+      const tableBox = await box(tableStoryTable(page));
       for (const args of ['status:loading;dataset:empty', 'dataset:empty', 'dataset:noResults', 'status:error']) {
         await expectPlayToPass(page, TABLE_STORY, args);
         sameBox(await box(page.locator('th[data-rop-select]')), thBox, `header cell (${args})`);
         // Same columns (the height follows the rows: 12 with data, the minimum body otherwise).
-        const t = await box(table(page));
+        const t = await box(tableStoryTable(page));
         close(t.x, tableBox.x, `table x (${args})`);
         close(t.width, tableBox.width, `table width (${args})`);
         await expect(page.locator('th[data-rop-select]').locator('..').locator('th')).toHaveCount(5);

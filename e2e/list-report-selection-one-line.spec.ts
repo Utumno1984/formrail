@@ -17,6 +17,8 @@ const count = (page: Page): Locator => page.locator('[data-rop-selection-count]'
 const clear = (page: Page): Locator => page.locator('[data-rop-selection-bar] button', { hasText: 'Clear selection' });
 const allBox = (page: Page): Locator => page.getByRole('checkbox', { name: 'Select all results' });
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
+// The Pro VirtualListReport keeps its own data (#531 migrates it): its bar is still named "Selection Invoices".
+const proBar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Invoices' });
 const scroller = (page: Page): Locator => page.getByRole('table', { name: 'Records' }).locator('..');
 const rowBoxes = (page: Page): Locator => page.getByRole('checkbox', { name: /^Select (INV|FT)-/ });
 
@@ -117,7 +119,7 @@ for (const vp of [
       const c = await box(count(page));
       const a = await box(page.getByRole('button', { name: /^Select all .* results$/ }));
       expect(a.y).toBeGreaterThan(c.y + c.height - 1);
-      expect((await box(bar(page))).height).toBeGreaterThan((await oneLineHeight(page)) + 10);
+      expect((await box(proBar(page))).height).toBeGreaterThan((await oneLineHeight(page)) + 10);
     });
 
     test('Pro VirtualListReport without consumer bulkActions (#504): one line, no "Select all N results"', async ({ page }) => {
@@ -133,7 +135,7 @@ for (const vp of [
         const v = (s: string): number => parseFloat(s);
         return el.getBoundingClientRect().height + v(cs.paddingTop) + v(cs.paddingBottom) + v(cs.borderTopWidth) + v(cs.borderBottomWidth);
       });
-      expect(Math.abs((await box(bar(page))).height - oneLine)).toBeLessThanOrEqual(1);
+      expect(Math.abs((await box(proBar(page))).height - oneLine)).toBeLessThanOrEqual(1);
     });
 
     test('bulkActions switched on after mount (Control): the bar goes to two lines without errors', async ({ page }) => {

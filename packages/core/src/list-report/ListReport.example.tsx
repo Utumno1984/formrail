@@ -9,7 +9,6 @@ import {
 } from '@formrail/core';
 
 interface RecordRow {
-  id: string;
   code: string;
   name: string;
   owner: string;
@@ -18,14 +17,16 @@ interface RecordRow {
 }
 
 const records: RecordRow[] = [
-  { id: 'rec-1', code: 'REC-00001', name: 'Café Report', owner: 'Ilaria Pellegrini', amount: 1250.5, status: 'pending' },
-  { id: 'rec-2', code: 'REC-00002', name: 'Indigo Plan', owner: 'James Brooks', amount: 380, status: 'active' },
-  { id: 'rec-3', code: 'REC-00003', name: 'Crème Review', owner: 'James Foster', amount: 9200, status: 'pending' },
-  { id: 'rec-4', code: 'REC-00004', name: 'Summit Checklist', owner: 'Élodie Martin', amount: 74.9, status: 'active' },
-  { id: 'rec-5', code: 'REC-00005', name: 'Tundra Plan', owner: 'Ayaka Sasaki', amount: 2310, status: 'pending' },
-  { id: 'rec-6', code: 'REC-00006', name: 'Amber Draft', owner: 'Charlotte Sullivan', amount: 645.25, status: 'active' },
-  { id: 'rec-7', code: 'REC-00007', name: 'Fjord Summary', owner: 'Ilaria Pellegrini', amount: 118.4, status: 'pending' },
-  { id: 'rec-8', code: 'REC-00008', name: 'Orchid Brief', owner: 'James Brooks', amount: 905, status: 'active' },
+  { code: 'REC-00001', name: 'Café Report', owner: 'Ilaria Pellegrini', amount: 1250.5, status: 'pending' },
+  { code: 'REC-00002', name: 'Indigo Plan', owner: 'James Brooks', amount: 380, status: 'active' },
+  { code: 'REC-00003', name: 'Crème Review', owner: 'James Foster', amount: 9200, status: 'pending' },
+  { code: 'REC-00004', name: 'Summit Checklist', owner: 'Élodie Martin', amount: 74.9, status: 'active' },
+  { code: 'REC-00005', name: 'Tundra Plan', owner: 'Ayaka Sasaki', amount: 2310, status: 'pending' },
+  { code: 'REC-00006', name: 'Amber Draft', owner: 'Charlotte Sullivan', amount: 645.25, status: 'active' },
+  { code: 'REC-00007', name: 'Fjord Summary', owner: 'Ilaria Pellegrini', amount: 118.4, status: 'pending' },
+  { code: 'REC-00008', name: 'Orchid Brief', owner: 'James Brooks', amount: 905, status: 'active' },
+  { code: 'REC-00009', name: 'Ridge Entry', owner: 'Ayaka Sasaki', amount: 56.2, status: 'pending' },
+  { code: 'REC-00010', name: 'Pebble Update', owner: 'Élodie Martin', amount: 3480.75, status: 'active' },
 ];
 
 const filters: ListReportFilter<RecordRow>[] = [
@@ -62,7 +63,7 @@ export function RecordList() {
     ],
     [],
   );
-  const table = useListReport({ rows: records, columns, getRowId: (row) => row.id, filters });
+  const table = useListReport({ rows: records, columns, getRowId: (row) => row.code, filters });
 
   // The floorplan (title, actions, filter bar, table) fills a parent with a bounded height: the page itself
   // never scrolls, the table does. In a flex or grid layout, give its cell `min-height: 0`.
