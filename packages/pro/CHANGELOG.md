@@ -186,7 +186,7 @@ Stories, copy-paste examples, showcases, tests and docs tooling: nothing here ch
 
 ## 0.1.0
 
-This package was never published. Its 0.1.0 is versioned together with `@formrail/core@0.1.0`, which contains the entries listed under "Also in the 0.1.0 of the core package" at the end of this section.
+This package was never published. Its 0.1.0 is versioned together with `@formrail/core@0.1.0`, which was published from the commit that also contains these Pro entries, listed under "Also in the 0.1.0 of the core package" at the end of this section.
 
 Not published: this package is private (commercial license, to be defined) and is versioned together
 with `@react-object-page/core`.

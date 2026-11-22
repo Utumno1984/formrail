@@ -8,6 +8,7 @@ Behaviour changes compared with the `@formrail/core@0.1.0` published on 2026-11-
 
 - `useObjectPageForm`: after a `save` that succeeds while the user kept typing, a field edited since the save started keeps the typed value and stays dirty, and every other field takes the value returned by the handler and is clean (before, all the current values were kept, so a field normalized by the server stayed dirty). See bb8e2f5 below.
 - `Menu`: opened with a click or tap on its trigger while another control had the focus, it now returns the focus to its trigger when it closes, not to that other control. See 8afe399 below.
+- List Report: the default texts with numbers (the count next to the title, the selection bar, the result announcement) now format the numbers in the `locale` of `useListReport` (`1,234` instead of `1234`). Without `locale` the runtime default is used: with server rendering pass `locale` to avoid a hydration mismatch, and update tests that match the raw number. A custom `labels.count`, `labels.selectionCount` or `labels.resultCount` still receives the raw number. See 8755727 and f724652 below.
 
 ### Minor Changes
 
