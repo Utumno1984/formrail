@@ -342,6 +342,16 @@ describe('evaluateChangesetGate: release PR exemption', () => {
     expect(go('0.2.0', '0.2.0-next.1')).toBe(false);
     expect(go('0.1.0', '0.1.0+build')).toBe(false);
     expect(go('0.1.0', '1.0')).toBe(false);
+    // prerelease precedence and edge shapes
+    expect(go('1.0.0-alpha', '1.0.0-alpha.1')).toBe(true);
+    expect(go('1.0.0-1', '1.0.0-a')).toBe(true);
+    expect(go('1.0.0-a', '1.0.0-1')).toBe(false);
+    expect(go('1.0.0-beta.2', '1.0.0-beta.11')).toBe(true);
+    expect(go('1.0.0-beta.11', '1.0.0-beta.2')).toBe(false);
+    expect(go('0.1.0', '0.2.0banana')).toBe(false);
+    expect(go('0.1.0', '0.1.1+build')).toBe(true);
+    expect(go('banana', '0.2.0')).toBe(false);
+    expect(go('0.1.0', ['0.2.0'])).toBe(false);
   });
 
   it('lists the bumped packages with from and to in the exemption message', () => {
