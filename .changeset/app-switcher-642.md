@@ -12,4 +12,7 @@ render the same. In the Menu every app is a `MenuLinkItem` (or a `MenuItem` with
 description. In the Sheet the focus starts on the current app and Escape returns it to the trigger. A plain click or
 Enter closes the list, gives the focus back to the trigger and then calls `onNavigate` once (so a `useDirtyGuard`
 dialog returns the focus to the trigger); Ctrl/Cmd+click and the middle button are left to the browser; choosing the
-current app only closes the list. With no app besides the current one the list shows `labels.empty`.
+current app only closes the list; a focus that `onNavigate` moves elsewhere (to the heading of the new page) stays
+there in both forms. The Sheet opens on the click of the trigger, so a press that ends in no click (dragged off, a
+touch that becomes a scroll) opens nothing. With no app besides the current one the list shows `labels.empty` (in the
+Menu as its only item, disabled).

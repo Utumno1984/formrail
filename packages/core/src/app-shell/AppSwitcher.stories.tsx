@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Field } from '../field/Field';
@@ -143,12 +143,113 @@ export const SheetOpen: Story = {
 };
 
 /**
- * `auto` at the width of a phone: the list opens as a Sheet (from 64rem it is a Menu). Escape closes it and the
- * focus is back on the trigger. Open this story with the Mobile viewport of the toolbar.
+ * `auto` at the width of a phone: the list opens as a Sheet (from 64rem it is a Menu). The play function taps the
+ * trigger: a Sheet titled "Switch app" opens, not a menu, with the focus on the current app and the trigger saying
+ * `aria-haspopup="dialog"`; Escape closes it and the focus is back on the trigger. The story opens with the Mobile
+ * viewport of the toolbar (on a canvas from 64rem the same trigger opens a Menu).
  */
 export const Mobile: Story = {
   args: { presentation: 'auto' },
   globals: { viewport: { value: 'mobile', isRotated: false } },
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const trigger = within(canvasElement).getByRole('button', { name: 'Switch app, current: App one' });
+    await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    await userEvent.click(trigger);
+    const sheet = await body.findByRole('dialog', { name: 'Switch app' });
+    await expect(body.queryByRole('menu')).toBeNull();
+    await expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+    await waitFor(() => expect(within(sheet).getByRole('link', { name: 'App one' })).toHaveFocus());
+    await expect(within(sheet).getByRole('link', { name: 'App two' })).toHaveAccessibleDescription(DISABLED_REASON);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+
+/**
+ * The only app is the current one: the trigger is still there, and the list says so. In the Menu the text is its
+ * only item, disabled (a menu must contain an item), and the Menu's description; in the Sheet a paragraph. The play
+ * function opens the list in the chosen form and checks the text.
+ */
+export const OnlyTheCurrentApp: Story = {
+  args: { presentation: 'menu' },
+  // The one app left is App one, never the disabled one.
+  parameters: { controls: { exclude: ['disabledApp'] } },
+  render: ({ disabledApp, ...args }) => (
+    <div style={bar}>
+      <AppSwitcher {...args} apps={appsOf(disabledApp).slice(0, 1)} />
+    </div>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(within(canvasElement).getByRole('button', { name: /^Switch app/ }));
+    if (args.presentation === 'sheet') {
+      const sheet = await body.findByRole('dialog', { name: 'Switch app' });
+      // Visible once the Sheet's entry animation has run.
+      await waitFor(() => expect(within(sheet).getByText('No other apps available')).toBeVisible());
+      await expect(within(sheet).queryAllByRole('link')).toHaveLength(0);
+    } else {
+      const menu = await body.findByRole('menu');
+      await expect(menu).toHaveAccessibleDescription('No other apps available');
+      const items = within(menu).getAllByRole('menuitem');
+      await expect(items).toHaveLength(1);
+      await expect(items[0]).toHaveAccessibleName('No other apps available');
+      await expect(items[0]).toHaveAttribute('aria-disabled', 'true');
+    }
+  },
+};
+
+/**
+ * What a router does: `onNavigate` shows the new page and moves the focus to its heading. The focus stays on the
+ * heading in both forms (the Sheet, which gives the focus back after its exit animation, leaves it there). The play
+ * function chooses App three and checks the focus once the list has gone.
+ */
+export const FocusOnTheNewPage: Story = {
+  args: { disabledApp: false },
+  // The current app is the page's own state, changed by `onNavigate`.
+  parameters: { controls: { exclude: ['currentAppId'] } },
+  render: function Render({ disabledApp, onNavigate, ...args }) {
+    const apps = appsOf(disabledApp);
+    const [current, setCurrent] = useState('one');
+    const heading = useRef<HTMLHeadingElement>(null);
+    return (
+      <>
+        <div style={bar}>
+          <AppSwitcher
+            {...args}
+            apps={apps}
+            currentAppId={current}
+            onNavigate={(app, event) => {
+              onNavigate(app, event);
+              setCurrent(app.id);
+              heading.current?.focus();
+            }}
+          />
+        </div>
+        <h1 ref={heading} tabIndex={-1} style={{ margin: 16, fontSize: 20 }}>
+          {apps.find((app) => app.id === current)?.label}
+        </h1>
+      </>
+    );
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole('button', { name: /^Switch app/ }));
+    const three = await waitFor(
+      () => body.queryByRole('menuitem', { name: 'App three' }) ?? body.getByRole('link', { name: 'App three' }),
+    );
+    await userEvent.click(three);
+    const heading = canvasElement.querySelector('h1')!;
+    await expect(heading).toHaveFocus();
+    await expect(heading).toHaveTextContent('App three');
+    await waitFor(() => expect(canvasElement.ownerDocument.querySelector('[role="menu"], [role="dialog"]')).toBeNull());
+    // A frame after the list has left the DOM: the moment its return of the focus would run.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await expect(heading).toHaveFocus();
+    await expect(args.onNavigate).toHaveBeenCalledTimes(1);
+  },
 };
 
 /**

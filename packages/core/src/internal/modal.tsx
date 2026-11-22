@@ -76,12 +76,27 @@ export interface ModalRootProps {
 }
 
 /**
+ * Props of `ModalRoot` that only the library's own components pass. Not part of `DialogProps` /
+ * `SheetProps` (they are `ModalRootProps`), never exported from the package.
+ */
+export interface ModalRootInternalProps extends ModalRootProps {
+  /**
+   * Checked when the focus is about to be returned, after "the focus is in another open modal":
+   * `true` leaves the focus where it is. For a component that hands the focus on itself when it
+   * closes (`AppSwitcher`: to its trigger, then the consumer's `onNavigate` may move it to the new
+   * page), so the return after the exit animation does not take it back. Default: none, as `Dialog`
+   * and `Sheet`.
+   */
+  keepFocusWhen?: () => boolean;
+}
+
+/**
  * Modal root (wraps `@radix-ui/react-dialog`). The open state is tracked here, not only inside
  * Radix, so that `useReturnFocus` sees every way of opening: with the trigger, or from application
  * state with no trigger at all. The focus returns to the element that had it before opening (or to
  * the content's `returnFocusRef`), never through Radix's own trigger-only return.
  */
-export function ModalRoot({ open, defaultOpen = false, onOpenChange, children }: ModalRootProps) {
+export function ModalRoot({ open, defaultOpen = false, onOpenChange, keepFocusWhen, children }: ModalRootInternalProps) {
   const [innerOpen, setInnerOpen] = useState(defaultOpen);
   const current = open ?? innerOpen;
   // True from the moment the panel's portal mounts until it has really unmounted, i.e. including
@@ -114,7 +129,11 @@ export function ModalRoot({ open, defaultOpen = false, onOpenChange, children }:
   // `skipWhen`: with the exit delayed, another modal may have opened in the meantime (a chain "close
   // this one, open that one" in one handler). The focus then belongs to it: pulling it back to this
   // panel's opener would make the other panel's focus trap bounce it back and select its text.
-  useReturnFocus({ open: current || panelMounted, fallbackRef, skipWhen: focusIsInOpenModal });
+  useReturnFocus({
+    open: current || panelMounted,
+    fallbackRef,
+    skipWhen: keepFocusWhen ? () => focusIsInOpenModal() || keepFocusWhen() : focusIsInOpenModal,
+  });
 
   const handleOpenChange = useCallback(
     (next: boolean) => {

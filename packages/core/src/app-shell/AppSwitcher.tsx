@@ -15,9 +15,10 @@ import { flushSync } from 'react-dom';
 import { Icon } from '../icon/Icon';
 import { internalIcons } from '../internal/icons';
 import { isDev } from '../internal/is-dev';
+import { ModalRoot } from '../internal/modal';
 import { handleNavigationClick, hasNavigableHref } from '../internal/navigation';
 import { Menu, MenuContent, MenuItem, MenuLinkItem, MenuTrigger } from '../menu/Menu';
-import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
+import { SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import { APP_SHELL_WIDE_QUERY } from './breakpoint';
@@ -36,7 +37,10 @@ export interface AppSwitcherLabels {
   noCurrent: string;
   /** Title of the Sheet (its accessible name) on a narrow viewport. Default `Switch app`. */
   sheetTitle: string;
-  /** Shown in the Menu or the Sheet when there is no app other than the current one. Default `No other apps available`. */
+  /**
+   * Shown in the Menu (as its only item, disabled) or the Sheet when there is no app other than the current one.
+   * Default `No other apps available`.
+   */
   empty: string;
 }
 
@@ -70,6 +74,8 @@ export interface AppSwitcherProps {
    * cancelled first. On an app with an `href`, never called for Ctrl/Cmd/Shift/Alt+click or the middle button:
    * those are left to the browser (a new tab or window on the real `href`), and the list closes. If it throws, the
    * list is already closed and the error propagates. Without `onNavigate` an app with an `href` is a plain link.
+   * A focus you move from here (to the heading of the new page) stays there in both forms: the Sheet, which returns
+   * the focus after its exit animation, leaves it where it is.
    */
   onNavigate?: (app: AppDescriptor, event: MouseEvent<HTMLElement>) => void;
   /**
@@ -77,7 +83,9 @@ export interface AppSwitcherProps {
    * viewport. `auto`: chosen when the list opens, from the width of the viewport (a Menu from 64rem, the breakpoint
    * of the app shell, a Sheet below it); a list that is open keeps its form until it closes, even if the viewport
    * crosses the breakpoint. While the list is closed the markup is the same in every form, so `auto` renders the
-   * same on the server and on the client.
+   * same on the server and on the client. The price of it: with `auto` and the list closed the trigger says
+   * `aria-haspopup="menu"` on every viewport, also on a narrow one where it opens a dialog (it says `dialog` while
+   * the Sheet is open, and always with `sheet`).
    * @default 'auto'
    */
   presentation?: AppSwitcherPresentation;
@@ -93,7 +101,7 @@ export function resolveAppSwitcherForm(presentation: AppSwitcherPresentation, is
   return isWide() ? 'menu' : 'sheet';
 }
 
-/** Whether the viewport is at or above the breakpoint. Without `matchMedia` (server, old test DOM): wide. */
+/** Whether the viewport is at or above the breakpoint. Without `matchMedia` (server, jsdom): wide, a Menu. */
 function viewportIsWide(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
   try {
@@ -186,6 +194,8 @@ const SHEET_ITEM_CURRENT =
   "before:absolute before:inset-y-1.5 before:start-0 before:w-1 before:rounded-e-full before:bg-rop-primary before:content-[''] " +
   'forced-colors:before:bg-[Highlight]';
 const EMPTY = 'm-0 px-3 py-2 text-rop-text-muted';
+// The same muted text in the Menu, on a disabled item that is not dimmed further (it is a message, not an app).
+const EMPTY_ITEM = 'cursor-default text-rop-text-muted data-[disabled]:cursor-default data-[disabled]:opacity-100';
 
 type Form = 'menu' | 'sheet';
 
@@ -202,9 +212,14 @@ type Form = 'menu' | 'sheet';
  *
  * Declared behaviour:
  * - When there is no app other than the current one (or `apps` is empty) the trigger is still there and the list
- *   shows `labels.empty` instead of the apps.
+ *   shows `labels.empty` instead of the apps: in the Menu as its only item, disabled (a menu must contain an item),
+ *   which is also the Menu's description, read when it opens; in the Sheet as a paragraph.
  * - If the app that has the focus leaves `apps` while the list is open, the focus moves to the next app that can
- *   take it (the previous one at the end); the list stays open.
+ *   take it (the previous one at the end); the list stays open. If it stays in `apps` but becomes disabled, the
+ *   focus stays on it: the item is still there, now disabled (it opens nothing, its reason is its description).
+ * - The Sheet opens on the click of the trigger (its activation, as any dialog trigger), the Menu on the press: a
+ *   press that ends in no click (dragged off the trigger, a touch that turns into a scroll) opens no Sheet. A
+ *   Ctrl+press (the secondary click of macOS) opens neither form.
  * - Unmounting the switcher with the list open closes it without errors.
  * - The same limits as `MenuLinkItem` apply to the Menu (Ctrl/Cmd/Shift+Enter navigates like Enter; an exit
  *   animation on the Menu would delay the focus).
@@ -250,9 +265,11 @@ export const AppSwitcher = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppSwit
   }, [presentation]);
   const closeList = useCallback(() => setOpen(false), []);
 
-  // A pointer press that will open a Sheet is taken from the Menu's trigger (which opens on the press): the Sheet
-  // opens on the click instead, so the end of the same press (the click, on a touch screen) never lands on the panel
-  // that has just appeared under the finger.
+  // A pointer press that will open a Sheet is taken from the Menu's trigger (Radix opens on the press): the Sheet
+  // opens on the click, the activation of a button, so a press that ends in no click opens nothing (dragged off
+  // the trigger, or a touch on the trigger that becomes a scroll of the page). The flag ties the click to its own
+  // press: a click no press began opens nothing, as in the Menu (Radix's trigger has no click handler); the Ctrl
+  // check is Radix's (the secondary click of macOS opens neither form).
   const sheetPress = useRef(false);
   const onTriggerPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
     sheetPress.current = false;
@@ -267,11 +284,25 @@ export const AppSwitcher = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppSwit
     openList();
   };
 
-  /** Closes the list, gives the focus to the trigger, then runs `then` (which may throw: the list is closed). */
+  /**
+   * Closes the list, gives the focus to the trigger, then runs `then` (which may throw: the list is closed). A focus
+   * `then` moves elsewhere stays there: the Menu does not return it when it is already outside, and the Sheet
+   * neither (`keepFocusWhen` below).
+   */
   const closeThen = (then: () => void) => {
     flushSync(() => setOpen(false));
     triggerRef.current?.focus();
     then();
+  };
+
+  // After its exit animation the Sheet returns the focus to the trigger. When something already has it (the trigger,
+  // given it by `closeThen`, or the heading the page opened by `onNavigate` moved it to) it is left there, the same
+  // rule as the Menu's. Without it a Sheet would take the focus back from the new page.
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const focusIsElsewhere = () => {
+    const doc = triggerRef.current?.ownerDocument ?? document;
+    const active = doc.activeElement;
+    return !!active && active !== doc.body && !sheetRef.current?.contains(active);
   };
 
   // --- The focus survives a change of the list ------------------------------------------------------------------
@@ -476,14 +507,21 @@ export const AppSwitcher = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppSwit
           {hasOthers ? (
             menuItems
           ) : (
-            <div id={emptyId} className={EMPTY}>
+            // A menu without an item is invalid (axe `aria-required-children`): the text is a disabled item, read as
+            // an unavailable item in browse mode, and the Menu's description (the focus stays on the Menu).
+            <MenuItem id={emptyId} disabled className={EMPTY_ITEM}>
               {labels.empty}
-            </div>
+            </MenuItem>
           )}
         </MenuContent>
       </Menu>
-      <Sheet open={open && form === 'sheet'} onOpenChange={(next) => (next ? openList() : closeList())}>
+      <ModalRoot
+        open={open && form === 'sheet'}
+        onOpenChange={(next) => (next ? openList() : closeList())}
+        keepFocusWhen={focusIsElsewhere}
+      >
         <SheetContent
+          ref={sheetRef}
           id={sheetId}
           side="left"
           size="sm"
@@ -505,7 +543,7 @@ export const AppSwitcher = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppSwit
             )}
           </SheetBody>
         </SheetContent>
-      </Sheet>
+      </ModalRoot>
     </>
   );
 });

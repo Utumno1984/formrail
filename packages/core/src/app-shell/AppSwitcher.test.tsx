@@ -39,6 +39,28 @@ const record = (event: Event) => {
   event.preventDefault();
 };
 
+/**
+ * Gives the modal panels an exit animation that never ends, as in a browser without reduced motion: jsdom has no CSS,
+ * so a closed Sheet would leave the DOM at once and its return of the focus would run before the consumer moves it.
+ * Radix's Presence reads `animationName` (an exit that differs from the entry keeps the nodes mounted); the panel's
+ * own safety net removes them after the animation's duration (0 here) plus 500ms, the "end of the animation".
+ */
+function animateModalExit() {
+  const real = window.getComputedStyle.bind(window);
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    const style = real(element, pseudo);
+    const modal = element.matches('[role="dialog"]') || !!element.querySelector(':scope > [role="dialog"]');
+    if (!modal) return style;
+    return new Proxy(style, {
+      get(target, key) {
+        if (key === 'animationName') return element.getAttribute('data-state') === 'closed' ? 'rop-out' : 'rop-in';
+        const value = Reflect.get(target, key) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      },
+    });
+  });
+}
+
 /** Stubs `matchMedia`: `wide` decides whether the app-shell breakpoint query matches. */
 function viewport(wide: boolean) {
   const state = { wide };
@@ -162,6 +184,15 @@ describe('trigger', () => {
     expect(matchMedia).not.toHaveBeenCalled();
   });
 
+  it('auto without matchMedia (server, jsdom) opens a Menu', async () => {
+    vi.stubGlobal('matchMedia', undefined);
+    const user = userEvent.setup();
+    renderSwitcher({ presentation: 'auto' });
+    await openWithKeyboard(user);
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('presentation="sheet" announces a dialog', () => {
     renderSwitcher({ presentation: 'sheet' });
     expect(trigger()).toHaveAttribute('aria-haspopup', 'dialog');
@@ -199,6 +230,16 @@ describe('Menu', () => {
     expect(three).toHaveAccessibleDescription('No access');
     expect(three).not.toHaveAttribute('href');
     expect(within(menu).getByRole('menuitem', { name: 'App two' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('an enabled app ignores its disabledReason: no description', async () => {
+    const user = userEvent.setup();
+    renderSwitcher({ apps: [APPS[0]!, { id: 'two', label: 'App two', href: '/two', disabledReason: 'Left over' }] });
+    await openWithKeyboard(user);
+    const two = await screen.findByRole('menuitem', { name: 'App two' });
+    expect(two).not.toHaveAttribute('aria-describedby');
+    expect(two).toHaveAccessibleDescription('');
+    expect(screen.queryByText('Left over')).toBeNull();
   });
 
   it('the arrows skip the disabled app; Enter on another: closed, focus on the trigger, then onNavigate once', async () => {
@@ -346,6 +387,52 @@ describe('Sheet', () => {
     await waitFor(() => expect(trigger()).toHaveFocus());
   });
 
+  it('the Sheet opens on the click, not on the press: a press that ends in no click opens nothing', async () => {
+    renderSwitcher({ presentation: 'sheet' });
+    fireEvent.pointerDown(trigger(), { button: 0, pointerType: 'mouse' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(trigger(), { button: 0 });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('a Ctrl+press and its click (the secondary click of macOS) open no Sheet, as the Menu', async () => {
+    renderSwitcher({ presentation: 'sheet' });
+    fireEvent.pointerDown(trigger(), { button: 0, ctrlKey: true, pointerType: 'mouse' });
+    fireEvent.click(trigger(), { button: 0, ctrlKey: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('a click no press began opens nothing, also after a Sheet opened by the pointer (as the Menu)', async () => {
+    const user = userEvent.setup();
+    renderSwitcher({ presentation: 'sheet' });
+    await user.click(trigger());
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    fireEvent.click(trigger(), { button: 0 });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('an enabled app ignores its disabledReason in the Sheet too', async () => {
+    const user = userEvent.setup();
+    renderSwitcher({
+      presentation: 'sheet',
+      apps: [APPS[0]!, { id: 'two', label: 'App two', href: '/two', disabledReason: 'Left over' }],
+    });
+    await user.click(trigger());
+    const two = within(await screen.findByRole('dialog')).getByRole('link', { name: 'App two' });
+    expect(two).not.toHaveAttribute('aria-describedby');
+    expect(two).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByText('Left over')).toBeNull();
+  });
+
   it('a plain click on an app: closed, focus on the trigger, then onNavigate once; the current app only closes', async () => {
     const user = userEvent.setup();
     const seen: { open: boolean; focused: Element | null }[] = [];
@@ -394,6 +481,19 @@ describe('Sheet', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
+  it('the middle button is the browser\'s: not cancelled, no onNavigate, the Sheet closes', async () => {
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    renderSwitcher({ presentation: 'sheet', onNavigate });
+    await user.click(trigger());
+    const two = within(await screen.findByRole('dialog')).getByRole('link', { name: 'App two' });
+    const auxclick = new MouseEvent('auxclick', { bubbles: true, cancelable: true, button: 1 });
+    fireEvent(two, auxclick);
+    expect(auxclick.defaultPrevented).toBe(false);
+    expect(onNavigate).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
   it('the form chosen at opening is kept while open, even if the viewport crosses the breakpoint', async () => {
     const state = viewport(false);
     const user = userEvent.setup();
@@ -413,6 +513,30 @@ describe('Sheet', () => {
 });
 
 describe('edge cases', () => {
+  // Only the Sheet has somewhere else to be inside the list (its close button): in the Menu a focus on the panel
+  // itself goes back to an item (Radix's entry focus).
+  it('the focused app leaving the list while the focus is elsewhere in the Sheet leaves the focus there', async () => {
+    const user = userEvent.setup();
+    function Demo() {
+      const [apps, setApps] = useState(APPS);
+      return (
+        <>
+          <AppSwitcher apps={apps} currentAppId="one" presentation="sheet" />
+          <button type="button" data-testid="remove" onClick={() => setApps((list) => list.filter((a) => a.id !== 'two'))} />
+        </>
+      );
+    }
+    render(<Demo />);
+    await openWithKeyboard(user);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'App one' })).toHaveFocus());
+    act(() => screen.getByRole('link', { name: 'App two' }).focus());
+    const close = within(screen.getByRole('dialog')).getByRole('button', { name: /^Close/ });
+    act(() => close.focus());
+    fireEvent.click(screen.getByTestId('remove'));
+    expect(screen.queryByRole('link', { name: 'App two' })).toBeNull();
+    expect(close).toHaveFocus();
+  });
+
   for (const presentation of ['menu', 'sheet'] as const) {
     it(`${presentation}: no app besides the current one shows the empty text; the trigger stays`, async () => {
       const user = userEvent.setup();
@@ -420,9 +544,22 @@ describe('edge cases', () => {
       expect(screen.getByRole('button', { name: 'Switch app' })).toBeEnabled();
       await openWithKeyboard(user);
       expect(await screen.findByText('No other apps available')).toBeInTheDocument();
-      expect(screen.queryAllByRole(presentation === 'menu' ? 'menuitem' : 'link')).toHaveLength(0);
+      if (presentation === 'menu') {
+        // A menu must contain an item (axe aria-required-children): the text is its only item, disabled, and the
+        // Menu's description; the focus stays on the Menu.
+        const menu = screen.getByRole('menu');
+        const items = within(menu).getAllByRole('menuitem');
+        expect(items).toHaveLength(1);
+        expect(items[0]).toHaveAccessibleName('No other apps available');
+        expect(items[0]).toHaveAttribute('aria-disabled', 'true');
+        expect(menu).toHaveAccessibleDescription('No other apps available');
+        await waitFor(() => expect(menu).toHaveFocus());
+      } else {
+        expect(screen.queryAllByRole('link')).toHaveLength(0);
+      }
       rerender(<AppSwitcher apps={[APPS[0]!]} currentAppId="one" presentation={presentation} labels={{ empty: 'Nothing else' }} />);
       expect(screen.getByText('Nothing else')).toBeInTheDocument();
+      if (presentation === 'menu') expect(within(screen.getByRole('menu')).getAllByRole('menuitem')).toHaveLength(1);
     });
 
     it(`${presentation}: the focused app leaving the list moves the focus to the next one, the list stays open`, async () => {
@@ -445,6 +582,81 @@ describe('edge cases', () => {
       expect(screen.queryByRole(role, { name: 'App two' })).toBeNull();
       // The menu skips the disabled App three; the Sheet keeps its focus stop.
       expect(screen.getByRole(role, { name: presentation === 'menu' ? 'App four' : 'App three' })).toHaveFocus();
+      expect(screen.getByRole(presentation === 'menu' ? 'menu' : 'dialog')).toBeInTheDocument();
+    });
+
+    it(`${presentation}: a focus the consumer moves in onNavigate (the new page's heading) stays there`, async () => {
+      // The Sheet returns the focus at the end of its exit animation, after `onNavigate` (the Menu has none).
+      if (presentation === 'sheet') animateModalExit();
+      const user = userEvent.setup();
+      function Page() {
+        const [current, setCurrent] = useState('one');
+        return (
+          <>
+            <AppSwitcher
+              apps={APPS}
+              currentAppId={current}
+              presentation={presentation}
+              onNavigate={(app) => {
+                setCurrent(app.id);
+                document.getElementById('page-title')?.focus();
+              }}
+            />
+            <h1 id="page-title" tabIndex={-1}>
+              Page
+            </h1>
+          </>
+        );
+      }
+      render(<Page />);
+      await openWithKeyboard(user);
+      const role = presentation === 'menu' ? 'menuitem' : 'link';
+      await waitFor(() => expect(screen.getByRole(role, { name: 'App one' })).toHaveFocus());
+      act(() => screen.getByRole(role, { name: 'App two' }).focus());
+      await user.keyboard('{Enter}');
+      // By id: during the Sheet's exit the rest of the page is still hidden from the accessibility tree.
+      const heading = document.getElementById('page-title');
+      expect(heading).toHaveFocus();
+      if (presentation === 'sheet') {
+        // Still on screen, closing (the exit animation), and the focus is on the heading.
+        expect(document.querySelector('[role="dialog"][data-state="closed"]')).not.toBeNull();
+      }
+      // Past the overlay's return of the focus (a frame after it has left the DOM).
+      await waitFor(() => expect(document.querySelector('[role="menu"], [role="dialog"]')).toBeNull(), { timeout: 2000 });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+      expect(heading).toHaveFocus();
+      expect(trigger()).toHaveAccessibleName('Switch app, current: App two');
+    });
+
+    it(`${presentation}: an app that becomes disabled while it has the focus keeps it, and opens nothing`, async () => {
+      const user = userEvent.setup();
+      const onNavigate = vi.fn();
+      function Demo() {
+        const [apps, setApps] = useState(APPS);
+        return (
+          <>
+            <AppSwitcher apps={apps} currentAppId="one" presentation={presentation} onNavigate={onNavigate} />
+            <button
+              type="button"
+              data-testid="disable"
+              onClick={() => setApps((list) => list.map((a) => (a.id === 'two' ? { ...a, disabled: true } : a)))}
+            />
+          </>
+        );
+      }
+      render(<Demo />);
+      await openWithKeyboard(user);
+      const role = presentation === 'menu' ? 'menuitem' : 'link';
+      await waitFor(() => expect(screen.getByRole(role, { name: 'App one' })).toHaveFocus());
+      const two = screen.getByRole(role, { name: 'App two' });
+      act(() => two.focus());
+      fireEvent.click(screen.getByTestId('disable'));
+      expect(two).toHaveFocus();
+      expect(two).toHaveAttribute('aria-disabled', 'true');
+      await user.keyboard('{Enter}');
+      expect(onNavigate).not.toHaveBeenCalled();
       expect(screen.getByRole(presentation === 'menu' ? 'menu' : 'dialog')).toBeInTheDocument();
     });
 

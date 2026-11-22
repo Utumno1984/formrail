@@ -5,6 +5,8 @@ import { MOBILE_VIEWPORT } from './helpers/viewports';
 
 const EXAMPLE = 'navigation-appswitcher--example';
 const DIRTY = 'navigation-appswitcher--with-dirty-guard';
+const ONLY_CURRENT = 'navigation-appswitcher--only-the-current-app';
+const NEW_PAGE = 'navigation-appswitcher--focus-on-the-new-page';
 const DESKTOP = { width: 1280, height: 800 };
 
 const trigger = (page: Page) => page.locator('[data-rop-app-switcher]');
@@ -28,7 +30,7 @@ async function recordClicks(page: Page): Promise<void> {
 const clicks = (page: Page) => page.evaluate(() => (window as unknown as { __clicks: string[] }).__clicks);
 
 test.describe('AppSwitcher', () => {
-  for (const name of ['playground', 'menu-open', 'sheet-open', 'with-dirty-guard', 'closed']) {
+  for (const name of ['playground', 'menu-open', 'sheet-open', 'with-dirty-guard', 'closed', 'only-the-current-app', 'focus-on-the-new-page']) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, `navigation-appswitcher--${name}`);
     });
@@ -211,5 +213,96 @@ test.describe('AppSwitcher', () => {
     await sheet(page).getByRole('link', { name: 'App four' }).tap();
     await expect(sheet(page)).toHaveCount(0);
     await expect(trigger(page)).toHaveAccessibleName('Switch app, current: App four');
+  });
+  // A menu must contain an item (axe aria-required-children, critical): with no other app the text is its only item.
+  for (const presentation of ['menu', 'sheet'] as const) {
+    test(`${presentation} with only the current app: the empty text, no axe violations with the list open`, async ({ page }) => {
+      await page.setViewportSize(presentation === 'menu' ? DESKTOP : MOBILE_VIEWPORT);
+      await expectPlayToPass(page, ONLY_CURRENT, `presentation:${presentation}`);
+      if (presentation === 'menu') {
+        await expect(page.getByRole('menu')).toHaveAccessibleDescription('No other apps available');
+        await expect(page.getByRole('menuitem')).toHaveCount(1);
+        await expect(page.getByRole('menuitem', { name: 'No other apps available' })).toHaveAttribute('aria-disabled', 'true');
+      } else {
+        await expect(sheet(page).getByText('No other apps available')).toBeVisible();
+      }
+      await expectNoA11yViolations(page);
+      await page.keyboard.press('Escape');
+      await expect(trigger(page)).toBeFocused();
+    });
+
+    test(`${presentation}: the focus onNavigate moves to the new page's heading is still there 800ms later`, async ({ page }) => {
+      await page.setViewportSize(presentation === 'menu' ? DESKTOP : MOBILE_VIEWPORT);
+      await expectPlayToPass(page, NEW_PAGE, `presentation:${presentation}`);
+      const heading = page.locator('#storybook-root h1');
+      await expect(heading).toHaveText('App three');
+      await trigger(page).click();
+      if (presentation === 'menu') await menuItem(page, 'App two').click();
+      else await sheet(page).getByRole('link', { name: 'App two' }).click();
+      await expect(heading).toHaveText('App two');
+      await expect(heading).toBeFocused();
+      // Well past the Sheet's exit animation and its return of the focus.
+      await page.waitForTimeout(800);
+      await expect(page.locator('[role="menu"], [role="dialog"]')).toHaveCount(0);
+      await expect(heading).toBeFocused();
+    });
+  }
+
+  test('Sheet: the middle button is the browser\'s, onNavigate is not called, the Sheet closes', async ({ page }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await expectPlayToPass(page, EXAMPLE);
+    await trigger(page).click();
+    await recordClicks(page);
+    await sheet(page).getByRole('link', { name: 'App two' }).click({ button: 'middle' });
+    await expect(sheet(page)).toHaveCount(0);
+    expect(await clicks(page)).toEqual(['auxclick:false']);
+    await expect(trigger(page)).toHaveAccessibleName('Switch app, current: App one');
+  });
+
+  // The Sheet opens on the click, the activation of a button; the Menu on the press (Radix).
+  test('@engines Sheet: a press opens nothing until its click; a press dragged off the trigger opens nothing', async ({ page }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await expectPlayToPass(page, EXAMPLE);
+    const box = (await trigger(page).boundingBox())!;
+    const frames = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await frames();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height + 200, { steps: 4 });
+    await page.mouse.up();
+    await frames();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await frames();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.mouse.up();
+    await expect(sheet(page)).toBeVisible();
+  });
+
+  test('@touch Sheet: a touch opens nothing until it ends in a tap; a touch that moves away (a scroll) opens nothing', async ({ page }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await expectPlayToPass(page, EXAMPLE);
+    const box = (await trigger(page).boundingBox())!;
+    const point = { x: box.x + box.width / 2, y: box.y + box.height / 2, id: 1 };
+    const frames = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await frames();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    for (const dy of [20, 60, 120]) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...point, y: point.y + dy }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await frames();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    await frames();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect(sheet(page)).toBeVisible();
+    await expect(sheet(page).getByRole('link', { name: 'App one' })).toBeFocused();
   });
 });
