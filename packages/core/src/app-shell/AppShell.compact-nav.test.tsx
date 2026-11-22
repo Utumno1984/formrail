@@ -852,6 +852,30 @@ describe('the viewport crossing the breakpoint', () => {
     expect(column().querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
   });
 
+  it('reopened during the exit a crossing to wide began, the Sheet keeps its links during its next exit', async () => {
+    animateModalExit();
+    const user = userEvent.setup();
+    render(<Shell active="B" />);
+    await openWithKeyboard(user);
+    screenSize.cross(true);
+    // Still in its exit animation (the same panel is reused when it opens again now).
+    expect(document.querySelector('[role="dialog"][data-state="closed"]')).not.toBeNull();
+    screenSize.cross(false);
+    const sheet = await openWithKeyboard(user);
+    expect(sheet).toHaveAttribute('data-state', 'open');
+    expect(sheetNav()!.querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    act(() => linkIn(sheet, 'B').focus());
+    await user.keyboard('{Escape}');
+    // Leaving with its links, the focus still on the one it had, as after any closing.
+    expect(sheet).toHaveAttribute('data-state', 'closed');
+    expect(sheetNav()!.querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    expect(column().querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(0);
+    expect(linkIn(sheet, 'B')).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull(), { timeout: 2000 });
+    expect(column().querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    await waitFor(() => expect(trigger()).toHaveFocus());
+  });
+
   it('the column takes the focus once after a crossing: a later render leaves it where the user moved it', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Shell active="B" />);

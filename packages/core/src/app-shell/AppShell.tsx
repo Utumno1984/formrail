@@ -550,8 +550,10 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
   // Whether the Sheet's panel is on screen (open, or in its exit animation): set by the panel's own ref.
   const [panelShown, setPanelShown] = useState(false);
   // The viewport crossed the breakpoint while the Sheet was open: the links go back to the column at once, and the
-  // Sheet leaves without them (until it has left: the next opening keeps them in it during its exit again).
+  // Sheet leaves without them (until it has left or opens again: the next exit keeps them in it again).
   const [leaving, setLeaving] = useState(false);
+  // Reopened during that exit, the same panel is reused (it never left), so the reset happens here.
+  if (open && leaving) setLeaving(false);
   const setPanel = useCallback((node: HTMLDivElement | null) => {
     setPanelShown(node !== null);
     if (!node) setLeaving(false);
