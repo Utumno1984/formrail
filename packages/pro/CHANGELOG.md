@@ -57,7 +57,6 @@
   
   Without the new option nothing changes. No new runtime export. Bundle: `computeRebase` +124 B and
   `useFormRebase` +188 B gzip; see the PR for the numbers.
-- 36fd5e8: `computeRebase` and `useFormRebase` (#383): three-way merge of a server update into a form being edited. Fields the user did not touch take the incoming value, touched fields keep the user's value, and fields changed by both sides in different ways are exposed as conflicts. `useFormRebase` applies the merge to a core `useObjectPageForm` through its public API (`reset` + `setValues` in one batch), queues an update that arrives during a save, and tracks the conflicts until they are resolved, the form is saved or reset. The package stays private.
 - 961c98c: New entry `@formrail/pro/react-hook-form` (#507): `useReactHookFormBinding(form)` binds a React Hook Form form (`useForm()`) to the `RebaseFormBinding` contract, so `useChangeSummary` and `useFormRebase` of `@formrail/pro/engine` work on it without `@formrail/core`. `binding.values` and `binding.baseline` are immutable snapshots of the values React Hook Form mutates in place, with the same identity across renders that change no value; the baseline follows React Hook Form's defaults (`form.reset(data)`, the `values` prop) and is the object passed to `binding.reset(saved)`. What `binding.reset` / `binding.setValues` change (a rebase, `acceptTheirs` / `keepMine`, `reset(saved)`) is written once, at the end of the synchronous run, with `setValue` on each changed field and `resetDefaultValues` (React Hook Form's `reset` only for a top-level key to remove): no `type: 'change'` event, no remount of the `useFieldArray` rows, `dirtyFields` only on the user's edits, `touchedFields` and `submitCount` kept, the errors of the fields the rebase did not change kept; a write of the app made after it in the same run wins on the fields it changes. `isSaving` / `saveError` map `handleSubmit` (`isSubmitting`, a failed submit; a submit ended by `binding.reset(saved)` has saved), or come from the options for a save of your own. `react-hook-form` (`^7.92.0`) is an **optional** peer dependency, used for the types only; the main entry `@formrail/pro` and `@formrail/pro/engine` do not name it. The package stays private.
 - c7273e8: `<RebaseNotice />` (#384): the result of a `useFormRebase` rebase as a message strip ("This record was updated while you were editing"). It shows the count of server changes applied and every conflict with both values (rendered like `ChangeSummary`, with the same `renderValue`), the choices "Use server value" / "Keep mine" named after the field, and "Use all server values".
   - **Announcements**: once per update, from a live region that is always mounted; a pending update that changes nothing once applied is announced too (`labels.pendingNoChanges`). An update never moves the focus.
@@ -71,7 +70,6 @@
   
   The Pro showcase "Invoices with Change Summary" gains "Simulate server update" (story-only).
 - 34c1814: New entry `@formrail/pro/tanstack-form` (#508): `useTanStackFormBinding(form)` binds a TanStack Form form (`useForm()` of `@tanstack/react-form`) to the `RebaseFormBinding` contract, so `useChangeSummary` and `useFormRebase` of `@formrail/pro/engine` work on it without `@formrail/core` and without `react-hook-form`; `Values` is inferred from `useForm({ defaultValues })`. `binding.values` and `binding.baseline` are immutable snapshots with the same identity across renders that change no value (an inline `defaultValues` included); the baseline follows TanStack Form's live defaults (a new `defaultValues`, also on a touched form; `form.reset(data)`) and is the object passed to `binding.reset(saved)`. What `binding.reset` / `binding.setValues` change (a rebase, `acceptTheirs` / `keepMine`, `reset(saved)`) is written in one update of the form's base store: no field meta, no `listeners.onChange`, no validator, a top-level key removed too, the array version of a `mode="array"` field bumped. The binding never writes TanStack Form's own defaults (`useForm` re-applies its options at every render): the README documents what that means for `isDefaultValue`, `isDirty` and `form.reset()`, and recommends keeping `defaultValues` on the binding's baseline (a `saved` state that follows `binding.baseline`, as the Storybook Example does); after a change of content of `defaultValues` the binding has TanStack Form recompute its field meta, so `isDefaultValue` agrees with the summary at once (on a touched form TanStack Form's `update()` does not recompute it). `isSaving` / `saveError` map `form.handleSubmit()` (`isSubmitting`, a submit that did not succeed), or come from the options for a save of your own. `@tanstack/react-form` (`~1.33.5`, the tested minor only: the adapter reads internals of TanStack Form that are not public API) is an **optional** peer dependency, used for the types only; the main entry, `@formrail/pro/engine` and `@formrail/pro/react-hook-form` do not name it. The package stays private.
-- ef448e2: Rebrand (#428): the project is now **Formrail**. `@formrail/core` is renamed from `@react-object-page/core`, and `@formrail/pro` from `@react-object-page/pro`; the repository moves to `github.com/Utumno1984/formrail` and the docs to `utumno1984.github.io/formrail/`. The API, the CSS entries and the design tokens (`--color-rop-*`, `--text-rop-*`, ...) are unchanged: to migrate, replace the package name in your `package.json` and in every import (`@react-object-page/core` → `@formrail/core`, including the `/styles.css` and `/theme.css` subpaths, and `@source '../node_modules/@formrail/core/dist'` on Tailwind v4). Breaking for tooling that matches the development messages: their prefix changes from `[react-object-page]` to `[formrail]` (`[formrail/pro]` in the Pro package). Entries in this changelog before this release were published under the old name.
 
 ### Patch Changes
 
@@ -81,18 +79,11 @@
 - 447ba6e: Docs: `VirtualListReport` / `VirtualListReportTable` document `virtualizeThreshold` (200) and `overscan` (10) with
   `@default`, and the descriptions of about 40 props no longer repeat the default already shown in the Default column
   (comments only, no change of behaviour).
-- e953eb7: Docs (#401): the Storybook props tables now come from `react-docgen-typescript`, so composed props types are documented in full (`ListReport`, `Accordion`, `VirtualListReport`, `VirtualListReportTable`, and the union members of `ListReportTable`, `Field` and `Button`). Demo-only controls and hook options shown as Controls are filed under "Story controls"; composed components declare their parts as `subcomponents`. TSDoc added to the props that had none (types only, no runtime change), including the Radix props the overlays pass through (`asChild`, `MenuContent`'s positioning and outside-interaction callbacks, `MenuItem`'s `disabled` / `textValue`), now redeclared with the same types; where the wrapper changes what Radix's own text promises, the prop is redeclared with a truthful description: `onCloseAutoFocus` on `DialogContent` / `SheetContent` / `MenuContent` (the focus is returned by the component, so `preventDefault()` has no effect) and the focus / outside-interaction callbacks of `DialogContent` / `SheetContent` (`dismissible={false}`) and `MenuContent` (touch tap outside a modal menu, focus moving out); `Button`'s `aria-label` / `aria-labelledby` are declared by each size branch instead of the HTML base (same accepted types). An e2e guard (`e2e/docs-props.spec.ts`) fails on an empty table, a row that is not a real prop, or a prop without TSDoc.
 - 8e15960: TSDoc for every member of the public types that had none (`UseListReportOptions`, `UseListReportReturn`,
   `ListReportColumn`, `ListReportFilter`, `ListReportSort`, `UseComboboxOptions`/`UseComboboxReturn`,
   `FieldControlProps`, the Standard Schema types, `RebaseConflict`, `UseFormRebaseOptions`, `ChangeEntry.kind`,
   ...): it now shows in the editor and on the reference pages of the Storybook, generated from the TSDoc. No
   runtime change.
-- d2a2916: Docs: every converted Docs page (Data, Floorplans, Patterns, the showcases) opens with a copy-paste example whose "Show code" is a real, type-checked file importing only `@formrail/core` / `@formrail/pro`, followed by the Playground with its Controls. `Data/ListReportTable` shows the complete pattern (`useListReport` → `table`, a flex parent with `min-height: 0`); the showcases list their main source files with links to GitHub. No change to the published code.
-- 69ca66b: Docs (#407): `Forms/Input` and `Foundations/Utilities` pages, explicit sections for `useFieldControl`, `useCombobox`/`defaultComboboxFilter`, `TooltipProvider`, `DescriptionListStatus` and, in Pro, `inferSegmentLabel` and `computeRebase`; `Overlays/Menu` gets its props tables. The Introduction index lists every public page, and a guard (`scripts/docs-coverage.test.mjs`) fails when a runtime export has no Docs page or a Docs page is missing from its Introduction.
-- dba9362: Docs: the `ListReport` and `VirtualListReport` copy-paste examples have a height that follows the viewport
-  (`clamp(20rem, calc(100dvh - 4rem), 40rem)`, with a `vh` fallback) instead of a fixed 420px / 480px, so a phone shows
-  more rows and the page can still be scrolled past the example. Documentation and examples only, no API changes.
-- a25cb28: Copy-paste examples (#493): the `MessageStrip` example wrapper forgets its focus ring when it is removed while focused, so it comes back without a ring until it receives the focus again; the wrapper carries a `data-testid`. Every `*.example.tsx` now fits in 110 columns (long imports, props and comments are wrapped), enforced by ESLint `max-len`. Documentation and examples only, no API changes.
 - c461f88: `<RebaseNotice />` follow-ups (#470):
   - **Focus not obscured (WCAG 2.4.11)**: a field being typed in that the notice pushes out of the top strip of the scroll container is brought back below what the container keeps stuck at its top, such as a sticky Anchor Bar. Until now it could stay hidden under that bar. Any other focused control still does not move the content, also when reached with the keyboard. This choice is documented. Such a control leaves the view by a scroll of its container: it is not covered by author-created content, and it received the focus fully visible. A choice in the notice moves the focus only to a live element, with `preventScroll`.
   - **Layout**: the position is recorded again when the box the notice sits in is resized from outside, for example a consumer that caps the notice's row above the virtual keyboard. Before, the next render scrolled by that move too. At the end of the content, where the browser clamps the scroll position in the relayout, that position is no longer counted twice. A scroll made in the same task as the commit, such as a callback that scrolls or moves the focus, is still kept.
@@ -101,12 +92,6 @@
   Story-only (Pro showcase "Invoices with Change Summary"):
   - After "Use server value" on a line the server removed, the focus goes to the line that took its place, else to the previous line, else to "Add line" (it was left on `<body>` when the removed line was the last).
   - The notice row is capped by the room that stays visible: 40% of the editor, and the scroller keeps 10rem, also above the virtual keyboard. The notice never goes below 3rem.
-- e98e3f4: Tests only, no type or behaviour changes: a generic test now checks that the default written in the prose of every
-  key of every `*Labels` interface ("Default `Next month`.") is the value of the code, in core and Pro, every value of
-  it when the prose lists several ("Default `Information`, `Success`, `Warning` and `Error`."), in order and in number.
-  To read the values, the default texts of `Calendar`, `DatePicker`, `FileUpload`, `MultiSelect`, `NumberInput`,
-  `Pagination` and `ToastProvider` are exported from their modules for the tests (`@internal`, not re-exported by the
-  package entries: nothing new is public).
 - 8610ee3: `RebaseNoticeLabels`: the TSDoc writes each default as the code has it (Default `Yours`), not with quotes inside the
   backticks. Documentation only, no type or behaviour changes.
 - 3054895: List Report table (#501): when the columns do not fit the scroll container, a translucent shade marks each inline edge past
@@ -124,13 +109,6 @@
   or resize. In browsers without `color-mix()` (Safari 16.0 and 16.1) the shades are now drawn, from an `@supports not`
   fallback with the same colour and alpha; nothing changes where `color-mix()` is supported. Shared by `ListReportTable`,
   `ListReport` and, in `@formrail/pro`, `VirtualListReportTable` / `VirtualListReport` (no Pro source change).
-- f01cf09: List Report: `rowActionsInline` (#364) on `ListReportTable`, `ListReport` and the internal `ListReportFrame`. With `rowActionsInline={n}` the first `n` actions with an `icon` of every row are inline icon buttons (a tooltip with the label on hover/keyboard focus, named `labels.rowAction(label, rowLabel)`, default "Delete FT-2026-0001") while the table's scroll container is at least 40rem wide, followed by the "…" menu with the other actions; below 40rem every action is back in the "…" menu. The switch is CSS alone (a container query on the scroll container, not the viewport): both forms are rendered from the same descriptors and only one is displayed, so `onSelect` and `disabled` are the same in both (a disabled inline action is `aria-disabled`, focusable, and does nothing). `returnFocusRef` is the control that was used. A menu open when the form changes closes without running anything and the focus goes to the visible control of the row. The actions column is `n` icon slots wider in the wide form, the same on every row and in every state. With `rowActionsInline` the scroll container gets inline-size containment (its width must come from its parent). Default `0`: unchanged. New label `rowAction`.
-  
-  Row actions menu: a press on the "…" trigger now gives it the focus, so closing the menu returns the focus to that trigger instead of to the control that was focused before (e.g. another row's button).
-  
-  Pro: `VirtualListReportTable` and `VirtualListReport` pass `rowActionsInline` to their rows.
-- 7dacd90: List Report: per-row actions. `ListReportTable` and `ListReport` accept `rowActions: (row) => readonly ListReportRowAction[]`, which adds a trailing structural column (not one of `columns`, as wide as a row is tall, sticky at the inline end so it stays in view while a narrow table scrolls sideways) with, in every row that has actions, a "…" button named "Actions for <row label>" (`labels.rowActions`, from the resolved `getRowLabel`, also without `selectable`) that opens a `Menu` with one item per action (`label`, optional `icon`, `disabled`, `tone: 'danger'`). `onSelect` receives `{ returnFocusRef }`, the row's trigger, to pass to a dialog the action opens. The header is named "Actions" (`labels.rowActionsColumn`, visually hidden); skeleton, empty, no-results and error states span the extra column. Without `rowActions` the DOM is unchanged. Exports `ListReportRowAction`, `ListReportRowActionContext`, `ListReportRowActions`. In `@formrail/pro`, `VirtualListReportTable`/`VirtualListReport` pass `rowActions` to their rows (same column and menu on the mounted rows).
-- b529ed5: Docs: copy-paste "Show code" examples for the Pro pages (ChangeSummary, Virtual List Report, Form rebase), #447. `exampleStory` (story-only) finds the examples of the packages each Storybook build includes, and the stylesheet reminder of a Pro page names the core then the Pro stylesheet. Pro README: the import order no longer lists `theme.css` together with `styles.css`. No change to the components.
 - a491276: `VirtualListReport`: the focus rule of the selection bar (a focused control of the bulk actions that goes away hands the focus to the header checkbox) now also sees a control nested inside a wrapper of the consumer (a change of children or of `hidden`/`class`/`style` anywhere inside the bulk actions) and a control under `visibility: hidden` (e.g. "Select all N results" once the selection stops being partial because of a change that is not a gesture on it); a control with `visibility: visible` inside a hidden wrapper keeps its focus. The label `selectAllResultsDescription` of `VirtualListReportLabels` is optional (it has a default, now documented as English only like the other labels).
   
   `@formrail/core`: the observer of that rule left `ListReportFrame` for the Pro, so the Free `ListReport` no longer ships it (smaller bundle, no change of behaviour). Internal channels only: the frame's internal `keepBulkActionsFocus` is replaced by `bulkActionsSlotRef`, and `/internal` re-exports `isLaidOut`; no public API change.
@@ -146,86 +124,69 @@
 - Updated dependencies [ab8098c]
 - Updated dependencies [c1a8816]
 - Updated dependencies [70788b4]
-- Updated dependencies [e8e9f81]
 - Updated dependencies [592feab]
 - Updated dependencies [3719b48]
-- Updated dependencies [2a9e22d]
-- Updated dependencies [1cb9db4]
 - Updated dependencies [ef0c1ef]
 - Updated dependencies [447ba6e]
-- Updated dependencies [88883b2]
-- Updated dependencies [6fb91a1]
 - Updated dependencies [e953eb7]
 - Updated dependencies [8e15960]
 - Updated dependencies [d2a2916]
-- Updated dependencies [69ca66b]
-- Updated dependencies [950e0a2]
 - Updated dependencies [dba9362]
 - Updated dependencies [a396014]
 - Updated dependencies [2ced549]
 - Updated dependencies [d11417c]
 - Updated dependencies [7bc62f7]
 - Updated dependencies [a25cb28]
-- Updated dependencies [eb7ebe0]
-- Updated dependencies [b63286b]
-- Updated dependencies [3b35740]
-- Updated dependencies [43d2bee]
-- Updated dependencies [f8cbc06]
-- Updated dependencies [77d0b29]
-- Updated dependencies [3a9f048]
-- Updated dependencies [c9996c5]
 - Updated dependencies [17d9019]
 - Updated dependencies [03df4b0]
 - Updated dependencies [a76ceb5]
 - Updated dependencies [59a52e9]
 - Updated dependencies [0c5b5b1]
 - Updated dependencies [b4b9e14]
-- Updated dependencies [995e152]
 - Updated dependencies [c25ec00]
-- Updated dependencies [31d910b]
 - Updated dependencies [e98e3f4]
 - Updated dependencies [39fe859]
-- Updated dependencies [0349725]
-- Updated dependencies [efe8ff7]
 - Updated dependencies [8755727]
 - Updated dependencies [f724652]
 - Updated dependencies [3054895]
 - Updated dependencies [fcdeb64]
-- Updated dependencies [f01cf09]
-- Updated dependencies [7dacd90]
-- Updated dependencies [def1a13]
 - Updated dependencies [5b2a71e]
-- Updated dependencies [675ad1c]
 - Updated dependencies [8afe399]
-- Updated dependencies [d924f62]
 - Updated dependencies [0c1b1a8]
-- Updated dependencies [98616e4]
-- Updated dependencies [d1b26e5]
 - Updated dependencies [2be809e]
 - Updated dependencies [140f87e]
-- Updated dependencies [a154f85]
 - Updated dependencies [229cc28]
 - Updated dependencies [b529ed5]
-- Updated dependencies [ef448e2]
 - Updated dependencies [bb8e2f5]
-- Updated dependencies [445b011]
 - Updated dependencies [a491276]
 - Updated dependencies [d3da7a9]
 - Updated dependencies [26611cb]
-- Updated dependencies [a47417f]
-- Updated dependencies [312ef8d]
-- Updated dependencies [d8b4eaf]
-- Updated dependencies [9e41f3e]
-- Updated dependencies [981156d]
-- Updated dependencies [f4c79c2]
 - Updated dependencies [7c33149]
-- Updated dependencies [6949cca]
-- Updated dependencies [86a31ee]
 - Updated dependencies [099c9fd]
 - Updated dependencies [70988b4]
   - @formrail/core@0.2.0
 
+### Documentation and examples (no change to the package)
+
+Stories, copy-paste examples, showcases, tests and docs tooling: nothing here changes what is published in `dist`.
+
+- e953eb7: Docs (#401): the Storybook props tables now come from `react-docgen-typescript`, so composed props types are documented in full (`ListReport`, `Accordion`, `VirtualListReport`, `VirtualListReportTable`, and the union members of `ListReportTable`, `Field` and `Button`). Demo-only controls and hook options shown as Controls are filed under "Story controls"; composed components declare their parts as `subcomponents`. TSDoc added to the props that had none (types only, no runtime change), including the Radix props the overlays pass through (`asChild`, `MenuContent`'s positioning and outside-interaction callbacks, `MenuItem`'s `disabled` / `textValue`), now redeclared with the same types; where the wrapper changes what Radix's own text promises, the prop is redeclared with a truthful description: `onCloseAutoFocus` on `DialogContent` / `SheetContent` / `MenuContent` (the focus is returned by the component, so `preventDefault()` has no effect) and the focus / outside-interaction callbacks of `DialogContent` / `SheetContent` (`dismissible={false}`) and `MenuContent` (touch tap outside a modal menu, focus moving out); `Button`'s `aria-label` / `aria-labelledby` are declared by each size branch instead of the HTML base (same accepted types). An e2e guard (`e2e/docs-props.spec.ts`) fails on an empty table, a row that is not a real prop, or a prop without TSDoc.
+- d2a2916: Docs: every converted Docs page (Data, Floorplans, Patterns, the showcases) opens with a copy-paste example whose "Show code" is a real, type-checked file importing only `@formrail/core` / `@formrail/pro`, followed by the Playground with its Controls. `Data/ListReportTable` shows the complete pattern (`useListReport` → `table`, a flex parent with `min-height: 0`); the showcases list their main source files with links to GitHub. No change to the published code.
+- dba9362: Docs: the `ListReport` and `VirtualListReport` copy-paste examples have a height that follows the viewport
+  (`clamp(20rem, calc(100dvh - 4rem), 40rem)`, with a `vh` fallback) instead of a fixed 420px / 480px, so a phone shows
+  more rows and the page can still be scrolled past the example. Documentation and examples only, no API changes.
+- a25cb28: Copy-paste examples (#493): the `MessageStrip` example wrapper forgets its focus ring when it is removed while focused, so it comes back without a ring until it receives the focus again; the wrapper carries a `data-testid`. Every `*.example.tsx` now fits in 110 columns (long imports, props and comments are wrapped), enforced by ESLint `max-len`. Documentation and examples only, no API changes.
+- e98e3f4: Tests only, no type or behaviour changes: a generic test now checks that the default written in the prose of every
+  key of every `*Labels` interface ("Default `Next month`.") is the value of the code, in core and Pro, every value of
+  it when the prose lists several ("Default `Information`, `Success`, `Warning` and `Error`."), in order and in number.
+  To read the values, the default texts of `Calendar`, `DatePicker`, `FileUpload`, `MultiSelect`, `NumberInput`,
+  `Pagination` and `ToastProvider` are exported from their modules for the tests (`@internal`, not re-exported by the
+  package entries: nothing new is public).
+- b529ed5: Docs: copy-paste "Show code" examples for the Pro pages (ChangeSummary, Virtual List Report, Form rebase), #447. `exampleStory` (story-only) finds the examples of the packages each Storybook build includes, and the stylesheet reminder of a Pro page names the core then the Pro stylesheet. Pro README: the import order no longer lists `theme.css` together with `styles.css`. No change to the components.
+
 ## 0.1.0
+
+This package was never published. Its 0.1.0 is versioned together with `@formrail/core@0.1.0`, which contains the entries listed under "Also in the 0.1.0 of the core package" at the end of this section.
 
 Not published: this package is private (commercial license, to be defined) and is versioned together
 with `@react-object-page/core`.
@@ -237,3 +198,57 @@ with `@react-object-page/core`.
   client-side datasets of 10⁴–10⁵ rows (same props and DOM as the Free table; below
   `virtualizeThreshold` it is the Free table), range selection, `aria-rowcount`/`aria-rowindex`, SSR.
 - Initial scaffold of the package (build, lint, typecheck and unit-test toolchain).
+
+### Also in the 0.1.0 of the core package
+
+#### Minor Changes
+
+- 36fd5e8: `computeRebase` and `useFormRebase` (#383): three-way merge of a server update into a form being edited. Fields the user did not touch take the incoming value, touched fields keep the user's value, and fields changed by both sides in different ways are exposed as conflicts. `useFormRebase` applies the merge to a core `useObjectPageForm` through its public API (`reset` + `setValues` in one batch), queues an update that arrives during a save, and tracks the conflicts until they are resolved, the form is saved or reset. The package stays private.
+- ef448e2: Rebrand (#428): the project is now **Formrail**. `@formrail/core` is renamed from `@react-object-page/core`, and `@formrail/pro` from `@react-object-page/pro`; the repository moves to `github.com/Utumno1984/formrail` and the docs to `utumno1984.github.io/formrail/`. The API, the CSS entries and the design tokens (`--color-rop-*`, `--text-rop-*`, ...) are unchanged: to migrate, replace the package name in your `package.json` and in every import (`@react-object-page/core` → `@formrail/core`, including the `/styles.css` and `/theme.css` subpaths, and `@source '../node_modules/@formrail/core/dist'` on Tailwind v4). Breaking for tooling that matches the development messages: their prefix changes from `[react-object-page]` to `[formrail]` (`[formrail/pro]` in the Pro package). This package is private and was never published, under either name.
+
+#### Patch Changes
+
+- 69ca66b: Docs (#407): `Forms/Input` and `Foundations/Utilities` pages, explicit sections for `useFieldControl`, `useCombobox`/`defaultComboboxFilter`, `TooltipProvider`, `DescriptionListStatus` and, in Pro, `inferSegmentLabel` and `computeRebase`; `Overlays/Menu` gets its props tables. The Introduction index lists every public page, and a guard (`scripts/docs-coverage.test.mjs`) fails when a runtime export has no Docs page or a Docs page is missing from its Introduction.
+- f01cf09: List Report: `rowActionsInline` (#364) on `ListReportTable`, `ListReport` and the internal `ListReportFrame`. With `rowActionsInline={n}` the first `n` actions with an `icon` of every row are inline icon buttons (a tooltip with the label on hover/keyboard focus, named `labels.rowAction(label, rowLabel)`, default "Delete FT-2026-0001") while the table's scroll container is at least 40rem wide, followed by the "…" menu with the other actions; below 40rem every action is back in the "…" menu. The switch is CSS alone (a container query on the scroll container, not the viewport): both forms are rendered from the same descriptors and only one is displayed, so `onSelect` and `disabled` are the same in both (a disabled inline action is `aria-disabled`, focusable, and does nothing). `returnFocusRef` is the control that was used. A menu open when the form changes closes without running anything and the focus goes to the visible control of the row. The actions column is `n` icon slots wider in the wide form, the same on every row and in every state. With `rowActionsInline` the scroll container gets inline-size containment (its width must come from its parent). Default `0`: unchanged. New label `rowAction`.
+  
+  Row actions menu: a press on the "…" trigger now gives it the focus, so closing the menu returns the focus to that trigger instead of to the control that was focused before (e.g. another row's button).
+  
+  Pro: `VirtualListReportTable` and `VirtualListReport` pass `rowActionsInline` to their rows.
+- 7dacd90: List Report: per-row actions. `ListReportTable` and `ListReport` accept `rowActions: (row) => readonly ListReportRowAction[]`, which adds a trailing structural column (not one of `columns`, as wide as a row is tall, sticky at the inline end so it stays in view while a narrow table scrolls sideways) with, in every row that has actions, a "…" button named "Actions for <row label>" (`labels.rowActions`, from the resolved `getRowLabel`, also without `selectable`) that opens a `Menu` with one item per action (`label`, optional `icon`, `disabled`, `tone: 'danger'`). `onSelect` receives `{ returnFocusRef }`, the row's trigger, to pass to a dialog the action opens. The header is named "Actions" (`labels.rowActionsColumn`, visually hidden); skeleton, empty, no-results and error states span the extra column. Without `rowActions` the DOM is unchanged. Exports `ListReportRowAction`, `ListReportRowActionContext`, `ListReportRowActions`. In `@formrail/pro`, `VirtualListReportTable`/`VirtualListReport` pass `rowActions` to their rows (same column and menu on the mounted rows).
+- Updated dependencies [e8e9f81]
+- Updated dependencies [2a9e22d]
+- Updated dependencies [1cb9db4]
+- Updated dependencies [88883b2]
+- Updated dependencies [6fb91a1]
+- Updated dependencies [69ca66b]
+- Updated dependencies [950e0a2]
+- Updated dependencies [eb7ebe0]
+- Updated dependencies [b63286b]
+- Updated dependencies [3b35740]
+- Updated dependencies [43d2bee]
+- Updated dependencies [f8cbc06]
+- Updated dependencies [77d0b29]
+- Updated dependencies [3a9f048]
+- Updated dependencies [c9996c5]
+- Updated dependencies [995e152]
+- Updated dependencies [31d910b]
+- Updated dependencies [0349725]
+- Updated dependencies [efe8ff7]
+- Updated dependencies [f01cf09]
+- Updated dependencies [7dacd90]
+- Updated dependencies [def1a13]
+- Updated dependencies [675ad1c]
+- Updated dependencies [d924f62]
+- Updated dependencies [98616e4]
+- Updated dependencies [d1b26e5]
+- Updated dependencies [a154f85]
+- Updated dependencies [ef448e2]
+- Updated dependencies [445b011]
+- Updated dependencies [a47417f]
+- Updated dependencies [312ef8d]
+- Updated dependencies [d8b4eaf]
+- Updated dependencies [9e41f3e]
+- Updated dependencies [981156d]
+- Updated dependencies [f4c79c2]
+- Updated dependencies [6949cca]
+- Updated dependencies [86a31ee]
