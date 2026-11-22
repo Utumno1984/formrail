@@ -451,13 +451,11 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
   const openRef = useRef(open);
   openRef.current = open;
   // Whether the Sheet's panel is on screen (open, or in its exit animation): set by the panel's own ref.
-  const panelRef = useRef<HTMLDivElement | null>(null);
   const [panelShown, setPanelShown] = useState(false);
   // The viewport crossed the breakpoint while the Sheet was open: the links go back to the column at once, and the
-  // Sheet leaves without them.
+  // Sheet leaves without them (until it has left: the next opening keeps them in it during its exit again).
   const [leaving, setLeaving] = useState(false);
   const setPanel = useCallback((node: HTMLDivElement | null) => {
-    panelRef.current = node;
     setPanelShown(node !== null);
     if (!node) setLeaving(false);
   }, []);
@@ -502,10 +500,10 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
       trigger.current?.focus();
       then();
     };
-    // After its exit animation the Sheet gives the focus back to the trigger. When something outside it already has
-    // the focus (the trigger, given it by `closeThen`; the heading `onNavigate` moved it to; the column after a
-    // crossing of the breakpoint) it is left there.
-    const focusIsElsewhere = () => document.activeElement !== document.body && !panelRef.current?.contains(document.activeElement);
+    // After its exit animation (once its panel has left the DOM, taking a focus it held with it) the Sheet gives the
+    // focus back to the trigger. When something already has the focus (the trigger, given it by `closeThen`; the
+    // heading `onNavigate` moved it to; the column after a crossing of the breakpoint) it is left there.
+    const focusIsElsewhere = () => document.activeElement !== document.body;
     const onOpenAutoFocus = (event: Event) => {
       const target = navFocusTarget(sheetNavRef.current);
       if (!target) return;
@@ -519,7 +517,6 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
           id={navSheet.sheetId}
           side={navSheet.side}
           size="sm"
-          aria-describedby={undefined}
           onOpenAutoFocus={onOpenAutoFocus}
           data-rop-app-shell-nav-sheet=""
         >
