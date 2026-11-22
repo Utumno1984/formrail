@@ -61,7 +61,12 @@ async function editAndLeave(canvasElement: HTMLElement, field: HTMLElement, type
   const body = within(document.body);
   const scroller = canvasElement.querySelector('[data-object-page-scroller]') as HTMLElement;
   const title = canvas.getByRole('heading', { level: 1 });
-  const placement = () => [Math.round(title.getBoundingClientRect().top), Math.round(scroller.getBoundingClientRect().bottom)];
+  // The title's place inside the scrolled content (the scroll offset added back: typing into a field far down
+  // scrolls it into view, which is not a jump) and the bottom edge of the scroller.
+  const placement = () => [
+    Math.round(title.getBoundingClientRect().top + scroller.scrollTop),
+    Math.round(scroller.getBoundingClientRect().bottom),
+  ];
 
   // No echo of the hydration: nothing is dirty after the data arrived.
   await expect(canvas.queryByRole('region', { name: 'Save actions' })).toBeNull();

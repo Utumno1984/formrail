@@ -200,7 +200,7 @@ for (const [name, viewport] of VIEWPORTS) {
         expect(await under()).toBeCloseTo(overlap, 0);
         await page.keyboard.press('Tab');
         const p = await probe(page);
-        expect(p.name).toBe('Currency');
+        expect(p.name).toBe('Category');
         expectClear(p, `overlap ${overlap}px`);
       });
     }

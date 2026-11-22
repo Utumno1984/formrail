@@ -170,11 +170,18 @@ test.describe('real input: the save bar, the dirty guard and the focus', () => {
       const field = id === HR ? page.getByRole('textbox', { name: 'Job title' }) : id === COURSE ? page.getByRole('textbox', { name: 'Module 1 title' }) : page.getByRole('textbox', { name: 'Order date' });
       await field.fill('Z');
       await expect(SAVE_BAR(page)).toBeVisible();
+      // The bar showed over a field that was in view already: focusing it again (as a Tab or a tap would) brings
+      // it clear of the bar.
+      await field.blur();
       await field.focus();
-      // The focused field is not under the save bar.
-      const box = await field.boundingBox();
-      const bar = await SAVE_BAR(page).boundingBox();
-      expect(box!.y + box!.height).toBeLessThanOrEqual(bar!.y + 1);
+      // The focused field is not under the save bar (the browser scrolls it over a few frames: poll).
+      await expect
+        .poll(async () => {
+          const box = await field.boundingBox();
+          const bar = await SAVE_BAR(page).boundingBox();
+          return box!.y + box!.height <= bar!.y + 1;
+        }, { message: id })
+        .toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
       void before;
     }
