@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectChangedFiles, evaluateChangesetGate, parseNameStatus } from './check-changeset.mjs';
+import { collectChangedFiles, evaluateChangesetGate, onlyVersionChanged, parseNameStatus } from './check-changeset.mjs';
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), 'check-changeset.mjs');
 
@@ -100,6 +100,113 @@ describe('evaluateChangesetGate', () => {
     expect(gate('Just text, no frontmatter\n')).toBe(false);
     expect(gate('---\nunterminated\n')).toBe(false);
     expect(gate(null)).toBe(false);
+  });
+});
+
+describe('evaluateChangesetGate: release PR exemption', () => {
+  const pkg = (o = {}) => JSON.stringify({ name: '@formrail/core', version: '0.1.0', dependencies: { a: '1' }, ...o }, null, 2);
+  const base = { 'packages/core/package.json': pkg() };
+  const head = { 'packages/core/package.json': pkg({ version: '0.2.0' }) };
+  const release = [
+    { status: 'M', path: 'packages/core/package.json' },
+    { status: 'M', path: 'packages/core/CHANGELOG.md' },
+    { status: 'D', path: '.changeset/brave-lions.md' },
+  ];
+  const run = (files, h = head, b = base) =>
+    evaluateChangesetGate(files, (p) => h[p] ?? null, (p) => b[p] ?? null);
+
+  it('exempts version + CHANGELOG with consumed changesets and says why', () => {
+    const r = run(release);
+    expect(r.ok).toBe(true);
+    expect(r.exempt).toBe(true);
+    expect(r.message).toContain('exemption applied');
+    expect(r.message).toContain('only the `version` field');
+    expect(r.message).toContain('consumed');
+    expect(r.message).toContain('no changeset was added');
+  });
+
+  it('exempts an added CHANGELOG and several packages and deleted changesets', () => {
+    const files = [
+      { status: 'M', path: 'packages/core/package.json' },
+      { status: 'M', path: 'packages/pro/package.json' },
+      { status: 'A', path: 'packages/pro/CHANGELOG.md' },
+      { status: 'D', path: '.changeset/a.md' },
+      { status: 'D', path: '.changeset/b.md' },
+      { status: 'M', path: '.changeset/config.json' },
+    ];
+    const h = { ...head, 'packages/pro/package.json': pkg({ name: 'p', version: '2' }) };
+    const b = { ...base, 'packages/pro/package.json': pkg({ name: 'p', version: '1' }) };
+    expect(run(files, h, b).exempt).toBe(true);
+  });
+
+  it('is not exempt when version changes together with another field', () => {
+    for (const extra of [{ dependencies: { a: '2' } }, { exports: './x.js' }, { name: '@formrail/other' }]) {
+      const r = run(release, { 'packages/core/package.json': pkg({ version: '0.2.0', ...extra }) });
+      expect(r.ok).toBe(false);
+      expect(r.exempt).toBeUndefined();
+      expect(r.message).toContain('npx changeset');
+    }
+  });
+
+  it('is not exempt when another field changes and version does not', () => {
+    expect(run(release, { 'packages/core/package.json': pkg({ dependencies: { a: '2' } }) }).ok).toBe(false);
+  });
+
+  it('is not exempt when a source file is touched', () => {
+    expect(run([...release, { status: 'M', path: 'packages/core/src/index.ts' }]).ok).toBe(false);
+  });
+
+  it('is not exempt when one changeset is deleted and another added (normal rule applies)', () => {
+    const files = [...release, { status: 'A', path: '.changeset/new.md' }];
+    const r = evaluateChangesetGate(files, (p) => (p === '.changeset/new.md' ? '---\n---\n' : head[p]), (p) => base[p]);
+    expect(r.ok).toBe(true);
+    expect(r.exempt).toBeUndefined();
+    expect(r.message).toContain('Changeset found');
+    const bad = evaluateChangesetGate(files, (p) => (p === '.changeset/new.md' ? 'no' : head[p]), (p) => base[p]);
+    expect(bad.ok).toBe(false);
+  });
+
+  it('is not exempt without a deleted changeset (README does not count)', () => {
+    expect(run(release.slice(0, 2)).ok).toBe(false);
+    expect(run([...release.slice(0, 2), { status: 'D', path: '.changeset/README.md' }]).ok).toBe(false);
+    expect(run([...release.slice(0, 2), { status: 'M', path: '.changeset/x.md' }]).ok).toBe(false);
+  });
+
+  it('is not exempt when package.json is added or deleted', () => {
+    for (const status of ['A', 'D']) {
+      const files = [{ status, path: 'packages/core/package.json' }, release[2]];
+      expect(run(files).ok).toBe(false);
+    }
+  });
+
+  it('is not exempt for a CHANGELOG-only change, a deleted CHANGELOG or lookalike files', () => {
+    expect(run([release[1], release[2]]).ok).toBe(false);
+    expect(run([release[0], { status: 'D', path: 'packages/core/CHANGELOG.md' }, release[2]]).ok).toBe(false);
+    for (const path of ['packages/core/CHANGELOG.md.bak', 'packages/core/docs/CHANGELOG.md', 'packages/core/src/package.json']) {
+      expect(run([release[0], { status: 'M', path }, release[2]]).ok).toBe(false);
+    }
+  });
+
+  it('is not exempt without a base reader, or on invalid JSON', () => {
+    expect(evaluateChangesetGate(release, (p) => head[p] ?? null).ok).toBe(false);
+    expect(run(release, { 'packages/core/package.json': '{ not json' }).ok).toBe(false);
+    expect(run(release, head, { 'packages/core/package.json': null }).ok).toBe(false);
+  });
+
+  it('keeps the plain "no package files" result when only changesets are deleted', () => {
+    const r = run([{ status: 'D', path: '.changeset/a.md' }]);
+    expect(r.ok).toBe(true);
+    expect(r.exempt).toBeUndefined();
+    expect(r.message).toContain('No file under packages/*');
+  });
+
+  it('compares parsed JSON: reformatting and key order neither hide nor fake a change', () => {
+    const a = '{"name":"x","version":"1","files":["a"]}';
+    expect(onlyVersionChanged(a, '{\n  "files": ["a"],\n  "version": "2",\n  "name": "x"\n}')).toBe(true);
+    expect(onlyVersionChanged(a, '{"name":"x","version":"2","files":["b"]}')).toBe(false);
+    expect(onlyVersionChanged(a, a)).toBe(false);
+    expect(onlyVersionChanged(a, '{"name":"x","version":"2"}')).toBe(false);
+    expect(onlyVersionChanged(a, '[]')).toBe(false);
   });
 });
 
@@ -201,5 +308,33 @@ describe('collectChangedFiles (real git repository)', () => {
     git('add', '-A');
     git('commit', '-q', '-m', 'good changeset');
     expect(run().status).toBe(0);
+  });
+
+  it('CLI: exempts a release PR (version + CHANGELOG, changeset consumed) and rejects an extra field', () => {
+    const pkgJson = (o = {}) => JSON.stringify({ name: '@formrail/core', version: '0.1.0', ...o }, null, 2) + '\n';
+    write('packages/core/package.json', pkgJson());
+    write('packages/core/CHANGELOG.md', '# core\n');
+    write('.changeset/pending.md', "---\n'@formrail/core': minor\n---\n\nFeature\n");
+    git('add', '-A');
+    git('commit', '-q', '-m', 'base with changeset');
+    git('switch', '-q', 'main');
+    git('merge', '-q', '--ff-only', 'feature');
+    git('switch', '-q', '-c', 'release');
+    write('packages/core/package.json', pkgJson({ version: '0.2.0' }));
+    write('packages/core/CHANGELOG.md', '# core\n\n## 0.2.0\n');
+    git('rm', '-q', '.changeset/pending.md');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'release');
+    const run = () =>
+      spawnSync(process.execPath, [script], { cwd: dir, encoding: 'utf8', env: { ...process.env, BASE_REF: 'main' } });
+    const ok = run();
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toContain('exemption applied');
+    write('packages/core/package.json', pkgJson({ version: '0.2.0', private: true }));
+    git('add', '-A');
+    git('commit', '-q', '-m', 'extra field');
+    const ko = run();
+    expect(ko.status).toBe(1);
+    expect(ko.stderr).toContain('npx changeset');
   });
 });

@@ -6,6 +6,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const PACKAGE_RE = /^packages\/[^/]+\//;
+const PACKAGE_JSON_RE = /^packages\/[^/]+\/package\.json$/;
+const PACKAGE_CHANGELOG_RE = /^packages\/[^/]+\/CHANGELOG\.md$/;
 const CHANGESET_RE = /^\.changeset\/(?!README\.md$)[^/]+\.md$/;
 
 export const GUIDANCE = [
@@ -28,7 +30,65 @@ export function hasValidFrontmatter(content) {
   return typeof content === 'string' && /^---\r?\n(?:[\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/.test(content);
 }
 
-export function evaluateChangesetGate(changedFiles, readContent) {
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((k) => [k, canonical(value[k])]));
+  }
+  return value;
+}
+
+/** True when the two package.json texts parse to JSON differing only in a changed `version` field. */
+export function onlyVersionChanged(baseText, headText) {
+  if (typeof baseText !== 'string' || typeof headText !== 'string') return false;
+  let base;
+  let head;
+  try {
+    base = JSON.parse(baseText);
+    head = JSON.parse(headText);
+  } catch {
+    return false;
+  }
+  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  if (!isObject(base) || !isObject(head)) return false;
+  if (!('version' in base) || !('version' in head)) return false;
+  if (JSON.stringify(canonical(base.version)) === JSON.stringify(canonical(head.version))) return false;
+  const { version: _b, ...restBase } = base;
+  const { version: _h, ...restHead } = head;
+  return JSON.stringify(canonical(restBase)) === JSON.stringify(canonical(restHead));
+}
+
+export const EXEMPTION_MESSAGE = [
+  'Changeset exemption applied (release PR): the diff is a version bump, not a change to be released.',
+  '  - inside packages/* only the `version` field of package.json and CHANGELOG.md files changed;',
+  '  - existing changesets (.changeset/*.md) were consumed (deleted);',
+  '  - no changeset was added.',
+].join('\n');
+
+/** Exemption decided from the diff content only (never from branch name, author or labels). */
+function isReleaseBump(entries, packageFiles, readContent, readBaseContent) {
+  if (!readContent || !readBaseContent || packageFiles.length === 0) return false;
+  const changesetEntries = entries.filter((e) => CHANGESET_RE.test(e.path));
+  if (changesetEntries.some((e) => e.status === 'A')) return false;
+  if (!changesetEntries.some((e) => e.status === 'D')) return false;
+  // At least one package must actually be version-bumped: a CHANGELOG alone is not a release.
+  if (!entries.some((e) => PACKAGE_JSON_RE.test(e.path))) return false;
+  return entries
+    .filter((e) => PACKAGE_RE.test(e.path))
+    .every((e) => {
+      if (PACKAGE_CHANGELOG_RE.test(e.path)) return e.status === 'A' || e.status === 'M';
+      if (PACKAGE_JSON_RE.test(e.path)) {
+        return e.status === 'M' && onlyVersionChanged(readBaseContent(e.path), readContent(e.path));
+      }
+      return false;
+    });
+}
+
+/**
+ * @param {(path: string) => string | null} [readBaseContent] returns a file's content at the merge-base;
+ *   without it the release-PR exemption is never applied.
+ */
+export function evaluateChangesetGate(changedFiles, readContent, readBaseContent) {
   const entries = changedFiles.map((f) => (typeof f === 'string' ? { path: f, status: 'A' } : { status: 'A', ...f }));
   const packageFiles = entries.filter((e) => PACKAGE_RE.test(e.path)).map((e) => e.path);
   // Only ADDED changesets count: a modified one already existed on the base branch.
@@ -39,6 +99,9 @@ export function evaluateChangesetGate(changedFiles, readContent) {
 
   if (packageFiles.length === 0) {
     return { ok: true, message: 'No file under packages/* touched: no changeset required.', packageFiles, changesets };
+  }
+  if (isReleaseBump(entries, packageFiles, readContent, readBaseContent)) {
+    return { ok: true, exempt: true, message: EXEMPTION_MESSAGE, packageFiles, changesets };
   }
   if (changesets.length === 0) {
     return {
@@ -63,8 +126,12 @@ function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' });
 }
 
+export function mergeBase(baseRef, headRef = 'HEAD') {
+  return git(['merge-base', baseRef, headRef]).trim();
+}
+
 export function collectChangedFiles(baseRef, headRef = 'HEAD') {
-  const base = git(['merge-base', baseRef, headRef]).trim();
+  const base = mergeBase(baseRef, headRef);
   return parseNameStatus(git(['diff', '--name-status', '--no-renames', '-z', base, headRef]));
 }
 
@@ -79,14 +146,16 @@ export function readAtRef(path, ref = 'HEAD') {
 function main() {
   const baseRef = process.env.BASE_REF || 'origin/main';
   let files;
+  let base;
   try {
+    base = mergeBase(baseRef);
     files = collectChangedFiles(baseRef);
   } catch (error) {
     console.error(`Cannot compute the merge-base with ${baseRef} (is the checkout shallow? use fetch-depth: 0).`);
     console.error(String(error.message ?? error));
     process.exit(2);
   }
-  const result = evaluateChangesetGate(files, (p) => readAtRef(p));
+  const result = evaluateChangesetGate(files, (p) => readAtRef(p), (p) => readAtRef(p, base));
   if (result.ok) {
     console.log(result.message);
   } else {
