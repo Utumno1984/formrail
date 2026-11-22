@@ -38,7 +38,7 @@ async function expectColour(target: Locator, expected: Rgb, label: string, prope
   actual.forEach((c, i) => expect(Math.abs(c - expected[i]!), `${label}: channel ${i} is ${c}, expected ${expected[i]}`).toBeLessThanOrEqual(1));
 }
 
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
 const selectedRow = (page: Page): Locator => table(page).locator('tbody tr[data-selected]').first();
 const plainRow = (page: Page): Locator => table(page).locator('tbody tr:not([data-selected]):not([aria-hidden])').first();
 
@@ -114,7 +114,7 @@ test.describe('Floorplans/List Report: selection follows a redeclared primary', 
       [await pill.elementHandle(), fill, border] as const,
       { polling: 'raf', timeout: 2_000 },
     );
-    await page.getByRole('radio', { name: 'Open' }).click();
+    await page.getByRole('radio', { name: 'Pending' }).click();
     await expect(pill).toHaveAttribute('data-changed', '');
     await tinted;
     await expect(pill).not.toHaveAttribute('data-changed');
@@ -161,7 +161,7 @@ test.describe('Floorplans/List Report: selection follows a redeclared primary', 
             observer.observe(el, { attributes: true, attributeFilter: ['data-changed'] });
           });
         });
-        await page.getByRole('radio', { name: 'Open' }).click();
+        await page.getByRole('radio', { name: 'Pending' }).click();
         const seen = await page.evaluate(() => (window as unknown as { __flash: Promise<{ bg: string; border: string }> }).__flash);
         // compare through the browser itself, with literal colours and no var()
         const [bg, border] = await page.evaluate((p) => {

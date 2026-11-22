@@ -12,7 +12,7 @@ const query = (page: Page) => page.getByTestId('router-query');
 test.describe('Floorplans/List Report: UrlStateRouterRecipe', () => {
   test('the play function passes (history push, the default)', async ({ page }) => {
     await expectPlayToPass(page, STORY);
-    await expect(pill(page, 'Approved')).toBeChecked();
+    await expect(pill(page, 'Active')).toBeChecked();
   });
 
   test('the play function passes with history replace', async ({ page }) => {
@@ -27,16 +27,16 @@ test.describe('Floorplans/List Report: UrlStateRouterRecipe', () => {
   test('smoke: Open + Amount show the query, the frame URL is unchanged, Back goes to the previous pill', async ({ page }) => {
     await gotoStory(page, FIXTURE);
     const before = page.url();
-    await pill(page, 'Open').click();
+    await pill(page, 'Pending').click();
     await page.getByRole('button', { name: 'Amount' }).click();
-    await expect(query(page)).toHaveText('filter=open&sort=amount.asc');
+    await expect(query(page)).toHaveText('filter=pending&sort=amount.asc');
     expect(page.url()).toBe(before);
     expect(await page.evaluate(() => window.location.search)).toBe(new URL(before).search);
 
-    await pill(page, 'Approved').click();
+    await pill(page, 'Active').click();
     await page.getByRole('button', { name: 'Back' }).click();
-    await expect(pill(page, 'Open')).toBeChecked();
-    await expect(query(page)).toHaveText('filter=open&sort=amount.asc');
+    await expect(pill(page, 'Pending')).toBeChecked();
+    await expect(query(page)).toHaveText('filter=pending&sort=amount.asc');
     expect(page.url()).toBe(before);
     // Back moved only the simulated history: Forward is now available.
     await expect(page.getByRole('button', { name: 'Forward' })).toBeEnabled();

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
+import { makeRecords } from '../packages/core/src/internal/demo-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
@@ -10,9 +10,9 @@ const FIXTURE = 'floorplans-list-report--url-state-no-play';
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
 const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 const amount = (page: Page): Locator => page.getByRole('button', { name: 'Amount' });
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
 const bodyRows = (page: Page): Locator => table(page).locator('tbody tr:not([aria-hidden])');
-const heading = (page: Page): Locator => page.getByRole('heading', { name: /Invoices/ });
+const heading = (page: Page): Locator => page.getByRole('heading', { name: /Records/ });
 const own = async (page: Page, prefix = ''): Promise<Record<string, string | null>> => {
   const search = new URL(page.url()).searchParams;
   const key = (name: string) => (prefix ? `${prefix}.${name}` : name);
@@ -20,10 +20,13 @@ const own = async (page: Page, prefix = ''): Promise<Record<string, string | nul
 };
 const historyLength = (page: Page): Promise<number> => page.evaluate(() => window.history.length);
 
-const ALL = makeDemoInvoices(200);
-const OPEN_ROSSI = ALL.filter((r) => r.status === 'pending' && r.supplier.startsWith('Rossi')).sort(
-  (a, b) => b.amount - a.amount,
-);
+const ALL = makeRecords(200);
+// The search is case and accent insensitive and reads the code, name and owner columns.
+const plain = (text: string): string => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const matching = (term: string) => ALL.filter((r) => plain(`${r.code} ${r.name} ${r.ownerName}`).includes(term));
+const PENDING_PLAN = matching('plan')
+  .filter((r) => r.status === 'pending')
+  .sort((a, b) => b.amountMinor - a.amountMinor);
 
 /** Records the story's Actions events (the `fn()` callbacks), by name, from before the story renders. */
 async function recordActions(page: Page): Promise<() => Promise<string[]>> {
@@ -55,12 +58,12 @@ async function recordActions(page: Page): Promise<() => Promise<string[]>> {
 test.describe('Floorplans/List Report: UrlState', () => {
   test('the play function passes (history replace, no prefix)', async ({ page }) => {
     await expectPlayToPass(page, STORY);
-    await expect(pill(page, 'Open')).toBeChecked();
+    await expect(pill(page, 'Pending')).toBeChecked();
   });
 
   test('the play function passes with history push and a prefix', async ({ page }) => {
     await expectPlayToPass(page, STORY, 'history:push;prefix:inv');
-    expect(await own(page, 'inv')).toEqual({ filter: 'open', q: 'rossi', sort: 'amount.desc' });
+    expect(await own(page, 'inv')).toEqual({ filter: 'pending', q: 'plan', sort: 'amount.desc' });
     expect(await own(page)).toEqual({ filter: null, q: null, sort: null });
   });
 
@@ -74,23 +77,23 @@ test.describe('Floorplans/List Report: UrlState', () => {
   }) => {
     await gotoStory(page, FIXTURE);
     const length = await historyLength(page);
-    await pill(page, 'Open').click();
-    await search(page).fill('rossi');
+    await pill(page, 'Pending').click();
+    await search(page).fill('plan');
     await search(page).press('Enter');
     await amount(page).click();
     await amount(page).click();
-    expect(new URL(page.url()).search).toContain('filter=open&q=rossi&sort=amount.desc');
+    expect(new URL(page.url()).search).toContain('filter=pending&q=plan&sort=amount.desc');
     expect(await historyLength(page)).toBe(length);
     // The rest of the iframe URL (story id, view mode) is untouched.
     expect(new URL(page.url()).searchParams.get('id')).toBe('floorplans-list-report--url-state-no-play');
 
     await page.reload();
-    await expect(pill(page, 'Open')).toBeChecked();
-    await expect(search(page)).toHaveValue('rossi');
+    await expect(pill(page, 'Pending')).toBeChecked();
+    await expect(search(page)).toHaveValue('plan');
     await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
-    await expect(bodyRows(page)).toHaveCount(OPEN_ROSSI.length);
-    await expect(bodyRows(page).first()).toContainText(OPEN_ROSSI[0]!.number);
-    await expect(heading(page)).toHaveText(`Invoices (${OPEN_ROSSI.length} of 200)`);
+    await expect(bodyRows(page)).toHaveCount(PENDING_PLAN.length);
+    await expect(bodyRows(page).first()).toContainText(PENDING_PLAN[0]!.code);
+    await expect(heading(page)).toHaveText(`Records (${PENDING_PLAN.length} of 200)`);
   });
 
   test('a hand-edited invalid URL shows the defaults, with no error and no rewrite', async ({ page }) => {
@@ -113,21 +116,21 @@ test.describe('Floorplans/List Report: UrlState', () => {
     const actions = await recordActions(page);
     await gotoStory(page, FIXTURE, 'history:push');
     const length = await historyLength(page);
-    await pill(page, 'Open').click();
-    await pill(page, 'Approved').click();
+    await pill(page, 'Pending').click();
+    await pill(page, 'Active').click();
     expect(await historyLength(page)).toBe(length + 2);
-    expect((await own(page)).filter).toBe('approved');
+    expect((await own(page)).filter).toBe('active');
     await expect.poll(actions).toEqual(['onFilterChange', 'onFilterChange']);
 
     await page.goBack();
-    await expect(pill(page, 'Open')).toBeChecked();
-    expect((await own(page)).filter).toBe('open');
+    await expect(pill(page, 'Pending')).toBeChecked();
+    expect((await own(page)).filter).toBe('pending');
     await expect(bodyRows(page)).toHaveCount(ALL.filter((r) => r.status === 'pending').length);
     await page.goBack();
     await expect(pill(page, 'All')).toBeChecked();
     expect((await own(page)).filter).toBeNull();
     await page.goForward();
-    await expect(pill(page, 'Open')).toBeChecked();
+    await expect(pill(page, 'Pending')).toBeChecked();
     // Navigation is not a gesture: still only the two clicks, and no entry was added or rewritten.
     expect(await actions()).toEqual(['onFilterChange', 'onFilterChange']);
     expect(await historyLength(page)).toBe(length + 2);
@@ -148,17 +151,17 @@ test.describe('Floorplans/List Report: UrlState', () => {
       }
     });
     const length = await historyLength(page);
-    // The page's clock stands still while typing, so the five keystrokes surely fall within the 300 ms
+    // The page's clock stands still while typing, so the four keystrokes surely fall within the 300 ms
     // commit delay however loaded the machine is; then it runs past the delay.
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await search(page).pressSequentially('rossi');
-    await expect(search(page)).toHaveValue('rossi');
+    await search(page).pressSequentially('plan');
+    await expect(search(page)).toHaveValue('plan');
     expect(await page.evaluate(() => (window as unknown as { __urls: string[] }).__urls)).toEqual([]);
     await page.clock.runFor(1_000);
-    await expect.poll(async () => (await own(page)).q).toBe('rossi');
+    await expect.poll(async () => (await own(page)).q).toBe('plan');
     const urls = await page.evaluate(() => (window as unknown as { __urls: string[] }).__urls);
     expect(urls).toHaveLength(1);
-    expect(new URLSearchParams(urls[0]).get('q')).toBe('rossi');
+    expect(new URLSearchParams(urls[0]).get('q')).toBe('plan');
     expect(await historyLength(page)).toBe(length + 1);
   });
 
@@ -166,8 +169,8 @@ test.describe('Floorplans/List Report: UrlState', () => {
     const actions = await recordActions(page);
     await page.clock.install();
     await gotoStory(page, FIXTURE, 'history:push');
-    await pill(page, 'Open').click();
-    await pill(page, 'Approved').click();
+    await pill(page, 'Pending').click();
+    await pill(page, 'Active').click();
     expect(await actions()).toEqual(['onFilterChange', 'onFilterChange']);
     const length = await historyLength(page);
     await page.evaluate(() => {
@@ -181,24 +184,24 @@ test.describe('Floorplans/List Report: UrlState', () => {
         };
       }
     });
-    // The page's clock stands still: Back surely arrives while the 300 ms commit of "ross" is pending.
+    // The page's clock stands still: Back surely arrives while the 300 ms commit of "pla" is pending.
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await search(page).pressSequentially('ross');
+    await search(page).pressSequentially('pla');
     await page.goBack();
-    await expect(pill(page, 'Open')).toBeChecked();
+    await expect(pill(page, 'Pending')).toBeChecked();
     await page.clock.runFor(2_000); // well past the commit delay
     await page.clock.resume();
     expect(await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes)).toEqual([]);
-    expect(await own(page)).toEqual({ filter: 'open', q: null, sort: null });
-    await expect(search(page)).toHaveValue('ross');
+    expect(await own(page)).toEqual({ filter: 'pending', q: null, sort: null });
+    await expect(search(page)).toHaveValue('pla');
     expect(await actions()).toEqual(['onFilterChange', 'onFilterChange']);
     expect(await historyLength(page)).toBe(length);
     // Forward is still there: the navigation was not cut by a write.
     await page.goForward();
-    await expect(pill(page, 'Approved')).toBeChecked();
+    await expect(pill(page, 'Active')).toBeChecked();
     // The text is still the user's: Enter commits it now, as a gesture.
     await search(page).press('Enter');
-    expect((await own(page)).q).toBe('ross');
+    expect((await own(page)).q).toBe('pla');
   });
 
   test('Back that moves only the sort while the user is typing: no write and no onSearchQueryChange', async ({ page }) => {
@@ -221,14 +224,14 @@ test.describe('Floorplans/List Report: UrlState', () => {
       }
     });
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await search(page).pressSequentially('ross');
+    await search(page).pressSequentially('pla');
     await page.goBack();
     await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'ascending');
     await page.clock.runFor(2_000);
     await page.clock.resume();
     expect(await page.evaluate(() => (window as unknown as { __writes: string[] }).__writes)).toEqual([]);
     expect((await own(page)).q).toBeNull();
-    await expect(search(page)).toHaveValue('ross');
+    await expect(search(page)).toHaveValue('pla');
     expect(await actions()).toEqual(['onSortChange', 'onSortChange']);
     expect(await historyLength(page)).toBe(length);
     await page.goForward();
@@ -241,32 +244,32 @@ test.describe('Floorplans/List Report: UrlState', () => {
     const actions = await recordActions(page);
     await page.clock.install();
     await gotoStory(page, FIXTURE, 'history:push;searchCommitDelay:800');
-    await search(page).fill('bianchi');
+    await search(page).fill('amber');
     await search(page).press('Enter');
-    await search(page).fill('rossi');
+    await search(page).fill('plan');
     await search(page).press('Enter');
-    expect((await own(page)).q).toBe('rossi');
+    expect((await own(page)).q).toBe('plan');
     const length = await historyLength(page);
     // The page's clock stands still: Back surely arrives while the 800 ms commit of the draft is pending.
     await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1_000);
-    await search(page).press('Backspace'); // draft "ross", committed "rossi"
+    await search(page).press('Backspace'); // draft "pla", committed "plan"
     await page.goBack();
-    await expect(search(page)).toHaveValue('ross');
-    const bianchi = ALL.filter((r) => r.supplier.toLowerCase().includes('bianchi')).length;
-    await expect(bodyRows(page)).toHaveCount(bianchi);
-    await expect(heading(page)).toHaveText(`Invoices (${bianchi} of 200)`);
+    await expect(search(page)).toHaveValue('pla');
+    const amber = matching('amber').length;
+    await expect(bodyRows(page)).toHaveCount(amber);
+    await expect(heading(page)).toHaveText(`Records (${amber} of 200)`);
     await page.clock.runFor(2_000); // well past the commit delay
     await page.clock.resume();
-    expect((await own(page)).q).toBe('bianchi');
-    await expect(search(page)).toHaveValue('ross');
+    expect((await own(page)).q).toBe('amber');
+    await expect(search(page)).toHaveValue('pla');
     expect(await historyLength(page)).toBe(length);
     expect(await actions()).toEqual(['onSearchQueryChange', 'onSearchQueryChange']);
 
     // Not typing (the field equals the committed value): Forward makes the field follow.
-    await search(page).fill('bianchi');
+    await search(page).fill('amber');
     await page.goForward();
-    await expect(search(page)).toHaveValue('rossi');
-    await expect(bodyRows(page)).toHaveCount(ALL.filter((r) => r.supplier.startsWith('Rossi')).length);
+    await expect(search(page)).toHaveValue('plan');
+    await expect(bodyRows(page)).toHaveCount(matching('plan').length);
     expect(await actions()).toEqual(['onSearchQueryChange', 'onSearchQueryChange']);
   });
 });

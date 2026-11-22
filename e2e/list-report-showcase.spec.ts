@@ -1,11 +1,15 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { makeEmployees } from '../packages/core/src/internal/demo-data';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
 // #132: the Smart Filter Bar showcase. URL state + scroll restoration + "New" -> Cancel, on the iframe.
 const STORY = 'floorplans-list-report--smart-filter-bar-showcase';
 const FIXTURE = 'floorplans-list-report--smart-filter-bar-showcase-no-play';
 
-const table = (page: Page): Locator => page.getByRole('table', { name: /Invoices/ });
+// A surname that an active employee of the fixture has: the search term of the URL scenario.
+const SURNAME = makeEmployees(200).find((e) => e.status === 'active')!.lastName.toLowerCase();
+
+const table = (page: Page): Locator => page.getByRole('table', { name: /Employees/ });
 const scroller = (page: Page): Locator => table(page).locator('..');
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
 const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
@@ -23,27 +27,27 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
     await expect(search(page)).toHaveValue('');
     const p = params(page);
     expect([p.get('filter'), p.get('q'), p.get('sort')]).toEqual([null, null, null]);
-    await expect(page.getByRole('columnheader', { name: /Amount/ })).not.toHaveAttribute(
+    await expect(page.getByRole('columnheader', { name: /Hire date/ })).not.toHaveAttribute(
       'aria-sort',
       /ascending|descending/,
     );
   });
 
-  test('with ?filter=open&q=rossi&sort=amount.desc the first render is that view', async ({ page }) => {
-    await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=open&q=rossi&sort=amount.desc`);
+  test('with ?filter=active, a surname as q and sort=hired.desc the first render is that view', async ({ page }) => {
+    await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=active&q=${SURNAME}&sort=hired.desc`);
     await expect(table(page)).toBeVisible();
-    await expect(pill(page, 'Open')).toBeChecked();
-    await expect(search(page)).toHaveValue('rossi');
-    await expect(page.getByRole('columnheader', { name: /Amount/ })).toHaveAttribute('aria-sort', 'descending');
+    await expect(pill(page, 'Active')).toBeChecked();
+    await expect(search(page)).toHaveValue(SURNAME);
+    await expect(page.getByRole('columnheader', { name: /Hire date/ })).toHaveAttribute('aria-sort', 'descending');
     const rows = (await page.getByRole('row').allTextContents()).slice(1);
     expect(rows.length).toBeGreaterThan(0);
-    for (const t of rows) expect(t.toLowerCase()).toContain('rossi');
+    for (const t of rows) expect(t.toLowerCase()).toContain(SURNAME);
   });
 
   test('invalid parameters fall back to the defaults without errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=xyz&sort=amount.sideways`);
+    await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=xyz&sort=hired.sideways`);
     await expect(table(page)).toBeVisible();
     await expect(pill(page, 'All')).toBeChecked();
     expect(errors).toEqual([]);
@@ -66,14 +70,14 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
       page.evaluate(() => (window as unknown as { __actions: unknown[] }).__actions.length);
     await gotoStory(page, FIXTURE, 'history:push');
     await expect(table(page)).toBeVisible();
-    await pill(page, 'Open').click();
-    await expect(pill(page, 'Open')).toBeChecked();
+    await pill(page, 'Active').click();
+    await expect(pill(page, 'Active')).toBeChecked();
     // The gesture is reported once: the probe works.
     await expect.poll(actions).toBe(1);
     await page.goBack();
     await expect(pill(page, 'All')).toBeChecked();
     await page.goForward();
-    await expect(pill(page, 'Open')).toBeChecked();
+    await expect(pill(page, 'Active')).toBeChecked();
     await page.waitForTimeout(300);
     expect(await actions()).toBe(1);
   });
@@ -93,15 +97,15 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
   test('error and empty: the filter bar stays usable and the URL follows', async ({ page }) => {
     for (const state of ['error', 'empty']) {
       await gotoStory(page, FIXTURE, `state:${state}`);
-      await pill(page, 'Open').click();
-      await expect(pill(page, 'Open')).toBeChecked();
-      await expect.poll(() => params(page).get('filter')).toBe('open');
+      await pill(page, 'Active').click();
+      await expect(pill(page, 'Active')).toBeChecked();
+      await expect.poll(() => params(page).get('filter')).toBe('active');
     }
   });
 
   test('loading then data: the scroll is restored only after the rows are there', async ({ page }) => {
     await gotoStory(page, FIXTURE);
-    await pill(page, 'Open').click();
+    await pill(page, 'Active').click();
     await scroller(page).evaluate((el) => void (el.scrollTop = 500));
     await expect.poll(() => scrollTop(page)).toBe(500);
     // Let the throttled write to sessionStorage happen, then reload the same view with late data.
@@ -109,7 +113,7 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
       .poll(() => page.evaluate(() => Object.keys(sessionStorage).some((k) => k.startsWith('rop:list-report-scroll:'))))
       .toBe(true);
     await page.waitForTimeout(300);
-    await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=open&args=loadDelayMs:600`);
+    await page.goto(`/iframe.html?id=${FIXTURE}&viewMode=story&filter=active&args=loadDelayMs:600`);
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     expect(await scrollTop(page)).toBe(0);
     await expect(page.getByRole('row').nth(10)).toBeVisible();
@@ -148,14 +152,14 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
         };
       });
       await gotoStory(page, FIXTURE);
-      await pill(page, 'Open').click();
+      await pill(page, 'Active').click();
       await scroller(page).evaluate((el) => void (el.scrollTop = 400));
       await expect.poll(() => scrollTop(page)).toBe(400);
       const newButton = page.getByRole('button', { name: 'New', exact: true });
       await newButton.click();
-      const sheet = page.getByRole('dialog', { name: 'New invoice' });
+      const sheet = page.getByRole('dialog', { name: 'New employee' });
       await expect(sheet).toBeVisible();
-      const input = sheet.getByRole('textbox', { name: 'Supplier name' });
+      const input = sheet.getByRole('textbox', { name: 'Employee name' });
       await input.focus();
       const keyboard = 300;
       await page.evaluate(
@@ -181,7 +185,7 @@ test.describe('Floorplans/List Report: SmartFilterBarShowcase', () => {
       await expect(sheet).toHaveCount(0);
       await expect(newButton).toBeFocused();
       expect(await scrollTop(page)).toBe(400);
-      await expect(pill(page, 'Open')).toBeChecked();
+      await expect(pill(page, 'Active')).toBeChecked();
     });
   });
 });

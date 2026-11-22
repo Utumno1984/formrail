@@ -14,9 +14,15 @@ import {
 } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
-import type { DemoInvoice } from '../internal/demo-invoices';
-import { COLUMNS, FILTERS, LABELS, PAGE, SORTABLE } from './invoice-list-shared';
-import { makeShowcaseInvoices } from './showcase-data';
+import {
+  DEPARTMENT_LABEL,
+  EMPLOYEE_STATUS_LABEL,
+  formatDate,
+  makeEmployees,
+  type DemoEmployee,
+} from '../internal/demo-data';
+import { useCaseStory as describeUseCase } from '../internal/story-example';
+import { LABELS, PAGE } from './ListReport.stories-data';
 import { repositionAfterMotion, settleMotion } from '../internal/settle-motion';
 import {
   Sheet,
@@ -29,7 +35,7 @@ import {
   SheetTrigger,
 } from '../sheet/Sheet';
 import { ListReport } from './ListReport';
-import type { ListReportSort } from './types';
+import type { ListReportColumn, ListReportFilter, ListReportSort } from './types';
 import { useListReport } from './use-list-report';
 import { useListReportScrollRestoration } from './use-list-report-scroll-restoration';
 import { useListReportUrlState } from './use-list-report-url-state';
@@ -54,7 +60,35 @@ interface ShowcaseArgs {
 /** Below this width `overlay: auto` opens a Sheet. */
 const MOBILE_QUERY = '(max-width: 600px)';
 
-const ROWS = makeShowcaseInvoices(200);
+const ROWS = makeEmployees(200);
+
+// The example is configured for an HR employee directory: pills by status and by department, search by name or
+// by personnel number, sorted by hire date (most recent first on the first click).
+const FILTERS: ListReportFilter<DemoEmployee>[] = [
+  { id: 'all', label: 'All' },
+  { id: 'active', label: EMPLOYEE_STATUS_LABEL.active, predicate: (e) => e.status === 'active' },
+  { id: 'on-leave', label: EMPLOYEE_STATUS_LABEL['on-leave'], predicate: (e) => e.status === 'on-leave' },
+  { id: 'sales', label: DEPARTMENT_LABEL.sales, predicate: (e) => e.department === 'sales' },
+  { id: 'finance', label: DEPARTMENT_LABEL.finance, predicate: (e) => e.department === 'finance' },
+  { id: 'it', label: DEPARTMENT_LABEL.it, predicate: (e) => e.department === 'it' },
+];
+
+const COLUMNS: ListReportColumn<DemoEmployee>[] = [
+  { id: 'code', header: 'Number', accessor: (e) => e.code, width: 120 },
+  { id: 'name', header: 'Name', accessor: (e) => e.fullName, minWidth: 200 },
+  { id: 'department', header: 'Department', accessor: (e) => DEPARTMENT_LABEL[e.department], searchable: false, minWidth: 150 },
+  {
+    id: 'hired',
+    header: 'Hire date',
+    accessor: (e) => e.hireDate,
+    cell: (e) => formatDate(e.hireDate),
+    firstSortDirection: 'desc',
+    searchable: false,
+    width: 150,
+  },
+  { id: 'status', header: 'Status', accessor: (e) => EMPLOYEE_STATUS_LABEL[e.status], searchable: false, width: 130 },
+];
+const SORTABLE = COLUMNS.map((c) => c.id);
 
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches);
@@ -70,14 +104,14 @@ function useIsMobile(): boolean {
 
 function NewForm({ kind }: { kind: 'dialog' | 'sheet' }) {
   const field = (
-    <Field label="Supplier name">
+    <Field label="Employee name">
       <Input />
     </Field>
   );
   return kind === 'dialog' ? (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>New invoice</DialogTitle>
+        <DialogTitle>New employee</DialogTitle>
         <DialogClose aria-label="Close" />
       </DialogHeader>
       <DialogBody>{field}</DialogBody>
@@ -91,7 +125,7 @@ function NewForm({ kind }: { kind: 'dialog' | 'sheet' }) {
   ) : (
     <SheetContent>
       <SheetHeader>
-        <SheetTitle>New invoice</SheetTitle>
+        <SheetTitle>New employee</SheetTitle>
         <SheetClose aria-label="Close" />
       </SheetHeader>
       <SheetBody>{field}</SheetBody>
@@ -134,7 +168,7 @@ function ShowcaseDemo({
 
   const url = useListReportUrlState({ filters: FILTERS, sortableColumnIds: SORTABLE, history });
   const scroll = useListReportScrollRestoration({ ready: status === 'ready' });
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoEmployee>({
     rows,
     columns: COLUMNS,
     getRowId: (r) => r.id,
@@ -177,7 +211,7 @@ function ShowcaseDemo({
     <div style={PAGE}>
       <div style={{ flex: 1, minHeight: 0 }}>
         <ListReport
-          title="Invoices"
+          title="Employees"
           table={table}
           actions={actions}
           status={status}
@@ -248,18 +282,25 @@ function resetBrowserState(win: Window): void {
 }
 
 const scrollerOf = (canvas: ReturnType<typeof within>): HTMLElement =>
-  canvas.getByRole('table', { name: /Invoices/ }).parentElement as HTMLElement;
+  canvas.getByRole('table', { name: /Employees/ }).parentElement as HTMLElement;
 
 /**
  * The List Report showcase: `useListReportUrlState` (pill, committed search and sort live in the URL of the
  * frame), `useListReportScrollRestoration`, and "New" opening a Dialog (a Sheet on mobile, Controls: `overlay`)
- * with "Cancel". The play function does the whole round: picks the "Open" pill, commits a search, sorts by
- * "Amount", scrolls the table, opens "New", types in the form and presses "Cancel"; then checks the URL, the
+ * with "Cancel". The play function does the whole round: picks the "Active" pill, commits a search, sorts by
+ * "Hire date", scrolls the table, opens "New", types in the form and presses "Cancel"; then checks the URL, the
  * scroll position, the pill, the search text and the focus on "New". Controls: `history`, `overlay`,
  * `loadDelayMs`, `state`.
  */
 export const SmartFilterBarShowcase: Story = {
-  tags: ['visual'],
+  name: 'Example: configured for an HR employee directory',
+  tags: ['use-case', 'vertical:hr', 'visual'],
+  ...describeUseCase({
+    vertical: 'hr',
+    problem: 'An HR team looks people up by name or personnel number, narrows the list by status or department, and comes back to the same place after opening a form.',
+    configuration:
+      'Pills for status and department, search by name or number, sort by hire date, with the pill, the search and the sort in the URL and the scroll position restored. "New" opens a Dialog (a Sheet on mobile, Controls: `overlay`) with "Cancel": the report comes back exactly as it was.',
+  }),
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
@@ -273,13 +314,13 @@ export const SmartFilterBarShowcase: Story = {
     await expect(args.onSearchQueryChange).not.toHaveBeenCalled();
     await expect(args.onSortChange).not.toHaveBeenCalled();
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
-    await expect(args.onFilterChange).toHaveBeenLastCalledWith('open');
-    // "FT-2026-00" matches the first 99 invoice numbers: still enough rows to scroll after the "Open" pill.
-    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'FT-2026-00{Enter}');
-    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('FT-2026-00');
-    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
-    await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
+    await userEvent.click(canvas.getByRole('radio', { name: 'Active' }));
+    await expect(args.onFilterChange).toHaveBeenLastCalledWith('active');
+    // "E-10" matches the first 99 personnel numbers: still enough rows to scroll after the "Active" pill.
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'E-10{Enter}');
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('E-10');
+    await userEvent.click(canvas.getByRole('button', { name: 'Hire date' }));
+    await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'hired', direction: 'desc' });
     const firstRow = () => canvas.getAllByRole('row')[1]!.textContent;
     const rowBefore = firstRow();
 
@@ -291,21 +332,21 @@ export const SmartFilterBarShowcase: Story = {
     const trigger = canvas.getByRole('button', { name: 'New' });
     await userEvent.click(trigger);
     await expect(args.onClick).toHaveBeenCalledTimes(1);
-    const overlay = await body.findByRole('dialog', { name: 'New invoice' });
+    const overlay = await body.findByRole('dialog', { name: 'New employee' });
     await settleMotion();
-    await userEvent.type(within(overlay).getByRole('textbox', { name: 'Supplier name' }), 'Acme');
-    await expect(within(overlay).getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Acme');
+    await userEvent.type(within(overlay).getByRole('textbox', { name: 'Employee name' }), 'Jordan Avery');
+    await expect(within(overlay).getByRole('textbox', { name: 'Employee name' })).toHaveValue('Jordan Avery');
 
     await userEvent.click(within(overlay).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
 
     const params = new URLSearchParams(win.location.search);
-    await expect(params.get('filter')).toBe('open');
-    await expect(params.get('q')).toBe('FT-2026-00');
-    await expect(params.get('sort')).toBe('amount.desc');
+    await expect(params.get('filter')).toBe('active');
+    await expect(params.get('q')).toBe('E-10');
+    await expect(params.get('sort')).toBe('hired.desc');
     await expect(scrollerOf(canvas).scrollTop).toBe(before);
-    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
-    await expect(canvas.getByRole('searchbox', { name: 'Search' })).toHaveValue('FT-2026-00');
+    await expect(canvas.getByRole('radio', { name: 'Active' })).toBeChecked();
+    await expect(canvas.getByRole('searchbox', { name: 'Search' })).toHaveValue('E-10');
     await expect(firstRow()).toBe(rowBefore);
     await waitFor(() => expect(trigger).toHaveFocus());
   },
@@ -313,13 +354,15 @@ export const SmartFilterBarShowcase: Story = {
 
 /** Fixture of the e2e suite and visual baseline: the showcase without the play function, as it opens. */
 export const SmartFilterBarShowcaseNoPlay: Story = {
-  tags: ['visual', 'internal'],
+  name: 'Example: configured for an HR employee directory (no play)',
+  tags: ['use-case', 'vertical:hr', 'visual', 'internal'],
   parameters: { controls: { disable: true } },
 };
 
-/** Visual variant: the "Open" pill active and the table sorted by amount. */
+/** Visual variant: the "Active" pill selected and the table sorted by hire date. */
 export const SmartFilterBarShowcaseActiveFilter: Story = {
-  tags: ['visual'],
+  name: 'Example: configured for an HR employee directory, Active pill',
+  tags: ['use-case', 'vertical:hr', 'visual', 'internal'],
   parameters: { controls: { disable: true } },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -327,10 +370,10 @@ export const SmartFilterBarShowcaseActiveFilter: Story = {
     if (!win) throw new Error('SmartFilterBarShowcaseActiveFilter: no window');
     resetBrowserState(win);
     await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10));
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
-    await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
-    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
-    await waitFor(() => expect(win.location.search).toContain('sort=amount.desc'));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Active' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Hire date' }));
+    await expect(canvas.getByRole('radio', { name: 'Active' })).toBeChecked();
+    await waitFor(() => expect(win.location.search).toContain('sort=hired.desc'));
   },
 };
 
@@ -340,7 +383,8 @@ export const SmartFilterBarShowcaseActiveFilter: Story = {
  * Sheet-on-mobile behaviour is covered by the `overlay: auto` e2e and the Sheet stories.
  */
 export const SmartFilterBarShowcaseOverlayOpen: Story = {
-  tags: ['visual', 'visual-viewport-only'],
+  name: 'Example: configured for an HR employee directory, New employee open',
+  tags: ['use-case', 'vertical:hr', 'visual', 'visual-viewport-only', 'internal'],
   args: { overlay: 'dialog' },
   parameters: { controls: { disable: true } },
   play: async ({ canvasElement }) => {
@@ -349,9 +393,9 @@ export const SmartFilterBarShowcaseOverlayOpen: Story = {
     if (!win) throw new Error('SmartFilterBarShowcaseOverlayOpen: no window');
     resetBrowserState(win);
     await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10));
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Active' }));
     await userEvent.click(canvas.getByRole('button', { name: 'New' }));
-    await within(document.body).findByRole('dialog', { name: 'New invoice' });
+    await within(document.body).findByRole('dialog', { name: 'New employee' });
     // Entry motion finished and the overlay measured on its final geometry before the picture (#111).
     await repositionAfterMotion();
   },

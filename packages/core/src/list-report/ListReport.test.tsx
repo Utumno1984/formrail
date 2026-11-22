@@ -2,8 +2,9 @@ import { createRef, type Ref } from 'react';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEMO_SUPPLIERS, makeDemoInvoices, type DemoInvoice } from '../internal/demo-invoices';
+import { makeRecords, type DemoRecord } from '../internal/demo-data';
 import { ListReport, type ListReportProps } from './ListReport';
+import { SEARCH_WORD } from './ListReport.stories-data';
 import { rootClass } from './list-report-styles';
 import type { ListReportColumn, ListReportFilter } from './types';
 import { useListReport } from './use-list-report';
@@ -13,26 +14,26 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const COLUMNS: ListReportColumn<DemoInvoice>[] = [
-  { id: 'number', header: 'Numero', accessor: (r) => r.number },
-  { id: 'supplier', header: 'Fornitore', accessor: (r) => r.supplier },
-  { id: 'amount', header: 'Importo', accessor: (r) => r.amount, firstSortDirection: 'desc' },
+const COLUMNS: ListReportColumn<DemoRecord>[] = [
+  { id: 'code', header: 'Numero', accessor: (r) => r.code },
+  { id: 'name', header: 'Fornitore', accessor: (r) => r.name },
+  { id: 'amount', header: 'Importo', accessor: (r) => r.amountMinor, firstSortDirection: 'desc' },
 ];
 
-const FILTERS: ListReportFilter<DemoInvoice>[] = [
+const FILTERS: ListReportFilter<DemoRecord>[] = [
   { id: 'all', label: 'Tutte' },
   { id: 'pending', label: 'Da approvare', predicate: (r) => r.status === 'pending' },
 ];
 
-const ROWS = makeDemoInvoices(40);
+const ROWS = makeRecords(40);
 
-type HostProps = Partial<Omit<ListReportProps<DemoInvoice>, 'table'>> & {
-  rows?: DemoInvoice[];
+type HostProps = Partial<Omit<ListReportProps<DemoRecord>, 'table'>> & {
+  rows?: readonly DemoRecord[];
   withFilters?: boolean;
   defaultFilter?: string;
   searchCommitDelay?: number | null;
   reportRef?: Ref<HTMLDivElement>;
-  filters?: ListReportFilter<DemoInvoice>[];
+  filters?: ListReportFilter<DemoRecord>[];
   onFilterChange?: (filter: string) => void;
 };
 
@@ -47,7 +48,7 @@ function Host({
   reportRef,
   ...props
 }: HostProps) {
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows,
     columns: COLUMNS,
     getRowId: (r) => r.id,
@@ -63,14 +64,17 @@ const heading = () => screen.getByRole('heading', { name: /Fatture/ });
 
 describe('dataset demo', () => {
   it('is deterministic, with unique ids, and gives every scenario of the showcase some rows', () => {
-    const a = makeDemoInvoices();
+    const a = makeRecords(200);
     expect(a).toHaveLength(200);
-    expect(makeDemoInvoices()).toEqual(a);
+    expect(makeRecords(200)).toEqual(a);
     expect(new Set(a.map((r) => r.id)).size).toBe(200);
-    expect(new Set(a.map((r) => r.status))).toEqual(new Set(['pending', 'approved', 'rejected']));
-    expect(new Set(a.map((r) => r.supplier)).size).toBe(DEMO_SUPPLIERS.length);
-    // the scenario of the play function: pending invoices of one supplier
-    expect(a.filter((r) => r.status === 'pending' && r.supplier.includes('Ferrari')).length).toBeGreaterThan(2);
+    expect(new Set(a.map((r) => r.status))).toEqual(new Set(['active', 'pending', 'on-hold', 'archived']));
+    // names have accented letters (the stories search without the accent) and repeat across rows (there are only
+    // 480 combinations of the two words): a search for one of them finds several records
+    expect(a.some((r) => /\P{ASCII}/u.test(r.name))).toBe(true);
+    expect(new Set(a.map((r) => r.name)).size).toBeLessThan(200);
+    // the scenario of the play function: pending records whose name has one word
+    expect(a.filter((r) => r.status === 'pending' && r.name.includes(SEARCH_WORD)).length).toBeGreaterThan(2);
   });
 });
 
@@ -91,8 +95,8 @@ describe('<ListReport> header', () => {
     expect(heading()).toHaveTextContent(`Fatture (${pending} of 40)`);
     await user.click(screen.getByRole('radio', { name: 'Tutte' }));
     expect(heading()).toHaveTextContent('Fatture (40)');
-    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
-    const matching = ROWS.filter((r) => r.supplier.includes('Ferrari')).length;
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), `${SEARCH_WORD}{Enter}`);
+    const matching = ROWS.filter((r) => r.name.includes(SEARCH_WORD)).length;
     expect(heading()).toHaveTextContent(`Fatture (${matching} of 40)`);
   });
 
@@ -225,10 +229,10 @@ describe('<ListReport> clear filters', () => {
   it('goes back to the default pill (one filter change) when it has results, not to the unfiltered one', async () => {
     const user = userEvent.setup();
     const onFilterChange = vi.fn();
-    const rows = ROWS.filter((r) => r.status !== 'rejected');
-    const filters: ListReportFilter<DemoInvoice>[] = [
+    const rows = ROWS.filter((r) => r.status !== 'archived');
+    const filters: ListReportFilter<DemoRecord>[] = [
       ...FILTERS,
-      { id: 'rejected', label: 'Respinte', predicate: (r) => r.status === 'rejected' },
+      { id: 'archived', label: 'Respinte', predicate: (r) => r.status === 'archived' },
     ];
     render(<Host rows={rows} filters={filters} defaultFilter="pending" onFilterChange={onFilterChange} />);
     await user.click(screen.getByRole('radio', { name: 'Respinte' }));
@@ -241,7 +245,7 @@ describe('<ListReport> clear filters', () => {
   it('with a search and an empty default pill: the first click clears the search, then the unfiltered pill', async () => {
     const user = userEvent.setup();
     render(<Host showSearch defaultFilter="pending" rows={ROWS.filter((r) => r.status !== 'pending')} />);
-    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), `${SEARCH_WORD}{Enter}`);
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('');
     expect(screen.getByRole('radio', { name: 'Tutte' })).toBeChecked();

@@ -235,7 +235,7 @@ function expectBackAtStart(after: AfterDirectionChange, browserName: string, lab
   if (browserName === 'firefox') expect(after.stopped, label).toBe(0);
 }
 
-/** The invoice button of the first data row (the data has arrived: skeleton rows hold no button). */
+/** The first button of the first data row (the data has arrived: skeleton rows hold no button). */
 const firstRowButton = (page: Page): Locator => scroller(page).locator('tbody tr:not([aria-hidden])').first().getByRole('button').first();
 
 async function waitForRows(page: Page): Promise<void> {
@@ -275,7 +275,7 @@ test.describe('List Report: edge shades (Free)', () => {
     expect(await scroller(page).locator('[data-rop-overflow-edges]').count()).toBe(0);
   });
 
-  test('a rotated tablet (768x1024 -> 1024x768) and back: the shades follow with no scroll; the end shade follows the width of the actions column in both forms', async ({ page }) => {
+  test('a rotated tablet (768x1024 -> 1180x820) and back: the shades follow with no scroll; the end shade follows the width of the actions column in both forms', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await gotoStory(page, ROW_ACTIONS_INLINE, 'selectable:!true');
     await waitForRows(page);
@@ -288,7 +288,7 @@ test.describe('List Report: edge shades (Free)', () => {
     expect(header.width).toBeGreaterThan(60);
     expect(Math.abs(box.x + shade.right - header.x)).toBeLessThanOrEqual(1);
 
-    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.setViewportSize({ width: 1180, height: 820 });
     await expectEdges(page, false, false);
     expect(await scroller(page).locator('[data-rop-overflow-edges]').count()).toBe(0);
     await page.setViewportSize({ width: 768, height: 1024 });
@@ -302,6 +302,20 @@ test.describe('List Report: edge shades (Free)', () => {
     shade = await shadeBox(page, 'end');
     expect(header.width).toBeLessThan(50);
     expect(Math.abs(box.x + shade.right - header.x)).toBeLessThanOrEqual(1);
+  });
+
+  test('1024x768 (a classic tablet): the Owner column still overflows, so the end shade shows (not the start one), ends where the actions column starts, and the page does not scroll sideways', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await gotoStory(page, ROW_ACTIONS_INLINE, 'selectable:!true');
+    await waitForRows(page);
+    expect((await edgeState(page)).overflow).toBeGreaterThan(1);
+    await expectEdges(page, false, true);
+    const header = (await scroller(page).locator('thead th').last().boundingBox())!;
+    const box = (await scroller(page).boundingBox())!;
+    const shade = await shadeBox(page, 'end');
+    expect(Math.abs(box.x + shade.right - header.x)).toBeLessThanOrEqual(1);
+    const page_ = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+    expect(page_.sw).toBeLessThanOrEqual(page_.cw);
   });
 
   test('row actions: the end shade is before the sticky column, the "…" trigger stays whole and clickable; its menu opens above the shade', async ({ page }) => {

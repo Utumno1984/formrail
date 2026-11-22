@@ -47,14 +47,14 @@ test.describe('useListReport fixture: uncontrolled', () => {
     expect((await column(page, 3)).at(-1)).toBe('');
   });
 
-  test('Customer: case/diacritics insensitive, ties keep the input order, empty last; only one column has aria-sort', async ({
+  test('Name: case/diacritics insensitive, ties keep the input order, empty last; only one column has aria-sort', async ({
     page,
   }) => {
     await gotoStory(page, STORY('uncontrolled'));
     await click(page, 'Amount');
-    await click(page, 'Customer');
+    await click(page, 'Name');
     await expect(header(page, 'Amount')).not.toHaveAttribute('aria-sort');
-    await expect(header(page, 'Customer')).toHaveAttribute('aria-sort', 'ascending');
+    await expect(header(page, 'Name')).toHaveAttribute('aria-sort', 'ascending');
     // "Café" (i4) and "Cafe" (i7) are equal: i4 stays before i7
     expect(await column(page, 0)).toEqual(['i2', 'i4', 'i7', 'i8', 'i1', 'i5', 'i3', 'i6']);
   });
@@ -78,9 +78,9 @@ test.describe('useListReport fixture: controlled', () => {
     page,
   }) => {
     await gotoStory(page, STORY('controlled'));
-    await page.getByRole('button', { name: 'Sort by Customer' }).click();
-    await expect(page.getByTestId('sort-state')).toHaveText('customer asc');
-    await expect(header(page, 'Customer')).toHaveAttribute('aria-sort', 'ascending');
+    await page.getByRole('button', { name: 'Sort by Name' }).click();
+    await expect(page.getByTestId('sort-state')).toHaveText('name asc');
+    await expect(header(page, 'Name')).toHaveAttribute('aria-sort', 'ascending');
     expect(await column(page, 0)).toEqual(['i2', 'i4', 'i7', 'i8', 'i1', 'i5', 'i3', 'i6']);
     await expect(log(page)).toHaveCount(0);
 
@@ -99,16 +99,16 @@ test.describe('useListReport fixture: filter and search', () => {
     await gotoStory(page, STORY('uncontrolled'));
     await page.clock.pauseAt(new Date(Date.now() + 60_000));
     const input = page.getByLabel('Search');
-    await input.fill('rossi');
+    await input.fill('ember');
     // the draft is in the input, the rows are still all there (the 300 ms timer runs on the fake clock)
-    await expect(input).toHaveValue('rossi');
+    await expect(input).toHaveValue('ember');
     await page.clock.runFor(299);
     expect(await rowIds(page)).toHaveLength(8);
     await page.clock.runFor(1);
     await expect.poll(() => rowIds(page)).toEqual(['i1', 'i5']);
     await expect(page.getByTestId('counts')).toHaveText('2/8');
 
-    await input.fill('verdi');
+    await input.fill('fjord');
     await page.getByRole('button', { name: 'Commit' }).click();
     expect(await rowIds(page)).toEqual(['i3']);
   });
@@ -122,8 +122,8 @@ test.describe('useListReport fixture: filter and search', () => {
 
   test('filter pill, then sort: the sort applies to the filtered rows; Reset restores everything', async ({ page }) => {
     await gotoStory(page, STORY('uncontrolled'));
-    await page.getByRole('button', { name: 'To approve' }).click();
-    await expect(page.getByRole('button', { name: 'To approve' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Large' }).click();
+    await expect(page.getByRole('button', { name: 'Large' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute('aria-pressed', 'false');
     await click(page, 'Amount');
     expect(await rowIds(page)).toEqual(['i1', 'i7', 'i6', 'i4']);
@@ -138,14 +138,14 @@ test.describe('useListReport fixture: filter and search', () => {
   test('controlled: an outside search change does not overwrite the typed text and does not echo', async ({ page }) => {
     await gotoStory(page, STORY('controlled'));
     const input = page.getByLabel('Search');
-    await input.fill('rossi');
-    await page.getByRole('button', { name: 'Set search: bianchi' }).click();
-    await expect(input).toHaveValue('rossi');
+    await input.fill('ember');
+    await page.getByRole('button', { name: 'Set search: alder' }).click();
+    await expect(input).toHaveValue('ember');
     await expect.poll(() => rowIds(page)).toEqual(['i2']);
-    await expect(log(page).filter({ hasText: 'search:bianchi' })).toHaveCount(0);
+    await expect(log(page).filter({ hasText: 'search:alder' })).toHaveCount(0);
     // the typed text is still only a draft; committing it is an explicit gesture
     await page.getByRole('button', { name: 'Commit' }).click();
     await expect.poll(() => rowIds(page)).toEqual(['i1', 'i5']);
-    await expect(log(page).filter({ hasText: 'search:rossi' })).toHaveCount(1);
+    await expect(log(page).filter({ hasText: 'search:ember' })).toHaveCount(1);
   });
 });

@@ -20,11 +20,6 @@
       "invoice",
       "supplier"
     ],
-    "Floorplans/List Report": [
-      "customer",
-      "invoice",
-      "supplier"
-    ],
     "Floorplans/Object Page with Validation": [
       "customer",
       "invoice",

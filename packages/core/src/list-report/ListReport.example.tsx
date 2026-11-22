@@ -8,37 +8,39 @@ import {
   type ListReportFilter,
 } from '@formrail/core';
 
-interface Invoice {
-  id: string;
-  customer: string;
+interface RecordRow {
+  code: string;
+  name: string;
+  owner: string;
   amount: number;
-  status: 'pending' | 'approved';
+  status: 'pending' | 'active';
 }
 
-const invoices: Invoice[] = [
-  { id: 'INV-0142', customer: 'Rossi Construction', amount: 1250.5, status: 'pending' },
-  { id: 'INV-0143', customer: 'Bianchi & Associates', amount: 380, status: 'approved' },
-  { id: 'INV-0144', customer: 'Verdi Industrial Supplies', amount: 9200, status: 'pending' },
-  { id: 'INV-0145', customer: 'Gialli Transport', amount: 74.9, status: 'approved' },
-  { id: 'INV-0146', customer: 'Neri Logistics', amount: 2310, status: 'pending' },
-  { id: 'INV-0147', customer: 'Russo Electrical', amount: 645.25, status: 'approved' },
-  { id: 'INV-0148', customer: 'Ferrari Office Supplies', amount: 118.4, status: 'pending' },
-  { id: 'INV-0149', customer: 'Esposito Catering', amount: 905, status: 'approved' },
-  { id: 'INV-0150', customer: 'Romano Packaging', amount: 3480.75, status: 'pending' },
-  { id: 'INV-0151', customer: 'Colombo Printing', amount: 56.2, status: 'approved' },
+const records: RecordRow[] = [
+  { code: 'REC-00001', name: 'Café Report', owner: 'Ilaria Pellegrini', amount: 1250.5, status: 'pending' },
+  { code: 'REC-00002', name: 'Indigo Plan', owner: 'James Brooks', amount: 380, status: 'active' },
+  { code: 'REC-00003', name: 'Crème Review', owner: 'James Foster', amount: 9200, status: 'pending' },
+  { code: 'REC-00004', name: 'Summit Checklist', owner: 'Élodie Martin', amount: 74.9, status: 'active' },
+  { code: 'REC-00005', name: 'Tundra Plan', owner: 'Ayaka Sasaki', amount: 2310, status: 'pending' },
+  { code: 'REC-00006', name: 'Amber Draft', owner: 'Charlotte Sullivan', amount: 645.25, status: 'active' },
+  { code: 'REC-00007', name: 'Fjord Summary', owner: 'Ilaria Pellegrini', amount: 118.4, status: 'pending' },
+  { code: 'REC-00008', name: 'Orchid Brief', owner: 'James Brooks', amount: 905, status: 'active' },
+  { code: 'REC-00009', name: 'Ridge Entry', owner: 'Ayaka Sasaki', amount: 56.2, status: 'pending' },
+  { code: 'REC-00010', name: 'Pebble Update', owner: 'Élodie Martin', amount: 3480.75, status: 'active' },
 ];
 
-const filters: ListReportFilter<Invoice>[] = [
+const filters: ListReportFilter<RecordRow>[] = [
   { id: 'all', label: 'All' },
-  { id: 'pending', label: 'To approve', predicate: (row) => row.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (row) => row.status === 'approved' },
+  { id: 'pending', label: 'Pending', predicate: (row) => row.status === 'pending' },
+  { id: 'active', label: 'Active', predicate: (row) => row.status === 'active' },
 ];
 
-export function InvoiceList() {
-  const columns = useMemo<ListReportColumn<Invoice>[]>(
+export function RecordList() {
+  const columns = useMemo<ListReportColumn<RecordRow>[]>(
     () => [
-      { id: 'id', header: 'Number', accessor: (row) => row.id, width: 110 },
-      { id: 'customer', header: 'Customer', accessor: (row) => row.customer, minWidth: 180 },
+      { id: 'code', header: 'Code', accessor: (row) => row.code, width: 130 },
+      { id: 'name', header: 'Name', accessor: (row) => row.name, minWidth: 180 },
+      { id: 'owner', header: 'Owner', accessor: (row) => row.owner, minWidth: 160 },
       {
         id: 'amount',
         header: 'Amount',
@@ -52,8 +54,8 @@ export function InvoiceList() {
         header: 'Status',
         accessor: (row) => row.status,
         cell: (row) => (
-          <StatusBadge tone={row.status === 'pending' ? 'warning' : 'success'}>
-            {row.status === 'pending' ? 'To approve' : 'Approved'}
+          <StatusBadge tone={row.status === 'pending' ? 'info' : 'success'}>
+            {row.status === 'pending' ? 'Pending' : 'Active'}
           </StatusBadge>
         ),
         width: 140,
@@ -61,7 +63,7 @@ export function InvoiceList() {
     ],
     [],
   );
-  const table = useListReport({ rows: invoices, columns, getRowId: (row) => row.id, filters });
+  const table = useListReport({ rows: records, columns, getRowId: (row) => row.code, filters });
 
   // The floorplan (title, actions, filter bar, table) fills a parent with a bounded height: the page itself
   // never scrolls, the table does. In a flex or grid layout, give its cell `min-height: 0`.
@@ -76,7 +78,7 @@ export function InvoiceList() {
         maxHeight: 'clamp(20rem, calc(100dvh - 4rem), 40rem)',
       }}
     >
-      <ListReport title="Invoices" table={table} actions={<Button variant="primary">New invoice</Button>} />
+      <ListReport title="Records" table={table} actions={<Button variant="primary">New record</Button>} />
     </div>
   );
 }

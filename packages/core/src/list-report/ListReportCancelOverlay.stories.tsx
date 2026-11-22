@@ -14,7 +14,7 @@ import {
 } from '../dialog/Dialog';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
-import { formatEuro, makeDemoInvoices, type DemoInvoice } from '../internal/demo-invoices';
+import { makeRecords, type DemoRecord } from '../internal/demo-data';
 import { settleMotion } from '../internal/settle-motion';
 import {
   Sheet,
@@ -27,7 +27,7 @@ import {
   SheetTrigger,
 } from '../sheet/Sheet';
 import { ListReport } from './ListReport';
-import type { ListReportColumn, ListReportFilter } from './types';
+import { COLUMNS, FILTERS, LABELS } from './ListReport.stories-data';
 import { useListReport } from './use-list-report';
 
 type OverlayKind = 'dialog' | 'sheet';
@@ -45,48 +45,6 @@ interface CancelOverlayArgs {
   tallPage?: boolean;
 }
 
-const LABELS = {
-  loading: 'Loading…',
-  empty: 'No data',
-  noResults: 'No results for the current filters',
-  error: 'Could not load the data',
-  retry: 'Retry',
-  clearFilters: 'Clear filters',
-  resultCount: (count: number) => (count === 1 ? '1 result' : `${count} results`),
-  count: (resultCount: number, totalCount: number) =>
-    resultCount === totalCount ? `(${resultCount})` : `(${resultCount} of ${totalCount})`,
-};
-
-const STATUS_LABEL: Record<DemoInvoice['status'], string> = {
-  pending: 'Open',
-  approved: 'Approved',
-  rejected: 'Rejected',
-};
-
-const FILTERS: ListReportFilter<DemoInvoice>[] = [
-  { id: 'all', label: 'All' },
-  { id: 'open', label: 'Open', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
-  { id: 'rejected', label: 'Rejected', predicate: (r) => r.status === 'rejected' },
-];
-
-const COLUMNS: ListReportColumn<DemoInvoice>[] = [
-  { id: 'number', header: 'Number', accessor: (r) => r.number, width: 150 },
-  { id: 'supplier', header: 'Supplier', accessor: (r) => r.supplier, minWidth: 200 },
-  { id: 'date', header: 'Date', accessor: (r) => r.date, width: 130 },
-  {
-    id: 'amount',
-    header: 'Amount',
-    accessor: (r) => r.amount,
-    cell: (r) => formatEuro(r.amount),
-    align: 'end',
-    firstSortDirection: 'desc',
-    searchable: false,
-    width: 140,
-  },
-  { id: 'status', header: 'Status', accessor: (r) => STATUS_LABEL[r.status], searchable: false, width: 150 },
-];
-
 const PAGE: CSSProperties = {
   boxSizing: 'border-box',
   padding: 16,
@@ -98,14 +56,14 @@ const PAGE: CSSProperties = {
 
 function NewForm({ kind }: { kind: OverlayKind }) {
   const field = (
-    <Field label="Supplier name">
+    <Field label="Record name">
       <Input />
     </Field>
   );
   return kind === 'dialog' ? (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>New invoice</DialogTitle>
+        <DialogTitle>New record</DialogTitle>
         <DialogClose />
       </DialogHeader>
       <DialogBody>{field}</DialogBody>
@@ -119,7 +77,7 @@ function NewForm({ kind }: { kind: OverlayKind }) {
   ) : (
     <SheetContent>
       <SheetHeader>
-        <SheetTitle>New invoice</SheetTitle>
+        <SheetTitle>New record</SheetTitle>
         <SheetClose />
       </SheetHeader>
       <SheetBody>{field}</SheetBody>
@@ -141,7 +99,7 @@ function CancelOverlayDemo({
   searchCommitDelay = 300,
   tallPage = false,
 }: CancelOverlayArgs) {
-  const all = useMemo(() => makeDemoInvoices(200), []);
+  const all = useMemo(() => makeRecords(200), []);
   const [loaded, setLoaded] = useState(loadMs === 0);
   useEffect(() => {
     if (loadMs === 0) return;
@@ -149,7 +107,7 @@ function CancelOverlayDemo({
     return () => clearTimeout(id);
   }, [loadMs]);
 
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows: loaded ? all : [],
     columns: COLUMNS,
     getRowId: (r) => r.id,
@@ -179,7 +137,7 @@ function CancelOverlayDemo({
     <div style={tallPage ? { ...PAGE, height: 'auto' } : PAGE}>
       <div style={tallPage ? { flex: 'none', height: '70dvh' } : { flex: 1, minHeight: 0 }}>
         <ListReport
-          title="Invoices"
+          title="Records"
           table={table}
           actions={actions}
           status={loaded ? 'ready' : 'loading'}
@@ -219,7 +177,7 @@ type Story = StoryObj<CancelOverlayArgs>;
 /**
  * "New" opens a Dialog (or a Sheet, Controls: `overlay`) above a mounted List Report; "Cancel" closes it.
  * Nothing is left to restore: the report must come back exactly as it was. The play function picks the
- * "Open" pill, commits a search, sorts by "Amount", scrolls the table, opens "New" and checks the scroll is
+ * "Active" pill, commits a search, sorts by "Amount", scrolls the table, opens "New" and checks the scroll is
  * unchanged while the overlay is open, then presses "Cancel" and checks scroll, pill, search text and sort
  * (the first row) are unchanged and the focus is back on "New". The e2e suite repeats it for Escape, a click
  * on the backdrop, reduced motion and the mobile/tablet viewports.
@@ -228,11 +186,11 @@ export const CancelActionOverlay: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
-    const scroller = canvas.getByRole('table', { name: /Invoices/ }).parentElement as HTMLElement;
+    const scroller = canvas.getByRole('table', { name: /Records/ }).parentElement as HTMLElement;
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
-    // "FT-2026-00" matches the first 99 invoice numbers: still enough rows to scroll after the "Open" pill.
-    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'FT-2026-00{Enter}');
+    await userEvent.click(canvas.getByRole('radio', { name: 'Active' }));
+    // "REC-00" matches the first 99 record codes: still enough rows to scroll after the "Active" pill.
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'REC-00{Enter}');
     await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
     const firstRow = () => canvas.getAllByRole('row')[1]!.textContent;
     const rowBefore = firstRow();
@@ -246,7 +204,7 @@ export const CancelActionOverlay: Story = {
     const trigger = canvas.getByRole('button', { name: 'New' });
     await userEvent.click(trigger);
     await expect(args.onClick).toHaveBeenCalledTimes(1);
-    const overlay = await body.findByRole('dialog', { name: 'New invoice' });
+    const overlay = await body.findByRole('dialog', { name: 'New record' });
     await settleMotion();
     await expect(scroller.scrollTop).toBe(before.top);
     await expect(scroller.scrollLeft).toBe(before.left);
@@ -256,8 +214,8 @@ export const CancelActionOverlay: Story = {
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(false);
     await expect(scroller.scrollTop).toBe(before.top);
     await expect(scroller.scrollLeft).toBe(before.left);
-    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
-    await expect(canvas.getByRole('searchbox', { name: 'Search' })).toHaveValue('FT-2026-00');
+    await expect(canvas.getByRole('radio', { name: 'Active' })).toBeChecked();
+    await expect(canvas.getByRole('searchbox', { name: 'Search' })).toHaveValue('REC-00');
     await expect(firstRow()).toBe(rowBefore);
     await waitFor(() => expect(trigger).toHaveFocus());
   },

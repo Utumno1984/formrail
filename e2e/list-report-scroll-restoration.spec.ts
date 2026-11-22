@@ -7,8 +7,8 @@ const FIXTURE = 'floorplans-list-report--scroll-restoration-no-play';
 const DELAY = 'loadDelayMs:600';
 
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
-const scroller = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' }).locator('..');
-const detailTitle = (page: Page): Locator => page.getByText('Invoice detail');
+const scroller = (page: Page): Locator => page.getByRole('table', { name: 'Records' }).locator('..');
+const detailTitle = (page: Page): Locator => page.getByText('Record detail');
 const scrollTop = (page: Page): Promise<number> => scroller(page).evaluate((el) => el.scrollTop);
 const setScrollTop = (page: Page, top: number): Promise<void> =>
   scroller(page).evaluate((el, t) => void (el.scrollTop = t), top);
@@ -27,9 +27,9 @@ async function openAndScroll(page: Page, name: string, top: number): Promise<num
   return actual;
 }
 
-/** Clicks an invoice link that is already inside the scroller's viewport: Playwright would otherwise scroll one into view (and move the position under test). */
+/** Clicks a record link that is already inside the scroller's viewport: Playwright would otherwise scroll one into view (and move the position under test). */
 async function clickVisibleRow(page: Page): Promise<void> {
-  const links = page.getByRole('button', { name: /^FT-2026-/ });
+  const links = page.getByRole('button', { name: /^REC-/ });
   const box = await scroller(page).boundingBox();
   const index = await links.evaluateAll(
     (els, area) =>
@@ -50,56 +50,56 @@ test.describe('Floorplans/List Report: ScrollRestoration', () => {
 
   test('Cancel: loading first (not scrolled), then the data and the position; window untouched', async ({ page }) => {
     await gotoStory(page, FIXTURE, DELAY);
-    const saved = await openAndScroll(page, 'Open', 600);
+    const saved = await openAndScroll(page, 'Pending', 600);
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     expect(await scrollTop(page)).toBe(0);
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^REC-/ }).first()).toBeVisible();
     await expect.poll(async () => Math.abs((await scrollTop(page)) - saved)).toBeLessThanOrEqual(1);
-    await expect(pill(page, 'Open')).toBeChecked();
+    await expect(pill(page, 'Pending')).toBeChecked();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
 
   test('real browser Back restores the same way', async ({ page }) => {
     await gotoStory(page, FIXTURE, DELAY);
-    const saved = await openAndScroll(page, 'Open', 500);
+    const saved = await openAndScroll(page, 'Pending', 500);
     await page.goBack();
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^REC-/ }).first()).toBeVisible();
     await expect.poll(async () => Math.abs((await scrollTop(page)) - saved)).toBeLessThanOrEqual(1);
-    await expect(pill(page, 'Open')).toBeChecked();
+    await expect(pill(page, 'Pending')).toBeChecked();
   });
 
   test('a full reload of the list page restores it (sessionStorage survives)', async ({ page }) => {
     await gotoStory(page, FIXTURE, DELAY);
     await expect(page.getByRole('row').nth(10)).toBeVisible();
-    await pill(page, 'Open').click();
+    await pill(page, 'Pending').click();
     await setScrollTop(page, 400);
     await expect.poll(() => scrollTop(page)).toBeGreaterThan(398);
     const saved = await scrollTop(page);
     await page.waitForTimeout(300);
     await page.reload();
-    await expect(pill(page, 'Open')).toBeChecked();
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+    await expect(pill(page, 'Pending')).toBeChecked();
+    await expect(page.getByRole('button', { name: /^REC-/ }).first()).toBeVisible();
     await expect.poll(async () => Math.abs((await scrollTop(page)) - saved)).toBeLessThanOrEqual(1);
   });
 
   test('another pill starts at the top (no position saved for that URL)', async ({ page }) => {
     await gotoStory(page, FIXTURE, DELAY);
-    await openAndScroll(page, 'Open', 600);
+    await openAndScroll(page, 'Pending', 600);
     await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
-    await pill(page, 'Rejected').click();
-    await expect(pill(page, 'Rejected')).toBeChecked();
+    await expect(page.getByRole('button', { name: /^REC-/ }).first()).toBeVisible();
+    await pill(page, 'On hold').click();
+    await expect(pill(page, 'On hold')).toBeChecked();
     // The container keeps its position when the pill changes; the user opens a row without scrolling.
     await page.waitForTimeout(300);
     await clickVisibleRow(page);
     await expect(detailTitle(page)).toBeVisible();
     const keys = await page.evaluate(() => Object.keys(window.sessionStorage));
-    expect(keys.some((k) => k.includes('filter=open'))).toBe(true);
-    expect(keys.some((k) => k.includes('filter=rejected'))).toBe(false); // nothing was scrolled for this view
+    expect(keys.some((k) => k.includes('filter=pending'))).toBe(true);
+    expect(keys.some((k) => k.includes('filter=on-hold'))).toBe(false); // nothing was scrolled for this view
     await page.getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
-    await expect(pill(page, 'Rejected')).toBeChecked();
+    await expect(page.getByRole('button', { name: /^REC-/ }).first()).toBeVisible();
+    await expect(pill(page, 'On hold')).toBeChecked();
     expect(await scrollTop(page)).toBe(0);
   });
 });
@@ -114,12 +114,12 @@ for (const [name, width, height] of [
 
     test('Cancel restores the position after the data arrives', async ({ page }) => {
       await gotoStory(page, FIXTURE, DELAY);
-      const saved = await openAndScroll(page, 'Open', 500);
+      const saved = await openAndScroll(page, 'Pending', 500);
       await page.getByRole('button', { name: 'Cancel' }).click();
       await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
-      await expect(page.getByRole('button', { name: /^FT-2026-/ }).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: /^REC-/ }).first()).toBeVisible();
       await expect.poll(async () => Math.abs((await scrollTop(page)) - saved)).toBeLessThanOrEqual(1);
-      await expect(pill(page, 'Open')).toBeChecked();
+      await expect(pill(page, 'Pending')).toBeChecked();
     });
   });
 }

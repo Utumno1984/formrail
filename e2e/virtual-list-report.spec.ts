@@ -585,7 +585,7 @@ for (const vp of [
 
     test('one line at mount: count and "Clear selection" on the same row, as tall as the one-line bar of the Free ListReport', async ({ page }) => {
       await gotoStory(page, FREE_NO_BULK);
-      const freeHeight = (await rectOf(page.getByRole('group', { name: 'Selection Invoices' }))).height;
+      const freeHeight = (await rectOf(page.getByRole('group', { name: 'Selection Records' }))).height;
       await gotoStory(page, SELECTION);
       await expect(selCount(page)).toHaveText('No items selected');
       await expect(selBar(page)).toHaveAttribute('data-rop-bulk-actions', 'false');

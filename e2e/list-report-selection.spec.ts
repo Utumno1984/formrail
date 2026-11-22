@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
+import { makeRecords } from '../packages/core/src/internal/demo-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
@@ -7,14 +7,16 @@ import { expectPlayToPass, gotoStory } from './helpers/story';
 const STORY = (name: string) => `floorplans-list-report--${name}`;
 const TABLE_STORY = 'data-listreporttable--selection';
 
-// The scenario of the story: the first open invoice and the first two that are not open.
-const ROWS = makeDemoInvoices(200);
+// The scenario of the story: the first pending record and the first two that are not pending.
+const ROWS = makeRecords(200);
 const FIRST_OPEN = ROWS.find((r) => r.status === 'pending')!;
 const SCENARIO = [FIRST_OPEN, ...ROWS.filter((r) => r.status !== 'pending').slice(0, 2)];
 
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
+// The table of the ListReportTable stories (#626 migrates them): still named "Invoices".
+const tableStoryTable = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
 const scroller = (page: Page): Locator => table(page).locator('..');
-const bar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Invoices' });
+const bar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Records' });
 const allBox = (page: Page): Locator => page.getByRole('checkbox', { name: 'Select all results' });
 const rowBox = (page: Page, number: string): Locator => page.getByRole('checkbox', { name: `Select ${number}` });
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
@@ -73,14 +75,14 @@ for (const vp of VIEWPORTS) {
       const bar0 = await box(bar(page));
       const table0 = await box(scroller(page));
 
-      for (const row of SCENARIO) await rowBox(page, row.number).click();
+      for (const row of SCENARIO) await rowBox(page, row.code).click();
       await expect(bar(page)).toContainText('3 selected');
       await expect(clearSelection(page)).toBeVisible();
       sameBox(await box(bar(page)), bar0, 'bar at 3 selected');
       sameBox(await box(scroller(page)), table0, 'table at 3 selected');
-      for (const row of SCENARIO) await expect(rowBox(page, row.number).locator('xpath=ancestor::tr')).toHaveAttribute('data-selected', '');
+      for (const row of SCENARIO) await expect(rowBox(page, row.code).locator('xpath=ancestor::tr')).toHaveAttribute('data-selected', '');
 
-      await pill(page, 'Open').click();
+      await pill(page, 'Pending').click();
       await expect(bar(page)).toContainText('1 selected (2 hidden by filters)');
       expect(await indeterminate(allBox(page))).toBe(true);
       // A native checkbox exposes "mixed" through its indeterminate property (no aria-checked needed).
@@ -89,7 +91,7 @@ for (const vp of VIEWPORTS) {
       sameBox(await box(bar(page)), bar0, 'bar with hidden ids');
 
       await pill(page, 'All').click();
-      for (const row of SCENARIO) await expect(rowBox(page, row.number)).toBeChecked();
+      for (const row of SCENARIO) await expect(rowBox(page, row.code)).toBeChecked();
       await allBox(page).click();
       await expect(allBox(page)).toBeChecked();
       await expect(bar(page)).toContainText('200 selected');
@@ -105,8 +107,8 @@ for (const vp of VIEWPORTS) {
 
     test('keyboard only: Tab/Space on the rows, Enter on "Clear selection", focus on the header checkbox', async ({ page }) => {
       await gotoStory(page, STORY('selection-no-play'));
-      const first = rowBox(page, ROWS[0]!.number);
-      const second = rowBox(page, ROWS[1]!.number);
+      const first = rowBox(page, ROWS[0]!.code);
+      const second = rowBox(page, ROWS[1]!.code);
       await page.locator('body').click({ position: { x: 1, y: 1 } });
       await tabTo(page, first);
       await page.keyboard.press('Space');
@@ -133,7 +135,7 @@ for (const vp of VIEWPORTS) {
       const thBox = await box(th);
       const headerBox = await box(allBox(page));
       // Square column (as wide as a row is tall) and the box centred in it.
-      const firstCell = table(page).locator('tbody tr').first().locator('td').first();
+      const firstCell = tableStoryTable(page).locator('tbody tr').first().locator('td').first();
       const cellBox = await box(firstCell);
       const bodyBox = await box(rowBox(page, 'F-0001'));
       close(thBox.width, cellBox.width, 'column width');
@@ -143,12 +145,12 @@ for (const vp of VIEWPORTS) {
       close(bodyBox.y + bodyBox.height / 2, cellBox.y + cellBox.height / 2, 'row box centred vertically');
       close(headerBox.x, bodyBox.x, 'header and body boxes aligned');
 
-      const tableBox = await box(table(page));
+      const tableBox = await box(tableStoryTable(page));
       for (const args of ['status:loading;dataset:empty', 'dataset:empty', 'dataset:noResults', 'status:error']) {
         await expectPlayToPass(page, TABLE_STORY, args);
         sameBox(await box(page.locator('th[data-rop-select]')), thBox, `header cell (${args})`);
         // Same columns (the height follows the rows: 12 with data, the minimum body otherwise).
-        const t = await box(table(page));
+        const t = await box(tableStoryTable(page));
         close(t.x, tableBox.x, `table x (${args})`);
         close(t.width, tableBox.width, `table width (${args})`);
         await expect(page.locator('th[data-rop-select]').locator('..').locator('th')).toHaveCount(5);
@@ -163,7 +165,7 @@ for (const vp of VIEWPORTS) {
     test('selected rows are tinted, the hover stays distinguishable', async ({ page }) => {
       await gotoStory(page, STORY('selection-no-play'), 'preselected:some');
       const bg = (l: Locator) => l.evaluate((el) => getComputedStyle(el).backgroundColor);
-      const selectedRow = rowBox(page, SCENARIO[0]!.number).locator('xpath=ancestor::tr');
+      const selectedRow = rowBox(page, SCENARIO[0]!.code).locator('xpath=ancestor::tr');
       const plainRow = table(page).locator('tbody tr:not([data-selected]):not([aria-hidden])').first();
       await page.mouse.move(0, 0);
       const selected = await bg(selectedRow);
@@ -183,8 +185,8 @@ for (const vp of VIEWPORTS) {
     test('forced colours: the checkbox still carries the state', async ({ page }) => {
       await page.emulateMedia({ forcedColors: 'active' });
       await gotoStory(page, STORY('selection-no-play'), 'preselected:some');
-      const checked = rowBox(page, SCENARIO[0]!.number);
-      const unchecked = rowBox(page, ROWS.find((r) => !SCENARIO.includes(r))!.number);
+      const checked = rowBox(page, SCENARIO[0]!.code);
+      const unchecked = rowBox(page, ROWS.find((r) => !SCENARIO.includes(r))!.code);
       const fill = (l: Locator) => l.evaluate((el) => getComputedStyle(el).backgroundColor);
       const rowBg = await checked.locator('xpath=ancestor::tr').evaluate((el) => getComputedStyle(el).backgroundColor);
       expect(await fill(checked)).not.toBe(await fill(unchecked));

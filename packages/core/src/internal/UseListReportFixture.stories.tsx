@@ -1,4 +1,5 @@
-// Internal fixture for `useListReport`: a raw `<table>`, no style. Not exported from the package
+// Internal fixture for `useListReport`: a raw `<table>`, no style. Inline neutral rows built on purpose for the sort edge
+// cases (empty values, a tie between "Café" and "Cafe", equal amounts): `makeRecords` has none of these by design. Not exported from the package
 // and never to be re-exported from it.
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
@@ -6,39 +7,39 @@ import { fn } from 'storybook/test';
 import { useListReport } from '../list-report/use-list-report';
 import type { ListReportColumn, ListReportFilter, ListReportSort } from '../list-report/types';
 
-interface Invoice {
+interface Item {
   id: string;
-  customer: string | null;
+  name: string | null;
   amount: number | null;
   date: Date | null;
 }
 
-const INVOICES: Invoice[] = [
-  { id: 'i1', customer: 'Rossi', amount: 10, date: new Date('2025-03-10') },
-  { id: 'i2', customer: 'bianchi', amount: 2, date: new Date('2025-01-05') },
-  { id: 'i3', customer: 'Verdi', amount: null, date: new Date('2025-07-21') },
-  { id: 'i4', customer: 'Café', amount: 100, date: null },
-  { id: 'i5', customer: 'Rossi', amount: 2, date: new Date('2024-11-30') },
-  { id: 'i6', customer: null, amount: 33, date: new Date('2025-05-02') },
-  { id: 'i7', customer: 'Cafe', amount: 10, date: new Date('2025-02-14') },
-  { id: 'i8', customer: 'Neri', amount: 1, date: new Date('2025-09-09') },
+const ITEMS: Item[] = [
+  { id: 'i1', name: 'Ember', amount: 10, date: new Date('2025-03-10') },
+  { id: 'i2', name: 'alder', amount: 2, date: new Date('2025-01-05') },
+  { id: 'i3', name: 'Fjord', amount: null, date: new Date('2025-07-21') },
+  { id: 'i4', name: 'Café', amount: 100, date: null },
+  { id: 'i5', name: 'Ember', amount: 2, date: new Date('2024-11-30') },
+  { id: 'i6', name: null, amount: 33, date: new Date('2025-05-02') },
+  { id: 'i7', name: 'Cafe', amount: 10, date: new Date('2025-02-14') },
+  { id: 'i8', name: 'Delta', amount: 1, date: new Date('2025-09-09') },
 ];
 
-const COLUMNS: ListReportColumn<Invoice>[] = [
+const COLUMNS: ListReportColumn<Item>[] = [
   { id: 'id', header: 'No.' },
-  { id: 'customer', header: 'Customer', accessor: (r) => r.customer },
+  { id: 'name', header: 'Name', accessor: (r) => r.name },
   { id: 'amount', header: 'Amount', accessor: (r) => r.amount },
   { id: 'date', header: 'Date', accessor: (r) => r.date, firstSortDirection: 'desc' },
 ];
 
-const FILTERS: ListReportFilter<Invoice>[] = [
+const FILTERS: ListReportFilter<Item>[] = [
   { id: 'all', label: 'All' },
-  { id: 'open', label: 'To approve', predicate: (r) => r.amount !== null && r.amount >= 10 },
+  { id: 'large', label: 'Large', predicate: (r) => r.amount !== null && r.amount >= 10 },
   { id: 'dated', label: 'With date', predicate: (r) => r.date !== null },
 ];
 
-const fmt = (row: Invoice, id: string): string => {
-  const value = row[id as keyof Invoice];
+const fmt = (row: Item, id: string): string => {
+  const value = row[id as keyof Item];
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return value === null ? '' : String(value);
 };
@@ -53,8 +54,8 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
   const [log, setLog] = useState<string[]>([]);
   // Controlled mode also controls the committed search query (the external button sets it).
   const [query, setQuery] = useState('');
-  const report = useListReport<Invoice>({
-    rows: INVOICES,
+  const report = useListReport<Item>({
+    rows: ITEMS,
     columns: COLUMNS,
     getRowId: (r) => r.id,
     filters: FILTERS,
@@ -94,8 +95,8 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
           Reset
         </button>
         {controlled && (
-          <button type="button" onClick={() => setQuery('bianchi')}>
-            Set search: bianchi
+          <button type="button" onClick={() => setQuery('alder')}>
+            Set search: alder
           </button>
         )}
       </div>
@@ -127,8 +128,8 @@ function ListReportDemo({ controlled, onSortChange }: DemoArgs) {
         </tbody>
       </table>
       {controlled && (
-        <button type="button" onClick={() => setSort({ columnId: 'customer', direction: 'asc' })}>
-          Sort by Customer
+        <button type="button" onClick={() => setSort({ columnId: 'name', direction: 'asc' })}>
+          Sort by Name
         </button>
       )}
       <p data-testid="sort-state" style={{ margin: 0 }}>
