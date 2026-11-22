@@ -40,18 +40,28 @@ test.describe('Storybook Docs pages', () => {
       // tens of thousands of nodes) keeps the main thread busy for seconds while it mounts them, and a poll from
       // here measured that latency, not the scroll (it timed out with `scrollY` at 0 all along). A frame is
       // drawn only after the page's scroll handlers ran, so every reading is the position the guard left.
+      // It starts once every story iframe shows its story (an autofocus in it has run by then), or after
+      // `windowMs` if one never does: a reading taken before an iframe focused would see the top and pass.
       const scrollY = await page.evaluate(
         ({ limit, windowMs }) =>
           new Promise<number>((resolve) => {
             const start = performance.now();
+            const storiesUp = () =>
+              [...document.querySelectorAll('iframe')].every((frame) => {
+                const doc = frame.contentDocument;
+                return !doc || (doc.readyState === 'complete' && !!doc.querySelector('#storybook-root')?.firstElementChild);
+              });
+            let since = -1;
             let frames = 0;
             const read = () => {
-              const y = window.scrollY;
-              if (y < limit || (frames >= 2 && performance.now() - start >= windowMs)) resolve(y);
-              else {
+              const now = performance.now();
+              if (since < 0 && (storiesUp() || now - start >= windowMs)) since = now;
+              if (since >= 0) {
                 frames += 1;
-                requestAnimationFrame(read);
+                const y = window.scrollY;
+                if (frames >= 2 && (y < limit || now - since >= windowMs)) return resolve(y);
               }
+              requestAnimationFrame(read);
             };
             read();
           }),
