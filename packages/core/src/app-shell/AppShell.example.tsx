@@ -5,6 +5,7 @@ import {
   AppShellMain,
   AppShellNav,
   AppShellNavLink,
+  AppShellNavTrigger,
   Avatar,
   Text,
   Title,
@@ -23,11 +24,18 @@ export function AppFrame() {
   // whole page (the default, `100dvh`). Header and navigation stay where they are; only the content scrolls.
   // With a router, navigate in `onNavigate` (e.g. `navigate(href)`): a plain click or Enter lands there,
   // while Ctrl/Cmd+click still opens the real href in a new tab. Or render your router's link with `asChild`.
+  // Below 64rem (a phone, a tablet held upright) the column is not displayed: `AppShellNavTrigger`, first in
+  // the header, opens the same links in a Sheet (from 64rem up it is not displayed).
   return (
     <div style={{ height: 360, border: '1px solid var(--color-rop-border)' }}>
       <AppShell fill="parent">
         <AppShellHeader
-          start={<TruncatedText style={{ fontWeight: 600 }}>App one</TruncatedText>}
+          start={
+            <>
+              <AppShellNavTrigger />
+              <TruncatedText style={{ fontWeight: 600 }}>App one</TruncatedText>
+            </>
+          }
           end={<Avatar name="User one" size="sm" />}
         />
         <AppShellNav>
