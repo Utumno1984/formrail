@@ -249,6 +249,62 @@ test.describe('Storybook "Show code"', () => {
       });
     }
   });
+
+  // Ticket #627: the six "Example: configured for ..." stories of the List Report exist to teach the column
+  // configuration, so their "Show code" must print the `columns` array as a consumer writes it (the `Intl`
+  // formatter inline in the `cell`, `align`, `width`, `searchable`, `compare`, ...), not only
+  // `render: args => <Xyz {...args} />` with the columns in a module-level component it does not show. Each
+  // needle is looked for in the printed `render` only (from `render:` to `play:`): the story's description
+  // (`configuration`) names the same options as text, and must not satisfy the check on its own.
+  test('List Report column examples: "Show code" prints each column configuration, in the render (#627)', async ({ page }) => {
+    test.setTimeout(240_000); // the List Report's Docs page holds ~30 live stories
+    const examples: { story: string; needles: (string | RegExp)[] }[] = [
+      {
+        story: 'erp-purchase-order',
+        needles: ["searchable: searchableColumns.includes('supplier')", 'searchable: false', 'accessor: supplierName', "new Intl.NumberFormat('en-GB', { style: 'currency', currency: o.currency })", "firstSortDirection: 'desc'"],
+      },
+      {
+        story: 'ecommerce-product-catalogue',
+        needles: ['width: 130', "width: nameWidth === 'auto' ? undefined", 'minWidth: 160', /\btruncate(?: \}|,)/, "new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' })"],
+      },
+      {
+        story: 'b-2-b-price-list',
+        needles: ["new Intl.NumberFormat(locale, { style: 'currency', currency })", "align: 'end'", 'accessor: ', 'cell: ', 'searchable: false'],
+      },
+      {
+        story: 'elearning-enrolments',
+        needles: ["new Intl.DateTimeFormat(locale, { dateStyle, timeZone: 'UTC' })", '<Absent label="Not completed"', '<StatusBadge tone={ENROLMENT_STATUS_TONE'],
+      },
+      {
+        story: 'hr-employee-directory',
+        needles: [/all\.filter\(\(?column\)? => !column\.optional \|\| visible\.includes\(column\.optional\)\)/, 'useState', '<Checkbox', "optional: 'manager'"],
+      },
+      {
+        story: 'helpdesk-support-queue',
+        needles: [/compare: \(a, b\) => PRIORITY_RANK\[a\.priority\] - PRIORITY_RANK\[b\.priority\]/, "firstSortDirection: 'desc'", "firstSortDirection: 'asc'", 'firstSortDirection: priorityFirstDirection', 'sortable: false'],
+      },
+    ];
+    await page.goto('/iframe.html?id=floorplans-list-report--docs&viewMode=docs');
+    await page.waitForSelector('.sbdocs-content', { timeout: 30_000 });
+    const anchorOf = (story: string) => `anchor--floorplans-list-report--use-case-${story}`;
+    const sources = await openAllSources(page, examples.map(({ story }) => anchorOf(story)));
+    for (const { story, needles } of examples) {
+      const shown = normalize(sources[anchorOf(story)]!);
+      const start = shown.indexOf('render:');
+      // `\bplay:`, not `play:`: the render itself can hold `display:` (the HR toolbar's style).
+      const after = start < 0 ? -1 : shown.slice(start).search(/\bplay:/);
+      const end = after < 0 ? -1 : start + after;
+      expect.soft(start, `${story}: no "render:" in "Show code": ${shown.slice(0, 200)}`).toBeGreaterThanOrEqual(0);
+      expect.soft(end, `${story}: no "play:" after "render:" in "Show code"`).toBeGreaterThan(start);
+      const render = start < 0 ? '' : shown.slice(start, end < 0 ? undefined : end);
+      for (const needle of needles) {
+        if (typeof needle === 'string') expect.soft(render, `${story}: "${needle}" not in the printed render`).toContain(needle);
+        else expect.soft(render, `${story}: ${needle} not in the printed render`).toMatch(needle);
+      }
+      // The formatting is written in the cell, not hidden in a story helper the reader cannot see.
+      expect.soft(render, `${story}: a story-only helper in the printed render`).not.toMatch(/\b(formatMinor|formatDay|expectedDay)\(/);
+    }
+  });
 });
 
 // Copy-paste examples (ticket #403): the first "Show code" of every public Docs page is code a reader can
