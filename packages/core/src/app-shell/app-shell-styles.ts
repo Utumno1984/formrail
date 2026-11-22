@@ -45,6 +45,14 @@ export const navClass =
   'col-start-1 row-start-2 hidden min-h-0 w-[var(--rop-app-shell-nav-width,16rem)] overflow-y-auto overflow-x-hidden ' +
   'border-0 border-e border-solid border-rop-border bg-rop-surface-subtle min-[64rem]:block';
 export const navListClass = 'm-0 flex list-none flex-col gap-0.5 p-2';
+
+// The trigger of the navigation Sheet (`AppShellNavTrigger`): displayed only below the breakpoint, where the column
+// is not, with the same `min-[64rem]:` variant as the column. Decided in CSS: nothing moves at the first paint or at
+// hydration, and from the breakpoint up it is neither drawn nor a Tab stop.
+export const navTriggerClass = 'min-[64rem]:hidden';
+// The body of the navigation Sheet: no padding of its own, the list keeps the column's (the links line up as in
+// the column). The body is still the only scroller of the Sheet.
+export const navSheetBodyClass = 'p-0';
 export const navItemClass = 'flex min-w-0 flex-col';
 
 // A link of the navigation: one line, truncated at the column's width, 2.5rem tall with or without a consumer's

@@ -84,3 +84,11 @@ export const moreIcon = /* @__PURE__ */ (() => (
     <circle cx="19" cy="12" r="2" />
   </svg>
 ))();
+
+// Kept apart for the same reason: only the trigger of the app shell's navigation Sheet uses it. Three lines
+// ("open the navigation"), on the same 24x24 stroke grid as `internalIcons`.
+export const navMenuIcon = /* @__PURE__ */ (() => (
+  <svg {...stroke}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </svg>
+))();

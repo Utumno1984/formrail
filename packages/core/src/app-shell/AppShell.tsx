@@ -4,25 +4,35 @@ import {
   createContext,
   forwardRef,
   isValidElement,
+  useCallback,
   useContext,
   useEffect,
   useId,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type AnchorHTMLAttributes,
+  type ButtonHTMLAttributes,
   type CSSProperties,
   type HTMLAttributes,
   type MouseEvent,
   type MouseEventHandler,
+  type MutableRefObject,
   type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react';
+import { flushSync } from 'react-dom';
+import { Button } from '../button/Button';
+import { navMenuIcon } from '../internal/icons';
 import { isDev } from '../internal/is-dev';
-import { handleNavigationClick, hasNavigableHref, isAppNavigationClick } from '../internal/navigation';
+import { ModalRoot } from '../internal/modal';
+import { handleNavigationClick, hasNavigableHref, isAppNavigationClick, isModifiedClick } from '../internal/navigation';
+import { SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
+import { composeRefs } from '../utils/compose-refs';
 import {
   boxStyle,
   headerCenterClass,
@@ -40,24 +50,33 @@ import {
   navLinkEnabledClass,
   navLinkIconClass,
   navListClass,
+  navSheetBodyClass,
+  navTriggerClass,
   rootClass,
   rootParentClass,
   rootStyle,
   rootViewportClass,
   skipLinkClass,
 } from './app-shell-styles';
+import { APP_SHELL_WIDE_QUERY } from './breakpoint';
 
 export interface AppShellLabels {
   /** Text of the skip link, the first stop of the Tab order, which moves the focus to the content. Default `Skip to content`. */
   skipToContent: string;
-  /** Accessible name of the navigation landmark (`AppShellNav`), unless it has its own `aria-label`. Default `Main`. */
+  /**
+   * Accessible name of the navigation landmark (`AppShellNav`), unless it has its own `aria-label`, and the title of
+   * the navigation Sheet below the breakpoint. Default `Main`.
+   */
   nav: string;
+  /** Accessible name of `AppShellNavTrigger`, the button that opens the navigation below the breakpoint. Default `Open navigation`. */
+  openNav: string;
 }
 
 /** @internal Not public API: exported only for the test of the documented defaults (label-defaults.test.tsx, #549). */
 export const DEFAULT_LABELS: AppShellLabels = {
   skipToContent: 'Skip to content',
   nav: 'Main',
+  openNav: 'Open navigation',
 };
 
 interface AppShellContextValue {
@@ -67,6 +86,88 @@ interface AppShellContextValue {
 }
 
 const AppShellContext = /* @__PURE__ */ createContext<AppShellContextValue | null>(null);
+
+/**
+ * The navigation Sheet, shared by `AppShellNavTrigger` (in the header) and `AppShellNav` (which renders the Sheet with
+ * its own children). Apart from the shell's context, so that opening it does not render the main again.
+ */
+interface AppShellNavSheetValue {
+  /** Whether the Sheet is open (the requested state, not whether its panel is still on screen). */
+  open: boolean;
+  /** The edge the Sheet comes from: the start edge in the trigger's direction, read when it opens. */
+  side: 'left' | 'right';
+  /** Opens the Sheet from this trigger. */
+  openFrom: (trigger: HTMLElement) => void;
+  setOpen: (open: boolean) => void;
+  /** `id` of the Sheet's panel (the trigger's `aria-controls` while it is open). */
+  sheetId: string;
+  /** The trigger, where the focus goes back. */
+  triggerRef: MutableRefObject<HTMLButtonElement | null>;
+  /** Whether the shell has an `AppShellNav`: without one the trigger opens nothing. */
+  hasNav: boolean;
+  /** Called by `AppShellNav` when it mounts; returns the function to call when it unmounts. */
+  registerNav: () => () => void;
+}
+
+const AppShellNavSheetContext = /* @__PURE__ */ createContext<AppShellNavSheetValue | null>(null);
+
+/** Given by `AppShellNav` to the links it renders in its Sheet: closes the Sheet, focuses the trigger, then runs `then`. */
+const NavInSheetContext = /* @__PURE__ */ createContext<((then: () => void) => void) | null>(null);
+
+const noop = () => undefined;
+
+/**
+ * @internal Not public API (exported for the unit test). Whether the viewport is at or above the breakpoint of the
+ * navigation column. Without `matchMedia`, or with one that throws (a restricted embed), it is not known: `false`, and
+ * the CSS alone decides what is displayed.
+ */
+export function wideViewport(view: Window | null | undefined): boolean {
+  if (!view || typeof view.matchMedia !== 'function') return false;
+  try {
+    return view.matchMedia(APP_SHELL_WIDE_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * @internal Not public API (exported for the unit test). Calls `onChange` every time the viewport crosses the
+ * breakpoint of the navigation column, with whether it is now at or above it; returns the function that stops
+ * watching. Without `matchMedia`, or with one that throws, nothing is watched.
+ */
+export function watchWideViewport(view: Window | null | undefined, onChange: (wide: boolean) => void): () => void {
+  if (!view || typeof view.matchMedia !== 'function') return noop;
+  let list: MediaQueryList;
+  try {
+    list = view.matchMedia(APP_SHELL_WIDE_QUERY);
+  } catch {
+    return noop;
+  }
+  const listener = (event: MediaQueryListEvent) => onChange(event.matches);
+  list.addEventListener('change', listener);
+  return () => list.removeEventListener('change', listener);
+}
+
+/**
+ * @internal Not public API (exported for the unit test). The link that takes the focus when a navigation is shown
+ * (the Sheet opening, the column coming back): the current page, else the first link that can be followed, else the
+ * first link, else `null`.
+ */
+export function navFocusTarget(container: HTMLElement | null): HTMLElement | null {
+  if (!container) return null;
+  const links = [...container.querySelectorAll<HTMLElement>('[data-rop-app-shell-nav-link]')];
+  return (
+    links.find((link) => link.getAttribute('aria-current') === 'page') ??
+    links.find((link) => link.getAttribute('aria-disabled') !== 'true') ??
+    links[0] ??
+    null
+  );
+}
+
+/** The start edge in the element's writing direction. */
+function startSide(element: HTMLElement): 'left' | 'right' {
+  return element.ownerDocument.defaultView?.getComputedStyle(element).direction === 'rtl' ? 'right' : 'left';
+}
 
 // SSR: useLayoutEffect warns on the server (React 18).
 const useIsomorphicLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
@@ -108,8 +209,8 @@ export interface AppShellProps extends HTMLAttributes<HTMLDivElement> {
  *   ancestor to change them. Neither depends on what the slots hold: empty slots, slots filled after the mount (a
  *   user loaded asynchronously) and long texts leave the content where it is.
  * - **Breakpoint**: from 64rem (1024px with the default font size) the navigation is a column beside the content;
- *   below it the navigation is not displayed and the content takes the whole width. Decided in CSS: nothing moves
- *   at the first paint or at hydration.
+ *   below it the column is not displayed, the content takes the whole width and the navigation opens in a Sheet
+ *   from the `AppShellNavTrigger` of the header. Decided in CSS: nothing moves at the first paint or at hydration.
  * - **No horizontal overflow**: every part of the header shrinks; put long text in a `TruncatedText` (or any
  *   child with a zero minimum width and an ellipsis) and it is cut at the part's real width.
  * - **Virtual keyboard** (a focused `Field`): `AppShellMain` ends above the keyboard (a transparent bottom border
@@ -128,7 +229,7 @@ export interface AppShellProps extends HTMLAttributes<HTMLDivElement> {
  *
  * ```tsx
  * <AppShell>
- *   <AppShellHeader start={<Text>App one</Text>} end={<UserMenu />} />
+ *   <AppShellHeader start={<><AppShellNavTrigger /><Text>App one</Text></>} end={<UserMenu />} />
  *   <AppShellNav>
  *     <AppShellNavLink href="/a" active>Section A</AppShellNavLink>
  *     <AppShellNavLink href="/b">Section B</AppShellNavLink>
@@ -147,9 +248,28 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
   const [mainId, setMainId] = useState(`${generatedId}-main`);
   const skipToContent = labelsProp?.skipToContent ?? DEFAULT_LABELS.skipToContent;
   const nav = labelsProp?.nav ?? DEFAULT_LABELS.nav;
+  const openNav = labelsProp?.openNav ?? DEFAULT_LABELS.openNav;
   const context = useMemo<AppShellContextValue>(
-    () => ({ mainId, setMainId, labels: { skipToContent, nav } }),
-    [mainId, skipToContent, nav],
+    () => ({ mainId, setMainId, labels: { skipToContent, nav, openNav } }),
+    [mainId, skipToContent, nav, openNav],
+  );
+
+  const [navOpen, setNavOpen] = useState(false);
+  const [navSide, setNavSide] = useState<'left' | 'right'>('left');
+  const [navCount, setNavCount] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const openFrom = useCallback((trigger: HTMLElement) => {
+    setNavSide(startSide(trigger));
+    setNavOpen(true);
+  }, []);
+  const registerNav = useCallback(() => {
+    setNavCount((count) => count + 1);
+    return () => setNavCount((count) => count - 1);
+  }, []);
+  const sheetId = `${generatedId}-nav-sheet`;
+  const navSheet = useMemo<AppShellNavSheetValue>(
+    () => ({ open: navOpen, side: navSide, openFrom, setOpen: setNavOpen, sheetId, triggerRef, hasNav: navCount > 0, registerNav }),
+    [navOpen, navSide, openFrom, sheetId, navCount, registerNav],
   );
 
   const skip = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -161,18 +281,20 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
 
   return (
     <AppShellContext.Provider value={context}>
-      <div
-        {...rest}
-        ref={ref}
-        data-rop-app-shell=""
-        className={cn(rootClass, fill === 'parent' ? rootParentClass : rootViewportClass, className)}
-        style={{ ...(rootStyle as CSSProperties), ...style }}
-      >
-        <a href={`#${mainId}`} data-rop-app-shell-skip-link="" className={skipLinkClass} onClick={skip}>
-          {skipToContent}
-        </a>
-        {children}
-      </div>
+      <AppShellNavSheetContext.Provider value={navSheet}>
+        <div
+          {...rest}
+          ref={ref}
+          data-rop-app-shell=""
+          className={cn(rootClass, fill === 'parent' ? rootParentClass : rootViewportClass, className)}
+          style={{ ...(rootStyle as CSSProperties), ...style }}
+        >
+          <a href={`#${mainId}`} data-rop-app-shell-skip-link="" className={skipLinkClass} onClick={skip}>
+            {skipToContent}
+          </a>
+          {children}
+        </div>
+      </AppShellNavSheetContext.Provider>
     </AppShellContext.Provider>
   );
 });
@@ -211,37 +333,232 @@ export const AppShellHeader = /* @__PURE__ */ forwardRef<HTMLElement, AppShellHe
   );
 });
 
+export interface AppShellNavTriggerProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'type'> {
+  /** Called first, for every click. Cancel the event (`event.preventDefault()`) to keep the Sheet closed. */
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+}
+
+/**
+ * The button that opens the navigation of the app (`AppShellNav`) in a Sheet below the breakpoint, where the column
+ * is not displayed. Put it in the header, at the start (before the name of the app). It is displayed only below the
+ * breakpoint, decided in CSS like the column: nothing moves at the first paint or at hydration, and from the
+ * breakpoint up it is neither drawn nor a Tab stop. An icon button named by `labels.openNav` of the `AppShell`
+ * (`Open navigation`) unless it has its own `aria-label`, with `aria-haspopup="dialog"`, `aria-expanded`, and
+ * `aria-controls` while the Sheet is open. Must be rendered inside an `AppShell` (it throws otherwise).
+ *
+ * The Sheet comes from the start edge (the right one in a right-to-left page), as tall as the visible viewport,
+ * titled with the name of the navigation, and holds the same links as the column (see `AppShellNav`). It opens with
+ * the focus on the link of the current page (else the first link that can be followed) and the rest of the page
+ * inert; Escape, its close button or the backdrop close it, and the focus goes back to the trigger.
+ *
+ * Declared limits: in a shell without an `AppShellNav` it opens nothing. A trigger that is disabled or unmounted
+ * when the Sheet closes does not get the focus back, and nothing else is focused instead.
+ */
+export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppShellNavTriggerProps>(function AppShellNavTrigger(
+  { onClick, className, 'aria-label': ariaLabel, ...rest },
+  ref,
+) {
+  const shell = useContext(AppShellContext);
+  const navSheet = useContext(AppShellNavSheetContext);
+  const triggerRef = navSheet?.triggerRef;
+  const composedRef = useMemo(() => composeRefs<HTMLButtonElement>(triggerRef, ref), [triggerRef, ref]);
+  if (!shell || !navSheet) throw new Error('[formrail] <AppShellNavTrigger> must be rendered inside <AppShell>.');
+  const { open, hasNav, openFrom, sheetId } = navSheet;
+  const onTriggerClick = (event: MouseEvent<HTMLButtonElement>) => {
+    onClick?.(event);
+    const button = event.currentTarget;
+    // From the breakpoint up the column is there (a click made in code, or in the frame the viewport crossed it).
+    if (event.defaultPrevented || !hasNav || wideViewport(button.ownerDocument.defaultView)) return;
+    // The Sheet gives the focus back to the element that had it when it opened: the trigger (a click does not
+    // focus a button in every browser).
+    if (button.ownerDocument.activeElement !== button) button.focus({ preventScroll: true });
+    openFrom(button);
+  };
+  return (
+    <Button
+      {...rest}
+      ref={composedRef as Ref<HTMLElement>}
+      variant="ghost"
+      size="icon-md"
+      aria-label={ariaLabel ?? shell.labels.openNav}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls={open ? sheetId : undefined}
+      data-rop-app-shell-nav-trigger=""
+      className={cn(navTriggerClass, className)}
+      onClick={onTriggerClick}
+    >
+      {navMenuIcon}
+    </Button>
+  );
+});
+
 export interface AppShellNavProps extends HTMLAttributes<HTMLElement> {
   /** `AppShellNavLink`s, in the order of the Tab key. */
   children?: ReactNode;
 }
 
+/** The text of the elements with these ids, as `aria-labelledby` reads them (in this order, one space apart). */
+function textOfIds(ids: string | undefined): string {
+  return (ids ?? '')
+    .split(/\s+/)
+    .map((id) => document.getElementById(id)?.textContent?.trim() ?? '')
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
  * The navigation of the app: a named `<nav>` landmark holding a list of `AppShellNavLink`. From the breakpoint
- * up it is a column beside the content; below it, it is not displayed (see `AppShell`, "Layout and sizing"). It
- * scrolls on its own only when its links are taller than the room it has, and never with the content.
+ * up it is a column beside the content (see `AppShell`, "Layout and sizing"). It scrolls on its own only when its
+ * links are taller than the room it has, and never with the content.
+ *
+ * Below the breakpoint the column is not displayed, and `AppShellNavTrigger` (in the header) opens the navigation in
+ * a Sheet: a modal dialog titled with the navigation's name, holding a `<nav>` with the same name and the same
+ * links. One `AppShellNav` per shell, and its children are written once: they are mounted in one place at a time,
+ * the column or the Sheet, never in both (no duplicate `id`, one navigation landmark). The column holds them
+ * whenever the Sheet is not on screen, also below the breakpoint where it is not displayed; while the Sheet is open
+ * (and during its exit animation) they are in the Sheet, so their own state (a search field) starts again at each
+ * opening. In the Sheet:
+ * - A plain click or Enter on a link closes the Sheet and gives the focus to the trigger, then calls the link's
+ *   `onNavigate` (a dirty guard opened from there returns the focus to the trigger); a focus `onNavigate` moves
+ *   elsewhere (the heading of the new page) stays there. A plain link without `onNavigate` and a router's link
+ *   (`asChild`) close it too. A Ctrl/Cmd/Shift/Alt+click or the middle button on a link with an `href` is the
+ *   browser's (a new tab) and the Sheet stays open; so does a click on a disabled link, or one an `onClick` cancelled.
+ * - When the viewport crosses the breakpoint with the Sheet open (a tablet turned to landscape), the Sheet closes,
+ *   the links are in the column at once and the focus goes to the link of the current page there. When it crosses
+ *   it the other way with the focus in the column, the focus goes to the trigger.
  *
  * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
- * `aria-labelledby` takes the place of that name.
+ * `aria-labelledby` takes the place of that name, in the Sheet's title too.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
   { className, style, children, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
   ref,
 ) {
   const shell = useContext(AppShellContext);
+  const navSheet = useContext(AppShellNavSheetContext);
   const label = ariaLabel ?? (ariaLabelledBy ? undefined : (shell?.labels.nav ?? DEFAULT_LABELS.nav));
+  const columnRef = useRef<HTMLElement | null>(null);
+  const composedRef = useMemo(() => composeRefs<HTMLElement>(columnRef, ref), [ref]);
+  const sheetNavRef = useRef<HTMLElement | null>(null);
+
+  const registerNav = navSheet?.registerNav;
+  useIsomorphicLayoutEffect(() => registerNav?.(), [registerNav]);
+
+  const open = !!navSheet?.open;
+  const setOpen = navSheet?.setOpen;
+  const triggerRef = navSheet?.triggerRef;
+  const openRef = useRef(open);
+  openRef.current = open;
+  // Whether the Sheet's panel is on screen (open, or in its exit animation): set by the panel's own ref.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const [panelShown, setPanelShown] = useState(false);
+  // The viewport crossed the breakpoint while the Sheet was open: the links go back to the column at once, and the
+  // Sheet leaves without them.
+  const [leaving, setLeaving] = useState(false);
+  const setPanel = useCallback((node: HTMLDivElement | null) => {
+    panelRef.current = node;
+    setPanelShown(node !== null);
+    if (!node) setLeaving(false);
+  }, []);
+  const inSheet = open || (panelShown && !leaving);
+
+  // The viewport crossing the breakpoint. Wide with the Sheet open: it closes and the column takes the focus (in a
+  // passive effect, once the Sheet's focus trap is off). Narrow with the focus in the column: the trigger takes it.
+  const focusColumn = useRef(false);
+  useEffect(() => {
+    if (!setOpen || !triggerRef) return undefined;
+    return watchWideViewport(window, (wide) => {
+      if (!wide) {
+        if (columnRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+        return;
+      }
+      if (!openRef.current) return;
+      focusColumn.current = true;
+      setLeaving(true);
+      setOpen(false);
+    });
+  }, [setOpen, triggerRef]);
+  useEffect(() => {
+    if (!focusColumn.current) return;
+    focusColumn.current = false;
+    navFocusTarget(columnRef.current)?.focus();
+  });
+
+  // The title of the Sheet is the name of the navigation; with `aria-labelledby`, the text it points to, read at each
+  // opening.
+  const [labelledByText, setLabelledByText] = useState('');
+  useIsomorphicLayoutEffect(() => {
+    setLabelledByText(textOfIds(ariaLabelledBy));
+  }, [open, ariaLabelledBy]);
+
+  let sheet: ReactNode = null;
+  if (navSheet) {
+    const close = navSheet.setOpen;
+    const trigger = navSheet.triggerRef;
+    /** Closes the Sheet, gives the focus to the trigger, then runs `then` (which may throw: the Sheet is closed). */
+    const closeThen = (then: () => void) => {
+      flushSync(() => close(false));
+      trigger.current?.focus();
+      then();
+    };
+    // After its exit animation the Sheet gives the focus back to the trigger. When something outside it already has
+    // the focus (the trigger, given it by `closeThen`; the heading `onNavigate` moved it to; the column after a
+    // crossing of the breakpoint) it is left there.
+    const focusIsElsewhere = () => document.activeElement !== document.body && !panelRef.current?.contains(document.activeElement);
+    const onOpenAutoFocus = (event: Event) => {
+      const target = navFocusTarget(sheetNavRef.current);
+      if (!target) return;
+      event.preventDefault();
+      target.focus();
+    };
+    sheet = (
+      <ModalRoot open={navSheet.open} onOpenChange={close} keepFocusWhen={focusIsElsewhere}>
+        <SheetContent
+          ref={setPanel}
+          id={navSheet.sheetId}
+          side={navSheet.side}
+          size="sm"
+          aria-describedby={undefined}
+          onOpenAutoFocus={onOpenAutoFocus}
+          data-rop-app-shell-nav-sheet=""
+        >
+          <SheetHeader>
+            <SheetTitle>{label ?? labelledByText}</SheetTitle>
+            <SheetClose />
+          </SheetHeader>
+          <SheetBody className={navSheetBodyClass}>
+            <nav
+              ref={sheetNavRef}
+              aria-label={label}
+              aria-labelledby={ariaLabelledBy}
+              data-rop-app-shell-nav-sheet-nav=""
+            >
+              <NavInSheetContext.Provider value={closeThen}>
+                <ul className={navListClass}>{inSheet ? children : null}</ul>
+              </NavInSheetContext.Provider>
+            </nav>
+          </SheetBody>
+        </SheetContent>
+      </ModalRoot>
+    );
+  }
+
   return (
-    <nav
-      {...rest}
-      ref={ref}
-      aria-label={label}
-      aria-labelledby={ariaLabelledBy}
-      data-rop-app-shell-nav=""
-      className={cn(navClass, className)}
-      style={{ ...boxStyle, ...style }}
-    >
-      <ul className={navListClass}>{children}</ul>
-    </nav>
+    <>
+      <nav
+        {...rest}
+        ref={composedRef}
+        aria-label={label}
+        aria-labelledby={ariaLabelledBy}
+        data-rop-app-shell-nav=""
+        className={cn(navClass, className)}
+        style={{ ...boxStyle, ...style }}
+      >
+        <ul className={navListClass}>{inSheet ? null : children}</ul>
+      </nav>
+      {sheet}
+    </>
   );
 });
 
@@ -260,8 +577,9 @@ export interface AppShellNavLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnch
    * link; the browser's own navigation to the `href` is cancelled first. On a link with an `href`, never called for
    * Ctrl/Cmd/Shift/Alt+click or the middle button (the browser opens the real `href`). On a link without one,
    * called for every click, modifiers included. Not called when an `onClick` has already cancelled the click. The
-   * link has the focus when it is called. Not used with `asChild`: the child (your router's link) navigates by
-   * itself, and passing both is an error in development.
+   * link has the focus when it is called; in the navigation Sheet (below the breakpoint) it is called AFTER the Sheet
+   * has closed, with the focus on `AppShellNavTrigger`. Not used with `asChild`: the child (your router's link)
+   * navigates by itself, and passing both is an error in development.
    */
   onNavigate?: (event: MouseEvent<AppShellNavLinkElement>) => void;
   /** Called first, for every click (also on a disabled link). Cancel the event to keep `onNavigate` from running. */
@@ -329,6 +647,8 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
       </>
     );
     const current = active ? ('page' as const) : undefined;
+    // Set when the link is in the navigation Sheet (below the breakpoint): closes it before the navigation.
+    const closeSheetThen = useContext(NavInSheetContext);
 
     const activate = (native: boolean) => (event: MouseEvent<AppShellNavLinkElement>) => {
       onClick?.(event);
@@ -336,14 +656,27 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
         event.preventDefault();
         return;
       }
-      if (!onNavigate) return;
+      if (!onNavigate) {
+        // A plain link in the Sheet: the browser follows it, and the Sheet closes as for any navigation.
+        if (closeSheetThen && native && isAppNavigationClick(event)) closeSheetThen(noop);
+        return;
+      }
       const link = event.currentTarget;
       const rule = { native };
       // A click handed to `onNavigate` gives the link the focus first (Safari does not focus a clicked link), so a
-      // dialog opened from `onNavigate` (a dirty guard) returns the focus to it.
+      // dialog opened from `onNavigate` (a dirty guard) returns the focus to it. In the Sheet the Sheet closes first
+      // and the focus goes to the trigger, which such a dialog returns it to.
       if (isAppNavigationClick(event, rule) && link.ownerDocument.activeElement !== link) link.focus({ preventScroll: true });
-      handleNavigationClick(event, onNavigate, rule);
+      handleNavigationClick(event, closeSheetThen ? (e) => closeSheetThen(() => onNavigate(e)) : onNavigate, rule);
     };
+    // A router's link (`asChild`) navigates by itself, in its own click handler, which runs before this one: in the
+    // Sheet a plain primary click closes it (a modified one is the browser's, as for the router).
+    const onRouterLinkClick = closeSheetThen
+      ? (event: MouseEvent<AppShellNavLinkElement>) => {
+          onClick?.(event);
+          if (!isModifiedClick(event)) closeSheetThen(noop);
+        }
+      : onClick;
 
     let element: ReactNode;
     if (disabled) {
@@ -381,7 +714,7 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
           ref={ref as Ref<HTMLElement>}
           aria-current={current}
           data-rop-app-shell-nav-link=""
-          onClick={onClick}
+          onClick={onRouterLinkClick}
         >
           {merged}
         </Slot>

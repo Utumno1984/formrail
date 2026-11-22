@@ -47,7 +47,7 @@ describe('AppShell: landmarks and skip link', () => {
   });
 
   it('the documented defaults are the English texts', () => {
-    expect(DEFAULT_LABELS).toEqual({ skipToContent: 'Skip to content', nav: 'Main' });
+    expect(DEFAULT_LABELS).toEqual({ skipToContent: 'Skip to content', nav: 'Main', openNav: 'Open navigation' });
   });
 
   it('the skip link is the first element of the shell and the first Tab stop, and points to the main', async () => {
