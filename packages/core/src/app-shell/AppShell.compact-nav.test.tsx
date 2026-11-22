@@ -420,6 +420,26 @@ describe('the Sheet', () => {
     expect(sheet).toHaveAttribute('aria-modal', 'true');
   });
 
+  it('a trigger mounted again while the Sheet is open (a new key): Escape gives the focus to the new trigger', async () => {
+    const user = userEvent.setup();
+    let remount: () => void = () => undefined;
+    function Page() {
+      const [key, setKey] = useState(0);
+      remount = () => setKey((k) => k + 1);
+      return <Shell trigger={<AppShellNavTrigger key={key} />} />;
+    }
+    render(<Page />);
+    const before = trigger();
+    const sheet = await openWithKeyboard(user);
+    await waitFor(() => expect(linkIn(sheet, 'A')).toHaveFocus());
+    act(() => remount());
+    expect(trigger()).not.toBe(before);
+    expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(trigger()).toHaveFocus());
+  });
+
   it('with no current page the focus starts on the first link that can be followed', async () => {
     const user = userEvent.setup();
     render(<Shell active="none" link={(section) => (section === 'A' ? { disabled: true } : {})} />);
@@ -904,6 +924,44 @@ describe('the viewport crossing the breakpoint', () => {
     act(() => document.getElementById('page-title')!.focus());
     screenSize.cross(false);
     expect(document.getElementById('page-title')).toHaveFocus();
+  });
+
+  it("in another document (a frame) the nav watches that document's viewport and focus", () => {
+    const frame = document.body.appendChild(document.createElement('iframe'));
+    const view = frame.contentWindow!;
+    const doc = frame.contentDocument!;
+    let wide = true;
+    const listeners = new Set<(event: MediaQueryListEvent) => void>();
+    Object.defineProperty(view, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({
+        get matches() {
+          return query === APP_SHELL_WIDE_QUERY ? wide : false;
+        },
+        media: query,
+        addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.add(listener),
+        removeEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => listeners.delete(listener),
+      }),
+    });
+    const crossFrame = (next: boolean) => {
+      wide = next;
+      act(() => {
+        for (const listener of [...listeners]) listener({ matches: next } as MediaQueryListEvent);
+      });
+    };
+    const container = doc.body.appendChild(doc.createElement('div'));
+    const { unmount } = render(<Shell />, { container, baseElement: doc.body });
+    // The frame's viewport is watched, not the main window's.
+    expect(listeners.size).toBe(1);
+    expect(screenSize.listeners.size).toBe(0);
+    const link = within(container).getByRole('link', { name: 'Section B', hidden: true });
+    act(() => link.focus());
+    expect(doc.activeElement).toBe(link);
+    crossFrame(false);
+    expect(doc.activeElement).toBe(container.querySelector('[data-rop-app-shell-nav-trigger]'));
+    unmount();
+    expect(listeners.size).toBe(0);
+    frame.remove();
   });
 
   it('to narrow after the browser has dropped the focus of the column it no longer displays: the trigger takes it, once', () => {

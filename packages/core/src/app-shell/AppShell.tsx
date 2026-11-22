@@ -390,7 +390,10 @@ function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProp
   // After its exit animation (once its panel has left the DOM, taking a focus it held with it) the Sheet gives the
   // focus back to the trigger. When something already has the focus (the trigger, given it by `closeThen`; the
   // heading `onNavigate` moved it to; the column after a crossing of the breakpoint) it is left there.
-  const focusIsElsewhere = () => document.activeElement !== document.body;
+  const focusIsElsewhere = () => {
+    const doc = trigger.current?.ownerDocument ?? document;
+    return doc.activeElement !== doc.body;
+  };
   const onOpenAutoFocus = (event: Event) => {
     const target = navFocusTarget(sheetNavRef.current);
     if (!target) return;
@@ -404,6 +407,7 @@ function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProp
         id={navSheet.sheetId}
         side={navSheet.side}
         size="sm"
+        returnFocusRef={trigger}
         onOpenAutoFocus={onOpenAutoFocus}
         data-rop-app-shell-nav-sheet=""
       >
@@ -575,13 +579,15 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
   // page: the trigger takes it.
   const focusColumn = useRef(false);
   useEffect(() => {
-    if (!setOpen || !triggerRef) return undefined;
-    return watchWideViewport(window, (wide) => {
+    const column = columnRef.current;
+    if (!setOpen || !triggerRef || !column) return undefined;
+    const doc = column.ownerDocument;
+    return watchWideViewport(doc.defaultView, (wide) => {
       const lost = focusLostWithColumn.current;
       focusLostWithColumn.current = false;
       if (!wide) {
-        const active = document.activeElement;
-        if ((lost && active === document.body) || columnRef.current?.contains(active)) triggerRef.current?.focus();
+        const active = doc.activeElement;
+        if ((lost && active === doc.body) || column.contains(active)) triggerRef.current?.focus();
         return;
       }
       if (!openRef.current) return;
