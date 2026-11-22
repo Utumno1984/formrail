@@ -291,7 +291,9 @@ test.describe('Storybook "Show code"', () => {
     for (const { story, needles } of examples) {
       const shown = normalize(sources[anchorOf(story)]!);
       const start = shown.indexOf('render:');
-      const end = shown.indexOf('play:', start);
+      // `\bplay:`, not `play:`: the render itself can hold `display:` (the HR toolbar's style).
+      const after = start < 0 ? -1 : shown.slice(start).search(/\bplay:/);
+      const end = after < 0 ? -1 : start + after;
       expect.soft(start, `${story}: no "render:" in "Show code": ${shown.slice(0, 200)}`).toBeGreaterThanOrEqual(0);
       expect.soft(end, `${story}: no "play:" after "render:" in "Show code"`).toBeGreaterThan(start);
       const render = start < 0 ? '' : shown.slice(start, end < 0 ? undefined : end);
