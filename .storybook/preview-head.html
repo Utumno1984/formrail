@@ -1,17 +1,157 @@
 <script>
   // Docs pages render stories in iframes; one that focuses an element on mount (autofocus demos) makes the
   // browser scroll the Docs page down to that iframe. Until the reader first touches the page, keep it at the
-  // top. Only the Docs page itself (viewMode=docs), not the story iframes inside it.
+  // top. Only a Docs page (viewMode=docs), not a story: neither the story iframes inside a Docs page nor a
+  // story open in the canvas.
+  //
+  // Which page (#663): the one the URL names now, not the one it named at load. In the manager the preview
+  // iframe is not reloaded when the reader picks another entry in the sidebar: Storybook renders it in the
+  // same document and only rewrites the URL (`history.replaceState`, no event). So the manager's preview
+  // watches its URL: a story shown there turns the guard off at once (a scroll from a script in the story is
+  // never undone), and every Docs page shown there arms it again, as a fresh load would (from a story, or
+  // from another Docs page). Any other document (a story iframe, `iframe.html` opened alone) never changes
+  // page: it reads its URL once.
+  //
+  // How long (#663): until every story iframe of the page shows its story (`readyState` complete and
+  // `#storybook-root` not empty: an autofocus in it has run by then), held for SETTLE_MS, iframes added later
+  // included (a new one arms the guard again). Not a fixed time: on a heavy Docs page the iframes finish
+  // loading well after any fixed delay (seen at 9-14 s with the old 8 s one, which left the page scrolled).
+  // MAX_MS (from the time the page was shown) is only a safety cap, wide on purpose: an iframe that never
+  // shows a story (a broken one) must not keep the guard on forever; it is about the time a heavy page takes
+  // to mount its stories on a slow machine.
+  // A real gesture of the reader (wheel, key, pointer, touch), on the page or inside a story iframe, turns the
+  // guard off at once and for good on that page: a scroll the reader wants is never undone.
+  //
+  // An anchor is a place the reader asked for (#663): a hash in the URL when the page is shown (this page's,
+  // or the manager's: Storybook's Docs read the parent's), and every `hashchange` while the guard is on. Then
+  // the guard holds that anchor instead of the top: the page goes to it, and an autofocus that scrolls away
+  // is brought back to it. Why hold it rather than switch the guard off: on a heavy Docs page the stories go
+  // on mounting long after the jump, and a late autofocus would throw the reader away from the section they
+  // linked to. Held by element, not by a scroll position: the stories mounting above it move it down. An
+  // anchor not in the page (yet) holds the top until it is.
   (function () {
-    if (new URLSearchParams(location.search).get('viewMode') !== 'docs') return;
-    var touched = false;
-    var stop = function () { touched = true; };
-    ['wheel', 'keydown', 'pointerdown', 'touchstart'].forEach(function (t) {
-      window.addEventListener(t, stop, { capture: true, once: true, passive: true });
+    var docsPage = function () {
+      var query = new URLSearchParams(location.search);
+      return query.get('viewMode') === 'docs' ? query.get('id') || '' : null;
+    };
+    var preview = false; // the manager's preview iframe: the only document whose page changes
+    try {
+      preview = !!window.frameElement && window.frameElement.id === 'storybook-preview-iframe';
+    } catch (e) {
+      // the manager on another origin: read the URL once
+    }
+    if (!preview && docsPage() === null) return;
+    var SETTLE_MS = 1000;
+    var MAX_MS = 60000;
+    var GESTURES = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+    var page = null; // the Docs page the guard was armed for, or null: not a Docs page
+    var off = true; // on this page, for good: a gesture, MAX_MS, or not a Docs page
+    var started = false;
+    var shownAt = 0;
+    var settled = false; // every story iframe up for SETTLE_MS; a new or reloading iframe clears it
+    var settledSince = null;
+    var frames = document.getElementsByTagName('iframe');
+    var watched = typeof WeakSet === 'function' ? new WeakSet() : null;
+    var timer = null;
+    var anchor = null; // the id the URL's hash points to, or null: hold the top
+    var readAnchor = function (hash) {
+      var id = (hash || '').replace(/^#/, '');
+      try {
+        id = decodeURIComponent(id);
+      } catch (e) {
+        // a malformed escape: the raw text is the id
+      }
+      return id || null;
+    };
+    var parentHash = function () {
+      try {
+        return window.parent !== window ? window.parent.location.hash : '';
+      } catch (e) {
+        return ''; // the manager on another origin: only this page's hash
+      }
+    };
+    // Is the guard on? Follows the page the URL names: a Docs page shown since the last call arms the guard,
+    // anything else turns it off.
+    var on = function () {
+      var now = docsPage();
+      if (now !== page) {
+        page = now;
+        off = now === null;
+        settled = false;
+        settledSince = null;
+        shownAt = started ? performance.now() : 0; // the page shown at load: from the load, as before
+        anchor = off ? null : readAnchor(location.hash) || readAnchor(parentHash());
+      }
+      return !off;
+    };
+    // The position the guard holds: the anchor's top (clamped to what the page can scroll), or the top.
+    var held = function () {
+      var el = anchor && document.getElementById(anchor);
+      if (!el) return 0;
+      var max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      return Math.min(max, Math.max(0, Math.round(window.scrollY + el.getBoundingClientRect().top)));
+    };
+    var hold = function () {
+      if (!on() || settled) return;
+      var y = held();
+      if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+    };
+    var stop = function () {
+      off = true;
+      // The manager's preview keeps watching its URL: the next Docs page shown there arms the guard again.
+      if (preview || timer === null) return;
+      clearInterval(timer);
+      timer = null;
+    };
+    // Only a real gesture (`isTrusted`): a story iframe runs its `play`, whose `userEvent` dispatches keys and
+    // pointer events of its own, and those must not turn the guard off.
+    var onGesture = function (event) {
+      if (event.isTrusted) stop();
+    };
+    var listen = function (win) {
+      GESTURES.forEach(function (t) {
+        win.addEventListener(t, onGesture, { capture: true, passive: true });
+      });
+    };
+    var storyUp = function (frame) {
+      var doc;
+      try {
+        doc = frame.contentDocument;
+      } catch (e) {
+        return true; // another origin: not a story of this Storybook
+      }
+      if (!doc) return true;
+      // A gesture inside a story iframe never reaches this window: listen in each document the iframe loads.
+      // By document, not by `contentWindow`: that proxy stays the same object when the iframe reloads, while the
+      // window behind it (where the listeners are) is a new one.
+      if (watched && !watched.has(doc) && doc.defaultView) {
+        watched.add(doc);
+        listen(doc.defaultView);
+      }
+      var root = doc.getElementById('storybook-root');
+      return doc.readyState === 'complete' && !!root && !!root.firstElementChild;
+    };
+    var check = function () {
+      if (!on()) return;
+      var up = true;
+      for (var i = 0; i < frames.length; i++) if (!storyUp(frames[i])) up = false;
+      var now = performance.now();
+      if (!up || !document.querySelector('.sbdocs-content')) settledSince = null;
+      else if (settledSince === null) settledSince = now;
+      settled = settledSince !== null && now - settledSince >= SETTLE_MS;
+      if (now - shownAt >= MAX_MS) return stop();
+      // An anchor rendered after the jump, or moved by the stories mounting above it: go (back) to it.
+      if (anchor) hold();
+    };
+    on();
+    started = true;
+    listen(window);
+    window.addEventListener('hashchange', function () {
+      if (!on()) return;
+      anchor = readAnchor(location.hash);
+      hold();
     });
-    window.addEventListener('scroll', function () {
-      if (!touched && window.scrollY > 0) window.scrollTo(0, 0);
-    }, { passive: true });
-    setTimeout(function () { touched = true; }, 8000);
+    window.addEventListener('scroll', hold, { passive: true });
+    timer = setInterval(check, 100);
   })();
 </script>
