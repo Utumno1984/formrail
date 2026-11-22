@@ -16,20 +16,9 @@
       "invoice",
       "supplier"
     ],
-    "Floorplans/Object Page/Anchor Bar": [
-      "invoice",
-      "supplier"
-    ],
     "Floorplans/Object Page/Footer": [
       "customer",
       "invoice",
-      "supplier",
-      "vat"
-    ],
-    "Floorplans/Object Page/Layout": [
-      "customer",
-      "invoice",
-      "purchase order",
       "supplier",
       "vat"
     ],

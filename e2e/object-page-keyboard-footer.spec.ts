@@ -115,7 +115,7 @@ for (const viewport of [
     });
 
     test('the field focused near the bottom lands just above the keyboard, with no gap of the save bar\'s height', async ({ page }) => {
-      await focusLow(page, 'Supplier name');
+      await focusLow(page, 'Site name');
       await setKeyboard(page, keyboard);
       await expect.poll(async () => (await spot(page)).controlBottom).toBeLessThanOrEqual(viewport.height - keyboard);
       const s = await spot(page);
@@ -140,12 +140,12 @@ for (const viewport of [
     });
 
     test('Tab to the next field with the keyboard open: it lands just above the keyboard too', async ({ page }) => {
-      await focusLow(page, 'Supplier name');
+      await focusLow(page, 'Site name');
       await setKeyboard(page, keyboard);
       await expect.poll(async () => (await spot(page)).controlBottom).toBeLessThanOrEqual(viewport.height - keyboard);
       // The next field is below the keyboard now: Tab brings it up.
       await page.keyboard.press('Tab');
-      await expect(page.getByRole('textbox', { name: 'VAT number', exact: true })).toBeFocused();
+      await expect(page.getByRole('textbox', { name: 'Registry code', exact: true })).toBeFocused();
       await expect.poll(async () => (await spot(page)).controlBottom).toBeLessThanOrEqual(viewport.height - keyboard);
       const s = await spot(page);
       expect(Math.abs(s.fieldBottom - (s.visibleBottom - MARGIN)), `Field bottom ${s.fieldBottom}, keyboard at ${s.visibleBottom}`).toBeLessThanOrEqual(1);
@@ -153,7 +153,7 @@ for (const viewport of [
     });
 
     test('a keyboard shorter than the save bar leaves the scroll margin at 0.5rem; closed, the same', async ({ page }) => {
-      await focusLow(page, 'Supplier name');
+      await focusLow(page, 'Site name');
       const footer = (await spot(page)).footer;
       await setKeyboard(page, Math.floor(footer / 2));
       expect((await spot(page)).marginBottom).toBe(MARGIN);
@@ -170,7 +170,7 @@ for (const viewport of [
 test.describe('Object Page whose document scrolls (no height on the parent), virtual keyboard of 225px (390x500): the whole keyboard counts (#498)', () => {
   const viewport = { width: 390, height: 500 } as const;
   const keyboard = 225;
-  const LAST = 'Notes for the supplier';
+  const LAST = 'Notes for the owner';
   test.use({ viewport, hasTouch: true });
 
   test.beforeEach(async ({ page }) => {
@@ -247,7 +247,7 @@ test.describe('Object Page whose document scrolls (no height on the parent), vir
     // Only the Anchor Bar and the Notes section (no header), and the page pushed down so it ends 20px above the bottom
     // of the window.
     await page.locator(SCROLLER).evaluate((scroller) => {
-      const hidden = [scroller.querySelector(':scope > div'), scroller.querySelector('#general'), scroller.querySelector('#supplier')];
+      const hidden = [scroller.querySelector(':scope > div'), scroller.querySelector('#general'), scroller.querySelector('#location')];
       for (const el of hidden) (el as HTMLElement).style.display = 'none';
       const root = scroller.parentElement as HTMLElement;
       (root.parentElement as HTMLElement).style.paddingTop = `${window.innerHeight - 20 - root.getBoundingClientRect().bottom}px`;
@@ -269,13 +269,13 @@ test.describe('Object Page whose document scrolls (no height on the parent), vir
 // the one the Field's scroll uses, or the save bar counts twice and the field lands a save bar's height too high
 // (it did: Field at 178 and 367 instead of 267 and 456).
 for (const { viewport, keyboard, push } of [
-  // The tester's D3: the Notes section alone (no header, no General data, no Supplier) at 390x500.
+  // The tester's D3: the Notes section alone (no header, no General, no Location) at 390x500.
   { viewport: { width: 390, height: 500 }, keyboard: 225, push: false },
   // The tester's G: a short form at 390x844, its last field low in the page, but no overflow.
   { viewport: { width: 390, height: 844 }, keyboard: 380, push: true },
 ] as const) {
   test.describe(`Object Page with a height whose content fits, virtual keyboard of ${keyboard}px (${viewport.width}x${viewport.height}): the save bar is counted once on every focus (#498)`, () => {
-    const LAST = 'Notes for the supplier';
+    const LAST = 'Notes for the owner';
     test.use({ viewport, hasTouch: true });
 
     test.beforeEach(async ({ page }) => {
@@ -285,7 +285,7 @@ for (const { viewport, keyboard, push } of [
       await page.locator(SCROLLER).evaluate(
         (scroller, pushDown) => {
           (document.activeElement as HTMLElement | null)?.blur();
-          const hidden = [scroller.querySelector(':scope > div'), scroller.querySelector('#general'), scroller.querySelector('#supplier')];
+          const hidden = [scroller.querySelector(':scope > div'), scroller.querySelector('#general'), scroller.querySelector('#location')];
           for (const el of hidden) (el as HTMLElement).style.display = 'none';
           if (pushDown) {
             // The last field ends 20px above the scroller's bottom edge: low in the page, still no overflow.

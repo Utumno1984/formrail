@@ -5,11 +5,15 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
+import { RECORD_STATUS_LABEL, getRecordDetail } from '../internal/demo-data';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { ObjectPage } from './ObjectPage';
 import { ObjectPageFooter } from './ObjectPageFooter';
 import { ObjectPageHeader } from './ObjectPageHeader';
 import { ObjectPageSection } from './ObjectPageSection';
+
+// The neutral record every page of the Object Page shows (the verticals come at the bottom, as examples).
+const RECORD = getRecordDetail('rec-42');
 
 interface PlaygroundArgs {
   headingLevel: 1 | 2 | 3 | 4;
@@ -42,8 +46,8 @@ const meta: Meta<PlaygroundArgs> = {
   args: {
     headingLevel: 1,
     sectionCount: 4,
-    title: 'Invoice 2026/0142',
-    subtitle: 'ACME srl',
+    title: `Record ${RECORD.code}`,
+    subtitle: RECORD.name,
     showActions: true,
     showStatus: true,
     onApprove: fn(),
@@ -66,7 +70,7 @@ function Filler({ height, children }: { height: number; children: ReactNode }) {
   return <div style={{ height, background: BLOCK_BG, borderRadius: 8, padding: 12, boxSizing: 'border-box' }}>{children}</div>;
 }
 
-const SECTION_TITLES = ['General data', 'Supplier', 'Lines', 'Amounts', 'Payment', 'Attachments', 'Notes', 'History'];
+const SECTION_TITLES = ['General', 'Details', 'Location', 'Items', 'Tags', 'Attachments', 'Notes', 'History'];
 
 /** The sections of the demo; the last one always holds a Field, the target of the keyboard scenarios. */
 function Sections({ count }: { count: number }) {
@@ -91,6 +95,8 @@ function Sections({ count }: { count: number }) {
   );
 }
 
+const RECORD_STATUS = RECORD_STATUS_LABEL[RECORD.status];
+
 const statusBadge = (
   <span
     style={{
@@ -103,7 +109,7 @@ const statusBadge = (
       fontWeight: 600,
     }}
   >
-    To approve
+    {RECORD_STATUS}
   </span>
 );
 
@@ -177,8 +183,8 @@ export const Playground: Story = {
   },
 };
 
-const LONG_TITLE =
-  'Invoice 2026/0142 issued by Rossi Construction and Special Precision Installations Single-Member Limited Liability Company';
+const LONG_TITLE = `Record ${RECORD.code}: a deliberately long name that wraps over several lines because a title is never truncated, kept by its owner for the whole group`;
+const LONG_SUBTITLE = `Owner: ${RECORD.ownerName} · Due ${RECORD.dueOn}`;
 
 /**
  * Visual matrix: a header with status and actions, a very long title that wraps (never truncated), six
@@ -192,7 +198,7 @@ export const Overview: Story = {
       <ObjectPage>
         <ObjectPageHeader
           title={LONG_TITLE}
-          subtitle="Supplier: Rossi Construction · Due 30/11/2026"
+          subtitle={LONG_SUBTITLE}
           status={statusBadge}
           actions={
             <>
@@ -215,7 +221,7 @@ export const ManyActions: Story = {
       <ObjectPage>
         <ObjectPageHeader
           title={LONG_TITLE}
-          subtitle="Supplier: Rossi Construction · Due 30/11/2026"
+          subtitle={LONG_SUBTITLE}
           status={statusBadge}
           actions={
             <>
@@ -264,7 +270,7 @@ export const HeaderOnly: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title={`Record ${RECORD.code}`} subtitle={RECORD.name} />
       </ObjectPage>
     </div>
   ),
@@ -280,12 +286,12 @@ export const KeyboardSafe: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Invoice 2026/0142" />
+        <ObjectPageHeader title={`Record ${RECORD.code}`} />
         <ObjectPageSection id="long" title="Long section">
           <Filler height={900}>Long content before the field.</Filler>
         </ObjectPageSection>
         <ObjectPageSection id="last" title="Last section">
-          <Field label="Billing address">
+          <Field label="Address">
             <Input />
           </Field>
         </ObjectPageSection>
@@ -300,7 +306,7 @@ export const TextAndWideContent: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Invoice 2026/0142" />
+        <ObjectPageHeader title={`Record ${RECORD.code}`} />
         <ObjectPageSection id="text" title="Text only">
           {Array.from({ length: 24 }, (_, i) => (
             <p key={i} style={{ margin: '0 0 12px' }}>
@@ -319,20 +325,20 @@ export const TextAndWideContent: Story = {
 };
 
 const GENERAL_FIELDS = [
-  'Order number',
-  'Order date',
-  'Requested delivery',
-  'Requisition reference',
-  'Cost center',
-  'Project code',
+  'Name',
+  'Status',
+  'Owner',
+  'Amount',
+  'Due date',
+  'Reference',
+  'Category',
   'Currency',
-  'Payment terms',
-  'Buyer',
-  'Approver',
+  'Quantity',
+  'Created on',
 ];
-const SUPPLIER_FIELDS = ['Supplier name', 'VAT number', 'Street', 'City', 'Postal code', 'Country'];
-const BANK_FIELDS = ['IBAN', 'BIC'];
-const NOTES_FIELDS = ['Internal notes', 'Notes for the supplier'];
+const LOCATION_FIELDS = ['Site name', 'Registry code', 'Street', 'City', 'Postal code', 'Country'];
+const CONTACT_FIELDS = ['Phone', 'Email'];
+const NOTES_FIELDS = ['Internal notes', 'Notes for the owner'];
 
 /** One labelled text field per name. */
 function TextFields({ names }: { names: readonly string[] }) {
@@ -360,7 +366,7 @@ function clearStrip(canvasElement: HTMLElement): { top: number; bottom: number }
  * clear of the sticky Anchor Bar (and stays above the save bar, which sits below the scroller): WCAG
  * 2.4.12 Focus Not Obscured (Enhanced).
  *
- * The play function tabs from the first field to the last one of "General data", then back up with
+ * The play function tabs from the first field to the last one of "General", then back up with
  * Shift+Tab, and checks that each focused field is entirely in the clear strip. "Edit" shows the save
  * bar, "Cancel" hides it: its room is always reserved, so nothing above it moves.
  */
@@ -372,21 +378,21 @@ export const LongForm: Story = {
       <div style={FRAME}>
         <ObjectPage>
           <ObjectPageHeader
-            title="Purchase order PO-2026-0318"
-            subtitle="Harbourline Marine Parts"
+            title={`Record ${RECORD.code}`}
+            subtitle={RECORD.name}
             actions={
               <Button variant="secondary" onClick={() => setEditing(true)}>
                 Edit
               </Button>
             }
           />
-          <ObjectPageSection id="general" title="General data">
+          <ObjectPageSection id="general" title="General">
             <TextFields names={GENERAL_FIELDS} />
           </ObjectPageSection>
-          <ObjectPageSection id="supplier" title="Supplier">
-            <TextFields names={SUPPLIER_FIELDS} />
-            <ObjectPageSection id="bank" title="Bank details">
-              <TextFields names={BANK_FIELDS} />
+          <ObjectPageSection id="location" title="Location">
+            <TextFields names={LOCATION_FIELDS} />
+            <ObjectPageSection id="contact" title="Contact details">
+              <TextFields names={CONTACT_FIELDS} />
             </ObjectPageSection>
           </ObjectPageSection>
           <ObjectPageSection id="notes" title="Notes">
@@ -433,7 +439,7 @@ export const NoParentHeight: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <ObjectPage>
-      <ObjectPageHeader title="Invoice 2026/0142" />
+      <ObjectPageHeader title={`Record ${RECORD.code}`} />
       <Sections count={5} />
     </ObjectPage>
   ),

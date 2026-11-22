@@ -48,15 +48,15 @@ function Filler({ height, children }: { height: number; children: ReactNode }) {
   return <div style={{ height, background: BLOCK_BG, borderRadius: 8, padding: 12, boxSizing: 'border-box' }}>{children}</div>;
 }
 
-const TITLES = ['General data', 'Supplier', 'Lines', 'Amounts', 'Payments', 'Attachments', 'Notes', 'History', 'Approvals', 'Audit'];
+const TITLES = ['General', 'Details', 'Location', 'Items', 'Contacts', 'Attachments', 'Notes', 'History', 'Approvals', 'Audit'];
 const LONG_TITLES = [
-  'General document data',
-  'Supplier and bank details',
-  'Invoice lines and item codes',
-  'Amounts, taxes and withholdings',
-  'Payment terms and due dates',
-  'Attachments and linked documents',
-  'Internal notes for the accounting team',
+  'General record data',
+  'Details and reference codes',
+  'Location and site codes',
+  'Items, quantities and totals',
+  'Contacts and responsible people',
+  'Attachments and linked records',
+  'Internal notes for the review team',
   'Change history',
   'Required approvals',
   'Full audit log',
@@ -107,7 +107,7 @@ export const Playground: Story = {
   render: ({ sectionNavigation, sectionCount, lastSectionHeight, anchorBarLabel }) => (
     <div style={FRAME}>
       <ObjectPage sectionNavigation={sectionNavigation} labels={{ anchorBar: anchorBarLabel }}>
-        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Record REC-00042" subtitle="Ångström Batch" />
         <Sections count={sectionCount} lastHeight={lastSectionHeight} />
       </ObjectPage>
     </div>
@@ -155,16 +155,16 @@ export const MidPage: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Record REC-00042" subtitle="Ångström Batch" />
         <Sections count={6} lastHeight={300} />
       </ObjectPage>
     </div>
   ),
   play: async ({ canvasElement }) => {
     const scroller = scrollerOf(canvasElement);
-    const second = within(canvasElement).getByRole('region', { name: 'Supplier' });
+    const second = within(canvasElement).getByRole('region', { name: 'Details' });
     scroller.scrollTop = second.offsetTop - 40 + 200;
-    await waitFor(() => expect(within(canvasElement).getByRole('link', { name: 'Supplier' })).toHaveAttribute('aria-current', 'location'));
+    await waitFor(() => expect(within(canvasElement).getByRole('link', { name: 'Details' })).toHaveAttribute('aria-current', 'location'));
   },
 };
 
@@ -175,20 +175,20 @@ export const ManySections: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Invoice 2026/0142" subtitle="ACME srl" />
+        <ObjectPageHeader title="Record REC-00042" subtitle="Ångström Batch" />
         <Sections count={10} lastHeight={200} titles={LONG_TITLES} />
       </ObjectPage>
     </div>
   ),
   play: async ({ canvasElement }) => {
-    const link = await within(canvasElement).findByRole('link', { name: 'Payment terms and due dates' });
+    const link = await within(canvasElement).findByRole('link', { name: 'Contacts and responsible people' });
     await userEvent.click(link);
     await waitFor(() => expect(link).toHaveAttribute('aria-current', 'location'));
     // Wait for the smooth scroll to arrive (the section's top at the bar's bottom edge) so the picture is
     // steady, however slow the machine is: a "stopped moving" check could fire before it has started.
     const scroller = scrollerOf(canvasElement);
     const bar = within(canvasElement).getByRole('navigation');
-    const section = within(canvasElement).getByRole('region', { name: 'Payment terms and due dates' });
+    const section = within(canvasElement).getByRole('region', { name: 'Contacts and responsible people' });
     await waitFor(
       () => {
         const gap = section.getBoundingClientRect().top - scroller.getBoundingClientRect().top - bar.getBoundingClientRect().height;
@@ -209,7 +209,7 @@ export const TooltipOverBar: Story = {
   render: () => (
     <div style={FRAME}>
       <ObjectPage>
-        <ObjectPageHeader title="Invoice 2026/0142" />
+        <ObjectPageHeader title="Record REC-00042" />
         <ObjectPageSection id="info" title="Information">
           <Tooltip content="Hint that overlaps the bar" delayDuration={0}>
             <Button variant="secondary">Details</Button>
