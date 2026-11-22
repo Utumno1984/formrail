@@ -18,7 +18,7 @@ returns the focus to the trigger; a focus `onNavigate` moves to the new page sta
 or the middle button on a link with an `href` is left to the browser and the Sheet stays open. When the viewport
 crosses the breakpoint with the Sheet open, the Sheet closes and the focus goes to the current link of the column;
 crossing it the other way with the focus in the column moves the focus to the trigger. An `AppShellNav` unmounted
-while the Sheet is open closes it. Several triggers in one shell share the Sheet: the focus goes back to the one it was
+while the Sheet is open closes it, and the focus the Sheet held goes back to the trigger. Several triggers in one shell share the Sheet: the focus goes back to the one it was
 opened from, or to another mounted one when that one has unmounted.
 
 The Sheet's code comes with `AppShellNavTrigger`: a shell without a trigger (an app for wide screens only) does not

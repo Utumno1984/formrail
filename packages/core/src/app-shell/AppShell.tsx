@@ -397,8 +397,24 @@ export const AppShellHeader = /* @__PURE__ */ forwardRef<HTMLElement, AppShellHe
 function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProps) {
   const navSheet = useContext(AppShellNavSheetContext)!;
   const sheetNavRef = useRef<HTMLElement | null>(null);
-  const close = navSheet.setOpen;
-  const trigger = navSheet.triggerRef;
+  const panelNode = useRef<HTMLDivElement | null>(null);
+  const setPanel = useMemo(() => composeRefs<HTMLDivElement>(panelNode, panelRef), [panelRef]);
+  const { open, setOpen: close, triggerRef: trigger } = navSheet;
+  // An `AppShellNav` unmounted while the Sheet is on screen takes it away with no closing, so the Sheet's own return
+  // of the focus never runs. Run here, before the panel leaves the DOM: a focus in the panel (or lost to `body` during
+  // its exit) goes back to the trigger in the next frame, unless something else has taken it by then (a focus that was
+  // elsewhere, in a dialog of the app, is left alone).
+  useIsomorphicLayoutEffect(
+    () => () => {
+      const panel = panelNode.current;
+      const doc = panel?.ownerDocument;
+      if (!panel || !doc || !(panel.contains(doc.activeElement) || doc.activeElement === doc.body)) return;
+      doc.defaultView?.requestAnimationFrame(() => {
+        if (doc.activeElement === doc.body) trigger.current?.focus();
+      });
+    },
+    [trigger],
+  );
   /** Closes the Sheet, gives the focus to the trigger, then runs `then` (which may throw: the Sheet is closed). */
   const closeThen = (then: () => void) => {
     flushSync(() => close(false));
@@ -419,9 +435,9 @@ function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProp
     target.focus();
   };
   return (
-    <ModalRoot open={navSheet.open} onOpenChange={close} keepFocusWhen={focusIsElsewhere}>
+    <ModalRoot open={open} onOpenChange={close} keepFocusWhen={focusIsElsewhere}>
       <SheetContent
-        ref={panelRef}
+        ref={setPanel}
         id={navSheet.sheetId}
         side={navSheet.side}
         size="sm"
@@ -550,7 +566,9 @@ function textOfIds(ids: string | undefined): string {
  *   it the other way with the focus in the column, the focus goes to the trigger.
  *
  * An `AppShellNav` unmounted while the Sheet is open (a navigation that depends on permissions loaded later) takes the
- * Sheet with it and closes it: the trigger is collapsed again, and a navigation mounted later opens nothing by itself.
+ * Sheet with it and closes it: the trigger is collapsed again, the focus the Sheet held goes back to the trigger (one
+ * the app moved elsewhere at the same time, or that was not in the Sheet, stays where it is), and a navigation mounted
+ * later opens nothing by itself.
  *
  * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.

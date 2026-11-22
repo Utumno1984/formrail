@@ -4,6 +4,7 @@ import { StrictMode, createRef, forwardRef, useState, type AnchorHTMLAttributes,
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Dialog, DialogContent, DialogTitle } from '../dialog/Dialog';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
 import { overlayLayer } from '../overlay/layers';
 import {
@@ -354,11 +355,14 @@ describe('AppShellNavTrigger', () => {
         );
       }
       render(<Page />);
-      await openWithKeyboard(user);
+      const sheet = await openWithKeyboard(user);
+      await waitFor(() => expect(linkIn(sheet, 'A')).toHaveFocus());
       act(() => showNav(false));
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(trigger()).toHaveAttribute('aria-expanded', 'false');
       expect(trigger()).not.toHaveAttribute('aria-controls');
+      // The focus the Sheet held goes back to the trigger, as at any closing, before the user moves it.
+      await waitFor(() => expect(trigger()).toHaveFocus());
       // The page is not inert any more: the user moves on, then the nav comes back.
       const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
       act(() => elsewhere.focus());
@@ -378,6 +382,131 @@ describe('AppShellNavTrigger', () => {
       expect(trigger()).toHaveAttribute('aria-expanded', 'true');
     });
   }
+
+  describe('a nav unmounted with the Sheet on screen', () => {
+    /** A shell whose nav can be removed (`showNav`), with a dialog of the app's (`showDialog`) and a heading. */
+    function Removable({ strict = false }: { strict?: boolean }) {
+      const [nav, setNav] = useState(true);
+      const [dialog, setDialog] = useState(false);
+      showNav = setNav;
+      showDialog = setDialog;
+      const page = (
+        <AppShell>
+          <AppShellHeader start={<AppShellNavTrigger />} />
+          {nav ? (
+            <AppShellNav>
+              <AppShellNavLink href="/a">Section A</AppShellNavLink>
+              <AppShellNavLink href="/b" active>
+                Section B
+              </AppShellNavLink>
+            </AppShellNav>
+          ) : null}
+          <AppShellMain>
+            <h1 id="page-title" tabIndex={-1}>
+              Page
+            </h1>
+          </AppShellMain>
+          <Dialog open={dialog} onOpenChange={setDialog}>
+            <DialogContent>
+              <DialogTitle>Session</DialogTitle>
+              <button type="button">Sign in again</button>
+            </DialogContent>
+          </Dialog>
+        </AppShell>
+      );
+      return strict ? <StrictMode>{page}</StrictMode> : page;
+    }
+    let showNav: (shown: boolean) => void = () => undefined;
+    let showDialog: (shown: boolean) => void = () => undefined;
+    const settle = () =>
+      act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+    for (const strict of [false, true]) {
+      it(`the focus it held goes back to the trigger once, with nothing else moving it${strict ? ' (StrictMode)' : ''}`, async () => {
+        const error = vi.spyOn(console, 'error');
+        const user = userEvent.setup();
+        render(<Removable strict={strict} />);
+        const sheet = await openWithKeyboard(user);
+        await waitFor(() => expect(linkIn(sheet, 'B')).toHaveFocus());
+        const focused = vi.fn();
+        trigger().addEventListener('focus', focused);
+        act(() => showNav(false));
+        await waitFor(() => expect(trigger()).toHaveFocus());
+        await settle();
+        expect(trigger()).toHaveFocus();
+        expect(focused).toHaveBeenCalledTimes(1);
+        expect(error).not.toHaveBeenCalled();
+      });
+    }
+
+    it('during its exit animation (Escape just pressed, the focus lost with the panel): the trigger takes it', async () => {
+      animateModalExit();
+      const user = userEvent.setup();
+      render(<Removable />);
+      await openWithKeyboard(user);
+      await user.keyboard('{Escape}');
+      expect(document.querySelector('[role="dialog"][data-state="closed"]')).not.toBeNull();
+      act(() => showNav(false));
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      await waitFor(() => expect(trigger()).toHaveFocus());
+    });
+
+    it('a focus the app moves elsewhere as the nav leaves (the heading) stays there', async () => {
+      const user = userEvent.setup();
+      render(<Removable />);
+      await openWithKeyboard(user);
+      act(() => {
+        showNav(false);
+      });
+      act(() => document.getElementById('page-title')!.focus());
+      await settle();
+      expect(document.getElementById('page-title')).toHaveFocus();
+    });
+
+    it('a focus that was not in the Sheet (a dialog of the app opened above it) is not taken', async () => {
+      const user = userEvent.setup();
+      render(<Removable />);
+      await openWithKeyboard(user);
+      act(() => showDialog(true));
+      const signIn = await screen.findByRole('button', { name: 'Sign in again' });
+      await waitFor(() => expect(signIn).toHaveFocus());
+      act(() => showNav(false));
+      await settle();
+      expect(signIn).toHaveFocus();
+    });
+
+    it('two shells on one page: the focus goes back to the trigger of the shell whose nav left', async () => {
+      const user = userEvent.setup();
+      function Two() {
+        const [nav, setNav] = useState(true);
+        showNav = setNav;
+        return (
+          <>
+            <Shell labels={{ openNav: 'Other' }} />
+            <AppShell>
+              <AppShellHeader start={<AppShellNavTrigger />} />
+              {nav ? (
+                <AppShellNav>
+                  <AppShellNavLink href="/a">Section A</AppShellNavLink>
+                </AppShellNav>
+              ) : null}
+              <AppShellMain />
+            </AppShell>
+          </>
+        );
+      }
+      render(<Two />);
+      await openWithKeyboard(user);
+      await waitFor(() => expect(linkIn(screen.getByRole('dialog'), 'A')).toHaveFocus());
+      act(() => showNav(false));
+      await waitFor(() => expect(trigger()).toHaveFocus());
+      await settle();
+      expect(trigger()).toHaveFocus();
+      expect(screen.getByRole('button', { name: 'Other', hidden: true })).not.toHaveFocus();
+    });
+  });
 
   it('on a wide viewport (a click made in code) it opens nothing: the column is there', () => {
     screenSize.cross(true);

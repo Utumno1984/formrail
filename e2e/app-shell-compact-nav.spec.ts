@@ -214,6 +214,8 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
       await expect(trigger(page)).not.toHaveAttribute('aria-controls');
+      // The focus the Sheet held goes back to the trigger, as at any closing, before the user moves it.
+      await expect(trigger(page)).toBeFocused();
       // The page is not inert any more: the user moves on, then the navigation comes back (permissions loaded later).
       const details = page.getByRole('link', { name: 'Details of block 1' });
       await details.focus();
@@ -233,6 +235,20 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
       await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
       await expect(trigger(page)).not.toHaveAttribute('aria-controls');
       await expect(details).toBeFocused();
+    });
+  }
+
+  for (const motion of ['no-preference', 'reduce'] as const) {
+    test(`mobile (${motion}): the nav unmounted with the Sheet open gives the focus it held to the trigger, and keeps it there`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: motion });
+      await openCompact(page, MOBILE_VIEWPORT, `${COMPACT}-open`);
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      await setArgs(page, { navCount: 0 });
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(trigger(page)).toBeFocused();
+      // Longer than the Sheet's exit animation: nothing takes it away afterwards.
+      await page.waitForTimeout(800);
+      await expect(trigger(page)).toBeFocused();
     });
   }
 
