@@ -12,10 +12,14 @@ const sortButton = (page: Page, name: string): Locator => header(page, name).get
 const SETTLE = 900;
 // Declared widths of the stories' columns, read from the fixture and not copied.
 const COLUMNS = columns();
-const declaredWidth = (id: string): number => COLUMNS.find((c) => c.id === id)!.width!;
+const px = (value: string | number | undefined): number => {
+  if (typeof value !== 'number') throw new Error(`expected a pixel width in the fixture, got ${String(value)}`);
+  return value;
+};
+const declaredWidth = (id: string): number => px(COLUMNS.find((c) => c.id === id)?.width);
 const CODE_WIDTH = declaredWidth('code');
 // What the columns need side by side: the width when fixed, the minimum otherwise.
-const NEEDED_WIDTH = COLUMNS.reduce((sum, c) => sum + (c.width ?? c.minWidth ?? 0), 0);
+const NEEDED_WIDTH = COLUMNS.reduce((sum, c) => sum + px(c.width ?? c.minWidth), 0);
 
 /** Text of one column of the body, in display order. */
 const column = (page: Page, index: number): Promise<string[]> =>
