@@ -34,6 +34,9 @@ import type { ListReportColumn, ListReportSort, ListReportSortDirection } from '
 // different vertical, on the page of `Floorplans/List Report`. They live in their own file because the Docs
 // page keeps the `use-case` stories after every neutral one (#624), file by file in the order of the paths: this
 // file sorts after `ListReportCancelOverlay.stories.tsx`, the last neutral file of the page.
+// Each story declares its component inside `render` (`function XyzDemo() {...}; return <XyzDemo {...args} />`) and
+// writes its `Intl` formatters inline in the `cell`s: that is the shape for which "Show code" prints the story's
+// original source (.storybook/source-transform.ts), so the reader sees the `columns` array as a consumer writes it.
 
 const meta: Meta = {
   title: 'Floorplans/List Report',
@@ -45,14 +48,11 @@ export default meta;
 
 const SORT_CALLBACK = { onSortChange: { control: false, table: { disable: true } } } as const;
 
-/** An amount in minor units (cents, pence, yen) as money: `Intl` knows how many decimals the currency has. */
-function formatMinor(minor: number, currency: string, locale: string): string {
-  const format = new Intl.NumberFormat(locale, { style: 'currency', currency });
-  return format.format(minor / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
-}
-
-/** An ISO date (`2026-06-12`) in the reader's locale. The date has no time zone, so format it in UTC. */
-function formatDay(iso: string, locale: string, dateStyle: 'short' | 'medium' | 'long'): string {
+/**
+ * For the plays only: the text a date cell is expected to show, computed as the cells compute it. The stories
+ * write their `Intl` formatters inline, in the `cell` of each column, so that "Show code" prints them.
+ */
+function expectedDay(iso: string, locale: string, dateStyle: 'short' | 'medium' | 'long'): string {
   return new Intl.DateTimeFormat(locale, { dateStyle, timeZone: 'UTC' }).format(new Date(iso));
 }
 
@@ -75,46 +75,6 @@ interface ErpArgs {
 
 const PURCHASE_ORDERS = makePurchaseOrders(40);
 const supplierName = (order: DemoPurchaseOrder): string => getSupplier(order.supplierId)?.name ?? order.supplierId;
-
-function ErpPurchaseOrders({ searchableColumns, onSortChange }: ErpArgs) {
-  const columns = useMemo<ListReportColumn<DemoPurchaseOrder>[]>(
-    () => [
-      // `id` is the stable key; `header` is what the reader sees; `accessor` is the raw value (sorting, search).
-      { id: 'number', header: 'Order', accessor: (o) => o.number, searchable: searchableColumns.includes('number'), width: 200 },
-      { id: 'supplier', header: 'Supplier', accessor: supplierName, searchable: searchableColumns.includes('supplier'), minWidth: 240 },
-      {
-        id: 'status',
-        header: 'Status',
-        accessor: (o) => PURCHASE_ORDER_STATUS_LABEL[o.status],
-        // `cell` is only the rendering: the accessor above is still what is sorted and searched.
-        cell: (o) => <StatusBadge tone={PURCHASE_ORDER_STATUS_TONE[o.status]}>{PURCHASE_ORDER_STATUS_LABEL[o.status]}</StatusBadge>,
-        searchable: searchableColumns.includes('status'),
-        width: 150,
-      },
-      {
-        id: 'ordered',
-        header: 'Ordered',
-        accessor: (o) => o.orderDate,
-        cell: (o) => formatDay(o.orderDate, 'en-GB', 'medium'),
-        firstSortDirection: 'desc',
-        searchable: false,
-        width: 140,
-      },
-      {
-        // The raw amount in minor units of the record's own currency: sorting does not convert between currencies.
-        id: 'total',
-        header: 'Total',
-        accessor: (o) => o.totalMinor,
-        cell: (o) => formatMinor(o.totalMinor, o.currency, 'en-GB'),
-        align: 'end',
-        searchable: false,
-        width: 170,
-      },
-    ],
-    [searchableColumns],
-  );
-  return <ColumnsReport title="Purchase orders" rows={PURCHASE_ORDERS} columns={columns} getRowId={(o) => o.id} onSortChange={onSortChange} />;
-}
 
 const searchbox = (canvas: ReturnType<typeof within>) => canvas.getByRole('searchbox', { name: 'Search' });
 
@@ -144,7 +104,53 @@ export const UseCaseErpPurchaseOrder: StoryObj<ErpArgs> = {
     ...SORT_CALLBACK,
   },
   args: { searchableColumns: ['number', 'supplier'], onSortChange: fn() },
-  render: (args) => <ErpPurchaseOrders {...args} />,
+  render: (args) => {
+    function ErpPurchaseOrdersDemo({ searchableColumns, onSortChange }: ErpArgs) {
+      const columns = useMemo<ListReportColumn<DemoPurchaseOrder>[]>(() => {
+        // An ISO date (`2026-06-12`) has no time zone: format it in UTC.
+        const day = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
+        return [
+          // `id` is the stable key; `header` is what the reader sees; `accessor` is the raw value (sorting, search).
+          { id: 'number', header: 'Order', accessor: (o) => o.number, searchable: searchableColumns.includes('number'), width: 200 },
+          { id: 'supplier', header: 'Supplier', accessor: supplierName, searchable: searchableColumns.includes('supplier'), minWidth: 240 },
+          {
+            id: 'status',
+            header: 'Status',
+            accessor: (o) => PURCHASE_ORDER_STATUS_LABEL[o.status],
+            // `cell` is only the rendering: the accessor above is still what is sorted and searched.
+            cell: (o) => <StatusBadge tone={PURCHASE_ORDER_STATUS_TONE[o.status]}>{PURCHASE_ORDER_STATUS_LABEL[o.status]}</StatusBadge>,
+            searchable: searchableColumns.includes('status'),
+            width: 150,
+          },
+          {
+            id: 'ordered',
+            header: 'Ordered',
+            accessor: (o) => o.orderDate,
+            cell: (o) => day.format(new Date(o.orderDate)),
+            firstSortDirection: 'desc',
+            searchable: false,
+            width: 140,
+          },
+          {
+            // The raw amount in minor units of the record's own currency: sorting does not convert between currencies.
+            id: 'total',
+            header: 'Total',
+            accessor: (o) => o.totalMinor,
+            cell: (o) => {
+              // Each order has its own currency; `Intl.NumberFormat` knows how many decimals it has (JPY none).
+              const money = new Intl.NumberFormat('en-GB', { style: 'currency', currency: o.currency });
+              return money.format(o.totalMinor / 10 ** (money.resolvedOptions().maximumFractionDigits ?? 2));
+            },
+            align: 'end',
+            searchable: false,
+            width: 170,
+          },
+        ];
+      }, [searchableColumns]);
+      return <ColumnsReport title="Purchase orders" rows={PURCHASE_ORDERS} columns={columns} getRowId={(o) => o.id} onSortChange={onSortChange} />;
+    }
+    return <ErpPurchaseOrdersDemo {...args} />;
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const first = PURCHASE_ORDERS[0]!;
@@ -186,38 +192,6 @@ interface CatalogueArgs {
 
 const PRODUCTS = makeProducts(40);
 
-function ProductCatalogue({ nameWidth, truncate, onSortChange }: CatalogueArgs) {
-  const columns = useMemo<ListReportColumn<DemoProduct>[]>(
-    () => [
-      // A fixed width in px: an SKU never changes length.
-      { id: 'sku', header: 'SKU', accessor: (p) => p.sku, width: 130 },
-      {
-        id: 'name',
-        header: 'Product',
-        accessor: (p) => p.name,
-        // `width` takes px or any CSS length; without one the column shares the free space. `minWidth` counts
-        // in the table's minimum width, so a narrow container scrolls instead of squeezing the name.
-        width: nameWidth === 'auto' ? undefined : /^\d+$/.test(nameWidth) ? Number(nameWidth) : nameWidth,
-        minWidth: 160,
-        // `true` (default): one line with an ellipsis and a tooltip with the full text on hover or focus.
-        truncate,
-      },
-      { id: 'category', header: 'Category', accessor: (p) => PRODUCT_CATEGORY_LABEL[p.category], width: 170 },
-      {
-        id: 'price',
-        header: 'Price',
-        accessor: (p) => p.listPriceMinor.EUR,
-        cell: (p) => formatMinor(p.listPriceMinor.EUR, 'EUR', 'en-GB'),
-        align: 'end',
-        searchable: false,
-        width: 120,
-      },
-    ],
-    [nameWidth, truncate],
-  );
-  return <ColumnsReport title="Products" rows={PRODUCTS} columns={columns} getRowId={(p) => p.id} onSortChange={onSortChange} />;
-}
-
 /**
  * Width and truncation: `width` (a number in px, or a CSS length such as `18rem`; without one the column shares
  * the free space), `minWidth` (counted in the minimum width of the table, so a narrow container scrolls) and
@@ -245,7 +219,41 @@ export const UseCaseEcommerceProductCatalogue: StoryObj<CatalogueArgs> = {
     ...SORT_CALLBACK,
   },
   args: { nameWidth: '240', truncate: true, onSortChange: fn() },
-  render: (args) => <ProductCatalogue {...args} />,
+  render: (args) => {
+    function ProductCatalogueDemo({ nameWidth, truncate, onSortChange }: CatalogueArgs) {
+      const columns = useMemo<ListReportColumn<DemoProduct>[]>(() => {
+        const euro = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' });
+        return [
+          // A fixed width in px: an SKU never changes length.
+          { id: 'sku', header: 'SKU', accessor: (p) => p.sku, width: 130 },
+          {
+            id: 'name',
+            header: 'Product',
+            accessor: (p) => p.name,
+            // `width` takes px or any CSS length; without one the column shares the free space. `minWidth` counts
+            // in the table's minimum width, so a narrow container scrolls instead of squeezing the name.
+            width: nameWidth === 'auto' ? undefined : /^\d+$/.test(nameWidth) ? Number(nameWidth) : nameWidth,
+            minWidth: 160,
+            // `true` (default): one line with an ellipsis and a tooltip with the full text on hover or focus.
+            truncate,
+          },
+          { id: 'category', header: 'Category', accessor: (p) => PRODUCT_CATEGORY_LABEL[p.category], width: 170 },
+          {
+            id: 'price',
+            header: 'Price',
+            // The price in cents: the column sorts by the number.
+            accessor: (p) => p.listPriceMinor.EUR,
+            cell: (p) => euro.format(p.listPriceMinor.EUR / 100),
+            align: 'end',
+            searchable: false,
+            width: 120,
+          },
+        ];
+      }, [nameWidth, truncate]);
+      return <ColumnsReport title="Products" rows={PRODUCTS} columns={columns} getRowId={(p) => p.id} onSortChange={onSortChange} />;
+    }
+    return <ProductCatalogueDemo {...args} />;
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(canvasElement.ownerDocument.body);
@@ -301,28 +309,6 @@ interface PriceListArgs {
   onSortChange: (sort: ListReportSort) => void;
 }
 
-function PriceList({ currency, locale, onSortChange }: PriceListArgs) {
-  const columns = useMemo<ListReportColumn<DemoProduct>[]>(
-    () => [
-      { id: 'sku', header: 'SKU', accessor: (p) => p.sku, width: 130 },
-      { id: 'name', header: 'Product', accessor: (p) => p.name, minWidth: 240 },
-      {
-        id: 'price',
-        header: `List price (${currency})`,
-        // Sorting is on the raw number, never on the formatted text.
-        accessor: (p) => p.listPriceMinor[currency],
-        // Numbers line up on the right; `Intl.NumberFormat` knows that EUR has two decimals and JPY none.
-        cell: (p) => formatMinor(p.listPriceMinor[currency], currency, locale),
-        align: 'end',
-        searchable: false,
-        width: 190,
-      },
-    ],
-    [currency, locale],
-  );
-  return <ColumnsReport title="Price list" rows={PRODUCTS} columns={columns} getRowId={(p) => p.id} onSortChange={onSortChange} />;
-}
-
 /** The characters of an amount that are not digits, as the reader sees them. */
 const decimalSeparatorOf = (locale: string): string =>
   new Intl.NumberFormat(locale).formatToParts(1.1).find((part) => part.type === 'decimal')!.value;
@@ -350,7 +336,32 @@ export const UseCaseB2bPriceList: StoryObj<PriceListArgs> = {
     ...SORT_CALLBACK,
   },
   args: { currency: 'EUR', locale: 'en-GB', onSortChange: fn() },
-  render: (args) => <PriceList {...args} />,
+  render: (args) => {
+    function PriceListDemo({ currency, locale, onSortChange }: PriceListArgs) {
+      const columns = useMemo<ListReportColumn<DemoProduct>[]>(() => {
+        // `Intl.NumberFormat` knows that EUR has two decimals and JPY none: the prices are in minor units (cents, yen).
+        const money = new Intl.NumberFormat(locale, { style: 'currency', currency });
+        const decimals = money.resolvedOptions().maximumFractionDigits ?? 2;
+        return [
+          { id: 'sku', header: 'SKU', accessor: (p) => p.sku, width: 130 },
+          { id: 'name', header: 'Product', accessor: (p) => p.name, minWidth: 240 },
+          {
+            id: 'price',
+            header: `List price (${currency})`,
+            // Sorting is on the raw number, never on the formatted text.
+            accessor: (p) => p.listPriceMinor[currency],
+            cell: (p) => money.format(p.listPriceMinor[currency] / 10 ** decimals),
+            // Numbers line up on the right, header included.
+            align: 'end',
+            searchable: false,
+            width: 190,
+          },
+        ];
+      }, [currency, locale]);
+      return <ColumnsReport title="Price list" rows={PRODUCTS} columns={columns} getRowId={(p) => p.id} onSortChange={onSortChange} />;
+    }
+    return <PriceListDemo {...args} />;
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(() => expect(rowsOf(canvas).length).toBe(PRODUCTS.length));
@@ -392,59 +403,6 @@ interface EnrolmentArgs {
 
 const ENROLMENTS = makeEnrolments(40);
 
-/** A missing value shown as a dash that a screen reader announces as what is missing (spec 1.13.1). */
-function Absent({ label }: { label: string }) {
-  return (
-    <span role="img" aria-label={label}>
-      —
-    </span>
-  );
-}
-
-function CourseEnrolments({ dateStyle, locale, onSortChange }: EnrolmentArgs) {
-  const columns = useMemo<ListReportColumn<DemoEnrolment>[]>(
-    () => [
-      { id: 'learner', header: 'Learner', accessor: (e) => e.learner.name, minWidth: 200 },
-      {
-        id: 'status',
-        header: 'Status',
-        accessor: (e) => ENROLMENT_STATUS_LABEL[e.status],
-        cell: (e) => <StatusBadge tone={ENROLMENT_STATUS_TONE[e.status]}>{ENROLMENT_STATUS_LABEL[e.status]}</StatusBadge>,
-        searchable: false,
-        width: 150,
-      },
-      {
-        id: 'enrolled',
-        header: 'Enrolled',
-        accessor: (e) => e.enrolledOn,
-        cell: (e) => formatDay(e.enrolledOn, locale, dateStyle),
-        searchable: false,
-        width: 170,
-      },
-      {
-        id: 'completed',
-        header: 'Completed',
-        // An empty value sorts last; the cell says what is missing instead of leaving a bare dash.
-        accessor: (e) => e.completedOn,
-        cell: (e) => (e.completedOn ? formatDay(e.completedOn, locale, dateStyle) : <Absent label="Not completed" />),
-        searchable: false,
-        width: 170,
-      },
-      {
-        id: 'score',
-        header: 'Score',
-        accessor: (e) => e.score,
-        cell: (e) => (e.score === null ? <Absent label="No score" /> : `${e.score}%`),
-        align: 'end',
-        searchable: false,
-        width: 110,
-      },
-    ],
-    [dateStyle, locale],
-  );
-  return <ColumnsReport title="Enrolments" rows={ENROLMENTS} columns={columns} getRowId={(e) => e.id} onSortChange={onSortChange} />;
-}
-
 /**
  * Dates and status: `cell` formats an ISO date with `Intl.DateTimeFormat` (`dateStyle`, in the reader's
  * locale) and shows the state as a `StatusBadge` whose tone comes from a map. A missing completion date or score
@@ -468,7 +426,62 @@ export const UseCaseElearningEnrolments: StoryObj<EnrolmentArgs> = {
     ...SORT_CALLBACK,
   },
   args: { dateStyle: 'medium', locale: 'en-GB', onSortChange: fn() },
-  render: (args) => <CourseEnrolments {...args} />,
+  render: (args) => {
+    /** A missing value shown as a dash that a screen reader announces as what is missing (spec 1.13.1). */
+    function Absent({ label }: { label: string }) {
+      return (
+        <span role="img" aria-label={label}>
+          —
+        </span>
+      );
+    }
+    function CourseEnrolmentsDemo({ dateStyle, locale, onSortChange }: EnrolmentArgs) {
+      const columns = useMemo<ListReportColumn<DemoEnrolment>[]>(() => {
+        // An ISO date (`2026-06-12`) in the reader's locale. The date has no time zone, so format it in UTC.
+        const day = new Intl.DateTimeFormat(locale, { dateStyle, timeZone: 'UTC' });
+        return [
+          { id: 'learner', header: 'Learner', accessor: (e) => e.learner.name, minWidth: 200 },
+          {
+            id: 'status',
+            header: 'Status',
+            accessor: (e) => ENROLMENT_STATUS_LABEL[e.status],
+            cell: (e) => <StatusBadge tone={ENROLMENT_STATUS_TONE[e.status]}>{ENROLMENT_STATUS_LABEL[e.status]}</StatusBadge>,
+            searchable: false,
+            width: 150,
+          },
+          {
+            id: 'enrolled',
+            header: 'Enrolled',
+            // The accessor keeps the ISO string, which sorts as a date.
+            accessor: (e) => e.enrolledOn,
+            cell: (e) => day.format(new Date(e.enrolledOn)),
+            searchable: false,
+            width: 170,
+          },
+          {
+            id: 'completed',
+            header: 'Completed',
+            // An empty value sorts last; the cell says what is missing instead of leaving a bare dash.
+            accessor: (e) => e.completedOn,
+            cell: (e) => (e.completedOn ? day.format(new Date(e.completedOn)) : <Absent label="Not completed" />),
+            searchable: false,
+            width: 170,
+          },
+          {
+            id: 'score',
+            header: 'Score',
+            accessor: (e) => e.score,
+            cell: (e) => (e.score === null ? <Absent label="No score" /> : `${e.score}%`),
+            align: 'end',
+            searchable: false,
+            width: 110,
+          },
+        ];
+      }, [dateStyle, locale]);
+      return <ColumnsReport title="Enrolments" rows={ENROLMENTS} columns={columns} getRowId={(e) => e.id} onSortChange={onSortChange} />;
+    }
+    return <CourseEnrolmentsDemo {...args} />;
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(() => expect(rowsOf(canvas).length).toBe(ENROLMENTS.length));
@@ -489,7 +502,7 @@ export const UseCaseElearningEnrolments: StoryObj<EnrolmentArgs> = {
     const done = cellsOf(completed);
     const record = ENROLMENTS[completed]!;
     await expect(done[statusIndex]).toHaveTextContent(ENROLMENT_STATUS_LABEL.completed);
-    await expect(done[completedIndex]).toHaveTextContent(formatDay(record.completedOn!, args.locale, args.dateStyle));
+    await expect(done[completedIndex]).toHaveTextContent(expectedDay(record.completedOn!, args.locale, args.dateStyle));
     await expect(within(done[completedIndex]!).queryByRole('img', { name: 'Not completed' })).toBeNull();
     await expect(done[scoreIndex]).toHaveTextContent(`${record.score}%`);
   },
@@ -512,55 +525,6 @@ interface DirectoryArgs {
 const EMPLOYEES = makeEmployees(40);
 const EMPLOYEE_BY_ID = new Map(EMPLOYEES.map((e) => [e.id, e]));
 const managerName = (e: DemoEmployee): string => (e.managerId ? (EMPLOYEE_BY_ID.get(e.managerId)?.fullName ?? '') : '');
-
-/** The consumer's recipe: a checkbox group picks the optional columns and the `columns` array is filtered, memoized. */
-function EmployeeDirectory({ visibleColumns, onSortChange }: DirectoryArgs) {
-  const [visible, setVisible] = useState<readonly OptionalColumnId[]>(visibleColumns);
-  const columns = useMemo<ListReportColumn<DemoEmployee>[]>(() => {
-    const all: (ListReportColumn<DemoEmployee> & { optional?: OptionalColumnId })[] = [
-      { id: 'name', header: 'Name', accessor: (e) => e.fullName, minWidth: 200 },
-      { id: 'title', header: 'Title', accessor: (e) => e.title, minWidth: 200 },
-      { id: 'department', header: 'Department', accessor: (e) => DEPARTMENT_LABEL[e.department], width: 170, optional: 'department' },
-      { id: 'manager', header: 'Manager', accessor: managerName, minWidth: 180, optional: 'manager' },
-      {
-        id: 'hired',
-        header: 'Hire date',
-        accessor: (e) => e.hireDate,
-        cell: (e) => formatDay(e.hireDate, 'en-GB', 'medium'),
-        searchable: false,
-        width: 150,
-        optional: 'hired',
-      },
-    ];
-    // A column without `optional` is always there; the others only while their box is checked.
-    return all.filter((column) => !column.optional || visible.includes(column.optional));
-  }, [visible]);
-  const toolbar = (
-    <fieldset style={{ display: 'flex', flexWrap: 'wrap', gap: 16, margin: 0, border: 0, padding: 0 }}>
-      <legend style={{ marginBottom: 4 }}>Optional columns</legend>
-      {OPTIONAL_COLUMNS.map(({ id, label }) => (
-        <Checkbox
-          key={id}
-          checked={visible.includes(id)}
-          onCheckedChange={(checked) => setVisible((now) => (checked ? [...now, id] : now.filter((c) => c !== id)))}
-        >
-          {label}
-        </Checkbox>
-      ))}
-    </fieldset>
-  );
-  return (
-    <ColumnsReport
-      title="Employees"
-      rows={EMPLOYEES}
-      columns={columns}
-      getRowId={(e) => e.id}
-      onSortChange={onSortChange}
-      selectable
-      toolbar={toolbar}
-    />
-  );
-}
 
 /**
  * Hidden or optional columns, with no API of their own: the consumer keeps the optional columns in state (here a
@@ -589,7 +553,58 @@ export const UseCaseHrEmployeeDirectory: StoryObj<DirectoryArgs> = {
     ...SORT_CALLBACK,
   },
   args: { visibleColumns: ['department', 'manager', 'hired'], onSortChange: fn() },
-  render: (args) => <EmployeeDirectory key={args.visibleColumns.join()} {...args} />,
+  render: (args) => {
+    /** The consumer's recipe: a checkbox group picks the optional columns and the `columns` array is filtered, memoized. */
+    function EmployeeDirectoryDemo({ visibleColumns, onSortChange }: DirectoryArgs) {
+      const [visible, setVisible] = useState<readonly OptionalColumnId[]>(visibleColumns);
+      const columns = useMemo<ListReportColumn<DemoEmployee>[]>(() => {
+        const day = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
+        const all: (ListReportColumn<DemoEmployee> & { optional?: OptionalColumnId })[] = [
+          { id: 'name', header: 'Name', accessor: (e) => e.fullName, minWidth: 200 },
+          { id: 'title', header: 'Title', accessor: (e) => e.title, minWidth: 200 },
+          { id: 'department', header: 'Department', accessor: (e) => DEPARTMENT_LABEL[e.department], width: 170, optional: 'department' },
+          { id: 'manager', header: 'Manager', accessor: managerName, minWidth: 180, optional: 'manager' },
+          {
+            id: 'hired',
+            header: 'Hire date',
+            accessor: (e) => e.hireDate,
+            cell: (e) => day.format(new Date(e.hireDate)),
+            searchable: false,
+            width: 150,
+            optional: 'hired',
+          },
+        ];
+        // A column without `optional` is always there; the others only while their box is checked.
+        return all.filter((column) => !column.optional || visible.includes(column.optional));
+      }, [visible]);
+      const toolbar = (
+        <fieldset style={{ display: 'flex', flexWrap: 'wrap', gap: 16, margin: 0, border: 0, padding: 0 }}>
+          <legend style={{ marginBottom: 4 }}>Optional columns</legend>
+          {OPTIONAL_COLUMNS.map(({ id, label }) => (
+            <Checkbox
+              key={id}
+              checked={visible.includes(id)}
+              onCheckedChange={(checked) => setVisible((now) => (checked ? [...now, id] : now.filter((c) => c !== id)))}
+            >
+              {label}
+            </Checkbox>
+          ))}
+        </fieldset>
+      );
+      return (
+        <ColumnsReport
+          title="Employees"
+          rows={EMPLOYEES}
+          columns={columns}
+          getRowId={(e) => e.id}
+          onSortChange={onSortChange}
+          selectable
+          toolbar={toolbar}
+        />
+      );
+    }
+    return <EmployeeDirectoryDemo key={args.visibleColumns.join()} {...args} />;
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(() => expect(rowsOf(canvas).length).toBe(EMPLOYEES.length));
@@ -641,54 +656,6 @@ const SUPPORT_CASES = makeSupportCases(40);
 /** Urgent above high above normal above low: an order the alphabet does not give. */
 const PRIORITY_RANK: Readonly<Record<DemoSupportCasePriority, number>> = { low: 0, normal: 1, high: 2, urgent: 3 };
 
-function SupportQueue({ defaultSort, priorityFirstDirection, onSortChange }: QueueArgs) {
-  const columns = useMemo<ListReportColumn<DemoSupportCase>[]>(
-    () => [
-      { id: 'number', header: 'Case', accessor: (c) => c.number, width: 130 },
-      // `sortable: false`: a free-text subject has no useful order, so it has no sort button.
-      { id: 'subject', header: 'Subject', accessor: (c) => c.subject, sortable: false, minWidth: 260 },
-      {
-        id: 'priority',
-        header: 'Priority',
-        accessor: (c) => SUPPORT_CASE_PRIORITY_LABEL[c.priority],
-        // The alphabet would put "High" before "Urgent" and "Low" before "Normal": compare by rank instead.
-        compare: (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority],
-        cell: (c) => <StatusBadge tone={SUPPORT_CASE_PRIORITY_TONE[c.priority]}>{SUPPORT_CASE_PRIORITY_LABEL[c.priority]}</StatusBadge>,
-        firstSortDirection: priorityFirstDirection,
-        searchable: false,
-        width: 130,
-      },
-      {
-        // The first click shows the newest case; sorting is on the ISO string, which orders as a date.
-        id: 'opened',
-        header: 'Opened',
-        accessor: (c) => c.openedOn,
-        cell: (c) => formatDay(c.openedOn, 'en-GB', 'medium'),
-        firstSortDirection: 'desc',
-        searchable: false,
-        width: 140,
-      },
-      {
-        // The first click shows the case that is due first.
-        id: 'sla',
-        header: 'Reply due',
-        accessor: (c) => c.slaDueDate,
-        cell: (c) => formatDay(c.slaDueDate, 'en-GB', 'medium'),
-        firstSortDirection: 'asc',
-        searchable: false,
-        width: 140,
-      },
-    ],
-    [priorityFirstDirection],
-  );
-  const initial = useMemo<ListReportSort>(() => {
-    if (defaultSort === 'none') return null;
-    const direction = defaultSort === 'priority' ? priorityFirstDirection : defaultSort === 'opened' ? 'desc' : 'asc';
-    return { columnId: defaultSort === 'sla' ? 'sla' : defaultSort, direction };
-  }, [defaultSort, priorityFirstDirection]);
-  return <ColumnsReport title="Support cases" rows={SUPPORT_CASES} columns={columns} getRowId={(c) => c.id} defaultSort={initial} onSortChange={onSortChange} />;
-}
-
 /**
  * Sorting: `compare` replaces the default comparator (the priority has an order of its own, not the alphabet),
  * `firstSortDirection` chooses what the first click does (newest first on "Opened", earliest due first on
@@ -716,7 +683,57 @@ export const UseCaseHelpdeskSupportQueue: StoryObj<QueueArgs> = {
     ...SORT_CALLBACK,
   },
   args: { defaultSort: 'none', priorityFirstDirection: 'desc', onSortChange: fn() },
-  render: (args) => <SupportQueue key={`${args.defaultSort}-${args.priorityFirstDirection}`} {...args} />,
+  render: (args) => {
+    function SupportQueueDemo({ defaultSort, priorityFirstDirection, onSortChange }: QueueArgs) {
+      const columns = useMemo<ListReportColumn<DemoSupportCase>[]>(() => {
+        const day = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeZone: 'UTC' });
+        return [
+          { id: 'number', header: 'Case', accessor: (c) => c.number, width: 130 },
+          // `sortable: false`: a free-text subject has no useful order, so it has no sort button.
+          { id: 'subject', header: 'Subject', accessor: (c) => c.subject, sortable: false, minWidth: 260 },
+          {
+            id: 'priority',
+            header: 'Priority',
+            accessor: (c) => SUPPORT_CASE_PRIORITY_LABEL[c.priority],
+            // The alphabet would put "High" before "Urgent" and "Low" before "Normal": compare by rank instead.
+            compare: (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority],
+            cell: (c) => <StatusBadge tone={SUPPORT_CASE_PRIORITY_TONE[c.priority]}>{SUPPORT_CASE_PRIORITY_LABEL[c.priority]}</StatusBadge>,
+            firstSortDirection: priorityFirstDirection,
+            searchable: false,
+            width: 130,
+          },
+          {
+            // The first click shows the newest case; sorting is on the ISO string, which orders as a date.
+            id: 'opened',
+            header: 'Opened',
+            accessor: (c) => c.openedOn,
+            cell: (c) => day.format(new Date(c.openedOn)),
+            firstSortDirection: 'desc',
+            searchable: false,
+            width: 140,
+          },
+          {
+            // The first click shows the case that is due first.
+            id: 'sla',
+            header: 'Reply due',
+            accessor: (c) => c.slaDueDate,
+            cell: (c) => day.format(new Date(c.slaDueDate)),
+            firstSortDirection: 'asc',
+            searchable: false,
+            width: 140,
+          },
+        ];
+      }, [priorityFirstDirection]);
+      // `defaultSort` of `useListReport`: the column sorted at mount, in the direction of its first click.
+      const initial = useMemo<ListReportSort>(() => {
+        if (defaultSort === 'none') return null;
+        const direction = defaultSort === 'priority' ? priorityFirstDirection : defaultSort === 'opened' ? 'desc' : 'asc';
+        return { columnId: defaultSort === 'sla' ? 'sla' : defaultSort, direction };
+      }, [defaultSort, priorityFirstDirection]);
+      return <ColumnsReport title="Support cases" rows={SUPPORT_CASES} columns={columns} getRowId={(c) => c.id} defaultSort={initial} onSortChange={onSortChange} />;
+    }
+    return <SupportQueueDemo key={`${args.defaultSort}-${args.priorityFirstDirection}`} {...args} />;
+  },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await waitFor(() => expect(rowsOf(canvas).length).toBe(SUPPORT_CASES.length));
@@ -739,12 +756,12 @@ export const UseCaseHelpdeskSupportQueue: StoryObj<QueueArgs> = {
     await userEvent.click(canvas.getByRole('button', { name: 'Opened' }));
     await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'opened', direction: 'desc' });
     const newest = SUPPORT_CASES.map((c) => c.openedOn).sort().at(-1)!;
-    await expect(top('Opened')).toHaveTextContent(formatDay(newest, 'en-GB', 'medium'));
+    await expect(top('Opened')).toHaveTextContent(expectedDay(newest, 'en-GB', 'medium'));
 
     await userEvent.click(canvas.getByRole('button', { name: 'Reply due' }));
     await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'sla', direction: 'asc' });
     const earliest = SUPPORT_CASES.map((c) => c.slaDueDate).sort()[0]!;
-    await expect(top('Reply due')).toHaveTextContent(formatDay(earliest, 'en-GB', 'medium'));
+    await expect(top('Reply due')).toHaveTextContent(expectedDay(earliest, 'en-GB', 'medium'));
   },
 };
 
