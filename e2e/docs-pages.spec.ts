@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Frame, type Page } from '@playwright/test';
 
 // Every generated Docs page (autodocs + the Introduction MDX) must open and stay usable: stories rendered
 // inline in the Docs page share its document, so one that opens a modal at mount, steals the focus or
@@ -135,6 +135,162 @@ test.describe('Storybook Docs pages', () => {
       await expect.poll(anchorTop, { message: 'the guard did not keep the anchor' }).toBeLessThanOrEqual(1);
       await frames();
       expect(Math.abs(await anchorTop()), 'the page left the anchor').toBeLessThanOrEqual(1);
+    });
+  }
+
+  // Through the manager (#663): its preview iframe is never reloaded when the reader picks another entry in the
+  // sidebar (Storybook renders it in the same document and only rewrites the URL), and the hash of a deep link
+  // is in the manager's URL, not the preview's.
+  test.describe('in the manager', () => {
+    /** The manager's preview iframe: the same `Frame` for the whole test, since it never reloads. */
+    const previewFrame = async (page: Page): Promise<Frame> => {
+      const frame = await (await page.waitForSelector('#storybook-preview-iframe')).contentFrame();
+      if (!frame) throw new Error('no preview iframe');
+      return frame;
+    };
+    /** A marker on the preview's document: still there after a pick in the sidebar, so the document is the same. */
+    const mark = (preview: Frame) => preview.evaluate(() => ((window as unknown as { __rop663?: boolean }).__rop663 = true));
+    const marked = (preview: Frame) => preview.evaluate(() => (window as unknown as { __rop663?: boolean }).__rop663 === true);
+    const scrollY = (preview: Frame) => preview.evaluate(() => window.scrollY);
+    /** Three ticks of the guard's 100 ms check, then two frames: on the preview's clock. */
+    const ticks = (preview: Frame) =>
+      preview.evaluate(() => new Promise((resolve) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(resolve)), 300)));
+    const pick = async (page: Page, preview: Frame, id: string, viewMode: 'docs' | 'story') => {
+      const item = page.locator(`[data-item-id="${id}"]`);
+      if (!(await item.isVisible())) await page.locator(`[data-item-id="${id.split('--')[0]}"]`).click();
+      await item.click();
+      await preview.waitForFunction(
+        ([id, viewMode]) => {
+          const query = new URLSearchParams(location.search);
+          return query.get('id') === id && query.get('viewMode') === viewMode;
+        },
+        [id, viewMode],
+      );
+      await preview.waitForSelector(viewMode === 'docs' ? '.sbdocs-content' : '#storybook-root > *');
+      expect(await marked(preview), 'the preview reloaded: the check below would prove nothing').toBe(true);
+    };
+
+    test('a story picked in the sidebar after a Docs page is not held by the scroll guard', async ({ page }) => {
+      await page.goto('/?path=/docs/introduction--docs');
+      const preview = await previewFrame(page);
+      await preview.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+      await mark(preview);
+      await pick(page, preview, 'primitives-card--example', 'story');
+      // A scroll from a script in the story (a play's `scrollIntoView`, an autofocus below the fold) stays.
+      const moved = await preview.evaluate(() => {
+        document.body.style.minHeight = '4000px';
+        window.scrollTo(0, 800);
+        return window.scrollY;
+      });
+      expect(moved, 'the story cannot scroll: the check below would prove nothing').toBe(800);
+      await ticks(preview);
+      expect(await scrollY(preview), 'the scroll guard of the Docs page undid a scroll in a story').toBe(800);
+    });
+
+    for (const from of ['a story', 'another Docs page'] as const) {
+      test(`a Docs page picked in the sidebar after ${from} arms the scroll guard`, async ({ page }) => {
+        // Every story iframe of a Docs page held (request never answered): the guard waits for them, so it stays
+        // on. The preview itself is not matched: it is loaded once, before the route for a story, in docs mode
+        // for a Docs page.
+        const holdStoryFrames = () => page.route(/iframe\.html\?.*viewMode=story/, () => undefined);
+        let preview: Frame;
+        if (from === 'a story') {
+          await page.goto('/?path=/story/primitives-card--example');
+          preview = await previewFrame(page);
+          await preview.waitForSelector('#storybook-root > *', { timeout: 15_000 });
+          await holdStoryFrames();
+        } else {
+          await holdStoryFrames();
+          await page.goto('/?path=/docs/overlays-menu--docs');
+          preview = await previewFrame(page);
+          await preview.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+          await preview.evaluate(() => window.scrollTo(0, 800));
+          await expect.poll(() => scrollY(preview), { message: 'the guard is not on: the check below would prove nothing' }).toBe(0);
+          // A real gesture turns the guard off on this page: a scroll from a script now stays.
+          const box = await page.locator('#storybook-preview-iframe').boundingBox();
+          if (!box) throw new Error('no box for the preview');
+          await page.mouse.move(box.x + box.width / 2, box.y + 40);
+          await page.mouse.wheel(0, 400);
+          await expect.poll(() => scrollY(preview), { message: 'the wheel did not scroll the page' }).toBeGreaterThan(200);
+          await preview.evaluate(() => window.scrollTo(0, 800));
+          await ticks(preview);
+          expect(await scrollY(preview), 'the gesture did not turn the guard off: the check below would prove nothing').toBe(800);
+        }
+        await mark(preview);
+        await pick(page, preview, 'primitives-card--docs', 'docs');
+        // The guard is on for the page just shown: a scroll from a script (what an autofocus does) goes back to the top.
+        await preview.evaluate(() => window.scrollTo(0, 800));
+        await expect.poll(() => scrollY(preview), { message: 'the Docs page picked in the sidebar has no scroll guard' }).toBe(0);
+      });
+    }
+
+    test('a hash in the manager URL at load takes the Docs page to the anchor and the scroll guard keeps it there', async ({ page }) => {
+      const anchor = 'anchor--primitives-card--playground';
+      await page.route(/iframe\.html\?.*viewMode=story/, () => undefined);
+      await page.goto(`/?path=/docs/primitives-card--docs#${anchor}`);
+      const preview = await previewFrame(page);
+      await preview.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+      await preview.waitForSelector(`#${anchor}`);
+      const hashes = { manager: await page.evaluate(() => location.hash), preview: await preview.evaluate(() => location.hash) };
+      expect(hashes, 'the hash is not only in the manager URL: the check below would prove nothing').toEqual({ manager: `#${anchor}`, preview: '' });
+      const anchorTop = () => preview.evaluate((id) => Math.round(document.getElementById(id)?.getBoundingClientRect().top ?? NaN), anchor);
+      await expect.poll(anchorTop, { message: 'the page did not go to the anchor' }).toBeLessThanOrEqual(1);
+      expect(await anchorTop()).toBeGreaterThanOrEqual(-1);
+      expect(await scrollY(preview), 'the anchor is at the top of the page: the check proves nothing').toBeGreaterThan(200);
+      // A scroll from a script (an autofocus elsewhere) is brought back to the anchor, not to the top.
+      await preview.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(anchorTop, { message: 'the guard did not keep the anchor' }).toBeLessThanOrEqual(1);
+      await ticks(preview);
+      expect(Math.abs(await anchorTop()), 'the page left the anchor').toBeLessThanOrEqual(1);
+    });
+  });
+
+  // A story iframe that reloads is a new document, with a new window behind the same `contentWindow` (#663): the
+  // guard arms again for it, so it must hear the reader's gestures in it too, by wheel or by key.
+  for (const gesture of ['a wheel', 'a key'] as const) {
+    test(`${gesture} by the reader in a story iframe that reloaded turns the scroll guard off`, async ({ page }) => {
+      const scrollY = () => page.evaluate(() => window.scrollY);
+      const shown = 'primitives-card--example'; // the first story, in the viewport
+      const frame = `.sbdocs-content iframe[src*="id=${shown}"]`;
+      // The other story iframes are held (request never answered): the guard waits for them, so it is on.
+      await page.route(/iframe\.html\?.*viewMode=story/, (route) => (route.request().url().includes(`id=${shown}`) ? route.continue() : undefined));
+      await page.goto('/iframe.html?id=primitives-card--docs&viewMode=docs');
+      await page.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+      await page.frameLocator(frame).locator('#storybook-root > *').first().waitFor();
+      await page.evaluate((sel) => {
+        const doc = document.querySelector<HTMLIFrameElement>(sel)?.contentDocument as (Document & { __rop663?: boolean }) | null;
+        if (!doc) throw new Error('no story document');
+        doc.__rop663 = true;
+        doc.defaultView?.location.reload();
+      }, frame);
+      // The new document shows its story, and the guard's 100 ms check has seen it.
+      await page.waitForFunction((sel) => {
+        const doc = document.querySelector<HTMLIFrameElement>(sel)?.contentDocument as (Document & { __rop663?: boolean }) | null;
+        return !!doc && !doc.__rop663 && doc.readyState === 'complete' && !!doc.querySelector('#storybook-root > *');
+      }, frame);
+      await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 300)));
+      // The guard is on: a scroll from a script (what an autofocus does) goes back to the top.
+      await page.evaluate(() => window.scrollTo(0, 800));
+      await expect.poll(scrollY, { message: 'the guard is not on: the check below would prove nothing' }).toBe(0);
+      if (gesture === 'a wheel') {
+        const box = await page.locator(frame).boundingBox();
+        if (!box) throw new Error('no box for the story iframe');
+        await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 40));
+        await page.mouse.wheel(0, 800);
+        await expect.poll(scrollY, { message: 'the wheel did not scroll the page' }).toBeGreaterThan(400);
+      } else {
+        // The key goes to the story iframe (focused from a script, like a click in it would), not to the page.
+        const focused = await page.evaluate((sel) => {
+          const iframe = document.querySelector<HTMLIFrameElement>(sel);
+          iframe?.contentWindow?.focus();
+          return document.activeElement === iframe;
+        }, frame);
+        expect(focused, 'the story iframe has no focus: the key would reach the page').toBe(true);
+        await page.keyboard.press('Shift');
+        await page.evaluate(() => window.scrollTo(0, 800));
+      }
+      await page.evaluate(() => new Promise((resolve) => setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(resolve)), 300)));
+      expect(await scrollY(), 'the guard did not hear the gesture in the reloaded story iframe').toBeGreaterThan(400);
     });
   }
 });
