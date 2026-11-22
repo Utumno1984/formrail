@@ -22,7 +22,8 @@ const ENROLMENTS = STORY('elearning-enrolments');
 const DIRECTORY = STORY('hr-employee-directory');
 const QUEUE = STORY('helpdesk-support-queue');
 // The same stories without their play: a test starts from the state the Controls give, not where the play left it.
-const [ERP_NP, CATALOGUE_NP, PRICES_NP, ENROLMENTS_NP, DIRECTORY_NP, QUEUE_NP] = [ERP, CATALOGUE, PRICES, ENROLMENTS, DIRECTORY, QUEUE].map((id) => `${id}-no-play`);
+const noPlay = (id: string): string => `${id}-no-play`;
+const [ERP_NP, CATALOGUE_NP, PRICES_NP, ENROLMENTS_NP, DIRECTORY_NP, QUEUE_NP] = [noPlay(ERP), noPlay(CATALOGUE), noPlay(PRICES), noPlay(ENROLMENTS), noPlay(DIRECTORY), noPlay(QUEUE)] as const;
 
 // The filler row of the table (`data-rop-filler`) keeps the footprint stable: it is not a record.
 // Storybook merges an array arg from the URL into the default one BY INDEX (it cannot make it shorter), so each
