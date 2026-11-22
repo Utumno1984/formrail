@@ -18,7 +18,7 @@ afterEach(() => {
 
 const COLUMNS: ListReportColumn<DemoRecord>[] = [{ id: 'code', header: 'Numero', accessor: (r) => r.code }];
 
-function Host({ rows }: { rows: DemoRecord[] }) {
+function Host({ rows }: { rows: readonly DemoRecord[] }) {
   const table = useListReport<DemoRecord>({ rows, columns: COLUMNS, getRowId: (r) => r.id, searchCommitDelay: null });
   return <ListReport table={table} title="Fatture" />;
 }

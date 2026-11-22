@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { makeRecords, type DemoRecord } from '../internal/demo-data';
 import { ListReport, type ListReportProps } from './ListReport';
-import { SEARCH_WORD } from './record-list-shared';
+import { SEARCH_WORD } from './ListReport.stories-data';
 import { rootClass } from './list-report-styles';
 import type { ListReportColumn, ListReportFilter } from './types';
 import { useListReport } from './use-list-report';
@@ -28,7 +28,7 @@ const FILTERS: ListReportFilter<DemoRecord>[] = [
 const ROWS = makeRecords(40);
 
 type HostProps = Partial<Omit<ListReportProps<DemoRecord>, 'table'>> & {
-  rows?: DemoRecord[];
+  rows?: readonly DemoRecord[];
   withFilters?: boolean;
   defaultFilter?: string;
   searchCommitDelay?: number | null;
@@ -71,7 +71,7 @@ describe('dataset demo', () => {
     expect(new Set(a.map((r) => r.status))).toEqual(new Set(['active', 'pending', 'on-hold', 'archived']));
     // names have accented letters (the stories search without the accent) and repeat across rows (there are only
     // 480 combinations of the two words): a search for one of them finds several records
-    expect(a.some((r) => /[^\u0000-\u007f]/.test(r.name))).toBe(true);
+    expect(a.some((r) => /\P{ASCII}/u.test(r.name))).toBe(true);
     expect(new Set(a.map((r) => r.name)).size).toBeLessThan(200);
     // the scenario of the play function: pending records whose name has one word
     expect(a.filter((r) => r.status === 'pending' && r.name.includes(SEARCH_WORD)).length).toBeGreaterThan(2);

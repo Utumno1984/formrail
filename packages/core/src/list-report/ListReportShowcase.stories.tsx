@@ -22,7 +22,7 @@ import {
   type DemoEmployee,
 } from '../internal/demo-data';
 import { useCaseStory as describeUseCase } from '../internal/story-example';
-import { LABELS, PAGE } from './record-list-shared';
+import { LABELS, PAGE } from './ListReport.stories-data';
 import { repositionAfterMotion, settleMotion } from '../internal/settle-motion';
 import {
   Sheet,

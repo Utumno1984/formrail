@@ -6,7 +6,7 @@ import { Button } from '../button/Button';
 import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
 import { formatMoney, makeRecords, type DemoRecord } from '../internal/demo-data';
 import { ListReport } from './ListReport';
-import { FILTERS, SEARCH_WORD, recordColumns } from './record-list-shared';
+import { FILTERS, SEARCH_WORD, recordColumns } from './ListReport.stories-data';
 import type {
   ListReportColumn,
   ListReportRowAction,

@@ -27,7 +27,7 @@ import {
   SheetTrigger,
 } from '../sheet/Sheet';
 import { ListReport } from './ListReport';
-import { COLUMNS, FILTERS, LABELS } from './record-list-shared';
+import { COLUMNS, FILTERS, LABELS } from './ListReport.stories-data';
 import { useListReport } from './use-list-report';
 
 type OverlayKind = 'dialog' | 'sheet';

@@ -183,6 +183,8 @@ export default tseslint.config(
       '**/*.stories.tsx',
       '**/*.test.{ts,tsx}',
       '**/*.example.tsx',
+      // Story-only data next to a story file (`ListReport.stories-data.ts`, ticket #528): never imported by library code.
+      '**/*.stories-data.ts',
       '**/showcase/**',
       '**/internal/demo-data/**',
     ],

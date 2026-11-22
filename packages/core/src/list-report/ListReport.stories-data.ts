@@ -1,5 +1,5 @@
 // Story-only: the neutral record list definition (filter pills, columns, labels, page frame) shared by the List
-// Report stories (`ListReport.stories.tsx`, `ListReportCancelOverlay.stories.tsx`). The rows are `makeRecords`
+// Report stories (in `list-report/`). The rows are `makeRecords`
 // of the demo universe (`internal/demo-data`): generic "records" with a code, a name, a status, an owner, an
 // amount and a due date, no business domain. Not exported by the package.
 import type { CSSProperties } from 'react';
