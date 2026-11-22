@@ -1,6 +1,6 @@
 {
   "name": "@formrail/core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Headless React implementation of public List Report and Object Page interaction patterns (Free tier, MIT).",
   "license": "MIT",
   "author": "Daniele Ingusci",
