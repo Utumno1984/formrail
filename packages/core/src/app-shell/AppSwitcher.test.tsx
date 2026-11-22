@@ -14,7 +14,8 @@ import {
   survivingFocusKey,
   type AppSwitcherProps,
 } from './AppSwitcher';
-import { APP_SHELL_NAV_BREAKPOINT, APP_SHELL_WIDE_QUERY } from './breakpoint';
+import { APP_SHELL_NAV_BREAKPOINT } from './app-shell-styles';
+import { APP_SHELL_WIDE_QUERY } from './breakpoint';
 import type { AppDescriptor } from './types';
 
 beforeAll(() => {

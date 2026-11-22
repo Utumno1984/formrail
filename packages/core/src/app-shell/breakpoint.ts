@@ -3,14 +3,7 @@
 // opens a Menu from this width and a Sheet below it. One value, so that the two always agree on the same screen.
 
 /**
- * The breakpoint of the app shell: 64rem (1024px with the default font size). Desktop 1280 and landscape tablet
- * 1024 are "wide", portrait tablet 768 and phones are "narrow". A plain literal, for a `matchMedia` query (a class
- * built from it would not be seen by the CSS build).
- */
-export const APP_SHELL_NAV_BREAKPOINT = '64rem';
-
-/**
- * The media query that is true on a wide viewport (at or above {@link APP_SHELL_NAV_BREAKPOINT}). A plain literal,
+ * The media query that is true on a wide viewport (at or above `APP_SHELL_NAV_BREAKPOINT`, the single source in app-shell-styles.ts). A plain literal,
  * not a template built from the constant: a module-level template literal is not dropped by the bundler, so it
  * would weigh on every import of the package. A unit test pins the two together.
  */
