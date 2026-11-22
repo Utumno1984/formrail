@@ -8,40 +8,31 @@ import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReportFilterBar } from './ListReportFilterBar';
 import type { ListReportColumn, ListReportFilter } from './types';
 import { useListReport } from './use-list-report';
+import { RECORD_STATUS_LABEL, makeRecords, type DemoRecord, type DemoRecordStatus } from '../internal/demo-data';
 
-interface Invoice {
-  id: string;
-  customer: string;
-  status: 'pending' | 'approved';
-}
+// Neutral records (`makeRecords`, a demo universe with no business domain): 4 pending, 6 active, 1 on hold, 1 archived.
+const RECORDS: DemoRecord[] = [...makeRecords(12)];
 
-const INVOICES: Invoice[] = [
-  { id: 'F-001', customer: 'Rossi Construction', status: 'pending' },
-  { id: 'F-002', customer: 'Bianchi & Associates', status: 'approved' },
-  { id: 'F-003', customer: 'Rossi Supplies', status: 'approved' },
-  { id: 'F-004', customer: 'Verdi Industrial', status: 'pending' },
-  { id: 'F-005', customer: 'Neri Transport', status: 'pending' },
-  { id: 'F-006', customer: 'Rossini Logistics', status: 'pending' },
-  { id: 'F-007', customer: 'Gialli', status: 'approved' },
-  { id: 'F-008', customer: 'Rossetti Installations', status: 'approved' },
+const COLUMNS: ListReportColumn<DemoRecord>[] = [
+  { id: 'code', header: 'Code', accessor: (r) => r.code },
+  { id: 'name', header: 'Name', accessor: (r) => r.name },
 ];
 
-const COLUMNS: ListReportColumn<Invoice>[] = [{ id: 'customer', header: 'Customer', accessor: (r) => r.customer }];
-
-const FILTERS: ListReportFilter<Invoice>[] = [
+const FILTERS: ListReportFilter<DemoRecord>[] = [
   { id: 'all', label: 'All' },
-  { id: 'pending', label: 'To approve', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
+  { id: 'pending', label: RECORD_STATUS_LABEL.pending, predicate: (r) => r.status === 'pending' },
+  { id: 'active', label: RECORD_STATUS_LABEL.active, predicate: (r) => r.status === 'active' },
+  { id: 'on-hold', label: RECORD_STATUS_LABEL['on-hold'], predicate: (r) => r.status === 'on-hold' },
 ];
 
-const LONG_FILTERS: ListReportFilter<Invoice>[] = [
-  { id: 'all', label: 'All invoices received from suppliers in the current financial year' },
-  { id: 'pending', label: 'To approve by the end of the month by the purchasing office and the accounting department', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
+const LONG_FILTERS: ListReportFilter<DemoRecord>[] = [
+  { id: 'all', label: 'All records created in the current period across every team and every category' },
+  { id: 'pending', label: 'Pending review by the end of the month by the owner and the review team', predicate: (r) => r.status === 'pending' },
+  { id: 'active', label: RECORD_STATUS_LABEL.active, predicate: (r) => r.status === 'active' },
 ];
 
 interface DemoProps {
-  filters?: ListReportFilter<Invoice>[];
+  filters?: ListReportFilter<DemoRecord>[];
   showSearch?: boolean;
   defaultFilter?: string;
   defaultSearchQuery?: string;
@@ -57,14 +48,14 @@ interface DemoProps {
 
 /** The bar and, next to it, the raw list of the resulting rows (what the table would show). */
 function Demo({ filters = FILTERS, withRows = true, dir, showSearch, filtersLabel, searchLabel, ...options }: DemoProps) {
-  const table = useListReport<Invoice>({ rows: INVOICES, columns: COLUMNS, getRowId: (r) => r.id, filters, ...options });
+  const table = useListReport<DemoRecord>({ rows: RECORDS, columns: COLUMNS, getRowId: (r) => r.id, filters, ...options });
   return (
     <div dir={dir}>
       <ListReportFilterBar table={table} showSearch={showSearch} filtersLabel={filtersLabel} searchLabel={searchLabel} />
       {withRows ? (
         <ul data-testid="rows" style={{ margin: '16px 0 0', paddingInlineStart: 20 }}>
           {table.rows.map((r) => (
-            <li key={r.id}>{r.customer}</li>
+            <li key={r.id}>{r.name}</li>
           ))}
         </ul>
       ) : null}
@@ -123,10 +114,18 @@ const meta: Meta<PlaygroundArgs> = {
 export default meta;
 type Story = StoryObj<PlaygroundArgs>;
 
-const customers = (canvas: ReturnType<typeof within>): string[] =>
+const names = (canvas: ReturnType<typeof within>): string[] =>
   within(canvas.getByTestId('rows'))
     .queryAllByRole('listitem')
     .map((li) => li.textContent ?? '');
+
+/** The names the list must show for a status pill and a search text, computed from the fixture (not copied). */
+const matching = (status: DemoRecordStatus | undefined, query = ''): string[] =>
+  RECORDS.filter(
+    (r) =>
+      (status === undefined || r.status === status) &&
+      `${r.code} ${r.name}`.toLowerCase().includes(query.toLowerCase()),
+  ).map((r) => r.name);
 
 /**
  * Copy-paste example: one `table` from `useListReport({ filters })` drives both the filter bar (filter pills and search) and the `ListReportTable` that shows the result.
@@ -142,8 +141,8 @@ export const Example: Story = {
  *
  * Controls: `searchCommitDelay` (0 / 300 / 800 ms, or "Enter only" = only Enter commits), `showSearch`,
  * the two accessible names and `dir`. `onFilterChange` and `onSearchQueryChange` show up in Actions.
- * The play function moves from "All" to "To approve" with the arrow key, types "rossi" and presses
- * Enter (one `onSearchQueryChange('rossi')`, only the matching pending invoices left), then Escape
+ * The play function moves from "All" to "Pending" with the arrow key, types "indigo" and presses
+ * Enter (one `onSearchQueryChange('indigo')`, only the matching pending record left), then Escape
  * clears the search and the whole filter comes back.
  */
 export const Playground: Story = {
@@ -160,23 +159,23 @@ export const Playground: Story = {
     const canvas = within(canvasElement);
     canvas.getByRole('radio', { name: 'All' }).focus();
     await userEvent.keyboard('{ArrowRight}');
-    await expect(canvas.getByRole('radio', { name: 'To approve' })).toHaveAttribute('aria-checked', 'true');
+    await expect(canvas.getByRole('radio', { name: 'Pending' })).toHaveAttribute('aria-checked', 'true');
     await expect(args.onFilterChange).toHaveBeenCalledTimes(1);
     await expect(args.onFilterChange).toHaveBeenCalledWith('pending');
-    await expect(customers(canvas)).toHaveLength(4);
+    await expect(names(canvas)).toEqual(matching('pending'));
 
     const search = canvas.getByRole('searchbox', { name: 'Search' });
     await userEvent.click(search);
-    await userEvent.type(search, 'rossi');
+    await userEvent.type(search, 'indigo');
     await userEvent.keyboard('{Enter}');
     await expect(args.onSearchQueryChange).toHaveBeenCalledTimes(1);
-    await expect(args.onSearchQueryChange).toHaveBeenCalledWith('rossi');
-    await expect(customers(canvas)).toEqual(['Rossi Construction', 'Rossini Logistics']);
+    await expect(args.onSearchQueryChange).toHaveBeenCalledWith('indigo');
+    await expect(names(canvas)).toEqual(matching('pending', 'indigo'));
 
     await userEvent.keyboard('{Escape}');
     await expect(search).toHaveValue('');
     await expect(search).toHaveFocus();
-    await waitFor(() => expect(customers(canvas)).toHaveLength(4));
+    await waitFor(() => expect(names(canvas)).toEqual(matching('pending')));
     await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('');
   },
 };
@@ -187,13 +186,13 @@ export const ActiveFilter: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <div style={PAGE}>
-      <Demo defaultFilter="approved" />
+      <Demo defaultFilter="active" />
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('radio', { name: 'Approved' })).toHaveAttribute('aria-checked', 'true');
-    await expect(customers(canvas)).toHaveLength(4);
+    await expect(canvas.getByRole('radio', { name: 'Active' })).toHaveAttribute('aria-checked', 'true');
+    await expect(names(canvas)).toEqual(matching('active'));
   },
 };
 
@@ -203,14 +202,14 @@ export const SearchWithText: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <div style={PAGE}>
-      <Demo defaultSearchQuery="rossi" />
+      <Demo defaultSearchQuery="indigo" />
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('searchbox')).toHaveValue('rossi');
+    await expect(canvas.getByRole('searchbox')).toHaveValue('indigo');
     await expect(canvas.getByRole('button', { name: 'Clear search' })).toBeVisible();
-    await expect(customers(canvas)).toHaveLength(3);
+    await expect(names(canvas)).toEqual(matching(undefined, 'indigo'));
   },
 };
 
@@ -227,13 +226,13 @@ export const LongLabels: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const pill = canvas.getByRole('radio', { name: /To approve by/ });
+    const pill = canvas.getByRole('radio', { name: /Pending review by/ });
     const bar = canvas.getByRole('search');
     await expect(pill.getBoundingClientRect().right).toBeLessThanOrEqual(bar.getBoundingClientRect().right + 1);
     const label = pill.firstElementChild as HTMLElement;
     await expect(label.scrollWidth).toBeLessThanOrEqual(label.clientWidth);
     // wrapped: taller than a one-line pill
-    await expect(pill.getBoundingClientRect().height).toBeGreaterThan(canvas.getByRole('radio', { name: 'Approved' }).getBoundingClientRect().height * 1.5);
+    await expect(pill.getBoundingClientRect().height).toBeGreaterThan(canvas.getByRole('radio', { name: 'Active' }).getBoundingClientRect().height * 1.5);
     await expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth);
   },
 };
@@ -259,14 +258,14 @@ export const Rtl: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <div style={PAGE}>
-      <Demo dir="rtl" defaultSearchQuery="rossi" />
+      <Demo dir="rtl" defaultSearchQuery="indigo" />
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     canvas.getByRole('radio', { name: 'All' }).focus();
     await userEvent.keyboard('{ArrowLeft}');
-    await expect(canvas.getByRole('radio', { name: 'To approve' })).toHaveFocus();
+    await expect(canvas.getByRole('radio', { name: 'Pending' })).toHaveFocus();
   },
 };
 
@@ -299,8 +298,8 @@ export const ExternalSearchQuery: Story = {
   render: () => {
     function ControlledDemo() {
       const [query, setQuery] = useState('');
-      const table = useListReport<Invoice>({
-        rows: INVOICES,
+      const table = useListReport<DemoRecord>({
+        rows: RECORDS,
         columns: COLUMNS,
         getRowId: (r) => r.id,
         filters: FILTERS,
@@ -311,7 +310,7 @@ export const ExternalSearchQuery: Story = {
       return (
         <div style={PAGE}>
           <ListReportFilterBar table={table} />
-          <Button onClick={() => setQuery('verdi')}>Set “verdi”</Button>
+          <Button onClick={() => setQuery('kestrel')}>Set “kestrel”</Button>
           <output data-testid="committed">{table.searchQuery}</output>
         </div>
       );
@@ -331,8 +330,8 @@ export const InsideDialog: Story = {
         </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Filter invoices</DialogTitle>
-            <DialogDescription>Search among the invoices.</DialogDescription>
+            <DialogTitle>Filter records</DialogTitle>
+            <DialogDescription>Search among the records.</DialogDescription>
           </DialogHeader>
           <DialogBody>
             <Demo />

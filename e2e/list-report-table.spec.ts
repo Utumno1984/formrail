@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectFocusRingVisible, expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass } from './helpers/story';
+import { columns } from '../packages/core/src/list-report/ListReportTable.stories-data';
 
 const STORY = (name: string) => `data-listreporttable--${name}`;
 const scroller = (page: Page): Locator => page.getByTestId('scroller');
@@ -9,6 +10,16 @@ const header = (page: Page, name: string | RegExp): Locator => page.getByRole('c
 const sortButton = (page: Page, name: string): Locator => header(page, name).getByRole('button');
 // Longer than the tooltip delay (500ms): "nothing opened" is not just "not yet".
 const SETTLE = 900;
+// Declared widths of the stories' columns, read from the fixture and not copied.
+const COLUMNS = columns();
+const px = (value: string | number | undefined): number => {
+  if (typeof value !== 'number') throw new Error(`expected a pixel width in the fixture, got ${String(value)}`);
+  return value;
+};
+const declaredWidth = (id: string): number => px(COLUMNS.find((c) => c.id === id)?.width);
+const CODE_WIDTH = declaredWidth('code');
+// What the columns need side by side: the width when fixed, the minimum otherwise.
+const NEEDED_WIDTH = COLUMNS.reduce((sum, c) => sum + px(c.width ?? c.minWidth), 0);
 
 /** Text of one column of the body, in display order. */
 const column = (page: Page, index: number): Promise<string[]> =>
@@ -47,7 +58,7 @@ test.describe('sorting', () => {
     const opacity = (name: string) => sortButton(page, name).locator('svg').evaluate((el) => getComputedStyle(el).opacity);
     const rotate = () => button.locator('svg').evaluate((el) => getComputedStyle(el).rotate);
     expect(await opacity('Amount')).toBe('1');
-    expect(await opacity('Customer')).toBe('0');
+    expect(await opacity('Name')).toBe('0');
     expect(await rotate()).toBe('none');
     await button.click();
     await expect(header(page, 'Amount')).not.toHaveAttribute('aria-sort');
@@ -61,16 +72,16 @@ test.describe('sorting', () => {
     await expect(scroller(page)).toBeFocused();
     await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
-    const button = sortButton(page, 'Customer');
+    const button = sortButton(page, 'Name');
     await expect(button).toBeFocused();
     await button.evaluate((el) => ((window as unknown as { __marked: Element }).__marked = el));
 
     await page.keyboard.press('Enter');
-    await expect(header(page, 'Customer')).toHaveAttribute('aria-sort', 'ascending');
+    await expect(header(page, 'Name')).toHaveAttribute('aria-sort', 'ascending');
     await page.keyboard.press('Enter');
-    await expect(header(page, 'Customer')).toHaveAttribute('aria-sort', 'descending');
+    await expect(header(page, 'Name')).toHaveAttribute('aria-sort', 'descending');
     await page.keyboard.press('Space');
-    await expect(header(page, 'Customer')).not.toHaveAttribute('aria-sort');
+    await expect(header(page, 'Name')).not.toHaveAttribute('aria-sort');
     const same = await page.evaluate(() => document.activeElement === (window as unknown as { __marked: Element }).__marked);
     expect(same).toBe(true);
   });
@@ -89,7 +100,7 @@ test.describe('geometry', () => {
   test('columns with a width have exactly it; the others share the rest; the table fills the container', async ({ page }) => {
     await expectPlayToPass(page, STORY('plain'));
     const widths = await page.getByRole('columnheader').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().width));
-    expect(widths[0]).toBeCloseTo(90, 0);
+    expect(widths[0]).toBeCloseTo(CODE_WIDTH, 0);
     expect(widths[3]).toBeCloseTo(120, 0);
     expect(widths[4]).toBeCloseTo(120, 0);
     const container = await rect(scroller(page));
@@ -141,8 +152,8 @@ test.describe('geometry', () => {
     await expectPlayToPass(page, STORY('narrow-container'));
     const s = scroller(page);
     const { scrollWidth, clientWidth } = await s.evaluate((el) => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
-    // 90 + 160 + 200 + 120 + 120
-    expect(scrollWidth).toBeGreaterThanOrEqual(690);
+    expect(NEEDED_WIDTH).toBeGreaterThan(clientWidth);
+    expect(scrollWidth).toBeGreaterThanOrEqual(NEEDED_WIDTH);
     expect(clientWidth).toBeLessThan(scrollWidth);
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
@@ -221,7 +232,7 @@ test.describe('one scroller and the sticky header', () => {
     await scroller(page).evaluate((el) => el.scrollTo(0, 120));
     const header0 = await rect(page.getByRole('columnheader').nth(2));
     // the first description cell fully below the header
-    const cells = page.getByRole('row').filter({ has: page.getByRole('cell') }).getByRole('cell').filter({ hasText: 'Invoice awaiting' });
+    const cells = page.getByRole('row').filter({ has: page.getByRole('cell') }).getByRole('cell').filter({ hasText: /^.{80,}$/ });
     const count = await cells.count();
     let target: Locator | null = null;
     for (let i = 0; i < count; i++) {

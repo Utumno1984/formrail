@@ -116,7 +116,7 @@ test.describe('Docs typography (#610)', () => {
   test('the text of a real Dialog opened from a Docs story (a portal on body) is in the design-system font', async ({ page }) => {
     await openDocs(page, 'data-listreportfilterbar--docs');
     await page.locator('[id="anchor--data-listreportfilterbar--inside-dialog"]').getByRole('button', { name: 'Open filters' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Filter invoices' });
+    const dialog = page.getByRole('dialog', { name: 'Filter records' });
     await expect(dialog).toBeVisible();
     // The dialog is mounted on body, outside .docs-story: the scan must reach it, and it includes its native controls.
     await expect(page.locator('.docs-story').getByRole('dialog')).toHaveCount(0);

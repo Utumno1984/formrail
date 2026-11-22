@@ -1,9 +1,16 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { makeRecords, type DemoRecordStatus } from '../packages/core/src/internal/demo-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const STORY = (name: string) => `data-listreportfilterbar--${name}`;
+
+// The fixture of the stories: the first 12 neutral records. What each pill and each search must show is computed
+// from it, not copied: the pills are All, Pending, Active, On hold (4 pending, 6 active, 1 on hold, 12 in all).
+const RECORDS = makeRecords(12);
+const names = (status?: DemoRecordStatus, query = ''): string[] =>
+  RECORDS.filter((r) => (status === undefined || r.status === status) && `${r.code} ${r.name}`.toLowerCase().includes(query.toLowerCase())).map((r) => r.name);
 const pill = (page: Page, name: string | RegExp): Locator => page.getByRole('radio', { name });
 const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 const rows = (page: Page): Locator => page.getByTestId('rows').getByRole('listitem');
@@ -29,7 +36,7 @@ test.describe('accessibility', () => {
   test('the bar is a named search landmark with a named radiogroup', async ({ page }) => {
     await gotoStory(page, STORY('active-filter'));
     const landmark = page.getByRole('search', { name: 'Filters and search' });
-    await expect(landmark.getByRole('radiogroup', { name: 'Filters' }).getByRole('radio')).toHaveCount(3);
+    await expect(landmark.getByRole('radiogroup', { name: 'Filters' }).getByRole('radio')).toHaveCount(4);
     await expect(landmark.getByRole('searchbox', { name: 'Search' })).toBeVisible();
   });
 });
@@ -66,52 +73,54 @@ test.describe('pills', () => {
 
   test('a click selects exactly that pill and the rows follow', async ({ page }) => {
     await gotoStory(page, STORY('active-filter'));
-    await pill(page, 'To approve').click();
-    expect(await checked(page)).toEqual(['To approve']);
-    await expect(rows(page)).toHaveCount(4);
-    await expect(rows(page).first()).toHaveText('Rossi Construction');
+    await pill(page, 'Pending').click();
+    expect(await checked(page)).toEqual(['Pending']);
+    await expect(rows(page)).toHaveCount(names('pending').length);
+    await expect(rows(page).first()).toHaveText(names('pending')[0]!);
   });
 
   test('real keyboard: one tab stop, arrows move and select with wrap-around, Home/End jump', async ({ page }) => {
     await gotoStory(page, STORY('active-filter'));
-    // The checked pill ("Approved") is the tab stop; the others are skipped.
+    // The checked pill ("Active", the third of four) is the tab stop; the others are skipped.
     await search(page).focus();
     await page.keyboard.press('Shift+Tab');
-    await expect(pill(page, 'Approved')).toBeFocused();
+    await expect(pill(page, 'Active')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(search(page)).toBeFocused();
     await page.keyboard.press('Shift+Tab');
-    await expect(pill(page, 'Approved')).toBeFocused();
+    await expect(pill(page, 'Active')).toBeFocused();
 
+    await page.keyboard.press('ArrowRight'); // On hold, the last
+    await expect(pill(page, 'On hold')).toBeFocused();
     await page.keyboard.press('ArrowRight'); // wraps to the first
     await expect(pill(page, 'All')).toBeFocused();
     expect(await checked(page)).toEqual(['All']);
-    await expect(rows(page)).toHaveCount(8);
+    await expect(rows(page)).toHaveCount(RECORDS.length);
     await page.keyboard.press('ArrowLeft'); // wraps to the last
-    await expect(pill(page, 'Approved')).toBeFocused();
+    await expect(pill(page, 'On hold')).toBeFocused();
     await page.keyboard.press('ArrowUp');
-    await expect(pill(page, 'To approve')).toBeFocused();
+    await expect(pill(page, 'Active')).toBeFocused();
     await page.keyboard.press('ArrowDown');
-    await expect(pill(page, 'Approved')).toBeFocused();
+    await expect(pill(page, 'On hold')).toBeFocused();
     await page.keyboard.press('Home');
     await expect(pill(page, 'All')).toBeFocused();
     expect(await checked(page)).toEqual(['All']);
     await page.keyboard.press('End');
-    await expect(pill(page, 'Approved')).toBeFocused();
-    expect(await checked(page)).toEqual(['Approved']);
+    await expect(pill(page, 'On hold')).toBeFocused();
+    expect(await checked(page)).toEqual(['On hold']);
 
     // roving tabindex: exactly one pill is a tab stop, the checked one
     const tabIndexes = await page.getByRole('radio').evaluateAll((els) => els.map((el) => (el as HTMLElement).tabIndex));
-    expect(tabIndexes).toEqual([-1, -1, 0]);
+    expect(tabIndexes).toEqual([-1, -1, -1, 0]);
   });
 
   test('dir="rtl": Left goes forward and Right goes back', async ({ page }) => {
-    await expectPlayToPass(page, STORY('rtl')); // the play leaves "To approve" focused and checked
-    await expect(pill(page, 'To approve')).toBeFocused();
+    await expectPlayToPass(page, STORY('rtl')); // the play leaves "Pending" focused and checked
+    await expect(pill(page, 'Pending')).toBeFocused();
     await page.keyboard.press('ArrowLeft');
-    await expect(pill(page, 'Approved')).toBeFocused();
+    await expect(pill(page, 'Active')).toBeFocused();
     await page.keyboard.press('ArrowRight');
-    await expect(pill(page, 'To approve')).toBeFocused();
+    await expect(pill(page, 'Pending')).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(pill(page, 'All')).toBeFocused();
     expect(await checked(page)).toEqual(['All']);
@@ -120,46 +129,59 @@ test.describe('pills', () => {
 
 test.describe('search', () => {
   test('typing changes the rows only after the commit delay (page.clock); Enter commits at once', async ({ page }) => {
-    await gotoStory(page, STORY('active-filter')); // "Approved": 4 rows, delay 300 ms (the hook's default)
+    await gotoStory(page, STORY('active-filter')); // "Active": its rows, delay 300 ms (the hook's default)
     // Frozen: time moves only with `runFor`, however long the typing takes.
     await page.clock.install({ time: 0 });
     await page.clock.pauseAt(1000);
     await search(page).click();
-    await page.keyboard.type('rossi');
-    await expect(search(page)).toHaveValue('rossi');
-    await expect(rows(page)).toHaveCount(4);
+    await page.keyboard.type('indigo');
+    await expect(search(page)).toHaveValue('indigo');
+    await expect(rows(page)).toHaveCount(names('active').length);
     await page.clock.runFor(299);
-    await expect(rows(page)).toHaveCount(4);
+    await expect(rows(page)).toHaveCount(names('active').length);
     await page.clock.runFor(1);
-    await expect(rows(page)).toHaveText(['Rossi Supplies']);
+    expect(names('active', 'indigo')).not.toHaveLength(0);
+    await expect(rows(page)).toHaveText(names('active', 'indigo'));
 
     // Enter does not wait
     await search(page).fill('');
     await page.clock.runFor(300);
-    await expect(rows(page)).toHaveCount(4);
-    await page.keyboard.type('gialli');
+    await expect(rows(page)).toHaveCount(names('active').length);
+    await page.keyboard.type('tundra');
     await page.keyboard.press('Enter');
-    await expect(rows(page)).toHaveText(['Gialli']);
+    expect(names('active', 'tundra')).not.toHaveLength(0);
+    await expect(rows(page)).toHaveText(names('active', 'tundra'));
+  });
+
+  test('a name with an accent is found without typing it (Crème Review, searched as "creme")', async ({ page }) => {
+    await gotoStory(page, STORY('playground'));
+    await search(page).click();
+    await page.keyboard.type('creme');
+    await page.keyboard.press('Enter');
+    const accented = RECORDS.filter((r) => r.name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().includes('creme')).map((r) => r.name);
+    expect(accented.length).toBeGreaterThan(0);
+    await expect(rows(page)).toHaveText(accented);
   });
 
   test('Enter never submits an enclosing form, and a quick double Enter is harmless', async ({ page }) => {
     await gotoStory(page, STORY('inside-form'));
     await search(page).click();
-    await page.keyboard.type('verdi');
-    await expect(rows(page)).toHaveCount(8); // "Enter only": nothing committed yet
+    await page.keyboard.type('kestrel');
+    await expect(rows(page)).toHaveCount(RECORDS.length); // "Enter only": nothing committed yet
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
-    await expect(rows(page)).toHaveText(['Verdi Industrial']);
+    expect(names(undefined, 'kestrel')).not.toHaveLength(0);
+    await expect(rows(page)).toHaveText(names(undefined, 'kestrel'));
     await expect(page.getByTestId('submits')).toHaveText('0');
   });
 
   test('the clear button empties draft and committed query at once and puts the focus back in the input', async ({ page }) => {
     await expectPlayToPass(page, STORY('search-with-text'));
-    await expect(rows(page)).toHaveCount(3);
+    await expect(rows(page)).toHaveCount(names(undefined, 'indigo').length);
     await page.getByRole('button', { name: 'Clear search' }).click();
     await expect(search(page)).toHaveValue('');
     await expect(search(page)).toBeFocused();
-    await expect(rows(page)).toHaveCount(8);
+    await expect(rows(page)).toHaveCount(RECORDS.length);
     await expect(page.getByRole('button', { name: 'Clear search' })).toHaveCount(0);
   });
 
@@ -169,25 +191,25 @@ test.describe('search', () => {
     await page.keyboard.press('Escape');
     await expect(search(page)).toHaveValue('');
     await expect(search(page)).toBeFocused();
-    await expect(rows(page)).toHaveCount(8);
+    await expect(rows(page)).toHaveCount(RECORDS.length);
     await page.keyboard.press('Escape');
     await expect(search(page)).toBeFocused();
-    await expect(rows(page)).toHaveCount(8);
+    await expect(rows(page)).toHaveCount(RECORDS.length);
   });
 
   test('Escape in a Dialog: the first clears the search, the Dialog stays; with an empty search it closes', async ({ page }) => {
     await gotoStory(page, STORY('inside-dialog'));
     await page.getByRole('button', { name: 'Open filters' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Filter invoices' });
+    const dialog = page.getByRole('dialog', { name: 'Filter records' });
     await expect(dialog).toBeVisible();
     await search(page).click();
-    await page.keyboard.type('rossi');
+    await page.keyboard.type('indigo');
     await page.keyboard.press('Enter');
-    await expect(rows(page)).toHaveCount(3);
+    await expect(rows(page)).toHaveCount(names(undefined, 'indigo').length);
 
     await page.keyboard.press('Escape');
     await expect(search(page)).toHaveValue('');
-    await expect(rows(page)).toHaveCount(8);
+    await expect(rows(page)).toHaveCount(RECORDS.length);
     await expect(dialog).toBeVisible();
 
     await page.keyboard.press('Escape');
@@ -200,8 +222,8 @@ test.describe('search', () => {
     await input.click();
     await page.keyboard.type('ross');
     await input.evaluate((el: HTMLInputElement) => el.setSelectionRange(2, 2));
-    await page.getByRole('button', { name: 'Set “verdi”' }).click();
-    await expect(page.getByTestId('committed')).toHaveText('verdi');
+    await page.getByRole('button', { name: 'Set “kestrel”' }).click();
+    await expect(page.getByTestId('committed')).toHaveText('kestrel');
     await expect(input).toHaveValue('ross');
     expect(await input.evaluate((el: HTMLInputElement) => el.selectionStart)).toBe(2);
     // and the caret keeps working where it was
@@ -269,7 +291,7 @@ test.describe('responsive', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     const bar = await page.getByRole('search').boundingBox();
     const field = await search(page).boundingBox();
-    const lastPill = await pill(page, 'Approved').boundingBox();
+    const lastPill = await pill(page, 'Active').boundingBox();
     expect(bar && field && lastPill).toBeTruthy();
     // full width of the bar (the input is the Field's column)
     expect(Math.abs(field!.width - bar!.width)).toBeLessThanOrEqual(1);
@@ -281,13 +303,13 @@ test.describe('responsive', () => {
       const box = (await radio.boundingBox())!;
       expect(box.x + box.width).toBeLessThanOrEqual(bar!.x + bar!.width + 1);
     }
-    const label = pill(page, /To approve by/).locator('> *').first();
+    const label = pill(page, /Pending review by/).locator('> *').first();
     expect(await label.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
-    const long = (await pill(page, /To approve by/).boundingBox())!;
-    const short = (await pill(page, 'Approved').boundingBox())!;
+    const long = (await pill(page, /Pending review by/).boundingBox())!;
+    const short = (await pill(page, 'Active').boundingBox())!;
     expect(long.height).toBeGreaterThan(short.height * 1.5);
-    await pill(page, /To approve by/).focus();
-    await expect(pill(page, /To approve by/)).toContainText('accounting');
+    await pill(page, /Pending review by/).focus();
+    await expect(pill(page, /Pending review by/)).toContainText('review team');
   });
 
   test('pills wrap onto more lines on a narrow screen', async ({ page }) => {
@@ -302,7 +324,7 @@ test.describe('responsive', () => {
     await page.setViewportSize({ width: 1000, height: 700 });
     await gotoStory(page, STORY('active-filter'));
     const field = (await search(page).boundingBox())!;
-    const last = (await pill(page, 'Approved').boundingBox())!;
+    const last = (await pill(page, 'On hold').boundingBox())!;
     expect(field.x).toBeGreaterThanOrEqual(last.x + last.width);
     expect(field.width).toBeLessThanOrEqual(288 + 1);
   });

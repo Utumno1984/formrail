@@ -7,38 +7,39 @@ import {
   type ListReportFilter,
 } from '@formrail/core';
 
-interface Invoice {
-  id: string;
-  customer: string;
-  status: 'pending' | 'approved';
+interface Row {
+  code: string;
+  name: string;
+  status: 'active' | 'pending' | 'on-hold';
 }
 
-const invoices: Invoice[] = [
-  { id: 'INV-0142', customer: 'Rossi Construction', status: 'pending' },
-  { id: 'INV-0143', customer: 'Bianchi & Associates', status: 'approved' },
-  { id: 'INV-0144', customer: 'Verdi Industrial Supplies', status: 'pending' },
+const rows: Row[] = [
+  { code: 'REC-0001', name: 'Amber Plan', status: 'active' },
+  { code: 'REC-0002', name: 'Café Report', status: 'pending' },
+  { code: 'REC-0003', name: 'Delta Summary', status: 'on-hold' },
 ];
 
-const filters: ListReportFilter<Invoice>[] = [
+const filters: ListReportFilter<Row>[] = [
   { id: 'all', label: 'All' },
-  { id: 'pending', label: 'To approve', predicate: (row) => row.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (row) => row.status === 'approved' },
+  { id: 'active', label: 'Active', predicate: (row) => row.status === 'active' },
+  { id: 'pending', label: 'Pending', predicate: (row) => row.status === 'pending' },
+  { id: 'on-hold', label: 'On hold', predicate: (row) => row.status === 'on-hold' },
 ];
 
-export function FilteredInvoices() {
-  const columns = useMemo<ListReportColumn<Invoice>[]>(
+export function FilteredRecords() {
+  const columns = useMemo<ListReportColumn<Row>[]>(
     () => [
-      { id: 'id', header: 'Number', accessor: (row) => row.id, width: 110 },
-      { id: 'customer', header: 'Customer', accessor: (row) => row.customer, minWidth: 180 },
+      { id: 'code', header: 'Code', accessor: (row) => row.code, width: 110 },
+      { id: 'name', header: 'Name', accessor: (row) => row.name, minWidth: 180 },
     ],
     [],
   );
   // One `table` drives both: the bar sets the filter and the search, the table shows the result.
-  const table = useListReport({ rows: invoices, columns, getRowId: (row) => row.id, filters });
+  const table = useListReport({ rows, columns, getRowId: (row) => row.code, filters });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <ListReportFilterBar table={table} />
-      <ListReportTable table={table} aria-label="Invoices" />
+      <ListReportTable table={table} aria-label="Records" />
     </div>
   );
 }
