@@ -45,6 +45,7 @@ const CLASS_NAME = "a real prop of every component (its root's HTML attribute, m
  */
 const INHERITED_ATTRIBUTE_ROWS: AuditOptions['inheritedAttributeRows'] = {
   AppLauncher: { className: CLASS_NAME },
+  AppShell: { className: CLASS_NAME },
   Avatar: { className: CLASS_NAME },
   Breadcrumb: { className: CLASS_NAME },
   Card: { className: CLASS_NAME },
