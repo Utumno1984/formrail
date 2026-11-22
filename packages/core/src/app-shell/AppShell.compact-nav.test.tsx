@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createRef, forwardRef, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
+import { StrictMode, createRef, forwardRef, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -891,6 +891,47 @@ describe('a link in the Sheet', () => {
     });
     expect(document.activeElement).toBe(document.body);
     expect(error).not.toHaveBeenCalled();
+  });
+
+  it('in StrictMode: opening, Escape, a link, crossings in both directions; links mounted once, one listener, no error', async () => {
+    const error = vi.spyOn(console, 'error');
+    const user = userEvent.setup();
+    const onNavigate = vi.fn();
+    render(
+      <StrictMode>
+        <Shell onNavigate={onNavigate} />
+      </StrictMode>,
+    );
+    let sheet = await openWithKeyboard(user);
+    expect(document.querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    await waitFor(() => expect(linkIn(sheet, 'A')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(trigger()).toHaveFocus());
+    sheet = await openWithKeyboard(user);
+    await user.click(linkIn(sheet, 'C'));
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(trigger()).toHaveFocus();
+    await openWithKeyboard(user);
+    screenSize.cross(true);
+    await waitFor(() => expect(linkIn(column(), 'A')).toHaveFocus());
+    screenSize.cross(false);
+    expect(trigger()).toHaveFocus();
+    expect(document.querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    expect(screenSize.listeners.size).toBe(1);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('two shells on one page are independent: opening one leaves the other closed', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Shell />
+        <Shell labels={{ openNav: 'Other' }} />
+      </>,
+    );
+    await openWithKeyboard(user);
+    expect(screen.getByRole('button', { name: 'Other', hidden: true })).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1);
   });
 
   it('unmounting the shell with the Sheet open throws nothing', async () => {
