@@ -42,6 +42,10 @@
       "baseline": 33010,
       "limit": 36311
     },
+    "AppShellNavTrigger": {
+      "baseline": 30289,
+      "limit": 33318
+    },
     "AppSwitcher": {
       "baseline": 51709,
       "limit": 56880

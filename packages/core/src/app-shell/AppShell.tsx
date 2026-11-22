@@ -14,6 +14,7 @@ import {
   useState,
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
+  type ComponentType,
   type CSSProperties,
   type FocusEvent,
   type HTMLAttributes,
@@ -108,6 +109,25 @@ interface AppShellNavSheetValue {
   hasNav: boolean;
   /** Called by `AppShellNav` when it mounts; returns the function to call when it unmounts. */
   registerNav: () => () => void;
+  /**
+   * The Sheet `AppShellNav` renders its children in, given by `AppShellNavTrigger` when it mounts (`null` until then):
+   * only the trigger imports it, so a shell without one (an app for wide screens only) does not ship the Sheet.
+   */
+  Sheet: ComponentType<NavSheetProps> | null;
+  provideSheet: (sheet: ComponentType<NavSheetProps>) => void;
+}
+
+interface NavSheetProps {
+  /** `aria-label` of the Sheet's `<nav>` (the name of the column). */
+  label: string | undefined;
+  /** `aria-labelledby` of the Sheet's `<nav>` (the column's). */
+  labelledBy: string | undefined;
+  /** Text of the Sheet's title. */
+  title: string;
+  /** Called with the panel when it mounts and with `null` when it has left the DOM (after its exit animation). */
+  panelRef: (node: HTMLDivElement | null) => void;
+  /** The children of `AppShellNav` while they are in the Sheet, else `null`. */
+  children: ReactNode;
 }
 
 const AppShellNavSheetContext = /* @__PURE__ */ createContext<AppShellNavSheetValue | null>(null);
@@ -267,10 +287,23 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
     setNavCount((count) => count + 1);
     return () => setNavCount((count) => count - 1);
   }, []);
+  const [Sheet, setSheet] = useState<ComponentType<NavSheetProps> | null>(null);
+  const provideSheet = useCallback((sheet: ComponentType<NavSheetProps>) => setSheet(() => sheet), []);
   const sheetId = `${generatedId}-nav-sheet`;
   const navSheet = useMemo<AppShellNavSheetValue>(
-    () => ({ open: navOpen, side: navSide, openFrom, setOpen: setNavOpen, sheetId, triggerRef, hasNav: navCount > 0, registerNav }),
-    [navOpen, navSide, openFrom, sheetId, navCount, registerNav],
+    () => ({
+      open: navOpen,
+      side: navSide,
+      openFrom,
+      setOpen: setNavOpen,
+      sheetId,
+      triggerRef,
+      hasNav: navCount > 0,
+      registerNav,
+      Sheet,
+      provideSheet,
+    }),
+    [navOpen, navSide, openFrom, sheetId, navCount, registerNav, Sheet, provideSheet],
   );
 
   const skip = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -334,6 +367,57 @@ export const AppShellHeader = /* @__PURE__ */ forwardRef<HTMLElement, AppShellHe
   );
 });
 
+/**
+ * The navigation Sheet, rendered by `AppShellNav` (so that its children stay in their own tree of contexts) but
+ * referenced only by `AppShellNavTrigger`, which gives it to the shell: the Sheet's code comes with the trigger.
+ */
+function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProps) {
+  const navSheet = useContext(AppShellNavSheetContext)!;
+  const sheetNavRef = useRef<HTMLElement | null>(null);
+  const close = navSheet.setOpen;
+  const trigger = navSheet.triggerRef;
+  /** Closes the Sheet, gives the focus to the trigger, then runs `then` (which may throw: the Sheet is closed). */
+  const closeThen = (then: () => void) => {
+    flushSync(() => close(false));
+    trigger.current?.focus();
+    then();
+  };
+  // After its exit animation (once its panel has left the DOM, taking a focus it held with it) the Sheet gives the
+  // focus back to the trigger. When something already has the focus (the trigger, given it by `closeThen`; the
+  // heading `onNavigate` moved it to; the column after a crossing of the breakpoint) it is left there.
+  const focusIsElsewhere = () => document.activeElement !== document.body;
+  const onOpenAutoFocus = (event: Event) => {
+    const target = navFocusTarget(sheetNavRef.current);
+    if (!target) return;
+    event.preventDefault();
+    target.focus();
+  };
+  return (
+    <ModalRoot open={navSheet.open} onOpenChange={close} keepFocusWhen={focusIsElsewhere}>
+      <SheetContent
+        ref={panelRef}
+        id={navSheet.sheetId}
+        side={navSheet.side}
+        size="sm"
+        onOpenAutoFocus={onOpenAutoFocus}
+        data-rop-app-shell-nav-sheet=""
+      >
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetClose />
+        </SheetHeader>
+        <SheetBody className={navSheetBodyClass}>
+          <nav ref={sheetNavRef} aria-label={label} aria-labelledby={labelledBy} data-rop-app-shell-nav-sheet-nav="">
+            <NavInSheetContext.Provider value={closeThen}>
+              <ul className={navListClass}>{children}</ul>
+            </NavInSheetContext.Provider>
+          </nav>
+        </SheetBody>
+      </SheetContent>
+    </ModalRoot>
+  );
+}
+
 export interface AppShellNavTriggerProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'type'> {
   /** Called first, for every click. Cancel the event (`event.preventDefault()`) to keep the Sheet closed. */
   onClick?: MouseEventHandler<HTMLButtonElement>;
@@ -363,6 +447,9 @@ export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, 
   const navSheet = useContext(AppShellNavSheetContext);
   const triggerRef = navSheet?.triggerRef;
   const composedRef = useMemo(() => composeRefs<HTMLButtonElement>(triggerRef, ref), [triggerRef, ref]);
+  // Kept once given (a trigger unmounted while the Sheet is open: the Sheet can still close).
+  const provideSheet = navSheet?.provideSheet;
+  useIsomorphicLayoutEffect(() => provideSheet?.(NavSheet), [provideSheet]);
   if (!shell || !navSheet) throw new Error('[formrail] <AppShellNavTrigger> must be rendered inside <AppShell>.');
   const { open, hasNav, openFrom, sheetId } = navSheet;
   const onTriggerClick = (event: MouseEvent<HTMLButtonElement>) => {
@@ -431,6 +518,8 @@ function textOfIds(ids: string | undefined): string {
  *
  * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.
+ *
+ * The Sheet's code comes with `AppShellNavTrigger`: a shell without one (an app for wide screens only) does not ship it.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
   { className, style, children, onBlur, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
@@ -441,7 +530,6 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
   const label = ariaLabel ?? (ariaLabelledBy ? undefined : (shell?.labels.nav ?? DEFAULT_LABELS.nav));
   const columnRef = useRef<HTMLElement | null>(null);
   const composedRef = useMemo(() => composeRefs<HTMLElement>(columnRef, ref), [ref]);
-  const sheetNavRef = useRef<HTMLElement | null>(null);
 
   const registerNav = navSheet?.registerNav;
   useIsomorphicLayoutEffect(() => registerNav?.(), [registerNav]);
@@ -505,56 +593,12 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
     setLabelledByText(textOfIds(ariaLabelledBy));
   }, [open, ariaLabelledBy]);
 
-  let sheet: ReactNode = null;
-  if (navSheet) {
-    const close = navSheet.setOpen;
-    const trigger = navSheet.triggerRef;
-    /** Closes the Sheet, gives the focus to the trigger, then runs `then` (which may throw: the Sheet is closed). */
-    const closeThen = (then: () => void) => {
-      flushSync(() => close(false));
-      trigger.current?.focus();
-      then();
-    };
-    // After its exit animation (once its panel has left the DOM, taking a focus it held with it) the Sheet gives the
-    // focus back to the trigger. When something already has the focus (the trigger, given it by `closeThen`; the
-    // heading `onNavigate` moved it to; the column after a crossing of the breakpoint) it is left there.
-    const focusIsElsewhere = () => document.activeElement !== document.body;
-    const onOpenAutoFocus = (event: Event) => {
-      const target = navFocusTarget(sheetNavRef.current);
-      if (!target) return;
-      event.preventDefault();
-      target.focus();
-    };
-    sheet = (
-      <ModalRoot open={navSheet.open} onOpenChange={close} keepFocusWhen={focusIsElsewhere}>
-        <SheetContent
-          ref={setPanel}
-          id={navSheet.sheetId}
-          side={navSheet.side}
-          size="sm"
-          onOpenAutoFocus={onOpenAutoFocus}
-          data-rop-app-shell-nav-sheet=""
-        >
-          <SheetHeader>
-            <SheetTitle>{label ?? labelledByText}</SheetTitle>
-            <SheetClose />
-          </SheetHeader>
-          <SheetBody className={navSheetBodyClass}>
-            <nav
-              ref={sheetNavRef}
-              aria-label={label}
-              aria-labelledby={ariaLabelledBy}
-              data-rop-app-shell-nav-sheet-nav=""
-            >
-              <NavInSheetContext.Provider value={closeThen}>
-                <ul className={navListClass}>{inSheet ? children : null}</ul>
-              </NavInSheetContext.Provider>
-            </nav>
-          </SheetBody>
-        </SheetContent>
-      </ModalRoot>
-    );
-  }
+  const Sheet = navSheet?.Sheet;
+  const sheet = Sheet ? (
+    <Sheet label={label} labelledBy={ariaLabelledBy} title={label ?? labelledByText} panelRef={setPanel}>
+      {inSheet ? children : null}
+    </Sheet>
+  ) : null;
 
   return (
     <>
