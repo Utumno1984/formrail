@@ -49,7 +49,7 @@ for (const [name, story] of [
   }, testInfo) => {
     const browserName = testInfo.project.name;
     await gotoStory(page, story);
-    const table = page.getByRole('table', { name: 'Records' });
+    const table = page.getByRole('table', { name: 'Invoices' });
     const scroller = table.locator('..');
     await expect(table.getByRole('checkbox', { name: 'Select INV-000003' })).toBeVisible();
 

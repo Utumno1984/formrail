@@ -138,7 +138,7 @@ describe('type reference: markdown normalisation (#402)', () => {
 
   it('rowActionsInline: the span of labels.rowAction is on one line', () => {
     const member = reference.entries.ListReportTableProps.members.find((m) => m.name === 'rowActionsInline');
-    expect(member.description).toContain('named `labels.rowAction(label, rowLabel)`: "Delete FT-2026-0001"');
+    expect(member.description).toContain('named `labels.rowAction(label, rowLabel)`: "Delete REC-00001"');
   });
 
   it('no generated text has an inline code span broken over lines (outside fenced blocks)', () => {

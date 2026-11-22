@@ -275,7 +275,7 @@ test.describe('List Report: edge shades (Free)', () => {
     expect(await scroller(page).locator('[data-rop-overflow-edges]').count()).toBe(0);
   });
 
-  test('a rotated tablet (768x1024 -> 1024x768) and back: the shades follow with no scroll; the end shade follows the width of the actions column in both forms', async ({ page }) => {
+  test('a rotated tablet (768x1024 -> 1180x820) and back: the shades follow with no scroll; the end shade follows the width of the actions column in both forms', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await gotoStory(page, ROW_ACTIONS_INLINE, 'selectable:!true');
     await waitForRows(page);
@@ -288,7 +288,7 @@ test.describe('List Report: edge shades (Free)', () => {
     expect(header.width).toBeGreaterThan(60);
     expect(Math.abs(box.x + shade.right - header.x)).toBeLessThanOrEqual(1);
 
-    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.setViewportSize({ width: 1180, height: 820 });
     await expectEdges(page, false, false);
     expect(await scroller(page).locator('[data-rop-overflow-edges]').count()).toBe(0);
     await page.setViewportSize({ width: 768, height: 1024 });

@@ -22,7 +22,7 @@ test.describe('Pro copy-paste examples per build (#447)', () => {
   test('the Free Storybook carries no Pro example text', () => {
     const text = buildText(`${SITE_DIR}storybook`);
     // The core examples ARE there (the lookup works in this build): the scan reads the right assets.
-    expect(text).toContain('export function InvoiceList(');
+    expect(text).toContain('export function RecordList(');
     for (const { file, marker } of examples) expect(text.includes(marker), file).toBe(false);
   });
 
@@ -31,7 +31,7 @@ test.describe('Pro copy-paste examples per build (#447)', () => {
     for (const { file, folder, marker } of examples) expect(text.includes(marker), file).toBe(!notPublic.includes(folder));
     for (const marker of ['export function InvoiceRebase(', 'export function InvoiceUpdatedNotice(']) expect(text, marker).toContain(marker);
     // Nor the core examples: the demo has no core page.
-    expect(text).not.toContain('export function InvoiceList(');
+    expect(text).not.toContain('export function RecordList(');
   });
 
   test('a Free Docs page still opens with its example, without a lookup error', async ({ page }) => {
