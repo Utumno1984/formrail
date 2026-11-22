@@ -107,7 +107,7 @@ interface AppShellNavSheetValue {
   triggerRef: MutableRefObject<HTMLButtonElement | null>;
   /** Whether the shell has an `AppShellNav`: without one the trigger opens nothing. */
   hasNav: boolean;
-  /** Called by `AppShellNav` when it mounts; returns the function to call when it unmounts. */
+  /** Called by `AppShellNav` when it mounts; returns the function to call when it unmounts (which closes the Sheet). */
   registerNav: () => () => void;
   /**
    * The Sheet `AppShellNav` renders its children in, given by `AppShellNavTrigger` when it mounts (`null` until then):
@@ -283,9 +283,14 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
     setNavSide(startSide(trigger));
     setNavOpen(true);
   }, []);
+  // The Sheet is rendered by `AppShellNav`: a nav that leaves takes the Sheet with it, so it closes it too (else the
+  // trigger would announce an open Sheet that is not there, and a nav mounted later would open it by itself).
   const registerNav = useCallback(() => {
     setNavCount((count) => count + 1);
-    return () => setNavCount((count) => count - 1);
+    return () => {
+      setNavCount((count) => count - 1);
+      setNavOpen(false);
+    };
   }, []);
   const [Sheet, setSheet] = useState<ComponentType<NavSheetProps> | null>(null);
   const provideSheet = useCallback((sheet: ComponentType<NavSheetProps>) => setSheet(() => sheet), []);
@@ -515,6 +520,9 @@ function textOfIds(ids: string | undefined): string {
  * - When the viewport crosses the breakpoint with the Sheet open (a tablet turned to landscape), the Sheet closes,
  *   the links are in the column at once and the focus goes to the link of the current page there. When it crosses
  *   it the other way with the focus in the column, the focus goes to the trigger.
+ *
+ * An `AppShellNav` unmounted while the Sheet is open (a navigation that depends on permissions loaded later) takes the
+ * Sheet with it and closes it: the trigger is collapsed again, and a navigation mounted later opens nothing by itself.
  *
  * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.

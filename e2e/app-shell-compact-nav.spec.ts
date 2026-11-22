@@ -29,6 +29,16 @@ async function recordClicks(page: Page): Promise<void> {
 }
 const clicks = (page: Page) => page.evaluate(() => (window as unknown as { __clicks: string[] }).__clicks);
 
+/** Updates the args of the current story the way the Controls panel does (no remount). */
+const setArgs = (page: Page, updatedArgs: Record<string, unknown>) =>
+  page.evaluate((args) => {
+    const w = window as unknown as {
+      __STORYBOOK_ADDONS_CHANNEL__: { emit: (e: string, p: unknown) => void };
+      __STORYBOOK_PREVIEW__: { currentRender: { id: string } };
+    };
+    w.__STORYBOOK_ADDONS_CHANNEL__.emit('updateStoryArgs', { storyId: w.__STORYBOOK_PREVIEW__.currentRender.id, updatedArgs: args });
+  }, updatedArgs);
+
 /** Opens the story at the width of a phone, the Sheet closed (the play of CompactNavigation leaves it closed). */
 async function openCompact(page: Page, size = MOBILE_VIEWPORT, id = COMPACT): Promise<void> {
   await page.setViewportSize(size);
@@ -194,6 +204,30 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
     await expect(trigger(page)).toBeFocused();
     await expect(column(page)).toBeHidden();
   });
+
+  for (const [name, size] of [['narrow', PORTRAIT_TABLET], ['wide', LANDSCAPE_TABLET]] as const) {
+    test(`the nav unmounted with the Sheet open closes it; mounted again (${name}) it opens nothing and takes no focus`, async ({ page }) => {
+      await page.setViewportSize(PORTRAIT_TABLET);
+      await gotoStory(page, `${COMPACT}-open`);
+      await expect(sheet(page)).toBeVisible();
+      await setArgs(page, { navCount: 0 });
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
+      await expect(trigger(page)).not.toHaveAttribute('aria-controls');
+      // The page is not inert any more: the user moves on, then the navigation comes back (permissions loaded later).
+      const details = page.getByRole('link', { name: 'Details of block 1' });
+      await details.focus();
+      await page.setViewportSize(size);
+      await setArgs(page, { navCount: 5 });
+      await expect(column(page).getByRole('link')).toHaveCount(5);
+      // Longer than the Sheet's entry and exit animations.
+      await page.waitForTimeout(800);
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
+      await expect(trigger(page)).not.toHaveAttribute('aria-controls');
+      await expect(details).toBeFocused();
+    });
+  }
 
   test('portrait with the focus in the page, not in the column: it stays there', async ({ page }) => {
     await page.setViewportSize(LANDSCAPE_TABLET);

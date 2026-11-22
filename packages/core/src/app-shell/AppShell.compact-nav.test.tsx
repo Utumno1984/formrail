@@ -334,6 +334,51 @@ describe('AppShellNavTrigger', () => {
     expect(trigger()).not.toHaveAttribute('aria-controls');
   });
 
+  for (const wide of [true, false]) {
+    it(`a nav unmounted with the Sheet open closes it; mounted again (${wide ? 'wide' : 'narrow'}) it opens nothing`, async () => {
+      const user = userEvent.setup();
+      let showNav: (shown: boolean) => void = () => undefined;
+      function Page() {
+        const [nav, setNav] = useState(true);
+        showNav = setNav;
+        return (
+          <AppShell>
+            <AppShellHeader start={<AppShellNavTrigger />} end={<button type="button">Elsewhere</button>} />
+            {nav ? (
+              <AppShellNav>
+                <AppShellNavLink href="/a">Section A</AppShellNavLink>
+              </AppShellNav>
+            ) : null}
+            <AppShellMain />
+          </AppShell>
+        );
+      }
+      render(<Page />);
+      await openWithKeyboard(user);
+      act(() => showNav(false));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger()).not.toHaveAttribute('aria-controls');
+      // The page is not inert any more: the user moves on, then the nav comes back.
+      const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+      act(() => elsewhere.focus());
+      if (wide) screenSize.cross(true);
+      act(() => showNav(true));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(document.querySelector('[role="dialog"]')).toBeNull();
+      expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger()).not.toHaveAttribute('aria-controls');
+      expect(elsewhere).toHaveFocus();
+      // The links are in the column, and the trigger opens the Sheet again.
+      expect(linkIn(column(), 'A')).toBeInTheDocument();
+      if (wide) screenSize.cross(false);
+      await openWithKeyboard(user);
+      expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+    });
+  }
+
   it('on a wide viewport (a click made in code) it opens nothing: the column is there', () => {
     screenSize.cross(true);
     render(<Shell />);
