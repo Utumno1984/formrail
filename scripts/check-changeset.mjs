@@ -39,7 +39,9 @@ function canonical(value) {
 }
 
 const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
-const RANGE_PREFIX_RE = /^([\^~]?)(.+)$/;
+// The only range shapes `changeset version` rewrites for a bumped workspace package: exact, caret, tilde.
+const RANGE_PREFIXES = ['', '^', '~'];
+const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 function parseJson(text) {
@@ -52,27 +54,56 @@ function parseJson(text) {
   }
 }
 
-/** Name and new version of a package whose package.json changed its `version` (null otherwise). */
+/** Semver precedence of two valid versions (-1, 0, 1); build metadata is ignored. */
+function compareSemver(a, b) {
+  const [, ...x] = SEMVER_RE.exec(a);
+  const [, ...y] = SEMVER_RE.exec(b);
+  for (let i = 0; i < 3; i++) {
+    if (Number(x[i]) !== Number(y[i])) return Number(x[i]) < Number(y[i]) ? -1 : 1;
+  }
+  if (x[3] === undefined && y[3] === undefined) return 0;
+  if (x[3] === undefined) return 1;
+  if (y[3] === undefined) return -1;
+  const pa = x[3].split('.');
+  const pb = y[3].split('.');
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if (pa[i] === undefined) return -1;
+    if (pb[i] === undefined) return 1;
+    if (pa[i] === pb[i]) continue;
+    const na = /^\d+$/.test(pa[i]);
+    const nb = /^\d+$/.test(pb[i]);
+    if (na && nb) return Number(pa[i]) < Number(pb[i]) ? -1 : 1;
+    if (na !== nb) return na ? -1 : 1;
+    return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+/** True when `to` is a valid semver strictly greater than the valid semver `from`. */
+export function isVersionBump(from, to) {
+  return typeof from === 'string' && typeof to === 'string' && SEMVER_RE.test(from) && SEMVER_RE.test(to) && compareSemver(from, to) < 0;
+}
+
+/** `{ name, from, to }` of a package whose package.json carries a valid version bump (null otherwise). */
 export function bumpedPackage(baseText, headText) {
   const base = parseJson(baseText);
   const head = parseJson(headText);
-  if (!base || !head || typeof head.name !== 'string' || typeof head.version !== 'string') return null;
-  if (base.version === head.version) return null;
-  return { name: head.name, version: head.version };
+  if (!base || !head || typeof head.name !== 'string' || !isVersionBump(base.version, head.version)) return null;
+  return { name: head.name, from: base.version, to: head.version };
 }
 
 /**
- * True when the two package.json texts parse to JSON differing only in a changed `version` field and in
+ * True when the two package.json texts parse to JSON differing only in a valid version bump and in
  * workspace-internal ranges (dependencies/devDependencies/peerDependencies entries naming a package of
- * `internalVersions`, a name -> new version map) that moved to the same prefix (`^`, `~` or none) plus
- * that package's new version. Entries added or removed, external packages and any other field disqualify.
+ * `bumps`, a name -> { from, to } map). Such an entry is accepted only as `prefix + from` -> `prefix + to` with
+ * prefix in '', '^', '~' (what `changeset version` writes). Entries added or removed, external packages,
+ * other range shapes and any other field disqualify.
  */
-export function onlyVersionChanged(baseText, headText, internalVersions = {}) {
+export function onlyVersionChanged(baseText, headText, bumps = {}) {
   const base = parseJson(baseText);
   const head = parseJson(headText);
   if (!base || !head) return false;
-  if (!('version' in base) || !('version' in head)) return false;
-  if (JSON.stringify(canonical(base.version)) === JSON.stringify(canonical(head.version))) return false;
+  if (!isVersionBump(base.version, head.version)) return false;
   const restBase = { ...base };
   const restHead = { ...head };
   delete restBase.version;
@@ -89,45 +120,52 @@ export function onlyVersionChanged(baseText, headText, internalVersions = {}) {
     for (const name of names) {
       if (!(name in h)) return false;
       if (b[name] === h[name]) continue;
-      const target = Object.hasOwn(internalVersions, name) ? internalVersions[name] : undefined;
-      if (typeof target !== 'string' || typeof b[name] !== 'string' || typeof h[name] !== 'string') return false;
-      const prefix = RANGE_PREFIX_RE.exec(b[name])?.[1];
-      if (prefix === undefined || h[name] !== `${prefix}${target}`) return false;
+      const bump = Object.hasOwn(bumps, name) ? bumps[name] : undefined;
+      if (!bump) return false;
+      if (!RANGE_PREFIXES.some((p) => b[name] === `${p}${bump.from}` && h[name] === `${p}${bump.to}`)) return false;
     }
   }
   return JSON.stringify(canonical(restBase)) === JSON.stringify(canonical(restHead));
 }
 
-export const EXEMPTION_MESSAGE = [
-  'Changeset exemption applied (release PR): the diff is a version bump, not a change to be released.',
-  '  - inside packages/* only the `version` field of package.json (plus workspace-internal dependency ranges aligned to the new versions) and CHANGELOG.md files changed;',
-  '  - existing changesets (.changeset/*.md) were consumed (deleted);',
-  '  - no changeset was added.',
-].join('\n');
+export const EXEMPTION_HEADLINE = 'Changeset exemption applied (release PR): the diff is a version bump, not a change to be released.';
+
+function exemptionMessage(bumps) {
+  return [
+    EXEMPTION_HEADLINE,
+    '  - inside packages/* only the `version` field of package.json (plus workspace-internal dependency ranges aligned to the new versions) and CHANGELOG.md files changed;',
+    '  - existing changesets (.changeset/*.md) were consumed (deleted);',
+    '  - no changeset was added.',
+    'Bumped packages:',
+    ...Object.entries(bumps).map(([name, { from, to }]) => `  - ${name} ${from} \u2192 ${to}`),
+  ].join('\n');
+}
 
 /** Exemption decided from the diff content only (never from branch name, author or labels). */
-function isReleaseBump(entries, packageFiles, readContent, readBaseContent) {
-  if (!readContent || !readBaseContent || packageFiles.length === 0) return false;
+/** Returns the bumped packages (name -> { from, to }) when the diff is a release bump, null otherwise. */
+function releaseBumps(entries, packageFiles, readContent, readBaseContent) {
+  if (!readContent || !readBaseContent || packageFiles.length === 0) return null;
   const changesetEntries = entries.filter((e) => CHANGESET_RE.test(e.path));
-  if (changesetEntries.some((e) => e.status === 'A')) return false;
-  if (!changesetEntries.some((e) => e.status === 'D')) return false;
+  if (changesetEntries.some((e) => e.status === 'A')) return null;
+  if (!changesetEntries.some((e) => e.status === 'D')) return null;
   // At least one package must actually be version-bumped: a CHANGELOG alone is not a release.
-  if (!entries.some((e) => PACKAGE_JSON_RE.test(e.path))) return false;
-  const internalVersions = {};
+  if (!entries.some((e) => PACKAGE_JSON_RE.test(e.path))) return null;
+  const bumps = {};
   for (const e of entries) {
     if (!PACKAGE_JSON_RE.test(e.path) || e.status !== 'M') continue;
     const bumped = bumpedPackage(readBaseContent(e.path), readContent(e.path));
-    if (bumped) internalVersions[bumped.name] = bumped.version;
+    if (bumped) bumps[bumped.name] = { from: bumped.from, to: bumped.to };
   }
-  return entries
+  const valid = entries
     .filter((e) => PACKAGE_RE.test(e.path))
     .every((e) => {
       if (PACKAGE_CHANGELOG_RE.test(e.path)) return e.status === 'A' || e.status === 'M';
       if (PACKAGE_JSON_RE.test(e.path)) {
-        return e.status === 'M' && onlyVersionChanged(readBaseContent(e.path), readContent(e.path), internalVersions);
+        return e.status === 'M' && onlyVersionChanged(readBaseContent(e.path), readContent(e.path), bumps);
       }
       return false;
     });
+  return valid ? bumps : null;
 }
 
 /**
@@ -146,8 +184,9 @@ export function evaluateChangesetGate(changedFiles, readContent, readBaseContent
   if (packageFiles.length === 0) {
     return { ok: true, message: 'No file under packages/* touched: no changeset required.', packageFiles, changesets };
   }
-  if (isReleaseBump(entries, packageFiles, readContent, readBaseContent)) {
-    return { ok: true, exempt: true, message: EXEMPTION_MESSAGE, packageFiles, changesets };
+  const bumps = releaseBumps(entries, packageFiles, readContent, readBaseContent);
+  if (bumps) {
+    return { ok: true, exempt: true, message: exemptionMessage(bumps), packageFiles, changesets };
   }
   if (changesets.length === 0) {
     return {

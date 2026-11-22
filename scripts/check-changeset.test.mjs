@@ -134,8 +134,8 @@ describe('evaluateChangesetGate: release PR exemption', () => {
       { status: 'D', path: '.changeset/b.md' },
       { status: 'M', path: '.changeset/config.json' },
     ];
-    const h = { ...head, 'packages/pro/package.json': pkg({ name: 'p', version: '2' }) };
-    const b = { ...base, 'packages/pro/package.json': pkg({ name: 'p', version: '1' }) };
+    const h = { ...head, 'packages/pro/package.json': pkg({ name: 'p', version: '2.0.0' }) };
+    const b = { ...base, 'packages/pro/package.json': pkg({ name: 'p', version: '1.0.0' }) };
     expect(run(files, h, b).exempt).toBe(true);
   });
 
@@ -257,14 +257,104 @@ describe('evaluateChangesetGate: release PR exemption', () => {
     it('is not exempt when the internal package version does not change but the range does', () => {
       expect(go(proJson(), core('0.1.0')).ok).toBe(false);
     });
+
+    const goBase = (proBase, proHead = proJson()) =>
+      run(
+        files,
+        { 'packages/core/package.json': core('0.2.0'), 'packages/pro/package.json': proHead },
+        { 'packages/core/package.json': core('0.1.0'), 'packages/pro/package.json': proBase },
+      );
+    const proBase = (o = {}) => proJson(o, '0.1.0');
+
+    it('exempts an aligned internal range in dependencies (exact, caret and tilde)', () => {
+      for (const [from, to] of [['0.1.0', '0.2.0'], ['^0.1.0', '^0.2.0'], ['~0.1.0', '~0.2.0']]) {
+        const r = goBase(
+          proBase({ dependencies: { '@formrail/core': from } }),
+          proJson({ dependencies: { '@formrail/core': to } }),
+        );
+        expect(r.exempt).toBe(true);
+      }
+    });
+
+    it('is not exempt when an internal range of another shape is rewritten to the new exact version', () => {
+      for (const from of ['>=0.1.0', '*', 'workspace:^0.1.0', 'file:../core', 'github:x/y', 'npm:react@18', '^9.9.9', '0.0.5']) {
+        expect(goBase(proBase({ peerDependencies: { '@formrail/core': from } })).ok).toBe(false);
+      }
+      expect(goBase(proBase({ devDependencies: { '@formrail/core': '^9.9.9' } })).ok).toBe(false);
+    });
+
+    it('is not exempt when a non-standard range keeps its shape but follows the new version', () => {
+      const r = goBase(
+        proBase({ peerDependencies: { '@formrail/core': '>=0.1.0' } }),
+        proJson({ peerDependencies: { '@formrail/core': '>=0.2.0' } }),
+      );
+      expect(r.ok).toBe(false);
+    });
+
+    it('is not exempt when an external dependency is added to an existing devDependencies', () => {
+      const r = goBase(proBase(), proJson({ devDependencies: { '@formrail/core': '^0.2.0', vitest: '^3.0.0', zod: '^3.0.0' } }));
+      expect(r.ok).toBe(false);
+    });
+
+    it('is not exempt when a base dependency value is not a string', () => {
+      const r = goBase(proBase({ devDependencies: { '@formrail/core': { v: 1 }, vitest: '^3.0.0' } }));
+      expect(r.ok).toBe(false);
+    });
+
+    it('is not exempt for aligned ranges in optionalDependencies, overrides or resolutions', () => {
+      for (const field of ['optionalDependencies', 'overrides', 'resolutions']) {
+        const r = goBase(
+          proBase({ [field]: { '@formrail/core': '0.1.0' } }),
+          proJson({ [field]: { '@formrail/core': '0.2.0' } }),
+        );
+        expect(r.ok).toBe(false);
+      }
+    });
+  });
+
+  it('is not exempt when package.json gains a version it did not have', () => {
+    const noVersion = JSON.stringify({ name: '@formrail/core' });
+    expect(run(release, head, { 'packages/core/package.json': noVersion }).ok).toBe(false);
+  });
+
+  it('is not exempt for a lowercase changelog.md or a nested package.json with only a version bump', () => {
+    expect(run([release[0], { status: 'A', path: 'packages/core/changelog.md' }, release[2]]).ok).toBe(false);
+    const nested = 'packages/core/src/package.json';
+    const files = [release[0], { status: 'M', path: nested }, release[2]];
+    const withNested = (v) => ({ ...head, [nested]: JSON.stringify({ name: 'n', version: v }) });
+    const baseNested = { ...base, [nested]: JSON.stringify({ name: 'n', version: '1.0.0' }) };
+    expect(run(files, withNested('1.1.0'), baseNested).ok).toBe(false);
+  });
+
+  it('requires the new version to be a valid semver strictly greater than the base', () => {
+    const go = (from, to) =>
+      run(release, { 'packages/core/package.json': pkg({ version: to }) }, { 'packages/core/package.json': pkg({ version: from }) }).ok;
+    expect(go('0.1.0', '0.2.0')).toBe(true);
+    expect(go('0.1.0', '0.1.1')).toBe(true);
+    expect(go('0.2.0-next.1', '0.2.0-next.2')).toBe(true);
+    expect(go('0.2.0-next.1', '0.2.0')).toBe(true);
+    expect(go('0.9.0', '0.10.0')).toBe(true);
+    expect(go('0.1.0', 'banana')).toBe(false);
+    expect(go('0.1.0', '2')).toBe(false);
+    expect(go('0.1.0', 2)).toBe(false);
+    expect(go('0.2.0', '0.1.0')).toBe(false);
+    expect(go('0.2.0', '0.2.0')).toBe(false);
+    expect(go('0.2.0', '0.2.0-next.1')).toBe(false);
+    expect(go('0.1.0', '0.1.0+build')).toBe(false);
+    expect(go('0.1.0', '1.0')).toBe(false);
+  });
+
+  it('lists the bumped packages with from and to in the exemption message', () => {
+    const r = run(release);
+    expect(r.message).toContain('@formrail/core 0.1.0 → 0.2.0');
   });
 
   it('compares parsed JSON: reformatting and key order neither hide nor fake a change', () => {
-    const a = '{"name":"x","version":"1","files":["a"]}';
-    expect(onlyVersionChanged(a, '{\n  "files": ["a"],\n  "version": "2",\n  "name": "x"\n}')).toBe(true);
-    expect(onlyVersionChanged(a, '{"name":"x","version":"2","files":["b"]}')).toBe(false);
+    const a = '{"name":"x","version":"1.0.0","files":["a"]}';
+    expect(onlyVersionChanged(a, '{\n  "files": ["a"],\n  "version": "2.0.0",\n  "name": "x"\n}')).toBe(true);
+    expect(onlyVersionChanged(a, '{"name":"x","version":"2.0.0","files":["b"]}')).toBe(false);
     expect(onlyVersionChanged(a, a)).toBe(false);
-    expect(onlyVersionChanged(a, '{"name":"x","version":"2"}')).toBe(false);
+    expect(onlyVersionChanged(a, '{"name":"x","version":"2.0.0"}')).toBe(false);
     expect(onlyVersionChanged(a, '[]')).toBe(false);
   });
 });
