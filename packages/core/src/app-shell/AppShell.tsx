@@ -15,6 +15,7 @@ import {
   type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type CSSProperties,
+  type FocusEvent,
   type HTMLAttributes,
   type MouseEvent,
   type MouseEventHandler,
@@ -432,7 +433,7 @@ function textOfIds(ids: string | undefined): string {
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
-  { className, style, children, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
+  { className, style, children, onBlur, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
   ref,
 ) {
   const shell = useContext(AppShellContext);
@@ -461,14 +462,28 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
   }, []);
   const inSheet = open || (panelShown && !leaving);
 
+  // The focus left the column because the column stopped being displayed: the viewport crossed the breakpoint, and
+  // the browser may drop the focus of a link it no longer displays before it reports the crossing (Chrome does, in
+  // its own task, whenever a layout runs at the new size first).
+  const focusLostWithColumn = useRef(false);
+  const onColumnBlur = (event: FocusEvent<HTMLElement>) => {
+    onBlur?.(event);
+    const column = event.currentTarget;
+    focusLostWithColumn.current = column.ownerDocument.defaultView?.getComputedStyle(column).display === 'none';
+  };
+
   // The viewport crossing the breakpoint. Wide with the Sheet open: it closes and the column takes the focus (in a
-  // passive effect, once the Sheet's focus trap is off). Narrow with the focus in the column: the trigger takes it.
+  // passive effect, once the Sheet's focus trap is off). Narrow with the focus in the column, or lost with it to the
+  // page: the trigger takes it.
   const focusColumn = useRef(false);
   useEffect(() => {
     if (!setOpen || !triggerRef) return undefined;
     return watchWideViewport(window, (wide) => {
+      const lost = focusLostWithColumn.current;
+      focusLostWithColumn.current = false;
       if (!wide) {
-        if (columnRef.current?.contains(document.activeElement)) triggerRef.current?.focus();
+        const active = document.activeElement;
+        if ((lost && active === document.body) || columnRef.current?.contains(active)) triggerRef.current?.focus();
         return;
       }
       if (!openRef.current) return;
@@ -551,6 +566,7 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
         data-rop-app-shell-nav=""
         className={cn(navClass, className)}
         style={{ ...boxStyle, ...style }}
+        onBlur={onColumnBlur}
       >
         <ul className={navListClass}>{inSheet ? null : children}</ul>
       </nav>

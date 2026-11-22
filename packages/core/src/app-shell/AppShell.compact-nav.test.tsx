@@ -17,6 +17,7 @@ import {
   watchWideViewport,
   wideViewport,
   type AppShellNavLinkProps,
+  type AppShellNavProps,
   type AppShellProps,
 } from './AppShell';
 import { APP_SHELL_NAV_BREAKPOINT, navTriggerClass } from './app-shell-styles';
@@ -91,6 +92,25 @@ function animateModalExit() {
   });
 }
 
+/**
+ * The column as the browser sees it below the breakpoint, at the new size: not displayed (jsdom has no CSS; an inline
+ * `display: none` would also keep jsdom from moving the focus out of it).
+ */
+function hideColumn() {
+  const real = window.getComputedStyle.bind(window);
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    const style = real(element, pseudo);
+    if (!element.matches('[data-rop-app-shell-nav]')) return style;
+    return new Proxy(style, {
+      get(target, key) {
+        if (key === 'display') return 'none';
+        const value = Reflect.get(target, key) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      },
+    });
+  });
+}
+
 let screenSize: ReturnType<typeof viewport>;
 beforeEach(() => {
   clicks.length = 0;
@@ -110,7 +130,7 @@ interface ShellProps extends Partial<AppShellProps> {
   active?: string;
   onNavigate?: (section: string) => void;
   link?: (section: string) => Partial<AppShellNavLinkProps>;
-  navProps?: { 'aria-label'?: string; 'aria-labelledby'?: string; id?: string };
+  navProps?: Omit<AppShellNavProps, 'children'>;
   trigger?: ReactNode;
   extra?: ReactNode;
 }
@@ -309,6 +329,9 @@ describe('AppShellNavTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Drop' }));
     fireEvent.click(trigger());
     expect(screen.queryByRole('dialog')).toBeNull();
+    // Nothing was opened, not even a Sheet with nothing to show: the trigger does not announce one.
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger()).not.toHaveAttribute('aria-controls');
   });
 
   it('on a wide viewport (a click made in code) it opens nothing: the column is there', () => {
@@ -432,6 +455,24 @@ describe('the Sheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
     sheet = await openWithKeyboard(user);
     expect(sheet).toHaveAccessibleName('Sections of the app');
+  });
+
+  it('with aria-labelledby the title reads as the name: the texts trimmed, one space apart, a missing id skipped', async () => {
+    const user = userEvent.setup();
+    render(
+      <Shell
+        navProps={{ 'aria-labelledby': 'part-one missing part-two' }}
+        extra={
+          <p>
+            <span id="part-one">{'  Pages  '}</span>
+            <span id="part-two">{'\n  of the app \n'}</span>
+          </p>
+        }
+      />,
+    );
+    const sheet = await openWithKeyboard(user);
+    expect(within(sheet).getByRole('heading').textContent).toBe('Pages of the app');
+    expect(sheet).toHaveAccessibleName('Pages of the app');
   });
 
   it('labels.nav names the Sheet and its nav', async () => {
@@ -748,6 +789,35 @@ describe('the viewport crossing the breakpoint', () => {
     expect(linkIn(column(), 'B')).toHaveFocus();
   });
 
+  it('after a crossing to wide has taken the links out of the leaving Sheet, the next one keeps them during its exit', async () => {
+    animateModalExit();
+    const user = userEvent.setup();
+    render(<Shell active="B" />);
+    await openWithKeyboard(user);
+    screenSize.cross(true);
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull(), { timeout: 2000 });
+    screenSize.cross(false);
+    const sheet = await openWithKeyboard(user);
+    await waitFor(() => expect(linkIn(sheet, 'B')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    expect(document.querySelector('[role="dialog"][data-state="closed"]')).not.toBeNull();
+    expect(sheetNav()!.querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    expect(column().querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(0);
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull(), { timeout: 2000 });
+    expect(column().querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+  });
+
+  it('the column takes the focus once after a crossing: a later render leaves it where the user moved it', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Shell active="B" />);
+    await openWithKeyboard(user);
+    screenSize.cross(true);
+    await waitFor(() => expect(linkIn(column(), 'B')).toHaveFocus());
+    act(() => document.getElementById('page-title')!.focus());
+    rerender(<Shell active="C" />);
+    expect(document.getElementById('page-title')).toHaveFocus();
+  });
+
   it('to wide with the Sheet closed: nothing moves', () => {
     render(<Shell />);
     act(() => document.getElementById('page-title')!.focus());
@@ -762,6 +832,43 @@ describe('the viewport crossing the breakpoint', () => {
     screenSize.cross(false);
     expect(trigger()).toHaveFocus();
     screenSize.cross(true);
+    act(() => document.getElementById('page-title')!.focus());
+    screenSize.cross(false);
+    expect(document.getElementById('page-title')).toHaveFocus();
+  });
+
+  it('to narrow after the browser has dropped the focus of the column it no longer displays: the trigger takes it, once', () => {
+    const onBlur = vi.fn();
+    screenSize.cross(true);
+    render(<Shell navProps={{ onBlur }} />);
+    act(() => linkIn(column(), 'B').focus());
+    // The new size is laid out first: the column is not displayed, and the browser drops the focus of its link
+    // (Chrome, in a task of its own) before it reports the crossing.
+    hideColumn();
+    act(() => linkIn(column(), 'B').blur());
+    expect(document.body).toHaveFocus();
+    expect(onBlur).toHaveBeenCalledTimes(1);
+    screenSize.cross(false);
+    expect(trigger()).toHaveFocus();
+    // Used once: a later crossing with the focus on the page leaves it there.
+    act(() => trigger().blur());
+    screenSize.cross(true);
+    screenSize.cross(false);
+    expect(document.body).toHaveFocus();
+  });
+
+  it('to narrow after the focus left a column still displayed (a click on the page): it stays where it went', () => {
+    screenSize.cross(true);
+    render(<Shell />);
+    act(() => linkIn(column(), 'B').focus());
+    act(() => linkIn(column(), 'B').blur());
+    screenSize.cross(false);
+    expect(document.body).toHaveFocus();
+    // Dropped with the column, then moved by the user before the crossing is reported: it stays there too.
+    screenSize.cross(true);
+    act(() => linkIn(column(), 'B').focus());
+    hideColumn();
+    act(() => linkIn(column(), 'B').blur());
     act(() => document.getElementById('page-title')!.focus());
     screenSize.cross(false);
     expect(document.getElementById('page-title')).toHaveFocus();

@@ -333,8 +333,15 @@ export const HeaderLoadsLater: Story = {
 
 /** Whether an element is displayed at the current width (the trigger is not, from 64rem up). */
 const displayed = (element: HTMLElement) => element.ownerDocument.defaultView!.getComputedStyle(element).display !== 'none';
-/** The trigger, found also where it is not displayed (from 64rem) or hidden by an open Sheet. */
-const navTrigger = (canvasElement: HTMLElement) => within(canvasElement).getByRole('button', { name: 'Open navigation', hidden: true });
+/**
+ * The trigger, found also where it is not displayed (from 64rem: an element that is not displayed has no accessible
+ * name, so it is found by its marker) or hidden by an open Sheet.
+ */
+const navTrigger = (canvasElement: HTMLElement) => {
+  const trigger = canvasElement.querySelector<HTMLElement>('[data-rop-app-shell-nav-trigger]');
+  if (!trigger) throw new Error('No AppShellNavTrigger in the story');
+  return trigger;
+};
 /** The Mobile viewport of the toolbar: on a canvas from 64rem the trigger is not displayed and the column is there. */
 const MOBILE = { viewport: { value: 'mobile', isRotated: false } };
 

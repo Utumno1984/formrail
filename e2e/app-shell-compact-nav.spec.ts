@@ -73,15 +73,17 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
   });
 
   test('mobile, keyboard: named trigger, the Sheet with the focus on the current link, the page inert, Escape returns the focus', async ({ page }) => {
-    // The play leaves Section B current and the Sheet closed; the test starts from a page with no focus.
+    // The play (Tab from the top of the page: the skip link, then the trigger) leaves Section B current, the Sheet
+    // closed and the focus on the trigger. Here the trigger is reached again from the skip link, its previous stop.
     await openCompact(page);
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     const button = page.getByRole('button', { name: 'Open navigation' });
+    await expect(button).toBeFocused();
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute('aria-haspopup', 'dialog');
     await expect(button).toHaveAttribute('aria-expanded', 'false');
     await expect(button).not.toHaveAttribute('aria-controls');
-    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(button).toBeFocused();
     await page.keyboard.press('Enter');
