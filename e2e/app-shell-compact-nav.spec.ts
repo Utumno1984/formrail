@@ -93,7 +93,8 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
     await expect(trigger(page)).toHaveAttribute('aria-controls', (await panel.getAttribute('id'))!);
     await expect(panel.getByRole('link', { name: 'Section B' })).toBeFocused();
     await expect(panel.getByRole('heading', { name: 'Main' })).toBeVisible();
-    // The Sheet comes from the left edge and is as tall as the window.
+    // The Sheet comes from the left edge (at the end of its entry animation, a slide) and is as tall as the window.
+    await expect.poll(async () => (await panel.boundingBox())!.x).toBe(0);
     const box = (await panel.boundingBox())!;
     expect(box.x).toBe(0);
     expect(box.y).toBe(0);
