@@ -230,3 +230,5 @@ export type {
   AppShellNavLinkElement,
   AppShellMainProps,
 } from './app-shell/AppShell';
+export { AppSwitcher } from './app-shell/AppSwitcher';
+export type { AppSwitcherProps, AppSwitcherLabels, AppSwitcherPresentation } from './app-shell/AppSwitcher';

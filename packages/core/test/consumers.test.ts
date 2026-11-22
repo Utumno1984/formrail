@@ -25,6 +25,7 @@ const EXPORTS = [
   'AppShellMain',
   'AppShellNav',
   'AppShellNavLink',
+  'AppSwitcher',
   'Avatar',
   'Breadcrumb',
   'BreadcrumbItem',

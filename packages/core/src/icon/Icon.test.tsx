@@ -223,6 +223,7 @@ describe('internal icons', () => {
       'AppShellMain',
       'AppShellNav',
       'AppShellNavLink',
+      'AppSwitcher',
       'Avatar',
       'Breadcrumb',
       'BreadcrumbItem',
