@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 import { MOBILE_VIEWPORT } from './helpers/viewports';
-import { getCourse, getEmployee, getPurchaseOrder } from '../packages/core/src/internal/demo-data';
+import { getCourse, getEmployee, getProduct, getPurchaseOrder } from '../packages/core/src/internal/demo-data';
 
 // Ticket #529: the three "Example: configured for ..." stories of Floorplans/Object Page/Layout. The plays check
 // the default Controls; here each story is driven with real input, with two values of its Controls.
@@ -15,6 +15,14 @@ const noPlay = (id: string) => `${id}-no-play`;
 
 const SAVE_BAR = (page: Page) => page.getByRole('region', { name: 'Save actions' });
 const SCROLLER = '[data-object-page-scroller]';
+
+/** Whether a `beforeunload` listener asks the browser to prompt (it is registered only while the guard has unsaved changes). */
+const beforeUnloadAsksToStay = (page: Page) =>
+  page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
 
 /** Where the title and the bottom edge of the scroller are: the two things that would jump if the save bar's room were not reserved. */
 const placement = (page: Page) =>
@@ -68,8 +76,9 @@ test.describe('the Controls change the sections', () => {
     const total = await page.getByLabel('Order total').textContent();
     expect(total).toContain(order.totalMinor.toLocaleString('en-GB'));
     expect(total).not.toMatch(/\.\d/);
-    for (const [index] of order.lines.entries()) {
-      expect(await page.getByLabel(`Total of line ${index + 1}`).textContent()).not.toMatch(/\.\d/);
+    for (const line of order.lines) {
+      const product = getProduct(line.productId)!.name;
+      expect(await page.getByLabel(`Total of ${product}`).textContent()).not.toMatch(/\.\d/);
     }
     await expect(page.getByRole('region', { name: 'Delivery' })).toBeVisible();
     await gotoStory(page, noPlay(ORDER), 'showDelivery:!false');
@@ -77,13 +86,48 @@ test.describe('the Controls change the sections', () => {
   });
 });
 
+test.describe('erp: each line reads as one row', () => {
+  for (const [label, viewport] of [['desktop', { width: 1280, height: 720 }], ['mobile', MOBILE_VIEWPORT]] as const) {
+    test(`${label}: the total sits at the height of the quantity input${label === 'desktop' ? ', and so does the product name' : ' and the product name has a row above'}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await gotoStory(page, noPlay(ORDER));
+      for (const line of getPurchaseOrder('po-31')!.lines) {
+        const product = getProduct(line.productId)!.name;
+        const input = page.getByRole('textbox', { name: `Quantity of ${product}` });
+        await input.scrollIntoViewIfNeeded();
+        const centre = async (box: { y: number; height: number } | null) => box!.y + box!.height / 2;
+        const inputCentre = await centre(await input.boundingBox());
+        const nameBox = (await page.getByText(product, { exact: true }).boundingBox())!;
+        const totalCentre = await centre(await page.getByLabel(`Total of ${product}`).boundingBox());
+        if (label === 'desktop') {
+          expect(Math.abs((await centre(nameBox)) - inputCentre), `${product}: name`).toBeLessThanOrEqual(2);
+        } else {
+          // Stacked: the name has its own row above the quantity and the total, on at most two lines.
+          const inputBox = (await input.boundingBox())!;
+          expect(nameBox.y + nameBox.height, `${product}: name above the input`).toBeLessThanOrEqual(inputBox.y);
+          expect(nameBox.height, `${product}: name on at most two lines`).toBeLessThanOrEqual(48);
+        }
+        expect(Math.abs(totalCentre - inputCentre), `${product}: total`).toBeLessThanOrEqual(2);
+      }
+    });
+  }
+});
+
 test.describe('real input: the save bar, the dirty guard and the focus', () => {
   test('arrival is clean: no save bar, no beforeunload prompt armed by an echo', async ({ page }) => {
+    // A guard with unsaved changes arms `beforeunload` (the browser's own prompt): arriving must not.
+    let prompts = 0;
+    page.on('dialog', async (dialog) => {
+      if (dialog.type() === 'beforeunload') prompts += 1;
+      await dialog.dismiss();
+    });
     for (const id of [HR, COURSE, ORDER]) {
       await gotoStory(page, noPlay(id));
       await expect(SAVE_BAR(page)).toBeHidden();
       await expect(page.getByRole('region', { name: 'Save actions' })).toHaveCount(0);
+      expect(await beforeUnloadAsksToStay(page), `${id}: a beforeunload listener asks to stay`).toBe(false);
     }
+    expect(prompts).toBe(0);
   });
 
   test('editing shows the save bar without moving the title or the scroller; restoring the value hides it again', async ({ page }) => {
@@ -95,6 +139,8 @@ test.describe('real input: the save bar, the dirty guard and the focus', () => {
     await field.fill(`${saved} II`);
     await expect(SAVE_BAR(page)).toBeVisible();
     expect(await placement(page)).toEqual(before);
+    // The control of the arrival test: with a real edit the same listener does ask to stay.
+    expect(await beforeUnloadAsksToStay(page)).toBe(true);
     // The dirty flag compares against the saved record: typing the saved value back is clean again.
     await field.fill(saved);
     await expect(SAVE_BAR(page)).toHaveCount(0);
@@ -149,7 +195,7 @@ test.describe('real input: the save bar, the dirty guard and the focus', () => {
   test('erp: a new quantity moves the line total and the order total; the locked fields are read-only but focusable', async ({ page }) => {
     await gotoStory(page, noPlay(ORDER));
     const totalBefore = await page.getByLabel('Order total').textContent();
-    const quantity = page.getByRole('textbox', { name: 'Quantity of line 1' });
+    const quantity = page.getByRole('textbox', { name: `Quantity of ${getProduct(getPurchaseOrder('po-31')!.lines[0]!.productId)!.name}` });
     await quantity.fill('1');
     await expect(page.getByLabel('Order total')).not.toHaveText(totalBefore!);
     const number = page.getByRole('textbox', { name: 'Order number' });
@@ -170,6 +216,8 @@ test.describe('real input: the save bar, the dirty guard and the focus', () => {
       const field = id === HR ? page.getByRole('textbox', { name: 'Job title' }) : id === COURSE ? page.getByRole('textbox', { name: 'Module 1 title' }) : page.getByRole('textbox', { name: 'Order date' });
       await field.fill('Z');
       await expect(SAVE_BAR(page)).toBeVisible();
+      // The room of the bar was reserved: its appearance moved neither the title nor the bottom edge of the scroller.
+      expect(await placement(page), `${id}: nothing moved when the bar appeared`).toEqual(before);
       // The bar showed over a field that was in view already: focusing it again (as a Tab or a tap would) brings
       // it clear of the bar.
       await field.blur();
@@ -183,7 +231,6 @@ test.describe('real input: the save bar, the dirty guard and the focus', () => {
         }, { message: id })
         .toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-      void before;
     }
   });
 });

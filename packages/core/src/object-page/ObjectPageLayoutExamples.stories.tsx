@@ -132,7 +132,8 @@ export const UseCaseHrEmployee: StoryObj<HrArgs> = {
           email: EMPLOYEE.email,
           jobTitle: EMPLOYEE.title,
           department: DEPARTMENT_LABEL[EMPLOYEE.department],
-          managerId: EMPLOYEE.managerId ?? '',
+          // An employee with no manager has no value (`undefined` = nothing selected), not an empty string.
+          managerId: EMPLOYEE.managerId ?? undefined,
           hireDate: EMPLOYEE.hireDate,
           street: '12 Harbour Street',
           postalCode: '3011',
@@ -171,7 +172,7 @@ export const UseCaseHrEmployee: StoryObj<HrArgs> = {
                 {text('jobTitle', 'Job title')}
                 {text('department', 'Department')}
                 <Field label="Manager" name="managerId" help="Stored as an id, shown as a name.">
-                  <Select options={MANAGERS} value={form.values.managerId} onValueChange={(id) => form.setValue('managerId', id ?? '')} />
+                  <Select options={MANAGERS} value={form.values.managerId} onValueChange={(id) => form.setValue('managerId', id)} />
                 </Field>
                 {text('hireDate', 'Hire date')}
               </div>
@@ -293,7 +294,7 @@ export const UseCaseElearningCourse: StoryObj<CourseArgs> = {
                   <Input value={form.values.title} onChange={(event) => form.setValue('title', event.target.value)} />
                 </Field>
                 <Field label="Catalogue code" name="code" state="locked" stateReason="Assigned by the catalogue when the course is created.">
-                  <Input value={form.values.code} readOnly />
+                  <Input value={form.values.code} />
                 </Field>
               </div>
             </ObjectPageSection>
@@ -374,6 +375,7 @@ interface PurchaseOrderArgs {
 // A yen order: its amounts have no decimals.
 const ORDER = getPurchaseOrder('po-31')!;
 const SUPPLIER_NAME = getSupplier(ORDER.supplierId)?.name ?? ORDER.supplierId;
+const PRODUCT_NAME: Record<string, string> = Object.fromEntries(ORDER.lines.map((line) => [line.id, getProduct(line.productId)?.name ?? line.productId]));
 
 /**
  * Purchase order: a Header section whose number and supplier are locked (each with its reason), a Lines section
@@ -412,7 +414,10 @@ export const UseCaseErpPurchaseOrder: StoryObj<PurchaseOrderArgs> = {
       const { guard, dialog } = useDirtyGuard({ when: form.isDirty });
       const lineTotals = ORDER.lines.map((line) => {
         const quantity = Number.parseInt(form.values.quantities[line.id] ?? '', 10);
-        return Number.isFinite(quantity) ? lineTotalMinor(quantity, line.unitPriceMinor, line.discountPercent) : 0;
+        if (!Number.isFinite(quantity)) return 0;
+        // quantity x unit price, less the discount rounded half-up (the rule of the fixture).
+        const gross = quantity * line.unitPriceMinor;
+        return gross - Math.round((gross * line.discountPercent) / 100);
       });
       const orderTotal = lineTotals.reduce((sum, total) => sum + total, 0);
       return (
@@ -431,10 +436,10 @@ export const UseCaseErpPurchaseOrder: StoryObj<PurchaseOrderArgs> = {
             <ObjectPageSection id="header" title="Header">
               <div style={{ display: 'grid', gap: 16, maxWidth: 420 }}>
                 <Field label="Order number" state="locked" stateReason="Assigned when the order is created.">
-                  <Input value={ORDER.number} readOnly />
+                  <Input value={ORDER.number} />
                 </Field>
                 <Field label="Supplier" state="locked" stateReason="Changing the supplier means creating a new order.">
-                  <Input value={SUPPLIER_NAME} readOnly />
+                  <Input value={SUPPLIER_NAME} />
                 </Field>
                 <Field label="Order date" name="orderDate">
                   <Input value={form.values.orderDate} onChange={(event) => form.setValue('orderDate', event.target.value)} />
@@ -444,16 +449,19 @@ export const UseCaseErpPurchaseOrder: StoryObj<PurchaseOrderArgs> = {
             <ObjectPageSection id="lines" title="Lines">
               <div style={{ display: 'grid', gap: 12, maxWidth: 640 }}>
                 {ORDER.lines.map((line, index) => (
-                  <div key={line.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 110px 120px', gap: 12, alignItems: 'end' }}>
-                    <span>{getProduct(line.productId)?.name ?? line.productId}</span>
-                    <Field label={`Quantity of line ${index + 1}`} name={`quantities.${line.id}`}>
-                      <Input
-                        inputMode="numeric"
-                        value={form.values.quantities[line.id]}
-                        onChange={(event) => form.setValue('quantities', { ...form.values.quantities, [line.id]: event.target.value })}
-                      />
-                    </Field>
-                    <output aria-label={`Total of line ${index + 1}`} style={{ textAlign: 'end' }}>
+                  // Wraps on a narrow screen: the product name takes a row, quantity and total the next one.
+                  <div key={line.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                    <span style={{ flex: '1 1 220px', minWidth: 0 }}>{PRODUCT_NAME[line.id]}</span>
+                    <div style={{ flex: '0 0 110px' }}>
+                      <Field label={`Quantity of ${PRODUCT_NAME[line.id]}`} name={`quantities.${line.id}`} hideLabel reserveMessageSpace={false}>
+                        <Input
+                          inputMode="numeric"
+                          value={form.values.quantities[line.id]}
+                          onChange={(event) => form.setValue('quantities', { ...form.values.quantities, [line.id]: event.target.value })}
+                        />
+                      </Field>
+                    </div>
+                    <output aria-label={`Total of ${PRODUCT_NAME[line.id]}`} style={{ flex: '0 0 120px', textAlign: 'end' }}>
                       {format(lineTotals[index] ?? 0)}
                     </output>
                   </div>
@@ -514,12 +522,12 @@ export const UseCaseErpPurchaseOrder: StoryObj<PurchaseOrderArgs> = {
     await expect(number).toHaveAccessibleDescription(/Assigned when the order is created/);
 
     const first = ORDER.lines[0]!;
-    const quantity = canvas.getByRole('textbox', { name: 'Quantity of line 1' });
+    const quantity = canvas.getByRole('textbox', { name: `Quantity of ${PRODUCT_NAME[first.id]}` });
     await editAndLeave(canvasElement, quantity, '0', args.onLeave);
     // "0" typed after the quantity: the total of the line and of the order follow the new value.
     const newQuantity = Number(`${first.quantity}0`);
     const newLine = lineTotalMinor(newQuantity, first.unitPriceMinor, first.discountPercent);
-    await expect(canvas.getByLabelText('Total of line 1')).toHaveTextContent(format(newLine));
+    await expect(canvas.getByLabelText(`Total of ${PRODUCT_NAME[first.id]}`)).toHaveTextContent(format(newLine));
     await expect(canvas.getByLabelText('Order total')).toHaveTextContent(format(ORDER.totalMinor - first.lineTotalMinor + newLine));
   },
 };

@@ -312,7 +312,7 @@ test.describe('Storybook "Show code"', () => {
   // from `render:` to `\bplay:`.
   test('Object Page examples: "Show code" prints the sections, the fields and the guard, in the render (#529)', async ({ page }) => {
     test.setTimeout(240_000);
-    const examples: { story: string; needles: (string | RegExp)[] }[] = [
+    const examples: { story: string; needles: (string | RegExp)[]; absent?: RegExp }[] = [
       {
         story: 'hr-employee',
         needles: ['<ObjectPageSection id="personal" title="Personal">', '<ObjectPageSection id="job" title="Job">', 'useObjectPageForm', 'useDirtyGuard({ when: form.isDirty })', '<Select options={MANAGERS}', '<ObjectPageFooter visible={form.isDirty}'],
@@ -323,14 +323,16 @@ test.describe('Storybook "Show code"', () => {
       },
       {
         story: 'erp-purchase-order',
-        needles: ['<ObjectPageSection id="lines" title="Lines">', 'ORDER.lines.map((line, index)', 'state="locked"', "new Intl.NumberFormat('en-GB', { style: 'currency', currency: ORDER.currency })", 'lineTotalMinor(quantity', 'useDirtyGuard({ when: form.isDirty })'],
+        needles: ['<ObjectPageSection id="lines" title="Lines">', 'ORDER.lines.map((line, index)', 'state="locked"', "new Intl.NumberFormat('en-GB', { style: 'currency', currency: ORDER.currency })", 'gross - Math.round(gross * line.discountPercent / 100)', 'useDirtyGuard({ when: form.isDirty })'],
+        // The example stands on its own: the line total is computed in the render, not by a helper of the demo data.
+        absent: /\b(lineTotalMinor|getProduct)\(/,
       },
     ];
     await page.goto('/iframe.html?id=floorplans-object-page-layout--docs&viewMode=docs');
     await page.waitForSelector('.sbdocs-content', { timeout: 30_000 });
     const anchorOf = (story: string) => `anchor--floorplans-object-page-layout--use-case-${story}`;
     const sources = await openAllSources(page, examples.map(({ story }) => anchorOf(story)));
-    for (const { story, needles } of examples) {
+    for (const { story, needles, absent } of examples) {
       const shown = normalize(sources[anchorOf(story)]!);
       const start = shown.indexOf('render:');
       const after = start < 0 ? -1 : shown.slice(start).search(/\bplay:/);
@@ -338,6 +340,7 @@ test.describe('Storybook "Show code"', () => {
       expect.soft(start, `${story}: no "render:" in "Show code": ${shown.slice(0, 200)}`).toBeGreaterThanOrEqual(0);
       expect.soft(end, `${story}: no "play:" after "render:" in "Show code"`).toBeGreaterThan(start);
       const render = start < 0 ? '' : shown.slice(start, end < 0 ? undefined : end);
+      if (absent) expect.soft(render, `${story}: a story-only helper in the printed render`).not.toMatch(absent);
       for (const needle of needles) {
         if (typeof needle === 'string') expect.soft(render, `${story}: "${needle}" not in the printed render`).toContain(needle);
         else expect.soft(render, `${story}: ${needle} not in the printed render`).toMatch(needle);
