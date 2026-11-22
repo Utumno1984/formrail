@@ -4,16 +4,11 @@ import { exampleStory } from '../internal/example-story';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { useConfirmDialog } from '../confirm-dialog/use-confirm-dialog';
-import {
-  DEMO_STATUS_LABEL,
-  formatEuro,
-  makeDemoInvoices,
-  type DemoInvoice,
-} from '../internal/demo-invoices';
+import { formatMoney, makeRecords, type DemoRecord } from '../internal/demo-data';
 import { ListReport } from './ListReport';
+import { FILTERS, SEARCH_WORD, recordColumns } from './record-list-shared';
 import type {
   ListReportColumn,
-  ListReportFilter,
   ListReportRowAction,
   ListReportSort,
   ListReportSortDirection,
@@ -27,31 +22,7 @@ import { useListReportUrlState } from './use-list-report-url-state';
 /** How long "Simulate loading" keeps the report in `loading`. */
 const LOADING_MS = 800;
 
-const FILTERS: ListReportFilter<DemoInvoice>[] = [
-  { id: 'all', label: 'All' },
-  { id: 'pending', label: 'To approve', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
-  { id: 'rejected', label: 'Rejected', predicate: (r) => r.status === 'rejected' },
-];
-
-function columns(firstDateDirection: ListReportSortDirection): ListReportColumn<DemoInvoice>[] {
-  return [
-    { id: 'number', header: 'Number', accessor: (r) => r.number, width: 150 },
-    { id: 'supplier', header: 'Supplier', accessor: (r) => r.supplier, minWidth: 200 },
-    { id: 'date', header: 'Date', accessor: (r) => r.date, firstSortDirection: firstDateDirection, width: 130 },
-    {
-      id: 'amount',
-      header: 'Amount',
-      accessor: (r) => r.amount,
-      cell: (r) => formatEuro(r.amount),
-      align: 'end',
-      firstSortDirection: 'desc',
-      searchable: false,
-      width: 140,
-    },
-    { id: 'status', header: 'Status', accessor: (r) => DEMO_STATUS_LABEL[r.status], searchable: false, width: 150 },
-  ];
-}
+const URL_FILTERS = FILTERS;
 
 type DelayChoice = 0 | 300 | 800 | 'Enter only';
 type Dataset = 0 | 3 | 200 | 1200;
@@ -104,13 +75,13 @@ function Showcase({
   longCountLabel,
   flow,
 }: ShowcaseArgs) {
-  const all = useMemo(() => makeDemoInvoices(dataset), [dataset]);
+  const all = useMemo(() => makeRecords(dataset), [dataset]);
   const [simulating, setSimulating] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  const cols = useMemo(() => columns(firstSortDirection), [firstSortDirection]);
+  const cols = useMemo(() => recordColumns({ dueFirstDirection: firstSortDirection, amountFirstDirection: 'desc' }), [firstSortDirection]);
 
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     // While "loading" there are no rows yet: the skeleton shows, and filter and search survive.
     rows: simulating ? [] : all,
     columns: cols,
@@ -141,12 +112,12 @@ function Showcase({
       </div>
       <div style={{ width: containerWidth, maxWidth: '100%', height: flow ? undefined : 'min(600px, calc(100dvh - 104px))' }}>
         <ListReport
-          title="Invoices"
+          title="Records"
           table={table}
-          actions={<Button>New invoice</Button>}
+          actions={<Button>New record</Button>}
           status={simulating ? 'loading' : status}
           onRetry={onRetry}
-          labels={longCountLabel ? { count: (shown, total) => `Showing ${shown} of ${total} invoices matching the filters` } : undefined}
+          labels={longCountLabel ? { count: (shown, total) => `Showing ${shown} of ${total} records matching the filters` } : undefined}
         />
       </div>
     </div>
@@ -181,7 +152,7 @@ const meta: Meta<ShowcaseArgs> = {
       'rowActionsInline',
       'ref',
     ),
-    dataset: storyControl({ control: 'select', options: [0, 3, 200, 1200], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 1,200 invoices.' }),
+    dataset: storyControl({ control: 'select', options: [0, 3, 200, 1200], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 1,200 records.' }),
     locale: storyControl({
       control: 'select',
       options: ['en-US', 'de-DE', 'fr-FR'],
@@ -195,7 +166,7 @@ const meta: Meta<ShowcaseArgs> = {
     firstSortDirection: storyControl({
       control: 'radio',
       options: ['asc', 'desc'],
-      description: 'The `firstSortDirection` of the "Date" column (a column option of `useListReport({ columns })`): direction of the first click.',
+      description: 'The `firstSortDirection` of the "Due date" column (a column option of `useListReport({ columns })`): direction of the first click.',
     }),
     containerWidth: storyControl({ control: { type: 'range', min: 320, max: 1280, step: 10 }, description: 'Width of the demo container (px).' }),
     onSortChange: storyControl({ control: false, description: 'An option of the hook: `useListReport({ onSortChange })`.' }),
@@ -227,7 +198,7 @@ type Story = StoryObj<ShowcaseArgs>;
 
 const NO_CONTROLS = { controls: { disable: true } };
 
-const heading = (canvas: ReturnType<typeof within>) => canvas.getByRole('heading', { name: /Invoices/ });
+const heading = (canvas: ReturnType<typeof within>) => canvas.getByRole('heading', { name: /Records/ });
 const bodyRows = (canvas: ReturnType<typeof within>) => canvas.getAllByRole('row').slice(1);
 
 /**
@@ -242,10 +213,10 @@ export const Example: Story = {
  * Demo code: "Show code" prints this story's demo wrapper with the live Controls, not code to paste (see
  * the example at the top of the page).
  *
- * An invoice queue example: title with count, actions, filters and search, and a table that
+ * A record list example: title with count, actions, filters and search, and a table that
  * fills the space with a single scroller. Controls: `status`, `dataset`, `searchCommitDelay`,
- * `firstSortDirection` of the "Date" column and container width; the callbacks show up in Actions.
- * The play function picks "To approve", searches for a supplier, sorts by amount descending, checks
+ * `firstSortDirection` of the "Due date" column and container width; the callbacks show up in Actions.
+ * The play function picks "Pending", searches for a name, sorts by amount descending (the raw amount, in the currency of each record), checks
  * the first rows and the "n of 200" count, then searches for a non-existent text, clicks "Clear filters"
  * and checks that 200 rows are back and that the focus is on the search field.
  */
@@ -256,35 +227,35 @@ export const Playground: Story = {
     // the scenario has nothing to check.
     if (args.dataset !== 200 || args.status !== 'ready') return;
     const canvas = within(canvasElement);
-    const all = makeDemoInvoices(200);
+    const all = makeRecords(200);
     const pending = all.filter((r) => r.status === 'pending');
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'To approve' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
     await expect(args.onFilterChange).toHaveBeenLastCalledWith('pending');
-    await expect(heading(canvas)).toHaveTextContent(`Invoices (${pending.length} of 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Records (${pending.length} of 200)`);
 
     const search = canvas.getByRole('searchbox', { name: 'Search' });
-    await userEvent.type(search, 'Ferrari{Enter}');
-    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
-    const found = pending.filter((r) => r.supplier.includes('Ferrari'));
+    await userEvent.type(search, `${SEARCH_WORD}{Enter}`);
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith(SEARCH_WORD);
+    const found = pending.filter((r) => r.name.includes(SEARCH_WORD));
     await expect(found.length).toBeGreaterThan(2);
-    await expect(heading(canvas)).toHaveTextContent(`Invoices (${found.length} of 200)`);
+    await expect(heading(canvas)).toHaveTextContent(`Records (${found.length} of 200)`);
 
     await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
     await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
-    const sorted = [...found].sort((a, b) => b.amount - a.amount);
+    const sorted = [...found].sort((a, b) => b.amountMinor - a.amountMinor);
     const rows = bodyRows(canvas);
     await expect(rows).toHaveLength(found.length);
-    await expect(rows[0]).toHaveTextContent(sorted[0]!.number);
-    await expect(rows[0]).toHaveTextContent(formatEuro(sorted[0]!.amount));
-    await expect(rows[1]).toHaveTextContent(sorted[1]!.number);
+    await expect(rows[0]).toHaveTextContent(sorted[0]!.code);
+    await expect(rows[0]).toHaveTextContent(formatMoney(sorted[0]!.amountMinor, sorted[0]!.currency));
+    await expect(rows[1]).toHaveTextContent(sorted[1]!.code);
 
     await userEvent.clear(search);
     await userEvent.type(search, 'zzz{Enter}');
     await expect(canvas.getByText('No results for the current filters', { selector: 'p' })).toBeVisible();
     await userEvent.click(canvas.getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => expect(bodyRows(canvas)).toHaveLength(200));
-    await expect(heading(canvas)).toHaveTextContent('Invoices (200)');
+    await expect(heading(canvas)).toHaveTextContent('Records (200)');
     await expect(canvas.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(search).toHaveValue('');
     await expect(search).toHaveFocus();
@@ -292,8 +263,8 @@ export const Playground: Story = {
 };
 
 /**
- * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 1,200 invoices. The play function
- * searches a supplier, checks the "n of 1,200" count in the chosen locale, selects all the rows from the header and
+ * Numbers in the locale of `useListReport({ locale })` (Control `locale`): 1,200 records. The play function
+ * searches a name, checks the "n of 1,200" count in the chosen locale, selects all the rows from the header and
  * checks the selection text, also with most of the selection hidden by the search. Stories and baselines always use a fixed locale.
  */
 export const LocaleCount: Story = {
@@ -303,15 +274,15 @@ export const LocaleCount: Story = {
     const canvas = within(canvasElement);
     const fmt = new Intl.NumberFormat(args.locale);
     const selectionText = () => canvasElement.querySelector('[data-rop-selection-count]')?.textContent;
-    await expect(heading(canvas).textContent).toBe(`Invoices (${fmt.format(1200)})`);
+    await expect(heading(canvas).textContent).toBe(`Records (${fmt.format(1200)})`);
     // Select every row from the header, then narrow the list: most of the selection ends up hidden by the filter.
     await userEvent.click(canvas.getAllByRole('checkbox')[0]!);
     await expect(selectionText()).toBe(`${fmt.format(1200)} selected`);
-    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), 'Ferrari{Enter}');
-    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('Ferrari');
-    const found = makeDemoInvoices(1200).filter((r) => r.supplier.includes('Ferrari')).length;
+    await userEvent.type(canvas.getByRole('searchbox', { name: 'Search' }), `${SEARCH_WORD}{Enter}`);
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith(SEARCH_WORD);
+    const found = makeRecords(1200).filter((r) => r.name.includes(SEARCH_WORD)).length;
     await expect(1200 - found).toBeGreaterThanOrEqual(1000);
-    await waitFor(() => expect(heading(canvas).textContent).toBe(`Invoices (${fmt.format(found)} of ${fmt.format(1200)})`));
+    await waitFor(() => expect(heading(canvas).textContent).toBe(`Records (${fmt.format(found)} of ${fmt.format(1200)})`));
     await expect(selectionText()).toBe(`${fmt.format(found)} selected (${fmt.format(1200 - found)} hidden by filters)`);
   },
 };
@@ -322,16 +293,16 @@ export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: ['internal'], pl
 /** Fixture of the e2e suite: `LocaleCountNoPlay` with a long custom `labels.count` (no `whitespace-nowrap`: it wraps). */
 export const LocaleCountLongLabel: Story = { ...LocaleCountNoPlay, tags: ['internal'], args: { ...LocaleCountNoPlay.args, longCountLabel: true } };
 
-/** Active filter ("To approve"): the count says "n of 200". */
+/** Active filter ("Pending"): the count says "n of 200". */
 export const WithActiveFilter: Story = {
   tags: ['visual'],
   parameters: NO_CONTROLS,
   args: { defaultFilter: 'pending' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const pending = makeDemoInvoices(200).filter((r) => r.status === 'pending').length;
-    await expect(canvas.getByRole('radio', { name: 'To approve' })).toBeChecked();
-    await expect(heading(canvas)).toHaveTextContent(`Invoices (${pending} of 200)`);
+    const pending = makeRecords(200).filter((r) => r.status === 'pending').length;
+    await expect(canvas.getByRole('radio', { name: 'Pending' })).toBeChecked();
+    await expect(heading(canvas)).toHaveTextContent(`Records (${pending} of 200)`);
     await expect(bodyRows(canvas)).toHaveLength(pending);
   },
 };
@@ -343,7 +314,7 @@ export const Loading: Story = {
   args: { status: 'loading', dataset: 0 },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole('table', { name: 'Invoices' })).toBeVisible();
+    await expect(canvas.getByRole('table', { name: 'Records' })).toBeVisible();
     await expect(canvasElement.querySelectorAll('[data-rop-skeleton]').length).toBeGreaterThan(0);
   },
 };
@@ -356,7 +327,7 @@ export const Empty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('No data', { selector: 'p' })).toBeVisible();
-    await expect(heading(canvas)).toHaveTextContent('Invoices (0)');
+    await expect(heading(canvas)).toHaveTextContent('Records (0)');
   },
 };
 
@@ -369,7 +340,7 @@ export const NoResults: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText('No results for the current filters', { selector: 'p' })).toBeVisible();
     await expect(canvas.getByRole('button', { name: 'Clear filters' })).toBeVisible();
-    await expect(heading(canvas)).toHaveTextContent('Invoices (0 of 200)');
+    await expect(heading(canvas)).toHaveTextContent('Records (0 of 200)');
   },
 };
 
@@ -393,7 +364,7 @@ export const ErrorState: Story = {
 
 /**
  * The count is a small pill that briefly changes colour when the number changes (not on mount).
- * No Controls (the callbacks and Controls are in the Playground). The play function picks "To approve" and checks
+ * No Controls (the callbacks and Controls are in the Playground). The play function picks "Pending" and checks
  * that the pill marks the change (`data-changed`) and then returns to rest, then goes back to "All" and checks the
  * same cycle. With `prefers-reduced-motion` the tone does not change (see e2e): the number just appears.
  */
@@ -404,9 +375,9 @@ export const CountPill: Story = {
     const pill = canvasElement.querySelector('[data-rop-count]');
     if (!(pill instanceof HTMLElement)) throw new Error('count pill not found');
     await expect(pill).not.toHaveAttribute('data-changed');
-    const pending = makeDemoInvoices(200).filter((r) => r.status === 'pending').length;
+    const pending = makeRecords(200).filter((r) => r.status === 'pending').length;
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'To approve' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
     await expect(pill).toHaveTextContent(`(${pending} of 200)`);
     await expect(pill).toHaveAttribute('data-changed');
     await waitFor(() => expect(pill).not.toHaveAttribute('data-changed'));
@@ -432,36 +403,9 @@ export const FlowLayout: Story = {
 
 // --- URL state ---------------------------------------------------------------------------------
 
-const URL_STATUS_LABEL: Record<DemoInvoice['status'], string> = {
-  pending: 'Open',
-  approved: 'Approved',
-  rejected: 'Rejected',
-};
-
-const URL_FILTERS: ListReportFilter<DemoInvoice>[] = [
-  { id: 'all', label: 'All' },
-  { id: 'open', label: 'Open', predicate: (r) => r.status === 'pending' },
-  { id: 'approved', label: 'Approved', predicate: (r) => r.status === 'approved' },
-  { id: 'rejected', label: 'Rejected', predicate: (r) => r.status === 'rejected' },
-];
-
-const URL_COLUMNS: ListReportColumn<DemoInvoice>[] = [
-  { id: 'number', header: 'Number', accessor: (r) => r.number, width: 150 },
-  { id: 'supplier', header: 'Supplier', accessor: (r) => r.supplier, minWidth: 200 },
-  { id: 'date', header: 'Date', accessor: (r) => r.date, width: 130 },
-  {
-    id: 'amount',
-    header: 'Amount',
-    accessor: (r) => r.amount,
-    cell: (r) => formatEuro(r.amount),
-    align: 'end',
-    searchable: false,
-    width: 140,
-  },
-  { id: 'status', header: 'Status', accessor: (r) => URL_STATUS_LABEL[r.status], searchable: false, width: 150 },
-];
+const URL_COLUMNS = recordColumns();
 const URL_SORTABLE = URL_COLUMNS.map((c) => c.id);
-const URL_ROWS = makeDemoInvoices(200);
+const URL_ROWS = makeRecords(200);
 
 const URL_LABELS = {
   loading: 'Loading…',
@@ -494,7 +438,7 @@ function UrlStateDemo({ history, prefix, searchCommitDelay, onFilterChange, onSe
     prefix: prefix || undefined,
     history,
   });
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows: URL_ROWS,
     columns: URL_COLUMNS,
     getRowId: (r) => r.id,
@@ -523,7 +467,7 @@ function UrlStateDemo({ history, prefix, searchCommitDelay, onFilterChange, onSe
         Query string of this frame: <code data-testid="url-search">{search || '(empty)'}</code>
       </p>
       <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
-        <ListReport title="Invoices" table={table} labels={URL_LABELS} filtersLabel="Filters" searchLabel="Search" />
+        <ListReport title="Records" table={table} labels={URL_LABELS} filtersLabel="Filters" searchLabel="Search" />
       </div>
     </div>
   );
@@ -539,7 +483,7 @@ const HIDDEN = { control: false, table: { disable: true } } as const;
  * (parameters become `<prefix>.filter`, `<prefix>.q`, `<prefix>.sort`) and the search commit delay; the
  * callbacks show up in Actions only for gestures, never for Back/Forward.
  * The play function starts from a URL without the report's parameters (as Back would: no callback),
- * picks "Open", searches "rossi" with Enter, clicks "Amount" twice and checks the query string, the
+ * picks "Pending", searches "plan" with Enter, clicks "Amount" twice and checks the query string, the
  * selected pill, the sorted rows and the history length.
  */
 export const UrlState: StoryObj<UrlStateArgs> = {
@@ -597,37 +541,37 @@ export const UrlState: StoryObj<UrlStateArgs> = {
     const length = win.history.length;
     const step = args.history === 'push' ? 1 : 0;
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
-    await expect(args.onFilterChange).toHaveBeenLastCalledWith('open');
-    await expect(own()).toBe(`${filterKey}=open&${searchKey}=&${sortKey}=`);
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
+    await expect(args.onFilterChange).toHaveBeenLastCalledWith('pending');
+    await expect(own()).toBe(`${filterKey}=pending&${searchKey}=&${sortKey}=`);
     await expect(win.history.length).toBe(length + step);
 
     // No pause between keystrokes (`delay: null`): the five characters land within any commit delay, even
     // on a slow machine, so the search is committed once (by Enter) and not halfway through the word.
-    await userEvent.type(search, 'rossi{Enter}', { delay: null });
+    await userEvent.type(search, 'plan{Enter}', { delay: null });
     await expect(args.onSearchQueryChange).toHaveBeenCalledOnce();
-    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('rossi');
-    await expect(own()).toBe(`${filterKey}=open&${searchKey}=rossi&${sortKey}=`);
+    await expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('plan');
+    await expect(own()).toBe(`${filterKey}=pending&${searchKey}=plan&${sortKey}=`);
     await expect(win.history.length).toBe(length + 2 * step);
 
     const amount = canvas.getByRole('button', { name: 'Amount' });
     await userEvent.click(amount);
     await userEvent.click(amount);
     await expect(args.onSortChange).toHaveBeenLastCalledWith({ columnId: 'amount', direction: 'desc' });
-    await expect(win.location.search).toContain(`${filterKey}=open&${searchKey}=rossi&${sortKey}=amount.desc`);
+    await expect(win.location.search).toContain(`${filterKey}=pending&${searchKey}=plan&${sortKey}=amount.desc`);
     await expect(win.history.length).toBe(length + 4 * step);
 
     // The report shows what the URL says.
-    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
+    await expect(canvas.getByRole('radio', { name: 'Pending' })).toBeChecked();
     await expect(canvas.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
-    const expected = URL_ROWS.filter((r) => r.status === 'pending' && r.supplier.startsWith('Rossi')).sort(
-      (a, b) => b.amount - a.amount,
+    const expected = URL_ROWS.filter((r) => r.status === 'pending' && r.name.includes('Plan')).sort(
+      (a, b) => b.amountMinor - a.amountMinor,
     );
     await expect(expected.length).toBeGreaterThan(2);
     const rows = canvas.getAllByRole('row').slice(1);
     await expect(rows).toHaveLength(expected.length);
-    await expect(rows[0]).toHaveTextContent(expected[0]!.number);
-    await expect(rows[1]).toHaveTextContent(expected[1]!.number);
+    await expect(rows[0]).toHaveTextContent(expected[0]!.code);
+    await expect(rows[1]).toHaveTextContent(expected[1]!.code);
     await expect(canvas.getByTestId('url-search')).toHaveTextContent(`${sortKey}=amount.desc`);
   },
 };
@@ -656,7 +600,7 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
   const [, setVersion] = useState(0);
   useEffect(() => adapter.subscribe(() => setVersion((v) => v + 1)), [adapter]);
   const url = useListReportUrlState({ filters: URL_FILTERS, sortableColumnIds: URL_SORTABLE, history, adapter });
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows: URL_ROWS,
     columns: URL_COLUMNS,
     getRowId: (r) => r.id,
@@ -690,7 +634,7 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
         </p>
       </div>
       <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 140px))' }}>
-        <ListReport title="Invoices" table={table} labels={URL_LABELS} filtersLabel="Filters" searchLabel="Search" />
+        <ListReport title="Records" table={table} labels={URL_LABELS} filtersLabel="Filters" searchLabel="Search" />
       </div>
     </div>
   );
@@ -782,8 +726,8 @@ function UrlStateRouterRecipeDemo({ history, onFilterChange, onSearchQueryChange
  * With TanStack Router, a route with typed `validateSearch` may parse values (numbers, JSON) that the
  * hook then reads back as strings: keep this report's parameters as plain strings.
  *
- * The play function picks "Open", sorts by "Amount", picks "Approved", presses "Back" and checks that the
- * pill returns to "Open" while `onFilterChange` was called only for the two clicks.
+ * The play function picks "Pending", sorts by "Amount", picks "Active", presses "Back" and checks that the
+ * pill returns to "Pending" while `onFilterChange` was called only for the two clicks.
  */
 export const UrlStateRouterRecipe: StoryObj<UrlStateRouterRecipeArgs> = {
   argTypes: {
@@ -813,24 +757,24 @@ export const UrlStateRouterRecipe: StoryObj<UrlStateRouterRecipeArgs> = {
     const frameSearch = win.location.search;
     const query = () => canvas.getByTestId('router-query');
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
     await userEvent.click(canvas.getByRole('button', { name: 'Amount' }));
-    await expect(query()).toHaveTextContent('filter=open&sort=amount.asc');
-    await userEvent.click(canvas.getByRole('radio', { name: 'Approved' }));
-    await expect(query()).toHaveTextContent('filter=approved&sort=amount.asc');
+    await expect(query()).toHaveTextContent('filter=pending&sort=amount.asc');
+    await userEvent.click(canvas.getByRole('radio', { name: 'Active' }));
+    await expect(query()).toHaveTextContent('filter=active&sort=amount.asc');
     await expect(args.onFilterChange).toHaveBeenCalledTimes(2);
     await expect(args.onWrite).toHaveBeenCalledTimes(3);
-    await expect(args.onWrite).toHaveBeenLastCalledWith('filter=approved&sort=amount.asc', args.history);
+    await expect(args.onWrite).toHaveBeenLastCalledWith('filter=active&sort=amount.asc', args.history);
 
     if (args.history === 'push') {
       await userEvent.click(canvas.getByRole('button', { name: 'Back' }));
-      await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
-      await expect(query()).toHaveTextContent('filter=open&sort=amount.asc');
+      await expect(canvas.getByRole('radio', { name: 'Pending' })).toBeChecked();
+      await expect(query()).toHaveTextContent('filter=pending&sort=amount.asc');
       // Navigation is not a gesture: no callback, no write.
       await expect(args.onFilterChange).toHaveBeenCalledTimes(2);
       await expect(args.onWrite).toHaveBeenCalledTimes(3);
       await userEvent.click(canvas.getByRole('button', { name: 'Forward' }));
-      await expect(canvas.getByRole('radio', { name: 'Approved' })).toBeChecked();
+      await expect(canvas.getByRole('radio', { name: 'Active' })).toBeChecked();
     } else {
       await expect(canvas.getByRole('button', { name: 'Back' })).toBeDisabled();
     }
@@ -851,22 +795,22 @@ export const UrlStateRouterRecipeNoPlay: StoryObj<UrlStateRouterRecipeArgs> = {
 interface ScrollRestorationArgs {
   loadDelayMs: number;
   history: 'replace' | 'push';
-  onOpenDetail: (invoiceId: string) => void;
+  onOpenDetail: (recordId: string) => void;
   onCancel: () => void;
 }
 
-const scrollColumns = (open: (id: string) => void): ListReportColumn<DemoInvoice>[] =>
+const scrollColumns = (open: (id: string) => void): ListReportColumn<DemoRecord>[] =>
   URL_COLUMNS.map((c) =>
-    c.id === 'number'
+    c.id === 'code'
       ? {
           ...c,
-          cell: (r: DemoInvoice) => (
+          cell: (r: DemoRecord) => (
             <button
               type="button"
               onClick={() => open(r.id)}
               style={{ all: 'unset', cursor: 'pointer', textDecoration: 'underline', color: 'inherit' }}
             >
-              {r.number}
+              {r.code}
             </button>
           ),
         }
@@ -881,7 +825,7 @@ function ScrollRestorationList({
 }: {
   loadDelayMs: number;
   history: 'replace' | 'push';
-  onOpen: (invoiceId: string) => void;
+  onOpen: (recordId: string) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -891,7 +835,7 @@ function ScrollRestorationList({
   const url = useListReportUrlState({ filters: URL_FILTERS, sortableColumnIds: URL_SORTABLE, history });
   const scroll = useListReportScrollRestoration({ ready: loaded });
   const columns = useMemo(() => scrollColumns(onOpen), [onOpen]);
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows: loaded ? URL_ROWS : [],
     columns,
     getRowId: (r) => r.id,
@@ -900,7 +844,7 @@ function ScrollRestorationList({
   });
   return (
     <ListReport
-      title="Invoices"
+      title="Records"
       table={table}
       status={loaded ? 'ready' : 'loading'}
       labels={URL_LABELS}
@@ -922,13 +866,13 @@ function ScrollRestorationDemo({ loadDelayMs, history, onOpenDetail, onCancel }:
     return () => window.removeEventListener('popstate', onPop);
   }, []);
   const open = useMemo(
-    () => (invoiceId: string) => {
+    () => (recordId: string) => {
       const params = new URLSearchParams(window.location.search);
       params.set('view', 'detail');
       const url = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
       window.history.pushState(window.history.state, '', url);
       setDetail(true);
-      onOpenDetail(invoiceId);
+      onOpenDetail(recordId);
     },
     [onOpenDetail],
   );
@@ -936,7 +880,7 @@ function ScrollRestorationDemo({ loadDelayMs, history, onOpenDetail, onCancel }:
     <div style={PAGE}>
       {detail ? (
         <div>
-          <p style={{ marginTop: 0 }}>Invoice detail (a page of its own: the list is unmounted).</p>
+          <p style={{ marginTop: 0 }}>Record detail (a page of its own: the list is unmounted).</p>
           <Button
             variant="secondary"
             onClick={() => {
@@ -957,13 +901,13 @@ function ScrollRestorationDemo({ loadDelayMs, history, onOpenDetail, onCancel }:
 }
 
 /**
- * `useListReportScrollRestoration` with `useListReportUrlState`: the list and an invoice "detail" are two
+ * `useListReportScrollRestoration` with `useListReportUrlState`: the list and a record "detail" are two
  * pages of a mini-router (the detail is pushed to the history, so Cancel and the browser's Back both
  * return). Going to the detail unmounts the list; coming back mounts it with no data and, `loadDelayMs`
  * later, with the data: only then is the table's container scrolled where it was, with the same pill
  * selected. Another pill (another URL) starts at the top. The position lives in `sessionStorage`, never in the URL.
  * Controls: the load delay (a range) and how the pills write the URL (`history`).
- * The play function picks "Open", scrolls the table, opens an invoice, presses Cancel, waits for the data
+ * The play function picks "Pending", scrolls the table, opens a record, presses Cancel, waits for the data
  * and checks the scroll position and the pill.
  */
 export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
@@ -994,29 +938,29 @@ export const ScrollRestoration: StoryObj<ScrollRestorationArgs> = {
     win.history.replaceState(win.history.state, '', win.location.pathname);
     win.dispatchEvent(new PopStateEvent('popstate', { state: win.history.state }));
 
-    const scroller = () => canvas.getByRole('table', { name: 'Invoices' }).parentElement as HTMLElement;
+    const scroller = () => canvas.getByRole('table', { name: 'Records' }).parentElement as HTMLElement;
     await waitFor(() => expect(canvas.getAllByRole('row').length).toBeGreaterThan(10));
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
-    await waitFor(() => expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked());
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
+    await waitFor(() => expect(canvas.getByRole('radio', { name: 'Pending' })).toBeChecked());
 
     scroller().scrollTop = 600;
     await waitFor(() => expect(scroller().scrollTop).toBe(600));
-    // The position is stored (throttled); then the user opens an invoice and the list unmounts.
-    const storedKey = `rop:list-report-scroll:#${win.location.pathname}?filter=open`;
+    // The position is stored (throttled); then the user opens a record and the list unmounts.
+    const storedKey = `rop:list-report-scroll:#${win.location.pathname}?filter=pending`;
     await waitFor(() => expect(win.sessionStorage.getItem(storedKey)).not.toBeNull(), { timeout: 3000 });
     const windowScroll = win.scrollY;
-    await userEvent.click(canvas.getAllByRole('button', { name: /^FT-2026-/ })[0]!);
+    await userEvent.click(canvas.getAllByRole('button', { name: /^REC-/ })[0]!);
     await expect(args.onOpenDetail).toHaveBeenCalledOnce();
     await expect(canvas.queryByRole('table')).toBeNull();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Cancel' }));
     await expect(args.onCancel).toHaveBeenCalledOnce();
     // First the loading state (the skeleton is not scrolled), then the data and the saved position, with the same pill.
-    await waitFor(() => expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked());
+    await waitFor(() => expect(canvas.getByRole('radio', { name: 'Pending' })).toBeChecked());
     await waitFor(() => expect(scroller()).toHaveAttribute('aria-busy', 'true'));
     await expect(scroller().scrollTop).toBe(0);
     await waitFor(() => expect(Math.abs(scroller().scrollTop - 600)).toBeLessThanOrEqual(1), { timeout: 5000 });
-    await expect(canvas.getByRole('radio', { name: 'Open' })).toBeChecked();
+    await expect(canvas.getByRole('radio', { name: 'Pending' })).toBeChecked();
     await expect(win.scrollY).toBe(windowScroll);
   },
 };
@@ -1030,9 +974,9 @@ export const ScrollRestorationNoPlay: StoryObj<ScrollRestorationArgs> = {
 
 // --- Selection -----------------------------------------------------------------------------------
 
-const SELECTION_ROWS = makeDemoInvoices(200);
-// The scenario of the play function and of the "some" preset: the first open invoice and the first two
-// that are not open, in the input order. On the "Open" pill two of the three are hidden.
+const SELECTION_ROWS = makeRecords(200);
+// The scenario of the play function and of the "some" preset: the first pending record and the first two
+// that are not pending, in the input order. On the "Pending" pill two of the three are hidden.
 const FIRST_OPEN = SELECTION_ROWS.find((r) => r.status === 'pending')!;
 const FIRST_TWO_OTHERS = SELECTION_ROWS.filter((r) => r.status !== 'pending').slice(0, 2);
 const SCENARIO = [FIRST_OPEN, ...FIRST_TWO_OTHERS];
@@ -1076,7 +1020,7 @@ function SelectionReport({
 }: SelectionArgs) {
   // Controlled: the parent owns the set and applies what the hook reports (a new Set every time).
   const [parentIds, setParentIds] = useState<ReadonlySet<string>>(PRESELECTED[preselected]);
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows: SELECTION_ROWS,
     columns: URL_COLUMNS,
     getRowId: (r) => r.id,
@@ -1090,7 +1034,7 @@ function SelectionReport({
       onSelectedIdsChange(ids);
     },
   });
-  const numbers = () => table.selection.getSelectedRows().map((r) => r.number);
+  const numbers = () => table.selection.getSelectedRows().map((r) => r.code);
   return (
     <div style={PAGE}>
       {controlled ? (
@@ -1100,11 +1044,11 @@ function SelectionReport({
       ) : null}
       <div style={{ width: containerWidth, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
         <ListReport
-          title="Invoices"
+          title="Records"
           table={table}
           filtersLabel="Filters"
           searchLabel="Search"
-          labels={longClearLabel ? { clearSelection: 'Remove every invoice from the selection' } : undefined}
+          labels={longClearLabel ? { clearSelection: 'Remove every record from the selection' } : undefined}
           bulkActions={
             withBulkActions
               ? (selection) => (
@@ -1131,7 +1075,7 @@ const SELECTION_ARG_TYPES = {
   preselected: {
     control: 'select',
     options: ['none', 'some', 'all'],
-    description: 'Initial selection: none, three invoices (one open, two not) or all 200',
+    description: 'Initial selection: none, three records (one pending, two not) or all 200',
   },
   onSelectedIdsChange: { control: false },
   onApprove: { control: false },
@@ -1151,7 +1095,7 @@ const SELECTION_ARGS: SelectionArgs = {
   onExport: fn(),
 };
 
-const selectionBar = (canvas: ReturnType<typeof within>) => canvas.getByRole('group', { name: 'Selection Invoices' });
+const selectionBar = (canvas: ReturnType<typeof within>) => canvas.getByRole('group', { name: 'Selection Records' });
 const rowBox = (canvas: ReturnType<typeof within>, number: string) => canvas.getByRole('checkbox', { name: `Select ${number}` });
 const allBox = (canvas: ReturnType<typeof within>) => canvas.getByRole('checkbox', { name: 'Select all results' }) as HTMLInputElement;
 
@@ -1162,8 +1106,8 @@ const allBox = (canvas: ReturnType<typeof within>) => canvas.getByRole('checkbox
  * disabled at 0; they receive only the selected rows the user can see). Ids hidden by a pill stay selected:
  * the bar says how many. Controls: `selectable`, `controlled` (the parent's set is shown above) and the
  * initial selection; `onSelectedIdsChange` and the bulk actions show up in Actions.
- * The play function selects three invoices, picks "Open" (one left visible, two hidden; the header is
- * indeterminate), approves (Actions gets only the visible invoice), goes back to "All" (the three are
+ * The play function selects three records, picks "Pending" (one left visible, two hidden; the header is
+ * indeterminate), approves (Actions gets only the visible record), goes back to "All" (the three are
  * still selected), selects all, then clears the selection and checks that the focus is on the header checkbox.
  */
 export const Selection: StoryObj<SelectionArgs> = {
@@ -1175,19 +1119,19 @@ export const Selection: StoryObj<SelectionArgs> = {
     if (!args.selectable || args.preselected !== 'none') return;
     const canvas = within(canvasElement);
     await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
-    for (const row of SCENARIO) await userEvent.click(rowBox(canvas, row.number));
+    for (const row of SCENARIO) await userEvent.click(rowBox(canvas, row.code));
     await expect(selectionBar(canvas)).toHaveTextContent('3 selected');
     await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(3);
     await expect(allBox(canvas).indeterminate).toBe(true);
 
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
     await expect(selectionBar(canvas)).toHaveTextContent('1 selected (2 hidden by filters)');
     await expect(allBox(canvas).indeterminate).toBe(OPEN_COUNT > 1);
     await userEvent.click(canvas.getByRole('button', { name: 'Approve' }));
-    await expect(args.onApprove).toHaveBeenLastCalledWith([FIRST_OPEN.number]);
+    await expect(args.onApprove).toHaveBeenLastCalledWith([FIRST_OPEN.code]);
 
     await userEvent.click(canvas.getByRole('radio', { name: 'All' }));
-    for (const row of SCENARIO) await expect(rowBox(canvas, row.number)).toBeChecked();
+    for (const row of SCENARIO) await expect(rowBox(canvas, row.code)).toBeChecked();
     await userEvent.click(allBox(canvas));
     await expect(allBox(canvas)).toBeChecked();
     await expect(selectionBar(canvas)).toHaveTextContent('200 selected');
@@ -1204,7 +1148,7 @@ export const Selection: StoryObj<SelectionArgs> = {
  * `Selection` without bulk actions: below 640px the count and "Clear selection" share one line and the
  * bar keeps the same box at 0 and at n selected. The `withBulkActions` Control adds the bulk actions back (two
  * lines below 640px, as before); `containerWidth` narrows the demo container. The play function selects
- * three invoices, checks the count and that "Clear selection" shows up, that the bar did not move, then
+ * three records, checks the count and that "Clear selection" shows up, that the bar did not move, then
  * clears and checks that the focus is on the header checkbox.
  */
 export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
@@ -1222,7 +1166,7 @@ export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
     const canvas = within(canvasElement);
     await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
     const before = selectionBar(canvas).getBoundingClientRect();
-    for (const row of SCENARIO) await userEvent.click(rowBox(canvas, row.number));
+    for (const row of SCENARIO) await userEvent.click(rowBox(canvas, row.code));
     await expect(selectionBar(canvas)).toHaveTextContent('3 selected');
     await expect(args.onSelectedIdsChange).toHaveBeenCalledTimes(3);
     const clear = canvas.getByRole('button', { name: 'Clear selection' });
@@ -1271,7 +1215,7 @@ export const SelectionNone: StoryObj<SelectionArgs> = {
   },
 };
 
-/** Three invoices selected: the header checkbox is indeterminate, the rows are tinted. */
+/** Three records selected: the header checkbox is indeterminate, the rows are tinted. */
 export const SelectionSome: StoryObj<SelectionArgs> = {
   ...Selection,
   tags: ['visual'],
@@ -1284,7 +1228,7 @@ export const SelectionSome: StoryObj<SelectionArgs> = {
   },
 };
 
-/** Every invoice selected. */
+/** Every record selected. */
 export const SelectionAll: StoryObj<SelectionArgs> = {
   ...Selection,
   tags: ['visual'],
@@ -1318,7 +1262,7 @@ const DEFAULT_BLUE: [number, number, number] = [10, 110, 209]; // #0a6ed1
  * Only `--color-rop-primary` is redeclared on a wrapper (Violet, `#6b3fa0`) and the selection follows it:
  * the selected rows are tinted with 8% of the violet (16% when hovered or pressed) and the count pill flashes
  * with it, not with the default blue. The tint tokens are computed where they are used, so they stay unset on
- * the wrapper. Same three preselected invoices as "Selection some".
+ * the wrapper. Same three preselected records as "Selection some".
  * The play function checks that the tinted rows are violet (and not the default blue family), that an
  * unselected row is not tinted, that a row follows its checkbox off and on, and that the count pill
  * flashes when a filter changes the number. A script cannot trigger the CSS `:hover`/`:active` nor read the
@@ -1345,24 +1289,24 @@ export const SelectionScopedPrimary: StoryObj<SelectionArgs> = {
     }
 
     const row = (number: string) => rowBox(canvas, number).closest('tr')!;
-    const selected = row(FIRST_OPEN.number);
+    const selected = row(FIRST_OPEN.code);
     await expect(selected).toHaveAttribute('data-selected');
     await expect(near(channels(selected), tint(SCOPED_VIOLET, 8))).toBe(true);
     await expect(near(channels(selected), tint(DEFAULT_BLUE, 8))).toBe(false);
 
     const other = SELECTION_ROWS.find((r) => !SCENARIO.includes(r))!;
-    await expect(row(other.number)).not.toHaveAttribute('data-selected');
-    await expect(near(channels(row(other.number)), tint(SCOPED_VIOLET, 8))).toBe(false);
+    await expect(row(other.code)).not.toHaveAttribute('data-selected');
+    await expect(near(channels(row(other.code)), tint(SCOPED_VIOLET, 8))).toBe(false);
 
-    await userEvent.click(rowBox(canvas, FIRST_OPEN.number));
+    await userEvent.click(rowBox(canvas, FIRST_OPEN.code));
     await expect(selected).not.toHaveAttribute('data-selected');
     await expect(near(channels(selected), tint(SCOPED_VIOLET, 8))).toBe(false);
-    await userEvent.click(rowBox(canvas, FIRST_OPEN.number));
+    await userEvent.click(rowBox(canvas, FIRST_OPEN.code));
     await expect(near(channels(selected), tint(SCOPED_VIOLET, 8))).toBe(true);
 
     const pill = canvasElement.querySelector('[data-rop-count]');
     if (!(pill instanceof HTMLElement)) throw new Error('count pill not found');
-    await userEvent.click(canvas.getByRole('radio', { name: 'Open' }));
+    await userEvent.click(canvas.getByRole('radio', { name: 'Pending' }));
     await expect(pill).toHaveAttribute('data-changed');
     await waitFor(() => expect(pill).not.toHaveAttribute('data-changed'));
   },
@@ -1375,12 +1319,12 @@ export const SelectionScopedPrimaryNoPlay: StoryObj<SelectionArgs> = {
   play: undefined,
 };
 
-/** The same three invoices on the "Open" pill: one visible, two hidden by the filter. */
+/** The same three records on the "Pending" pill: one visible, two hidden by the filter. */
 export const SelectionHiddenByFilter: StoryObj<SelectionArgs> = {
   ...Selection,
   tags: ['visual'],
   parameters: NO_CONTROLS,
-  args: { ...SELECTION_ARGS, preselected: 'some', defaultFilter: 'open' },
+  args: { ...SELECTION_ARGS, preselected: 'some', defaultFilter: 'pending' },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(selectionBar(canvas)).toHaveTextContent('1 selected (2 hidden by filters)');
@@ -1395,9 +1339,9 @@ interface DeleteRecipeArgs {
 }
 
 function DeleteRecipe({ onDelete, onSelectedIdsChange }: DeleteRecipeArgs) {
-  const [rows, setRows] = useState<readonly DemoInvoice[]>(() => makeDemoInvoices(20));
+  const [rows, setRows] = useState<readonly DemoRecord[]>(() => makeRecords(20));
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
-  const table = useListReport<DemoInvoice>({
+  const table = useListReport<DemoRecord>({
     rows,
     columns: URL_COLUMNS,
     getRowId: (r) => r.id,
@@ -1416,13 +1360,13 @@ function DeleteRecipe({ onDelete, onSelectedIdsChange }: DeleteRecipeArgs) {
     const goneIds = new Set(gone.map((r) => r.id));
     setRows((current) => current.filter((r) => !goneIds.has(r.id)));
     setSelectedIds((current) => new Set([...current].filter((id) => !goneIds.has(id))));
-    onDelete(gone.map((r) => r.number));
+    onDelete(gone.map((r) => r.code));
   };
   return (
     <div style={PAGE}>
       <div style={{ width: 1100, maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
         <ListReport
-          title="Invoices"
+          title="Records"
           table={table}
           filtersLabel="Filters"
           searchLabel="Search"
@@ -1441,7 +1385,7 @@ function DeleteRecipe({ onDelete, onSelectedIdsChange }: DeleteRecipeArgs) {
  * Recipe: a "Delete" bulk action. It deletes `selection.getSelectedRows()` (only the selected rows that are
  * visible) and removes those ids from its own controlled `selectedIds`: the hook keeps ids that left the
  * data, so the consumer that deletes rows updates the selection itself. Ids hidden by a pill stay selected.
- * The play function selects two invoices, deletes them and checks that 18 are left and nothing is selected.
+ * The play function selects two records, deletes them and checks that 18 are left and nothing is selected.
  */
 export const SelectionDeleteRecipe: StoryObj<DeleteRecipeArgs> = {
   argTypes: {
@@ -1454,14 +1398,14 @@ export const SelectionDeleteRecipe: StoryObj<DeleteRecipeArgs> = {
   render: (args) => <DeleteRecipe {...args} />,
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    const [first, second] = makeDemoInvoices(20);
-    await userEvent.click(rowBox(canvas, first!.number));
-    await userEvent.click(rowBox(canvas, second!.number));
+    const [first, second] = makeRecords(20);
+    await userEvent.click(rowBox(canvas, first!.code));
+    await userEvent.click(rowBox(canvas, second!.code));
     await expect(selectionBar(canvas)).toHaveTextContent('2 selected');
     await userEvent.click(canvas.getByRole('button', { name: 'Delete' }));
-    await expect(args.onDelete).toHaveBeenCalledWith([first!.number, second!.number]);
-    await expect(canvas.getByRole('heading', { name: /Invoices/ })).toHaveTextContent('Invoices (18)');
-    await expect(canvas.queryByRole('checkbox', { name: `Select ${first!.number}` })).toBeNull();
+    await expect(args.onDelete).toHaveBeenCalledWith([first!.code, second!.code]);
+    await expect(canvas.getByRole('heading', { name: /Records/ })).toHaveTextContent('Records (18)');
+    await expect(canvas.queryByRole('checkbox', { name: `Select ${first!.code}` })).toBeNull();
     await expect(selectionBar(canvas)).toHaveTextContent('No items selected');
     await expect(canvas.getByRole('button', { name: 'Delete' })).toBeDisabled();
   },
@@ -1469,11 +1413,11 @@ export const SelectionDeleteRecipe: StoryObj<DeleteRecipeArgs> = {
 
 // --- Row actions ---
 
-const ROW_ACTION_ROWS = makeDemoInvoices(20);
+const ROW_ACTION_ROWS = makeRecords(20);
 const THIRD_ROW = ROW_ACTION_ROWS[2]!;
-const FIRST_APPROVED = ROW_ACTION_ROWS.find((r) => r.status === 'approved')!;
+const FIRST_ARCHIVED = ROW_ACTION_ROWS.find((r) => r.status === 'archived')!;
 
-type DisabledFor = DemoInvoice['status'] | 'none';
+type DisabledFor = DemoRecord['status'] | 'none';
 
 // A trash can on the 24x24 grid of the library's icons (stroke, current colour).
 const trashIcon = (
@@ -1487,7 +1431,7 @@ const trashIcon = (
 const ROW_ACTIONS_CONTAINER_WIDTH = { wide: 1100, narrow: 480 } as const;
 
 interface RowActionsArgs {
-  /** Status of the invoices whose "Delete" is disabled. */
+  /** Status of the records whose "Delete" is disabled. */
   disabledFor: DisabledFor;
   /** Tone of the "Delete" action. */
   deleteTone: 'danger' | 'default';
@@ -1505,7 +1449,7 @@ interface RowActionsArgs {
   preselectedIds?: readonly string[];
   /** `useListReport({ onSelectedIdsChange })`: wired by the stories that check a selection gesture. */
   onSelectedIdsChange?: (ids: ReadonlySet<string>) => void;
-  /** Fixture: the invoices of this status have no "Delete" at all (fewer actions than the others). Not in Controls. */
+  /** Fixture: the records of this status have no "Delete" at all (fewer actions than the others). Not in Controls. */
   withoutDeleteFor?: DisabledFor;
   /** Fixture: `status` of the report. Not in Controls. */
   status?: 'ready' | 'loading';
@@ -1526,8 +1470,8 @@ function RowActionsReport({
   status,
   onSelectedIdsChange,
 }: RowActionsArgs) {
-  const [rows, setRows] = useState<readonly DemoInvoice[]>(ROW_ACTION_ROWS);
-  const table = useListReport<DemoInvoice>({
+  const [rows, setRows] = useState<readonly DemoRecord[]>(ROW_ACTION_ROWS);
+  const table = useListReport<DemoRecord>({
     rows,
     columns: URL_COLUMNS,
     getRowId: (r) => r.id,
@@ -1540,7 +1484,7 @@ function RowActionsReport({
   // Memoized with what it reads: the rows are memoized, a stable function that read other values
   // would leave them as they were.
   const rowActions = useCallback(
-    (row: DemoInvoice): readonly ListReportRowAction[] => {
+    (row: DemoRecord): readonly ListReportRowAction[] => {
       const duplicate: ListReportRowAction = { id: 'duplicate', label: duplicateLabel, onSelect: () => onDuplicate(row.id) };
       if (row.status === withoutDeleteFor) return [duplicate];
       return [
@@ -1552,12 +1496,12 @@ function RowActionsReport({
           tone: deleteTone,
           disabled: row.status === disabledFor,
           // The confirmation gives the focus back to the control that was used (this row's inline button
-          // or "…" button) when it closes (Cancel), or to the table once the row is deleted (Delete invoice).
+          // or "…" button) when it closes (Cancel), or to the table once the row is deleted (Delete record).
           onSelect: async ({ returnFocusRef }) => {
             const confirmed = await confirm({
-              title: `Delete invoice ${row.number}?`,
-              description: 'The invoice is removed from the queue. This cannot be undone.',
-              confirmLabel: 'Delete invoice',
+              title: `Delete record ${row.code}?`,
+              description: 'The record is removed from the list. This cannot be undone.',
+              confirmLabel: 'Delete record',
               returnFocusRef,
             });
             if (!confirmed) return;
@@ -1573,7 +1517,7 @@ function RowActionsReport({
     <div style={PAGE}>
       <div style={{ width: ROW_ACTIONS_CONTAINER_WIDTH[containerWidth], maxWidth: '100%', height: 'min(600px, calc(100dvh - 104px))' }}>
         <ListReport
-          title="Invoices"
+          title="Records"
           table={table}
           filtersLabel="Filters"
           searchLabel="Search"
@@ -1590,8 +1534,8 @@ function RowActionsReport({
 const ROW_ACTIONS_ARG_TYPES = {
   disabledFor: {
     control: 'select',
-    options: ['approved', 'pending', 'rejected', 'none'],
-    description: 'Invoices whose "Delete" is `disabled` (by status): shown in the menu, skipped by the arrows, never selected',
+    options: ['archived', 'pending', 'active', 'on-hold', 'none'],
+    description: 'Records whose "Delete" is `disabled` (by status): shown in the menu, skipped by the arrows, never selected',
   },
   deleteTone: { control: 'radio', options: ['danger', 'default'], description: '`tone` of the "Delete" action' },
   deleteIcon: {
@@ -1621,7 +1565,7 @@ const ROW_ACTIONS_ARG_TYPES = {
 
 // The menu-only configuration (no inline action, no icon): the fixtures of the menu alone.
 const ROW_ACTIONS_ARGS: RowActionsArgs = {
-  disabledFor: 'approved',
+  disabledFor: 'archived',
   deleteTone: 'danger',
   deleteIcon: false,
   duplicateLabel: 'Duplicate',
@@ -1635,12 +1579,12 @@ const ROW_ACTIONS_ARGS: RowActionsArgs = {
 // "Delete…" (with an icon) inline on a wide table, "Duplicate" (without one) in the "…" menu.
 const ROW_ACTIONS_INLINE_ARGS: RowActionsArgs = { ...ROW_ACTIONS_ARGS, deleteIcon: true, rowActionsInline: 1 };
 
-// The first invoice that "Delete…" can delete (not approved), at the top of the table.
-const FIRST_DELETABLE = ROW_ACTION_ROWS.find((r) => r.status !== 'approved')!;
+// The first record that "Delete…" can delete (not archived), at the top of the table.
+const FIRST_DELETABLE = ROW_ACTION_ROWS.find((r) => r.status !== 'archived')!;
 
 /**
  * Per-row actions (`rowActions`): a trailing column, sticky at the end of the table. "Delete…" (danger,
- * with a trash icon, disabled for the approved invoices; it asks for a confirmation, then deletes the
+ * with a trash icon, disabled for the archived records; it asks for a confirmation, then deletes the
  * row) is an inline icon button named "Delete… <number>" (`rowActionsInline={1}`) while the table is at
  * least 40rem wide, with its label as a tooltip on hover or keyboard focus; "Duplicate" (no icon) is in
  * the "…" menu named "Actions for <number>". With `containerWidth: narrow` (a 30rem panel, whatever the
@@ -1648,8 +1592,8 @@ const FIRST_DELETABLE = ROW_ACTION_ROWS.find((r) => r.status !== 'approved')!;
  * returns the focus to the control that was used, a confirmed deletion to the table. Controls: the
  * number of inline actions, the icon of "Delete" (without one it never goes inline), the status whose
  * "Delete" is disabled, its tone, `selectable` and the width of the box. `onDuplicate`/`onDelete` show
- * up in Actions with the id of the row. The play function (wide box) deletes an invoice from its inline
- * button, checks that click and Enter on the disabled inline button of an approved invoice call nothing,
+ * up in Actions with the id of the row. The play function (wide box) deletes an record from its inline
+ * button, checks that click and Enter on the disabled inline button of an archived record call nothing,
  * then chooses "Duplicate" in that row's "…" menu from the keyboard and checks the focus back on it.
  */
 export const RowActions: StoryObj<RowActionsArgs> = {
@@ -1660,7 +1604,7 @@ export const RowActions: StoryObj<RowActionsArgs> = {
   play: async ({ args, canvasElement }) => {
     // Written for the default configuration, on a viewport where the wide box is at least 40rem.
     if (
-      args.disabledFor !== 'approved' ||
+      args.disabledFor !== 'archived' ||
       args.duplicateLabel !== 'Duplicate' ||
       args.rowActionsInline !== 1 ||
       !args.deleteIcon ||
@@ -1676,16 +1620,16 @@ export const RowActions: StoryObj<RowActionsArgs> = {
     const trigger = (number: string) => page.getByRole('button', { name: `Actions for ${number}` });
 
     // Inline "Delete…": the confirmation, then the call with the row's id.
-    await userEvent.click(inline(FIRST_DELETABLE.number));
-    const dialog = await page.findByRole('dialog', { name: `Delete invoice ${FIRST_DELETABLE.number}?` });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+    await userEvent.click(inline(FIRST_DELETABLE.code));
+    const dialog = await page.findByRole('dialog', { name: `Delete record ${FIRST_DELETABLE.code}?` });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Delete record' }));
     await expect(args.onDelete).toHaveBeenCalledTimes(1);
     await expect(args.onDelete).toHaveBeenCalledWith(FIRST_DELETABLE.id);
     await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
-    await waitFor(() => expect(page.queryByRole('button', { name: `Delete… ${FIRST_DELETABLE.number}` })).toBeNull());
+    await waitFor(() => expect(page.queryByRole('button', { name: `Delete… ${FIRST_DELETABLE.code}` })).toBeNull());
 
-    // An approved invoice: its inline "Delete…" is aria-disabled; click and Enter open nothing, call nothing.
-    const disabled = inline(FIRST_APPROVED.number);
+    // An archived record: its inline "Delete…" is aria-disabled; click and Enter open nothing, call nothing.
+    const disabled = inline(FIRST_ARCHIVED.code);
     await expect(disabled).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(disabled);
     disabled.focus();
@@ -1694,15 +1638,15 @@ export const RowActions: StoryObj<RowActionsArgs> = {
     await expect(args.onDelete).toHaveBeenCalledTimes(1);
 
     // Its "…" menu holds what is not inline: "Duplicate", chosen from the keyboard.
-    trigger(FIRST_APPROVED.number).focus();
+    trigger(FIRST_ARCHIVED.code).focus();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
     await expect(page.queryByRole('menuitem', { name: 'Delete…' })).toBeNull();
     await userEvent.keyboard('{Enter}');
     await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
-    await expect(args.onDuplicate).toHaveBeenCalledWith(FIRST_APPROVED.id);
+    await expect(args.onDuplicate).toHaveBeenCalledWith(FIRST_ARCHIVED.id);
     await waitFor(() => expect(page.queryByRole('menu')).toBeNull());
-    await waitFor(() => expect(trigger(FIRST_APPROVED.number)).toHaveFocus());
+    await waitFor(() => expect(trigger(FIRST_ARCHIVED.code)).toHaveFocus());
   },
 };
 
@@ -1717,14 +1661,14 @@ export const RowActionsMenuOnly: StoryObj<RowActionsArgs> = {
   args: ROW_ACTIONS_ARGS,
   render: (args) => <RowActionsReport {...args} />,
   play: async ({ args, canvasElement }) => {
-    // Written for the default configuration ("Delete…" disabled for the approved invoices, "Duplicate").
-    if (args.disabledFor !== 'approved' || args.duplicateLabel !== 'Duplicate') return;
+    // Written for the default configuration ("Delete…" disabled for the archived records, "Duplicate").
+    if (args.disabledFor !== 'archived' || args.duplicateLabel !== 'Duplicate') return;
     // The menu is in a portal: query the whole document.
     const page = within(canvasElement.ownerDocument.body);
     const trigger = (number: string) => page.getByRole('button', { name: `Actions for ${number}`, hidden: true });
 
-    // An approved invoice: "Delete…" is there, disabled, and the arrows skip it.
-    trigger(FIRST_APPROVED.number).focus();
+    // An archived record: "Delete…" is there, disabled, and the arrows skip it.
+    trigger(FIRST_ARCHIVED.code).focus();
     await userEvent.keyboard('{Enter}');
     const remove = await page.findByRole('menuitem', { name: 'Delete…' });
     await expect(remove).toHaveAttribute('aria-disabled', 'true');
@@ -1732,18 +1676,18 @@ export const RowActionsMenuOnly: StoryObj<RowActionsArgs> = {
     await userEvent.keyboard('{ArrowDown}');
     await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus();
     await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(trigger(FIRST_APPROVED.number)).toHaveFocus());
+    await waitFor(() => expect(trigger(FIRST_ARCHIVED.code)).toHaveFocus());
     await expect(args.onDelete).not.toHaveBeenCalled();
 
     // The third row, from the keyboard: Enter opens on "Duplicate", Enter chooses it.
-    trigger(THIRD_ROW.number).focus();
+    trigger(THIRD_ROW.code).focus();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
     await userEvent.keyboard('{Enter}');
     await expect(args.onDuplicate).toHaveBeenCalledTimes(1);
     await expect(args.onDuplicate).toHaveBeenCalledWith(THIRD_ROW.id);
     await waitFor(() => expect(page.queryByRole('menu')).toBeNull());
-    await waitFor(() => expect(trigger(THIRD_ROW.number)).toHaveFocus());
+    await waitFor(() => expect(trigger(THIRD_ROW.code)).toHaveFocus());
   },
 };
 
@@ -1764,8 +1708,8 @@ export const RowActionsInlineNoPlay: StoryObj<RowActionsArgs> = {
 };
 
 /**
- * Visual fixture: one inline action, wide box, `selectable` with the second invoice selected. The
- * inline "Delete…" of the approved invoices is disabled; on a mobile viewport the box is below 40rem
+ * Visual fixture: one inline action, wide box, `selectable` with the second record selected. The
+ * inline "Delete…" of the archived records is disabled; on a mobile viewport the box is below 40rem
  * and the narrow form (the "…" alone) shows instead.
  */
 export const RowActionsInlineWide: StoryObj<RowActionsArgs> = {
@@ -1787,10 +1731,10 @@ export const RowActionsInlineNarrow: StoryObj<RowActionsArgs> = {
 
 const SECOND_ROW = ROW_ACTION_ROWS[1]!;
 const rowActionsScroller = (canvasElement: HTMLElement) =>
-  within(canvasElement).getByRole('table', { name: /Invoices/, hidden: true }).parentElement as HTMLElement;
+  within(canvasElement).getByRole('table', { name: /Records/, hidden: true }).parentElement as HTMLElement;
 
 /**
- * Visual fixture: with `selectable`, the second invoice selected (its sticky actions cell has the tint
+ * Visual fixture: with `selectable`, the second record selected (its sticky actions cell has the tint
  * of the row) and the table scrolled sideways by half of what it can scroll (on a narrow viewport the
  * columns pass under the sticky actions column; on a wide one there is nothing to scroll).
  */
@@ -1807,7 +1751,7 @@ export const RowActionsSelectedScrolled: StoryObj<RowActionsArgs> = {
   },
 };
 
-/** Visual fixture: the menu of the third invoice open (opened from the keyboard, "Duplicate" focused). */
+/** Visual fixture: the menu of the third record open (opened from the keyboard, "Duplicate" focused). */
 export const RowActionsMenuOpen: StoryObj<RowActionsArgs> = {
   name: 'Row actions: menu open',
   tags: ['internal', 'visual'],
@@ -1816,7 +1760,7 @@ export const RowActionsMenuOpen: StoryObj<RowActionsArgs> = {
   render: (args) => <RowActionsReport {...args} />,
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body);
-    page.getByRole('button', { name: `Actions for ${THIRD_ROW.number}` }).focus();
+    page.getByRole('button', { name: `Actions for ${THIRD_ROW.code}` }).focus();
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveFocus());
   },
