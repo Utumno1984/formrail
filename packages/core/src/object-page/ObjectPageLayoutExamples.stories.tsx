@@ -452,7 +452,7 @@ export const UseCaseErpPurchaseOrder: StoryObj<PurchaseOrderArgs> = {
                   // Wraps on a narrow screen: the product name takes a row, quantity and total the next one.
                   <div key={line.id} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
                     <span style={{ flex: '1 1 220px', minWidth: 0 }}>{PRODUCT_NAME[line.id]}</span>
-                    <div style={{ flex: '0 0 110px' }}>
+                    <div style={{ flex: '0 0 110px', position: 'relative' }}>
                       <Field label={`Quantity of ${PRODUCT_NAME[line.id]}`} name={`quantities.${line.id}`} hideLabel reserveMessageSpace={false}>
                         <Input
                           inputMode="numeric"

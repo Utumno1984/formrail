@@ -109,6 +109,8 @@ test.describe('erp: each line reads as one row', () => {
         }
         expect(Math.abs(totalCentre - inputCentre), `${product}: total`).toBeLessThanOrEqual(2);
       }
+      // The visually hidden labels stay inside the scroller: the page itself does not grow or scroll.
+      expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0);
     });
   }
 });
