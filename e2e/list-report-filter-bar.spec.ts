@@ -140,6 +140,7 @@ test.describe('search', () => {
     await page.clock.runFor(299);
     await expect(rows(page)).toHaveCount(names('active').length);
     await page.clock.runFor(1);
+    expect(names('active', 'indigo')).not.toHaveLength(0);
     await expect(rows(page)).toHaveText(names('active', 'indigo'));
 
     // Enter does not wait
@@ -148,6 +149,7 @@ test.describe('search', () => {
     await expect(rows(page)).toHaveCount(names('active').length);
     await page.keyboard.type('tundra');
     await page.keyboard.press('Enter');
+    expect(names('active', 'tundra')).not.toHaveLength(0);
     await expect(rows(page)).toHaveText(names('active', 'tundra'));
   });
 
@@ -168,6 +170,7 @@ test.describe('search', () => {
     await expect(rows(page)).toHaveCount(RECORDS.length); // "Enter only": nothing committed yet
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
+    expect(names(undefined, 'kestrel')).not.toHaveLength(0);
     await expect(rows(page)).toHaveText(names(undefined, 'kestrel'));
     await expect(page.getByTestId('submits')).toHaveText('0');
   });

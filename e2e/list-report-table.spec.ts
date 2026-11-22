@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectFocusRingVisible, expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass } from './helpers/story';
+import { columns } from '../packages/core/src/list-report/ListReportTable.stories-data';
 
 const STORY = (name: string) => `data-listreporttable--${name}`;
 const scroller = (page: Page): Locator => page.getByTestId('scroller');
@@ -9,6 +10,12 @@ const header = (page: Page, name: string | RegExp): Locator => page.getByRole('c
 const sortButton = (page: Page, name: string): Locator => header(page, name).getByRole('button');
 // Longer than the tooltip delay (500ms): "nothing opened" is not just "not yet".
 const SETTLE = 900;
+// Declared widths of the stories' columns, read from the fixture and not copied.
+const COLUMNS = columns();
+const declaredWidth = (id: string): number => COLUMNS.find((c) => c.id === id)!.width!;
+const CODE_WIDTH = declaredWidth('code');
+// What the columns need side by side: the width when fixed, the minimum otherwise.
+const NEEDED_WIDTH = COLUMNS.reduce((sum, c) => sum + (c.width ?? c.minWidth ?? 0), 0);
 
 /** Text of one column of the body, in display order. */
 const column = (page: Page, index: number): Promise<string[]> =>
@@ -89,7 +96,7 @@ test.describe('geometry', () => {
   test('columns with a width have exactly it; the others share the rest; the table fills the container', async ({ page }) => {
     await expectPlayToPass(page, STORY('plain'));
     const widths = await page.getByRole('columnheader').evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().width));
-    expect(widths[0]).toBeCloseTo(110, 0);
+    expect(widths[0]).toBeCloseTo(CODE_WIDTH, 0);
     expect(widths[3]).toBeCloseTo(120, 0);
     expect(widths[4]).toBeCloseTo(120, 0);
     const container = await rect(scroller(page));
@@ -141,8 +148,8 @@ test.describe('geometry', () => {
     await expectPlayToPass(page, STORY('narrow-container'));
     const s = scroller(page);
     const { scrollWidth, clientWidth } = await s.evaluate((el) => ({ scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }));
-    // 110 + 160 + 200 + 120 + 120
-    expect(scrollWidth).toBeGreaterThanOrEqual(710);
+    expect(NEEDED_WIDTH).toBeGreaterThan(clientWidth);
+    expect(scrollWidth).toBeGreaterThanOrEqual(NEEDED_WIDTH);
     expect(clientWidth).toBeLessThan(scrollWidth);
     await expectNoHorizontalOverflow(page.locator('#storybook-root'));
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
