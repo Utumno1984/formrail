@@ -61,7 +61,7 @@ test.describe('Floorplans/Object Page/Layout', () => {
     await gotoStory(page, STORY('overview'));
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     await expect(page.getByRole('region')).toHaveCount(6);
-    await expect(page.getByRole('region', { name: 'Lines' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Items' })).toBeVisible();
     await expectNoA11yViolations(page);
   });
 
@@ -146,7 +146,7 @@ test.describe('Floorplans/Object Page/Layout', () => {
   test('the focus ring of a control filling a section body is not clipped by the body', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 600 });
     await gotoStory(page, STORY('keyboard-safe'));
-    const input = page.getByRole('textbox', { name: 'Billing address' });
+    const input = page.getByRole('textbox', { name: 'Address' });
     await input.scrollIntoViewIfNeeded();
     await page.keyboard.press('Tab');
     await input.focus();
@@ -210,7 +210,7 @@ for (const [name, viewport] of [
 
     test('a field in the last section ends above the keyboard, scrolling the inner scroller and not the document', async ({ page }) => {
       await gotoStory(page, STORY('keyboard-safe'));
-      const input = page.getByRole('textbox', { name: 'Billing address' });
+      const input = page.getByRole('textbox', { name: 'Address' });
       const scroller = page.locator(SCROLLER);
       // Bottom edge of the scroll area: visible now, under the keyboard later.
       await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight));

@@ -13,29 +13,29 @@ const VIEWPORTS = [
 ] as const;
 
 // Every control of the story, in Tab order: the header action, the fields of each section (the nested
-// "Bank details" section included), and the save bar's actions.
+// "Contact details" section included), and the save bar's actions.
 const HEADER_ACTION = 'Edit';
 const FIELDS = [
-  'Order number',
-  'Order date',
-  'Requested delivery',
-  'Requisition reference',
-  'Cost center',
-  'Project code',
+  'Name',
+  'Status',
+  'Owner',
+  'Amount',
+  'Due date',
+  'Reference',
+  'Category',
   'Currency',
-  'Payment terms',
-  'Buyer',
-  'Approver',
-  'Supplier name',
-  'VAT number',
+  'Quantity',
+  'Created on',
+  'Site name',
+  'Registry code',
   'Street',
   'City',
   'Postal code',
   'Country',
-  'IBAN',
-  'BIC',
+  'Phone',
+  'Email',
   'Internal notes',
-  'Notes for the supplier',
+  'Notes for the owner',
 ];
 
 interface Probe {
@@ -182,9 +182,9 @@ for (const [name, viewport] of VIEWPORTS) {
     // first: a Field brings itself into view when it gets the focus outside the window).
     for (const overlap of [1, 10, 30]) {
       test(`Tab onto a field ${overlap}px under the Anchor Bar brings it clear of the bar @engines`, async ({ page }) => {
-        await page.getByRole('textbox', { name: 'Project code' }).focus();
+        await page.getByRole('textbox', { name: 'Reference' }).focus();
         await settle(page);
-        const target = page.getByRole('textbox', { name: 'Currency' });
+        const target = page.getByRole('textbox', { name: 'Category' });
         const under = () =>
           target.evaluate((el) => {
             const bar = el.closest('[data-object-page-scroller]')!.querySelector('[data-object-page-anchor-bar]') as HTMLElement;
@@ -200,7 +200,7 @@ for (const [name, viewport] of VIEWPORTS) {
         expect(await under()).toBeCloseTo(overlap, 0);
         await page.keyboard.press('Tab');
         const p = await probe(page);
-        expect(p.name).toBe('Currency');
+        expect(p.name).toBe('Category');
         expectClear(p, `overlap ${overlap}px`);
       });
     }
@@ -208,7 +208,7 @@ for (const [name, viewport] of VIEWPORTS) {
     test('hiding and showing the save bar moves no visible field @engines', async ({ page }) => {
       const scroller = page.locator(SCROLLER);
       await scroller.evaluate((el) => (el.scrollTop = 300));
-      await page.getByRole('textbox', { name: 'Payment terms' }).focus();
+      await page.getByRole('textbox', { name: 'Currency' }).focus();
       const before = await labelTops(page);
       // The header (and its "Edit") has scrolled away: clicked from script, not with a pointer that would scroll to it.
       await page.getByRole('button', { name: 'Cancel' }).click();
@@ -324,7 +324,7 @@ test.describe('Object Page: the focus is never under the Anchor Bar nor the virt
 
   test('Tab down and Shift+Tab back up with the keyboard open', async ({ page }) => {
     const visibleBottom = 844 - KEYBOARD;
-    await page.getByRole('textbox', { name: 'Supplier name' }).focus();
+    await page.getByRole('textbox', { name: 'Site name' }).focus();
     await page.evaluate((px) => (window as unknown as KeyboardWindow).__setKeyboard(px), KEYBOARD);
     const check = async (where: string) => {
       const p = await probe(page);
@@ -337,7 +337,7 @@ test.describe('Object Page: the focus is never under the Anchor Bar nor the virt
       return p.name;
     };
     await expect.poll(async () => (await probe(page)).bottom).toBeLessThanOrEqual(visibleBottom);
-    const start = FIELDS.indexOf('Supplier name');
+    const start = FIELDS.indexOf('Site name');
     for (const field of FIELDS.slice(start + 1)) {
       await page.keyboard.press('Tab');
       // The Field brings itself above the keyboard on its own visual-viewport work: wait for it, then measure.
