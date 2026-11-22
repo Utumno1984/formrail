@@ -281,7 +281,11 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
         (window as unknown as { __panel: Element | null }).__panel = document.querySelector('[role="dialog"]');
       });
       await page.setViewportSize(LANDSCAPE_TABLET);
-      await expect(column(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      // The crossing has closed the Sheet: with motion its panel is in its exit animation (160ms), and the turn back to
+      // portrait comes now, before it ends (no wait for the column's focus, which can come later than that); with
+      // reduced motion the panel has left already, and the column has the focus.
+      if (motion === 'no-preference') await expect(page.locator('[data-rop-app-shell-nav-sheet]')).toHaveAttribute('data-state', 'closed');
+      else await expect(column(page).getByRole('link', { name: 'Section B' })).toBeFocused();
       await page.setViewportSize(PORTRAIT_TABLET);
       await expect(trigger(page)).toBeFocused();
       await page.keyboard.press('Enter');
