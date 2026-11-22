@@ -45,6 +45,14 @@ async function openCompact(page: Page, size: { width: number; height: number } =
   await expectPlayToPass(page, id);
 }
 
+/** Plays the CSS animations ten times slower (Chromium, CDP): the 160ms exit of the Sheet lasts 1.6s, so the steps
+ *  a test takes "during the exit" come while it runs on a loaded machine too (5 runs of 10 failed without it). */
+async function slowAnimations(page: Page): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Animation.enable');
+  await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.1 });
+}
+
 async function openSheetWithKeyboard(page: Page): Promise<Locator> {
   await trigger(page).focus();
   await page.keyboard.press('Enter');
@@ -258,6 +266,7 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
       await page.emulateMedia({ reducedMotion: motion });
       await openCompact(page, MOBILE_VIEWPORT, `${COMPACT}-open`);
       await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      if (motion === 'no-preference') await slowAnimations(page);
       await page.evaluate(() => {
         (window as unknown as { __panel: Element | null }).__panel = document.querySelector('[role="dialog"]');
       });
@@ -277,6 +286,7 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
       await page.emulateMedia({ reducedMotion: motion });
       await openCompact(page, PORTRAIT_TABLET, `${COMPACT}-open`);
       await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      if (motion === 'no-preference') await slowAnimations(page);
       await page.evaluate(() => {
         (window as unknown as { __panel: Element | null }).__panel = document.querySelector('[role="dialog"]');
       });
