@@ -38,31 +38,69 @@ function canonical(value) {
   return value;
 }
 
-/** True when the two package.json texts parse to JSON differing only in a changed `version` field. */
-export function onlyVersionChanged(baseText, headText) {
-  if (typeof baseText !== 'string' || typeof headText !== 'string') return false;
-  let base;
-  let head;
+const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
+const RANGE_PREFIX_RE = /^([\^~]?)(.+)$/;
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function parseJson(text) {
+  if (typeof text !== 'string') return null;
   try {
-    base = JSON.parse(baseText);
-    head = JSON.parse(headText);
+    const value = JSON.parse(text);
+    return isObject(value) ? value : null;
   } catch {
-    return false;
+    return null;
   }
-  const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-  if (!isObject(base) || !isObject(head)) return false;
+}
+
+/** Name and new version of a package whose package.json changed its `version` (null otherwise). */
+export function bumpedPackage(baseText, headText) {
+  const base = parseJson(baseText);
+  const head = parseJson(headText);
+  if (!base || !head || typeof head.name !== 'string' || typeof head.version !== 'string') return null;
+  if (base.version === head.version) return null;
+  return { name: head.name, version: head.version };
+}
+
+/**
+ * True when the two package.json texts parse to JSON differing only in a changed `version` field and in
+ * workspace-internal ranges (dependencies/devDependencies/peerDependencies entries naming a package of
+ * `internalVersions`, a name -> new version map) that moved to the same prefix (`^`, `~` or none) plus
+ * that package's new version. Entries added or removed, external packages and any other field disqualify.
+ */
+export function onlyVersionChanged(baseText, headText, internalVersions = {}) {
+  const base = parseJson(baseText);
+  const head = parseJson(headText);
+  if (!base || !head) return false;
   if (!('version' in base) || !('version' in head)) return false;
   if (JSON.stringify(canonical(base.version)) === JSON.stringify(canonical(head.version))) return false;
   const restBase = { ...base };
   const restHead = { ...head };
   delete restBase.version;
   delete restHead.version;
+  for (const field of DEP_FIELDS) {
+    const b = restBase[field];
+    const h = restHead[field];
+    delete restBase[field];
+    delete restHead[field];
+    if (b === undefined && h === undefined) continue;
+    if (!isObject(b) || !isObject(h)) return false;
+    const names = Object.keys(b);
+    if (names.length !== Object.keys(h).length) return false;
+    for (const name of names) {
+      if (!(name in h)) return false;
+      if (b[name] === h[name]) continue;
+      const target = Object.hasOwn(internalVersions, name) ? internalVersions[name] : undefined;
+      if (typeof target !== 'string' || typeof b[name] !== 'string' || typeof h[name] !== 'string') return false;
+      const prefix = RANGE_PREFIX_RE.exec(b[name])?.[1];
+      if (prefix === undefined || h[name] !== `${prefix}${target}`) return false;
+    }
+  }
   return JSON.stringify(canonical(restBase)) === JSON.stringify(canonical(restHead));
 }
 
 export const EXEMPTION_MESSAGE = [
   'Changeset exemption applied (release PR): the diff is a version bump, not a change to be released.',
-  '  - inside packages/* only the `version` field of package.json and CHANGELOG.md files changed;',
+  '  - inside packages/* only the `version` field of package.json (plus workspace-internal dependency ranges aligned to the new versions) and CHANGELOG.md files changed;',
   '  - existing changesets (.changeset/*.md) were consumed (deleted);',
   '  - no changeset was added.',
 ].join('\n');
@@ -75,12 +113,18 @@ function isReleaseBump(entries, packageFiles, readContent, readBaseContent) {
   if (!changesetEntries.some((e) => e.status === 'D')) return false;
   // At least one package must actually be version-bumped: a CHANGELOG alone is not a release.
   if (!entries.some((e) => PACKAGE_JSON_RE.test(e.path))) return false;
+  const internalVersions = {};
+  for (const e of entries) {
+    if (!PACKAGE_JSON_RE.test(e.path) || e.status !== 'M') continue;
+    const bumped = bumpedPackage(readBaseContent(e.path), readContent(e.path));
+    if (bumped) internalVersions[bumped.name] = bumped.version;
+  }
   return entries
     .filter((e) => PACKAGE_RE.test(e.path))
     .every((e) => {
       if (PACKAGE_CHANGELOG_RE.test(e.path)) return e.status === 'A' || e.status === 'M';
       if (PACKAGE_JSON_RE.test(e.path)) {
-        return e.status === 'M' && onlyVersionChanged(readBaseContent(e.path), readContent(e.path));
+        return e.status === 'M' && onlyVersionChanged(readBaseContent(e.path), readContent(e.path), internalVersions);
       }
       return false;
     });

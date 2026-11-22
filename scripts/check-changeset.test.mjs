@@ -200,6 +200,65 @@ describe('evaluateChangesetGate: release PR exemption', () => {
     expect(r.message).toContain('No file under packages/*');
   });
 
+  describe('workspace-internal ranges', () => {
+    const core = (v) => JSON.stringify({ name: '@formrail/core', version: v });
+    const proJson = (o = {}, version = '0.2.0') =>
+      JSON.stringify({
+        name: '@formrail/pro',
+        version,
+        peerDependencies: { '@formrail/core': '0.2.0', react: '^18.0.0' },
+        devDependencies: { '@formrail/core': '^0.2.0', vitest: '^3.0.0' },
+        ...o,
+      });
+    const baseWith = {
+      'packages/core/package.json': core('0.1.0'),
+      'packages/pro/package.json': proJson(
+        {
+          peerDependencies: { '@formrail/core': '0.1.0', react: '^18.0.0' },
+          devDependencies: { '@formrail/core': '^0.1.0', vitest: '^3.0.0' },
+        },
+        '0.1.0',
+      ),
+    };
+    const headWith = { 'packages/core/package.json': core('0.2.0'), 'packages/pro/package.json': proJson() };
+    const files = [
+      { status: 'M', path: 'packages/core/package.json' },
+      { status: 'M', path: 'packages/pro/package.json' },
+      { status: 'D', path: '.changeset/a.md' },
+    ];
+    const go = (proHead, coreHead = headWith['packages/core/package.json']) =>
+      run(files, { 'packages/core/package.json': coreHead, 'packages/pro/package.json': proHead }, baseWith);
+
+    it('exempts internal ranges aligned to the new version in peer and dev dependencies', () => {
+      expect(go(proJson()).exempt).toBe(true);
+    });
+
+    it('is not exempt when an internal range points to the wrong version', () => {
+      expect(go(proJson({ peerDependencies: { '@formrail/core': '0.3.0', react: '^18.0.0' } })).ok).toBe(false);
+      expect(go(proJson({ devDependencies: { '@formrail/core': '^0.1.5', vitest: '^3.0.0' } })).ok).toBe(false);
+    });
+
+    it('is not exempt when the range prefix changes', () => {
+      expect(go(proJson({ devDependencies: { '@formrail/core': '~0.2.0', vitest: '^3.0.0' } })).ok).toBe(false);
+      expect(go(proJson({ peerDependencies: { '@formrail/core': '^0.2.0', react: '^18.0.0' } })).ok).toBe(false);
+    });
+
+    it('is not exempt when an external dependency changes with the version', () => {
+      expect(go(proJson({ devDependencies: { '@formrail/core': '^0.2.0', vitest: '^4.0.0' } })).ok).toBe(false);
+    });
+
+    it('is not exempt when an internal entry is added or removed', () => {
+      expect(
+        go(proJson({ dependencies: { '@formrail/core': '0.2.0' } })).ok,
+      ).toBe(false);
+      expect(go(proJson({ devDependencies: { vitest: '^3.0.0' } })).ok).toBe(false);
+    });
+
+    it('is not exempt when the internal package version does not change but the range does', () => {
+      expect(go(proJson(), core('0.1.0')).ok).toBe(false);
+    });
+  });
+
   it('compares parsed JSON: reformatting and key order neither hide nor fake a change', () => {
     const a = '{"name":"x","version":"1","files":["a"]}';
     expect(onlyVersionChanged(a, '{\n  "files": ["a"],\n  "version": "2",\n  "name": "x"\n}')).toBe(true);
@@ -336,5 +395,33 @@ describe('collectChangedFiles (real git repository)', () => {
     const ko = run();
     expect(ko.status).toBe(1);
     expect(ko.stderr).toContain('npx changeset');
+    git('reset', '-q', '--hard', 'HEAD~1');
+    // pro aligns its internal range to core's new version, as `changeset version` does.
+    write('packages/pro/package.json', JSON.stringify({ name: '@formrail/pro', version: '0.1.0', peerDependencies: { '@formrail/core': '0.1.0' } }, null, 2) + '\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'pro on base');
+    git('switch', '-q', 'main');
+    git('merge', '-q', '--ff-only', 'release');
+    git('switch', '-q', '-c', 'release2');
+    write('packages/core/package.json', pkgJson({ version: '0.3.0' }));
+    write('packages/pro/package.json', JSON.stringify({ name: '@formrail/pro', version: '0.2.0', peerDependencies: { '@formrail/core': '0.3.0' } }, null, 2) + '\n');
+    write('.changeset/second.md', '---\n---\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'second changeset base');
+    git('switch', '-q', 'main');
+    git('merge', '-q', '--ff-only', 'release2');
+    git('switch', '-q', '-c', 'release3');
+    write('packages/core/package.json', pkgJson({ version: '0.4.0' }));
+    write('packages/pro/package.json', JSON.stringify({ name: '@formrail/pro', version: '0.3.0', peerDependencies: { '@formrail/core': '0.4.0' } }, null, 2) + '\n');
+    git('rm', '-q', '.changeset/second.md');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'release with internal range');
+    const withRange = run();
+    expect(withRange.status).toBe(0);
+    expect(withRange.stdout).toContain('exemption applied');
+    write('packages/pro/package.json', JSON.stringify({ name: '@formrail/pro', version: '0.3.0', peerDependencies: { '@formrail/core': '0.9.0' } }, null, 2) + '\n');
+    git('add', '-A');
+    git('commit', '-q', '-m', 'wrong range');
+    expect(run().status).toBe(1);
   });
 });
