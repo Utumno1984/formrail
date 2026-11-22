@@ -36,12 +36,28 @@ test.describe('Storybook Docs pages', () => {
       // The story iframes focus their autofocus element a little after the page is up (later on a slow
       // machine); the page's own guard (.storybook/preview-head.html) then scrolls back to the top on the
       // next frame, so the scroll position is polled, not read once. A jump that stays fails.
-      await expect
-        .poll(() => page.evaluate(() => window.scrollY), {
-          message: `${entry.id}: the page scrolled on its own (autofocus in a story)`,
-          timeout: 4_000,
-        })
-        .toBeLessThan(200);
+      // The poll runs in the page, on the page's clock and frames (#663): a heavy Docs page (dozens of stories,
+      // tens of thousands of nodes) keeps the main thread busy for seconds while it mounts them, and a poll from
+      // here measured that latency, not the scroll (it timed out with `scrollY` at 0 all along). A frame is
+      // drawn only after the page's scroll handlers ran, so every reading is the position the guard left.
+      const scrollY = await page.evaluate(
+        ({ limit, windowMs }) =>
+          new Promise<number>((resolve) => {
+            const start = performance.now();
+            let frames = 0;
+            const read = () => {
+              const y = window.scrollY;
+              if (y < limit || (frames >= 2 && performance.now() - start >= windowMs)) resolve(y);
+              else {
+                frames += 1;
+                requestAnimationFrame(read);
+              }
+            };
+            read();
+          }),
+        { limit: 200, windowMs: 4_000 },
+      );
+      expect(scrollY, `${entry.id}: the page scrolled on its own (autofocus in a story)`).toBeLessThan(200);
       const state = await page.evaluate(() => ({
         hidden: document.querySelector('#storybook-docs')?.getAttribute('aria-hidden') === 'true',
         locked: getComputedStyle(document.body).pointerEvents === 'none',
