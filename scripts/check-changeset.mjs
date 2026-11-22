@@ -53,8 +53,10 @@ export function onlyVersionChanged(baseText, headText) {
   if (!isObject(base) || !isObject(head)) return false;
   if (!('version' in base) || !('version' in head)) return false;
   if (JSON.stringify(canonical(base.version)) === JSON.stringify(canonical(head.version))) return false;
-  const { version: _b, ...restBase } = base;
-  const { version: _h, ...restHead } = head;
+  const restBase = { ...base };
+  const restHead = { ...head };
+  delete restBase.version;
+  delete restHead.version;
   return JSON.stringify(canonical(restBase)) === JSON.stringify(canonical(restHead));
 }
 
