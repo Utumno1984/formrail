@@ -219,7 +219,14 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
       await details.focus();
       await page.setViewportSize(size);
       await setArgs(page, { navCount: 5 });
-      await expect(column(page).getByRole('link')).toHaveCount(5);
+      // The nav is back: in the column when wide; when narrow the column is hidden (its links are in the DOM, not in
+      // the accessibility tree) and the way to it is the trigger.
+      if (name === 'wide') await expect(column(page).getByRole('link')).toHaveCount(5);
+      else {
+        await expect(column(page)).toBeHidden();
+        await expect(column(page).locator('a')).toHaveCount(5);
+        await expect(trigger(page)).toBeVisible();
+      }
       // Longer than the Sheet's entry and exit animations.
       await page.waitForTimeout(800);
       await expect(page.getByRole('dialog')).toHaveCount(0);
