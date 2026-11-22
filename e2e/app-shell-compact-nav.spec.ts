@@ -40,7 +40,7 @@ const setArgs = (page: Page, updatedArgs: Record<string, unknown>) =>
   }, updatedArgs);
 
 /** Opens the story at the width of a phone, the Sheet closed (the play of CompactNavigation leaves it closed). */
-async function openCompact(page: Page, size = MOBILE_VIEWPORT, id = COMPACT): Promise<void> {
+async function openCompact(page: Page, size: { width: number; height: number } = MOBILE_VIEWPORT, id = COMPACT): Promise<void> {
   await page.setViewportSize(size);
   await expectPlayToPass(page, id);
 }
