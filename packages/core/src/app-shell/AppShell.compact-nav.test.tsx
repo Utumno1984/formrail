@@ -690,6 +690,38 @@ describe('the Sheet', () => {
     await waitFor(() => expect(trigger()).toHaveFocus());
   });
 
+  it('reopened during its exit animation (Escape, then a click on the trigger): the focus on the current link, not on the panel', async () => {
+    animateModalExit();
+    const user = userEvent.setup();
+    render(<Shell active="B" />);
+    const sheet = await openWithKeyboard(user);
+    await waitFor(() => expect(linkIn(sheet, 'B')).toHaveFocus());
+    await user.keyboard('{Escape}');
+    expect(sheet).toHaveAttribute('data-state', 'closed');
+    await user.click(trigger());
+    // The same panel, reused: Radix runs no opening focus for it.
+    expect(screen.getByRole('dialog')).toBe(sheet);
+    expect(sheet).toHaveAttribute('data-state', 'open');
+    expect(linkIn(sheet, 'B')).toHaveFocus();
+    // Closed again, the focus still goes back to the trigger once the panel has left.
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull(), { timeout: 2000 });
+    await waitFor(() => expect(trigger()).toHaveFocus());
+  });
+
+  it('opened again after its exit has ended, a new panel: the focus on the current link (Radix opening focus)', async () => {
+    animateModalExit();
+    const user = userEvent.setup();
+    render(<Shell active="C" />);
+    const first = await openWithKeyboard(user);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull(), { timeout: 2000 });
+    await waitFor(() => expect(trigger()).toHaveFocus());
+    const second = await openWithKeyboard(user);
+    expect(second).not.toBe(first);
+    await waitFor(() => expect(linkIn(second, 'C')).toHaveFocus());
+  });
+
   it('the title and the nav follow the aria-label, or the text aria-labelledby points to, of AppShellNav', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<Shell navProps={{ 'aria-label': 'Sections' }} labels={{ nav: 'Ignored' }} />);
@@ -1130,6 +1162,8 @@ describe('the viewport crossing the breakpoint', () => {
     const sheet = await openWithKeyboard(user);
     expect(sheet).toHaveAttribute('data-state', 'open');
     expect(sheetNav()!.querySelectorAll('[data-rop-app-shell-nav-link]')).toHaveLength(3);
+    // The same panel, opened again: the focus on the current link, as at any opening (not on the panel itself).
+    expect(linkIn(sheet, 'B')).toHaveFocus();
     act(() => linkIn(sheet, 'B').focus());
     await user.keyboard('{Escape}');
     // Leaving with its links, the focus still on the one it had, as after any closing.

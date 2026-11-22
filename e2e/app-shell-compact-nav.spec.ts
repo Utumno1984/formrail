@@ -250,6 +250,49 @@ test.describe('Floorplans/App Shell: compact navigation', () => {
       await page.waitForTimeout(800);
       await expect(trigger(page)).toBeFocused();
     });
+
+    // The Sheet reopened while its exit animation runs: its panel is the same node (it never left the DOM), and the
+    // focus still starts on the current link, not on the panel. With reduced motion there is no exit animation: the
+    // panel has left at once and a new one opens (the same focus, by the ordinary opening).
+    test(`mobile (${motion}): Escape, then a click on the trigger during the exit: the focus on the current link`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: motion });
+      await openCompact(page, MOBILE_VIEWPORT, `${COMPACT}-open`);
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      await page.evaluate(() => {
+        (window as unknown as { __panel: Element | null }).__panel = document.querySelector('[role="dialog"]');
+      });
+      const box = (await trigger(page).boundingBox())!;
+      await page.keyboard.press('Escape');
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      const reused = await page.evaluate(
+        () => document.querySelector('[role="dialog"]') === (window as unknown as { __panel: Element | null }).__panel,
+      );
+      expect(reused).toBe(motion === 'no-preference');
+      await page.waitForTimeout(400);
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+    });
+
+    test(`tablet (${motion}): reopened with Enter during the exit a turn to landscape and back began: the focus on the current link`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: motion });
+      await openCompact(page, PORTRAIT_TABLET, `${COMPACT}-open`);
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      await page.evaluate(() => {
+        (window as unknown as { __panel: Element | null }).__panel = document.querySelector('[role="dialog"]');
+      });
+      await page.setViewportSize(LANDSCAPE_TABLET);
+      await expect(column(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      await page.setViewportSize(PORTRAIT_TABLET);
+      await expect(trigger(page)).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+      const reused = await page.evaluate(
+        () => document.querySelector('[role="dialog"]') === (window as unknown as { __panel: Element | null }).__panel,
+      );
+      expect(reused).toBe(motion === 'no-preference');
+      await page.waitForTimeout(400);
+      await expect(sheet(page).getByRole('link', { name: 'Section B' })).toBeFocused();
+    });
   }
 
   test('portrait with the focus in the page, not in the column: it stays there', async ({ page }) => {

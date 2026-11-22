@@ -400,6 +400,19 @@ function NavSheet({ label, labelledBy, title, panelRef, children }: NavSheetProp
   const panelNode = useRef<HTMLDivElement | null>(null);
   const setPanel = useMemo(() => composeRefs<HTMLDivElement>(panelNode, panelRef), [panelRef]);
   const { open, setOpen: close, triggerRef: trigger } = navSheet;
+  // Reopened during its exit animation, the panel is the one still on screen (it never left the DOM): Radix runs no
+  // opening focus for it (no `onOpenAutoFocus`) and the panel itself took the focus. The current link takes it, as at
+  // any opening. Read in a layout effect, so before the focus trap is on again and before anything is painted.
+  const leavingPanel = useRef<HTMLDivElement | null>(null);
+  useIsomorphicLayoutEffect(() => {
+    const panel = panelNode.current;
+    if (!open) {
+      leavingPanel.current = panel;
+      return;
+    }
+    if (panel && panel === leavingPanel.current) navFocusTarget(sheetNavRef.current)?.focus();
+    leavingPanel.current = null;
+  }, [open]);
   // An `AppShellNav` unmounted while the Sheet is on screen takes it away with no closing, so the Sheet's own return
   // of the focus never runs. Run here, before the panel leaves the DOM: a focus in the panel (or lost to `body` during
   // its exit) goes back to the trigger in the next frame, unless something else has taken it by then (a focus that was
