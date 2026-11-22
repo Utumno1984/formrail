@@ -11,6 +11,14 @@
   // keep the guard on forever; it is about the time a heavy page takes to mount its stories on a slow machine.
   // A real gesture of the reader (wheel, key, pointer, touch), on the page or inside a story iframe, turns the
   // guard off at once and for good: a scroll the reader wants is never undone.
+  //
+  // An anchor is a place the reader asked for (#663): a hash in the URL at load (this page's, or the
+  // manager's: Storybook's Docs read the parent's), and every `hashchange` while the guard is on. Then the
+  // guard holds that anchor instead of the top: the page goes to it, and an autofocus that scrolls away is
+  // brought back to it. Why hold it rather than switch the guard off: on a heavy Docs page the stories go on
+  // mounting long after the jump, and a late autofocus would throw the reader away from the section they
+  // linked to. Held by element, not by a scroll position: the stories mounting above it move it down. An
+  // anchor not in the page (yet) holds the top until it is.
   (function () {
     if (new URLSearchParams(location.search).get('viewMode') !== 'docs') return;
     var SETTLE_MS = 1000;
@@ -22,6 +30,28 @@
     var frames = document.getElementsByTagName('iframe');
     var watched = typeof WeakSet === 'function' ? new WeakSet() : null;
     var timer = null;
+    var anchor = null; // the id the URL's hash points to, or null: hold the top
+    var readAnchor = function (hash) {
+      var id = (hash || '').replace(/^#/, '');
+      try {
+        id = decodeURIComponent(id);
+      } catch (e) {
+        // a malformed escape: the raw text is the id
+      }
+      return id || null;
+    };
+    // The position the guard holds: the anchor's top (clamped to what the page can scroll), or the top.
+    var held = function () {
+      var el = anchor && document.getElementById(anchor);
+      if (!el) return 0;
+      var max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      return Math.min(max, Math.max(0, Math.round(window.scrollY + el.getBoundingClientRect().top)));
+    };
+    var hold = function () {
+      if (off || settled) return;
+      var y = held();
+      if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+    };
     var stop = function () {
       off = true;
       if (timer !== null) clearInterval(timer);
@@ -62,11 +92,22 @@
       else if (settledSince === null) settledSince = now;
       settled = settledSince !== null && now - settledSince >= SETTLE_MS;
       if (now >= MAX_MS) stop();
+      // An anchor rendered after the jump, or moved by the stories mounting above it: go (back) to it.
+      if (anchor) hold();
     };
     listen(window);
-    window.addEventListener('scroll', function () {
-      if (!off && !settled && window.scrollY > 0) window.scrollTo(0, 0);
-    }, { passive: true });
+    var parentHash = '';
+    try {
+      parentHash = window.parent !== window ? window.parent.location.hash : '';
+    } catch (e) {
+      // the manager on another origin: only this page's hash
+    }
+    anchor = readAnchor(location.hash) || readAnchor(parentHash);
+    window.addEventListener('hashchange', function () {
+      anchor = readAnchor(location.hash);
+      hold();
+    });
+    window.addEventListener('scroll', hold, { passive: true });
     timer = setInterval(check, 100);
   })();
 </script>

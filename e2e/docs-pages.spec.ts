@@ -107,4 +107,34 @@ test.describe('Storybook Docs pages', () => {
       expect(await scrollY(), 'the guard undid the reader\'s scroll').toBeGreaterThan(400);
     });
   }
+
+  // An anchor is a place the reader asked for: a deep link (hash at load) or a `hashchange` while the guard is on
+  // takes the page there and keeps it there, even when a script (what an autofocus does) scrolls it away.
+  for (const how of ['a hash in the URL at load', 'a hashchange']) {
+    test(`${how} takes the Docs page to the anchor and the scroll guard keeps it there`, async ({ page }) => {
+      const anchor = 'anchor--primitives-card--playground';
+      const frames = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const scrollY = () => page.evaluate(() => window.scrollY);
+      const anchorTop = () => page.evaluate((id) => Math.round(document.getElementById(id)?.getBoundingClientRect().top ?? NaN), anchor);
+      // Every story iframe held (request never answered): the guard waits for them, so it is on throughout.
+      await page.route(/iframe\.html\?.*viewMode=story/, () => undefined);
+      await page.goto(`/iframe.html?id=primitives-card--docs&viewMode=docs${how === 'a hashchange' ? '' : `#${anchor}`}`);
+      await page.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+      await page.waitForSelector(`#${anchor}`);
+      if (how === 'a hashchange') {
+        // The guard is on: a scroll from a script goes back to the top.
+        await page.evaluate(() => window.scrollTo(0, 800));
+        await expect.poll(scrollY, { message: 'the guard is not on: the check below would prove nothing' }).toBe(0);
+        await page.evaluate((id) => (window.location.hash = `#${id}`), anchor);
+      }
+      await expect.poll(anchorTop, { message: 'the page did not go to the anchor' }).toBeLessThanOrEqual(1);
+      expect(await anchorTop()).toBeGreaterThanOrEqual(-1);
+      expect(await scrollY(), 'the anchor is at the top of the page: the check proves nothing').toBeGreaterThan(200);
+      // A scroll from a script (an autofocus elsewhere) is brought back to the anchor, not to the top.
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(anchorTop, { message: 'the guard did not keep the anchor' }).toBeLessThanOrEqual(1);
+      await frames();
+      expect(Math.abs(await anchorTop()), 'the page left the anchor').toBeLessThanOrEqual(1);
+    });
+  }
 });
