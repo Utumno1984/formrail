@@ -78,4 +78,33 @@ test.describe('Storybook Docs pages', () => {
       if (!withoutStories(entry)) expect(state.showCode, `${entry.id}: no "Show code"`).toBeGreaterThan(0);
     }
   });
+
+  // The scroll guard of .storybook/preview-head.html stays on until the story iframes show their stories (#663),
+  // seconds on a page of iframes: the reader's own scroll in that time must never be undone, on the page or with
+  // the pointer over a story iframe (whose events never reach the page's window).
+  for (const over of ['the page', 'a story iframe'] as const) {
+    test(`a wheel scroll by the reader over ${over} is not undone by the scroll guard`, async ({ page }) => {
+      const frames = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const scrollY = () => page.evaluate(() => window.scrollY);
+      // The other story iframes are held (their request never answered): the guard waits for them, so it is
+      // still on when the reader scrolls, however fast the machine. The one under the pointer shows its story.
+      const shown = 'primitives-card--example'; // the first story, in the viewport
+      await page.route(/iframe\.html\?.*viewMode=story/, (route) => (over === 'a story iframe' && route.request().url().includes(`id=${shown}`) ? route.continue() : undefined));
+      await page.goto('/iframe.html?id=primitives-card--docs&viewMode=docs');
+      await page.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+      const frame = `.sbdocs-content iframe[src*="id=${shown}"]`;
+      if (over === 'a story iframe') await page.frameLocator(frame).locator('#storybook-root > *').first().waitFor();
+      // The guard is on: a scroll from a script (what an autofocus does) goes back to the top.
+      await page.evaluate(() => window.scrollTo(0, 800));
+      await expect.poll(scrollY, { message: 'the guard is not on: the check below would prove nothing' }).toBe(0);
+      const target = over === 'the page' ? page.locator('.sbdocs-content h1').first() : page.locator(frame);
+      const box = await target.boundingBox();
+      if (!box) throw new Error(`no box for ${over}`);
+      await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 40));
+      await page.mouse.wheel(0, 800);
+      await expect.poll(scrollY, { message: 'the wheel did not scroll the page' }).toBeGreaterThan(400);
+      await frames();
+      expect(await scrollY(), 'the guard undid the reader\'s scroll').toBeGreaterThan(400);
+    });
+  }
 });

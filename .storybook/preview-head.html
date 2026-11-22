@@ -2,16 +2,71 @@
   // Docs pages render stories in iframes; one that focuses an element on mount (autofocus demos) makes the
   // browser scroll the Docs page down to that iframe. Until the reader first touches the page, keep it at the
   // top. Only the Docs page itself (viewMode=docs), not the story iframes inside it.
+  //
+  // How long (#663): until every story iframe of the page shows its story (`readyState` complete and
+  // `#storybook-root` not empty: an autofocus in it has run by then), held for SETTLE_MS, iframes added later
+  // included (a new one arms the guard again). Not a fixed time: on a heavy Docs page the iframes finish
+  // loading well after any fixed delay (seen at 9-14 s with the old 8 s one, which left the page scrolled).
+  // MAX_MS is only a safety cap, wide on purpose: an iframe that never shows a story (a broken one) must not
+  // keep the guard on forever; it is about the time a heavy page takes to mount its stories on a slow machine.
+  // A real gesture of the reader (wheel, key, pointer, touch), on the page or inside a story iframe, turns the
+  // guard off at once and for good: a scroll the reader wants is never undone.
   (function () {
     if (new URLSearchParams(location.search).get('viewMode') !== 'docs') return;
-    var touched = false;
-    var stop = function () { touched = true; };
-    ['wheel', 'keydown', 'pointerdown', 'touchstart'].forEach(function (t) {
-      window.addEventListener(t, stop, { capture: true, once: true, passive: true });
-    });
+    var SETTLE_MS = 1000;
+    var MAX_MS = 60000;
+    var GESTURES = ['wheel', 'keydown', 'pointerdown', 'touchstart'];
+    var off = false; // for good: a gesture, or MAX_MS
+    var settled = false; // every story iframe up for SETTLE_MS; a new or reloading iframe clears it
+    var settledSince = null;
+    var frames = document.getElementsByTagName('iframe');
+    var watched = typeof WeakSet === 'function' ? new WeakSet() : null;
+    var timer = null;
+    var stop = function () {
+      off = true;
+      if (timer !== null) clearInterval(timer);
+      timer = null;
+    };
+    // Only a real gesture (`isTrusted`): a story iframe runs its `play`, whose `userEvent` dispatches keys and
+    // pointer events of its own, and those must not turn the guard off.
+    var onGesture = function (event) {
+      if (event.isTrusted) stop();
+    };
+    var listen = function (win) {
+      GESTURES.forEach(function (t) {
+        win.addEventListener(t, onGesture, { capture: true, passive: true });
+      });
+    };
+    var storyUp = function (frame) {
+      var doc;
+      try {
+        doc = frame.contentDocument;
+      } catch (e) {
+        return true; // another origin: not a story of this Storybook
+      }
+      if (!doc) return true;
+      // A gesture inside a story iframe never reaches this window: listen in each document the iframe loads.
+      if (watched && frame.contentWindow && !watched.has(frame.contentWindow)) {
+        watched.add(frame.contentWindow);
+        listen(frame.contentWindow);
+      }
+      var root = doc.getElementById('storybook-root');
+      return doc.readyState === 'complete' && !!root && !!root.firstElementChild;
+    };
+    var check = function () {
+      if (off) return;
+      var up = true;
+      for (var i = 0; i < frames.length; i++) if (!storyUp(frames[i])) up = false;
+      var now = performance.now();
+      if (!up || !document.querySelector('.sbdocs-content')) settledSince = null;
+      else if (settledSince === null) settledSince = now;
+      settled = settledSince !== null && now - settledSince >= SETTLE_MS;
+      if (now >= MAX_MS) stop();
+    };
+    listen(window);
     window.addEventListener('scroll', function () {
-      if (!touched && window.scrollY > 0) window.scrollTo(0, 0);
+      if (!off && !settled && window.scrollY > 0) window.scrollTo(0, 0);
     }, { passive: true });
-    setTimeout(function () { touched = true; }, 8000);
+    timer = setInterval(check, 100);
   })();
 </script>
