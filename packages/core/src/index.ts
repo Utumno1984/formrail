@@ -220,12 +220,13 @@ export type {
   AppLauncherGroupHeadingLevel,
 } from './app-shell/AppLauncher';
 export type { AppDescriptor, AppLauncherExtraGroup, AppLauncherExtraItem } from './app-shell/types';
-export { AppShell, AppShellHeader, AppShellMain, AppShellNav, AppShellNavLink } from './app-shell/AppShell';
+export { AppShell, AppShellHeader, AppShellMain, AppShellNav, AppShellNavLink, AppShellNavTrigger } from './app-shell/AppShell';
 export type {
   AppShellProps,
   AppShellLabels,
   AppShellHeaderProps,
   AppShellNavProps,
+  AppShellNavTriggerProps,
   AppShellNavLinkProps,
   AppShellNavLinkElement,
   AppShellMainProps,
