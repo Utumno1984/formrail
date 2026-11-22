@@ -440,6 +440,82 @@ describe('the Sheet', () => {
     await waitFor(() => expect(trigger()).toHaveFocus());
   });
 
+  describe('two triggers in one shell', () => {
+    function TwoTriggers({ onNavigate, second = true }: { onNavigate?: (section: string) => void; second?: boolean }) {
+      return (
+        <Shell
+          onNavigate={onNavigate}
+          trigger={
+            <>
+              <AppShellNavTrigger aria-label="First" />
+              {second ? <AppShellNavTrigger aria-label="Second" /> : null}
+            </>
+          }
+        />
+      );
+    }
+    const button = (name: string) => screen.getByRole('button', { name, hidden: true });
+    const openFromButton = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+      act(() => button(name).focus());
+      await user.keyboard('{Enter}');
+      return screen.findByRole('dialog');
+    };
+
+    it('a link gives the focus to the trigger the Sheet was opened from, before onNavigate', async () => {
+      animateModalExit();
+      const user = userEvent.setup();
+      const focused: (string | null)[] = [];
+      const onNavigate = () => focused.push(document.activeElement!.getAttribute('aria-label'));
+      render(<TwoTriggers onNavigate={onNavigate} />);
+      await user.click(linkIn(await openFromButton(user, 'First'), 'B'));
+      await waitFor(() => expect(screen.queryByRole('dialog', { hidden: true })).toBeNull(), { timeout: 2000 });
+      await user.click(linkIn(await openFromButton(user, 'Second'), 'C'));
+      expect(focused).toEqual(['First', 'Second']);
+    });
+
+    it('the other one unmounted: the one left still gets the focus', async () => {
+      animateModalExit();
+      const user = userEvent.setup();
+      const focused: (string | null)[] = [];
+      const onNavigate = () => focused.push(document.activeElement!.getAttribute('aria-label'));
+      const { rerender } = render(<TwoTriggers onNavigate={onNavigate} />);
+      rerender(<TwoTriggers onNavigate={onNavigate} second={false} />);
+      await user.click(linkIn(await openFromButton(user, 'First'), 'B'));
+      expect(focused).toEqual(['First']);
+    });
+
+    it('the trigger it was opened from unmounted while the Sheet is open: Escape gives the focus to the other one', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(<TwoTriggers />);
+      await openFromButton(user, 'Second');
+      rerender(<TwoTriggers second={false} />);
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await waitFor(() => expect(button('First')).toHaveFocus());
+    });
+
+    it('the first one unmounted before any opening: a crossing to narrow gives the focus of the column to the other one', () => {
+      screenSize.cross(true);
+      function FirstOptional({ first }: { first: boolean }) {
+        return (
+          <Shell
+            trigger={
+              <>
+                {first ? <AppShellNavTrigger aria-label="First" /> : null}
+                <AppShellNavTrigger aria-label="Second" />
+              </>
+            }
+          />
+        );
+      }
+      const { rerender } = render(<FirstOptional first />);
+      rerender(<FirstOptional first={false} />);
+      act(() => linkIn(column(), 'B').focus());
+      screenSize.cross(false);
+      expect(button('Second')).toHaveFocus();
+    });
+  });
+
   it('with no current page the focus starts on the first link that can be followed', async () => {
     const user = userEvent.setup();
     render(<Shell active="none" link={(section) => (section === 'A' ? { disabled: true } : {})} />);

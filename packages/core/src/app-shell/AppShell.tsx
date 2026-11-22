@@ -99,12 +99,17 @@ interface AppShellNavSheetValue {
   /** The edge the Sheet comes from: the start edge in the trigger's direction, read when it opens. */
   side: 'left' | 'right';
   /** Opens the Sheet from this trigger. */
-  openFrom: (trigger: HTMLElement) => void;
+  openFrom: (trigger: HTMLButtonElement) => void;
   setOpen: (open: boolean) => void;
   /** `id` of the Sheet's panel (the trigger's `aria-controls` while it is open). */
   sheetId: string;
-  /** The trigger, where the focus goes back. */
+  /**
+   * The trigger, where the focus goes back: the one the Sheet was opened from while it is mounted, else another
+   * mounted one (the first mounted until the Sheet opens), else `null`.
+   */
   triggerRef: MutableRefObject<HTMLButtonElement | null>;
+  /** Called by `AppShellNavTrigger` with its button when it mounts; returns the function to call when it unmounts. */
+  registerTrigger: (trigger: HTMLButtonElement) => () => void;
   /** Whether the shell has an `AppShellNav`: without one the trigger opens nothing. */
   hasNav: boolean;
   /** Called by `AppShellNav` when it mounts; returns the function to call when it unmounts (which closes the Sheet). */
@@ -279,9 +284,21 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
   const [navSide, setNavSide] = useState<'left' | 'right'>('left');
   const [navCount, setNavCount] = useState(0);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const openFrom = useCallback((trigger: HTMLElement) => {
+  const triggers = useRef<HTMLButtonElement[]>([]);
+  const openFrom = useCallback((trigger: HTMLButtonElement) => {
+    triggerRef.current = trigger;
     setNavSide(startSide(trigger));
     setNavOpen(true);
+  }, []);
+  // Every mounted trigger, so that the focus has one to go back to when the one the Sheet opened from unmounts.
+  const registerTrigger = useCallback((trigger: HTMLButtonElement) => {
+    const list = triggers.current;
+    list.push(trigger);
+    triggerRef.current ??= trigger;
+    return () => {
+      list.splice(list.indexOf(trigger), 1);
+      if (triggerRef.current === trigger) triggerRef.current = list[0] ?? null;
+    };
   }, []);
   // The Sheet is rendered by `AppShellNav`: a nav that leaves takes the Sheet with it, so it closes it too (else the
   // trigger would announce an open Sheet that is not there, and a nav mounted later would open it by itself).
@@ -303,12 +320,13 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
       setOpen: setNavOpen,
       sheetId,
       triggerRef,
+      registerTrigger,
       hasNav: navCount > 0,
       registerNav,
       Sheet,
       provideSheet,
     }),
-    [navOpen, navSide, openFrom, sheetId, navCount, registerNav, Sheet, provideSheet],
+    [navOpen, navSide, openFrom, sheetId, registerTrigger, navCount, registerNav, Sheet, provideSheet],
   );
 
   const skip = (event: MouseEvent<HTMLAnchorElement>) => {
@@ -445,8 +463,12 @@ export interface AppShellNavTriggerProps extends Omit<ButtonHTMLAttributes<HTMLB
  * the focus on the link of the current page (else the first link that can be followed) and the rest of the page
  * inert; Escape, its close button or the backdrop close it, and the focus goes back to the trigger.
  *
- * Declared limits: in a shell without an `AppShellNav` it opens nothing. A trigger that is disabled or unmounted
- * when the Sheet closes does not get the focus back, and nothing else is focused instead.
+ * Several triggers in one shell (one in the header, one in an empty page) share the Sheet: the focus goes back to the
+ * one the Sheet was opened from, or, when that one has unmounted, to another mounted one; a trigger mounted again
+ * while the Sheet is open (a new `key`) gets it too.
+ *
+ * Declared limits: in a shell without an `AppShellNav` it opens nothing. When no trigger is mounted as the Sheet
+ * closes, or the one the focus goes back to is disabled, the focus is not given back, and nothing else is focused.
  */
 export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppShellNavTriggerProps>(function AppShellNavTrigger(
   { onClick, className, 'aria-label': ariaLabel, ...rest },
@@ -454,11 +476,13 @@ export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, 
 ) {
   const shell = useContext(AppShellContext);
   const navSheet = useContext(AppShellNavSheetContext);
-  const triggerRef = navSheet?.triggerRef;
-  const composedRef = useMemo(() => composeRefs<HTMLButtonElement>(triggerRef, ref), [triggerRef, ref]);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const composedRef = useMemo(() => composeRefs<HTMLButtonElement>(buttonRef, ref), [ref]);
   // Kept once given (a trigger unmounted while the Sheet is open: the Sheet can still close).
   const provideSheet = navSheet?.provideSheet;
   useIsomorphicLayoutEffect(() => provideSheet?.(NavSheet), [provideSheet]);
+  const registerTrigger = navSheet?.registerTrigger;
+  useIsomorphicLayoutEffect(() => (buttonRef.current ? registerTrigger?.(buttonRef.current) : undefined), [registerTrigger]);
   if (!shell || !navSheet) throw new Error('[formrail] <AppShellNavTrigger> must be rendered inside <AppShell>.');
   const { open, hasNav, openFrom, sheetId } = navSheet;
   const onTriggerClick = (event: MouseEvent<HTMLButtonElement>) => {
