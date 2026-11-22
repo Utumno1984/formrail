@@ -224,6 +224,58 @@ test.describe('Storybook Docs pages', () => {
       });
     }
 
+    // The guard of the preview goes on checking its URL after a stop, and with it the interval that listens in
+    // the story iframes of the page just shown: a reader's wheel over one of them must not be undone.
+    test('a wheel by the reader over a story iframe of a Docs page picked after another Docs page is not undone', async ({ page }) => {
+      const shown = 'primitives-card--example'; // the first story of the page picked, in the viewport
+      // The other story iframes are held (request never answered): the guard waits for them, so it stays on.
+      await page.route(/iframe\.html\?.*viewMode=story/, (route) => (route.request().url().includes(`id=${shown}`) ? route.continue() : undefined));
+      await page.goto('/?path=/docs/overlays-menu--docs');
+      const preview = await previewFrame(page);
+      await preview.waitForSelector('.sbdocs-content', { timeout: 15_000 });
+      await preview.evaluate(() => window.scrollTo(0, 800));
+      await expect.poll(() => scrollY(preview), { message: 'the guard is not on: the check below would prove nothing' }).toBe(0);
+      // A real gesture turns the guard off on this page.
+      const outer = await page.locator('#storybook-preview-iframe').boundingBox();
+      if (!outer) throw new Error('no box for the preview');
+      await page.mouse.move(outer.x + outer.width / 2, outer.y + 40);
+      await page.mouse.wheel(0, 400);
+      await expect.poll(() => scrollY(preview), { message: 'the wheel did not scroll the page' }).toBeGreaterThan(200);
+      await mark(preview);
+      await pick(page, preview, 'primitives-card--docs', 'docs');
+      await preview.evaluate(() => window.scrollTo(0, 0));
+      await expect.poll(() => scrollY(preview)).toBe(0);
+      const frame = preview.locator(`.sbdocs-content iframe[src*="id=${shown}"]`);
+      await preview.frameLocator(`.sbdocs-content iframe[src*="id=${shown}"]`).locator('#storybook-root > *').first().waitFor();
+      await ticks(preview); // the guard's check has seen the story and listens in its document
+      // The guard is on for the new page: a scroll from a script goes back to the top.
+      await preview.evaluate(() => window.scrollTo(0, 800));
+      await expect.poll(() => scrollY(preview), { message: 'the guard is not on: the check below would prove nothing' }).toBe(0);
+      const box = await frame.boundingBox();
+      if (!box) throw new Error('no box for the story iframe');
+      await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 40));
+      await page.mouse.wheel(0, 800);
+      await expect.poll(() => scrollY(preview), { message: 'the wheel did not scroll the page' }).toBeGreaterThan(400);
+      await ticks(preview);
+      expect(await scrollY(preview), 'the guard undid the reader\'s scroll').toBeGreaterThan(400);
+    });
+
+    // The 60 s ceiling counts from the moment the page is shown, not from the load of the preview.
+    test('the scroll guard of a Docs page picked after a minute in the manager still holds the page', async ({ page }) => {
+      await page.clock.install();
+      await page.goto('/?path=/story/primitives-card--example');
+      const preview = await previewFrame(page);
+      await preview.waitForSelector('#storybook-root > *', { timeout: 15_000 });
+      // The story iframes of the Docs page are held (the preview itself is loaded already): the guard stays on.
+      await page.route(/iframe\.html\?.*viewMode=story/, () => undefined);
+      await mark(preview);
+      await page.clock.fastForward(61_000);
+      await pick(page, preview, 'primitives-card--docs', 'docs');
+      await preview.evaluate(() => window.scrollTo(0, 800));
+      await page.clock.runFor(500);
+      expect(await scrollY(preview), 'the ceiling counted from the load: the guard is off').toBe(0);
+    });
+
     test('a hash in the manager URL at load takes the Docs page to the anchor and the scroll guard keeps it there', async ({ page }) => {
       const anchor = 'anchor--primitives-card--playground';
       await page.route(/iframe\.html\?.*viewMode=story/, () => undefined);
