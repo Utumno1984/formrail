@@ -4,19 +4,19 @@ import { waitForOutsidePressArmed } from './helpers/overlay';
 
 // #130: "New" opens a Dialog/Sheet above a mounted List Report; closing it must leave the report as it
 // was (same DOM node, same scroll, pill, search, sort) and give the focus back to "New".
-// The table scroller is the table's parent. The search term "FT-2026-00" matches the first 99 invoice
-// numbers: with the "Open" pill there are still enough rows to scroll well past 600px.
+// The table scroller is the table's parent. The search term "REC-00" matches the first 99 record
+// numbers: with the "Active" pill there are still enough rows to scroll well past 600px.
 const STORY = 'floorplans-list-report--cancel-action-overlay-no-play';
 const LOADING_STORY = 'floorplans-list-report--cancel-action-overlay-loading';
-const SEARCH = 'FT-2026-00';
+const SEARCH = 'REC-00';
 
-const table = (page: Page): Locator => page.getByRole('table', { name: /Invoices/ });
+const table = (page: Page): Locator => page.getByRole('table', { name: /Records/ });
 const scroller = (page: Page): Locator => table(page).locator('..');
 const newButton = (page: Page): Locator => page.getByRole('button', { name: 'New', exact: true });
 const searchbox = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 // CSS, not a role query: with a modal open the page behind is aria-hidden.
 const heading = (page: Page): Locator => page.locator('#storybook-root h2');
-const overlay = (page: Page): Locator => page.getByRole('dialog', { name: 'New invoice' });
+const overlay = (page: Page): Locator => page.getByRole('dialog', { name: 'New record' });
 
 const TALL_STORY = 'floorplans-list-report--cancel-action-overlay-tall-page';
 
@@ -32,7 +32,7 @@ const open = async (
 
 /** Pill, committed search and sort, then scroll the table (down, and sideways where it is wider than its box). */
 async function prepare(page: Page): Promise<void> {
-  await page.getByRole('radio', { name: 'Open' }).click();
+  await page.getByRole('radio', { name: 'Active' }).click();
   await searchbox(page).fill(SEARCH);
   await searchbox(page).press('Enter');
   await page.getByRole('button', { name: 'Amount' }).click();
@@ -71,7 +71,7 @@ async function expectRestored(page: Page, before: State): Promise<void> {
   await expect(overlay(page)).toHaveCount(0);
   const after = await snapshot(page);
   expect(after).toEqual(before);
-  await expect(page.getByRole('radio', { name: 'Open' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Active' })).toBeChecked();
   await expect(searchbox(page)).toHaveValue(SEARCH);
   await expect(newButton(page)).toBeFocused();
 }
@@ -243,7 +243,7 @@ for (const vp of VIEWPORTS) {
       await prepare(page);
       const before = await snapshot(page);
       await newButton(page).click();
-      const field = overlay(page).getByRole('textbox', { name: 'Supplier name' });
+      const field = overlay(page).getByRole('textbox', { name: 'Record name' });
       await field.click();
       await expect(field).toBeFocused();
       await field.pressSequentially('Acme');
@@ -290,7 +290,7 @@ test('the Dialog field keeps the table scroll too', async ({ page }) => {
   await prepare(page);
   const before = await snapshot(page);
   await newButton(page).click();
-  const field = overlay(page).getByRole('textbox', { name: 'Supplier name' });
+  const field = overlay(page).getByRole('textbox', { name: 'Record name' });
   await field.click();
   await field.pressSequentially('Acme');
   expect(await snapshot(page)).toEqual(before);

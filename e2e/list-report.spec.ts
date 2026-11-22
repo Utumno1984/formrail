@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { formatEuro, makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
+import { formatMoney, makeRecords } from '../packages/core/src/internal/demo-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass } from './helpers/story';
@@ -11,16 +11,16 @@ const STORY = (name: string) => `floorplans-list-report--${name}`;
 // the sort active), so a test that interacts starts from the same page without it.
 const PLAYGROUND = STORY('no-play');
 
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
 const scroller = (page: Page): Locator => table(page).locator('..');
-const heading = (page: Page): Locator => page.getByRole('heading', { name: /Invoices/ });
+const heading = (page: Page): Locator => page.getByRole('heading', { name: /Records/ });
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
 const search = (page: Page): Locator => page.getByRole('searchbox', { name: 'Search' });
 const bodyRows = (page: Page): Locator => table(page).locator('tbody tr:not([aria-hidden])');
 
-const ALL = makeDemoInvoices(200);
+const ALL = makeRecords(200);
 const PENDING = ALL.filter((r) => r.status === 'pending');
-const FOUND = PENDING.filter((r) => r.supplier.includes('Ferrari')).sort((a, b) => b.amount - a.amount);
+const FOUND = PENDING.filter((r) => r.name.includes('Plan')).sort((a, b) => b.amountMinor - a.amountMinor);
 
 interface Box {
   top: number;
@@ -78,10 +78,10 @@ test.describe('accessibility', () => {
 
   test('the table is named by the title (aria-labelledby), the count is part of the heading only', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
-    await expect(heading(page)).toHaveText('Invoices (200)');
+    await expect(heading(page)).toHaveText('Records (200)');
     const id = await table(page).getAttribute('aria-labelledby');
     expect(id).toBeTruthy();
-    await expect(page.locator(`[id="${id}"]`)).toHaveText('Invoices');
+    await expect(page.locator(`[id="${id}"]`)).toHaveText('Records');
     await expect(table(page)).not.toHaveAttribute('aria-label', /.+/);
   });
 
@@ -161,7 +161,7 @@ test.describe('responsive', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoStory(page, PLAYGROUND);
     const title = await heading(page).boundingBox();
-    const action = await page.getByRole('button', { name: 'New invoice' }).boundingBox();
+    const action = await page.getByRole('button', { name: 'New record' }).boundingBox();
     expect(action!.y).toBeGreaterThanOrEqual(title!.y + title!.height - 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
     expect(await scroller(page).evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
@@ -179,7 +179,7 @@ test.describe('responsive', () => {
   test('desktop: title and actions on one row', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
     const title = await heading(page).boundingBox();
-    const action = await page.getByRole('button', { name: 'New invoice' }).boundingBox();
+    const action = await page.getByRole('button', { name: 'New record' }).boundingBox();
     expect(action!.y).toBeLessThan(title!.y + title!.height);
     expect(action!.x).toBeGreaterThan(title!.x + title!.width);
   });
@@ -194,7 +194,7 @@ test.describe('live region count', () => {
     await page.keyboard.press('ArrowRight');
     await expect(region).toHaveText(`${PENDING.length} results`);
     await search(page).focus();
-    await page.keyboard.type('Ferrari');
+    await page.keyboard.type('Plan');
     await page.keyboard.press('Enter');
     await expect(region).toHaveText(FOUND.length === 1 ? '1 result' : `${FOUND.length} results`);
     await expect(region).toHaveCount(1);
@@ -206,35 +206,35 @@ test.describe('real keyboard (no mouse)', () => {
     await gotoStory(page, PLAYGROUND);
     await pill(page, 'All').focus();
     await page.keyboard.press('ArrowRight');
-    await expect(pill(page, 'To approve')).toBeChecked();
-    await expect(pill(page, 'To approve')).toBeFocused();
-    await expect(heading(page)).toHaveText(`Invoices (${PENDING.length} of 200)`);
+    await expect(pill(page, 'Pending')).toBeChecked();
+    await expect(pill(page, 'Pending')).toBeFocused();
+    await expect(heading(page)).toHaveText(`Records (${PENDING.length} of 200)`);
 
     await page.keyboard.press('Tab');
     await expect(search(page)).toBeFocused();
-    await page.keyboard.type('Ferrari');
+    await page.keyboard.type('Plan');
     await page.keyboard.press('Enter');
-    await expect(heading(page)).toHaveText(`Invoices (${FOUND.length} of 200)`);
+    await expect(heading(page)).toHaveText(`Records (${FOUND.length} of 200)`);
     await expect(bodyRows(page)).toHaveCount(FOUND.length);
 
     await tabTo(page, page.getByRole('button', { name: 'Amount' }));
     await page.keyboard.press('Enter');
     await expect(page.getByRole('columnheader', { name: 'Amount' })).toHaveAttribute('aria-sort', 'descending');
-    await expect(bodyRows(page).nth(0)).toContainText(FOUND[0]!.number);
-    await expect(bodyRows(page).nth(0)).toContainText(formatEuro(FOUND[0]!.amount));
-    await expect(bodyRows(page).nth(1)).toContainText(FOUND[1]!.number);
+    await expect(bodyRows(page).nth(0)).toContainText(FOUND[0]!.code);
+    await expect(bodyRows(page).nth(0)).toContainText(formatMoney(FOUND[0]!.amountMinor, FOUND[0]!.currency));
+    await expect(bodyRows(page).nth(1)).toContainText(FOUND[1]!.code);
 
     await search(page).focus();
     await page.keyboard.press('Control+A');
     await page.keyboard.type('zzz');
     await page.keyboard.press('Enter');
     await expect(table(page).getByText('No results for the current filters', { exact: true })).toBeVisible();
-    await expect(heading(page)).toHaveText('Invoices (0 of 200)');
+    await expect(heading(page)).toHaveText('Records (0 of 200)');
 
     await tabTo(page, page.getByRole('button', { name: 'Clear filters' }));
     await page.keyboard.press('Enter');
     await expect(bodyRows(page)).toHaveCount(200);
-    await expect(heading(page)).toHaveText('Invoices (200)');
+    await expect(heading(page)).toHaveText('Records (200)');
     await expect(pill(page, 'All')).toBeChecked();
     await expect(search(page)).toHaveValue('');
     await expect(search(page)).toBeFocused();
@@ -283,16 +283,16 @@ test.describe('"Simulate loading"', () => {
 
   test('a filter and a typed search survive loading -> data', async ({ page }) => {
     await gotoStory(page, PLAYGROUND);
-    await pill(page, 'To approve').click();
-    await search(page).fill('Ferrari');
+    await pill(page, 'Pending').click();
+    await search(page).fill('Plan');
     await search(page).press('Enter');
-    await expect(heading(page)).toHaveText(`Invoices (${FOUND.length} of 200)`);
+    await expect(heading(page)).toHaveText(`Records (${FOUND.length} of 200)`);
     await page.getByRole('button', { name: 'Simulate loading' }).click();
     await expect(scroller(page)).toHaveAttribute('aria-busy', 'true');
     await expect(scroller(page)).not.toHaveAttribute('aria-busy', 'true');
-    await expect(pill(page, 'To approve')).toBeChecked();
-    await expect(search(page)).toHaveValue('Ferrari');
-    await expect(heading(page)).toHaveText(`Invoices (${FOUND.length} of 200)`);
+    await expect(pill(page, 'Pending')).toBeChecked();
+    await expect(search(page)).toHaveValue('Plan');
+    await expect(heading(page)).toHaveText(`Records (${FOUND.length} of 200)`);
   });
 });
 
@@ -323,14 +323,14 @@ test.describe('controls', () => {
     expect(await scroller(page).evaluate((el) => el.matches(':focus-visible'))).toBe(false);
   });
 
-  test('firstSortDirection of "Data": asc or desc at the first click', async ({ page }) => {
+  test('firstSortDirection of "Due date": asc or desc at the first click', async ({ page }) => {
     for (const [direction, sort] of [
       ['asc', 'ascending'],
       ['desc', 'descending'],
     ] as const) {
       await gotoStory(page, PLAYGROUND, `firstSortDirection:${direction}`);
-      await page.getByRole('button', { name: 'Date' }).click();
-      await expect(page.getByRole('columnheader', { name: 'Date' })).toHaveAttribute('aria-sort', sort);
+      await page.getByRole('button', { name: 'Due date' }).click();
+      await expect(page.getByRole('columnheader', { name: 'Due date' })).toHaveAttribute('aria-sort', sort);
     }
   });
 

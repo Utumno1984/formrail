@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { makeDemoInvoices, type DemoInvoice } from '../internal/demo-invoices';
+import { makeRecords, type DemoRecord } from '../internal/demo-data';
 import { ListReport } from './ListReport';
 import { countClass, countFlashClass } from './list-report-styles';
 import type { ListReportColumn } from './types';
@@ -16,14 +16,14 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const COLUMNS: ListReportColumn<DemoInvoice>[] = [{ id: 'number', header: 'Numero', accessor: (r) => r.number }];
+const COLUMNS: ListReportColumn<DemoRecord>[] = [{ id: 'code', header: 'Numero', accessor: (r) => r.code }];
 
-function Host({ rows }: { rows: DemoInvoice[] }) {
-  const table = useListReport<DemoInvoice>({ rows, columns: COLUMNS, getRowId: (r) => r.id, searchCommitDelay: null });
+function Host({ rows }: { rows: DemoRecord[] }) {
+  const table = useListReport<DemoRecord>({ rows, columns: COLUMNS, getRowId: (r) => r.id, searchCommitDelay: null });
   return <ListReport table={table} title="Fatture" />;
 }
 
-const ROWS = makeDemoInvoices(40);
+const ROWS = makeRecords(40);
 const pill = () => within(screen.getByRole('heading', { name: /Fatture/ })).getByText(/^\(\d+\)$/);
 const flashing = () => pill().hasAttribute('data-changed');
 
@@ -75,7 +75,7 @@ describe('<ListReport> count pill', () => {
     // a new array with the same length: same numbers, nothing changed
     rerender(<Host rows={[...ROWS]} />);
     expect(flashing()).toBe(false);
-    rerender(<Host rows={makeDemoInvoices(41)} />);
+    rerender(<Host rows={makeRecords(41)} />);
     expect(flashing()).toBe(true);
   });
 

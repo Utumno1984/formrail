@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
+import { makeRecords } from '../packages/core/src/internal/demo-data';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
 
@@ -8,16 +8,16 @@ const NO_BULK = 'floorplans-list-report--selection-without-bulk-actions-no-play'
 const WITH_BULK = 'floorplans-list-report--selection-no-play';
 const PRO = 'pro-floorplans-virtual-list-report--default-no-play';
 
-// The scenario of the Selection story: the first open invoice and the first two that are not open.
-const ROWS = makeDemoInvoices(200);
+// The scenario of the Selection story: the first pending record and the first two that are not pending.
+const ROWS = makeRecords(200);
 const SCENARIO = [ROWS.find((r) => r.status === 'pending')!, ...ROWS.filter((r) => r.status !== 'pending').slice(0, 2)];
 
-const bar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Invoices' });
+const bar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Records' });
 const count = (page: Page): Locator => page.locator('[data-rop-selection-count]');
 const clear = (page: Page): Locator => page.locator('[data-rop-selection-bar] button', { hasText: 'Clear selection' });
 const allBox = (page: Page): Locator => page.getByRole('checkbox', { name: 'Select all results' });
 const pill = (page: Page, name: string): Locator => page.getByRole('radio', { name });
-const scroller = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' }).locator('..');
+const scroller = (page: Page): Locator => page.getByRole('table', { name: 'Records' }).locator('..');
 const rowBoxes = (page: Page): Locator => page.getByRole('checkbox', { name: /^Select (INV|FT)-/ });
 
 interface Box {
@@ -45,7 +45,7 @@ async function oneLineHeight(page: Page): Promise<number> {
   });
 }
 async function pick(page: Page, n: number): Promise<void> {
-  for (const row of SCENARIO.slice(0, n)) await page.getByRole('checkbox', { name: `Select ${row.number}` }).click();
+  for (const row of SCENARIO.slice(0, n)) await page.getByRole('checkbox', { name: `Select ${row.code}` }).click();
 }
 const sameRow = async (page: Page): Promise<void> => {
   expect(Math.abs(cy(await box(count(page))) - cy(await box(clear(page))))).toBeLessThanOrEqual(1);
@@ -78,7 +78,7 @@ for (const vp of [
       await expect(clear(page)).toBeVisible();
       await sameRow(page);
       await check('3 selected');
-      await pill(page, 'Open').click();
+      await pill(page, 'Pending').click();
       await expect(bar(page)).toContainText('hidden by filters');
       await check('with hidden ids');
       await pill(page, 'All').click();
@@ -153,7 +153,7 @@ test.describe('narrow edge cases', () => {
     await page.setViewportSize({ width: 320, height: 640 });
     await gotoStory(page, NO_BULK);
     await pick(page, 3);
-    await pill(page, 'Open').click();
+    await pill(page, 'Pending').click();
     await expect(bar(page)).toContainText('1 selected (2 hidden by filters)');
     const c = await box(count(page));
     const b = await box(clear(page));
@@ -202,9 +202,9 @@ const setDir = (page: Page, dir: 'rtl' | 'ltr'): Promise<void> =>
 const minCount = (page: Page): Promise<number> => count(page).evaluate((el) => parseFloat(getComputedStyle(el).minWidth));
 /** `pick` for large text: the sticky header can cover a row, so the box is clicked through the DOM (the same React event). */
 async function pickDom(page: Page, n: number): Promise<void> {
-  for (const row of SCENARIO.slice(0, n)) await page.getByRole('checkbox', { name: `Select ${row.number}` }).evaluate((el) => (el as HTMLInputElement).click());
+  for (const row of SCENARIO.slice(0, n)) await page.getByRole('checkbox', { name: `Select ${row.code}` }).evaluate((el) => (el as HTMLInputElement).click());
 }
-const LONG_CLEAR = 'Remove every invoice from the selection';
+const LONG_CLEAR = 'Remove every record from the selection';
 const longClear = (page: Page): Locator => page.locator('[data-rop-selection-bar] button', { hasText: LONG_CLEAR });
 
 /** Runs 0 / 3 / hidden / all / cleared and checks that the bar, the count and the page hold at each step. */
@@ -238,7 +238,7 @@ async function expectStableThrough(page: Page, wrapped: boolean): Promise<void> 
   await pickDom(page, 3);
   await expect(bar(page)).toContainText('3 selected');
   await check('3 selected');
-  await pill(page, 'Open').click();
+  await pill(page, 'Pending').click();
   await expect(bar(page)).toContainText('hidden by filters');
   await check('with hidden ids');
   await pill(page, 'All').click();

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
+import { makeRecords } from '../packages/core/src/internal/demo-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
@@ -11,12 +11,12 @@ const MENU_ONLY_PLAY_STORY = 'floorplans-list-report--row-actions-menu-only';
 const WIDE_VISUAL_STORY = 'floorplans-list-report--row-actions-inline-wide';
 const NARROW = 'containerWidth:narrow';
 
-const ROWS = makeDemoInvoices(20);
-const APPROVED = ROWS.find((r) => r.status === 'approved')!;
+const ROWS = makeRecords(20);
+const ARCHIVED = ROWS.find((r) => r.status === 'archived')!;
 const PENDING = ROWS.find((r) => r.status === 'pending')!;
-const REJECTED = ROWS.find((r) => r.status === 'rejected')!;
+const ON_HOLD = ROWS.find((r) => r.status === 'on-hold')!;
 
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
 const scroller = (page: Page): Locator => table(page).locator('..');
 // Only what is displayed: the hidden form (`display: none`) is out of the accessibility tree.
 const inline = (page: Page, number: string): Locator => page.getByRole('button', { name: `Delete… ${number}`, exact: true });
@@ -24,7 +24,7 @@ const trigger = (page: Page, number: string): Locator => page.getByRole('button'
 const rowOf = (page: Page, number: string): Locator => table(page).getByRole('row').filter({ has: page.getByRole('cell', { name: number, exact: true }) });
 const menu = (page: Page): Locator => page.getByRole('menu');
 const item = (page: Page, name: string): Locator => page.getByRole('menuitem', { name, exact: true });
-const confirmation = (page: Page, number: string): Locator => page.getByRole('dialog', { name: `Delete invoice ${number}?` });
+const confirmation = (page: Page, number: string): Locator => page.getByRole('dialog', { name: `Delete record ${number}?` });
 
 const isFocused = (l: Locator): Promise<boolean> => l.evaluate((el) => el === document.activeElement);
 
@@ -59,65 +59,65 @@ test.describe('List Report inline row actions (#364)', () => {
 
   test('one accessible control per action and row at each width: inline + "…" when wide, "…" alone when narrow', async ({ page }) => {
     await gotoStory(page, STORY);
-    await expect(page.getByRole('button', { name: /^Delete… FT-/ })).toHaveCount(ROWS.length);
-    await expect(page.getByRole('button', { name: /^Actions for FT-/ })).toHaveCount(ROWS.length);
+    await expect(page.getByRole('button', { name: /^Delete… REC-/ })).toHaveCount(ROWS.length);
+    await expect(page.getByRole('button', { name: /^Actions for REC-/ })).toHaveCount(ROWS.length);
     // Both forms are in the DOM: two triggers per row, one of them hidden.
     await expect(table(page).locator('button[aria-label^="Actions for"]')).toHaveCount(ROWS.length * 2);
-    for (const number of [PENDING.number, APPROVED.number]) {
+    for (const number of [PENDING.code, ARCHIVED.code]) {
       await expect(inline(page, number)).toHaveCount(1);
       await expect(trigger(page, number)).toHaveCount(1);
     }
 
     await gotoStory(page, STORY, NARROW);
-    await expect(page.getByRole('button', { name: /^Delete… FT-/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^Actions for FT-/ })).toHaveCount(ROWS.length);
+    await expect(page.getByRole('button', { name: /^Delete… REC-/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Actions for REC-/ })).toHaveCount(ROWS.length);
     await expect(table(page).locator('button[aria-label^="Delete… "]')).toHaveCount(ROWS.length);
   });
 
   test('Tab never reaches the hidden form', async ({ page }) => {
     const [first, second] = [ROWS[0]!, ROWS[1]!];
     await gotoStory(page, STORY);
-    await inline(page, first.number).focus();
+    await inline(page, first.code).focus();
     await page.keyboard.press('Tab');
-    await expect(trigger(page, first.number)).toBeFocused();
+    await expect(trigger(page, first.code)).toBeFocused();
     await page.keyboard.press('Tab');
     // Next row: its inline button, never the hidden narrow trigger of the first row.
-    await expect(inline(page, second.number)).toBeFocused();
+    await expect(inline(page, second.code)).toBeFocused();
 
     await gotoStory(page, STORY, NARROW);
-    await trigger(page, first.number).focus();
+    await trigger(page, first.code).focus();
     await page.keyboard.press('Tab');
-    await expect(trigger(page, second.number)).toBeFocused();
+    await expect(trigger(page, second.code)).toBeFocused();
     await page.keyboard.press('Shift+Tab');
-    await expect(trigger(page, first.number)).toBeFocused();
+    await expect(trigger(page, first.code)).toBeFocused();
   });
 
   test('the same descriptor in both forms: the inline button and the menu item call onSelect once each, for the same row, returnFocusRef = the control used', async ({ page }) => {
     const read = await recordActions(page);
     await gotoStory(page, STORY);
     // Wide: the inline button.
-    await inline(page, PENDING.number).click();
-    await expect(confirmation(page, PENDING.number)).toHaveCount(1);
-    await confirmation(page, PENDING.number).getByRole('button', { name: 'Cancel' }).click();
-    await expect(confirmation(page, PENDING.number)).toHaveCount(0);
+    await inline(page, PENDING.code).click();
+    await expect(confirmation(page, PENDING.code)).toHaveCount(1);
+    await confirmation(page, PENDING.code).getByRole('button', { name: 'Cancel' }).click();
+    await expect(confirmation(page, PENDING.code)).toHaveCount(0);
     // returnFocusRef: the inline button that was used.
-    await expect(inline(page, PENDING.number)).toBeFocused();
-    await inline(page, PENDING.number).click();
-    await confirmation(page, PENDING.number).getByRole('button', { name: 'Delete invoice' }).click();
-    await expect(rowOf(page, PENDING.number)).toHaveCount(0);
+    await expect(inline(page, PENDING.code)).toBeFocused();
+    await inline(page, PENDING.code).click();
+    await confirmation(page, PENDING.code).getByRole('button', { name: 'Delete record' }).click();
+    await expect(rowOf(page, PENDING.code)).toHaveCount(0);
     await expect.poll(() => callsOf(read, 'onDelete')).toEqual([[PENDING.id]]);
 
     // Narrow: the same action from the "…" menu.
     await gotoStory(page, STORY, NARROW);
-    await trigger(page, PENDING.number).click();
+    await trigger(page, PENDING.code).click();
     await item(page, 'Delete…').click();
-    await expect(confirmation(page, PENDING.number)).toHaveCount(1);
-    await confirmation(page, PENDING.number).getByRole('button', { name: 'Cancel' }).click();
-    await expect(trigger(page, PENDING.number)).toBeFocused();
-    await trigger(page, PENDING.number).click();
+    await expect(confirmation(page, PENDING.code)).toHaveCount(1);
+    await confirmation(page, PENDING.code).getByRole('button', { name: 'Cancel' }).click();
+    await expect(trigger(page, PENDING.code)).toBeFocused();
+    await trigger(page, PENDING.code).click();
     await item(page, 'Delete…').click();
-    await confirmation(page, PENDING.number).getByRole('button', { name: 'Delete invoice' }).click();
-    await expect(rowOf(page, PENDING.number)).toHaveCount(0);
+    await confirmation(page, PENDING.code).getByRole('button', { name: 'Delete record' }).click();
+    await expect(rowOf(page, PENDING.code)).toHaveCount(0);
     // One more call, the same row (the record is reset by the new page load).
     await expect.poll(() => callsOf(read, 'onDelete')).toEqual([[PENDING.id]]);
     expect(await callsOf(read, 'onDuplicate')).toEqual([]);
@@ -126,20 +126,20 @@ test.describe('List Report inline row actions (#364)', () => {
   test('keyboard on the inline button: Enter and Space open the confirmation; Cancel returns the focus to it', async ({ page }) => {
     await gotoStory(page, STORY);
     for (const key of ['Enter', 'Space'] as const) {
-      await inline(page, PENDING.number).focus();
+      await inline(page, PENDING.code).focus();
       await page.keyboard.press(key);
-      const dialog = confirmation(page, PENDING.number);
+      const dialog = confirmation(page, PENDING.code);
       await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
       await page.keyboard.press('Escape');
       await expect(dialog).toHaveCount(0);
-      await expect(inline(page, PENDING.number)).toBeFocused();
+      await expect(inline(page, PENDING.code)).toBeFocused();
     }
   });
 
   test('disabled in both forms: nothing is called by click, Enter or Space inline, nor by click or Enter on the menu item', async ({ page }) => {
     const read = await recordActions(page);
     await gotoStory(page, STORY);
-    const button = inline(page, APPROVED.number);
+    const button = inline(page, ARCHIVED.code);
     await expect(button).toHaveAttribute('aria-disabled', 'true');
     // `force`: Playwright waits for an `aria-disabled` control to become enabled; the click is the point here.
     await button.click({ force: true });
@@ -151,7 +151,7 @@ test.describe('List Report inline row actions (#364)', () => {
     await expect(button).toBeFocused();
 
     await gotoStory(page, STORY, NARROW);
-    await trigger(page, APPROVED.number).click();
+    await trigger(page, ARCHIVED.code).click();
     const entry = item(page, 'Delete…');
     await expect(entry).toHaveAttribute('aria-disabled', 'true');
     await expect(entry).toHaveAttribute('data-disabled', '');
@@ -164,8 +164,8 @@ test.describe('List Report inline row actions (#364)', () => {
 
   test('name "Delete… <number>"; the tooltip "Delete…" only on hover or keyboard focus, never at mount', async ({ page }) => {
     await gotoStory(page, STORY);
-    const button = inline(page, PENDING.number);
-    await expect(button).toHaveAccessibleName(`Delete… ${PENDING.number}`);
+    const button = inline(page, PENDING.code);
+    await expect(button).toHaveAccessibleName(`Delete… ${PENDING.code}`);
     await page.waitForTimeout(800);
     await expect(page.getByRole('tooltip')).toHaveCount(0);
     await button.hover();
@@ -175,8 +175,8 @@ test.describe('List Report inline row actions (#364)', () => {
     await page.mouse.move(10, 10);
     await expect(page.getByRole('tooltip')).toHaveCount(0);
     // Keyboard: Tab onto it from the previous control.
-    await inline(page, ROWS[0]!.number).focus();
-    const target = inline(page, ROWS[1]!.number);
+    await inline(page, ROWS[0]!.code).focus();
+    const target = inline(page, ROWS[1]!.code);
     for (let i = 0; i < 4 && !(await isFocused(target)); i += 1) await page.keyboard.press('Tab');
     await expect(target).toBeFocused();
     await expect(page.getByRole('tooltip')).toHaveText('Delete…');
@@ -184,7 +184,7 @@ test.describe('List Report inline row actions (#364)', () => {
 
   test('the inline button and the trigger have a target of at least 24×24px', async ({ page }) => {
     await gotoStory(page, STORY);
-    for (const control of [inline(page, PENDING.number), trigger(page, PENDING.number)]) {
+    for (const control of [inline(page, PENDING.code), trigger(page, PENDING.code)]) {
       const box = (await control.boundingBox())!;
       expect(box.width).toBeGreaterThanOrEqual(24);
       expect(box.height).toBeGreaterThanOrEqual(24);
@@ -196,12 +196,12 @@ test.describe('List Report inline row actions (#364)', () => {
     await gotoStory(page, STORY, NARROW);
     const width = await scroller(page).evaluate((el) => el.clientWidth);
     expect(width).toBeLessThan(640);
-    await expect(inline(page, PENDING.number)).toHaveCount(0);
-    await expect(trigger(page, PENDING.number)).toBeVisible();
+    await expect(inline(page, PENDING.code)).toHaveCount(0);
+    await expect(trigger(page, PENDING.code)).toBeVisible();
     // And the wide box on the same viewport: the wide form.
     await gotoStory(page, STORY);
     expect(await scroller(page).evaluate((el) => el.clientWidth)).toBeGreaterThanOrEqual(640);
-    await expect(inline(page, PENDING.number)).toBeVisible();
+    await expect(inline(page, PENDING.code)).toBeVisible();
   });
 });
 
@@ -229,10 +229,10 @@ test.describe('List Report inline row actions: geometry (#364)', () => {
     ['narrow', NARROW, 44],
   ] as const) {
     test(`${name}: one width for the column on every row (some without "Delete…"), and in loading and no-results`, async ({ page }) => {
-      await gotoStory(page, STORY, [args, `withoutDeleteFor:rejected`].filter(Boolean).join(';'));
+      await gotoStory(page, STORY, [args, `withoutDeleteFor:on-hold`].filter(Boolean).join(';'));
       const data = await measure(page);
       // Rows with fewer actions are there.
-      await expect(rowOf(page, REJECTED.number).getByRole('button')).toHaveCount(1);
+      await expect(rowOf(page, ON_HOLD.code).getByRole('button')).toHaveCount(1);
       expect(data.rowCount).toBe(ROWS.length);
       // 2.75rem in the narrow form; + 1 icon slot (2.25rem) + 0.25rem in the wide one.
       expect(Math.round(data.header)).toBe(expected);
@@ -245,7 +245,7 @@ test.describe('List Report inline row actions: geometry (#364)', () => {
       expect((await measure(page)).header).toBeCloseTo(data.header, 1);
 
       await gotoStory(page, STORY, args || undefined);
-      await page.getByRole('searchbox', { name: 'Search' }).fill('zzzz-no-such-invoice');
+      await page.getByRole('searchbox', { name: 'Search' }).fill('zzzz-no-such-record');
       await expect(table(page).getByText('No results for the current filters')).toBeVisible();
       expect((await measure(page)).header).toBeCloseTo(data.header, 1);
     });
@@ -266,13 +266,13 @@ test.describe('List Report inline row actions: the form changes under an open me
     await page.setViewportSize({ width: 560, height: 800 });
     await gotoStory(page, STORY);
     expect(await scroller(page).evaluate((el) => el.clientWidth)).toBeLessThan(640);
-    await trigger(page, PENDING.number).click();
+    await trigger(page, PENDING.code).click();
     await expect(item(page, 'Delete…')).toBeVisible();
     await page.setViewportSize({ width: 1280, height: 800 });
     await expect(menu(page)).toHaveCount(0);
-    await expect(inline(page, PENDING.number)).toBeFocused();
+    await expect(inline(page, PENDING.code)).toBeFocused();
     await page.waitForTimeout(300);
-    await expect(inline(page, PENDING.number)).toBeFocused();
+    await expect(inline(page, PENDING.code)).toBeFocused();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(await read()).toEqual([]);
@@ -282,34 +282,34 @@ test.describe('List Report inline row actions: the form changes under an open me
     const read = await recordActions(page);
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, STORY);
-    await trigger(page, PENDING.number).focus();
+    await trigger(page, PENDING.code).focus();
     await page.keyboard.press('Enter');
     await expect(item(page, 'Duplicate')).toBeFocused();
     await page.setViewportSize({ width: 560, height: 800 });
     await expect(menu(page)).toHaveCount(0);
-    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await expect(trigger(page, PENDING.code)).toBeFocused();
     await page.waitForTimeout(300);
-    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await expect(trigger(page, PENDING.code)).toBeFocused();
     expect(await read()).toEqual([]);
   });
 
   test('wide → narrow with the focus on an inline button (no menu open): the focus goes to the "…" of the row, never body', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, STORY);
-    await inline(page, PENDING.number).focus();
-    await expect(inline(page, PENDING.number)).toBeFocused();
+    await inline(page, PENDING.code).focus();
+    await expect(inline(page, PENDING.code)).toBeFocused();
     await page.setViewportSize({ width: 560, height: 800 });
-    await expect(inline(page, PENDING.number)).toHaveCount(0);
-    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await expect(inline(page, PENDING.code)).toHaveCount(0);
+    await expect(trigger(page, PENDING.code)).toBeFocused();
     await page.waitForTimeout(300);
-    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await expect(trigger(page, PENDING.code)).toBeFocused();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
   });
 
   test('a resize that keeps the form leaves the menu open', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoStory(page, STORY);
-    await trigger(page, PENDING.number).click();
+    await trigger(page, PENDING.code).click();
     await expect(menu(page)).toBeVisible();
     await page.setViewportSize({ width: 1200, height: 800 });
     await page.waitForTimeout(200);
@@ -320,17 +320,17 @@ test.describe('List Report inline row actions: the form changes under an open me
 test.describe('List Report inline row actions: accessibility (#364)', () => {
   test('no axe violation in either form, with a selected row (contrast of its inline button) and with a menu open', async ({ page }) => {
     await gotoStory(page, WIDE_VISUAL_STORY);
-    await expect(inline(page, PENDING.number)).toBeVisible();
+    await expect(inline(page, PENDING.code)).toBeVisible();
     const selected = table(page).locator('tbody tr[data-selected]');
     await expect(selected).toHaveCount(1);
     await expect(selected.getByRole('button', { name: /^Delete… / })).toBeVisible();
     await expectNoA11yViolations(page);
-    await trigger(page, PENDING.number).click();
+    await trigger(page, PENDING.code).click();
     await expect(menu(page)).toBeVisible();
     await expectNoA11yViolations(page);
 
     await gotoStory(page, WIDE_VISUAL_STORY, NARROW);
-    await expect(trigger(page, PENDING.number)).toBeVisible();
+    await expect(trigger(page, PENDING.code)).toBeVisible();
     await expectNoA11yViolations(page);
   });
 });

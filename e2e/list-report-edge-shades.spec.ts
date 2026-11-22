@@ -235,7 +235,7 @@ function expectBackAtStart(after: AfterDirectionChange, browserName: string, lab
   if (browserName === 'firefox') expect(after.stopped, label).toBe(0);
 }
 
-/** The invoice button of the first data row (the data has arrived: skeleton rows hold no button). */
+/** The first button of the first data row (the data has arrived: skeleton rows hold no button). */
 const firstRowButton = (page: Page): Locator => scroller(page).locator('tbody tr:not([aria-hidden])').first().getByRole('button').first();
 
 async function waitForRows(page: Page): Promise<void> {

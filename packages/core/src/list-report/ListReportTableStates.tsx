@@ -47,7 +47,7 @@ export interface ListReportTableLabels {
   rowActions: (label: string) => string;
   /**
    * Name of an inline action button (with `rowActionsInline`), from the action's `label` and
-   * `selection.getRowLabel(row)`: "Delete FT-2026-0001". Keep it distinct per row (200 buttons all
+   * `selection.getRowLabel(row)`: "Delete REC-00001". Keep it distinct per row (200 buttons all
    * named "Delete" cannot be told apart). Default `<action label> <row label>`.
    */
   rowAction: (actionLabel: string, rowLabel: string) => string;

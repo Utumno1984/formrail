@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { makeDemoInvoices } from '../packages/core/src/internal/demo-invoices';
+import { makeRecords } from '../packages/core/src/internal/demo-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
@@ -7,13 +7,13 @@ const STORY = 'floorplans-list-report--row-actions-no-play';
 const PLAY_STORY = 'floorplans-list-report--row-actions';
 const SELECTED_STORY = 'floorplans-list-report--row-actions-selected-scrolled';
 
-// The rows of the story (20 demo invoices); "Delete…" is disabled for the approved ones.
-const ROWS = makeDemoInvoices(20);
+// The rows of the story (20 neutral records); "Delete…" is disabled for the archived ones.
+const ROWS = makeRecords(20);
 const THIRD = ROWS[2]!;
-const APPROVED = ROWS.find((r) => r.status === 'approved')!;
+const ARCHIVED = ROWS.find((r) => r.status === 'archived')!;
 const PENDING = ROWS.find((r) => r.status === 'pending')!;
 
-const table = (page: Page): Locator => page.getByRole('table', { name: 'Invoices', includeHidden: true });
+const table = (page: Page): Locator => page.getByRole('table', { name: 'Records', includeHidden: true });
 const scroller = (page: Page): Locator => table(page).locator('..');
 // `includeHidden`: an open modal menu hides the rest of the page (trigger included) with aria-hidden.
 const trigger = (page: Page, number: string): Locator =>
@@ -42,26 +42,26 @@ test.describe('List Report row actions', () => {
     await expect(page.getByRole('button', { name: /^Actions for / })).toHaveCount(ROWS.length);
     // The trigger is in the last cell of its row.
     const lastCell = table(page).getByRole('row').nth(3).getByRole('cell').last();
-    await expect(lastCell.getByRole('button')).toHaveAccessibleName(`Actions for ${THIRD.number}`);
+    await expect(lastCell.getByRole('button')).toHaveAccessibleName(`Actions for ${THIRD.code}`);
   });
 
   test('mouse: click the trigger, then an item: the menu closes and the focus is back on the trigger', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, THIRD.number).click();
+    await trigger(page, THIRD.code).click();
     await expect(menu(page)).toBeVisible();
     await item(page, 'Duplicate').click();
     await expect(menu(page)).toHaveCount(0);
-    await expect(trigger(page, THIRD.number)).toBeFocused();
+    await expect(trigger(page, THIRD.code)).toBeFocused();
   });
 
   test('not modal: with a menu open, a click on another row trigger closes it and opens that row menu (one menu at a time)', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, THIRD.number).click();
+    await trigger(page, THIRD.code).click();
     await expect(menu(page)).toHaveCount(1);
-    await trigger(page, ROWS[0]!.number).click();
+    await trigger(page, ROWS[0]!.code).click();
     await expect(menu(page)).toHaveCount(1);
-    await expect(trigger(page, ROWS[0]!.number)).toHaveAttribute('aria-expanded', 'true');
-    await expect(trigger(page, THIRD.number)).toHaveAttribute('aria-expanded', 'false');
+    await expect(trigger(page, ROWS[0]!.code)).toHaveAttribute('aria-expanded', 'true');
+    await expect(trigger(page, THIRD.code)).toHaveAttribute('aria-expanded', 'false');
     // The rest of the page is not hidden from assistive technology while the menu is open.
     await expect(page.locator('[aria-hidden="true"] input[type="search"]')).toHaveCount(0);
   });
@@ -69,28 +69,28 @@ test.describe('List Report row actions', () => {
   for (const key of ['Enter', 'Space', 'ArrowDown'] as const) {
     test(`keyboard: Tab reaches the trigger, ${key} opens on the first enabled item, Escape returns to the trigger`, async ({ page }) => {
       await gotoStory(page, STORY);
-      await tabTo(page, trigger(page, ROWS[0]!.number));
+      await tabTo(page, trigger(page, ROWS[0]!.code));
       await page.keyboard.press(key);
       await expect(item(page, 'Duplicate')).toBeFocused();
       await page.keyboard.press('Escape');
       await expect(menu(page)).toHaveCount(0);
-      await expect(trigger(page, ROWS[0]!.number)).toBeFocused();
+      await expect(trigger(page, ROWS[0]!.code)).toBeFocused();
     });
   }
 
   test('keyboard: Enter on an item selects it and returns the focus to the trigger', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, THIRD.number).focus();
+    await trigger(page, THIRD.code).focus();
     await page.keyboard.press('Enter');
     await expect(item(page, 'Duplicate')).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(menu(page)).toHaveCount(0);
-    await expect(trigger(page, THIRD.number)).toBeFocused();
+    await expect(trigger(page, THIRD.code)).toBeFocused();
   });
 
-  test('a disabled action (approved invoice): aria-disabled, skipped by the arrows, never selected by mouse or keyboard', async ({ page }) => {
+  test('a disabled action (archived record): aria-disabled, skipped by the arrows, never selected by mouse or keyboard', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, APPROVED.number).focus();
+    await trigger(page, ARCHIVED.code).focus();
     await page.keyboard.press('Enter');
     const remove = item(page, 'Delete…');
     await expect(remove).toHaveAttribute('aria-disabled', 'true');
@@ -107,26 +107,26 @@ test.describe('List Report row actions', () => {
 
   test('an action that opens a confirmation with returnFocusRef: the focus enters it (Cancel), and after Cancel comes back to the row trigger', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, PENDING.number).click();
+    await trigger(page, PENDING.code).click();
     await item(page, 'Delete…').click();
-    const dialog = page.getByRole('dialog', { name: `Delete invoice ${PENDING.number}?` });
+    const dialog = page.getByRole('dialog', { name: `Delete record ${PENDING.code}?` });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await expect(trigger(page, PENDING.code)).toBeFocused();
     expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
   });
 
   test('confirming deletes the row: the focus goes to the table container, never body (code review of #370)', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, PENDING.number).click();
+    await trigger(page, PENDING.code).click();
     await item(page, 'Delete…').click();
-    const dialog = page.getByRole('dialog', { name: `Delete invoice ${PENDING.number}?` });
-    await dialog.getByRole('button', { name: 'Delete invoice' }).click();
+    const dialog = page.getByRole('dialog', { name: `Delete record ${PENDING.code}?` });
+    await dialog.getByRole('button', { name: 'Delete record' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(trigger(page, PENDING.number)).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: /Invoices/ })).toContainText(`(${ROWS.length - 1})`);
+    await expect(trigger(page, PENDING.code)).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /Records/ })).toContainText(`(${ROWS.length - 1})`);
     // The return happens after the exit animation of the dialog.
     await expect(scroller(page)).toBeFocused();
     await page.waitForTimeout(500);
@@ -136,7 +136,7 @@ test.describe('List Report row actions', () => {
 
   test('the same from the keyboard, with Escape on the confirmation', async ({ page }) => {
     await gotoStory(page, STORY);
-    await trigger(page, PENDING.number).focus();
+    await trigger(page, PENDING.code).focus();
     await page.keyboard.press('Enter');
     await page.keyboard.press('ArrowDown');
     await expect(item(page, 'Delete…')).toBeFocused();
@@ -145,13 +145,13 @@ test.describe('List Report row actions', () => {
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
-    await expect(trigger(page, PENDING.number)).toBeFocused();
+    await expect(trigger(page, PENDING.code)).toBeFocused();
   });
 
   test('no axe violation with the menu closed and open', async ({ page }) => {
     await gotoStory(page, STORY);
     await expectNoA11yViolations(page);
-    await trigger(page, THIRD.number).click();
+    await trigger(page, THIRD.code).click();
     await expect(menu(page)).toBeVisible();
     await expectNoA11yViolations(page);
   });
@@ -159,11 +159,11 @@ test.describe('List Report row actions', () => {
   test('a long action label wraps inside the menu, which stays within the viewport (mobile)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     // No comma: Storybook drops a URL arg with characters outside its safe set.
-    const long = 'Duplicate this invoice together with every attachment and note and approval step it currently has';
-    const longWord = 'Duplicate-with-attachments-notes-and-approval-steps-of-the-original-invoice';
+    const long = 'Duplicate this record together with every attachment and note and review step it currently has';
+    const longWord = 'Duplicate-with-attachments-notes-and-review-steps-of-the-original-record';
     for (const label of [long, longWord]) {
       await gotoStory(page, STORY, `duplicateLabel:${label.replaceAll(' ', '+')}`);
-      await trigger(page, THIRD.number).click();
+      await trigger(page, THIRD.code).click();
       const panel = menu(page);
       await expect(panel).toBeVisible();
       const entry = item(page, label);
@@ -210,13 +210,13 @@ test.describe('List Report row actions: sticky column (375px)', () => {
       await el.evaluate((s, l) => {
         s.scrollLeft = l;
       }, left);
-      await expectTriggerReachable(page, THIRD.number);
+      await expectTriggerReachable(page, THIRD.code);
     }
     // At scroll 0 a click opens its menu, and the table did not scroll to reach it.
     await el.evaluate((s) => {
       s.scrollLeft = 0;
     });
-    await trigger(page, THIRD.number).click();
+    await trigger(page, THIRD.code).click();
     await expect(menu(page)).toBeVisible();
     expect(await el.evaluate((s) => s.scrollLeft)).toBe(0);
   });

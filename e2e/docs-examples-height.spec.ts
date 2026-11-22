@@ -5,8 +5,8 @@ import { gotoStory } from './helpers/story';
 // of it), have a margin in the Docs preview, show whole rows on a phone and never trap a touch scroll.
 
 const EXAMPLES = [
-  { name: 'Free', id: 'floorplans-list-report--example', docs: 'floorplans-list-report--docs', minRows: 7, docsMinRows: 7 },
-  { name: 'Pro', id: 'pro-floorplans-virtual-list-report--example', docs: 'pro-floorplans-virtual-list-report--docs', minRows: 6, docsMinRows: 5 },
+  { name: 'Free', id: 'floorplans-list-report--example', docs: 'floorplans-list-report--docs', minRows: 7, docsMinRows: 7, table: 'Records' },
+  { name: 'Pro', id: 'pro-floorplans-virtual-list-report--example', docs: 'pro-floorplans-virtual-list-report--docs', minRows: 6, docsMinRows: 5, table: 'Invoices' },
 ] as const;
 
 // A whole Docs page (all the stories of the file) renders slowly on a loaded machine: the wait is for the page, not the example.
@@ -20,8 +20,8 @@ const VIEWPORTS = [
 ] as const;
 
 /** The scroll container of the table, its box and the rows that are whole inside it, below the sticky header. */
-async function measure(page: Page) {
-  return page.getByRole('table', { name: 'Invoices' }).first().evaluate((table) => {
+async function measure(page: Page, tableName: string) {
+  return page.getByRole('table', { name: tableName }).first().evaluate((table) => {
     let box: HTMLElement | null = table.parentElement;
     while (box && !['auto', 'scroll'].includes(getComputedStyle(box).overflowY)) box = box.parentElement;
     if (!box) throw new Error('no scroll container');
@@ -50,8 +50,8 @@ for (const example of EXAMPLES) {
     test('390x844: whole rows, a strip of the page outside the example', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await gotoStory(page, example.id);
-      await expect(page.getByRole('table', { name: 'Invoices' })).toBeVisible();
-      const m = await measure(page);
+      await expect(page.getByRole('table', { name: example.table })).toBeVisible();
+      const m = await measure(page, example.table);
       expect(m.wholeRows).toBeGreaterThanOrEqual(example.minRows);
       // A strip of the page stays outside the example: a touch that starts there scrolls the page.
       expect(m.parentHeight).toBeLessThanOrEqual(m.innerHeight - 64 + 0.5);
@@ -61,8 +61,8 @@ for (const example of EXAMPLES) {
       test(`${vp.name} ${vp.width}x${vp.height}: height within the ceiling and the floor`, async ({ page }) => {
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await gotoStory(page, example.id);
-        await expect(page.getByRole('table', { name: 'Invoices' })).toBeVisible();
-        const m = await measure(page);
+        await expect(page.getByRole('table', { name: example.table })).toBeVisible();
+        const m = await measure(page, example.table);
         expect(m.parentHeight).toBeLessThanOrEqual(640.5);
         const atFloor = Math.abs(m.parentHeight - 320) < 0.5;
         expect(atFloor || m.parentHeight <= m.innerHeight - 64 + 0.5).toBe(true);
@@ -73,8 +73,8 @@ for (const example of EXAMPLES) {
 
     test('declares a vh height with a dvh maxHeight, so a browser without dvh keeps a bounded height', async ({ page }) => {
       await gotoStory(page, example.id);
-      await expect(page.getByRole('table', { name: 'Invoices' })).toBeVisible();
-      const m = await measure(page);
+      await expect(page.getByRole('table', { name: example.table })).toBeVisible();
+      const m = await measure(page, example.table);
       expect(m.parentStyle?.height).toContain('100vh');
       expect(m.parentStyle?.maxHeight).toContain('100dvh');
     });
@@ -85,20 +85,20 @@ for (const example of EXAMPLES) {
       test.setTimeout(DOCS_RENDER_MS + 30_000);
       await page.setViewportSize({ width: 1280, height: 844 });
       await page.goto(`/iframe.html?id=${example.docs}&viewMode=docs`);
-      await expect(page.getByRole('table', { name: 'Invoices' }).first()).toBeVisible({ timeout: DOCS_RENDER_MS });
+      await expect(page.getByRole('table', { name: example.table }).first()).toBeVisible({ timeout: DOCS_RENDER_MS });
       for (const width of [1280, 390, 320]) {
         await page.setViewportSize({ width, height: 844 });
-        const edges = await page.getByRole('table', { name: 'Invoices' }).first().evaluate((t) => {
+        const edges = await page.getByRole('table', { name: example.table }).first().evaluate((t, title) => {
           let box: HTMLElement | null = t.parentElement;
           while (box && !['auto', 'scroll'].includes(getComputedStyle(box).overflowY)) box = box.parentElement;
           const frame = t.closest('.docs-story');
           if (!box || !frame) throw new Error('no scroll container or docs frame');
-          const heading = Array.from(frame.querySelectorAll('h1, h2, h3, [role="heading"]')).find((h) => h.textContent?.trim().startsWith('Invoices'));
+          const heading = Array.from(frame.querySelectorAll('h1, h2, h3, [role="heading"]')).find((h) => h.textContent?.trim().startsWith(title));
           if (!heading) throw new Error('no example title');
           const f = frame.getBoundingClientRect();
           const b = box.getBoundingClientRect();
           return { frameLeft: f.left, frameRight: f.right, boxLeft: b.left, boxRight: b.right, headingLeft: heading.getBoundingClientRect().left };
-        });
+        }, example.table);
         expect(edges.boxLeft - edges.frameLeft, `box start at ${width}`).toBeGreaterThanOrEqual(16);
         expect(edges.frameRight - edges.boxRight, `box end at ${width}`).toBeGreaterThanOrEqual(16);
         expect(edges.headingLeft - edges.frameLeft, `title start at ${width}`).toBeGreaterThanOrEqual(16);
@@ -110,10 +110,10 @@ for (const example of EXAMPLES) {
     test('Docs page at 390x844: whole rows', async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto(`/iframe.html?id=${example.docs}&viewMode=docs`);
-      await expect(page.getByRole('table', { name: 'Invoices' }).first()).toBeVisible({ timeout: DOCS_RENDER_MS });
+      await expect(page.getByRole('table', { name: example.table }).first()).toBeVisible({ timeout: DOCS_RENDER_MS });
       // Measured: the Docs page narrows the example (page and preview paddings), so the Pro header wraps more and
       // 5 whole rows fit (not the 6 of the canvas); #502 allows no fewer than the 4 of before plus one.
-      expect((await measure(page)).wholeRows).toBeGreaterThanOrEqual(example.docsMinRows);
+      expect((await measure(page, example.table)).wholeRows).toBeGreaterThanOrEqual(example.docsMinRows);
     });
   });
 }
@@ -142,9 +142,9 @@ for (const example of EXAMPLES) {
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoStory(page, example.id);
-    const table = page.getByRole('table', { name: 'Invoices' });
+    const table = page.getByRole('table', { name: example.table });
     await expect(table).toBeVisible();
-    expect((await measure(page)).parentHeight).toBeCloseTo(640, 0);
+    expect((await measure(page, example.table)).parentHeight).toBeCloseTo(640, 0);
     const scrollBox = () =>
       table.evaluate((t) => {
         let box: HTMLElement | null = t.parentElement;
@@ -163,8 +163,8 @@ for (const example of EXAMPLES) {
     // The address bar / keyboard: the viewport gets shorter (390x500) and the visual viewport loses a keyboard's worth.
     await page.setViewportSize({ width: 390, height: 500 });
     await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(150));
-    await expect.poll(async () => (await measure(page)).parentHeight).toBeLessThanOrEqual(436 + 0.5);
-    expect((await measure(page)).parentHeight).toBeGreaterThanOrEqual(320 - 0.5);
+    await expect.poll(async () => (await measure(page, example.table)).parentHeight).toBeLessThanOrEqual(436 + 0.5);
+    expect((await measure(page, example.table)).parentHeight).toBeGreaterThanOrEqual(320 - 0.5);
     expect(await scrollBox()).toBe(before);
     await expect(search).toBeFocused();
     const box = (await search.boundingBox())!;
@@ -173,7 +173,7 @@ for (const example of EXAMPLES) {
     // Back to the tall viewport: the height follows again.
     await page.evaluate(() => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(0));
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect.poll(async () => (await measure(page)).parentHeight).toBeCloseTo(640, 0);
+    await expect.poll(async () => (await measure(page, example.table)).parentHeight).toBeCloseTo(640, 0);
   });
 }
 
@@ -181,14 +181,14 @@ test('Pro example 390x844: the table box is the same before and after selecting 
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoStory(page, 'pro-floorplans-virtual-list-report--example');
   await expect(page.getByRole('table', { name: 'Invoices' })).toBeVisible();
-  const before = (await measure(page)).boxHeight;
+  const before = (await measure(page, 'Invoices')).boxHeight;
   const check = page.getByRole('checkbox', { name: 'Select INV-00002' });
   await check.click();
   await expect(page.getByText('1 selected')).toBeVisible();
-  const selected = (await measure(page)).boxHeight;
+  const selected = (await measure(page, 'Invoices')).boxHeight;
   await check.click();
   await expect(page.getByText('1 selected')).toHaveCount(0);
-  const after = (await measure(page)).boxHeight;
+  const after = (await measure(page, 'Invoices')).boxHeight;
   expect([Math.round(selected), Math.round(after)]).toEqual([Math.round(before), Math.round(before)]);
 });
 

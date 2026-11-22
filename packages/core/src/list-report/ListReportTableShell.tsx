@@ -127,7 +127,7 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    *
    * With `n` > 0 the first `n` actions with an `icon` of every row are icon buttons in the actions
    * column (a `Tooltip` with the label on hover/keyboard focus, named `labels.rowAction(label,
-   * rowLabel)`: "Delete FT-2026-0001"), followed by the "…" menu with the other actions (no "…" when
+   * rowLabel)`: "Delete REC-00001"), followed by the "…" menu with the other actions (no "…" when
    * none is left). Below 40rem every action is in the "…" menu. The switch is CSS alone (a container
    * query on the scroll container, not the viewport: a table in a narrow panel of a wide page uses the
    * narrow form): both forms are rendered from the same descriptors, only one is displayed, and the
