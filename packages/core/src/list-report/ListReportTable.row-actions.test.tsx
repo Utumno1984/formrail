@@ -27,51 +27,51 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-interface Invoice {
+interface Row {
   id: string;
-  number: string;
-  customer: string;
-  approved: boolean;
+  code: string;
+  name: string;
+  locked: boolean;
 }
 
-const ROWS: Invoice[] = [
-  { id: 'a', number: 'FT-2026-0001', customer: 'Rossi', approved: false },
-  { id: 'b', number: 'FT-2026-0002', customer: 'Bianchi', approved: true },
-  { id: 'c', number: 'FT-2026-0003', customer: 'Verdi', approved: false },
+const ROWS: Row[] = [
+  { id: 'a', code: 'REC-0001', name: 'Amber', locked: false },
+  { id: 'b', code: 'REC-0002', name: 'Birch', locked: true },
+  { id: 'c', code: 'REC-0003', name: 'Cedar', locked: false },
 ];
 
-const COLUMNS: ListReportColumn<Invoice>[] = [
-  { id: 'number', header: 'Number', width: 120, accessor: (r) => r.number },
-  { id: 'customer', header: 'Customer', accessor: (r) => r.customer },
+const COLUMNS: ListReportColumn<Row>[] = [
+  { id: 'code', header: 'Code', width: 120, accessor: (r) => r.code },
+  { id: 'name', header: 'Name', accessor: (r) => r.name },
 ];
 
-const FILTERS: ListReportFilter<Invoice>[] = [
+const FILTERS: ListReportFilter<Row>[] = [
   { id: 'all', label: 'All' },
   { id: 'none', label: 'None', predicate: () => false },
 ];
 
 interface HostProps {
-  rows?: Invoice[];
-  rowActions?: ListReportRowActions<Invoice>;
+  rows?: Row[];
+  rowActions?: ListReportRowActions<Row>;
   selectable?: boolean;
-  getRowLabel?: (row: Invoice) => string;
+  getRowLabel?: (row: Row) => string;
   status?: ListReportTableStatus;
   filter?: string;
   labels?: Parameters<typeof ListReportTable>[0]['labels'];
 }
 
 function Host({ rows = ROWS, rowActions, selectable, getRowLabel, status, filter, labels }: HostProps) {
-  const table = useListReport<Invoice>({ rows, columns: COLUMNS, getRowId: (r) => r.id, selectable, getRowLabel, filters: FILTERS, filter });
-  return <ListReportTable table={table} aria-label="Invoices" rowActions={rowActions} status={status} labels={labels} />;
+  const table = useListReport<Row>({ rows, columns: COLUMNS, getRowId: (r) => r.id, selectable, getRowLabel, filters: FILTERS, filter });
+  return <ListReportTable table={table} aria-label="Records" rowActions={rowActions} status={status} labels={labels} />;
 }
 
 const trigger = (label: string) => screen.getByRole('button', { name: `Actions for ${label}`, hidden: true });
 const rowOf = (label: string) => screen.getByRole('cell', { name: label }).closest('tr') as HTMLTableRowElement;
 
 function actionsFor(spies: { duplicate?: ListReportRowAction['onSelect']; remove?: ListReportRowAction['onSelect'] } = {}) {
-  return (row: Invoice): readonly ListReportRowAction[] => [
+  return (row: Row): readonly ListReportRowAction[] => [
     { id: 'duplicate', label: 'Duplicate', onSelect: spies.duplicate ?? (() => {}) },
-    { id: 'delete', label: 'Delete', tone: 'danger', disabled: row.approved, onSelect: spies.remove ?? (() => {}) },
+    { id: 'delete', label: 'Delete', tone: 'danger', disabled: row.locked, onSelect: spies.remove ?? (() => {}) },
   ];
 }
 
@@ -93,34 +93,45 @@ describe('ListReportTable rowActions — structure', () => {
   it('names the header column through labels.rowActionsColumn and the trigger through labels.rowActions', () => {
     render(<Host rowActions={actionsFor()} labels={{ rowActionsColumn: 'Azioni', rowActions: (l) => `Azioni per ${l}` }} />);
     expect(screen.getAllByRole('columnheader').at(-1)).toHaveAccessibleName('Azioni');
-    expect(screen.getByRole('button', { name: 'Azioni per FT-2026-0001' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Azioni per REC-0001' })).toBeInTheDocument();
   });
 
   it('every row with actions has a trigger named from the resolved row label, without selectable', () => {
     render(<Host rowActions={actionsFor()} />);
-    for (const row of ROWS) expect(trigger(row.number)).toBeInTheDocument();
+    for (const row of ROWS) expect(trigger(row.code)).toBeInTheDocument();
     expect(new Set(screen.getAllByRole('button', { name: /^Actions for / }).map((b) => b.getAttribute('aria-label'))).size).toBe(ROWS.length);
   });
 
+  it('rows with the same name and different codes keep distinct action triggers (named by the code, the first column)', () => {
+    const twins: Row[] = [
+      { id: 'a', code: 'REC-0001', name: 'Indigo Plan', locked: false },
+      { id: 'b', code: 'REC-0002', name: 'Indigo Plan', locked: false },
+    ];
+    render(<Host rows={twins} rowActions={actionsFor()} />);
+    const names = screen.getAllByRole('button', { name: /^Actions for / }).map((b) => b.getAttribute('aria-label'));
+    expect(names).toEqual(['Actions for REC-0001', 'Actions for REC-0002']);
+    expect(trigger('REC-0002')).toBeInTheDocument();
+  });
+
   it('uses a custom getRowLabel', () => {
-    render(<Host rowActions={actionsFor()} getRowLabel={(r) => `invoice ${r.customer}`} />);
-    expect(trigger('invoice Rossi')).toBeInTheDocument();
+    render(<Host rowActions={actionsFor()} getRowLabel={(r) => `record ${r.name}`} />);
+    expect(trigger('record Amber')).toBeInTheDocument();
   });
 
   it('works next to the selection column (leading checkbox, trailing actions)', () => {
     render(<Host selectable rowActions={actionsFor()} />);
-    const cells = rowOf('FT-2026-0001').children;
+    const cells = rowOf('REC-0001').children;
     expect(cells).toHaveLength(COLUMNS.length + 2);
     expect(within(cells[0] as HTMLElement).getByRole('checkbox')).toBeInTheDocument();
-    expect(within(cells[cells.length - 1] as HTMLElement).getByRole('button', { name: 'Actions for FT-2026-0001' })).toBeInTheDocument();
+    expect(within(cells[cells.length - 1] as HTMLElement).getByRole('button', { name: 'Actions for REC-0001' })).toBeInTheDocument();
   });
 
   it('a row whose actions are [] has an empty cell; with every row empty the column stays', () => {
     const { container, rerender } = render(<Host rowActions={(r) => (r.id === 'b' ? [] : actionsFor()(r))} />);
-    const cell = rowOf('FT-2026-0002').lastElementChild as HTMLElement;
+    const cell = rowOf('REC-0002').lastElementChild as HTMLElement;
     expect(cell.tagName).toBe('TD');
     expect(cell).toBeEmptyDOMElement();
-    expect(cell.className).toBe((rowOf('FT-2026-0001').lastElementChild as HTMLElement).className);
+    expect(cell.className).toBe((rowOf('REC-0001').lastElementChild as HTMLElement).className);
     rerender(<Host rowActions={() => []} />);
     expect(screen.queryAllByRole('button', { name: /^Actions for / })).toHaveLength(0);
     expect(container.querySelectorAll('colgroup > col')).toHaveLength(COLUMNS.length + 1);
@@ -144,7 +155,7 @@ describe('ListReportTable rowActions — structure', () => {
     const user = userEvent.setup();
     const duplicate = vi.fn();
     render(<Host status="loading" rowActions={actionsFor({ duplicate })} />);
-    await user.click(trigger('FT-2026-0001'));
+    await user.click(trigger('REC-0001'));
     await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
     expect(duplicate).toHaveBeenCalledTimes(1);
   });
@@ -168,12 +179,12 @@ describe('ListReportTable rowActions — menu', () => {
     const user = userEvent.setup();
     const duplicate = vi.fn<(ctx: ListReportRowActionContext) => void>();
     render(<Host rowActions={actionsFor({ duplicate })} />);
-    await user.click(trigger('FT-2026-0003'));
+    await user.click(trigger('REC-0003'));
     await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
     expect(duplicate).toHaveBeenCalledTimes(1);
-    expect(duplicate.mock.calls[0]![0].returnFocusRef.current).toBe(trigger('FT-2026-0003'));
+    expect(duplicate.mock.calls[0]![0].returnFocusRef.current).toBe(trigger('REC-0003'));
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
-    await waitFor(() => expect(trigger('FT-2026-0003')).toHaveFocus());
+    await waitFor(() => expect(trigger('REC-0003')).toHaveFocus());
   });
 
   it('a sort that changes with the menu open: the menu stays with the trigger of the same row', async () => {
@@ -181,28 +192,28 @@ describe('ListReportTable rowActions — menu', () => {
     const duplicate = vi.fn<(ctx: ListReportRowActionContext) => void>();
     let sortDesc: () => void = () => {};
     function Sorted() {
-      const table = useListReport<Invoice>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id });
-      sortDesc = () => table.setSort({ columnId: 'number', direction: 'desc' });
-      return <ListReportTable table={table} aria-label="Invoices" rowActions={actionsFor({ duplicate })} />;
+      const table = useListReport<Row>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id });
+      sortDesc = () => table.setSort({ columnId: 'code', direction: 'desc' });
+      return <ListReportTable table={table} aria-label="Records" rowActions={actionsFor({ duplicate })} />;
     }
     render(<Sorted />);
-    await user.click(trigger('FT-2026-0001'));
+    await user.click(trigger('REC-0001'));
     await screen.findByRole('menu');
     act(() => sortDesc());
-    // FT-2026-0001 is now the last row; its trigger is the one that owns the open menu.
+    // REC-0001 is now the last row; its trigger is the one that owns the open menu.
     const rows = screen.getAllByRole('row', { hidden: true });
-    expect(within(rows.at(-2)!).getByRole('button', { hidden: true })).toBe(trigger('FT-2026-0001'));
-    expect(trigger('FT-2026-0001')).toHaveAttribute('aria-expanded', 'true');
-    expect(trigger('FT-2026-0003')).toHaveAttribute('aria-expanded', 'false');
+    expect(within(rows.at(-2)!).getByRole('button', { hidden: true })).toBe(trigger('REC-0001'));
+    expect(trigger('REC-0001')).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger('REC-0003')).toHaveAttribute('aria-expanded', 'false');
     await user.click(screen.getByRole('menuitem', { name: 'Duplicate' }));
-    expect(duplicate.mock.calls[0]![0].returnFocusRef.current).toBe(trigger('FT-2026-0001'));
+    expect(duplicate.mock.calls[0]![0].returnFocusRef.current).toBe(trigger('REC-0001'));
   });
 
   it('a fast double click on an item calls onSelect once', async () => {
     const user = userEvent.setup();
     const duplicate = vi.fn();
     render(<Host rowActions={actionsFor({ duplicate })} />);
-    await user.click(trigger('FT-2026-0001'));
+    await user.click(trigger('REC-0001'));
     await user.dblClick(await screen.findByRole('menuitem', { name: 'Duplicate' }));
     expect(duplicate).toHaveBeenCalledTimes(1);
   });
@@ -211,7 +222,7 @@ describe('ListReportTable rowActions — menu', () => {
     const user = userEvent.setup();
     const remove = vi.fn();
     render(<Host rowActions={actionsFor({ remove })} />);
-    trigger('FT-2026-0002').focus();
+    trigger('REC-0002').focus();
     await user.keyboard('{Enter}');
     const item = await screen.findByRole('menuitem', { name: 'Delete' });
     expect(item).toHaveAttribute('aria-disabled', 'true');
@@ -232,7 +243,7 @@ describe('ListReportTable rowActions — menu', () => {
       { id: 'del', label: 'Delete', tone: 'danger', onSelect: () => {} },
     ];
     render(<Host rowActions={rowActions} />);
-    await user.click(trigger('FT-2026-0001'));
+    await user.click(trigger('REC-0001'));
     const dup = await screen.findByRole('menuitem', { name: 'Duplicate' });
     const del = screen.getByRole('menuitem', { name: 'Delete' });
     expect(del).toHaveAttribute('data-tone', 'danger');
@@ -244,12 +255,12 @@ describe('ListReportTable rowActions — menu', () => {
   it('Escape closes the menu and returns the focus to the trigger', async () => {
     const user = userEvent.setup();
     render(<Host rowActions={actionsFor()} />);
-    trigger('FT-2026-0001').focus();
+    trigger('REC-0001').focus();
     await user.keyboard('{ArrowDown}');
     expect(await screen.findByRole('menuitem', { name: 'Duplicate' })).toHaveFocus();
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
-    await waitFor(() => expect(trigger('FT-2026-0001')).toHaveFocus());
+    await waitFor(() => expect(trigger('REC-0001')).toHaveFocus());
   });
 
   it('a duplicate action id is reported with console.error, without crashing', () => {
@@ -262,20 +273,20 @@ describe('ListReportTable rowActions — menu', () => {
         ]}
       />,
     );
-    expect(trigger('FT-2026-0001')).toBeInTheDocument();
+    expect(trigger('REC-0001')).toBeInTheDocument();
     expect(error.mock.calls.some((args) => String(args[0]).includes('duplicate action id "x"'))).toBe(true);
   });
 
   it('the row removed while its menu is open: the menu closes, the focus goes to the table container', async () => {
     const user = userEvent.setup();
-    let setRows: (rows: Invoice[]) => void = () => {};
+    let setRows: (rows: Row[]) => void = () => {};
     function Removable() {
       const [rows, set] = useState(ROWS);
       setRows = set;
       return <Host rows={rows} rowActions={actionsFor()} />;
     }
     const { container } = render(<Removable />);
-    await user.click(trigger('FT-2026-0002'));
+    await user.click(trigger('REC-0002'));
     await screen.findByRole('menu');
     act(() => setRows(ROWS.filter((r) => r.id !== 'b')));
     await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
@@ -289,7 +300,7 @@ describe('ListReportTable rowActions — focus when the trigger goes away', () =
     const [rows, setRows] = useState(ROWS);
     const [emptied, setEmptied] = useState(false);
     const rowActions = useCallback(
-      (row: Invoice): readonly ListReportRowAction[] =>
+      (row: Row): readonly ListReportRowAction[] =>
         emptied
           ? []
           : [
@@ -318,16 +329,16 @@ describe('ListReportTable rowActions — focus when the trigger goes away', () =
   it('an action that removes its own row at once: the focus goes to the table container, never body', async () => {
     const user = userEvent.setup();
     const { container } = render(<Removable removeOnSelect />);
-    await user.click(trigger('FT-2026-0002'));
+    await user.click(trigger('REC-0002'));
     await user.click(await screen.findByRole('menuitem', { name: 'Archive' }));
-    expect(screen.queryByRole('cell', { name: 'FT-2026-0002' })).toBeNull();
+    expect(screen.queryByRole('cell', { name: 'REC-0002' })).toBeNull();
     await waitFor(() => expect(scrollerOf(container)).toHaveFocus());
   });
 
   it('an action after which the row has no actions ([]): the focus goes to the table container', async () => {
     const user = userEvent.setup();
     const { container } = render(<Removable emptyOnSelect />);
-    trigger('FT-2026-0002').focus();
+    trigger('REC-0002').focus();
     await user.keyboard('{Enter}');
     await screen.findByRole('menuitem', { name: 'Archive' });
     await user.keyboard('{Enter}');
@@ -337,10 +348,10 @@ describe('ListReportTable rowActions — focus when the trigger goes away', () =
 
   it('a focused trigger whose row is removed from outside (menu closed): the focus goes to the table container', async () => {
     const { container } = render(<Removable />);
-    trigger('FT-2026-0001').focus();
+    trigger('REC-0001').focus();
     // A removal that does not move the focus (e.g. a poll that drops the row): `click()` without focusing.
     act(() => screen.getByRole('button', { name: 'Remove first' }).click());
-    expect(screen.queryByRole('cell', { name: 'FT-2026-0001' })).toBeNull();
+    expect(screen.queryByRole('cell', { name: 'REC-0001' })).toBeNull();
     await waitFor(() => expect(scrollerOf(container)).toHaveFocus());
   });
 
@@ -349,7 +360,7 @@ describe('ListReportTable rowActions — focus when the trigger goes away', () =
     render(<Removable />);
     const remove = screen.getByRole('button', { name: 'Remove first' });
     await user.click(remove);
-    expect(screen.queryByRole('cell', { name: 'FT-2026-0001' })).toBeNull();
+    expect(screen.queryByRole('cell', { name: 'REC-0001' })).toBeNull();
     await new Promise((resolve) => requestAnimationFrame(resolve));
     expect(remove).toHaveFocus();
   });
@@ -360,14 +371,14 @@ describe('ListReportTable rowActions — an action that awaits useConfirmDialog,
     const [rows, setRows] = useState(ROWS);
     const [confirm, confirmDialog] = useConfirmDialog();
     const rowActions = useCallback(
-      (row: Invoice): readonly ListReportRowAction[] => [
+      (row: Row): readonly ListReportRowAction[] => [
         {
           id: 'delete',
           label: 'Delete…',
           tone: 'danger',
           // The continuation runs as soon as `confirm()` resolves, while the dialog is still closing.
           onSelect: async ({ returnFocusRef }) => {
-            if (await confirm({ title: `Delete ${row.number}?`, confirmLabel: 'Delete invoice', returnFocusRef })) {
+            if (await confirm({ title: `Delete ${row.code}?`, confirmLabel: 'Delete record', returnFocusRef })) {
               setRows((current) => current.filter((r) => r.id !== row.id));
               onDeleted(row.id);
             }
@@ -388,12 +399,12 @@ describe('ListReportTable rowActions — an action that awaits useConfirmDialog,
     const user = userEvent.setup();
     const onDeleted = vi.fn();
     const { container } = render(<ConfirmThenDelete onDeleted={onDeleted} />);
-    await user.click(trigger('FT-2026-0002'));
+    await user.click(trigger('REC-0002'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Delete FT-2026-0002?' });
-    await user.click(within(dialog).getByRole('button', { name: 'Delete invoice' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete REC-0002?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete record' }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledWith('b'));
-    expect(screen.queryByRole('cell', { name: 'FT-2026-0002', hidden: true })).toBeNull();
+    expect(screen.queryByRole('cell', { name: 'REC-0002', hidden: true })).toBeNull();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const scroller = container.querySelector('table')!.parentElement!;
     await waitFor(() => expect(scroller).toHaveFocus());
@@ -407,27 +418,27 @@ describe('ListReportTable rowActions — an action that awaits useConfirmDialog,
     const user = userEvent.setup();
     const onDeleted = vi.fn();
     render(<ConfirmThenDelete onDeleted={onDeleted} />);
-    await user.click(trigger('FT-2026-0002'));
+    await user.click(trigger('REC-0002'));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete…' }));
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(trigger('FT-2026-0002')).toHaveFocus());
+    await waitFor(() => expect(trigger('REC-0002')).toHaveFocus());
     expect(onDeleted).not.toHaveBeenCalled();
   });
 
   it('returnFocusRef.current is the trigger while it exists, the table container once the row is gone', async () => {
     const user = userEvent.setup();
     let ref: ListReportRowActionContext['returnFocusRef'] | null = null;
-    let setRows: (rows: Invoice[]) => void = () => {};
+    let setRows: (rows: Row[]) => void = () => {};
     function Capture() {
       const [rows, set] = useState(ROWS);
       setRows = set;
       return <Host rows={rows} rowActions={() => [{ id: 'x', label: 'Capture', onSelect: (ctx) => (ref = ctx.returnFocusRef) }]} />;
     }
     const { container } = render(<Capture />);
-    await user.click(trigger('FT-2026-0001'));
+    await user.click(trigger('REC-0001'));
     await user.click(await screen.findByRole('menuitem', { name: 'Capture' }));
-    expect(ref!.current).toBe(trigger('FT-2026-0001'));
+    expect(ref!.current).toBe(trigger('REC-0001'));
     act(() => setRows(ROWS.slice(1)));
     expect(ref!.current).toBe(container.querySelector('table')!.parentElement);
   });
@@ -435,14 +446,14 @@ describe('ListReportTable rowActions — an action that awaits useConfirmDialog,
 
 describe('ListReportTable — a removed row that held the focus (any control of the row)', () => {
   it('a focused row checkbox whose row is removed: the focus goes to the table container', async () => {
-    let setRows: (rows: Invoice[]) => void = () => {};
+    let setRows: (rows: Row[]) => void = () => {};
     function Selectable() {
       const [rows, set] = useState(ROWS);
       setRows = set;
       return <Host rows={rows} selectable />;
     }
     const { container } = render(<Selectable />);
-    screen.getByRole('checkbox', { name: 'Select FT-2026-0001' }).focus();
+    screen.getByRole('checkbox', { name: 'Select REC-0001' }).focus();
     act(() => setRows(ROWS.slice(1)));
     await waitFor(() => expect(container.querySelector('table')!.parentElement).toHaveFocus());
   });
@@ -460,7 +471,7 @@ describe('ListReportTable rowActions — memoization', () => {
       rerender = () => setTick((t) => t + 1);
       lockAll = setLocked;
       const rowActions = useCallback(
-        (row: Invoice): readonly ListReportRowAction[] => {
+        (row: Row): readonly ListReportRowAction[] => {
           calls.push(row.id);
           return [{ id: 'dup', label: 'Duplicate', disabled: locked, onSelect: () => {} }];
         },
@@ -474,15 +485,15 @@ describe('ListReportTable rowActions — memoization', () => {
     expect(calls).toEqual([]);
     act(() => lockAll(true));
     expect([...calls].sort()).toEqual(['a', 'b', 'c']);
-    await user.click(trigger('FT-2026-0003'));
+    await user.click(trigger('REC-0003'));
     expect(await screen.findByRole('menuitem', { name: 'Duplicate' })).toHaveAttribute('aria-disabled', 'true');
   });
 });
 
 describe('ListReport rowActions', () => {
-  function Report({ rowActions }: { rowActions?: ListReportRowActions<Invoice> }) {
-    const table = useListReport<Invoice>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id });
-    return <ListReport title="Invoices" table={table} rowActions={rowActions} />;
+  function Report({ rowActions }: { rowActions?: ListReportRowActions<Row> }) {
+    const table = useListReport<Row>({ rows: ROWS, columns: COLUMNS, getRowId: (r) => r.id });
+    return <ListReport title="Records" table={table} rowActions={rowActions} />;
   }
 
   it('passes rowActions to its table and never to the DOM', async () => {
@@ -490,7 +501,7 @@ describe('ListReport rowActions', () => {
     const duplicate = vi.fn();
     const { container } = render(<Report rowActions={actionsFor({ duplicate })} />);
     expect(screen.getAllByRole('columnheader').at(-1)).toHaveAccessibleName('Actions');
-    await user.click(trigger('FT-2026-0001'));
+    await user.click(trigger('REC-0001'));
     await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
     expect(duplicate).toHaveBeenCalledTimes(1);
     expect((container.firstElementChild as HTMLElement).getAttributeNames()).toEqual(['class']);

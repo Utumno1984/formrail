@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { makeRecords } from '../packages/core/src/internal/demo-data';
+import { makeRows } from '../packages/core/src/list-report/ListReportTable.stories-data';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectNoHorizontalOverflow } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
@@ -13,8 +14,8 @@ const FIRST_OPEN = ROWS.find((r) => r.status === 'pending')!;
 const SCENARIO = [FIRST_OPEN, ...ROWS.filter((r) => r.status !== 'pending').slice(0, 2)];
 
 const table = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
-// The table of the ListReportTable stories (#626 migrates them): still named "Invoices".
-const tableStoryTable = (page: Page): Locator => page.getByRole('table', { name: 'Invoices' });
+// The table of the ListReportTable stories (#626): named "Records".
+const tableStoryTable = (page: Page): Locator => page.getByRole('table', { name: 'Records' });
 const scroller = (page: Page): Locator => table(page).locator('..');
 const bar = (page: Page): Locator => page.getByRole('group', { name: 'Selection Records' });
 const allBox = (page: Page): Locator => page.getByRole('checkbox', { name: 'Select all results' });
@@ -137,7 +138,7 @@ for (const vp of VIEWPORTS) {
       // Square column (as wide as a row is tall) and the box centred in it.
       const firstCell = tableStoryTable(page).locator('tbody tr').first().locator('td').first();
       const cellBox = await box(firstCell);
-      const bodyBox = await box(rowBox(page, 'F-0001'));
+      const bodyBox = await box(rowBox(page, makeRows(1)[0]!.code));
       close(thBox.width, cellBox.width, 'column width');
       close(headerBox.x + headerBox.width / 2, thBox.x + thBox.width / 2, 'header box centred horizontally');
       close(headerBox.y + headerBox.height / 2, thBox.y + thBox.height / 2, 'header box centred vertically');

@@ -7,15 +7,6 @@
       "supplier",
       "vat"
     ],
-    "Data/ListReportFilterBar": [
-      "customer",
-      "invoice",
-      "supplier"
-    ],
-    "Data/ListReportTable": [
-      "customer",
-      "invoice"
-    ],
     "Data/TruncatedText": [
       "invoice",
       "supplier"

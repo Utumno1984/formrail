@@ -221,7 +221,7 @@ test.describe('a Retry that changes nothing, then the user moves the focus away 
 test.describe('"Clear filters"', () => {
   test('is shown only for no results; clicking it calls onClearFilters, shows the rows and keeps the focus on the container', async ({ page }) => {
     await expectPlayToPass(page, PLAYGROUND, 'dataset:filter that excludes everything');
-    const table = page.getByRole('table', { name: 'Invoices' });
+    const table = page.getByRole('table', { name: 'Records' });
     await expect(table.getByText('No results for the current filters')).toBeVisible();
     await page.getByRole('button', { name: 'Clear filters' }).click();
     await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);

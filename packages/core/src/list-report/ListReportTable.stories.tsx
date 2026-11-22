@@ -7,55 +7,17 @@ import { storyControl, withoutControls } from '../internal/story-docs';
 import { ListReportTable } from './ListReportTable';
 import type { ListReportColumn, ListReportFilter, ListReportSort, ListReportSortDirection } from './types';
 import { useListReport } from './use-list-report';
-
-interface Invoice {
-  id: string;
-  customer: string;
-  description: string;
-  amount: number;
-  date: string;
-}
-
-const CUSTOMERS = [
-  'Bianchi & Associates Ltd - Administrative consulting services',
-  'Rossi Construction',
-  'Verdi Industrial Supplies Inc. - North-West Division',
-  'Neri',
-  'Gialli International Transport and Logistics Ltd',
-];
-
-// Deterministic (no Math.random): the visual baselines must never change between runs.
-function makeInvoices(count: number): Invoice[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `F-${String(i + 1).padStart(4, '0')}`,
-    customer: CUSTOMERS[i % CUSTOMERS.length]!,
-    description: `Invoice awaiting approval from the purchasing office, order reference ${1000 + i * 7}`,
-    amount: ((i * 7919) % 9973) + 0.5,
-    date: new Date(Date.UTC(2026, 0, 1 + ((i * 13) % 300))).toISOString().slice(0, 10),
-  }));
-}
-
-const money = (value: number): string => `€ ${value.toFixed(2)}`;
-
-function columns(firstDateDirection: ListReportSortDirection = 'desc'): ListReportColumn<Invoice>[] {
-  return [
-    { id: 'id', header: 'N.', accessor: (r) => r.id, width: 90 },
-    { id: 'customer', header: 'Customer', accessor: (r) => r.customer, minWidth: 160 },
-    { id: 'description', header: 'Description', accessor: (r) => r.description, sortable: false, minWidth: 200 },
-    { id: 'amount', header: 'Amount', accessor: (r) => r.amount, cell: (r) => money(r.amount), align: 'end', width: 120 },
-    { id: 'date', header: 'Date', accessor: (r) => r.date, firstSortDirection: firstDateDirection, width: 120 },
-  ];
-}
+import { LONG_TEXT_ROWS, columns, makeRows, money, type Row } from './ListReportTable.stories-data';
 
 // The "none" filter excludes every row: it makes the "no results" state (rows exist, none shown).
-const DEMO_FILTERS: ListReportFilter<Invoice>[] = [
+const DEMO_FILTERS: ListReportFilter<Row>[] = [
   { id: 'all', label: 'All' },
   { id: 'none', label: 'None', predicate: () => false },
 ];
 
 interface TableDemoProps {
-  rows: Invoice[];
-  columns: ListReportColumn<Invoice>[];
+  rows: Row[];
+  columns: ListReportColumn<Row>[];
   maxHeight?: number;
   onSortChange?: (sort: ListReportSort) => void;
   defaultSort?: ListReportSort;
@@ -78,7 +40,7 @@ function TableDemo({
   onSortChange,
   defaultSort,
   dir,
-  label = 'Invoices',
+  label = 'Records',
   defaultFilter,
   status,
   loadingRowCount,
@@ -96,7 +58,7 @@ function TableDemo({
     setSeenDefault(defaultFilter);
     setFilter(defaultFilter ?? 'all');
   }
-  const table = useListReport<Invoice>({
+  const table = useListReport<Row>({
     rows,
     columns: cols,
     getRowId: (r) => r.id,
@@ -185,11 +147,11 @@ const meta: Meta<PlaygroundArgs> = {
   },
 };
 
-const DATASETS: Record<Exclude<Dataset, 'filter that excludes everything'>, Invoice[]> = {
+const DATASETS: Record<Exclude<Dataset, 'filter that excludes everything'>, Row[]> = {
   empty: [],
-  '3 rows': makeInvoices(3),
-  '40 rows': makeInvoices(40),
-  '200 rows': makeInvoices(200),
+  '3 rows': makeRows(3),
+  '40 rows': makeRows(40),
+  '200 rows': makeRows(200),
 };
 
 export default meta;
@@ -197,7 +159,7 @@ type Story = StoryObj<PlaygroundArgs>;
 
 const PAGE: CSSProperties = { padding: 16, fontFamily: 'system-ui, sans-serif' };
 const NO_CONTROLS = { controls: { disable: true } };
-const INVOICES = makeInvoices(40);
+const RECORDS = makeRows(40);
 
 /**
  * Copy-paste example: `columns` memoized, `useListReport({ rows, columns, getRowId })` returns the `table`,
@@ -231,7 +193,7 @@ export const Playground: Story = {
       <div style={PAGE}>
         <div style={{ width: containerWidth, maxWidth: '100%' }} data-testid="box">
           <TableDemo
-            rows={excludeAll ? INVOICES : DATASETS[dataset]}
+            rows={excludeAll ? RECORDS : DATASETS[dataset]}
             defaultFilter={excludeAll ? 'none' : 'all'}
             columns={cols}
             maxHeight={maxHeight}
@@ -258,7 +220,7 @@ export const Playground: Story = {
     await userEvent.click(button);
     await expect(header).toHaveAttribute('aria-sort', 'descending');
 
-    const expected = [...INVOICES].sort((a, b) => b.amount - a.amount).slice(0, 3).map((r) => money(r.amount));
+    const expected = [...RECORDS].sort((a, b) => b.amountMinor - a.amountMinor).slice(0, 3).map((r) => money(r.amountMinor));
     const rows = canvas.getAllByRole('row').slice(1, 4);
     await expect(rows.map((r) => within(r).getAllByRole('cell')[3]!.textContent)).toEqual(expected);
 
@@ -302,14 +264,14 @@ export const Plain: Story = {
   render: () => (
     <div style={PAGE}>
       <div style={{ width: 900 }}>
-        <TableDemo rows={INVOICES} columns={columns()} maxHeight={360} />
+        <TableDemo rows={RECORDS} columns={columns()} maxHeight={360} />
       </div>
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByRole('columnheader')).toHaveLength(5);
-    await expect(canvas.getAllByRole('row')).toHaveLength(INVOICES.length + 1);
+    await expect(canvas.getAllByRole('row')).toHaveLength(RECORDS.length + 1);
     for (const header of canvas.getAllByRole('columnheader')) await expect(header).not.toHaveAttribute('aria-sort');
   },
 };
@@ -323,10 +285,10 @@ export const MixedWidths: Story = {
     <div style={PAGE}>
       <div style={WIDE_BOX}>
         <TableDemo
-          rows={INVOICES.slice(0, 4)}
+          rows={RECORDS.slice(0, 4)}
           columns={[
-            { id: 'id', header: 'N.', accessor: (r) => r.id, width: 200 },
-            { id: 'customer', header: 'Customer', accessor: (r) => r.customer, width: '30%' },
+            { id: 'code', header: 'Code', accessor: (r) => r.code, width: 200 },
+            { id: 'name', header: 'Name', accessor: (r) => r.name, width: '30%' },
           ]}
         />
       </div>
@@ -347,10 +309,10 @@ export const RemWidths: Story = {
     <div style={PAGE}>
       <div style={WIDE_BOX}>
         <TableDemo
-          rows={INVOICES.slice(0, 4)}
+          rows={RECORDS.slice(0, 4)}
           columns={[
-            { id: 'id', header: 'N.', accessor: (r) => r.id, width: '10rem' },
-            { id: 'customer', header: 'Customer', accessor: (r) => r.customer, width: '10rem' },
+            { id: 'code', header: 'Code', accessor: (r) => r.code, width: '10rem' },
+            { id: 'name', header: 'Name', accessor: (r) => r.name, width: '10rem' },
           ]}
         />
       </div>
@@ -369,7 +331,7 @@ export const LongTexts: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <div style={PAGE}>
-      <TableDemo rows={INVOICES.slice(0, 8)} columns={columns()} defaultSort={{ columnId: 'amount', direction: 'desc' }} />
+      <TableDemo rows={LONG_TEXT_ROWS} columns={columns()} defaultSort={{ columnId: 'amount', direction: 'desc' }} />
     </div>
   ),
   play: async ({ canvasElement }) => {
@@ -388,7 +350,7 @@ export const NarrowContainer: Story = {
   render: () => (
     <div style={PAGE}>
       <div style={{ width: 340, maxWidth: '100%' }}>
-        <TableDemo rows={INVOICES.slice(0, 8)} columns={columns()} />
+        <TableDemo rows={RECORDS.slice(0, 8)} columns={columns()} />
       </div>
     </div>
   ),
@@ -406,7 +368,7 @@ export const StickyAfterScroll: Story = {
   render: () => (
     <div style={PAGE}>
       <div style={{ width: 420, maxWidth: '100%' }}>
-        <TableDemo rows={INVOICES} columns={columns()} maxHeight={260} />
+        <TableDemo rows={RECORDS} columns={columns()} maxHeight={260} />
       </div>
     </div>
   ),
@@ -420,10 +382,10 @@ export const StickyAfterScroll: Story = {
   },
 };
 
-const MANY: ListReportColumn<Invoice>[] = Array.from({ length: 20 }, (_, i) => ({
+const MANY: ListReportColumn<Row>[] = Array.from({ length: 20 }, (_, i) => ({
   id: `c${i}`,
   header: i === 3 ? 'A very long header that must not wrap' : `Col. ${i + 1}`,
-  accessor: (r: Invoice) => `${r.id}/${i + 1}`,
+  accessor: (r: Row) => `${r.code}/${i + 1}`,
 }));
 
 /** Twenty columns in a phone-sized box: horizontal scroll inside the box, header sticky. */
@@ -433,7 +395,7 @@ export const TwentyColumns: Story = {
   render: () => (
     <div style={PAGE}>
       <div style={{ width: 360, maxWidth: '100%' }}>
-        <TableDemo rows={INVOICES.slice(0, 12)} columns={MANY} maxHeight={240} />
+        <TableDemo rows={RECORDS.slice(0, 12)} columns={MANY} maxHeight={240} />
       </div>
     </div>
   ),
@@ -450,7 +412,7 @@ export const Rtl: Story = {
   parameters: NO_CONTROLS,
   render: () => (
     <div style={PAGE}>
-      <TableDemo rows={INVOICES.slice(0, 6)} columns={columns()} dir="rtl" />
+      <TableDemo rows={RECORDS.slice(0, 6)} columns={columns()} dir="rtl" />
     </div>
   ),
   play: async ({ canvasElement }) => {
@@ -458,7 +420,7 @@ export const Rtl: Story = {
     const th = canvas.getByRole('columnheader', { name: 'Amount' });
     await expect(getComputedStyle(th).textAlign).toBe('end');
     const scroller = canvas.getByTestId('scroller');
-    // End in rtl is the left edge: the amount cell is to the left of the customer cell.
+    // End in rtl is the left edge: the amount cell is to the left of the name cell.
     const cells = within(canvas.getAllByRole('row')[1]!).getAllByRole('cell');
     await expect(cells[3]!.getBoundingClientRect().left).toBeLessThan(cells[1]!.getBoundingClientRect().left);
     await expect(getComputedStyle(scroller).direction).toBe('rtl');
@@ -517,7 +479,7 @@ export const Empty: Story = {
 export const NoResults: Story = {
   tags: ['visual'],
   parameters: stateParameters('The filter excludes every row: "Clear filters" appears.'),
-  render: stateRender({ rows: INVOICES.slice(0, 8), defaultFilter: 'none', onClearFilters: fn() }),
+  render: stateRender({ rows: RECORDS.slice(0, 8), defaultFilter: 'none', onClearFilters: fn() }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(within(canvas.getByRole('table')).getByText('No results for the current filters')).toBeVisible();
@@ -557,7 +519,7 @@ export const ErrorLongMessage: Story = {
           rows={[]}
           status="error"
           onRetry={fn()}
-          errorMessage={`Unable to load the invoices: ${'the server is not responding '.repeat(8)}https://example.com/${'a'.repeat(60)}`}
+          errorMessage={`Unable to load the records: ${'the server is not responding '.repeat(8)}https://example.com/${'a'.repeat(60)}`}
         />
       </div>
     </div>
@@ -573,7 +535,7 @@ export const ErrorLongMessage: Story = {
 export const Reloading: Story = {
   tags: ['visual'],
   parameters: stateParameters('`status="loading"` with rows already present: they stay visible, no skeletons.'),
-  render: stateRender({ rows: INVOICES.slice(0, 8), status: 'loading' }),
+  render: stateRender({ rows: RECORDS.slice(0, 8), status: 'loading' }),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId('scroller')).toHaveAttribute('aria-busy', 'true');
@@ -642,24 +604,24 @@ interface TableSelectionArgs {
   onSelectedIdsChange: (ids: ReadonlySet<string>) => void;
 }
 
-const SELECTION_INVOICES = makeInvoices(12);
-const SELECTION_COLUMNS: ListReportColumn<Invoice>[] = [
-  { id: 'id', header: 'No.', accessor: (r) => r.id, width: 90 },
-  { id: 'customer', header: 'Customer', accessor: (r) => r.customer, minWidth: 160 },
-  { id: 'amount', header: 'Amount', accessor: (r) => r.amount, cell: (r) => money(r.amount), align: 'end', width: 120 },
-  { id: 'date', header: 'Date', accessor: (r) => r.date, width: 120 },
+const SELECTION_RECORDS = makeRows(12);
+const SELECTION_COLUMNS: ListReportColumn<Row>[] = [
+  { id: 'code', header: 'Code', accessor: (r) => r.code, width: 110 },
+  { id: 'name', header: 'Name', accessor: (r) => r.name, minWidth: 160 },
+  { id: 'amount', header: 'Amount', accessor: (r) => r.amountMinor, cell: (r) => money(r.amountMinor), align: 'end', width: 120 },
+  { id: 'date', header: 'Date', accessor: (r) => r.createdOn, width: 120 },
 ];
-const NO_INVOICES: Invoice[] = [];
+const NO_RECORDS: Row[] = [];
 const TABLE_PRESELECTED: Record<TableSelectionArgs['preselected'], ReadonlySet<string>> = {
   none: new Set(),
-  some: new Set(['F-0002', 'F-0003']),
-  all: new Set(SELECTION_INVOICES.map((r) => r.id)),
+  some: new Set([SELECTION_RECORDS[1]!.id, SELECTION_RECORDS[2]!.id]),
+  all: new Set(SELECTION_RECORDS.map((r) => r.id)),
 };
 
 function TableSelectionDemo({ selectable, controlled, preselected, status, dataset, onSelectedIdsChange }: TableSelectionArgs) {
   const [parentIds, setParentIds] = useState<ReadonlySet<string>>(TABLE_PRESELECTED[preselected]);
-  const table = useListReport<Invoice>({
-    rows: dataset === 'empty' ? NO_INVOICES : SELECTION_INVOICES,
+  const table = useListReport<Row>({
+    rows: dataset === 'empty' ? NO_RECORDS : SELECTION_RECORDS,
     columns: SELECTION_COLUMNS,
     getRowId: (r) => r.id,
     filters: DEMO_FILTERS,
@@ -678,7 +640,7 @@ function TableSelectionDemo({ selectable, controlled, preselected, status, datas
         Selected: <output data-testid="selected-count">{table.selection.selectedResultCount}</output>
         {controlled ? ` (parent state: ${parentIds.size} ids)` : null}
       </p>
-      <ListReportTable table={table} aria-label="Invoices" maxHeight={420} status={status} />
+      <ListReportTable table={table} aria-label="Records" maxHeight={420} status={status} />
     </div>
   );
 }
@@ -686,7 +648,7 @@ function TableSelectionDemo({ selectable, controlled, preselected, status, datas
 /**
  * The table alone with `useListReport({ selectable: true })`: a leading checkbox column (as wide as a row
  * is tall), a tri-state "Select all results" header and one distinctly named checkbox per row ("Select
- * F-0001"). A selected row is tinted; a click elsewhere in the row does nothing. Controls: `selectable`,
+ * REC-00001"). A selected row is tinted; a click elsewhere in the row does nothing. Controls: `selectable`,
  * `controlled`, the initial selection, `status` and the dataset (the column keeps its place in every state);
  * `onSelectedIdsChange` shows up in Actions.
  * The play function selects two rows (the header becomes indeterminate), then uses the header to select
@@ -714,14 +676,14 @@ export const Selection: StoryObj<TableSelectionArgs> = {
     if (!args.selectable || args.preselected !== 'none' || args.status !== 'ready' || args.dataset !== 'rows') return;
     const canvas = within(canvasElement);
     const all = canvas.getByRole('checkbox', { name: 'Select all results' }) as HTMLInputElement;
-    await userEvent.click(canvas.getByRole('checkbox', { name: 'Select F-0001' }));
-    await userEvent.click(canvas.getByRole('checkbox', { name: 'Select F-0004' }));
+    await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${SELECTION_RECORDS[0]!.code}` }));
+    await userEvent.click(canvas.getByRole('checkbox', { name: `Select ${SELECTION_RECORDS[3]!.code}` }));
     await expect(all.indeterminate).toBe(true);
-    await expect(canvas.getByRole('checkbox', { name: 'Select F-0004' }).closest('tr')).toHaveAttribute('data-selected');
+    await expect(canvas.getByRole('checkbox', { name: `Select ${SELECTION_RECORDS[3]!.code}` }).closest('tr')).toHaveAttribute('data-selected');
     await expect(canvas.getByTestId('selected-count')).toHaveTextContent('2');
     await userEvent.click(all);
     await expect(all).toBeChecked();
-    await expect(canvas.getByTestId('selected-count')).toHaveTextContent('12');
+    await expect(canvas.getByTestId('selected-count')).toHaveTextContent(String(SELECTION_RECORDS.length));
     await userEvent.click(all);
     await expect(all).not.toBeChecked();
     await expect(canvas.getByTestId('selected-count')).toHaveTextContent('0');
