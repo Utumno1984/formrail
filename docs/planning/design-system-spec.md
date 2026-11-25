@@ -897,14 +897,17 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
    dolore della concorrenza sui dati e accettano costi di licenza se risolvono un problema
    strutturale.
 4. **Modello commerciale: licenza annuale per sviluppatore, con 12 mesi di aggiornamenti
-   inclusi** (schema standard enterprise). La vendita passa da un **Merchant of Record**, che gestisce IVA UE e
-   fatturazione. MoR di riferimento: **Paddle** (decisione di Daniele del 2026-11-26): nessun costo
-   iniziale, commissione 5% + 0,50 $ a transazione secondo la pagina prezzi pubblica. Lemon Squeezy,
-   citato in precedenza come esempio, non accetta più nuove registrazioni e chiude il 31/03/2027
-   (banner sulla pagina prezzi ufficiale, letta il 22/11/2026).
-   **Da verificare prima di aprire l'account**: che Paddle emetta chiavi di licenza o consenta di
-   consegnarle; che accetti un venditore italiano (persona fisica o micro-attività); il trattamento
-   fiscale, da concordare con un commercialista.
+   inclusi** (schema standard enterprise). La vendita passa da un **Merchant of Record**, che
+   gestisce IVA UE e fatturazione. MoR di riferimento: **Paddle** (decisione di Daniele del
+   2026-11-26): nessun costo iniziale, commissione 5% + 0,50 $ a transazione secondo la pagina
+   prezzi pubblica (letta il 26/11/2026). Lemon Squeezy, citato in precedenza come esempio, non
+   accetta più nuove registrazioni e chiude il 31/03/2027 (banner sulla pagina prezzi ufficiale,
+   letta il 22/11/2026).
+   **Da verificare prima di aprire l'account**: che Paddle consenta di collegare l'acquisto alla
+   concessione e alla revoca dell'accesso all'org npm privata (webhook o export degli ordini),
+   senza chiavi di licenza (vedi la voce "Concessione dell'accesso all'org npm" più sotto); che
+   accetti un venditore italiano (persona fisica o micro-attività); il trattamento fiscale, da
+   concordare con un commercialista.
 
 **Non toccato dalle decisioni**: la distribuzione resta come da §2.4 (org npm privata, nessun
 licensing a runtime).
