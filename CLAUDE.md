@@ -17,7 +17,8 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   2026-11-13, sostituiscono "abbonamento ricorrente"; non rinegoziabili senza nuova istruzione
   sua, dettaglio in `docs/planning/design-system-spec.md` §8)**: target team aziendali (ERP,
   gestionali, portali amministrativi); licenza annuale per sviluppatore con 12 mesi di
-  aggiornamenti inclusi, venduta tramite un Merchant of Record (es. Lemon Squeezy) che gestisce
+  aggiornamenti inclusi, venduta tramite un Merchant of Record, **Paddle** (decisione di Daniele del
+  2026-11-26: Lemon Squeezy non accetta nuove registrazioni e chiude il 31/03/2027), che gestisce
   IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
   d'attesa/pre-ordine (validazione della domanda), ticket #490. Ticket di studio/refactoring #489
   per rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
