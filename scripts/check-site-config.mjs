@@ -6,69 +6,45 @@
 // as a second line of defence. PR builds, `npm run check` and the visual job assemble the site with the
 // placeholders and stay green. A pure function is used instead of an environment variable that an
 // operator could forget to set: the default behaviour of the deploy job is to be strict.
-import { fileURLToPath } from "node:url";
-import {
-  DESIGN_PARTNER_URL,
-  EARLY_ACCESS_URL,
-  PRIVACY_EMAIL,
-} from "./site-config.mjs";
+import { fileURLToPath } from 'node:url';
+import { DESIGN_PARTNER_URL, EARLY_ACCESS_URL, PRIVACY_EMAIL } from './site-config.mjs';
 
-const PLACEHOLDER =
-  /placeholder|example\.(invalid|com|org|net)|\.invalid\b|\btodo\b|\bxxx+\b/i;
+const PLACEHOLDER = /placeholder|example\.(invalid|com|org|net)|\.invalid\b|\btodo\b|\bxxx+\b/i;
 const EMAIL = /^[^\s@<>()"]+@[^\s@<>()"]+\.[^\s@<>()"]{2,}$/;
 
 /**
  * @param {{ earlyAccessUrl: string, privacyEmail: string, designPartnerUrl?: string }} config
  * @returns {string[]} one message per problem; empty when the config can be published
  */
-export function findConfigProblems({
-  earlyAccessUrl,
-  privacyEmail,
-  designPartnerUrl = "",
-}) {
+export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartnerUrl = '' }) {
   const problems = [];
-  if (earlyAccessUrl === "")
-    problems.push(
-      "EARLY_ACCESS_URL is empty: the waitlist form link is missing.",
-    );
+  if (earlyAccessUrl === '') problems.push('EARLY_ACCESS_URL is empty: the waitlist form link is missing.');
   else {
     let url = null;
     try {
       url = new URL(earlyAccessUrl);
     } catch {
-      problems.push(
-        `EARLY_ACCESS_URL is not an absolute URL: ${earlyAccessUrl}`,
-      );
+      problems.push(`EARLY_ACCESS_URL is not an absolute URL: ${earlyAccessUrl}`);
     }
-    if (url && url.protocol !== "https:")
-      problems.push("EARLY_ACCESS_URL must be an https:// URL.");
-    if (PLACEHOLDER.test(earlyAccessUrl))
-      problems.push("EARLY_ACCESS_URL is still a placeholder.");
+    if (url && url.protocol !== 'https:') problems.push('EARLY_ACCESS_URL must be an https:// URL.');
+    if (PLACEHOLDER.test(earlyAccessUrl)) problems.push('EARLY_ACCESS_URL is still a placeholder.');
   }
   // Empty = design partner section switched off (ticket #697): allowed, unlike the waitlist URL.
-  if (designPartnerUrl !== "") {
+  if (designPartnerUrl !== '') {
     let url = null;
     try {
       url = new URL(designPartnerUrl);
     } catch {
-      problems.push(
-        `DESIGN_PARTNER_URL is not an absolute URL: ${designPartnerUrl}`,
-      );
+      problems.push(`DESIGN_PARTNER_URL is not an absolute URL: ${designPartnerUrl}`);
     }
-    if (url && url.protocol !== "https:")
-      problems.push("DESIGN_PARTNER_URL must be an https:// URL.");
-    if (PLACEHOLDER.test(designPartnerUrl))
-      problems.push("DESIGN_PARTNER_URL is still a placeholder.");
+    if (url && url.protocol !== 'https:') problems.push('DESIGN_PARTNER_URL must be an https:// URL.');
+    if (PLACEHOLDER.test(designPartnerUrl)) problems.push('DESIGN_PARTNER_URL is still a placeholder.');
     if (designPartnerUrl === earlyAccessUrl)
-      problems.push(
-        "DESIGN_PARTNER_URL is the same as EARLY_ACCESS_URL: the two forms must be distinct.",
-      );
+      problems.push('DESIGN_PARTNER_URL is the same as EARLY_ACCESS_URL: the two forms must be distinct.');
   }
-  if (privacyEmail === "") problems.push("PRIVACY_EMAIL is empty.");
-  else if (!EMAIL.test(privacyEmail))
-    problems.push(`PRIVACY_EMAIL is not an email address: ${privacyEmail}`);
-  else if (PLACEHOLDER.test(privacyEmail))
-    problems.push("PRIVACY_EMAIL is still a placeholder.");
+  if (privacyEmail === '') problems.push('PRIVACY_EMAIL is empty.');
+  else if (!EMAIL.test(privacyEmail)) problems.push(`PRIVACY_EMAIL is not an email address: ${privacyEmail}`);
+  else if (PLACEHOLDER.test(privacyEmail)) problems.push('PRIVACY_EMAIL is still a placeholder.');
   return problems;
 }
 
@@ -76,9 +52,7 @@ export function findConfigProblems({
 export function assertConfigPublishable(config) {
   const problems = findConfigProblems(config);
   if (problems.length > 0) {
-    throw new Error(
-      `scripts/site-config.mjs is not ready to publish:\n- ${problems.join("\n- ")}`,
-    );
+    throw new Error(`scripts/site-config.mjs is not ready to publish:\n- ${problems.join('\n- ')}`);
   }
 }
 
@@ -89,7 +63,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       privacyEmail: PRIVACY_EMAIL,
       designPartnerUrl: DESIGN_PARTNER_URL,
     });
-    console.log("site-config: values are final.");
+    console.log('site-config: values are final.');
   } catch (error) {
     console.error(error.message);
     process.exit(1);

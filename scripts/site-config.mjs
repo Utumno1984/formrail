@@ -1,8 +1,6 @@
 // Single source of the Pages path prefix (ticket #380): the assembler, the local server and the
 // smoke test all read it from here. On Pages the project site lives under `/<repo-name>/`.
-const repo = (process.env.GITHUB_REPOSITORY || "Utumno1984/formrail").split(
-  "/",
-)[1];
+const repo = (process.env.GITHUB_REPOSITORY || 'Utumno1984/formrail').split('/')[1];
 
 /** Path prefix of the published site, with leading and trailing slash. */
 export const SITE_BASE = `/${repo}/`;
@@ -23,17 +21,16 @@ export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
  * Must be an absolute `https://` URL. Setting it to '' makes the assembler leave every CTA out of the
  * pages (never a link to `#` or a broken one); the strict guard rejects '' too.
  */
-export const EARLY_ACCESS_URL = "https://tally.so/r/vXepWQ";
+export const EARLY_ACCESS_URL = 'https://tally.so/r/vXepWQ';
 
 /** Contact address of the data controller, printed on the privacy page (GDPR art. 13). */
-export const PRIVACY_EMAIL = "formrail.dev@gmail.com";
+export const PRIVACY_EMAIL = 'formrail.dev@gmail.com';
 
 /**
  * The indicative price, shown on the Pro page for teams exactly as written (decision of 2026-11-13).
  * '' removes the price block: no figure and no currency then appear anywhere on the site.
  */
-export const EXPECTED_PRICE_TEXT =
-  "Expected price: from \u20AC199 per developer/year";
+export const EXPECTED_PRICE_TEXT = 'Expected price: from \u20AC199 per developer/year';
 
 /**
  * Target of the "Apply as a design partner" link on /teams/ (ticket #697): the design partner application
@@ -43,7 +40,7 @@ export const EXPECTED_PRICE_TEXT =
  * Must be an absolute `https://` URL different from EARLY_ACCESS_URL. Setting it to '' switches the whole
  * design partner section off, on /teams/ and in the privacy notice (the strict guard accepts '').
  */
-export const DESIGN_PARTNER_URL = "https://tally.so/r/xVYjMo";
+export const DESIGN_PARTNER_URL = 'https://tally.so/r/xVYjMo';
 
 /**
  * Number of design partner seats (decision of 2026-11-26). 0 = seats exhausted: the section says so and
