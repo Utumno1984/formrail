@@ -4,7 +4,7 @@ import path from 'node:path';
 import { defaultTreeAdapter, html as parse5Html, parse as parseHtml, parseFragment, serialize } from 'parse5';
 import { afterEach, describe, expect, it } from 'vitest';
 import { assembleSite } from './assemble-site.mjs';
-import { BEFORE_BODY, escapeText, formatDate, loadArticles, parseArticle, renderArticles, renderArticlesLinks, renderFeed } from './articles.mjs';
+import { BEFORE_BODY, escapeText, formatDate, loadArticles, parseArticle, publishedBody, renderArticles, renderArticlesLinks, renderFeed } from './articles.mjs';
 
 const SITE_ROOT = path.join(import.meta.dirname, '..', 'site-root');
 const NOW = new Date('2026-11-26T10:00:00Z');
@@ -199,6 +199,25 @@ describe('parseArticle guards', () => {
     ["<p>x</p><img alt='x", /ends inside an unfinished tag or comment/],
     ['<p>x</p><!-- note', /ends inside an unfinished tag or comment/],
     ['<svg><![CDATA[x', /ends inside an unfinished tag or comment/],
+    // A last `<!...`, `<?...` or stray end tag without its `>` would take the `>` of the page's `</div>`.
+    ['<p>x</p><!x', /ends with a <!\.\.\., <\?\.\.\. or end tag that lacks its >/],
+    ['<p>x</p><?x', /lacks its >/],
+    ['<p>x</p><![CDATA[x', /lacks its >/],
+    ['<p>x</p><!DOCTYPE x', /lacks its >/],
+    ['<p>x</p></x', /lacks its >/],
+    ['<p>x</p></ x', /lacks its >/],
+    // select: parse5 8 drops the tags inside it, Chromium 135+ keeps them (customizable select).
+    ['<p>Pick one: <select><option>a</option><meta http-equiv="refresh" content="0;url=https://evil.example/select"></select></p>', /must not contain a select element/],
+    ['<table><select><option>a</option><meta http-equiv="refresh" content="0;url=https://e/"></select></table>', /select element/],
+    ['<table><tr><td><select><meta http-equiv="refresh" content="0;url=https://e/"></select></td></tr></table>', /select element/],
+    ['<math><mi><select><meta http-equiv="refresh" content="0;url=https://e/"></select></mi></math>', /select element/],
+    ['<select><iframe src="x.html"></iframe></select>', /select element/],
+    ['<select><img src="https://e/x.png"></select>', /select element/],
+    ['<select><svg><image href="https://e/x.png"/></svg></select>', /select element/],
+    ['<template><select><option>a</option></select></template>', /select element/],
+    ['<SELECT><option>a</option></SELECT>', /select element/],
+    ['<a href="/x" attributionsrc="https://e/">x</a>', /must not contain an attributionsrc attribute/],
+    ['<img src="a.png" alt="" ATTRIBUTIONSRC>', /attributionsrc attribute/],
   ])('rejects %j as the HTML parser reads it, naming the file and the reason', (body, reason) => {
     expect(() => parse(body)).toThrow(reason);
     expect(() => parse(body)).toThrow(/^articles\/x\.html: the body /);
@@ -297,6 +316,12 @@ describe('parseArticle guards', () => {
       if (rejected) expect(() => parse(body)).toThrow(/ends inside an unfinished tag or comment/);
       else expect(() => parse(body)).not.toThrow();
       expect(Date.now() - start).toBeLessThan(2000);
+    }
+  });
+
+  it('accepts a body whose last construct is complete or a tag that lacks only its >', () => {
+    for (const body of ['<p>x</p><!-- note -->', '<p>x</p><?x>', '<p>x</p><!x>', '<p>a</p', '<p>x</p><img alt="" src="a.png"', '<table><tr><td>x', '<pre>x']) {
+      expect(() => parse(body), body).not.toThrow();
     }
   });
 
@@ -465,6 +490,122 @@ describe('renderArticles', () => {
     expect(page['articles/tricky/index.html']).toContain('<pre tabindex="0"><code>x &lt; y</code></pre>');
     expect(page['articles/two/index.html']).toContain('<pre tabindex="0"><code>y</code></pre>');
     expect(page['articles/two/index.html']).not.toMatch(/tabindex="0" tabindex/);
+  });
+
+  // The page as it would be with `body` in place of the published body (the template, filled the same way).
+  const pageFor = (article) => {
+    const marker = '<p>@@BODY@@</p>';
+    const page = renderArticles([{ ...article, body: marker }], templates)[`articles/${article.slug}/index.html`];
+    return (body) => page.replace(marker, () => body);
+  };
+  const bodyOf = (page) => {
+    const start = page.indexOf('</p>', page.indexOf('class="article-meta"')) + '</p>\n'.length;
+    return page.slice(start, page.indexOf('\n        </div>\n      </article>'));
+  };
+  const BANNED = new Set(['script', 'iframe', 'embed', 'object', 'style', 'link', 'base', 'meta', 'form', 'select']);
+  // The tree a browser builds, as text lines (element, namespace, attributes in order, text and comments), and what
+  // it asks the browser to do: banned elements and http-equiv in the body (the head has the CSP meta), handler and
+  // style attributes anywhere.
+  const inspect = (html, scriptingEnabled) => {
+    const lines = [];
+    const dangers = [];
+    const walk = (node, depth, inBody) => {
+      if (node.tagName) {
+        lines.push(`${depth}<${node.namespaceURI.split('/').pop()}:${node.tagName} ${node.attrs.map((a) => `${a.prefix ?? ''}${a.name}=${JSON.stringify(a.value)}`).join(' ')}>`);
+        if (inBody && BANNED.has(node.tagName)) dangers.push(node.tagName);
+        for (const a of node.attrs) if (a.name.startsWith('on') || a.name === 'style' || (inBody && a.name === 'http-equiv')) dangers.push(`${node.tagName}[${a.name}]`);
+      } else if (node.nodeName === '#text' || node.nodeName === '#comment') lines.push(`${depth}${node.nodeName}${JSON.stringify(node.value ?? node.data)}`);
+      for (const child of node.childNodes ?? []) walk(child, depth + 1, inBody || node.tagName === 'body');
+      if (node.content) walk(node.content, depth + 1, inBody);
+    };
+    walk(parseHtml(html, { scriptingEnabled }), 0, false);
+    return { lines, dangers };
+  };
+  const dangers = (page) => [true, false].flatMap((scriptingEnabled) => inspect(page, scriptingEnabled).dangers);
+  // The published tree with the added `tabindex="0"` taken off again: what remains must be the linted tree.
+  const withoutAddedTabindex = (lines) => lines.map((line) => line.replace(/^(\d+<xhtml:pre )tabindex="0" ?/, '$1'));
+
+  it('adds tabindex only to <pre> start tags the parser builds: a "<pre" inside an attribute value stays as it is', () => {
+    for (const body of [
+      '<p><abbr title="<pre a><meta http-equiv=refresh content=0;url=https://evil.example/pre>">x</abbr></p>',
+      '<p><abbr title="<pre a><script>alert(1)</script>">x</abbr></p>',
+      '<p><a href="/x" title="<pre onclick=alert(1) z">x</a></p>',
+      "<p><a href=/x title='<pre onclick=alert(1) z'>x</a></p>",
+      '<p>see <code title="the <pre> element">pre</code></p>',
+      '<p><code>&lt;pre onclick="x"&gt;</code> and <!-- <pre onclick="x"> --></p>',
+    ]) {
+      const article = { ...parseArticle('articles/t.html', source({ slug: 'p' }, body)), file: 'articles/t.html' };
+      const page = renderArticles([article], templates)['articles/p/index.html'];
+      expect(bodyOf(page), body).toBe(body);
+      expect(dangers(page), body).toEqual([]);
+    }
+  });
+
+  it('adds tabindex="0" once to every HTML <pre> without one, wherever the parser puts it, and to no other', () => {
+    const cases = [
+      ['<pre>a</pre>', '<pre tabindex="0">a</pre>'],
+      ['<PRE\nclass="c">a</PRE>', '<PRE tabindex="0"\nclass="c">a</PRE>'],
+      ['<pre/>a', '<pre tabindex="0"/>a'],
+      ['<pre tabindex="-1">a</pre><pre TABINDEX=0>b</pre>', '<pre tabindex="-1">a</pre><pre TABINDEX=0>b</pre>'],
+      ['<pre class="c" tabindex="0">a</pre>', '<pre class="c" tabindex="0">a</pre>'],
+      // Nested, in a template, after an SVG or MathML breakout, inside foreignObject: each one is a real HTML pre.
+      ['<pre>a<pre>b</pre></pre>', '<pre tabindex="0">a<pre tabindex="0">b</pre></pre>'],
+      ['<template><pre>a</pre></template>', '<template><pre tabindex="0">a</pre></template>'],
+      ['<svg><pre>a</pre></svg>', '<svg><pre tabindex="0">a</pre></svg>'],
+      ['<math><mi><pre>a</pre></mi></math>', '<math><mi><pre tabindex="0">a</pre></mi></math>'],
+      ['<svg><foreignObject><pre>a</pre></foreignObject></svg>', '<svg><foreignObject><pre tabindex="0">a</pre></foreignObject></svg>'],
+      ['<table><tr><td><pre>a</pre></td></tr></table>', '<table><tr><td><pre tabindex="0">a</pre></td></tr></table>'],
+      // In a noscript it is text when scripting is on: left alone.
+      ['<noscript><pre>a</pre></noscript>', '<noscript><pre>a</pre></noscript>'],
+      // A start tag with scripting on, an attribute value with scripting off: a quote written there would close it.
+      ['<noscript><p title="</noscript><pre>"></p></noscript>', '<noscript><p title="</noscript><pre>"></p></noscript>'],
+      // Not a pre start tag: other names, end tags, text, comments.
+      ['<prefix>a</prefix><p>&lt;pre&gt;</p></pre><!--<pre>-->', '<prefix>a</prefix><p>&lt;pre&gt;</p></pre><!--<pre>-->'],
+    ];
+    for (const [body, published] of cases) {
+      expect(() => parseArticle('articles/t.html', source({}, body)), body).not.toThrow();
+      expect(publishedBody({ slug: 's', body }), body).toBe(published);
+    }
+  });
+
+  it('renderArticles lints the body it publishes: a body that never went through parseArticle is refused', () => {
+    expect(() => renderArticles([{ ...tricky, body: '<p onclick="x()">x</p>' }], templates)).toThrow(
+      /^articles\/tricky: the published body must not contain an inline event handler \(on\.\.\.=\)\.$/,
+    );
+    expect(() => renderArticles([{ ...tricky, file: 'articles/t.html', body: '<select><meta http-equiv="refresh"></select>' }], templates)).toThrow(
+      /^articles\/t\.html: the published body must not contain a select element/,
+    );
+  });
+
+  it('the published page has the tree of the linted body plus a tabindex on each pre (differential, 500 random bodies, fixed seed)', () => {
+    const PIECES = ['<pre', '<PRE', '<pre>', '</pre>', '>', '"', "'", ' ', '=', ' title=', ' tabindex=1', ' class=a', '<p>', '<abbr', '<code>', '</code>', 'x', '&lt;pre', '<noscript>', '</noscript>', '<template>', '</template>', '<svg>', '<math><mi>', '<!--', '-->', '<meta x>', '\n'];
+    let seed = 11;
+    const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const seen = { accepted: 0, tabindexAdded: 0, preTextNotTag: 0 };
+    const pageWith = pageFor(parseArticle('articles/t.html', source({ slug: 'f' })));
+    for (let k = 0; k < 500; k++) {
+      let body = '<p>';
+      for (let j = 2 + Math.floor(random() * 14); j > 0; j--) body += PIECES[Math.floor(random() * PIECES.length)];
+      body += '</p>';
+      let article;
+      try {
+        article = { ...parseArticle('articles/t.html', source({ slug: 'f' }, body)), file: 'articles/t.html' };
+      } catch {
+        continue;
+      }
+      seen.accepted++;
+      const page = renderArticles([article], templates)['articles/f/index.html'];
+      const published = bodyOf(page);
+      expect(page, body).toBe(pageWith(published));
+      for (const scripting of [true, false]) {
+        const got = inspect(page, scripting);
+        expect(got.dangers, body).toEqual([]);
+        expect(withoutAddedTabindex(got.lines), body).toEqual(inspect(pageWith(body), scripting).lines);
+      }
+      if (published !== body) seen.tabindexAdded++;
+      if (/<pre/i.test(body) && published === body) seen.preTextNotTag++;
+    }
+    for (const [key, count] of Object.entries(seen)) expect(count, `${key} in ${JSON.stringify(seen)}`).toBeGreaterThanOrEqual(30);
   });
 
   it('an unknown placeholder in a template fails naming the template', () => {

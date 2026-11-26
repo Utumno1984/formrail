@@ -24,14 +24,25 @@
 //   attributes the parser really builds, with entities already decoded, never at the spelling of the source. So
 //   code shown escaped in `<pre><code>` (`&lt;b onclick&gt;`) is text and passes, while an odd but valid spelling
 //   (unquoted values with quotes inside, `jav&#x61;script:`, a tab inside a URL, a tag missing its last `>`) is
-//   seen exactly as a browser sees it. Refused: script, h1, iframe, embed, object, style, link, base, meta and
-//   form elements; `on...` handler attributes; `javascript:` URLs; every `style` attribute (the page CSP blocks
-//   inline styles); `ping`; `src`/`srcset`/`poster`/`background` from another origin; in SVG an `href` to another
-//   origin (image, use...), an external `url()` or an animated `href`; a body that ends inside a quote or a comment.
+//   seen exactly as a browser sees it. Refused: script, h1, iframe, embed, object, style, link, base, meta, form
+//   and select elements; `on...` handler attributes; `javascript:` URLs; every `style` attribute (the page CSP
+//   blocks inline styles); `ping` and `attributionsrc`; `src`/`srcset`/`poster`/`background` from another
+//   origin; in SVG an `href` to another origin (image, use...), an external `url()` or an animated `href`; a body
+//   that ends inside a quote or a comment, or whose last `<!...`, `<?...` or end tag lacks its `>`.
+//   "The lint sees what the browser sees" holds only while parse5 and the browsers follow the same version of the
+//   parsing standard. `select` is refused for that reason: parse5 8 still drops the tags inside it (the old "in
+//   select" mode), while Chromium 135+ keeps them (customizable select), so a `<meta>` or an `<iframe>` inside a
+//   select would be invisible to the rules and live in the page. When parse5 or the browsers change how they
+//   parse, check the differences again before trusting this lint.
 //   It stays a lint, not a sanitiser: it cannot know every way a browser may fetch something (CSS escapes in an
 //   SVG presentation attribute, for one). The real barrier is the Content-Security-Policy `<meta>` of
 //   article.html/articles.html (no script, no inline style, no third-party resource, no form, no base, no
 //   object); links to external pages with `<a href>` are fine.
+// - The page gets the body with one change: every HTML `<pre>` that has no `tabindex` gets `tabindex="0"`
+//   (a scrollable region must be focusable). It is written right after the `<pre` of the start tags parse5 really
+//   builds (nested, inside a template, breaking out of SVG/MathML: all of them), never by matching text, so a
+//   `<pre` inside an attribute value or escaped code is left alone. A `<pre>` inside a `<noscript>` gets none: it
+//   is text when scripting is on. The changed body is checked again, and a refusal stops the build.
 // - Atom ids are `tag:` URIs, independent of the hosting (RFC 4287 section 4.2.6: an id must never change).
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -49,11 +60,14 @@ export const BEFORE_BODY = '<!DOCTYPE html><html><head></head><body><main><artic
 // In the page the template goes on after the body ("\n        </div>"): a last tag that lacks only its `>` is
 // still closed there, by that whitespace and the next `>`. Appending both shows that tag to the rules here too;
 // a body that ends inside a quoted value or a comment stays unfinished and is refused (`UNFINISHED`).
+// (No `eof-in-doctype`: the `>` appended here always closes a `<!DOCTYPE`; that case is the `>` check below.)
 const AFTER_BODY = '\n>';
-const UNFINISHED = new Set(['eof-in-tag', 'eof-in-comment', 'eof-in-doctype', 'eof-in-cdata']);
+const UNFINISHED = new Set(['eof-in-tag', 'eof-in-comment', 'eof-in-cdata']);
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const OTHER_BANNED = new Set(['iframe', 'embed', 'object', 'style', 'link', 'base', 'meta', 'form']);
+// Kept apart from OTHER_BANNED for its own reason (see the file header): parse5 and the browsers disagree inside it.
+const SELECT = 'select';
 // Attributes whose value a browser follows as a URL (navigation, submission or fetch): `javascript:` is refused there.
 const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'data', 'poster', 'background', 'cite', 'longdesc', 'lowsrc', 'dynsrc', 'codebase', 'classid', 'archive', 'manifest', 'icon', 'usemap', 'profile']);
 const SVG_ANIMATIONS = new Set(['animate', 'set', 'animatemotion', 'animatetransform', 'animatecolor']);
@@ -80,6 +94,10 @@ const RULES = [
   [(el) => el.fromBody && el.name === 'h1', 'must not contain an h1: the page title is the only h1'],
   [(el) => el.fromBody && el.name === 'script', 'must not contain a script: the site ships no script on articles'],
   [(el) => el.fromBody && OTHER_BANNED.has(el.name), 'must not contain an iframe, embed, object, style, link, base, meta or form element'],
+  [
+    (el) => el.fromBody && el.name === SELECT,
+    'must not contain a select element: browsers now keep the tags inside it, which this lint (parse5) cannot see',
+  ],
   [(el) => has(el, (a) => a.name.startsWith('on')), 'must not contain an inline event handler (on...=)'],
   [(el) => has(el, (a) => URL_ATTRIBUTES.has(a.local) && isJavascriptUrl(a.value)), 'must not contain a javascript: URL'],
   [(el) => has(el, (a) => a.name === 'style'), 'must not contain a style attribute: inline styles are blocked by the page CSP, use a class'],
@@ -87,6 +105,7 @@ const RULES = [
   [(el) => has(el, (a) => a.name === 'srcset' && hasExternalCandidate(a.value)), `must not load srcset ${THIRD_PARTY}`],
   [(el) => has(el, (a) => a.name === 'background' && isExternal(a.value)), `must not load background ${THIRD_PARTY}`],
   [(el) => has(el, (a) => a.name === 'ping'), 'must not contain a ping attribute: a click on the link would notify another address'],
+  [(el) => has(el, (a) => a.name === 'attributionsrc'), 'must not contain an attributionsrc attribute: a click or a load would notify another address'],
   [(el) => el.ns === SVG_NS && el.name !== 'a' && has(el, (a) => a.local === 'href' && isExternal(a.value)), `must not load an SVG href (image, use...) ${THIRD_PARTY}`],
   [(el) => el.ns === SVG_NS && has(el, (a) => hasExternalCssUrl(a.value)), `must not load an SVG url() ${THIRD_PARTY}`],
   [
@@ -108,17 +127,41 @@ function elementsOf(root) {
   return out;
 }
 
+/** The body parsed where the page puts it, with source locations, and the codes of its parse errors. */
+function parseBody(body, scriptingEnabled) {
+  const errors = [];
+  const source = `${BEFORE_BODY}${body}${AFTER_BODY}`;
+  const document = parse(source, {
+    scriptingEnabled,
+    sourceCodeLocationInfo: true,
+    onParseError: (error) => errors.push(error.code),
+  });
+  return { document, errors, end: source.length };
+}
+
+/**
+ * Whether the `>` appended after the body ends up as text or closes a tag (a tag that lacked only its `>`).
+ * Taken by a comment (`<!x`, `<?x`, `<![CDATA[x` outside SVG/MathML), a `<!DOCTYPE` or an end tag that closes
+ * nothing, it means that in the page the `>` of the template's `</div>` would end that construct instead.
+ */
+function lastCharIsTextOrTag(document, end) {
+  const stack = [document];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    const loc = node.sourceCodeLocation;
+    if (loc && (node.tagName ? loc.startTag?.endOffset === end || loc.endTag?.endOffset === end : node.nodeName === '#text' && loc.endOffset === end)) return true;
+    for (const child of node.childNodes ?? []) stack.push(child);
+    if (node.content) stack.push(node.content);
+  }
+  return false;
+}
+
 /**
  * The reason the body is refused when parsed with scripting on or off (a `<noscript>` is text in one mode and
  * markup in the other, and a browser may run either), or null.
  */
 function bodyProblem(body, scriptingEnabled) {
-  const errors = [];
-  const document = parse(`${BEFORE_BODY}${body}${AFTER_BODY}`, {
-    scriptingEnabled,
-    sourceCodeLocationInfo: true,
-    onParseError: (error) => errors.push(error.code),
-  });
+  const { document, errors, end } = parseBody(body, scriptingEnabled);
   const elements = elementsOf(document).map((node) => ({
     name: node.tagName.toLowerCase(),
     ns: node.namespaceURI,
@@ -143,7 +186,15 @@ function bodyProblem(body, scriptingEnabled) {
   if (errors.some((code) => UNFINISHED.has(code))) {
     return 'ends inside an unfinished tag or comment (an unclosed quote or <!--): the page after it would become part of it';
   }
+  if (!lastCharIsTextOrTag(document, end)) {
+    return 'ends with a <!..., <?... or end tag that lacks its >: the > of the page after it would close it';
+  }
   return null;
+}
+
+/** The lint of the body: the first reason it is refused, scripting on then off, or null. */
+function lintBody(body) {
+  return bodyProblem(body, true) ?? bodyProblem(body, false);
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -195,7 +246,7 @@ export function parseArticle(file, source) {
   const body = match[2].trim();
   if (body === '') fail('the article has no body.');
   if (CONTROL.test(body)) fail('the body contains a control character.');
-  const problem = bodyProblem(body, true) ?? bodyProblem(body, false);
+  const problem = lintBody(body);
   if (problem) fail(`the body ${problem}.`);
   return { ...meta, body };
 }
@@ -235,9 +286,39 @@ function fill(template, values, name) {
   });
 }
 
-/** The `<pre>` blocks are keyboard-scrollable (a scrollable region must be focusable). */
-function focusablePre(body) {
-  return body.replace(/<pre(?![^>]*\btabindex\b)([^>]*)>/gi, '<pre tabindex="0"$1>');
+/**
+ * Offsets in `body` right after the `<pre` of every HTML `pre` start tag that parse5 builds from the body and that
+ * has no `tabindex` (any case, any value).
+ */
+function preOffsets(body, scriptingEnabled) {
+  const offsets = new Set();
+  for (const node of elementsOf(parseBody(body, scriptingEnabled).document)) {
+    if (node.tagName !== 'pre' || node.namespaceURI !== HTML_NS || node.attrs.some((a) => a.name === 'tabindex')) continue;
+    const start = node.sourceCodeLocation?.startTag?.startOffset;
+    if (start === undefined || start < BEFORE_BODY.length) continue;
+    const at = start - BEFORE_BODY.length + '<pre'.length;
+    if (body.slice(at - 4, at).toLowerCase() !== '<pre') throw new Error(`Internal error: no "<pre" at offset ${at - 4} of the body.`);
+    offsets.add(at);
+  }
+  return offsets;
+}
+
+/**
+ * The body as the page publishes it: the `<pre>` blocks made keyboard-scrollable (a scrollable region must be
+ * focusable). The attribute goes right after the tag name of a start tag the parser really builds in both
+ * scripting modes: there the tokenizer reads ` tabindex="0"` as one more attribute and the rest of the body
+ * exactly as before. The result is linted again (defence in depth): the build fails if it is refused.
+ * @param {{ body: string, slug: string, file?: string }} article
+ */
+export function publishedBody(article) {
+  const { body } = article;
+  const off = preOffsets(body, false);
+  const offsets = [...preOffsets(body, true)].filter((at) => off.has(at)).sort((a, b) => b - a);
+  let out = body;
+  for (const at of offsets) out = `${out.slice(0, at)} tabindex="0"${out.slice(at)}`;
+  const problem = lintBody(out);
+  if (problem) throw new Error(`${article.file ?? `articles/${article.slug}`}: the published body ${problem}.`);
+  return out;
 }
 
 /** Absolute URL of a site path: origin + prefix + path (`SITE_BASE`, `/` by default since the move to formrail.dev). */
@@ -278,7 +359,7 @@ export function renderArticles(articles, { indexTemplate, articleTemplate, origi
         DATE_TEXT: formatDate(a.date),
         CANONICAL: escapeText(url(`articles/${a.slug}/`)),
         FEED_URL: escapeText(url('articles/feed.xml')),
-        BODY: focusablePre(a.body),
+        BODY: publishedBody(a),
       },
       'article.html',
     );
