@@ -41,7 +41,9 @@ const BODY_RULES = [
   [/<script[\s/>]/i, 'must not contain a script: the site ships no script on articles'],
   [/<(?:iframe|embed|object|style|link|base|meta|form)[\s/>]/i, 'must not contain an iframe, embed, object, style, link, base, meta or form element'],
 ];
-const TAG = /<[a-zA-Z](?:[^>"']|"[^"]*"|'[^']*')*>/g;
+// Quoted values may contain `>`; a stray unpaired quote or a missing final `>` must not hide the tag from the
+// rules (the browser still parses it), so a lone quote is consumed too and the tag may end at the end of the body.
+const TAG = /<[a-zA-Z](?:[^>"']|"[^"]*"|'[^']*'|["'])*(?:>|$)/g;
 const TAG_RULES = [
   [/[\s/"']on[a-z]+\s*=/i, 'must not contain an inline event handler (on...=)'],
   [/javascript\s*:/i, 'must not contain a javascript: URL'],

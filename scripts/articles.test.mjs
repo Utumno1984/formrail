@@ -102,6 +102,16 @@ describe('parseArticle guards', () => {
     ['<p STYLE = "background:URL (https://evil.test/a.png)">x</p>', /inline style/],
     ['<p style = "background: url (a.png)">x</p>', /inline style/],
     ['<a href="JAVASCRIPT:alert(1)">x</a>', /javascript: URL/],
+    ['<IMG ONERROR="x()">', /inline event handler/],
+    ['<img\n  alt="x"\n  src="https://e/x.png"\n>', /src\/poster from another origin/],
+    ['<p onclick="x()">a</p><p>b</p>', /inline event handler/],
+    ['<img src="https://e/x.png" title=\'Daniele\'s chart\'>', /src\/poster from another origin/],
+    ['<img alt=\'Daniele\'s chart\' onerror="x()">', /inline event handler/],
+    ['<img alt=it\'s src=https://e/x.png>', /src\/poster from another origin/],
+    ['<img alt=a"b src=//e/x.png>', /src\/poster from another origin/],
+    ['<p>x</p><img src=//e/x.png', /src\/poster from another origin/],
+    ['<a title="a > b" onclick="x()">x</a>', /inline event handler/],
+    ["<a title='a > b' onclick='x()'>x</a>", /inline event handler/],
   ])('rejects %s, naming the file and the reason', (body, reason) => {
     expect(() => parse(body)).toThrow(reason);
     expect(() => parse(body)).toThrow(/^articles\/x\.html: the body /);
@@ -123,6 +133,16 @@ describe('parseArticle guards', () => {
       '&lt;div style="background:url(a.png)"&gt;</code></pre>',
     ].join('\n');
     expect(() => parse(body)).not.toThrow();
+  });
+
+  it('stays linear on a long run of unclosed tags', () => {
+    const start = Date.now();
+    expect(() => parse('<a'.repeat(40000))).not.toThrow();
+    expect(Date.now() - start).toBeLessThan(2000);
+  });
+
+  it('accepts a > inside a quoted attribute value', () => {
+    expect(() => parse('<a title="a > b" href="/x">x</a>')).not.toThrow();
   });
 
   it('still rejects a real tag that follows escaped code in the same body', () => {
