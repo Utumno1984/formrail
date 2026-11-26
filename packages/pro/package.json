@@ -2,8 +2,13 @@
   "name": "@formrail/pro",
   "version": "0.2.0",
   "private": true,
-  "description": "Pro tier of Formrail (commercial license, to be defined). Private until the private npm org exists.",
+  "description": "Pro tier of Formrail (commercial license, to be defined). Distributed through GitHub Packages as @formrail-dev/pro (installed with an npm alias); private in this workspace, published only by scripts/release-pro.mjs.",
   "homepage": "https://formrail.dev/pro/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Utumno1984/formrail.git",
+    "directory": "packages/pro"
+  },
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",
   "sideEffects": [
@@ -99,5 +104,8 @@
     "tailwindcss": "^4.3.3",
     "tsup": "^9.0.0",
     "vitest": "^5.0.5"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   }
 }

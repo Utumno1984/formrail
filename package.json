@@ -34,6 +34,7 @@
     "changeset:check": "node scripts/check-changeset.mjs",
     "default-column:check": "node scripts/default-column-measure.mjs --check",
     "bundle:check": "node scripts/bundle-budget.mjs check",
+    "release:pro": "node scripts/release-pro.mjs",
     "bundle:update-baseline": "node scripts/bundle-budget.mjs update-baseline",
     "legacy-demo:check": "node scripts/legacy-demo-data.mjs check",
     "legacy-demo:update": "node scripts/legacy-demo-data.mjs update"
@@ -54,6 +55,7 @@
     "espree": "^10.4.0",
     "globals": "^17.13.0",
     "http-server": "^14.1.1",
+    "semver": "^7.8.6",
     "storybook": "^10.6.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0",
