@@ -678,6 +678,8 @@ describe('assembleSite with articles', () => {
     writeFileSync(path.join(storybookDir, 'index.html'), '<!-- manager -->');
     const siteRootDir = path.join(tmp, 'site-root');
     cpSync(SITE_ROOT, siteRootDir, { recursive: true });
+    // The repository publishes real articles now (#699): these tests start from a site-root with only their own.
+    rmSync(path.join(siteRootDir, 'articles'), { recursive: true, force: true });
     if (articleFiles) {
       mkdirSync(path.join(siteRootDir, 'articles'));
       for (const [name, content] of Object.entries(articleFiles)) writeFileSync(path.join(siteRootDir, 'articles', name), content);
