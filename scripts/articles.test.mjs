@@ -60,6 +60,73 @@ describe('parseArticle', () => {
   });
 });
 
+describe('parseArticle guards', () => {
+  const parse = (body) => parseArticle('articles/x.html', source({}, body));
+
+  it.each([
+    ['<script/src=https://evil.test/x.js></script>', /^articles\/x\.html: the body must not contain a script/],
+    ['<SCRIPT>1</SCRIPT>', /script/],
+    ['<h1/>Title</h1>', /h1/],
+    ['<H1>Title</H1>', /h1/],
+    ['<iframe src="x.html"></iframe>', /iframe, embed, object, style, link, base, meta or form/],
+    ['<embed src="x">', /embed/],
+    ['<object data="x"></object>', /object/],
+    ['<style>@import url(https://evil.test/a.css);</style>', /style/],
+    ['<link rel="stylesheet" href="x.css">', /link/],
+    ['<base href="https://evil.test/">', /base/],
+    ['<meta http-equiv="refresh" content="0;url=https://evil.test">', /meta/],
+    ['<form action="x"></form>', /form/],
+    ['<p onclick="alert(1)">x</p>', /inline event handler/],
+    ['<p/onclick=alert(1)>x</p>', /inline event handler/],
+    ['<img alt="a" onerror = "x">', /inline event handler/],
+    ['<a href="javascript:alert(1)">x</a>', /javascript: URL/],
+    ['<a href="JavaScript :alert(1)">x</a>', /javascript: URL/],
+    ['<img src="https://evil.test/p.png">', /src\/poster from another origin/],
+    ['<img src=http://evil.test/p.png>', /src\/poster from another origin/],
+    ['<img src="//evil.test/p.png">', /src\/poster from another origin/],
+    ['<video poster="https://evil.test/p.png"></video>', /src\/poster from another origin/],
+    ['<img srcset="a.png 1x, https://evil.test/b.png 2x">', /srcset from another origin/],
+    ['<p style="background:url(https://evil.test/a.png)">x</p>', /inline style/],
+  ])('rejects %s, naming the file and the reason', (body, reason) => {
+    expect(() => parse(body)).toThrow(reason);
+    expect(() => parse(body)).toThrow(/^articles\/x\.html: the body /);
+  });
+
+  it('still accepts external links, relative images and the usual content', () => {
+    expect(() => parse('<h2>A</h2><p>See <a href="https://example.org/x">this</a> and <a href="../../storybook/?path=/docs/a--docs">that</a>.</p><img src="pic.png" alt=""><h3>B</h3><pre><code>a &lt; b</code></pre>')).not.toThrow();
+  });
+
+  it('rejects a skipped heading level (h2 -> h4), and a first heading deeper than h2', () => {
+    expect(() => parse('<h2>A</h2><h4>B</h4>')).toThrow(/^articles\/x\.html: the body skips a heading level \(h4 after h2\)/);
+    expect(() => parse('<h3>A</h3>')).toThrow(/skips a heading level \(h3 after the page title\)/);
+    expect(() => parse('<h2>A</h2><h3>B</h3><h2>C</h2><h3>D</h3><h4>E</h4>')).not.toThrow();
+  });
+
+  it('rejects control characters in the front matter and in the body', () => {
+    expect(() => parseArticle('articles/x.html', source({ title: 'Bad\u0001title' }))).toThrow(/^articles\/x\.html: "title" contains a control character/);
+    expect(() => parse('<p>bad\u0007body</p>')).toThrow(/^articles\/x\.html: the body contains a control character/);
+  });
+
+  it.each(['\uFFFE', '\uFFFF'])('rejects the non-character U+%s (invalid in XML 1.0) in both places', (ch) => {
+    expect(() => parseArticle('articles/x.html', source({ description: `a${ch}b` }))).toThrow(/"description" contains a control character/);
+    expect(() => parse(`<p>a${ch}b</p>`)).toThrow(/body contains a control character/);
+  });
+
+  it('accepts a CRLF file (front matter and closing line)', () => {
+    const a = parseArticle('articles/x.html', source().replace(/\n/g, '\r\n'));
+    expect(a).toMatchObject({ title: 'A title', author: 'An Author' });
+    expect(a.body).toBe('<p>Body.</p>');
+  });
+
+  it('ignores a leading BOM', () => {
+    expect(parseArticle('articles/x.html', `\uFEFF${source()}`).title).toBe('A title');
+  });
+
+  it('keeps YAML-style quotes literal', () => {
+    expect(parseArticle('articles/x.html', source({ title: '"Quoted"' })).title).toBe('"Quoted"');
+  });
+});
+
 describe('loadArticles', () => {
   const dirs = [];
   afterEach(() => {
@@ -101,6 +168,11 @@ describe('loadArticles', () => {
     expect(() => loadArticles(dir, { now: NOW })).toThrow(/articles\/b\.html: duplicate slug "a-title" \(also used by articles\/a\.html\)/);
   });
 
+  it('files starting with a dot are ignored (even a non-.html one); any other non-.html file is refused', () => {
+    const dir = folder({ '.gitkeep': '', '.draft.html': 'not an article', 'ok.html': source() });
+    expect(loadArticles(dir, { now: NOW }).published.map((a) => a.slug)).toEqual(['a-title']);
+  });
+
   it('a malformed file fails and names it; a non-.html source is refused', () => {
     expect(() => loadArticles(folder({ 'ok.html': source(), 'broken.html': source({ title: undefined }, '<p>x</p>') }), { now: NOW })).toThrow(
       /articles\/broken\.html/,
@@ -138,6 +210,28 @@ describe('renderArticles', () => {
     expect(page).not.toContain('Compare a < b');
     expect(files['articles/index.html']).toContain('Compare a &lt; b &amp; &quot;c&quot;');
     expect(files['articles/feed.xml']).toContain('<title>Compare a &lt; b &amp; &quot;c&quot;</title>');
+    expect(files['articles/feed.xml']).toContain('<summary>Uses &lt;b&gt; &amp; &quot;quotes&quot;.</summary>');
+    expect(files['articles/index.html']).toContain('<p>Uses &lt;b&gt; &amp; &quot;quotes&quot;.</p>');
+  });
+
+  it('escapes the author in the page (meta line and article:author), the index and the feed', () => {
+    const odd = { ...tricky, slug: 'odd-author', author: 'Ann <b> & "Co"' };
+    const files = renderArticles([odd], templates);
+    const escaped = 'Ann &lt;b&gt; &amp; &quot;Co&quot;';
+    expect(files['articles/odd-author/index.html']).toContain(`</time> · ${escaped}</p>`);
+    expect(files['articles/odd-author/index.html']).toContain(`<meta property="article:author" content="${escaped}" />`);
+    expect(files['articles/index.html']).toContain(`</time> · ${escaped}</p>`);
+    expect(files['articles/feed.xml']).toContain(`<author><name>${escaped}</name></author>`);
+    for (const html of [files['articles/odd-author/index.html'], files['articles/index.html']]) expect(html).not.toContain('Ann <b>');
+  });
+
+  it('the Atom ids do not depend on the origin or the prefix (hosting-independent tag: URIs)', () => {
+    const ids = (origin, siteBase) => {
+      const xml = renderArticles([tricky], { ...templates, origin, siteBase })['articles/feed.xml'];
+      return [...xml.matchAll(/<id>([^<]*)<\/id>/g)].map((m) => m[1]);
+    };
+    expect(ids('https://formrail.dev', '/')).toEqual(['tag:formrail.dev,2026:articles', 'tag:formrail.dev,2026:articles/tricky']);
+    expect(ids('https://other.example', '/some/prefix/')).toEqual(ids('https://formrail.dev', '/'));
   });
 
   it('writes an absolute canonical URL from origin + prefix, plus Open Graph and a <time datetime>', () => {
@@ -159,6 +253,11 @@ describe('renderArticles', () => {
     expect(page['articles/tricky/index.html']).toContain('<pre tabindex="0"><code>x &lt; y</code></pre>');
     expect(page['articles/two/index.html']).toContain('<pre tabindex="0"><code>y</code></pre>');
     expect(page['articles/two/index.html']).not.toMatch(/tabindex="0" tabindex/);
+  });
+
+  it('an unknown placeholder in a template fails naming the template', () => {
+    expect(() => renderArticles([tricky], { ...templates, articleTemplate: '<p>{{NOPE}}</p>' })).toThrow(/^article\.html: unknown placeholder \{\{NOPE\}\}/);
+    expect(() => renderArticles([tricky], { ...templates, indexTemplate: '{{ITEMS}}{{OTHER}}' })).toThrow(/^articles\.html: unknown placeholder \{\{OTHER\}\}/);
   });
 
   it('a value cannot inject a placeholder into the template (single pass)', () => {
@@ -186,12 +285,20 @@ describe('renderFeed', () => {
   it('is an Atom feed with one entry per article, absolute links and updated', () => {
     const xml = renderFeed([a('two', '2026-05-02'), a('one', '2026-01-01')], url);
     expect(xml.startsWith('<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">')).toBe(true);
-    expect(xml).toContain('<id>https://formrail.dev/articles/</id>');
+    expect(xml).toContain('<id>tag:formrail.dev,2026:articles</id>');
     expect(xml).toContain('<updated>2026-05-02T00:00:00Z</updated>');
     expect(xml.match(/<entry>/g)).toHaveLength(2);
     expect(xml).toContain('<link rel="alternate" type="text/html" href="https://formrail.dev/articles/two/"/>');
     expect(xml).toContain('<author><name>Me &amp; You</name></author>');
     expect(xml.match(/<updated>/g)).toHaveLength(3);
+    expect(xml).toContain('<id>tag:formrail.dev,2026:articles/two</id>');
+  });
+
+  it('writes the exact updated and published values of each entry and of the feed', () => {
+    const xml = renderFeed([a('two', '2026-05-02'), a('one', '2026-01-01')], url);
+    expect(xml).toContain('<updated>2026-01-01T00:00:00Z</updated>\n    <published>2026-01-01T00:00:00Z</published>');
+    expect(xml).toContain('<updated>2026-05-02T00:00:00Z</updated>\n    <published>2026-05-02T00:00:00Z</published>');
+    expect(xml).toContain('href="https://formrail.dev/articles/"/>\n  <updated>2026-05-02T00:00:00Z</updated>\n  <entry>');
   });
 });
 

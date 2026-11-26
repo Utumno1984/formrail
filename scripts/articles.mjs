@@ -10,14 +10,37 @@
 //   description: One plain-text sentence (meta description, index, feed summary)
 //   author: Plain text
 //   ---
-//   <p>HTML body: h2/h3 headings (the page owns the h1), <pre><code> blocks, links.</p>
+//   <p>HTML body: h2/h3 headings (the page owns the h1; no level may be skipped), <pre><code> blocks, links.</p>
+//
+// Rules worth knowing:
+// - The build day is computed in UTC (`now.toISOString()`): near midnight it can differ from the local day.
+// - There is no scheduled deploy: an article dated in the future goes out with the first push to main on or
+//   after that date (the deploy runs on push), not by itself on the day.
+// - In `site-root/articles/` any file that is not `.html` stops the assembly (it is almost surely a mistake),
+//   while files starting with a dot (`.gitkeep`, editor leftovers) are ignored.
+// - Front matter values are plain text, not YAML: quotes around a value stay literal (`title: "A"` shows the quotes).
+// - The body is raw HTML written by the maintainers, but it is checked: no script, no inline event handler, no
+//   `javascript:` URL, no iframe/embed/object/style/link/base/meta/form, no third-party `src`/`srcset`/`poster`
+//   (the page must make no request to other origins); links to external pages with `<a href>` are fine.
+// - Atom ids are `tag:` URIs, independent of the hosting (RFC 4287 section 4.2.6: an id must never change).
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const KEYS = ['title', 'date', 'slug', 'description', 'author'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // eslint-disable-next-line no-control-regex -- the point is to reject control characters (invalid in XML 1.0)
-const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/;
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
+// Checked on the body, in order; the message completes "the body ...".
+const BODY_RULES = [
+  [/<h1[\s/>]/i, 'must not contain an h1: the page title is the only h1'],
+  [/<script[\s/>]/i, 'must not contain a script: the site ships no script on articles'],
+  [/<(?:iframe|embed|object|style|link|base|meta|form)[\s/>]/i, 'must not contain an iframe, embed, object, style, link, base, meta or form element'],
+  [/[\s/"']on[a-z]+\s*=/i, 'must not contain an inline event handler (on...=)'],
+  [/javascript\s*:/i, 'must not contain a javascript: URL'],
+  [/\bstyle\s*=\s*["'][^"']*url\s*\(/i, 'must not load a resource from an inline style (url())'],
+  [/\b(?:src|poster)\s*=\s*["']?\s*(?:https?:)?\/\//i, 'must not load src/poster from another origin (absolute http(s): or // URL): the page makes no third-party request'],
+  [/\bsrcset\s*=\s*["']?[^"'>]*?(?:https?:|\/\/)/i, 'must not load srcset from another origin (absolute http(s): or // URL): the page makes no third-party request'],
+];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** HTML/XML text and attribute escaping (the same rule serves both, quotes included). */
@@ -46,6 +69,7 @@ export function parseArticle(file, source) {
   const fail = (message) => {
     throw new Error(`${file}: ${message}`);
   };
+  source = source.replace(/^\uFEFF/, '');
   const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/.exec(source);
   if (!match) fail('missing front matter (the file must start with a "---" block).');
   const meta = {};
@@ -65,9 +89,16 @@ export function parseArticle(file, source) {
   if (!SLUG.test(meta.slug)) fail(`"slug" must be lowercase letters, digits and single dashes, got "${meta.slug}".`);
   const body = match[2].trim();
   if (body === '') fail('the article has no body.');
-  if (/<h1[\s>]/i.test(body)) fail('the body must not contain an h1: the page title is the only h1.');
-  if (/<script[\s>]/i.test(body)) fail('the body must not contain a script: the site ships no script on articles.');
   if (CONTROL.test(body)) fail('the body contains a control character.');
+  for (const [pattern, reason] of BODY_RULES) {
+    if (pattern.test(body)) fail(`the body ${reason}.`);
+  }
+  let level = 1;
+  for (const m of body.matchAll(/<h([2-6])[\s/>]/gi)) {
+    const next = Number(m[1]);
+    if (next > level + 1) fail(`the body skips a heading level (h${next} after ${level === 1 ? 'the page title' : `h${level}`}): headings must not skip levels.`);
+    level = next;
+  }
   return { ...meta, body };
 }
 
@@ -158,13 +189,13 @@ export function renderArticles(articles, { indexTemplate, articleTemplate, origi
   return files;
 }
 
-/** Atom 1.0 feed: one entry per article, absolute links, `updated` from the article date. */
+/** Atom 1.0 feed: one entry per article, absolute links, `updated` from the article date, hosting-independent `tag:` ids. */
 export function renderFeed(articles, url) {
   const stamp = (date) => `${date}T00:00:00Z`;
   const entries = articles
     .map(
       (a) => `  <entry>
-    <id>${escapeText(url(`articles/${a.slug}/`))}</id>
+    <id>tag:formrail.dev,2026:articles/${a.slug}</id>
     <title>${escapeText(a.title)}</title>
     <link rel="alternate" type="text/html" href="${escapeText(url(`articles/${a.slug}/`))}"/>
     <updated>${stamp(a.date)}</updated>
@@ -176,7 +207,7 @@ export function renderFeed(articles, url) {
     .join('\n');
   return `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-  <id>${escapeText(url('articles/'))}</id>
+  <id>tag:formrail.dev,2026:articles</id>
   <title>Formrail articles</title>
   <subtitle>Technical articles about record-editing screens in React.</subtitle>
   <link rel="self" type="application/atom+xml" href="${escapeText(url('articles/feed.xml'))}"/>
