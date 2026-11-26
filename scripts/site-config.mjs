@@ -48,3 +48,19 @@ export const PRIVACY_EMAIL = 'formrail.dev@gmail.com';
  * '' removes the price block: no figure and no currency then appear anywhere on the site.
  */
 export const EXPECTED_PRICE_TEXT = 'Expected price: from \u20AC199 per developer/year';
+
+/**
+ * Target of the "Apply as a design partner" link on /teams/ (ticket #697): the design partner application
+ * form, a Tally form (EU servers) created by Daniele, SEPARATE from the waitlist form and opened from an
+ * external link (never embedded). Its fields are listed one by one in site-root/privacy.html.
+ *
+ * Must be an absolute `https://` URL different from EARLY_ACCESS_URL. Setting it to '' switches the whole
+ * design partner section off, on /teams/ and in the privacy notice (the strict guard accepts '').
+ */
+export const DESIGN_PARTNER_URL = 'https://tally.so/r/xVYjMo';
+
+/**
+ * Number of design partner seats (decision of 2026-11-26). 0 = seats exhausted: the section says so and
+ * links to the waitlist instead of the form.
+ */
+export const DESIGN_PARTNER_SEATS = 3;

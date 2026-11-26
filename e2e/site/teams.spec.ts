@@ -2,7 +2,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 // @ts-expect-error plain .mjs helper shared with the assembler and the server, no type declarations
-import { EARLY_ACCESS_URL, EXPECTED_PRICE_TEXT, PRIVACY_EMAIL, SITE_BASE } from '../../scripts/site-config.mjs';
+import { DESIGN_PARTNER_SEATS, DESIGN_PARTNER_URL, EARLY_ACCESS_URL, EXPECTED_PRICE_TEXT, PRIVACY_EMAIL, SITE_BASE } from '../../scripts/site-config.mjs';
 import { expectNoA11yViolations } from '../helpers/a11y';
 
 // Pre-deploy smoke of the Pro page for teams (/teams/) and of the privacy page (/privacy/), ticket #490.
@@ -13,6 +13,8 @@ const base = SITE_BASE as string;
 const earlyAccessUrl = EARLY_ACCESS_URL as string;
 const priceText = EXPECTED_PRICE_TEXT as string;
 const privacyEmail = PRIVACY_EMAIL as string;
+const designPartnerUrl = DESIGN_PARTNER_URL as string;
+const designPartnerSeats = DESIGN_PARTNER_SEATS as number;
 const SITE_DIR = fileURLToPath(new URL('../../site/', import.meta.url));
 
 // Pro features that exist (spec §3, stories in packages/pro). Anything else must not be offered.
@@ -277,6 +279,128 @@ test.describe('waitlist call-to-action', () => {
   });
 });
 
+test.describe('design partners (#697)', () => {
+  test(
+    designPartnerUrl
+      ? 'the section lists the offer, the requests and the seats, and links the form in a new tab'
+      : 'DESIGN_PARTNER_URL is empty: no section and no mention anywhere',
+    async ({ page }) => {
+      await page.goto('teams/');
+      const section = page.locator('#design-partners');
+      if (!designPartnerUrl) {
+        await expect(section).toHaveCount(0);
+        for (const url of ['teams/', 'privacy/', '']) {
+          await page.goto(url);
+          expect(await page.locator('body').innerText()).not.toMatch(/design[- ]partner/i);
+        }
+        return;
+      }
+      await expect(section.getByRole('heading', { level: 2, name: 'Design partners' })).toBeVisible();
+      await expect(section.getByRole('heading', { level: 3 })).toHaveText(['What you get', 'What we ask']);
+      const lists = section.locator('.card ul');
+      await expect(lists.nth(0).locator('li')).toHaveText([
+        'Early access to Formrail Pro',
+        'Influence on the roadmap',
+        'A direct channel with the maintainer',
+        '50% off the early access license, when early access opens',
+      ]);
+      await expect(lists.nth(1).locator('li')).toHaveText(['Two short feedback calls', 'A written use case', 'A public quote, which is optional']);
+      if (designPartnerSeats > 0) {
+        await expect(section.locator('.seats')).toHaveText(
+          `Up to ${designPartnerSeats} team${designPartnerSeats === 1 ? '' : 's'}. Applying is free and does not oblige you to buy anything.`,
+        );
+        const apply = section.getByRole('link', { name: 'Apply as a design partner' });
+        await expect(apply).toHaveCount(1);
+        await expect(apply).toHaveAttribute('href', designPartnerUrl);
+        await expect(apply).toHaveAttribute('target', '_blank');
+        await expect(apply).toHaveAttribute('rel', /\bnoopener\b/);
+        const note = section.locator('.cta .muted');
+        await expect(note).toContainText('Opens an external form (Tally, servers in the EU) in a new tab; nothing is embedded in this page.');
+        await expect(note).toContainText('different form from the waitlist one');
+        await expect(note.getByRole('link', { name: 'privacy page' })).toHaveAttribute('href', '../privacy/');
+      } else {
+        await expect(section).toContainText('All design partner seats are taken for now.');
+        await expect(section.getByRole('link', { name: 'Apply as a design partner' })).toHaveCount(0);
+        await expect(section.locator(`a[href="${designPartnerUrl}"]`)).toHaveCount(0);
+        if (earlyAccessUrl) await expect(section.getByRole('link', { name: 'Go to the waitlist form' })).toHaveAttribute('href', '#waitlist');
+      }
+      // Nothing is promised: no date, no obligation, the discount is a percentage.
+      const text = await section.innerText();
+      expect(text).toContain('50%');
+      expect(text).not.toMatch(/[€$£]\s?\d/);
+    },
+  );
+
+  test('the link is the only way to the form: nothing is embedded in the page', async ({ page }) => {
+    test.skip(!designPartnerUrl || designPartnerSeats === 0, 'no form link in this configuration');
+    await page.goto('teams/');
+    await expect(page.locator('iframe, embed, object, script')).toHaveCount(0);
+    await expect(page.locator(`a[href="${designPartnerUrl}"]`)).toHaveCount(1);
+  });
+
+  test('#design-partners puts the section in view', async ({ page }) => {
+    test.skip(!designPartnerUrl, 'no section without a URL');
+    await page.goto('teams/#design-partners');
+    await expect(page.locator('#design-partners-title')).toBeInViewport();
+  });
+
+  test('the privacy page lists the fields of the form one by one, in a section separate from the waitlist one', async ({ page }) => {
+    test.skip(!designPartnerUrl, 'no section without a URL');
+    await page.goto('privacy/');
+    await expect(page.getByRole('heading', { level: 2, name: 'Design partner applications' })).toBeVisible();
+    await expect(page.locator('#dp-data-title ~ ul').first().locator('li')).toHaveText([
+      'Work email;',
+      'Your role;',
+      'What are you building? (a description of the type of application and the industry);',
+      'Team size (one of 1–3, 4–10, 11–50 or 50+);',
+      'Form library in use (you can pick several from a fixed list, which includes Custom, None and Other);',
+      'When would you need it? (one of Now, 1–3 months, 3–6 months or Later);',
+      'Are you available for two short feedback calls? (Yes or No);',
+      'May we mention your company publicly as a design partner? (Yes or No);',
+      'Consent, a box you check yourself that refers to this notice.',
+    ]);
+    await expect(page.getByRole('heading', { level: 3 })).toHaveText(['Data we collect', 'Purpose and legal basis', 'Where the data goes and retention']);
+    const main = page.locator('main');
+    await expect(main).toContainText('all required');
+    await expect(main).toContainText('art. 6(1)(a) GDPR');
+    await expect(main).toContainText('no later than 24 months after your application');
+    await expect(main).toContainText('servers in the European Union');
+    // The waitlist notice is unchanged: its own fields, its own purposes.
+    await expect(main.locator('#data-title + p + ul li')).toHaveCount(5);
+    await expect(main.locator('#purpose-title + p + ul li')).toHaveCount(2);
+    // The new section never links the form and never speaks of the waitlist offer.
+    await expect(main.locator('a[href*="tally.so/r/"]')).toHaveCount(0);
+    const section = await main.locator('#design-partners-title ~ *').evaluateAll((els) => {
+      const out: string[] = [];
+      for (const el of els) {
+        if (el.id === 'rights-title') break;
+        out.push((el as HTMLElement).innerText);
+      }
+      return out.join(' ');
+    });
+    expect(section).not.toMatch(/waitlist form (asks|is hosted)/i);
+    expect(section).not.toMatch(/early access/i);
+    // The email copy of Tally is disclosed, with Google and its transfer basis; the waitlist wording is not reused.
+    expect(section).toContain('formrail.dev@gmail.com');
+    expect(section).toContain('under its own terms and privacy policy');
+    expect(section).not.toMatch(/Google[^.]*as our processor/);
+    expect(section).toContain('EU-US Data Privacy Framework');
+    expect(section).toContain('both on Tally and from the mailbox');
+    expect(section).not.toContain('not copied to email');
+  });
+
+  test('keyboard: the apply link is followed by the privacy link of its note', async ({ page }) => {
+    test.skip(!designPartnerUrl || designPartnerSeats === 0, 'no form link in this configuration');
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('teams/');
+    const apply = page.getByRole('link', { name: 'Apply as a design partner' });
+    await apply.focus();
+    await expect(apply).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.locator('#design-partners .cta .muted a')).toBeFocused();
+  });
+});
+
 test.describe('privacy page', () => {
   test('has the decided items, as headings, with the controller and the no cookies / no analytics statement', async ({ page }) => {
     await page.goto('privacy/');
@@ -288,6 +412,7 @@ test.describe('privacy page', () => {
       'Where the data goes',
       'Transfers outside the EEA',
       'Retention',
+      ...(designPartnerUrl ? ['Design partner applications'] : []),
       'Your rights',
       'No cookies, no analytics',
     ]);
@@ -427,7 +552,7 @@ test.describe('network and weight', () => {
 
   test('the only absolute URLs are GitHub and, when set, the form (the email is a mailto)', () => {
     for (const file of ['teams/index.html', 'privacy/index.html']) {
-      let html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '');
+      let html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '').replace(designPartnerUrl || '\0', '');
       // Only the privacy page may carry the two official policy links (art. 13(1)(f)).
       if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replace(url, '');
       expect(html, file).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/formrail)/);
