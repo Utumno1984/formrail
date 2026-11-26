@@ -9,6 +9,7 @@ import { EARLY_ACCESS_URL } from './site-config.mjs';
 
 const O = 'https://utumno1984.github.io';
 const B = `${O}/formrail/`;
+const D = 'https://formrail.dev';
 
 describe('resolveRedirect', () => {
   const cases = [
@@ -33,6 +34,9 @@ describe('resolveRedirect', () => {
     ['bare iframe.html', `${B}iframe.html`, 'iframe', `${B}storybook/iframe.html`],
     ['bare iframe.html with foreign parameters', `${B}iframe.html?utm_source=x`, 'iframe', `${B}storybook/iframe.html?utm_source=x`],
     ['host without a prefix (custom domain)', `${O}/?path=/docs/a--docs`, 'index', `${O}/storybook/?path=/docs/a--docs`],
+    ['formrail.dev root', `${D}/?path=/docs/a--docs`, 'index', `${D}/storybook/?path=/docs/a--docs`],
+    ['formrail.dev with the legacy /formrail/ prefix', `${D}/formrail/?path=/docs/a--docs`, 'index', `${D}/formrail/storybook/?path=/docs/a--docs`],
+    ['formrail.dev iframe without prefix', `${D}/iframe.html?id=x&viewMode=story`, 'iframe', `${D}/storybook/iframe.html?id=x&viewMode=story`],
     [
       'encoded characters are not re-encoded',
       `${B}?path=/story/a--b&args=label:Caf%C3%A9`,
@@ -55,11 +59,15 @@ describe('resolveRedirect', () => {
     ['the privacy page', `${B}privacy/`],
     ['foreign parameters', `${B}?utm_source=x`],
     ['custom domain without a prefix', `${O}/`],
+    ['formrail.dev root', `${D}/`],
+    ['formrail.dev Pro page', `${D}/teams/`],
   ])('%s stays on the landing', (_name, href) => {
     expect(resolveRedirect(href, 'index')).toBeNull();
   });
 
   it('never redirects a URL that is already under storybook/ (no double prefix, no loop)', () => {
+    expect(resolveRedirect(`${D}/storybook/?path=/docs/a--docs`, 'index')).toBeNull();
+    expect(resolveRedirect(`${D}/formrail/storybook/?path=/docs/a--docs`, 'index')).toBeNull();
     expect(resolveRedirect(`${B}storybook/?path=/docs/a--docs`, 'index')).toBeNull();
     expect(resolveRedirect(`${B}storybook/index.html?path=/docs/a--docs`, 'index')).toBeNull();
     expect(resolveRedirect(`${B}storybook/iframe.html?id=x&viewMode=story`, 'iframe')).toBeNull();
@@ -90,12 +98,13 @@ describe('assembleSite', () => {
     return { tmp, storybookDir, outDir: path.join(tmp, 'site') };
   }
 
-  it('builds the structure: root files, storybook/, 404.html, .nojekyll, empty pro/', () => {
+  it('builds the structure: root files, storybook/, 404.html, CNAME, .nojekyll, empty pro/', () => {
     const { storybookDir, outDir } = setup();
     assembleSite({ storybookDir, outDir });
     expect(readdirSync(outDir).sort()).toEqual([
       '.nojekyll',
       '404.html',
+      'CNAME',
       'copy.js',
       'favicon.svg',
       'iframe.html',
@@ -193,6 +202,50 @@ describe('assembleSite', () => {
     expect(html).not.toContain('<script');
     expect(html).toContain('href="/some-repo/storybook/"');
     expect(html).not.toContain('{{SITE_BASE}}');
+  });
+
+  // Ticket #667: the site is served from the root of formrail.dev.
+  describe('base path `/` (custom domain)', () => {
+    it('writes a CNAME with the domain and keeps the 404 links at the root', () => {
+      const { storybookDir, outDir } = setup();
+      assembleSite({ storybookDir, outDir });
+      expect(readFileSync(path.join(outDir, 'CNAME'), 'utf8')).toBe('formrail.dev\n');
+      const html = readFileSync(path.join(outDir, '404.html'), 'utf8');
+      expect(html).toContain('href="/storybook/"');
+      expect(html).toContain('href="/privacy/"');
+      expect(html).not.toContain('/formrail/');
+    });
+
+    it('no static page carries the legacy /formrail/ prefix or github.io', () => {
+      const { storybookDir, outDir } = setup();
+      assembleSite({ storybookDir, outDir });
+      for (const file of ['index.html', 'iframe.html', '404.html', 'teams/index.html', 'privacy/index.html', 'landing.css', 'copy.js']) {
+        const text = readFileSync(path.join(outDir, file), 'utf8');
+        expect(text, file).not.toMatch(/["'(=\s]\/formrail\//);
+        expect(text, file).not.toContain('github.io');
+      }
+    });
+
+    it('internal links and assets of the static pages are never prefixed', () => {
+      const { storybookDir, outDir } = setup();
+      assembleSite({ storybookDir, outDir });
+      for (const file of ['index.html', 'teams/index.html', 'privacy/index.html']) {
+        const html = readFileSync(path.join(outDir, file), 'utf8');
+        const targets = [...html.matchAll(/(?:href|src)="([^"#]*)"/g)].map((m) => m[1]).filter((t) => t && !/^(https?:|mailto:)/.test(t));
+        expect(targets.length, file).toBeGreaterThan(0);
+        for (const target of targets) expect(target.startsWith('/formrail/'), `${file}: ${target}`).toBe(false);
+      }
+    });
+
+    it('an invalid base fails with a clear message before outDir is touched', () => {
+      const { storybookDir, outDir } = setup();
+      mkdirSync(outDir);
+      writeFileSync(path.join(outDir, 'previous.txt'), 'published');
+      for (const bad of ['', 'formrail', '/formrail', 'formrail/', '//', '/a//b/', '/../']) {
+        expect(() => assembleSite({ storybookDir, outDir, siteBase: bad }), bad).toThrow(/SITE_BASE/);
+      }
+      expect(readFileSync(path.join(outDir, 'previous.txt'), 'utf8')).toBe('published');
+    });
   });
 
   it('replaces a stale output folder instead of merging into it', () => {

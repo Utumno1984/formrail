@@ -7,9 +7,11 @@ enterprise UI patterns — the **List Report** (a list with filters, selection a
 **Object Page** (a sectioned editor with an anchor bar, a sticky save bar and dirty-tracking) — for
 teams that want that UX without a proprietary stack.
 
-- **Home page**: https://utumno1984.github.io/formrail/
-- **Live demo and documentation (Free)**: https://utumno1984.github.io/formrail/storybook/
-- **Pro demo**: https://utumno1984.github.io/formrail/pro/
+- **Home page**: https://formrail.dev/
+- **Live demo and documentation (Free)**: https://formrail.dev/storybook/
+- **Pro demo**: https://formrail.dev/pro/
+
+The old project-site address (`https://utumno1984.github.io/formrail/`) redirects to `formrail.dev`.
 
 ## Install
 

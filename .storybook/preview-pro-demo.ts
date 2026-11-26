@@ -10,7 +10,7 @@
 import './preview-pro-demo.css';
 
 const BANNER_CLASS = 'rop-pro-banner';
-const LANDING_PRO_URL = '/formrail/teams/';
+const LANDING_PRO_URL = '/teams/';
 
 function createBanner(doc: Document): HTMLElement {
   const banner = doc.createElement('div');
