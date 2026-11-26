@@ -13,3 +13,11 @@ author: Test Author
   <li>The control mounts empty.</li>
   <li>The record arrives and the control echoes it.</li>
 </ul>
+<p>Avoid <code>href="javascript:void(0)"</code> placeholders.</p>
+<pre><code>&lt;Button onClick={save}&gt;Save&lt;/Button&gt;
+const online = navigator.onLine;
+let ongoing = 0;
+function save({ onSuccess = noop }) {}
+img.src = "https://cdn.example/x.png";
+&lt;script src="https://cdn/x.js"&gt;&lt;/script&gt;
+&lt;div style="background:url(a.png)"&gt;</code></pre>

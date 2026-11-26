@@ -19,9 +19,12 @@
 // - In `site-root/articles/` any file that is not `.html` stops the assembly (it is almost surely a mistake),
 //   while files starting with a dot (`.gitkeep`, editor leftovers) are ignored.
 // - Front matter values are plain text, not YAML: quotes around a value stay literal (`title: "A"` shows the quotes).
-// - The body is raw HTML written by the maintainers, but it is checked: no script, no inline event handler, no
-//   `javascript:` URL, no iframe/embed/object/style/link/base/meta/form, no third-party `src`/`srcset`/`poster`
-//   (the page must make no request to other origins); links to external pages with `<a href>` are fine.
+// - The body is raw HTML written by the maintainers. A few regexes catch the usual mistakes (script, h1, iframe,
+//   embed, object, style, link, base, meta, form elements; inline `on...=` handlers, `javascript:` URLs, inline
+//   `url()` styles, absolute or protocol-relative `src`/`srcset`/`poster` inside real tags). They are a lint, not
+//   a sanitiser: HTML has too many ways to spell the same thing (entities, odd whitespace, SVG, `ping`...).
+//   The real barrier is the Content-Security-Policy `<meta>` of article.html/articles.html (no script, no
+//   third-party resource, no form, no base, no object); links to external pages with `<a href>` are fine.
 // - Atom ids are `tag:` URIs, independent of the hosting (RFC 4287 section 4.2.6: an id must never change).
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -30,16 +33,21 @@ const KEYS = ['title', 'date', 'slug', 'description', 'author'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // eslint-disable-next-line no-control-regex -- the point is to reject control characters (invalid in XML 1.0)
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
-// Checked on the body, in order; the message completes "the body ...".
+// Checked in order; the message completes "the body ...". `BODY_RULES` look at the whole body (tag names),
+// `TAG_RULES` only at the real tags (attributes): in text a `<` is always written `&lt;`, so code shown inside
+// `<pre><code>` (`onClick={save}`, `img.src = "https://..."`) or prose never forms a tag and is not scanned.
 const BODY_RULES = [
   [/<h1[\s/>]/i, 'must not contain an h1: the page title is the only h1'],
   [/<script[\s/>]/i, 'must not contain a script: the site ships no script on articles'],
   [/<(?:iframe|embed|object|style|link|base|meta|form)[\s/>]/i, 'must not contain an iframe, embed, object, style, link, base, meta or form element'],
+];
+const TAG = /<[a-zA-Z](?:[^>"']|"[^"]*"|'[^']*')*>/g;
+const TAG_RULES = [
   [/[\s/"']on[a-z]+\s*=/i, 'must not contain an inline event handler (on...=)'],
   [/javascript\s*:/i, 'must not contain a javascript: URL'],
   [/\bstyle\s*=\s*["'][^"']*url\s*\(/i, 'must not load a resource from an inline style (url())'],
-  [/\b(?:src|poster)\s*=\s*["']?\s*(?:https?:)?\/\//i, 'must not load src/poster from another origin (absolute http(s): or // URL): the page makes no third-party request'],
-  [/\bsrcset\s*=\s*["']?[^"'>]*?(?:https?:|\/\/)/i, 'must not load srcset from another origin (absolute http(s): or // URL): the page makes no third-party request'],
+  [/\b(?:src|poster)\s*=\s*["']?\s*(?:https?:|[/\\]{2})/i, 'must not load src/poster from another origin (absolute http(s): or // URL): the page makes no third-party request'],
+  [/\bsrcset\s*=\s*["']?[^"'>]*?(?:https?:|[/\\]{2})/i, 'must not load srcset from another origin (absolute http(s): or // URL): the page makes no third-party request'],
 ];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -93,6 +101,10 @@ export function parseArticle(file, source) {
   for (const [pattern, reason] of BODY_RULES) {
     if (pattern.test(body)) fail(`the body ${reason}.`);
   }
+  const tags = [...body.matchAll(TAG)].map((m) => m[0]);
+  for (const [pattern, reason] of TAG_RULES) {
+    if (tags.some((tag) => pattern.test(tag))) fail(`the body ${reason}.`);
+  }
   let level = 1;
   for (const m of body.matchAll(/<h([2-6])[\s/>]/gi)) {
     const next = Number(m[1]);
@@ -142,7 +154,7 @@ function focusablePre(body) {
   return body.replace(/<pre(?![^>]*\btabindex\b)([^>]*)>/gi, '<pre tabindex="0"$1>');
 }
 
-/** Absolute URL of a site path: origin + prefix + path (`SITE_BASE` today, `/` once the domain moves, #667). */
+/** Absolute URL of a site path: origin + prefix + path (`SITE_BASE`, `/` by default since the move to formrail.dev). */
 export function absoluteUrl(origin, siteBase, relativePath) {
   return `${origin.replace(/\/+$/, '')}${siteBase}${relativePath}`;
 }

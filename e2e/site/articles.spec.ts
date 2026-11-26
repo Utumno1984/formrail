@@ -120,10 +120,39 @@ test.describe('article page', () => {
   test('special characters in the title are shown literally, never as markup', async ({ page }) => {
     await page.goto(`${root}articles/false-dirty-on-hydration/`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(FIXTURE_TITLE);
-    await expect(page.locator('main code')).toHaveText('<tags>');
+    await expect(page.locator('main code').first()).toHaveText('<tags>');
     // The same title on the index, and in the document title.
     await page.goto(`${root}articles/`);
     await expect(page.getByRole('link', { name: FIXTURE_TITLE })).toBeVisible();
+  });
+
+  test('shows escaped code and prose as text, and the CSP blocks nothing the pages need', async ({ page }) => {
+    const violations: string[] = [];
+    page.on('console', (msg) => {
+      if (/Content Security Policy/i.test(msg.text())) violations.push(msg.text());
+    });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) => {
+        (window as unknown as { __csp: string[] }).__csp = [...((window as unknown as { __csp?: string[] }).__csp ?? []), e.violatedDirective];
+      });
+    });
+    for (const url of ['articles/', 'articles/false-dirty-on-hydration/', 'articles/change-summary-baseline/']) {
+      await page.goto(`${root}${url}`);
+      await page.waitForLoadState('load');
+      expect(await page.evaluate(() => (window as unknown as { __csp?: string[] }).__csp ?? [])).toEqual([]);
+      await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveCount(1);
+    }
+    await page.goto(`${root}articles/false-dirty-on-hydration/`);
+    const code = page.locator('main pre code');
+    await expect(code).toContainText('<Button onClick={save}>Save</Button>');
+    await expect(code).toContainText('img.src = "https://cdn.example/x.png";');
+    await expect(code).toContainText('<script src="https://cdn/x.js"></script>');
+    await expect(code).toContainText('<div style="background:url(a.png)">');
+    await expect(page.locator('main p code', { hasText: 'javascript:void(0)' })).toHaveText('href="javascript:void(0)"');
+    await expect(page.locator('main script, main button, main pre div, main p div')).toHaveCount(0);
+    const loaded = await page.evaluate(() => getComputedStyle(document.body).fontFamily);
+    expect(loaded).not.toBe('');
+    expect(violations).toEqual([]);
   });
 
   test('axe is clean', async ({ page }) => {

@@ -87,6 +87,21 @@ describe('parseArticle guards', () => {
     ['<video poster="https://evil.test/p.png"></video>', /src\/poster from another origin/],
     ['<img srcset="a.png 1x, https://evil.test/b.png 2x">', /srcset from another origin/],
     ['<p style="background:url(https://evil.test/a.png)">x</p>', /inline style/],
+    ['<a href="/x"onclick="y()">x</a>', /inline event handler/],
+    ["<a href='/x'onclick='y()'>x</a>", /inline event handler/],
+    ['<p ONCLICK="x()">x</p>', /inline event handler/],
+    ['<img SRC="HTTPS://evil.test/x.png">', /src\/poster from another origin/],
+    ['<img SRCSET="HTTPS://evil.test/x.png 1x">', /srcset from another origin/],
+    ['<img src = "https://evil.test/x.png">', /src\/poster from another origin/],
+    ['<img src=" https://evil.test/x.png">', /src\/poster from another origin/],
+    ['<img src="http:evil.test/x.png">', /src\/poster from another origin/],
+    ['<img src="/\\evil.test/x.png">', /src\/poster from another origin/],
+    ['<img srcset = "https://evil.test/x.png 1x">', /srcset from another origin/],
+    ['<img srcset="http:evil.test/x 1x">', /srcset from another origin/],
+    ['<img srcset="/\\evil.test/x 1x">', /srcset from another origin/],
+    ['<p STYLE = "background:URL (https://evil.test/a.png)">x</p>', /inline style/],
+    ['<p style = "background: url (a.png)">x</p>', /inline style/],
+    ['<a href="JAVASCRIPT:alert(1)">x</a>', /javascript: URL/],
   ])('rejects %s, naming the file and the reason', (body, reason) => {
     expect(() => parse(body)).toThrow(reason);
     expect(() => parse(body)).toThrow(/^articles\/x\.html: the body /);
@@ -94,6 +109,24 @@ describe('parseArticle guards', () => {
 
   it('still accepts external links, relative images and the usual content', () => {
     expect(() => parse('<h2>A</h2><p>See <a href="https://example.org/x">this</a> and <a href="../../storybook/?path=/docs/a--docs">that</a>.</p><img src="pic.png" alt=""><h3>B</h3><pre><code>a &lt; b</code></pre>')).not.toThrow();
+  });
+
+  it('accepts code and prose that only show handlers, URLs and tags escaped as text', () => {
+    const body = [
+      '<p>Avoid <code>href="javascript:void(0)"</code> placeholders.</p>',
+      '<pre><code>&lt;Button onClick={save}&gt;Save&lt;/Button&gt;',
+      'const online = navigator.onLine;',
+      'let ongoing = 0;',
+      'function save({ onSuccess = noop }) {}',
+      'img.src = "https://cdn.example/x.png";',
+      '&lt;script src="https://cdn/x.js"&gt;&lt;/script&gt;',
+      '&lt;div style="background:url(a.png)"&gt;</code></pre>',
+    ].join('\n');
+    expect(() => parse(body)).not.toThrow();
+  });
+
+  it('still rejects a real tag that follows escaped code in the same body', () => {
+    expect(() => parse('<pre><code>&lt;b onclick="x"&gt;</code></pre><p onclick="y()">x</p>')).toThrow(/inline event handler/);
   });
 
   it('rejects a skipped heading level (h2 -> h4), and a first heading deeper than h2', () => {
