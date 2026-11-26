@@ -2,7 +2,9 @@ import type { Locator, Page } from '@playwright/test';
 
 /**
  * Waits until a modal panel that has just appeared reacts to a press outside it (on its backdrop). Call it
- * between "the panel is visible" and a raw `page.mouse` press outside the panel.
+ * between "the panel is visible" and a raw `page.mouse` press (or a CDP tap) outside the panel. A modal
+ * Menu counts too: a press on its own trigger is a press outside it, the page behind being
+ * `pointer-events: none` (`menu.spec.ts`, #714).
  *
  * Why (#579): Radix's dismissable layer adds its `pointerdown` listener on `document` in a `setTimeout(0)`
  * scheduled by a passive effect (on purpose: the press that opened the panel must not close it). The panel

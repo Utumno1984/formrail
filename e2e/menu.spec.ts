@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
+import { waitForOutsidePressArmed } from './helpers/overlay';
 import { expectPlayToPass, gotoStory } from './helpers/story';
 
 const STORY = (name: string) => `overlays-menu--${name}`;
@@ -106,6 +107,9 @@ test.describe('Menu: roles, keyboard, focus', () => {
     await gotoStory(page, STORY('external-state'));
     await trigger(page).click();
     await expect(menuOf(page)).toBeVisible();
+    // The same wait as for the tap on the trigger below (#714): the click outside is seen only once
+    // Radix has armed its listener for it.
+    await waitForOutsidePressArmed(page, menuOf(page));
     // Where "Open from outside" is: a click there must only close the menu, not reopen it.
     const box = (await page.getByRole('button', { name: 'Open from outside', includeHidden: true }).boundingBox())!;
     await page.mouse.click(box.x + 4, box.y + 4);
@@ -424,6 +428,11 @@ test.describe('Menu: touch toggle and nesting @touch', () => {
     const tap = await tapper(page);
     await tap(trigger(page));
     await expect(menuOf(page)).toBeVisible();
+    // The page behind the open modal menu is `pointer-events: none`: the second tap lands on the root
+    // element, never on the trigger, and Radix closes the menu as for any press outside it. Its listener
+    // for that press is armed a timer tick after the menu has mounted (see the helper, #579): a tap a
+    // few ms after `toBeVisible` on a busy CI runner reached nobody and the menu stayed open (#714).
+    await waitForOutsidePressArmed(page, menuOf(page));
     await tap(trigger(page));
     await expect(menuOf(page)).toHaveCount(0);
     await page.waitForTimeout(400);
