@@ -223,7 +223,7 @@ describe.skipIf(!hasDist)('installing the tarball through the alias, in a clean 
       join(project, 'package.json'),
       JSON.stringify({ name: 'buyer', private: true, type: 'module', dependencies: { '@formrail/pro': `file:${tarball}` } }),
     );
-    const install = spawnSync('npm', ['install', '--offline', '--omit=peer', '--ignore-scripts', '--no-audit', '--no-fund'], {
+    const install = spawnSync('npm', ['install', '--offline', '--legacy-peer-deps', '--ignore-scripts', '--no-audit', '--no-fund'], {
       cwd: project,
       encoding: 'utf8',
     });
