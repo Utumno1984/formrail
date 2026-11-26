@@ -124,7 +124,7 @@ test.describe('Pro demo: banner', () => {
     await expect(banner).toHaveCount(1);
     await expect(banner).toHaveText(BANNER_TEXT);
     const link = banner.getByRole('link', { name: 'Learn more' });
-    await expect(link).toHaveAttribute('href', '/formrail/teams/');
+    await expect(link).toHaveAttribute('href', '/teams/');
     await expect(banner.getByRole('link')).toHaveCount(1);
     await expect(banner.getByRole('button')).toHaveCount(0);
     const geometry = await page.evaluate(() => {

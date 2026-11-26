@@ -11,7 +11,7 @@ Every PR that touches `packages/*` needs a changeset (`npx changeset`, see
 
 ## Storybook and end-to-end tests
 
-- **Public demo**: https://utumno1984.github.io/formrail/storybook/ is the Storybook of the
+- **Public demo**: https://formrail.dev/storybook/ is the Storybook of the
   core package only (Free). It is republished to GitHub Pages on every push to `main` with a green CI
   (job `deploy-pages` in `.github/workflows/ci.yml`; `workflow_dispatch` starts it manually). The site
   root is reserved for the landing page; until it exists it redirects to Storybook, and the old deep
@@ -19,7 +19,7 @@ Every PR that touches `packages/*` needs a changeset (`npx changeset`, see
 - The published site is assembled locally with
   `npm run build && STORYBOOK_EXCLUDE_PRO=1 npm run build-storybook && npm run assemble-site`
   (folder `site/`: root + `storybook/` + `pro/`); then `npm run serve-site` serves it at
-  `http://localhost:6008/formrail/` and `npm run test:site` runs the pre-deploy smoke test
+  `http://localhost:6008/` and `npm run test:site` runs the pre-deploy smoke test
   (`e2e/site/`, outside the PR e2e suite).
 - **Renaming a public story** (its title or its name, which changes its id): add the old id -> new id
   entry to the map in [`.storybook/legacy-story-ids.mjs`](.storybook/legacy-story-ids.mjs) **in the

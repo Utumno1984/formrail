@@ -1,16 +1,26 @@
-// Single source of the Pages path prefix (ticket #380): the assembler, the local server and the
-// smoke test all read it from here. On Pages the project site lives under `/<repo-name>/`.
-const repo = (process.env.GITHUB_REPOSITORY || 'Utumno1984/formrail').split('/')[1];
-
-/** Path prefix of the published site, with leading and trailing slash. */
-export const SITE_BASE = `/${repo}/`;
+// Single source of the site base path (tickets #380, #667): the assembler, the local server and the
+// smoke test all read it from here. The site is served from the root of the custom domain
+// (https://formrail.dev/), so the base is `/` whatever GITHUB_REPOSITORY says (a fork does not get
+// its own prefix by accident). A fork that publishes under a project-site URL (`https://<user>.<host>/<repo>/`) sets
+// SITE_BASE=/<repo>/ explicitly; note that the story links of the Pro demo (`/teams/`) assume the root.
+/** Origin of the published site: the single source for canonical URLs (`SITE_ORIGIN + SITE_BASE + path`). */
+export const SITE_ORIGIN = 'https://formrail.dev';
+export const SITE_DOMAIN = new URL(SITE_ORIGIN).host;
 
 /**
- * Origin of the absolute URLs the site must spell out (canonical links, Open Graph, the Atom feed; ticket #698):
- * origin + `SITE_BASE` + path. It moves to `https://formrail.dev` together with `SITE_BASE` = `/` in ticket #667
- * (one origin, root + path), so the canonical URLs of the articles change in that one place only.
+ * Validates an explicit base path: it must already look like `/` or `/segment/…/`. A value that does not
+ * (no leading or trailing slash, empty, `//`, `..`, spaces, `?`, `#`) fails with a clear message instead of
+ * silently producing broken links.
  */
-export const SITE_ORIGIN = 'https://utumno1984.github.io';
+export function normalizeSiteBase(value) {
+  if (!/^\/([A-Za-z0-9._~-]+\/)*$/.test(value) || /(^|\/)\.\.?\//.test(value)) {
+    throw new Error(`SITE_BASE must start and end with "/" and contain plain path segments (e.g. "/" or "/my-repo/"), got: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+/** Path prefix of the published site, with leading and trailing slash. */
+export const SITE_BASE = normalizeSiteBase(process.env.SITE_BASE ?? '/');
 
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;

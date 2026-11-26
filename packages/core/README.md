@@ -12,7 +12,7 @@ This package is the free, MIT-licensed tier of the
 tier today versus the commercially-licensed `@formrail/pro`. It is an independent
 implementation of generic, publicly known UI patterns.
 
-**[Live demo and documentation (Storybook)](https://utumno1984.github.io/formrail/storybook/)**
+**[Live demo and documentation (Storybook)](https://formrail.dev/storybook/)**
 
 ## Install
 
@@ -47,9 +47,9 @@ export function SupplierForm() {
 
 `Field` wires the label, help text, error and required state to the control (real `aria-describedby`,
 `aria-invalid`, `aria-required`). For whole pages see the
-[List Report](https://utumno1984.github.io/formrail/storybook/?path=/docs/floorplans-list-report--docs)
+[List Report](https://formrail.dev/storybook/?path=/docs/floorplans-list-report--docs)
 (`ListReport`, `useListReport`) and
-[Object Page](https://utumno1984.github.io/formrail/storybook/?path=/docs/floorplans-object-page-layout--docs)
+[Object Page](https://formrail.dev/storybook/?path=/docs/floorplans-object-page-layout--docs)
 (`ObjectPage`, `useObjectPageForm`, `useDirtyGuard`) documentation pages.
 
 ## License

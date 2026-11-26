@@ -7,7 +7,7 @@ import { escapeText, formatDate, loadArticles, parseArticle, renderArticles, ren
 
 const SITE_ROOT = path.join(import.meta.dirname, '..', 'site-root');
 const NOW = new Date('2026-11-26T10:00:00Z');
-const ORIGIN = 'https://example.test';
+const ORIGIN = 'https://formrail.dev';
 
 const source = (overrides = {}, body = '<p>Body.</p>') => {
   const meta = {
@@ -142,8 +142,8 @@ describe('renderArticles', () => {
 
   it('writes an absolute canonical URL from origin + prefix, plus Open Graph and a <time datetime>', () => {
     const page = renderArticles([tricky], templates)['articles/tricky/index.html'];
-    expect(page).toContain('<link rel="canonical" href="https://example.test/formrail/articles/tricky/" />');
-    expect(page).toContain('<meta property="og:url" content="https://example.test/formrail/articles/tricky/" />');
+    expect(page).toContain('<link rel="canonical" href="https://formrail.dev/formrail/articles/tricky/" />');
+    expect(page).toContain('<meta property="og:url" content="https://formrail.dev/formrail/articles/tricky/" />');
     expect(page).toContain('<meta property="og:title"');
     expect(page).toContain('<time datetime="2026-11-01">1 November 2026</time>');
     expect(page.match(/<h1[\s>]/g)).toHaveLength(1);
@@ -169,7 +169,7 @@ describe('renderArticles', () => {
 
   it('the index announces the feed; no page has a script or a third-party URL', () => {
     const files = renderArticles([tricky], templates);
-    expect(files['articles/index.html']).toContain('<link rel="alternate" type="application/atom+xml" title="Formrail articles" href="https://example.test/formrail/articles/feed.xml" />');
+    expect(files['articles/index.html']).toContain('<link rel="alternate" type="application/atom+xml" title="Formrail articles" href="https://formrail.dev/formrail/articles/feed.xml" />');
     for (const [file, html] of Object.entries(files)) {
       if (!file.endsWith('.html')) continue;
       expect(html, file).not.toMatch(/<script|<iframe/);
@@ -186,10 +186,10 @@ describe('renderFeed', () => {
   it('is an Atom feed with one entry per article, absolute links and updated', () => {
     const xml = renderFeed([a('two', '2026-05-02'), a('one', '2026-01-01')], url);
     expect(xml.startsWith('<?xml version="1.0" encoding="utf-8"?>\n<feed xmlns="http://www.w3.org/2005/Atom">')).toBe(true);
-    expect(xml).toContain('<id>https://example.test/articles/</id>');
+    expect(xml).toContain('<id>https://formrail.dev/articles/</id>');
     expect(xml).toContain('<updated>2026-05-02T00:00:00Z</updated>');
     expect(xml.match(/<entry>/g)).toHaveLength(2);
-    expect(xml).toContain('<link rel="alternate" type="text/html" href="https://example.test/articles/two/"/>');
+    expect(xml).toContain('<link rel="alternate" type="text/html" href="https://formrail.dev/articles/two/"/>');
     expect(xml).toContain('<author><name>Me &amp; You</name></author>');
     expect(xml.match(/<updated>/g)).toHaveLength(3);
   });
