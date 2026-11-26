@@ -168,11 +168,12 @@ const meta: Meta<ShowcaseArgs> = {
       'rowActionsInline',
       'ref',
     ),
-    searchLabel: storyControl({ control: 'text', description: 'Accessible name of the search box (reaches `ListReportFilterBar`).' }),
-    clearSearchLabel: storyControl({ control: 'text', description: 'Name of the button that clears the search (reaches `ListReportFilterBar`).' }),
-    searchPlaceholder: storyControl({ control: 'text', description: 'Placeholder of the search box; without it, `searchLabel`.' }),
-    filterBarLabel: storyControl({ control: 'text', description: 'Name of the `search` landmark of the bar (`aria-label` of `ListReportFilterBar`).' }),
-    filterBarLabelledBy: storyControl({ control: 'text', description: 'Id of the element that names the landmark (`aria-labelledby` of `ListReportFilterBar`). Nothing in the demo has an id to point at.' }),
+    // Real props of `ListReport` (their row and TSDoc stay in the props table): a Control each, no description.
+    searchLabel: { control: 'text' },
+    clearSearchLabel: { control: 'text' },
+    searchPlaceholder: { control: 'text' },
+    filterBarLabel: { control: 'text' },
+    filterBarLabelledBy: { control: 'text' },
     dataset: storyControl({ control: 'select', options: [0, 3, 200, 1200], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 1,200 records.' }),
     locale: storyControl({
       control: 'select',
@@ -327,8 +328,10 @@ export const LocalizedBar: Story = {
     await expect(canvas.queryByRole('search', { name: 'Filters and search' })).toBeNull();
     const box = canvas.getByRole('searchbox', { name: 'Cerca' });
     await expect(box).toHaveAttribute('placeholder', 'Cerca per numero o fornitore');
-    await userEvent.type(box, 'abc');
+    // The search is committed on Enter (or after the debounce): only then `onSearchQueryChange` is called.
+    await userEvent.type(box, 'abc{Enter}');
     await expect(box).toHaveValue('abc');
+    await waitFor(() => expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('abc'));
     await expect(canvas.queryByRole('button', { name: 'Clear search' })).toBeNull();
     await userEvent.click(canvas.getByRole('button', { name: 'Cancella ricerca' }));
     await expect(box).toHaveValue('');
