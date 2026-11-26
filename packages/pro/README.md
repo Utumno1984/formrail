@@ -64,10 +64,30 @@ Then `import { computeChangeSummary } from '@formrail/pro/engine'` works as in t
 
 ## Release (maintainers)
 
-`npm run build`, then `npm run release:pro` (a dry run: packs, checks the tarball, runs `npm publish --dry-run` against
-GitHub Packages, and verifies that the `@formrail/core` versions the Pro asks for are on npm). The real publish is
-`npm run release:pro -- --publish` with `NODE_AUTH_TOKEN` holding a `write:packages` token, and only with the explicit
-go-ahead of the project owner.
+The workspace keeps `"private": true`; the package is published only by `scripts/release-pro.mjs`, from a staging
+directory it creates under the system temp directory and always removes (also on an error, and on Ctrl-C or
+SIGTERM).
+
+1. `npm run build`. The script does not build: it refuses a `packages/pro/dist` older than the sources.
+2. `npm run release:pro`: a dry run. It checks that the `@formrail/core` versions the Pro asks for are on npm,
+   stages the published manifest (`@formrail-dev/pro`, no `private`, no `scripts` or `devDependencies`), checks
+   the tarball (only `dist/**`, `LICENSE`, `README.md`, `package.json`; no absolute path in the sourcemaps), runs
+   `npm publish --dry-run` and fails unless npm resolves the registry to `https://npm.pkg.github.com`.
+3. The real publish, only with the explicit go-ahead of the project owner:
+   `NODE_AUTH_TOKEN=<token with write:packages> npm run release:pro -- --publish`. It runs the whole dry run of
+   step 2 first and publishes only if it passes. The staging directory gets this `.npmrc`, the same as the
+   buyers' one above: npm reads the token from `NODE_AUTH_TOKEN` through it, and the token is never written to
+   disk.
+
+   ```ini
+   @formrail-dev:registry=https://npm.pkg.github.com
+   //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+   ```
+
+Note for the first publish: `repository` in `package.json` points to `Utumno1984/formrail`, while the package
+belongs to the `formrail-dev` organization. With two different owners the automatic link between the package and
+the repository may not happen: check it on the package page after the first publish, and decide then whether to
+change `repository` or link the package by hand.
 
 ## Entries, and who installs `@formrail/core`
 
