@@ -380,6 +380,12 @@ test.describe('design partners (#697)', () => {
     });
     expect(section).not.toMatch(/waitlist form (asks|is hosted)/i);
     expect(section).not.toMatch(/early access/i);
+    // The email copy of Tally is disclosed, with Google and its transfer basis; the waitlist wording is not reused.
+    expect(section).toContain('formrail.dev@gmail.com');
+    expect(section).toContain('Google');
+    expect(section).toContain('EU-US Data Privacy Framework');
+    expect(section).toContain('both on Tally and from the mailbox');
+    expect(section).not.toContain('not copied to email');
   });
 
   test('keyboard: the apply link is followed by the privacy link of its note', async ({ page }) => {

@@ -280,6 +280,10 @@ describe('design partner section (#697)', () => {
     ]) {
       expect(section, phrase).toContain(phrase);
     }
+    // Tally's email copy is disclosed in the design partner section only (the waitlist wording stays as is).
+    for (const phrase of ['formrail.dev@gmail.com', 'Google', 'EU-US Data Privacy Framework', 'both on Tally and from the mailbox'])
+      expect(section, phrase).toContain(phrase);
+    expect(section).not.toContain('not copied to email');
     // The waitlist notice is unchanged and never mentions the other form.
     const waitlist = flat(
       privacy.slice(privacy.indexOf('id="data-title"'), privacy.indexOf('id="design-partners-title"')),
