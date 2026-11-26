@@ -624,7 +624,7 @@ qualcuno sia disposto a pagare, prima di investire in un sistema di licensing pi
 
 **Aggiornamento 2026-11-13**: Daniele non ha modificato questa scelta. L'opzione 1 (all'epoca "org
 npm privata", superata il 2026-11-26; nessun licensing a runtime) restava la raccomandazione,
-compatibile con la licenza annuale per sviluppatore venduta tramite un Merchant of Record (§8).
+compatibile con la licenza per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi, venduta tramite un Merchant of Record (§8).
 
 **Decisione di Daniele, 2026-11-26 (scelta corrente)**: il Pro si distribuisce tramite **GitHub
 Packages**, sotto un'**organizzazione GitHub dedicata** (gratuita), non più tramite un'org npm
@@ -720,7 +720,7 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    continui + supporto si allinea meglio alla richiesta esplicita di reddito ricorrente, ed è anche
    il modello già scelto per l'altro filone di monetizzazione in corso, l'add-on Fatture in Cloud).
    **Decisa il 2026-11-13** (prende il posto dell'abbonamento ricorrente del 2026-11-03): licenza
-   annuale per sviluppatore con 12 mesi di aggiornamenti inclusi, tramite Merchant of Record. Cosa
+   per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi, tramite Merchant of Record. Cosa
    succede alla scadenza (rinnovo, uso delle versioni già ricevute) non è deciso. Vedi §8.
 5. **Target di clienti Pro**: freelance/piccoli team React che costruiscono backoffice/admin
    enterprise (stesso target implicito dei competitor noti in questo spazio: librerie di
