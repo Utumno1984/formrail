@@ -230,6 +230,16 @@ describe('footers and links', () => {
     expect(license).toMatch(/<footer[\s\S]*<a href="\.\/" aria-current="page">License terms<\/a>[\s\S]*<\/footer>/);
   });
 
+  it('the article templates carry the same footer sentence and a License terms link (source check)', () => {
+    for (const [file, rel] of [['articles.html', '..'], ['article.html', '../..']]) {
+      const html = readFileSync(path.join(ROOT, 'site-root', file), 'utf8');
+      expect(html, file).toContain(`<li>${SENTENCE}</li>`);
+      expect(html, file).toContain(`<li><a href="${rel}/license/">License terms</a></li>`);
+      expect(html, file).not.toContain('Annual license');
+      expect(html, file).not.toContain('terms published before sales');
+    }
+  });
+
   it('the 404 page links the license terms with the base path', () => {
     const { notFound } = build({ siteBase: '/some-repo/' });
     expect(notFound).toContain('<a href="/some-repo/license/">License terms</a>');
