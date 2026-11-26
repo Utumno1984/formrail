@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Serves the assembled `site/` under the Pages prefix (`/formrail/`), like the live site:
-// the same prefix matters because the redirects and the Storybook's relative links must work under it.
+// Serves the assembled `site/` at the site base (`/`, see SITE_BASE), like the live site on formrail.dev:
+// the base matters because the redirects and the Storybook's relative links must work under it.
 // Used by the pre-deploy smoke (playwright.site.config.ts) and for the manual check of the ticket.
 // Like Pages: a missing path gets `404.html` with status 404; a directory gets its `index.html`.
 import { createServer } from 'node:http';

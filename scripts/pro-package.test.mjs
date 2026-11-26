@@ -12,6 +12,10 @@ const readJson = (path) => JSON.parse(readFileSync(resolve(ROOT, path), 'utf8'))
 describe('packages/pro publication guard', () => {
   const pkg = readJson('packages/pro/package.json');
 
+  it('homepage is the Pro demo on formrail.dev (ticket #667)', () => {
+    expect(pkg.homepage).toBe('https://formrail.dev/pro/');
+  });
+
   it('is the @formrail/pro package', () => {
     expect(pkg.name).toBe('@formrail/pro');
   });

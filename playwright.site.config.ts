@@ -3,8 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 import { SITE_BASE, SITE_PORT } from './scripts/site-config.mjs';
 
 // Pre-deploy smoke of the assembled Pages site (ticket #380): the `site/` folder produced by
-// scripts/assemble-site.mjs, served locally under the same `/formrail/` prefix as the live
-// site. NOT part of the PR e2e suite (playwright.config.ts ignores e2e/site/): it runs in the
+// scripts/assemble-site.mjs, served locally at the same base path (`/`) as the live
+// site (formrail.dev). NOT part of the PR e2e suite (playwright.config.ts ignores e2e/site/): it runs in the
 // `deploy-pages` job, right before the artifact upload, and a failure there means no deploy.
 //   npm run build && npm run build-storybook && node scripts/assemble-site.mjs && npm run test:site
 export default defineConfig({

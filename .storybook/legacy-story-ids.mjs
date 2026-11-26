@@ -83,7 +83,7 @@ function decode(raw) {
  * Only the value of the `path` (manager) and `id` (preview) query parameters changes, wherever they are
  * in the query and however they are encoded (`path=%2Fstory%2F...`, `i%64=` are decoded to be matched); every
  * other parameter (`viewMode`, `args`, `globals`, foreign ones) and the hash are kept byte for byte, so are the
- * origin, credentials and the path prefix (`/`, `/formrail/storybook/`, `/formrail/pro/`). Matching is exact
+ * origin, credentials and the path prefix (`/storybook/`, `/pro/`, or the legacy `/formrail/storybook/`, `/formrail/pro/`). Matching is exact
  * and case-sensitive, like Storybook's ids: `/STORY/<old>`, `?id=<OLD>`, `/x/story/<old>` are left alone.
  * Whatever follows the id in `path` is written back percent-encoded, so `%26` there never becomes a new
  * parameter.
