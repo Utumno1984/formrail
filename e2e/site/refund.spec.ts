@@ -235,7 +235,7 @@ test.describe('privacy notice: purchases', () => {
     expect(dates[0]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  test('"No cookies, no analytics" stays true: nothing is loaded or stored, the purchase page is the declared exception', async ({
+  test('"No cookies, no analytics" stays true: nothing is loaded or stored, no exception is announced', async ({
     page,
     context,
   }) => {
@@ -252,8 +252,15 @@ test.describe('privacy notice: purchases', () => {
     await expect(page.locator('script')).toHaveCount(0);
     const cookies = page.locator('#cookies-title ~ p');
     await expect(cookies.nth(0)).toContainText('sets no cookies and runs no analytics or tracking');
-    await expect(cookies.nth(1)).toContainText('The only exception will be the purchase page, which is not published yet');
-    await expect(cookies.nth(1)).toContainText('only after you click "Buy"');
+    await expect(cookies.nth(0)).toContainText('It loads no fonts, scripts or content from other sites.');
+    await expect(cookies).toHaveCount(2);
+    // the expected text changed with the sale standby decision: no purchase page is announced any more
+    await expect(cookies.nth(1)).toContainText(
+      'Every page of this site keeps this promise. If a page ever needs to load a script or content from another site, this notice will say so before that page is published.',
+    );
+    for (const word of [/Paddle\.js/i, /\bBuy\b/i, /purchase page/i, /exception/i]) {
+      await expect(cookies.nth(1)).not.toContainText(word);
+    }
     // the other pages of the site load nothing from Paddle
     for (const url of ['', 'teams/', 'license/', 'refund/']) {
       await page.goto(url);

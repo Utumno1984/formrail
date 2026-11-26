@@ -295,15 +295,20 @@ describe('the Purchases section of the privacy notice', () => {
     expect(waitlist(build({ designPartnerUrl: '' }).privacy, '<h2 id="purchases-title">')).toBe(fixture);
   });
 
-  it('keeps the promise: no cookies, no analytics, with the purchase page as the only declared exception', () => {
+  it('keeps the promise: no cookies, no analytics, no exception announced (sale on standby)', () => {
     const { privacy } = build();
-    const cookies = text(privacy.slice(privacy.indexOf('id="cookies-title"')));
-    expect(cookies).toContain('This site sets no cookies and runs no analytics or tracking.');
-    expect(cookies).toContain('The only exception will be the purchase page, which is not published yet');
-    expect(cookies).toContain('only after you click "Buy"');
-    // nothing is claimed about what Paddle.js stores until it is measured
-    expect(cookies).toContain('will be described here when that page is published');
-    expect(cookies).not.toMatch(/Paddle[^.]*(sets|stores) no/i);
+    const cookies = text(privacy.slice(privacy.indexOf('id="cookies-title"'), privacy.indexOf('</main>')));
+    expect(cookies).toContain(
+      'This site sets no cookies and runs no analytics or tracking. It loads no fonts, scripts or content from other sites.',
+    );
+    // the expected text changed with the sale standby decision: no purchase page is announced any more
+    expect(cookies).toContain(
+      'Every page of this site keeps this promise. If a page ever needs to load a script or content from another site, this notice will say so before that page is published.',
+    );
+    expect(cookies).not.toMatch(/Paddle\.js/i);
+    expect(cookies).not.toMatch(/\bBuy\b/i);
+    expect(cookies).not.toMatch(/purchase page/i);
+    expect(cookies).not.toMatch(/exception/i);
     for (const page of Object.values(build())) expect(page).not.toMatch(/<script[^>]*src=["']?https?:/);
   });
 });
