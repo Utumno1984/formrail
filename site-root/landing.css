@@ -124,6 +124,7 @@ section {
 }
 #pro,
 #license,
+#design-partners,
 #waitlist {
   scroll-margin-top: 1rem;
 }
@@ -341,4 +342,16 @@ section {
    would otherwise be 0.75rem against 0 above, so both sides use the shared gap. */
 .cards + .section-lead {
   margin-block: var(--site-cards-gap);
+}
+
+/* Design partners (ticket #697). */
+.card ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.seats {
+  margin-bottom: 1rem;
+}
+#design-partners .cards + .cta {
+  margin-top: 1.5rem;
 }
