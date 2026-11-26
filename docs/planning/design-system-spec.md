@@ -916,8 +916,7 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
 3. **Target: team aziendali** (ERP, gestionali, portali amministrativi). Hanno budget, sentono il
    dolore della concorrenza sui dati e accettano costi di licenza se risolvono un problema
    strutturale.
-4. **Modello commerciale: licenza annuale per sviluppatore, con 12 mesi di aggiornamenti
-   inclusi** (schema standard enterprise). La vendita passa da un **Merchant of Record**, che
+4. **Modello commerciale: licenza per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi e uso senza limite di tempo delle versioni ricevute (decisione di Daniele del 2026-11-26)** (schema standard enterprise). La vendita passa da un **Merchant of Record**, che
    gestisce IVA UE e fatturazione. MoR di riferimento: **Paddle** (decisione di Daniele del
    2026-11-26): nessun costo iniziale, commissione 5% + 0,50 $ a transazione secondo la pagina
    prezzi pubblica (letta il 26/11/2026). Lemon Squeezy, citato in precedenza come esempio, non

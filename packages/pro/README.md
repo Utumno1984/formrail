@@ -4,7 +4,7 @@ Pro tier of Formrail (commercial license, see [LICENSE](./LICENSE)).
 
 Works with React Hook Form (`react-hook-form` ^7.92.0) and TanStack Form (`@tanstack/react-form`, tested on 1.33.x).
 
-- `"private": true` on purpose: nothing is published until the private npm org exists (a guard test,
+- `"private": true` on purpose: nothing is published from this workspace except by the release script (a guard test,
   `scripts/pro-package.test.mjs`, fails if `private` is removed or the license becomes MIT). There is
   no runtime licensing mechanism: no network access, no keys (asserted on the built bundle).
 - The source is readable in this public monorepo; the Pro moat is the service/license, not code secrecy.
@@ -76,8 +76,7 @@ npm install @formrail/pro react-hook-form
   not needed. `react-hook-form` is an **optional** peer dependency of `@formrail/pro`, used for the types
   only: nothing of the library is imported at runtime. The adapter calls the methods of your `form` and
   reads two **internal** fields of its `control` (see [Internals read](#internals-read)).
-- `@formrail/pro` is `"private": true` today: it will be installed from the private npm org once that
-  exists.
+- `@formrail/pro` is `"private": true` today: it is distributed through GitHub Packages (org `formrail-dev`) as `@formrail-dev/pro` and installed with the npm alias `@formrail/pro`.
 - The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
   `react-hook-form`; import the adapter from its subpath (`moduleResolution` `bundler`, `node16` or
   `nodenext`).
@@ -273,8 +272,7 @@ npm install @formrail/pro @tanstack/react-form
   types only: nothing of TanStack Form (`@tanstack/react-form`, `@tanstack/form-core`, `@tanstack/store`) is
   imported at runtime. The adapter calls the methods of your `form` (`form.store`, `form.baseStore`,
   `form.setFieldMeta`, `form.Subscribe`, see [What the adapter reads](#what-the-adapter-reads)).
-- `@formrail/pro` is `"private": true` today: it will be installed from the private npm org once that
-  exists.
+- `@formrail/pro` is `"private": true` today: it is distributed through GitHub Packages (org `formrail-dev`) as `@formrail-dev/pro` and installed with the npm alias `@formrail/pro`.
 - The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
   `@tanstack/react-form`; import the adapter from its subpath (`moduleResolution` `bundler`, `node16` or
   `nodenext`).

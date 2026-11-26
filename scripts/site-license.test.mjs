@@ -98,6 +98,8 @@ describe('the license page', () => {
       'for one licensed developer',
       'You pay once.',
       'every version published during 12 months of updates',
+      'the versions already available on the day access is granted, and to every version published during 12 months of updates',
+      'Copyright (c) Daniele Ingusci. All rights reserved.',
       'The 12 months start on the day access to the registry is granted to you, not on the day of the purchase.',
       'The license does not renew automatically',
       // after the term: what was received stays usable, with no time limit; revoking access is not revoking the license
