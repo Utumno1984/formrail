@@ -44,6 +44,7 @@ test.describe('refund page', () => {
     await expect(paddle).toHaveAttribute('href', 'https://paddle.net/');
     await expect(paddle).toHaveAttribute('rel', /noopener/);
     await expect(how.getByRole('link', { name: privacyEmail })).toHaveAttribute('href', `mailto:${privacyEmail}`);
+    await expect(how).toContainText('write the email address you used to buy, your company name, if any,');
     await expect(page.locator('main')).toContainText('You do not have to say why.');
   });
 
@@ -67,7 +68,12 @@ test.describe('refund page', () => {
     await expect(link).toHaveAttribute('rel', /noopener/);
     const section = page.locator('#consumers-title ~ p').first();
     await expect(section).toContainText('does not take away any right you have as a consumer');
-    await expect(section).toContainText('even if you have already started to use Formrail Pro');
+    // the expected text changed (critic of PR #713, note 4): using the product does not shorten the policy,
+    // and the Buyer Terms apply on top of it (they make the statutory withdrawal end once you start using it)
+    await expect(section).toContainText(
+      `Starting to use Formrail Pro does not shorten the ${days} days of this policy; your rights under Paddle's Buyer Terms apply in addition.`,
+    );
+    await expect(section).not.toContainText('even if you have already started to use');
   });
 
   test('the license and the refund page agree on the number of days', async ({ page }) => {
@@ -166,11 +172,18 @@ test.describe('privacy notice: purchases', () => {
       'Transfers outside the EEA',
       'Retention',
     ]);
+    // The expected list changed (critic of PR #713, points 3 and 10): the Paddle Billing checkout can also
+    // collect the postal code or address and, for a business, the tax number, and makes them available to the
+    // seller; a consumer has no company. The list says what the data "can include", it is not a closed list.
+    await expect(page.locator('#purchase-data-title + p')).toContainText(
+      'Depending on what you give to Paddle at checkout, it can include:',
+    );
     await expect(page.locator('#purchase-data-title + p + ul li')).toHaveText([
       'your name;',
       'your email address;',
-      'your company name;',
+      'your company name, if any;',
       'your country;',
+      'your postal code or address and, for a business, the tax or VAT number, when you give them to Paddle at checkout;',
       'the number of developers the license is for;',
       'the identifier of the transaction.',
     ]);
@@ -180,6 +193,10 @@ test.describe('privacy notice: purchases', () => {
     await expect(main).toContainText('art. 6(1)(c) GDPR');
     await expect(main).toContainText(`plus ${retention} years`);
     await expect(main).toContainText('Paddle may transfer data outside the EEA');
+    await expect(page.locator('#purchase-transfers-title + p')).toContainText(
+      'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision',
+    );
+    await expect(page.locator('.lead')).toContainText('it is also the information under art. 14 of the GDPR');
   });
 
   test('Paddle and GitHub are linked to their official pages, safely, and nothing else is added', async ({ page }) => {
@@ -215,8 +232,11 @@ test.describe('privacy notice: purchases', () => {
   test('the notice says what Paddle is and does not call Google a processor', async ({ page }) => {
     await page.goto('privacy/');
     const section = page.locator('#purchase-recipients-title ~ p').first();
-    await expect(section).toContainText('is the reseller of Formrail Pro');
+    await expect(section).toContainText(
+      'Paddle (Paddle.com Market Limited, UK, or the Paddle company named on your receipt, depending on where you buy) is the reseller of Formrail Pro',
+    );
     await expect(section).toContainText('independent controller');
+    await expect(section).not.toContainText('What it passes to us');
     const text = await page.locator('#purchases-title ~ *').evaluateAll((els) => els.map((e) => e.textContent ?? '').join(' '));
     expect(text).not.toMatch(/processor/i);
   });
@@ -261,6 +281,8 @@ test.describe('privacy notice: purchases', () => {
     for (const word of [/Paddle\.js/i, /\bBuy\b/i, /purchase page/i, /exception/i]) {
       await expect(cookies.nth(1)).not.toContainText(word);
     }
+    // neither paragraph mentions Paddle at all (critic of PR #713, note 7)
+    for (const i of [0, 1]) await expect(cookies.nth(i)).not.toContainText(/Paddle/);
     // the other pages of the site load nothing from Paddle
     for (const url of ['', 'teams/', 'license/', 'refund/']) {
       await page.goto(url);

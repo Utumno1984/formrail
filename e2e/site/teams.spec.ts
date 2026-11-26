@@ -558,8 +558,10 @@ test.describe('network and weight', () => {
   test('the only absolute URLs are GitHub and, when set, the form (the email is a mailto)', () => {
     for (const file of ['teams/index.html', 'privacy/index.html']) {
       let html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '').replace(designPartnerUrl || '\0', '');
-      // Only the privacy page may carry the official policy links (art. 13(1)(f)), removed one by one by exact URL.
-      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replaceAll(url, '');
+      // Only the privacy page may carry the official policy links (art. 13(1)(f)), removed one by one as a whole
+      // attribute, href="<url>": a link that only starts with an allowed URL (a longer path, a query) is not
+      // removed, so it still fails the check below (critic of PR #713, note 6).
+      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replaceAll(`href="${url}"`, '');
       expect(html, file).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/formrail)/);
     }
   });

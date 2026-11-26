@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,6 +103,10 @@ describe('the refund page', () => {
     expect(external(section)).toContain('https://paddle.net/');
     expect(section).toContain(`href="mailto:${LICENSOR.email}"`);
     expect(text(section)).toContain('You do not have to say why.');
+    // a consumer has no company: the email request asks for it only if there is one
+    expect(text(section)).toContain(
+      'write the email address you used to buy, your company name, if any, and the transaction identifier of your receipt if you have it',
+    );
     expect(LICENSOR.email).toBe(PRIVACY_EMAIL);
   });
 
@@ -120,11 +125,22 @@ describe('the refund page', () => {
   });
 
   it("points consumers to Paddle's Buyer Terms and takes no right away, even after use", () => {
-    const { refund } = build();
-    const section = refund.slice(refund.indexOf('id="consumers-title"'), refund.indexOf('id="seller-title"'));
+    const consumers = (options) => {
+      const { refund } = build(options);
+      return refund.slice(refund.indexOf('id="consumers-title"'), refund.indexOf('id="seller-title"'));
+    };
+    const section = consumers();
     expect(external(section)).toEqual(['https://www.paddle.com/legal/buyer-terms']);
     expect(text(section)).toContain('does not take away any right you have as a consumer');
-    expect(text(section)).toContain('even if you have already started to use Formrail Pro');
+    // The expected text changed (critic of PR #713, note 4): the Buyer Terms say that the statutory right of
+    // withdrawal is lost once you start to use the product, so the page no longer says that those terms apply
+    // "even if you have already started to use" it. Using it does not shorten the policy, and the Buyer Terms
+    // apply on top of it.
+    expect(text(section)).toContain(
+      `Starting to use Formrail Pro does not shorten the ${REFUND_DAYS} days of this policy; your rights under Paddle's Buyer Terms apply in addition.`,
+    );
+    expect(text(section)).not.toContain('even if you have already started to use');
+    expect(text(consumers({ refundDays: 30 }))).toContain('does not shorten the 30 days of this policy');
   });
 
   it('links outside the site only to the official pages, with rel=noopener, and names only the contact address', () => {
@@ -221,11 +237,20 @@ describe('the Purchases section of the privacy notice', () => {
     expect(items).toEqual([
       'your name;',
       'your email address;',
-      'your company name;',
+      'your company name, if any;',
       'your country;',
+      'your postal code or address and, for a business, the tax or VAT number, when you give them to Paddle at checkout;',
       'the number of developers the license is for;',
       'the identifier of the transaction.',
     ]);
+    // The expected list changed (critic of PR #713, points 3 and 10): the Paddle Billing checkout can also collect
+    // the postal code or address and, for a business, the tax number, and makes them available to the seller; a
+    // consumer has no company. The list is introduced as what the data "can include", not as a closed list.
+    expect(text(list)).toContain(
+      'We receive from Paddle the data of your purchase that Paddle makes available to us as the seller of the product. Depending on what you give to Paddle at checkout, it can include:',
+    );
+    expect(text(section)).not.toContain('What it passes to us');
+    expect(text(section)).not.toContain('the data listed above');
     expect(text(list)).toContain('GitHub user names that you give us');
     expect(text(list)).toContain('We do not receive your payment card or your bank details');
     expect(text(list)).toContain('(art. 13(2)(e) GDPR)');
@@ -244,7 +269,11 @@ describe('the Purchases section of the privacy notice', () => {
   it('names Paddle (reseller, independent controller) and GitHub (registry) with their official policy', () => {
     const section = purchases(build().privacy);
     const body = text(section);
-    expect(body).toContain('Paddle (Paddle.com Market Limited) is the reseller of Formrail Pro');
+    // Paddle's Buyer Terms: the contracting entity depends on where the buyer purchases from (US: Paddle.com Inc.,
+    // Canada: Paddle.com (Canada) Ltd, rest of world: Paddle.com Market Limited), critic of PR #713, point 2.
+    expect(body).toContain(
+      'Paddle (Paddle.com Market Limited, UK, or the Paddle company named on your receipt, depending on where you buy) is the reseller of Formrail Pro',
+    );
     expect(body).toContain('Paddle is an independent controller of your data');
     expect(body).toContain('The registry is hosted by GitHub (GitHub Packages)');
     expect(body).toContain('as an independent controller');
@@ -261,6 +290,20 @@ describe('the Purchases section of the privacy notice', () => {
     const body = text(purchases(build().privacy));
     expect(body).toContain('Paddle may transfer data outside the EEA');
     expect(body).toContain('EU-US Data Privacy Framework');
+    // Paddle itself is outside the EEA: the UK, covered by an adequacy decision (critic of PR #713, point 2)
+    expect(body).toContain(
+      'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision, as giving an adequate level of protection to personal data.',
+    );
+    expect(body).toContain('its other companies, and the safeguards it uses, are described in the privacy notice linked above');
+  });
+
+  it('the introduction cites art. 14 for the data received from Paddle, and art. 13 for the rest', () => {
+    const { privacy } = build();
+    const lead = text(privacy.match(/<p class="lead">[\s\S]*?<\/p>/)[0]);
+    expect(lead).toContain('Information under art. 13 of the GDPR');
+    expect(lead).toContain('for the purchase data that we receive from Paddle, it is also the information under art. 14 of the GDPR');
+    expect(text(build({ designPartnerUrl: '' }).privacy)).toContain('information under art. 14 of the GDPR');
+    expect(privacy).toContain('(GDPR art. 13 and 14)');
   });
 
   it('the retention period is the constant: duration of the license plus the number of years', () => {
@@ -309,6 +352,8 @@ describe('the Purchases section of the privacy notice', () => {
     expect(cookies).not.toMatch(/\bBuy\b/i);
     expect(cookies).not.toMatch(/purchase page/i);
     expect(cookies).not.toMatch(/exception/i);
+    // the paragraph says nothing about Paddle at all: no promise about what a Paddle page would set (note 7)
+    expect(cookies).not.toMatch(/Paddle/);
     for (const page of Object.values(build())) expect(page).not.toMatch(/<script[^>]*src=["']?https?:/);
   });
 });
@@ -339,6 +384,30 @@ describe('the retention guard (decision D8)', () => {
 
   it('a caller that does not pass it (an older call site) is not affected', () => {
     expect(findConfigProblems(FINAL)).toEqual([]);
+  });
+
+  // The CLI (`node scripts/check-site-config.mjs`, first step of the deploy job) builds the config from the
+  // constants itself. It is run here from a temporary copy whose `site-config.mjs` re-exports the real one and
+  // overrides one constant, so that forgetting to pass it to the guard makes this test fail (critic of PR #713,
+  // note 8).
+  function runCli(overrides) {
+    const tmp = mkdtempSync(path.join(tmpdir(), 'check-site-config-'));
+    dirs.push(tmp);
+    copyFileSync(path.join(ROOT, 'scripts', 'check-site-config.mjs'), path.join(tmp, 'check-site-config.mjs'));
+    const real = JSON.stringify(path.join(ROOT, 'scripts', 'site-config.mjs'));
+    const lines = Object.entries(overrides).map(([name, value]) => `export const ${name} = ${JSON.stringify(value)};`);
+    writeFileSync(path.join(tmp, 'site-config.mjs'), [`export * from ${real};`, ...lines].join('\n'));
+    return spawnSync(process.execPath, [path.join(tmp, 'check-site-config.mjs')], { encoding: 'utf8' });
+  }
+
+  it('the CLI passes the retention to the guard: a stand-in fails the deploy step, the committed value passes', () => {
+    const refused = runCli({ PURCHASE_RETENTION_YEARS: 'TBD' });
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toContain('PURCHASE_RETENTION_YEARS');
+    const passed = runCli({});
+    expect(passed.stderr).toBe('');
+    expect(passed.status).toBe(0);
+    expect(passed.stdout).toContain('site-config: values are final.');
   });
 
   it('strict mode refuses the assembly while a PR build with the same value stays green', () => {
