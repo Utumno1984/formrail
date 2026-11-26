@@ -459,7 +459,8 @@ import { join } from 'node:path';
 const [scriptUrl, proDir] = process.argv.slice(2);
 const { runCli } = await import(scriptUrl);
 const list = (dir, base = '') => readdirSync(join(dir, base), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? list(dir, join(base, e.name)) : [join(base, e.name)]));
-setInterval(() => {}, 1000);
+// Keeps the event loop alive while the fake dry run hangs, and ends the harness if no signal ever comes.
+setTimeout(() => process.exit(99), 30_000);
 const runNpm = (args, { cwd }) => {
   if (args[0] === 'pack') return { stdout: JSON.stringify([{ files: list(cwd).filter((p) => p !== '.npmrc').map((path) => ({ path })) }]) };
   if (args[0] === 'publish' && args.includes('--dry-run')) {
@@ -486,21 +487,26 @@ process.exit(await runCli([], { proDir, runNpm, fetchCoreVersions: () => ['0.1.0
     let stderr = '';
     child.stderr.setEncoding('utf8').on('data', (chunk) => (stderr += chunk));
     const exited = new Promise((resolveExit) => child.on('exit', (status, sig) => resolveExit({ status, sig })));
-    const staged = await new Promise((resolveReady, reject) => {
-      let stdout = '';
-      child.stdout.setEncoding('utf8').on('data', (chunk) => {
-        stdout += chunk;
-        const match = /READY (\S+)/.exec(stdout);
-        if (match) resolveReady(match[1]);
+    try {
+      const staged = await new Promise((resolveReady, reject) => {
+        let stdout = '';
+        child.stdout.setEncoding('utf8').on('data', (chunk) => {
+          stdout += chunk;
+          const match = /READY (\S+)/.exec(stdout);
+          if (match) resolveReady(match[1]);
+        });
+        exited.then(() => reject(new Error(`the harness exited before the dry run:\n${stderr}`)));
       });
-      exited.then(() => reject(new Error(`the harness exited before the dry run:\n${stderr}`)));
-    });
-    expect(dirname(staged)).toBe(childTmp);
-    expect(existsSync(join(staged, '.npmrc'))).toBe(true);
-    child.kill(signal);
-    expect(await exited).toEqual({ status: code, sig: null });
-    expect(stderr).toContain(`${signal}: stopped, temporary files removed.`);
-    expect(leftovers(childTmp)).toEqual([]);
+      expect(dirname(staged)).toBe(childTmp);
+      expect(existsSync(join(staged, '.npmrc'))).toBe(true);
+      child.kill(signal);
+      expect(await exited).toEqual({ status: code, sig: null });
+      expect(stderr).toContain(`${signal}: stopped, temporary files removed.`);
+      expect(leftovers(childTmp)).toEqual([]);
+    } finally {
+      // A failed assertion before the signal must not leave the harness running.
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }
   });
 });
 
