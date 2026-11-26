@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; img-src 'self' data:; form-action 'none'; base-uri 'none'; object-src 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Articles · Formrail</title>
+    <meta
+      name="description"
+      content="Technical articles about record-editing screens in React: dirty-tracking, change summaries and form rebase."
+    />
+    <link rel="canonical" href="{{CANONICAL}}" />
+    <link rel="alternate" type="application/atom+xml" title="Formrail articles" href="{{FEED_URL}}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Formrail articles" />
+    <meta
+      property="og:description"
+      content="Technical articles about record-editing screens in React: dirty-tracking, change summaries and form rebase."
+    />
+    <meta property="og:url" content="{{CANONICAL}}" />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../landing.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../">Formrail</a>
+        <nav aria-label="Main">
+          <ul class="nav-list">
+            <li><a href="../storybook/">Components</a></li>
+            <li><a href="../teams/">Pro for teams</a></li>
+            <li><a href="../articles/" aria-current="page">Articles</a></li>
+            <li><a href="https://github.com/Utumno1984/formrail">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="wrap">
+          <h1 id="hero-title">Articles</h1>
+          <p class="lead">Technical notes on record-editing screens in React. <a href="feed.xml">Atom feed</a>.</p>
+        </div>
+      </section>
+
+      <section class="prose" aria-label="All articles">
+        <div class="wrap">
+          <ul class="article-list">
+{{ITEMS}}
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <ul class="footer-list">
+          <li><a href="https://github.com/Utumno1984/formrail">Source on GitHub</a></li>
+          <li>Formrail Core: MIT license, free on npm.</li>
+          <li>Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.</li>
+          <li><a href="../articles/">Technical articles</a></li>
+          <li><a href="../privacy/">Privacy</a></li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

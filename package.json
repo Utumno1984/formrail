@@ -54,6 +54,7 @@
     "espree": "^10.4.0",
     "globals": "^17.13.0",
     "http-server": "^14.1.1",
+    "parse5": "^8.0.1",
     "storybook": "^10.6.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0",
