@@ -7,6 +7,7 @@
 //     tokens.css                the design tokens of the published theme, as plain :root variables
 //     teams/index.html          Pro for teams: license, price, waitlist CTA (ticket #490)
 //     privacy/index.html        privacy notice (GDPR art. 13), no cookies / no analytics
+//     license/index.html        the Formrail Pro license terms (ticket #691); same text as packages/pro/LICENSE
 //     iframe.html               redirects old story-renderer links to storybook/iframe.html
 //     404.html                  static, no script (cannot loop)
 //     CNAME                     the custom domain (formrail.dev); Pages ignores it on Actions deploys, it keeps the repo reproducible
@@ -26,6 +27,7 @@ import {
   DESIGN_PARTNER_URL,
   EARLY_ACCESS_URL,
   EXPECTED_PRICE_TEXT,
+  LICENSOR,
   PRIVACY_EMAIL,
   SITE_BASE,
   SITE_DOMAIN,
@@ -141,6 +143,20 @@ export function renderPrivacyEmail(html, email) {
   return html.replaceAll('{{PRIVACY_EMAIL}}', () => text);
 }
 
+/**
+/**
+ * The licensor's identification written into the license page (HTML-escaped). It never throws, so PR builds
+ * stay green with a stand-in value: the deploy refuses an empty or placeholder one (--strict, see
+ * scripts/check-site-config.mjs, which names the constant LICENSOR).
+ */
+export function renderLicensor(html, licensor) {
+  const fields = { NAME: licensor.name, STATUS: licensor.status, COUNTRY: licensor.country, EMAIL: licensor.email };
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let out = html;
+  for (const [key, value] of Object.entries(fields)) out = out.replaceAll(`{{LICENSOR_${key}}}`, () => esc(value));
+  return out;
+}
+
 /** Whether the command line asks for the deploy's strict mode (placeholder guard), see `assembleSite`. */
 export function isStrictRun(argv) {
   return argv.slice(2).includes('--strict');
@@ -164,6 +180,7 @@ export function redirectScriptSource(siteRootDir) {
  * @param {string} [options.priceText] the indicative price shown on teams/; empty = no price block (default `EXPECTED_PRICE_TEXT`)
  * @param {string} [options.designPartnerUrl] design partner form; empty = no design partner section (default `DESIGN_PARTNER_URL`)
  * @param {number} [options.designPartnerSeats] seats offered; 0 = exhausted, the section points to the waitlist (default `DESIGN_PARTNER_SEATS`)
+ * @param {typeof LICENSOR} [options.licensor] who licenses Formrail Pro, written into license/ (default `LICENSOR`)
  * @param {string} [options.privacyEmail] the controller's contact written into privacy/ (default `PRIVACY_EMAIL`)
  * @param {boolean} [options.strict] refuse to assemble while the form URL or the email is a placeholder (the
  *   deploy: `--strict` on the CLI, see scripts/check-site-config.mjs); PR builds leave it off
@@ -180,6 +197,7 @@ export function assembleSite({
   earlyAccessUrl = EARLY_ACCESS_URL,
   priceText = EXPECTED_PRICE_TEXT,
   privacyEmail = PRIVACY_EMAIL,
+  licensor = LICENSOR,
   designPartnerUrl = DESIGN_PARTNER_URL,
   designPartnerSeats = DESIGN_PARTNER_SEATS,
   strict = false,
@@ -187,7 +205,7 @@ export function assembleSite({
   faviconPath = FAVICON,
 } = {}) {
   siteBase = normalizeSiteBase(siteBase);
-  if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail, designPartnerUrl });
+  if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail, designPartnerUrl, licensor });
   if (!existsSync(path.join(storybookDir, 'index.html'))) {
     throw new Error(`No built Storybook at ${storybookDir}: run \`npm run build-storybook\` first.`);
   }
@@ -217,6 +235,7 @@ export function assembleSite({
     renderDesignPartners(privacySource, designPartnerUrl, designPartnerSeats),
     privacyEmail,
   );
+  const license = renderLicensor(readFileSync(path.join(siteRootDir, 'license.html'), 'utf8'), licensor);
   const notFound = readFileSync(path.join(siteRootDir, '404.html'), 'utf8').replaceAll('{{SITE_BASE}}', siteBase);
   const assets = ['landing.css', 'copy.js'].map((file) => path.join(siteRootDir, file));
   for (const asset of [...assets, faviconPath]) {
@@ -238,6 +257,7 @@ export function assembleSite({
   for (const [dir, html] of [
     ['teams', teams],
     ['privacy', privacy],
+    ['license', license],
   ]) {
     mkdirSync(path.join(outDir, dir));
     writeFileSync(path.join(outDir, dir, 'index.html'), html);

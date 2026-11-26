@@ -64,3 +64,16 @@ export const DESIGN_PARTNER_URL = 'https://tally.so/r/xVYjMo';
  * links to the waitlist instead of the form.
  */
 export const DESIGN_PARTNER_SEATS = 3;
+
+/**
+ * Who licenses Formrail Pro, printed in the Licensor section of /license/ and in packages/pro/LICENSE
+ * (ticket #691, decision D8 of 2026-11-26: the licensor is an individual with no VAT number; the formal
+ * seller towards the buyer is Paddle, the Merchant of Record). The minimum data only: no address, no tax code.
+ * `scripts/check-site-config.mjs --strict` (the deploy) refuses an empty or placeholder value and names this constant.
+ */
+export const LICENSOR = {
+  name: 'Daniele Ingusci',
+  status: 'an individual (not a company)',
+  country: 'Italy',
+  email: 'formrail.dev@gmail.com',
+};

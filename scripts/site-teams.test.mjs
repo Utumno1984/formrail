@@ -63,7 +63,7 @@ describe('assembled pages', () => {
       expect(html).not.toContain('PRICE_');
     }
     expect(teams).toContain(
-      'Annual license per developer, 12 months of updates included, terms published before sales.',
+      'Annual license per developer, 12 months of updates included.',
     );
   });
 
@@ -126,7 +126,7 @@ describe('assembled pages', () => {
     const { teams, privacy, home } = build();
     for (const html of [teams, privacy, home]) {
       expect(html).toContain(
-        'Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.',
+        'Formrail Pro: Annual license per developer, 12 months of updates included.',
       );
     }
   });
