@@ -12,7 +12,8 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   floorplan (vedi segmentazione in `docs/planning/design-system-spec.md`, §3).
 - `packages/pro`: licenza commerciale ("da definire"), **vive in questo monorepo pubblico**
   (decisione di Daniele del 2026-11-03: il sorgente è leggibile, il moat è servizio/licenza), con
-  `"private": true` finché non esiste l'org npm privata (nessun licensing a runtime). Si estende
+  `"private": true` finché il pacchetto non è pubblicato su GitHub Packages (nessun licensing a
+  runtime). Si estende
   solo con ticket espliciti (roadmap MVP, §6). **Piano commerciale (decisioni di Daniele del
   2026-11-13, sostituiscono "abbonamento ricorrente"; non rinegoziabili senza nuova istruzione
   sua, dettaglio in `docs/planning/design-system-spec.md` §8)**: target team aziendali (ERP,
@@ -22,8 +23,10 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
   d'attesa/pre-ordine (validazione della domanda), ticket #490. Ticket di studio/refactoring #489
   per rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
-  usa React Hook Form o TanStack Form. La distribuzione resta come da §2.4 della spec (org npm
-  privata, nessun licensing a runtime): non è toccata dalle decisioni.
+  usa React Hook Form o TanStack Form. **Distribuzione (decisione di Daniele del 2026-11-26)**:
+  GitHub Packages, org GitHub dedicata `formrail-dev`, pacchetto `@formrail-dev/pro` installato con
+  alias npm (`@formrail/pro`); sostituisce l'org npm privata (superata: i pacchetti privati npm sono
+  a pagamento, nessun costo fisso ammesso), nessun licensing a runtime. Dettagli in §2.4 e §8.
 - Il documento di pianificazione completo (inventario componenti, insidie tecniche di classe
   generale, segmentazione Free/Pro, MVP) è in `docs/planning/design-system-spec.md`. **Il
   pianificatore lo legge sempre prima di creare ticket.**
