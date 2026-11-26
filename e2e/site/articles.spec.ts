@@ -136,8 +136,8 @@ test.describe('article page', () => {
   test('the navigation and the footer link to the articles', async ({ page }) => {
     await page.goto(`${root}articles/change-summary-baseline/`);
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Articles' })).toHaveAttribute('href', '../../articles/');
-    await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Articles' })).toHaveAttribute('href', '../../articles/');
-    await page.getByRole('contentinfo').getByRole('link', { name: 'Articles' }).click();
+    await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Technical articles' })).toHaveAttribute('href', '../../articles/');
+    await page.getByRole('contentinfo').getByRole('link', { name: 'Technical articles' }).click();
     await page.waitForURL(`${root}articles/`);
   });
 
@@ -169,7 +169,7 @@ test.describe('article page', () => {
       // The block scrolls with the keyboard once focused.
       if (m.preScrolls) {
         await page.locator('pre').focus();
-        await page.keyboard.press('End');
+        for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowRight');
         expect(await page.locator('pre').evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
         expect(await page.evaluate(() => document.documentElement.scrollLeft)).toBe(0);
       }
@@ -224,8 +224,8 @@ test.describe('feed', () => {
       expect(entry.author).toBe('Test Author');
     }
     // Special characters come back as the original text after parsing (escaped in the XML).
-    expect(feed.entries[1].title).toBe(FIXTURE_TITLE);
-    expect(feed.updated).toBe(feed.entries[0].updated);
+    expect(feed.entries[1]?.title).toBe(FIXTURE_TITLE);
+    expect(feed.updated).toBe(feed.entries[0]?.updated);
   });
 });
 
@@ -253,8 +253,8 @@ test.describe('network and cookies', () => {
 function storyLinks(html: string): { dir: 'storybook' | 'pro'; id: string; href: string }[] {
   const out: { dir: 'storybook' | 'pro'; id: string; href: string }[] = [];
   for (const m of html.matchAll(/href="([^"]*?(storybook|pro)\/\?path=([^"]*))"/g)) {
-    const pathParam = decodeURIComponent(m[3].split('&')[0]);
-    out.push({ dir: m[2] as 'storybook' | 'pro', id: pathParam.replace(/^\/(docs|story)\//, ''), href: m[1] });
+    const pathParam = decodeURIComponent((m[3] ?? '').split('&')[0] ?? '');
+    out.push({ dir: m[2] as 'storybook' | 'pro', id: pathParam.replace(/^\/(docs|story)\//, ''), href: m[1] ?? '' });
   }
   return out;
 }
@@ -274,7 +274,7 @@ test.describe('story links', () => {
       expect(res.status(), `${dir}/index.json`).toBe(200);
       ids[dir] = new Set(Object.keys((await res.json()).entries));
     }
-    return links.filter((l) => !ids[l.dir].has(l.id)).map((l) => l.href);
+    return links.filter((l) => !ids[l.dir]?.has(l.id)).map((l) => l.href);
   }
 
   test('the story links of the fixture articles point to stories that exist', async ({ page }) => {
@@ -303,7 +303,7 @@ test.describe('the assembled site', () => {
       await page.goto(url);
       const count = published ? 1 : 0;
       await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Articles' }), url).toHaveCount(count);
-      await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Articles' }), url).toHaveCount(count);
+      await expect(page.getByRole('contentinfo').getByRole('link', { name: 'Technical articles' }), url).toHaveCount(count);
     }
     if (published) {
       const raw = await request.get(`${base}articles`, { maxRedirects: 0 });

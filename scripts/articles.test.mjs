@@ -236,7 +236,8 @@ describe('assembleSite with articles', () => {
     expect(read(paths.outDir, 'articles/feed.xml').match(/<entry>/g)).toHaveLength(2);
     for (const file of ['index.html', 'teams/index.html', 'privacy/index.html']) {
       const html = read(paths.outDir, file);
-      expect(html.match(/>Articles<\/a>/g), file).toHaveLength(2); // navigation + footer
+      expect(html.match(/>Articles<\/a>/g), file).toHaveLength(1); // navigation
+      expect(html.match(/>Technical articles<\/a>/g), file).toHaveLength(1); // footer
       expect(html).not.toContain('ARTICLES_START');
     }
     expect(read(paths.outDir, 'index.html')).toContain('href="articles/"');
