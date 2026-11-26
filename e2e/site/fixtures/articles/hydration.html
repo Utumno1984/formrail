@@ -1,0 +1,15 @@
+---
+title: Compare a < b & "quote" in the title
+date: 2026-01-10
+slug: false-dirty-on-hydration
+description: Why a form turns "dirty" when its values arrive late, and a way to tell system echoes from user edits.
+author: Test Author
+---
+<p>This is a fixture article, never published. It checks that <code>&lt;tags&gt;</code> and ampersands in prose survive.</p>
+<h2>The symptom</h2>
+<p>A control receives its value after mounting and reports a change.</p>
+<h3>A closer look</h3>
+<ul>
+  <li>The control mounts empty.</li>
+  <li>The record arrives and the control echoes it.</li>
+</ul>

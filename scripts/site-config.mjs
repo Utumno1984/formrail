@@ -5,6 +5,13 @@ const repo = (process.env.GITHUB_REPOSITORY || 'Utumno1984/formrail').split('/')
 /** Path prefix of the published site, with leading and trailing slash. */
 export const SITE_BASE = `/${repo}/`;
 
+/**
+ * Origin of the absolute URLs the site must spell out (canonical links, Open Graph, the Atom feed; ticket #698):
+ * origin + `SITE_BASE` + path. It moves to `https://formrail.dev` together with `SITE_BASE` = `/` in ticket #667
+ * (one origin, root + path), so the canonical URLs of the articles change in that one place only.
+ */
+export const SITE_ORIGIN = 'https://utumno1984.github.io';
+
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
