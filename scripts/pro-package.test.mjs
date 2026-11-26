@@ -241,3 +241,46 @@ describe('packages/pro tanstack-form entry', () => {
     expect(lock.packages['node_modules/@tanstack/react-form'].version).toBe(floor);
   });
 });
+
+// Ticket #693: the Pro is published on GitHub Packages as @formrail-dev/pro (the workspace name does not change).
+describe('packages/pro GitHub Packages configuration (#693)', () => {
+  const pkg = readJson('packages/pro/package.json');
+
+  it('publishConfig.registry is GitHub Packages', () => {
+    expect(pkg.publishConfig?.registry).toBe('https://npm.pkg.github.com');
+  });
+
+  it('repository points to the public repository, directory packages/pro (GitHub links the package through it)', () => {
+    expect(pkg.repository).toEqual({ type: 'git', url: 'git+https://github.com/Utumno1984/formrail.git', directory: 'packages/pro' });
+  });
+
+  it('the published name is @formrail-dev/pro while the workspace keeps @formrail/pro', async () => {
+    const { PUBLISHED_NAME, buildPublishManifest } = await import('./release-pro.mjs');
+    expect(PUBLISHED_NAME).toBe('@formrail-dev/pro');
+    expect(buildPublishManifest(pkg).name).toBe('@formrail-dev/pro');
+    expect(pkg.name).toBe('@formrail/pro');
+  });
+
+  it('the description no longer says the package waits for a private npm org', () => {
+    expect(pkg.description).not.toMatch(/private npm org/i);
+    expect(pkg.description).toContain('GitHub Packages');
+  });
+
+  it('the README "Install (licensed teams)" has the .npmrc, NODE_AUTH_TOKEN, read:packages, the alias and a CI example, and no real token', () => {
+    const readme = readFileSync(resolve(ROOT, 'packages/pro/README.md'), 'utf8');
+    const section = readme.slice(readme.indexOf('## Install (licensed teams)'), readme.indexOf('## Release (maintainers)'));
+    expect(section.length).toBeGreaterThan(0);
+    for (const text of [
+      '@formrail-dev:registry=https://npm.pkg.github.com',
+      '${NODE_AUTH_TOKEN}',
+      '`read:packages`',
+      '"@formrail/pro": "npm:@formrail-dev/pro@^0.2.0"',
+      'secrets.',
+      "import { computeChangeSummary } from '@formrail/pro/engine'",
+    ]) {
+      expect(section).toContain(text);
+    }
+    expect(readme).not.toMatch(/gh[pousr]_[A-Za-z0-9]{20,}/);
+    expect(readme).not.toMatch(/private npm org/i);
+  });
+});

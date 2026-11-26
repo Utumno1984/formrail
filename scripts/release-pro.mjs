@@ -34,12 +34,9 @@ export const CORE_NAME = '@formrail/core';
 /** The manifest that goes into the tarball, derived from the workspace one. */
 export function buildPublishManifest(pkg) {
   // Publish-time fields only: no scripts (nothing runs on pack/publish), no devDependencies (workspace tooling).
-  const { private: _private, scripts: _scripts, devDependencies: _dev, publishConfig: _pc, name: _name, ...rest } = pkg;
-  return {
-    name: PUBLISHED_NAME,
-    ...rest,
-    publishConfig: { registry: GITHUB_REGISTRY },
-  };
+  const manifest = { ...pkg };
+  for (const field of ['private', 'scripts', 'devDependencies', 'publishConfig', 'name']) delete manifest[field];
+  return { name: PUBLISHED_NAME, ...manifest, publishConfig: { registry: GITHUB_REGISTRY } };
 }
 
 /** Throws unless every range of `@formrail/core` the Pro declares (peer and dev) matches a published version. */
