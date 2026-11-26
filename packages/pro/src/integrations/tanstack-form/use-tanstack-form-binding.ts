@@ -4,11 +4,15 @@ import { useEffect, useInsertionEffect, useMemo, useState, useSyncExternalStore 
 // peer of `@formrail/pro`.
 import type { ReactFormExtendedApi } from '@tanstack/react-form';
 import type { RebaseFormBinding } from '../../form-rebase/types';
-import { isDev } from '../../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../../internal/use-isomorphic-layout-effect';
 // The immutable snapshots and the save merge of the React Hook Form adapter (#507, #545): pure helpers, no form
 // library, the same rules for both adapters.
 import { keepEditsSince, sameContent, snapshotOf } from '../react-hook-form/snapshot';
+
+// Module-scoped: the package compiles without Node types, and the literal `process.env.NODE_ENV` that the
+// bundlers replace stays in the output. Never a global declaration (it would clash with the consumer's
+// `@types/node`).
+declare const process: { env: { NODE_ENV?: string } };
 
 /** Options of {@link useTanStackFormBinding}. */
 export interface UseTanStackFormBindingOptions {
@@ -382,7 +386,7 @@ function liveFormApi(form: FormLike): { options: { defaultValues?: unknown } } {
     const { options } = candidate as { options?: unknown };
     if (typeof options === 'object' && options !== null) return candidate as { options: { defaultValues?: unknown } };
   }
-  if (isDev() && !warnedForms.has(form)) {
+  if (process.env.NODE_ENV !== 'production' && !warnedForms.has(form)) {
     warnedForms.add(form);
     console.warn(
       '[formrail] useTanStackFormBinding: `form.Subscribe` does not render the FormApi instance of `form` as its `form` prop ' +

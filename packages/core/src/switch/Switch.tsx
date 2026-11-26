@@ -16,7 +16,6 @@ import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { useFormResetSync } from '../internal/form-reset-sync';
-import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
@@ -78,9 +77,6 @@ const THUMB =
   'forced-colors:bg-[ButtonText] forced-colors:peer-checked:bg-[HighlightText]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 
-const BOTH_WARNING =
-  '[formrail] <Switch> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.';
-
 /**
  * Switch: a styled native `<input type="checkbox" role="switch">` with an optional inline label.
  * Inside a `Field` it takes `id`, `name`, `aria-describedby` (merged with its own), `aria-invalid`,
@@ -107,9 +103,11 @@ export const Switch = /* @__PURE__ */ forwardRef<HTMLInputElement, SwitchProps>(
   const warned = useRef(false);
 
   useEffect(() => {
-    if (controlled && defaultChecked !== undefined && !warned.current && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && controlled && defaultChecked !== undefined && !warned.current) {
       warned.current = true;
-      console.error(BOTH_WARNING);
+      console.error(
+        '[formrail] <Switch> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.',
+      );
     }
   }, [controlled, defaultChecked]);
 

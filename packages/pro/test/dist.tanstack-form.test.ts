@@ -64,18 +64,16 @@ describe('dist of @formrail/pro/tanstack-form', () => {
   });
 
   it.each(['js', 'cjs'])('the .%s adapter bundles only its own modules: no second copy of an engine or of a shared helper', (ext) => {
-    // (The CJS build also writes the comment of the entry file itself.) `internal/is-dev.ts` is the one module every
-    // entry bundles on purpose (tsup.config.ts). The pure snapshot helpers of the React Hook Form adapter
+    // (The CJS build also writes the comment of the entry file itself.) The pure snapshot helpers of the React Hook Form adapter
     // (`snapshot.ts`, no state, no library) are bundled by both adapter files: an app that uses one adapter loads
     // nothing of the other.
     expect(modulesOf(`tanstack-form.${ext}`).filter((module) => module !== 'src/tanstack-form.ts')).toEqual([
       'src/integrations/react-hook-form/snapshot.ts',
       'src/integrations/tanstack-form/use-tanstack-form-binding.ts',
-      'src/internal/is-dev.ts',
     ]);
     expect(distClosure(dist(`tanstack-form.${ext}`))).toContain(dist(`shared.${ext}`));
     const others = ['index', 'engine', 'shared'].flatMap((entry) => modulesOf(`${entry}.${ext}`));
-    expect(modulesOf(`tanstack-form.${ext}`).filter((module) => module !== 'src/internal/is-dev.ts' && others.includes(module))).toEqual([]);
+    expect(modulesOf(`tanstack-form.${ext}`).filter((module) => others.includes(module))).toEqual([]);
     // Neither adapter file reaches the other.
     expect(distClosure(dist(`tanstack-form.${ext}`))).not.toContain(dist(`react-hook-form.${ext}`));
     expect(distClosure(dist(`react-hook-form.${ext}`))).not.toContain(dist(`tanstack-form.${ext}`));

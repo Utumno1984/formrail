@@ -9,7 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../dialog/Dialog';
-import { isDev } from '../internal/is-dev';
 import { Spinner } from '../spinner/Spinner';
 import { OPTICAL_LABEL_TYPOGRAPHY, OpticalLabel } from '../utils/OpticalLabel';
 
@@ -212,7 +211,7 @@ export function ConfirmDialogBase({
   // Checked while open only: a closed dialog shows nothing (and the hook renders a closed placeholder).
   const blankConfirm = open && isBlankLabel(confirmLabel);
   useEffect(() => {
-    if (blankConfirm && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && blankConfirm) {
       console.error(
         '[formrail] <ConfirmDialog> needs a confirmLabel that names the action (e.g. "Delete invoice"), not an empty one.',
       );

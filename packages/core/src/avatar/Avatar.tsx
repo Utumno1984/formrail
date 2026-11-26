@@ -24,14 +24,6 @@ const SHAPE_CLASS: Record<AvatarShape, string> = {
 
 const useIsomorphicLayoutEffect = typeof document !== 'undefined' ? useLayoutEffect : useEffect;
 
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 // Once per page load; the flag lives on the function so the module stays tree-shakable.
 function warnNoName(): void {
   const self = warnNoName as typeof warnNoName & { done?: boolean };
@@ -88,7 +80,7 @@ export const Avatar = /* @__PURE__ */ forwardRef<HTMLSpanElement, AvatarProps>(f
 
   const initials = getInitials(name);
   const labelled = !decorative && initials !== '';
-  if (!decorative && !labelled && isDev()) warnNoName();
+  if (process.env.NODE_ENV !== 'production' && !decorative && !labelled) warnNoName();
   const sizeClass = Object.prototype.hasOwnProperty.call(SIZE_CLASS, size) ? SIZE_CLASS[size] : SIZE_CLASS.md;
   const shapeClass = Object.prototype.hasOwnProperty.call(SHAPE_CLASS, shape) ? SHAPE_CLASS[shape] : SHAPE_CLASS.circle;
   const a11y = labelled ? { role: 'img', 'aria-label': (name as string).trim() } : { 'aria-hidden': true as const };

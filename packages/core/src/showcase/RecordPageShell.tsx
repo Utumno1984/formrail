@@ -17,7 +17,6 @@ import { ObjectPageHeader } from '../object-page/ObjectPageHeader';
 import { useDirtyGuard } from '../object-page/use-dirty-guard';
 import { useFocusFirstInvalidField } from '../object-page/use-focus-first-invalid-field';
 import { useObjectPageForm, type UseObjectPageFormReturn } from '../object-page/use-object-page-form';
-import { isDev } from '../internal/is-dev';
 import { MessageStrip } from '../message-strip/MessageStrip';
 import { NOTICE_CAP_VAR, useNoticeCap } from './notice-cap';
 import { RecordAppContext, type RelatedRecords } from './record-app-context';
@@ -394,7 +393,7 @@ export function RecordEditor<T extends { id: string }, V extends object, D>({
   const [useAddons] = useState<UseRecordEditorAddons<T, V, D>>(() => (record && useAddonsProp) || useNoAddons);
   const mountedAddons = useRef(useAddonsProp);
   useEffect(() => {
-    if (useAddonsProp !== mountedAddons.current && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && useAddonsProp !== mountedAddons.current) {
       console.warn('[showcase] RecordEditor: useAddons changed after the mount; the hook of the mount is kept (remount the editor with a `key` to change it).');
     }
   }, [useAddonsProp]);

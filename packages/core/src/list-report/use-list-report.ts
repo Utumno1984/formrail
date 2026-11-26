@@ -13,15 +13,6 @@ import type {
   UseListReportReturn,
 } from './types';
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 const NO_FILTERS: readonly never[] = [];
 const DEFAULT_COMMIT_DELAY = 300;
 
@@ -267,7 +258,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
       const current = fs.current;
       if (id === current.filter) return;
       if (!current.filters.some((f) => f.id === id)) {
-        if (isDev()) {
+        if (process.env.NODE_ENV !== 'production') {
           console.warn(`[formrail] useListReport: setFilter("${id}") ignored, no such filter.`);
         }
         return;
@@ -370,7 +361,7 @@ export function useListReport<Row>(options: UseListReportOptions<Row>): UseListR
   // Like columns: no filters yet (asynchronous loading) is expected, not a mistake.
   const unknownFilter = requestedFilter !== null && !activeFilter && filters.length > 0 ? requestedFilter : null;
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     const warnOnce = (key: string, message: string) => {
       if (warned.current.has(key)) return;
       warned.current.add(key);

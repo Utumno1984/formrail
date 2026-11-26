@@ -37,15 +37,6 @@ const TONE_CLASS: Record<StatusBadgeTone, string> = {
 // set and CapIconSlot stay geometric.
 const WARNING_ICON_OPTICAL_SHIFT = '[&_svg]:[translate:0_-4%]';
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 // Library code cannot tell dev from prod reliably, so the misuse warning is emitted once per page
 // load. The flag lives on the function (not in a module-level `let`) so that the module stays
 // fully tree-shakable: a module-level mutable binding is kept in every bundle that imports it.
@@ -96,7 +87,7 @@ export const StatusBadge = /* @__PURE__ */ forwardRef<HTMLSpanElement, StatusBad
   ref,
 ) {
   if (!hasContent(children)) {
-    if (isDev()) warnEmpty();
+    if (process.env.NODE_ENV !== 'production') warnEmpty();
     return null;
   }
   const resolvedTone: StatusBadgeTone = Object.prototype.hasOwnProperty.call(TONE_CLASS, tone) ? tone : 'neutral';

@@ -27,15 +27,6 @@ import { cn } from '../utils/cn';
 import { internalIcons } from './icons';
 import { useBeganBeforeOpening } from './outside-interaction';
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 interface ModalContextValue {
   /** Where the content publishes its `returnFocusRef`, read by `useReturnFocus` at close time. */
   fallbackHolder: { current: RefObject<HTMLElement | null> | undefined };
@@ -57,7 +48,7 @@ const ModalContext =/* @__PURE__ */ createContext<ModalContextValue | null>(null
 
 function useModalContext(part: string, root: string): ModalContextValue {
   const ctx = useContext(ModalContext);
-  if (!ctx) throw new Error(`[formrail] <${part}> must be rendered inside <${root}>.`);
+  if (!ctx) throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<${part}> must be rendered inside <${root}>.`);
   return ctx;
 }
 
@@ -362,7 +353,7 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
         const stopTracking = trackVisualViewport(node);
         // Radix sets `aria-labelledby` only after the title has registered (a re-render following
         // the mount), so the name is checked one frame later, on the settled DOM.
-        const frame = isDev()
+        const frame = process.env.NODE_ENV !== 'production'
           ? requestAnimationFrame(() => {
               if (node.isConnected && !hasAccessibleName(node)) {
                 console.error(

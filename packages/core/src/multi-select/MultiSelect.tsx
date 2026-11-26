@@ -18,7 +18,6 @@ import { Icon } from '../icon/Icon';
 import { COMBOBOX_ANCHOR, COMBOBOX_LIST, COMBOBOX_OPTION } from '../internal/combobox-styles';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { internalIcons } from '../internal/icons';
-import { isDev } from '../internal/is-dev';
 import { useKeyboardOpen } from '../internal/keyboard-open';
 import {
   LISTBOX_CONTENT_POPOVER,
@@ -171,7 +170,7 @@ export const MultiSelect = /* @__PURE__ */ forwardRef<HTMLInputElement, MultiSel
 
   const duplicatesWarned = useRef(false);
   useEffect(() => {
-    if (!isDev() || duplicatesWarned.current) return;
+    if (process.env.NODE_ENV === 'production' || duplicatesWarned.current) return;
     const problems: string[] = [];
     if (rawValues && values.length !== rawValues.length) problems.push('`value` has duplicates (shown once)');
     if (new Set(options.map((o) => o.value)).size !== options.length) problems.push('two options share a `value`');

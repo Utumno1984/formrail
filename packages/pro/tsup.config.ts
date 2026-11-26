@@ -8,15 +8,14 @@ const ENGINE_SOURCE = source('engine.ts');
 const SHARED_ENTRY = source('internal/shared.ts');
 /**
  * The modules `src/internal/shared.ts` re-exports (keep the two lists in sync; dist.engine.test.ts checks the
- * dist). Not `internal/is-dev.ts` (a three-line `process.env.NODE_ENV` read): each entry keeps its own copy, so
- * `dist/index.*` still holds the only environment read of the main entry, which dist.smoke.test.ts pins.
+ * dist).
  */
 const SHARED_SOURCES = new Set(
   ['change-summary/format-change-value.ts', 'change-summary/infer-label.ts', 'internal/use-isomorphic-layout-effect.ts'].map(source),
 );
 
 /**
- * One copy of each module in the dist, `is-dev` aside (#489). `@formrail/pro/engine` is the only copy of the engines: a module
+ * One copy of each module in the dist (#489). `@formrail/pro/engine` is the only copy of the engines: a module
  * that imports `src/engine.ts` (the main entry and the core-typed `useFormRebase`) gets `./engine.js` /
  * `./engine.cjs` of the same `dist`, an external import, instead of a second bundled copy. An app that imports
  * both entries then loads the engine modules once, with one module-level state (the once-per-path development

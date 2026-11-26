@@ -9,15 +9,6 @@ export type DescriptionListItemVariant = 'default' | 'summary';
 const DEFAULT_EMPTY_LABEL = 'Not specified';
 const DEFAULT_EMPTY_PLACEHOLDER = '—';
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 interface DescriptionListContextValue {
   layout: DescriptionListLayout;
   emptyLabel: string;
@@ -111,7 +102,7 @@ export interface DescriptionListItemProps extends Omit<HTMLAttributes<HTMLDivEle
 export const DescriptionListItem = /* @__PURE__ */ forwardRef<HTMLDivElement, DescriptionListItemProps>(
   function DescriptionListItem({ label, children, emptyLabel, variant, className, ...rest }, ref) {
     const context = useContext(DescriptionListContext);
-    if (!context && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && !context) {
       throw new Error('[formrail] <DescriptionListItem> must be rendered inside a <DescriptionList>.');
     }
     const filled = hasContent(children);

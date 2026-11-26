@@ -3,8 +3,8 @@
   "version": 1,
   "exports": {
     "useReactHookFormBinding": {
-      "baseline": 3729,
-      "limit": 4102
+      "baseline": 3435,
+      "limit": 3779
     }
   }
 }
