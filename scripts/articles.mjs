@@ -19,38 +19,133 @@
 // - In `site-root/articles/` any file that is not `.html` stops the assembly (it is almost surely a mistake),
 //   while files starting with a dot (`.gitkeep`, editor leftovers) are ignored.
 // - Front matter values are plain text, not YAML: quotes around a value stay literal (`title: "A"` shows the quotes).
-// - The body is raw HTML written by the maintainers. A few regexes catch the usual mistakes (script, h1, iframe,
-//   embed, object, style, link, base, meta, form elements; inline `on...=` handlers, `javascript:` URLs, inline
-//   `url()` styles, absolute or protocol-relative `src`/`srcset`/`poster` inside real tags). They are a lint, not
-//   a sanitiser: HTML has too many ways to spell the same thing (entities, odd whitespace, SVG, `ping`...).
-//   The real barrier is the Content-Security-Policy `<meta>` of article.html/articles.html (no script, no
-//   third-party resource, no form, no base, no object); links to external pages with `<a href>` are fine.
+// - The body is raw HTML written by the maintainers. It is checked as a content lint with parse5, the reference
+//   implementation of the WHATWG HTML parser (the algorithm browsers use): the rules look at the elements and
+//   attributes the parser really builds, with entities already decoded, never at the spelling of the source. So
+//   code shown escaped in `<pre><code>` (`&lt;b onclick&gt;`) is text and passes, while an odd but valid spelling
+//   (unquoted values with quotes inside, `jav&#x61;script:`, a tab inside a URL, a tag missing its last `>`) is
+//   seen exactly as a browser sees it. Refused: script, h1, iframe, embed, object, style, link, base, meta and
+//   form elements; `on...` handler attributes; `javascript:` URLs; every `style` attribute (the page CSP blocks
+//   inline styles); `ping`; `src`/`srcset`/`poster`/`background` from another origin; in SVG an `href` to another
+//   origin (image, use...), an external `url()` or an animated `href`; a body that ends inside a quote or a comment.
+//   It stays a lint, not a sanitiser: it cannot know every way a browser may fetch something (CSS escapes in an
+//   SVG presentation attribute, for one). The real barrier is the Content-Security-Policy `<meta>` of
+//   article.html/articles.html (no script, no inline style, no third-party resource, no form, no base, no
+//   object); links to external pages with `<a href>` are fine.
 // - Atom ids are `tag:` URIs, independent of the hosting (RFC 4287 section 4.2.6: an id must never change).
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { parse } from 'parse5';
 
 const KEYS = ['title', 'date', 'slug', 'description', 'author'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 // eslint-disable-next-line no-control-regex -- the point is to reject control characters (invalid in XML 1.0)
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/;
-// Checked in order; the message completes "the body ...". `BODY_RULES` look at the whole body (tag names),
-// `TAG_RULES` only at the real tags (attributes): in text a `<` is always written `&lt;`, so code shown inside
-// `<pre><code>` (`onClick={save}`, `img.src = "https://..."`) or prose never forms a tag and is not scanned.
-const BODY_RULES = [
-  [/<h1[\s/>]/i, 'must not contain an h1: the page title is the only h1'],
-  [/<script[\s/>]/i, 'must not contain a script: the site ships no script on articles'],
-  [/<(?:iframe|embed|object|style|link|base|meta|form)[\s/>]/i, 'must not contain an iframe, embed, object, style, link, base, meta or form element'],
+// The body is parsed where article.html puts it: in main > article > div, after the page h1 and the meta line
+// (a test keeps the two in step).
+// A whole document, not a fragment, because a `<body ...>` or `<html ...>` tag in the body adds its attributes
+// to the page's own body/html element: a fragment parse drops them, a browser does not.
+export const BEFORE_BODY = '<!DOCTYPE html><html><head></head><body><main><article><div><h1>t</h1><p>m</p>';
+// In the page the template goes on after the body ("\n        </div>"): a last tag that lacks only its `>` is
+// still closed there, by that whitespace and the next `>`. Appending both shows that tag to the rules here too;
+// a body that ends inside a quoted value or a comment stays unfinished and is refused (`UNFINISHED`).
+const AFTER_BODY = '\n>';
+const UNFINISHED = new Set(['eof-in-tag', 'eof-in-comment', 'eof-in-doctype', 'eof-in-cdata']);
+const HTML_NS = 'http://www.w3.org/1999/xhtml';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const OTHER_BANNED = new Set(['iframe', 'embed', 'object', 'style', 'link', 'base', 'meta', 'form']);
+// Attributes whose value a browser follows as a URL (navigation, submission or fetch): `javascript:` is refused there.
+const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'data', 'poster', 'background', 'cite', 'longdesc', 'lowsrc', 'dynsrc', 'codebase', 'classid', 'archive', 'manifest', 'icon', 'usemap', 'profile']);
+const SVG_ANIMATIONS = new Set(['animate', 'set', 'animatemotion', 'animatetransform', 'animatecolor']);
+const THIRD_PARTY = 'from another origin (absolute http(s): or // URL): the page makes no third-party request';
+
+/** A URL attribute value as the URL parser reads it: tabs and newlines removed, leading/trailing C0 and spaces trimmed. */
+function urlOf(value) {
+  // eslint-disable-next-line no-control-regex -- the URL parser strips C0 controls and spaces at both ends
+  return value.replace(/[\t\n\r]/g, '').replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, '');
+}
+// Spaces before the colon are refused too: a browser reads `javascript :x` as a relative path, but it is surely meant as one.
+const isJavascriptUrl = (value) => /^javascript\s*:/i.test(urlOf(value));
+// `\` counts as `/` in http(s) URLs, so `/\host`, `\\host` and `\/host` are protocol-relative like `//host`.
+const isExternal = (value) => /^(?:https?:|[/\\]{2})/i.test(urlOf(value));
+// srcset: candidates are separated by commas, URL and descriptors by ASCII whitespace; every piece is checked
+// (a descriptor never starts with http: or //, so checking it too only errs on the strict side).
+const hasExternalCandidate = (value) => value.split(/[\t\n\f\r ,]+/).some(isExternal);
+const hasExternalCssUrl = (value) => /url\s*\(\s*["']?\s*(?:https?:|[/\\]{2})/i.test(value.replace(/[\t\n\r]/g, ''));
+const has = (el, test) => el.attrs.some(test);
+
+// Checked in order over every element; the message completes "the body ...". `fromBody` is false for the page
+// elements of BEFORE_BODY: only their attributes come from the article (merged by a `<body>`/`<html>` tag).
+const RULES = [
+  [(el) => el.fromBody && el.name === 'h1', 'must not contain an h1: the page title is the only h1'],
+  [(el) => el.fromBody && el.name === 'script', 'must not contain a script: the site ships no script on articles'],
+  [(el) => el.fromBody && OTHER_BANNED.has(el.name), 'must not contain an iframe, embed, object, style, link, base, meta or form element'],
+  [(el) => has(el, (a) => a.name.startsWith('on')), 'must not contain an inline event handler (on...=)'],
+  [(el) => has(el, (a) => URL_ATTRIBUTES.has(a.local) && isJavascriptUrl(a.value)), 'must not contain a javascript: URL'],
+  [(el) => has(el, (a) => a.name === 'style'), 'must not contain a style attribute: inline styles are blocked by the page CSP, use a class'],
+  [(el) => has(el, (a) => (a.name === 'src' || a.name === 'poster') && isExternal(a.value)), `must not load src/poster ${THIRD_PARTY}`],
+  [(el) => has(el, (a) => a.name === 'srcset' && hasExternalCandidate(a.value)), `must not load srcset ${THIRD_PARTY}`],
+  [(el) => has(el, (a) => a.name === 'background' && isExternal(a.value)), `must not load background ${THIRD_PARTY}`],
+  [(el) => has(el, (a) => a.name === 'ping'), 'must not contain a ping attribute: a click on the link would notify another address'],
+  [(el) => el.ns === SVG_NS && el.name !== 'a' && has(el, (a) => a.local === 'href' && isExternal(a.value)), `must not load an SVG href (image, use...) ${THIRD_PARTY}`],
+  [(el) => el.ns === SVG_NS && has(el, (a) => hasExternalCssUrl(a.value)), `must not load an SVG url() ${THIRD_PARTY}`],
+  [
+    (el) => el.ns === SVG_NS && SVG_ANIMATIONS.has(el.name) && has(el, (a) => a.name === 'attributename' && a.value.trim().toLowerCase().replace(/^.*:/, '') === 'href'),
+    'must not animate an SVG href: the animated value would escape the URL checks',
+  ],
 ];
-// Quoted values may contain `>`; a stray unpaired quote or a missing final `>` must not hide the tag from the
-// rules (the browser still parses it), so a lone quote is consumed too and the tag may end at the end of the body.
-const TAG = /<[a-zA-Z](?:[^>"']|"[^"]*"|'[^']*'|["'])*(?:>|$)/g;
-const TAG_RULES = [
-  [/[\s/"']on[a-z]+\s*=/i, 'must not contain an inline event handler (on...=)'],
-  [/javascript\s*:/i, 'must not contain a javascript: URL'],
-  [/\bstyle\s*=\s*["'][^"']*url\s*\(/i, 'must not load a resource from an inline style (url())'],
-  [/\b(?:src|poster)\s*=\s*["']?\s*(?:https?:|[/\\]{2})/i, 'must not load src/poster from another origin (absolute http(s): or // URL): the page makes no third-party request'],
-  [/\bsrcset\s*=\s*["']?[^"'>]*?(?:https?:|[/\\]{2})/i, 'must not load srcset from another origin (absolute http(s): or // URL): the page makes no third-party request'],
-];
+
+/** The elements of a parse5 tree in document order, template contents included (iterative: no recursion limit). */
+function elementsOf(root) {
+  const out = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node.tagName) out.push(node);
+    const next = node.content ? [...node.childNodes, node.content] : (node.childNodes ?? []);
+    for (let i = next.length - 1; i >= 0; i--) stack.push(next[i]);
+  }
+  return out;
+}
+
+/**
+ * The reason the body is refused when parsed with scripting on or off (a `<noscript>` is text in one mode and
+ * markup in the other, and a browser may run either), or null.
+ */
+function bodyProblem(body, scriptingEnabled) {
+  const errors = [];
+  const document = parse(`${BEFORE_BODY}${body}${AFTER_BODY}`, {
+    scriptingEnabled,
+    sourceCodeLocationInfo: true,
+    onParseError: (error) => errors.push(error.code),
+  });
+  const elements = elementsOf(document).map((node) => ({
+    name: node.tagName.toLowerCase(),
+    ns: node.namespaceURI,
+    // Elements the parser creates on its own (`tbody`...) have no location: they come from the body too.
+    fromBody: !(node.sourceCodeLocation?.startOffset < BEFORE_BODY.length),
+    attrs: node.attrs.map((a) => {
+      const name = a.name.toLowerCase();
+      return { name, local: name.slice(name.lastIndexOf(':') + 1), value: a.value };
+    }),
+  }));
+  for (const [test, reason] of RULES) {
+    if (elements.some(test)) return reason;
+  }
+  let level = 1;
+  for (const el of elements) {
+    const m = el.fromBody && el.ns === HTML_NS ? /^h([2-6])$/.exec(el.name) : null;
+    if (!m) continue;
+    const next = Number(m[1]);
+    if (next > level + 1) return `skips a heading level (h${next} after ${level === 1 ? 'the page title' : `h${level}`}): headings must not skip levels`;
+    level = next;
+  }
+  if (errors.some((code) => UNFINISHED.has(code))) {
+    return 'ends inside an unfinished tag or comment (an unclosed quote or <!--): the page after it would become part of it';
+  }
+  return null;
+}
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** HTML/XML text and attribute escaping (the same rule serves both, quotes included). */
@@ -100,19 +195,8 @@ export function parseArticle(file, source) {
   const body = match[2].trim();
   if (body === '') fail('the article has no body.');
   if (CONTROL.test(body)) fail('the body contains a control character.');
-  for (const [pattern, reason] of BODY_RULES) {
-    if (pattern.test(body)) fail(`the body ${reason}.`);
-  }
-  const tags = [...body.matchAll(TAG)].map((m) => m[0]);
-  for (const [pattern, reason] of TAG_RULES) {
-    if (tags.some((tag) => pattern.test(tag))) fail(`the body ${reason}.`);
-  }
-  let level = 1;
-  for (const m of body.matchAll(/<h([2-6])[\s/>]/gi)) {
-    const next = Number(m[1]);
-    if (next > level + 1) fail(`the body skips a heading level (h${next} after ${level === 1 ? 'the page title' : `h${level}`}): headings must not skip levels.`);
-    level = next;
-  }
+  const problem = bodyProblem(body, true) ?? bodyProblem(body, false);
+  if (problem) fail(`the body ${problem}.`);
   return { ...meta, body };
 }
 

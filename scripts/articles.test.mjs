@@ -1,9 +1,10 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { defaultTreeAdapter, html as parse5Html, parse as parseHtml, parseFragment, serialize } from 'parse5';
 import { afterEach, describe, expect, it } from 'vitest';
 import { assembleSite } from './assemble-site.mjs';
-import { escapeText, formatDate, loadArticles, parseArticle, renderArticles, renderArticlesLinks, renderFeed } from './articles.mjs';
+import { BEFORE_BODY, escapeText, formatDate, loadArticles, parseArticle, renderArticles, renderArticlesLinks, renderFeed } from './articles.mjs';
 
 const SITE_ROOT = path.join(import.meta.dirname, '..', 'site-root');
 const NOW = new Date('2026-11-26T10:00:00Z');
@@ -139,6 +140,164 @@ describe('parseArticle guards', () => {
     const start = Date.now();
     expect(() => parse('<a'.repeat(40000))).not.toThrow();
     expect(Date.now() - start).toBeLessThan(2000);
+  });
+
+  it.each([
+    // Unquoted values with a quote inside: the browser does not pair those quotes with the next quoted value.
+    [`<img alt=it's title='x>y' onerror="x()">`, /inline event handler/],
+    [`<img alt=a"b title="x>y" onerror="x()">`, /inline event handler/],
+    [`<img alt=it's title='x>y' src=https://e/x.png>`, /src\/poster from another origin/],
+    [`<a href=/x title=a"b data-x="1>2" onclick=alert(1)>x</a>`, /inline event handler/],
+    [`<img title=a="b src="x>y" onerror=x()>`, /inline event handler/],
+    [`<img alt="a" b' c='d>e' onerror=x()>`, /inline event handler/],
+    // Any attribute that starts with "on", known handler or not.
+    ['<input autofocus onfocus="x()">', /inline event handler/],
+    ['<details open ontoggle="x()"><summary>x</summary></details>', /inline event handler/],
+    ['<p onanimationstart="x()" onfuture="y()">x</p>', /inline event handler/],
+    ['<svg onload="x()"></svg>', /inline event handler/],
+    // URLs as the URL parser reads them: entities decoded, tabs and newlines removed, leading spaces trimmed.
+    ['<a href="jav&#x61;script:alert(1)">x</a>', /javascript: URL/],
+    ['<a href="java\tscript:alert(1)">x</a>', /javascript: URL/],
+    ['<a href="java&Tab;scr&NewLine;ipt&colon;alert(1)">x</a>', /javascript: URL/],
+    ['<a href="&#x20;&#x1;javascript:alert(1)">x</a>', /javascript: URL/],
+    ['<button formaction="javascript:alert(1)">x</button>', /javascript: URL/],
+    ['<svg><a xlink:href="javascript:alert(1)"><text>x</text></a></svg>', /javascript: URL/],
+    ['<math><mi href="javascript:alert(1)">x</mi></math>', /javascript: URL/],
+    ['<img src="h&#x74;tps://e/x.png">', /src\/poster from another origin/],
+    ['<img src="ht\ntps://e/x.png">', /src\/poster from another origin/],
+    ['<img src="\\\\e/x.png">', /src\/poster from another origin/],
+    ['<img src="\\/e/x.png">', /src\/poster from another origin/],
+    ['<video><source src="https://e/x.mp4"></video>', /src\/poster from another origin/],
+    ['<img srcset="a.png 1x,https://e/x.png 2x">', /srcset from another origin/],
+    ['<picture><source srcset="a.png 1x,\n//e/x.png 2x"><img src="a.png" alt=""></picture>', /srcset from another origin/],
+    ['<table background="https://e/x.png"><tr><td>x</td></tr></table>', /background from another origin/],
+    ['<a href="/x" ping="https://e/p">x</a>', /ping attribute/],
+    ['<a href="/x" PING="/p">x</a>', /ping attribute/],
+    ['<svg><image href="https://e/x.png"/></svg>', /SVG href \(image, use\.\.\.\) from another origin/],
+    ['<svg><image xlink:href="//e/x.png"/></svg>', /SVG href/],
+    ['<svg><use href="https://e/s.svg#i"/></svg>', /SVG href/],
+    ['<svg><filter><feImage href="https://e/x.png"/></filter></svg>', /SVG href/],
+    ['<svg><rect fill="url(https://e/p.svg#g)"/></svg>', /SVG url\(\) from another origin/],
+    ['<svg><a href="#x"><set attributeName="href" to="javascript:alert(1)"/><text>x</text></a></svg>', /animate an SVG href/],
+    ['<svg><image href="a.png"><animate attributeName="xlink:href" values="a.png;https://e/x.png"/></image></svg>', /animate an SVG href/],
+    // Elements and attributes wherever the parser puts them.
+    ['<SVG><SCRIPT>1</SCRIPT></SVG>', /script/],
+    ['<svg><style>@import url(https://e/a.css);</style></svg>', /iframe, embed, object, style/],
+    ['<svg><foreignObject><iframe src="x.html"></iframe></foreignObject></svg>', /iframe, embed, object, style/],
+    ['<body onload="x()">', /inline event handler/],
+    ['<html onclick="x()">', /inline event handler/],
+    ['<body background="https://e/x.png">', /background from another origin/],
+    ['<table><tr><td onclick="x()">x</td></tr></table>', /inline event handler/],
+    ['<template><img src="https://e/x.png"></template>', /src\/poster from another origin/],
+    ['<template shadowrootmode="open"><p onclick="x()">x</p></template>', /inline event handler/],
+    ['<noscript><img src="https://e/x.png"></noscript>', /src\/poster from another origin/],
+    ['<noscript><p title="</noscript><img src=https://e/x.png>"></p></noscript>', /src\/poster from another origin/],
+    ['<p>x</p></div></article></main><img src="https://e/x.png">', /src\/poster from another origin/],
+    ['<h2>A</h2><h4', /skips a heading level \(h4 after h2\)/],
+    // A body that ends inside a quote or a comment would swallow the page after it.
+    ['<p>x</p><img alt="x', /ends inside an unfinished tag or comment/],
+    ["<p>x</p><img alt='x", /ends inside an unfinished tag or comment/],
+    ['<p>x</p><!-- note', /ends inside an unfinished tag or comment/],
+    ['<svg><![CDATA[x', /ends inside an unfinished tag or comment/],
+  ])('rejects %j as the HTML parser reads it, naming the file and the reason', (body, reason) => {
+    expect(() => parse(body)).toThrow(reason);
+    expect(() => parse(body)).toThrow(/^articles\/x\.html: the body /);
+  });
+
+  it('rejects every style attribute with a reason that names the CSP and the alternative', () => {
+    for (const body of ['<p style="color:red">x</p>', '<p STYLE="">x</p>', '<svg><rect style="fill:red"/></svg>']) {
+      expect(() => parse(body), body).toThrow(/^articles\/x\.html: the body must not contain a style attribute: inline styles are blocked by the page CSP, use a class\.$/);
+    }
+  });
+
+  it('accepts what a browser reads as harmless, however it is spelled', () => {
+    const body = [
+      '<h2>Links and media</h2>',
+      '<p><abbr title="JavaScript: the language">JS</abbr>, <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript">MDN</a>, <a href=/x title=\'it&#39;s\'>x</a>.</p>',
+      '<p>It\'s "fine": 1 &lt; 2 &amp; <code>&lt;body onload="init()"&gt;</code>, <code>srcset="https://e/x.png 2x"</code>.</p>',
+      '<img src="data:image/png;base64,AA==" alt=""><img srcset="a.png 1x, b.png 2x" src="a.png" alt="" data-src="https://e/x.png">',
+      '<svg viewBox="0 0 1 1"><use href="#icon"/><image href="pic.png"/><rect fill="url(#g)"/><a href="https://example.org/">x</a></svg>',
+      '<h3>Code</h3><pre><code>&lt;a ping="https://e/p" style="color:red"&gt;</code></pre>',
+    ].join('\n');
+    expect(() => parse(body)).not.toThrow();
+  });
+
+  it('parses the body where article.html puts it (BEFORE_BODY mirrors the template)', () => {
+    const chain = (document) => {
+      const path = [];
+      const find = (node, trail) => {
+        for (const child of node.childNodes ?? []) {
+          if (child.tagName === 'span' && child.attrs.some((a) => a.value === 'body-here')) path.push(...trail, child.parentNode.childNodes.filter((n) => n.tagName && n !== child).map((n) => n.tagName).join('+'));
+          else if (child.tagName) find(child, [...trail, child.tagName]);
+        }
+      };
+      find(document, []);
+      return path;
+    };
+    const marker = '<span id="body-here"></span>';
+    const template = readFileSync(path.join(SITE_ROOT, 'article.html'), 'utf8').replace('{{BODY}}', marker);
+    expect(chain(parseHtml(template))).toEqual(['html', 'body', 'main', 'article', 'div', 'h1+p']);
+    expect(chain(parseHtml(`${BEFORE_BODY}${marker}`))).toEqual(chain(parseHtml(template)));
+  });
+
+  it('decides on what parse5 sees, not on how the tag is spelled (differential, 2,000 random tags, fixed seed)', () => {
+    const div = defaultTreeAdapter.createElement('div', parse5Html.NS.HTML, []);
+    const PIECES = ['a', '=', '"', "'", '>', ' ', '/', '\n', '<', ' onerror=x()', ' src=//e/x', ' src=https://e/x', ' src=x.png', ' title=', "it's", 'a"b', 'x>y'];
+    // The tag splitter of the regex version, kept only to show that the sample exercises the cases it misread.
+    const OLD_TAG = /<[a-zA-Z](?:[^>"']|"[^"]*"|'[^']*'|["'])*(?:>|$)/;
+    const verdict = (body) => {
+      try {
+        parse(body);
+        return 'accepted';
+      } catch (error) {
+        return error.message;
+      }
+    };
+    const elements = (node) => (node.childNodes ?? []).flatMap((child) => (child.tagName ? [child, ...elements(child)] : elements(child)));
+    let seed = 7;
+    const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const seen = { accepted: 0, handler: 0, src: 0, unfinished: 0, oldSplitWrong: 0 };
+    for (let k = 0; k < 2000; k++) {
+      let body = '<img ';
+      for (let j = 1 + Math.floor(random() * 12); j > 0; j--) body += PIECES[Math.floor(random() * PIECES.length)];
+      body += '>tail';
+      const errors = [];
+      const fragment = parseFragment(div, body, { sourceCodeLocationInfo: true, onParseError: (e) => errors.push(e.code) });
+      const got = verdict(body);
+      if (errors.includes('eof-in-tag')) {
+        seen.unfinished++;
+        expect(got, body).not.toBe('accepted');
+        continue;
+      }
+      const attrs = elements(fragment).flatMap((el) => el.attrs);
+      const expected = attrs.some((a) => a.name.startsWith('on'))
+        ? 'articles/x.html: the body must not contain an inline event handler (on...=).'
+        : attrs.some((a) => a.name === 'src' && /^(?:https?:|[/\\]{2})/i.test(a.value.replace(/[\t\n\r]/g, '').trim()))
+          ? 'articles/x.html: the body must not load src/poster from another origin (absolute http(s): or // URL): the page makes no third-party request.'
+          : 'accepted';
+      expect(got, body).toBe(expected);
+      // The canonical spelling of the same tree (parse5's serialisation) gets the same verdict.
+      expect(verdict(serialize(fragment)), body).toBe(got);
+      seen[expected === 'accepted' ? 'accepted' : expected.includes('handler') ? 'handler' : 'src']++;
+      const first = elements(fragment)[0];
+      if (first && OLD_TAG.exec(body)[0].length !== first.sourceCodeLocation.startTag.endOffset) seen.oldSplitWrong++;
+    }
+    for (const [key, count] of Object.entries(seen)) expect(count, `${key} in ${JSON.stringify(seen)}`).toBeGreaterThanOrEqual(20);
+  });
+
+  it('stays fast on long runs of stray quotes (junk attribute names are harmless) and on a long unclosed value', () => {
+    for (const [body, rejected] of [
+      ['<a "'.repeat(40000), false],
+      [`<a '"`.repeat(40000), false],
+      [`<a${' "'.repeat(40000)}`, false],
+      [`<a${'"'.repeat(80001)}`, false],
+      [`<a title="${'x'.repeat(80000)}`, true],
+    ]) {
+      const start = Date.now();
+      if (rejected) expect(() => parse(body)).toThrow(/ends inside an unfinished tag or comment/);
+      else expect(() => parse(body)).not.toThrow();
+      expect(Date.now() - start).toBeLessThan(2000);
+    }
   });
 
   it('accepts a > inside a quoted attribute value', () => {
