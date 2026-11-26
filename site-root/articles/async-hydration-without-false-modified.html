@@ -6,7 +6,7 @@ description: A record editor opens empty, the data arrives half a second later a
 author: Daniele Ingusci
 ---
 <p>You open a record in an editor. For half a second the fields are empty, then the data arrives and they fill in. You have not touched anything, yet the save bar slides in, and if you click "Back" the app asks whether you really want to discard your changes. It is a common small bug in record editors, and it erodes trust: a user who learns that the "unsaved changes" warning is sometimes wrong learns to ignore it, including the times it is right.</p>
-<p>This article explains where the false "modified" flag comes from and shows two ways to avoid it with <code>useObjectPageForm</code>, the form-state hook of <code>@formrail/core</code> (MIT). The code blocks are compiled against the current public API of the package, and the behaviours described are covered by unit tests in the repository.</p>
+<p>This article explains where the false "modified" flag comes from and shows two ways to avoid it with <code>useObjectPageForm</code>, the form-state hook of <code>@formrail/core</code> (MIT). The code blocks compile against the current public API of the package, and the behaviours described are covered by unit tests in the repository.</p>
 
 <h2>Where the false flag comes from</h2>
 <p>There are two independent causes, which often appear together.</p>
@@ -99,7 +99,7 @@ export function InvoicePage({ id }: { id: string }) {
 
 <h2>Option two: hydrate an existing form with reset</h2>
 <p>Sometimes the form has to exist before the data does: a page shell owns it, or one component handles both creation and editing. For that case the hook offers <code>reset(newBaseline)</code>. It replaces the baseline and the values at once, so the form is clean afterwards, and it is the explicit way to say "this is the saved state now" rather than an edit by the user. The hook has no change callback at all: nothing is reported to you when you hydrate it.</p>
-<pre><code class="language-tsx">import { useEffect } from 'react';
+<pre><code class="language-tsx">import { useEffect, useState } from 'react';
 import { Field, Input, useObjectPageForm } from '@formrail/core';
 
 interface Invoice {
@@ -115,15 +115,19 @@ declare function fetchInvoice(id: string): Promise&lt;Invoice&gt;;
 export function InvoicePage({ id }: { id: string }) {
   const form = useObjectPageForm({ baseline: EMPTY });
   const { reset } = form; // `reset` keeps its identity across renders
-  const loading = form.baseline === EMPTY;
+  const [loadedId, setLoadedId] = useState&lt;string | null&gt;(null); // the record the form holds
+  const loading = loadedId !== id;
 
   useEffect(() => {
     let ignore = false;
     void fetchInvoice(id).then((invoice) => {
-      if (!ignore) reset(invoice); // baseline and values become the record; `isDirty` is false
+      if (ignore) return;
+      reset(invoice); // baseline and values become the record; `isDirty` is false
+      setLoadedId(id);
     });
     return () => {
       ignore = true;
+      setLoadedId(null); // disabled until the next record is in the form
     };
   }, [id, reset]);
 
@@ -142,12 +146,12 @@ export function InvoicePage({ id }: { id: string }) {
 }</code></pre>
 <p>There are three traps, each a consequence of how the hook is specified.</p>
 <p><strong>The baseline option is not a subscription.</strong> It is read once, at mount. Passing a different baseline later changes neither <code>values</code> nor <code>baseline</code>, and in development the hook logs a single warning pointing to <code>reset(newBaseline)</code>. That is why the example passes a stable constant and hydrates through <code>reset</code>. An inline literal with the same content does not warn.</p>
-<p><strong>A late <code>reset</code> discards edits.</strong> It replaces the values, so anything typed between the first render and the arrival of the data is gone. This is the strongest argument for option one, and the reason the example keeps the control disabled until the record arrives. If the user can type before hydration, you have a product decision to make, not a library detail.</p>
+<p><strong>A late <code>reset</code> discards edits.</strong> It replaces the values, so anything typed between the first render and the arrival of the data is gone. This is the strongest argument for option one, and the reason the example keeps the control disabled until the record arrives, and again while any later one loads: the cleanup clears <code>loadedId</code>, so a record about to be replaced cannot be edited. If the user can type before hydration, you have a product decision to make, not a library detail.</p>
 <p><strong>Responses can arrive out of order.</strong> Without the <code>ignore</code> flag, a slow response for the previous record could call <code>reset</code> after the current one and overwrite it.</p>
 
 <h2>What StrictMode does, and what it does not</h2>
 <p>In development, <code>StrictMode</code> mounts every component, unmounts it and mounts it again, so each effect runs twice. For the code above this has one visible consequence: <code>fetchInvoice</code> is called twice, and the response of the first call is dropped by the <code>ignore</code> flag, because its cleanup ran before it arrived. Only the second response reaches <code>setLoaded</code> or <code>reset</code>.</p>
-<p>It does not change the dirty state: in both options the form is clean after the data has arrived, with the double mount as without. Both are tests in the repository (<code>use-object-page-form.async-hydration.test.tsx</code>), run with the real <code>Input</code> and a deferred promise standing in for the network. In production there is no double mount, so the second request disappears.</p>
+<p>It does not change the dirty state: in both options the form is clean after the data has arrived, with <code>StrictMode</code> as without. Both are tests in the repository (<code>use-object-page-form.async-hydration.test.tsx</code>), run with the real <code>Input</code> and a deferred promise standing in for the network. In production there is no double mount, so the second request disappears.</p>
 
 <h2>When a control rewrites what it receives</h2>
 <p>If a control from another library normalizes its value and reports it, your handler receives a value that differs from the baseline and the form is dirty, correctly, by its own definition. Two remedies, in order of preference. First, normalize the data once when it arrives and use the normalized record as the baseline: the echo then equals the baseline and, as seen above, is harmless. Second, tell the form what "equal" means with the <code>isEqual</code> option, which replaces the comparison behind <code>isDirty</code>:</p>

@@ -24,6 +24,9 @@ const INVOICES: Record<string, Invoice> = {
   b: { id: 'b', customer: 'Bianchi Logistics', reference: 'PO-2026-204' },
 };
 
+// What a superseded request answers in the StrictMode tests: if it ever reached the form, these values would show.
+const STALE_A: Invoice = { id: 'a', customer: 'Rossi Construction (stale)', reference: 'PO-2026-117' };
+
 interface Request {
   id: string;
   resolve: (invoice: Invoice) => void;
@@ -38,11 +41,12 @@ function network() {
         requests.push({ id, resolve });
       }),
   );
-  const answer = async (index: number) => {
+  /** Answers request `index` with the record of its id, or with `invoice` when given. */
+  const answer = async (index: number, invoice?: Invoice) => {
     const request = requests[index];
     if (!request) throw new Error(`no request #${index}`);
     await act(async () => {
-      request.resolve(INVOICES[request.id] as Invoice);
+      request.resolve(invoice ?? (INVOICES[request.id] as Invoice));
     });
   };
   return { requests, fetchInvoice, answer };
@@ -93,14 +97,18 @@ function hydratedWithReset(fetchInvoice: (id: string) => Promise<Invoice>, onCha
   return function InvoicePage({ id }: { id: string }) {
     const form = useObjectPageForm<Invoice>({ baseline: EMPTY });
     const { reset } = form;
-    const loading = form.baseline === EMPTY;
+    const [loadedId, setLoadedId] = useState<string | null>(null);
+    const loading = loadedId !== id;
     useEffect(() => {
       let ignore = false;
       void fetchInvoice(id).then((invoice) => {
-        if (!ignore) reset(invoice);
+        if (ignore) return;
+        reset(invoice);
+        setLoadedId(id);
       });
       return () => {
         ignore = true;
+        setLoadedId(null);
       };
     }, [id, reset]);
     return (
@@ -121,8 +129,9 @@ function hydratedWithReset(fetchInvoice: (id: string) => Promise<Invoice>, onCha
   };
 }
 
-// Not a wrapper component: StrictMode must be a direct element of the rendered tree for React to run the effects
-// twice (inside a function component's output it did not, with React 19.3 and Testing Library).
+// StrictMode is the root element given to `render`, not inside a wrapper component: with React 19.3 a StrictMode below
+// the root (inside a component or a <div>) does not run the extra effect cycle of the first mount (one run instead
+// of two); it does on mounts that come later, so only the root position tests the first mount.
 const modes: Array<[string, (ui: ReactElement) => ReactElement, number]> = [
   ['plain', (ui) => ui, 1],
   ['StrictMode', (ui) => <StrictMode>{ui}</StrictMode>, 2],
@@ -142,9 +151,9 @@ describe.each(modes)('async hydration (%s)', (_name, wrap, requestsAtMount) => {
       expect(net.fetchInvoice).toHaveBeenCalledTimes(requestsAtMount);
 
       // Every request is answered, the first one first: under StrictMode the first belongs to an effect that was
-      // cleaned up, so it must not mount anything; the last one does.
+      // cleaned up, so it must not mount anything, even with different data; the last one does.
       for (let i = 0; i < requestsAtMount - 1; i += 1) {
-        await net.answer(i);
+        await net.answer(i, STALE_A);
         expect(screen.queryByRole('textbox')).toBeNull();
       }
       await net.answer(requestsAtMount - 1);
@@ -201,11 +210,18 @@ describe.each(modes)('async hydration (%s)', (_name, wrap, requestsAtMount) => {
       render(
         wrap(<InvoicePage id="a" />),
       );
-      expect(screen.getByRole('textbox', { name: 'Customer' })).toBeDisabled();
-      expect(net.fetchInvoice).toHaveBeenCalledTimes(requestsAtMount);
-      for (let i = 0; i < requestsAtMount; i += 1) await net.answer(i);
-
       const customer = screen.getByRole('textbox', { name: 'Customer' });
+      expect(customer).toBeDisabled();
+      expect(net.fetchInvoice).toHaveBeenCalledTimes(requestsAtMount);
+      // Under StrictMode the first request belongs to an effect that was cleaned up: its answer, different data on
+      // purpose, must not reach reset (the form stays empty and disabled). Only the last one does.
+      for (let i = 0; i < requestsAtMount - 1; i += 1) {
+        await net.answer(i, STALE_A);
+        expect(customer).toBeDisabled();
+        expect(customer).toHaveValue('');
+      }
+      await net.answer(requestsAtMount - 1);
+
       expect(customer).toBeEnabled();
       expect(customer).toHaveValue('Rossi Construction');
       expect(screen.getByText('Saved')).toBeInTheDocument();
@@ -231,6 +247,58 @@ describe.each(modes)('async hydration (%s)', (_name, wrap, requestsAtMount) => {
       await net.answer(net.requests.length - 1);
       for (let i = 0; i < first; i += 1) await net.answer(i);
       expect(screen.getByRole('textbox', { name: 'Customer' })).toHaveValue('Bianchi Logistics');
+      expect(screen.getByText('Saved')).toBeInTheDocument();
+    });
+
+    it('another record: the control is disabled again while it loads, so nothing is typed into the old one', async () => {
+      const net = network();
+      const onChange = vi.fn();
+      const InvoicePage = hydratedWithReset(net.fetchInvoice, onChange);
+      const { rerender } = render(
+        wrap(<InvoicePage id="a" />),
+      );
+      for (let i = 0; i < net.requests.length; i += 1) await net.answer(i);
+      const customer = screen.getByRole('textbox', { name: 'Customer' });
+      expect(customer).toBeEnabled();
+
+      rerender(
+        wrap(<InvoicePage id="b" />),
+      );
+      expect(customer).toBeDisabled();
+      await userEvent.setup().type(customer, '!');
+      expect(customer).toHaveValue('Rossi Construction');
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByText('Saved')).toBeInTheDocument();
+
+      await net.answer(net.requests.length - 1);
+      expect(customer).toBeEnabled();
+      expect(customer).toHaveValue('Bianchi Logistics');
+      expect(screen.getByText('Saved')).toBeInTheDocument();
+    });
+
+    it('back to the record already in the form while its new request is in flight: disabled until that request answers', async () => {
+      const net = network();
+      const InvoicePage = hydratedWithReset(net.fetchInvoice, vi.fn());
+      const { rerender } = render(
+        wrap(<InvoicePage id="a" />),
+      );
+      for (let i = 0; i < net.requests.length; i += 1) await net.answer(i);
+      rerender(
+        wrap(<InvoicePage id="b" />),
+      );
+      const forB = net.requests.length - 1;
+      rerender(
+        wrap(<InvoicePage id="a" />),
+      );
+      const customer = screen.getByRole('textbox', { name: 'Customer' });
+      // The form still holds "a", but a new request for "a" will reset it: typing now would be lost.
+      expect(customer).toHaveValue('Rossi Construction');
+      expect(customer).toBeDisabled();
+
+      await net.answer(net.requests.length - 1);
+      expect(customer).toBeEnabled();
+      await net.answer(forB); // the answer for the record we left is dropped
+      expect(customer).toHaveValue('Rossi Construction');
       expect(screen.getByText('Saved')).toBeInTheDocument();
     });
   });
@@ -281,7 +349,8 @@ describe('the flag is a comparison against the baseline', () => {
     );
     act(() => echo(withIsEqual.result.current));
     expect(withIsEqual.result.current.isDirty).toBe(false);
-    // isEqual decides only isDirty: the value is the one the control reported.
+    // isEqual decides isDirty (and the warning on a changed baseline option), not the values: the value is the one
+    // the control reported.
     expect(withIsEqual.result.current.values.reference).toBe('PO-2026-118');
     expect(withIsEqual.result.current.baseline.reference).toBe('po-2026-118');
   });
