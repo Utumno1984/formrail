@@ -26,7 +26,8 @@ function ListReportImpl<Row>(props: ListReportProps<Row>, ref: Ref<HTMLDivElemen
  *   result the hook goes to the unfiltered pill), then the focus goes to the search box or the first pill of the bar.
  * - The count is part of the heading's name ("Invoices (12 of 40)"); the table's name stays "Invoices".
  * - `status`, `errorMessage`, `onRetry`, `loadingRowCount` and `labels` reach `ListReportTable` unchanged;
- *   `filtersLabel`, `searchLabel` and `showSearch` reach `ListReportFilterBar`. The other props go on the root.
+ *   `filtersLabel`, `searchLabel`, `showSearch`, `clearSearchLabel`,
+ *   `searchPlaceholder`, `filterBarLabel` (as `aria-label`) and `filterBarLabelledBy` (as `aria-labelledby`) reach `ListReportFilterBar`. The other props go on the root.
  *
  * - Selection (`useListReport({ selectable: true })`): a bar between the filters and the table, always
  *   mounted (its height is the same at 0 and at n selected, so the table never moves), with the count
