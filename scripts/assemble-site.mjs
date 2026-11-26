@@ -21,12 +21,24 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertConfigPublishable } from './check-site-config.mjs';
-import { EARLY_ACCESS_URL, EXPECTED_PRICE_TEXT, PRIVACY_EMAIL, SITE_BASE, SITE_DOMAIN, normalizeSiteBase } from './site-config.mjs';
+import {
+  DESIGN_PARTNER_SEATS,
+  DESIGN_PARTNER_URL,
+  EARLY_ACCESS_URL,
+  EXPECTED_PRICE_TEXT,
+  PRIVACY_EMAIL,
+  SITE_BASE,
+  SITE_DOMAIN,
+  normalizeSiteBase,
+} from './site-config.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PLACEHOLDER = '/*REDIRECT_FN*/';
 const CTA_BLOCK = /[ \t]*<!--EARLY_ACCESS_START-->[\s\S]*?<!--EARLY_ACCESS_END-->[ \t]*\r?\n?/g;
 const PRICE_BLOCK = /[ \t]*<!--PRICE_START-->[\s\S]*?<!--PRICE_END-->[ \t]*\r?\n?/g;
+const DESIGN_PARTNERS_BLOCK = /[ \t]*<!--DESIGN_PARTNERS_START-->[\s\S]*?<!--DESIGN_PARTNERS_END-->[ \t]*\r?\n?/g;
+const DP_OPEN_BLOCK = /[ \t]*<!--DP_OPEN_START-->[\s\S]*?<!--DP_OPEN_END-->[ \t]*\r?\n?/g;
+const DP_FULL_BLOCK = /[ \t]*<!--DP_FULL_START-->[\s\S]*?<!--DP_FULL_END-->[ \t]*\r?\n?/g;
 // The same file build-css.mjs copies, as is, to dist/theme.css (the published `theme.css`).
 const THEME_CSS = path.join(REPO_ROOT, 'packages', 'core', 'src', 'styles', 'tokens.css');
 const FAVICON = path.join(REPO_ROOT, '.storybook', 'public', 'favicon.svg');
@@ -79,7 +91,36 @@ export function renderEarlyAccess(html, earlyAccessUrl) {
   }
   if (url.protocol !== 'https:') throw new Error('EARLY_ACCESS_URL must be an https:// URL.');
   const attr = url.href.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  return html.replace(/<!--EARLY_ACCESS_(START|END)-->[ \t]*\r?\n?/g, '').replaceAll('{{EARLY_ACCESS_URL}}', () => attr);
+  return html
+    .replace(/<!--EARLY_ACCESS_(START|END)-->[ \t]*\r?\n?/g, '')
+    .replaceAll('{{EARLY_ACCESS_URL}}', () => attr);
+}
+
+/**
+ * The design partner section (ticket #697), on teams/ and in the privacy notice: removed altogether when
+ * `url` is empty (no page then says "design partner"). With seats left, the OPEN blocks are kept (form link
+ * written in); with 0 seats the FULL blocks are kept instead and no link to the form remains.
+ */
+export function renderDesignPartners(html, url, seats) {
+  if (!html.includes('<!--DESIGN_PARTNERS_START-->'))
+    throw new Error('The page has no DESIGN_PARTNERS_START/END block.');
+  if (url === '') return html.replace(DESIGN_PARTNERS_BLOCK, '');
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`DESIGN_PARTNER_URL is not an absolute URL: ${url}`);
+  }
+  if (parsed.protocol !== 'https:') throw new Error('DESIGN_PARTNER_URL must be an https:// URL.');
+  if (!Number.isInteger(seats) || seats < 0)
+    throw new Error(`DESIGN_PARTNER_SEATS must be a whole number >= 0: ${seats}`);
+  const attr = parsed.href.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const seatsText = seats === 1 ? 'Up to 1 team' : `Up to ${seats} teams`;
+  return html
+    .replace(seats > 0 ? DP_FULL_BLOCK : DP_OPEN_BLOCK, '')
+    .replace(/<!--(DESIGN_PARTNERS|DP_OPEN|DP_FULL)_(START|END)-->[ \t]*\r?\n?/g, '')
+    .replaceAll('{{DESIGN_PARTNER_URL}}', () => attr)
+    .replaceAll('{{DESIGN_PARTNER_SEATS_TEXT}}', () => seatsText);
 }
 
 /**
@@ -121,6 +162,8 @@ export function redirectScriptSource(siteRootDir) {
  * @param {string} [options.siteBase] path prefix, written into 404.html (default `SITE_BASE`)
  * @param {string} [options.earlyAccessUrl] target of the landing's CTA; empty = no CTA (default `EARLY_ACCESS_URL`)
  * @param {string} [options.priceText] the indicative price shown on teams/; empty = no price block (default `EXPECTED_PRICE_TEXT`)
+ * @param {string} [options.designPartnerUrl] design partner form; empty = no design partner section (default `DESIGN_PARTNER_URL`)
+ * @param {number} [options.designPartnerSeats] seats offered; 0 = exhausted, the section points to the waitlist (default `DESIGN_PARTNER_SEATS`)
  * @param {string} [options.privacyEmail] the controller's contact written into privacy/ (default `PRIVACY_EMAIL`)
  * @param {boolean} [options.strict] refuse to assemble while the form URL or the email is a placeholder (the
  *   deploy: `--strict` on the CLI, see scripts/check-site-config.mjs); PR builds leave it off
@@ -137,12 +180,14 @@ export function assembleSite({
   earlyAccessUrl = EARLY_ACCESS_URL,
   priceText = EXPECTED_PRICE_TEXT,
   privacyEmail = PRIVACY_EMAIL,
+  designPartnerUrl = DESIGN_PARTNER_URL,
+  designPartnerSeats = DESIGN_PARTNER_SEATS,
   strict = false,
   themeCssPath = THEME_CSS,
   faviconPath = FAVICON,
 } = {}) {
   siteBase = normalizeSiteBase(siteBase);
-  if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail });
+  if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail, designPartnerUrl });
   if (!existsSync(path.join(storybookDir, 'index.html'))) {
     throw new Error(`No built Storybook at ${storybookDir}: run \`npm run build-storybook\` first.`);
   }
@@ -162,8 +207,16 @@ export function assembleSite({
     // A function replacer: `$` sequences in the code must not be read as replacement patterns.
     pages[file] = html.replace(PLACEHOLDER, () => redirect);
   }
-  const teams = renderPrice(renderEarlyAccess(readFileSync(path.join(siteRootDir, 'teams.html'), 'utf8'), earlyAccessUrl), priceText);
-  const privacy = renderPrivacyEmail(readFileSync(path.join(siteRootDir, 'privacy.html'), 'utf8'), privacyEmail);
+  const teamsSource = readFileSync(path.join(siteRootDir, 'teams.html'), 'utf8');
+  const teams = renderPrice(
+    renderDesignPartners(renderEarlyAccess(teamsSource, earlyAccessUrl), designPartnerUrl, designPartnerSeats),
+    priceText,
+  );
+  const privacySource = readFileSync(path.join(siteRootDir, 'privacy.html'), 'utf8');
+  const privacy = renderPrivacyEmail(
+    renderDesignPartners(privacySource, designPartnerUrl, designPartnerSeats),
+    privacyEmail,
+  );
   const notFound = readFileSync(path.join(siteRootDir, '404.html'), 'utf8').replaceAll('{{SITE_BASE}}', siteBase);
   const assets = ['landing.css', 'copy.js'].map((file) => path.join(siteRootDir, file));
   for (const asset of [...assets, faviconPath]) {
@@ -195,5 +248,7 @@ export function assembleSite({
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const strict = isStrictRun(process.argv);
-  console.log(`Assembled the site in ${assembleSite({ proStorybookDir: path.join(REPO_ROOT, 'storybook-static-pro'), strict })}`);
+  console.log(
+    `Assembled the site in ${assembleSite({ proStorybookDir: path.join(REPO_ROOT, 'storybook-static-pro'), strict })}`,
+  );
 }

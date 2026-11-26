@@ -7,16 +7,16 @@
 // placeholders and stay green. A pure function is used instead of an environment variable that an
 // operator could forget to set: the default behaviour of the deploy job is to be strict.
 import { fileURLToPath } from 'node:url';
-import { EARLY_ACCESS_URL, PRIVACY_EMAIL } from './site-config.mjs';
+import { DESIGN_PARTNER_URL, EARLY_ACCESS_URL, PRIVACY_EMAIL } from './site-config.mjs';
 
 const PLACEHOLDER = /placeholder|example\.(invalid|com|org|net)|\.invalid\b|\btodo\b|\bxxx+\b/i;
 const EMAIL = /^[^\s@<>()"]+@[^\s@<>()"]+\.[^\s@<>()"]{2,}$/;
 
 /**
- * @param {{ earlyAccessUrl: string, privacyEmail: string }} config
+ * @param {{ earlyAccessUrl: string, privacyEmail: string, designPartnerUrl?: string }} config
  * @returns {string[]} one message per problem; empty when the config can be published
  */
-export function findConfigProblems({ earlyAccessUrl, privacyEmail }) {
+export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartnerUrl = '' }) {
   const problems = [];
   if (earlyAccessUrl === '') problems.push('EARLY_ACCESS_URL is empty: the waitlist form link is missing.');
   else {
@@ -28,6 +28,19 @@ export function findConfigProblems({ earlyAccessUrl, privacyEmail }) {
     }
     if (url && url.protocol !== 'https:') problems.push('EARLY_ACCESS_URL must be an https:// URL.');
     if (PLACEHOLDER.test(earlyAccessUrl)) problems.push('EARLY_ACCESS_URL is still a placeholder.');
+  }
+  // Empty = design partner section switched off (ticket #697): allowed, unlike the waitlist URL.
+  if (designPartnerUrl !== '') {
+    let url = null;
+    try {
+      url = new URL(designPartnerUrl);
+    } catch {
+      problems.push(`DESIGN_PARTNER_URL is not an absolute URL: ${designPartnerUrl}`);
+    }
+    if (url && url.protocol !== 'https:') problems.push('DESIGN_PARTNER_URL must be an https:// URL.');
+    if (PLACEHOLDER.test(designPartnerUrl)) problems.push('DESIGN_PARTNER_URL is still a placeholder.');
+    if (designPartnerUrl === earlyAccessUrl)
+      problems.push('DESIGN_PARTNER_URL is the same as EARLY_ACCESS_URL: the two forms must be distinct.');
   }
   if (privacyEmail === '') problems.push('PRIVACY_EMAIL is empty.');
   else if (!EMAIL.test(privacyEmail)) problems.push(`PRIVACY_EMAIL is not an email address: ${privacyEmail}`);
@@ -48,6 +61,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     assertConfigPublishable({
       earlyAccessUrl: EARLY_ACCESS_URL,
       privacyEmail: PRIVACY_EMAIL,
+      designPartnerUrl: DESIGN_PARTNER_URL,
     });
     console.log('site-config: values are final.');
   } catch (error) {
