@@ -222,9 +222,9 @@ jobs:
       # package.json: STORYBOOK_EDITION=pro + STORYBOOK_HIDE_INTERNAL=1, output storybook-static-pro/.
       - run: npm run build-storybook:pro
       # site/ = landing page at the root (#382; it still forwards old Storybook links) + storybook/ + pro/
-      # (tickets #380, #381). The prefix comes from GITHUB_REPOSITORY, see scripts/site-config.mjs.
+      # (tickets #380, #381). The base path is `/` (custom domain formrail.dev), see scripts/site-config.mjs.
       - run: node scripts/assemble-site.mjs --strict
-      # Pre-deploy smoke on the assembled folder, served locally under the same prefix as the live
+      # Pre-deploy smoke on the assembled folder, served locally at the same base path as the live
       # site (not against the live site). If it fails, nothing below runs: no deploy.
       - run: npx playwright install --with-deps chromium
       - run: npm run test:site

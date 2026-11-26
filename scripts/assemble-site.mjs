@@ -9,6 +9,7 @@
 //     privacy/index.html        privacy notice (GDPR art. 13), no cookies / no analytics
 //     iframe.html               redirects old story-renderer links to storybook/iframe.html
 //     404.html                  static, no script (cannot loop)
+//     CNAME                     the custom domain (formrail.dev); Pages ignores it on Actions deploys, it keeps the repo reproducible
 //     .nojekyll                 Pages must not run Jekyll over Storybook's underscore-prefixed files
 //     storybook/                the Free Storybook (storybook-static/)
 //     pro/                      the Pro demo Storybook (storybook-static-pro/, ticket #381)
@@ -27,6 +28,8 @@ import {
   EXPECTED_PRICE_TEXT,
   PRIVACY_EMAIL,
   SITE_BASE,
+  SITE_DOMAIN,
+  normalizeSiteBase,
 } from './site-config.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -183,6 +186,7 @@ export function assembleSite({
   themeCssPath = THEME_CSS,
   faviconPath = FAVICON,
 } = {}) {
+  siteBase = normalizeSiteBase(siteBase);
   if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail, designPartnerUrl });
   if (!existsSync(path.join(storybookDir, 'index.html'))) {
     throw new Error(`No built Storybook at ${storybookDir}: run \`npm run build-storybook\` first.`);
@@ -226,6 +230,7 @@ export function assembleSite({
   if (proStorybookDir === null) mkdirSync(path.join(outDir, 'pro'));
   else cpSync(proStorybookDir, path.join(outDir, 'pro'), { recursive: true });
   writeFileSync(path.join(outDir, '.nojekyll'), '');
+  writeFileSync(path.join(outDir, 'CNAME'), `${SITE_DOMAIN}\n`);
   writeFileSync(path.join(outDir, 'tokens.css'), tokens);
   for (const asset of assets) cpSync(asset, path.join(outDir, path.basename(asset)));
   cpSync(faviconPath, path.join(outDir, 'favicon.svg'));

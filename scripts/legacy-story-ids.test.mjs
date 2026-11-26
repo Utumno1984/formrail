@@ -14,11 +14,16 @@ const MAP = {
 const SB = 'https://utumno1984.github.io/formrail/storybook/';
 const PRO = 'https://utumno1984.github.io/formrail/pro/';
 const LOCAL = 'http://localhost:6006/';
+// Ticket #667: formrail.dev serves the site at the root; old links keep the `/formrail/` prefix.
+const DOMAIN_SB = 'https://formrail.dev/storybook/';
+const DOMAIN_LEGACY_SB = 'https://formrail.dev/formrail/storybook/';
 
 describe('resolveLegacyStory', () => {
   it.each([
     ['manager, Docs page', `${SB}?path=/docs/showcase-old--docs`, `${SB}?path=/docs/showcase-new--docs`],
     ['manager, story', `${SB}?path=/story/showcase-old--crud`, `${SB}?path=/story/showcase-new--crud`],
+    ['manager, formrail.dev without the legacy prefix', `${DOMAIN_SB}?path=/docs/showcase-old--docs`, `${DOMAIN_SB}?path=/docs/showcase-new--docs`],
+    ['manager, formrail.dev with the legacy prefix', `${DOMAIN_LEGACY_SB}?path=/story/showcase-old--crud`, `${DOMAIN_LEGACY_SB}?path=/story/showcase-new--crud`],
     ['manager, local root', `${LOCAL}?path=/story/showcase-old--crud`, `${LOCAL}?path=/story/showcase-new--crud`],
     ['manager, index.html spelled out', `${SB}index.html?path=/story/showcase-old--crud`, `${SB}index.html?path=/story/showcase-new--crud`],
     ['manager, Pro build prefix', `${PRO}?path=/docs/showcase-old--docs`, `${PRO}?path=/docs/showcase-new--docs`],
