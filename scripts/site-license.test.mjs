@@ -98,6 +98,8 @@ describe('the license page', () => {
       'for one licensed developer',
       'You pay once.',
       'every version published during 12 months of updates',
+      'the versions already available on the day access is granted, and to every version published during 12 months of updates',
+      'Copyright (c) Daniele Ingusci. All rights reserved.',
       'The 12 months start on the day access to the registry is granted to you, not on the day of the purchase.',
       'The license does not renew automatically',
       // after the term: what was received stays usable, with no time limit; revoking access is not revoking the license
@@ -228,6 +230,16 @@ describe('footers and links', () => {
     expect(teams).toMatch(/<footer[\s\S]*<a href="\.\.\/license\/">License terms<\/a>[\s\S]*<\/footer>/);
     expect(privacy).toMatch(/<footer[\s\S]*<a href="\.\.\/license\/">License terms<\/a>[\s\S]*<\/footer>/);
     expect(license).toMatch(/<footer[\s\S]*<a href="\.\/" aria-current="page">License terms<\/a>[\s\S]*<\/footer>/);
+  });
+
+  it('the article templates carry the same footer sentence and a License terms link (source check)', () => {
+    for (const [file, rel] of [['articles.html', '..'], ['article.html', '../..']]) {
+      const html = readFileSync(path.join(ROOT, 'site-root', file), 'utf8');
+      expect(html, file).toContain(`<li>${SENTENCE}</li>`);
+      expect(html, file).toContain(`<li><a href="${rel}/license/">License terms</a></li>`);
+      expect(html, file).not.toContain('Annual license');
+      expect(html, file).not.toContain('terms published before sales');
+    }
   });
 
   it('the 404 page links the license terms with the base path', () => {
