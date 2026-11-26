@@ -636,7 +636,7 @@ non è pubblicato su GitHub Packages (configurazione e pubblicazione: ticket #69
 - **Scope**: su GitHub Packages lo scope npm deve coincidere con il proprietario, e il nome `formrail`
   su GitHub è già occupato da un'organizzazione esistente (inattiva, non nostra), quindi lo scope
   `@formrail` non è utilizzabile lì. Decisione di Daniele del 2026-11-26 (opzione a): org gratuita
-  **`formrail-dev`** (la crea Daniele), pacchetto pubblicato **`@formrail-dev/pro`**.
+  **`formrail-dev`** (esiste dal 2026-11-26, creata da Daniele: piano Free, permessi base "No permission"), pacchetto pubblicato **`@formrail-dev/pro`**.
 - **Installazione**: chi compra usa un alias npm, per esempio
   `"@formrail/pro": "npm:@formrail-dev/pro@^0.2.0"`, così gli import restano `@formrail/pro` e la
   configurazione del registry non tocca lo scope pubblico `@formrail` del core.
@@ -982,11 +982,11 @@ solo se Daniele la conferma.
 ### Domande ancora aperte (da portare a Daniele quando servono, non decise)
 
 Le domande su prezzo, prova e valutazione, dopo i 12 mesi, supporto e concessione dell'accesso sono
-state risolte il 2026-11-26 (vedi "Decisioni del 2026-11-26" sopra). Restano aperte:
+state risolte il 2026-11-26 (vedi "Decisioni del 2026-11-26" sopra), così come lo scope del
+pacchetto Pro: `@formrail-dev/pro` (§2.4), con l'org GitHub `formrail-dev` già creata il 2026-11-26.
+Restano aperte:
 
 - **Identità e dati del licenziante** (chi vende e chi concede la licenza), da definire prima di
   scrivere le condizioni di licenza.
-- **Scope del pacchetto Pro**: la scelta di Daniele del 2026-11-26 è `@formrail-dev/pro` (§2.4);
-  resta aperta finché l'org `formrail-dev` non è creata da Daniele.
 - **Strumento della lista d'attesa e privacy (GDPR)** e **uso di Formrail in vistato come prova
   reale** (§6 punto 3) restano come in precedenza, non decisi.

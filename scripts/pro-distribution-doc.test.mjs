@@ -55,4 +55,10 @@ describe('Pro distribution docs (#690)', () => {
     expect(claude).toContain('2026-11-26');
     expect(claude).toMatch(/"private": true` finché il pacchetto non è pubblicato su GitHub Packages/);
   });
+
+  it('the formrail-dev org is no longer described as still to be created', () => {
+    expect(spec).not.toMatch(/la crea Daniele/);
+    expect(spec).not.toMatch(/finché l'org `formrail-dev` non è creata/);
+    expect(spec).toMatch(/formrail-dev[^\n]*esiste dal 2026-11-26/);
+  });
 });
