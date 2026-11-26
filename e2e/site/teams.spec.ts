@@ -33,6 +33,9 @@ const OFFICIAL_POLICIES = [
   'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
   'https://tally.so/help/gdpr',
   'https://tally.so/help/privacy-policy',
+  // Purchases section (#692): Paddle is an autonomous controller as Merchant of Record, so the notice
+  // must point to its privacy notice (art. 13). Exact URL, privacy page only; refund.spec.ts pins the link.
+  'https://www.paddle.com/legal/privacy',
 ];
 const THIRD_PARTY = [
   'sap',
@@ -555,8 +558,8 @@ test.describe('network and weight', () => {
   test('the only absolute URLs are GitHub and, when set, the form (the email is a mailto)', () => {
     for (const file of ['teams/index.html', 'privacy/index.html']) {
       let html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '').replace(designPartnerUrl || '\0', '');
-      // Only the privacy page may carry the two official policy links (art. 13(1)(f)).
-      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replace(url, '');
+      // Only the privacy page may carry the official policy links (art. 13(1)(f)), removed one by one by exact URL.
+      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replaceAll(url, '');
       expect(html, file).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/formrail)/);
     }
   });
