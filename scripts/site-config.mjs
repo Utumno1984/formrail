@@ -3,7 +3,9 @@
 // (https://formrail.dev/), so the base is `/` whatever GITHUB_REPOSITORY says (a fork does not get
 // its own prefix by accident). A fork that publishes under a project-site URL (`https://<user>.<host>/<repo>/`) sets
 // SITE_BASE=/<repo>/ explicitly; note that the story links of the Pro demo (`/teams/`) assume the root.
-export const SITE_DOMAIN = 'formrail.dev';
+/** Origin of the published site: the single source for canonical URLs (`SITE_ORIGIN + SITE_BASE + path`). */
+export const SITE_ORIGIN = 'https://formrail.dev';
+export const SITE_DOMAIN = new URL(SITE_ORIGIN).host;
 
 /**
  * Validates an explicit base path: it must already look like `/` or `/segment/…/`. A value that does not

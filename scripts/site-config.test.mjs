@@ -26,7 +26,9 @@ describe('SITE_BASE', () => {
   });
 
   it('the domain is formrail.dev', async () => {
-    expect((await load()).SITE_DOMAIN).toBe('formrail.dev');
+    const config = await load();
+    expect(config.SITE_DOMAIN).toBe('formrail.dev');
+    expect(config.SITE_ORIGIN).toBe('https://formrail.dev');
   });
 });
 
