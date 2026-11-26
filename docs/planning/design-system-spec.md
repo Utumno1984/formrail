@@ -605,9 +605,9 @@ variante avanzata basata sui pacchetti già esistenti react-virtual-tree-view/re
 
 Tre opzioni, da decidere (vedi §5):
 
-1. **npm org privata a pagamento** (es. tramite GitHub Packages o npm con accesso a pagamento):
-   semplice da implementare, ma lega l'accesso all'account npm del cliente — serve gestione
-   manuale degli accessi/revoche.
+1. **Registry con accesso riservato a chi compra** (in origine "npm org privata a pagamento", superata)
+   (opzione superata il 2026-11-26, vedi sotto): semplice da implementare, ma lega l'accesso all'account del
+   cliente: serve gestione manuale degli accessi/revoche. **Scelta corrente: GitHub Packages**.
 2. **Licenza con chiave (license key) verificata a build-time**: il pacchetto Pro è pubblicabile
    anche su registry pubblico ma richiede una chiave valida per buildare/avviare (controllata
    contro un piccolo servizio di licenze, anche minimale). Più lavoro iniziale, ma modello più
@@ -617,13 +617,31 @@ Tre opzioni, da decidere (vedi §5):
    distribuzione via link/zip + repo privato con accesso concesso all'acquisto): minimo sforzo
    infrastrutturale, meno professionale, meno adatto ad aggiornamenti continui.
 
-**Raccomandazione preliminare**: iniziare con l'opzione 1 (npm org privata) per l'MVP — è lo sforzo
-minimo per validare che qualcuno sia disposto a pagare, prima di investire in un sistema di
-licensing più sofisticato (opzione 2) quando i volumi lo giustificano.
+**Raccomandazione preliminare**: iniziare con l'opzione 1 (registry ad accesso riservato; allora
+pensato come npm org privata, superato il 2026-11-26) per l'MVP: è lo sforzo minimo per validare che
+qualcuno sia disposto a pagare, prima di investire in un sistema di licensing più sofisticato
+(opzione 2) quando i volumi lo giustificano.
 
-**Aggiornamento 2026-11-13**: Daniele non ha modificato questa scelta. L'opzione 1 (org npm
-privata, nessun licensing a runtime) resta la raccomandazione corrente, compatibile con la licenza
-annuale per sviluppatore venduta tramite un Merchant of Record (§8).
+**Aggiornamento 2026-11-13**: Daniele non ha modificato questa scelta. L'opzione 1 (all'epoca "org
+npm privata", superata il 2026-11-26; nessun licensing a runtime) restava la raccomandazione,
+compatibile con la licenza annuale per sviluppatore venduta tramite un Merchant of Record (§8).
+
+**Decisione di Daniele, 2026-11-26 (scelta corrente)**: il Pro si distribuisce tramite **GitHub
+Packages**, sotto un'**organizzazione GitHub dedicata** (gratuita), non più tramite un'org npm
+privata. Motivo: su npm i pacchetti privati richiedono un piano a pagamento mensile per utente, e il
+progetto non ammette costi fissi; GitHub Packages è gratuito entro i limiti di spazio e traffico del
+piano gratuito. Restano invariati: nessun licensing a runtime e nessuna chiave (verificato da
+`packages/pro/test/dist.smoke.test.ts`). `packages/pro` resta `"private": true` finché il pacchetto
+non è pubblicato su GitHub Packages (configurazione e pubblicazione: ticket #693).
+- **Scope**: su GitHub Packages lo scope npm deve coincidere con il proprietario, e il nome `formrail`
+  su GitHub è già occupato da un'organizzazione esistente (inattiva, non nostra), quindi lo scope
+  `@formrail` non è utilizzabile lì. Decisione di Daniele del 2026-11-26 (opzione a): org gratuita
+  **`formrail-dev`** (la crea Daniele), pacchetto pubblicato **`@formrail-dev/pro`**.
+- **Installazione**: chi compra usa un alias npm, per esempio
+  `"@formrail/pro": "npm:@formrail-dev/pro@^0.2.0"`, così gli import restano `@formrail/pro` e la
+  configurazione del registry non tocca lo scope pubblico `@formrail` del core.
+- Alternative scartate: pacchetto sotto l'account personale del maintainer; richiesta a GitHub del
+  nome inattivo `formrail` (esito e tempi incerti); npm a pagamento (costo fisso).
 
 ---
 
@@ -683,9 +701,10 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    `@formrail/pro`, repo `Utumno1984/formrail`; decisione di Daniele dell'11/11/2026, ticket #428).
    Nome precedente, storico: `react-object-page` (coerente col naming `react-virtual-*` già usato
    da Daniele), sostituito dal rebrand.
-2. **Mecanismo di licensing Pro**: npm org privata (minimo sforzo, meno standard) vs license-key
+2. **Mecanismo di licensing Pro**: registry riservato (minimo sforzo, meno standard) vs license-key
    (più standard di mercato, più sforzo iniziale) vs source-available a pagamento. Raccomandazione
-   preliminare in §2.4: iniziare semplice (npm org privata), evolvere se c'è trazione.
+   preliminare in §2.4: iniziare semplice (all'epoca npm org privata, superata il 2026-11-26:
+   oggi GitHub Packages), evolvere se c'è trazione.
 3. **Positioning: deciso neutro, nessun riferimento a prodotti/marchi terzi** (2026-10-30, revisione
    della scelta iniziale). Il progetto si presenta solo come implementazione React headless e
    indipendente di pattern UI enterprise generici (List Report, Object Page), senza nominare né
@@ -753,11 +772,12 @@ già un primo componente Pro vendibile per validare la domanda, senza costruire 
    **List Report virtualizzata** per dataset grandi, riusando direttamente
    react-virtual-tree-view/react-virtual-dnd-table come motore (vedi §4) — tempo di sviluppo basso
    perché il grosso del lavoro è già fatto e pubblico.
-5. **Primo canale di vendita**: npm org privata (§2.4 opzione 1) per il pacchetto Pro, pagina di
+5. **Primo canale di vendita**: registry riservato (§2.4 opzione 1) per il pacchetto Pro, pagina di
    landing con demo Storybook pubblica del Free + demo "a tempo/watermark" del Pro, prezzo iniziale
    semplice (per-progetto, non per-seat, per abbassare la frizione del primo acquisto).
    **Superato il 2026-11-13** per il modello di prezzo (licenza annuale per sviluppatore, non per
-   progetto) e per l'ordine: prima la landing con lista d'attesa/pre-ordine, poi le vendite. La
+   progetto) e per l'ordine: prima la landing con lista d'attesa/pre-ordine, poi le vendite.
+   **Canale superato il 2026-11-26**: non più "npm org privata" ma GitHub Packages (§2.4, §8). La
    "demo a tempo/watermark" del Pro non è né confermata né superata (non trattata). Vedi §8.
 
 **Non fare subito** (rischio di sovra-ingegnerizzare prima di validare): sistema di license-key,
@@ -904,13 +924,35 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
    accetta più nuove registrazioni e chiude il 31/03/2027 (banner sulla pagina prezzi ufficiale,
    letta il 22/11/2026).
    **Da verificare prima di aprire l'account**: che Paddle consenta di collegare l'acquisto alla
-   concessione e alla revoca dell'accesso all'org npm privata (webhook o export degli ordini),
-   senza chiavi di licenza (vedi la voce "Concessione dell'accesso all'org npm" più sotto); che
+   concessione e alla revoca dell'accesso al registry GitHub Packages (webhook o export degli
+   ordini), senza chiavi di licenza (vedi il punto 5 delle decisioni del 2026-11-26); che
    accetti un venditore italiano (persona fisica o micro-attività); il trattamento fiscale, da
    concordare con un commercialista.
 
-**Non toccato dalle decisioni**: la distribuzione resta come da §2.4 (org npm privata, nessun
-licensing a runtime).
+**Distribuzione**: come da §2.4, aggiornata il 2026-11-26 (GitHub Packages al posto dell'org npm
+privata, superata; nessun licensing a runtime).
+
+### Decisioni del 2026-11-26 (Daniele): distribuzione ed early access a pagamento
+
+1. **Distribuzione**: GitHub Packages, org GitHub gratuita `formrail-dev`, pacchetto
+   `@formrail-dev/pro` installato con alias npm (`"@formrail/pro": "npm:@formrail-dev/pro@^0.2.0"`).
+   Motivo e dettagli in §2.4.
+2. **Accesso subito alla 0.x**: chi compra ottiene subito le versioni 0.x.
+3. **Prezzo**: 149 € per sviluppatore per i primi 12 mesi (early access), poi listino da 199 €. Il
+   prezzo early access vale con un limite di quantità o di data: **il valore del limite non è ancora
+   stato fissato da Daniele** e va scritto qui appena deciso.
+4. **Pagamento una tantum**, senza rinnovo automatico.
+5. **Dopo i 12 mesi**: le versioni ricevute nei 12 mesi restano utilizzabili; lo sviluppatore che
+   lascia il team si può sostituire.
+6. **Prova e valutazione**: uso libero in sviluppo e valutazione; licenza obbligatoria in produzione.
+7. **Rimborso** entro 14 giorni senza motivazione, per tutti.
+8. **Supporto**: via email, best-effort, risposta entro 2 giorni lavorativi, nessuna data pubblica.
+9. **Checkout**: overlay Paddle, con Paddle.js caricato solo su azione dell'utente e solo nella
+   pagina di acquisto.
+10. **Concessione dell'accesso al registry**: a mano, entro 2 giorni lavorativi dall'acquisto.
+11. **Design partner**: sconto del 50%, candidatura con un modulo Tally separato.
+12. **Articoli tecnici** su `/articles/`.
+13. **Ordine**: prima design partner e articoli; il checkout solo dopo l'approvazione del dominio.
 
 **Dati demo di stories ed esempi** (epic #512, ticket #515): regola sul dominio e guard a cricchetto sui dati legacy in `CONTRIBUTING.md`, sezione "Demo data".
 
@@ -939,14 +981,12 @@ solo se Daniele la conferma.
 
 ### Domande ancora aperte (da portare a Daniele quando servono, non decise)
 
-- **Prezzo** della licenza per sviluppatore ed eventuali sconti per team.
-- **Condizioni di prova e valutazione**: per esempio uso gratuito in sviluppo e per valutazione,
-  licenza richiesta in produzione.
-- **Dopo i 12 mesi**: le versioni uscite durante la licenza restano utilizzabili senza rinnovo,
-  oppure no?
-- **Livello di supporto** promesso (canale, tempi di risposta).
-- **Strumento della lista d'attesa e privacy (GDPR)**: servizio esterno o funzione del Merchant of
-  Record. Dove sta la landing: oggi esiste già la home su GitHub Pages.
-- **Concessione dell'accesso all'org npm** dopo l'acquisto e revoca alla scadenza: manuale
-  all'inizio, oppure automatizzata dal webhook del Merchant of Record.
-- **Uso di Formrail in vistato come prova reale** (§6 punto 3): raccomandato, non deciso.
+Le domande su prezzo, prova e valutazione, dopo i 12 mesi, supporto e concessione dell'accesso sono
+state risolte il 2026-11-26 (vedi "Decisioni del 2026-11-26" sopra). Restano aperte:
+
+- **Identità e dati del licenziante** (chi vende e chi concede la licenza), da definire prima di
+  scrivere le condizioni di licenza.
+- **Scope del pacchetto Pro**: la scelta di Daniele del 2026-11-26 è `@formrail-dev/pro` (§2.4);
+  resta aperta finché l'org `formrail-dev` non è creata da Daniele.
+- **Strumento della lista d'attesa e privacy (GDPR)** e **uso di Formrail in vistato come prova
+  reale** (§6 punto 3) restano come in precedenza, non decisi.

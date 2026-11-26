@@ -1,0 +1,58 @@
+// Ticket #690: the Pro is distributed through GitHub Packages (decision of 2026-11-26). The spec (§2.4) and
+// CLAUDE.md must say so, and the superseded "org npm privata" may only appear as history, on a line that
+// marks it as superseded.
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SPEC = resolve(ROOT, 'docs/planning/design-system-spec.md');
+const CLAUDE = resolve(ROOT, 'CLAUDE.md');
+
+const PRIVATE_ORG = /org npm privata|npm org privata/i;
+const SUPERSEDED = /superat|non più/i;
+
+/** Lines that present the private npm org without marking it as superseded (i.e. as the current choice). */
+export const currentPrivateNpmOrgLines = (markdown) =>
+  markdown.split(/\r?\n/).filter((line) => PRIVATE_ORG.test(line) && !SUPERSEDED.test(line));
+
+/** The text of §2.4 of the spec, up to the next `---` or `## ` heading. */
+export const section24 = (spec) => {
+  const rest = spec.slice(spec.indexOf('### 2.4'));
+  const end = rest.search(/\n(?:---|## )/);
+  return end === -1 ? rest : rest.slice(0, end);
+};
+
+describe('Pro distribution docs (#690)', () => {
+  const spec = readFileSync(SPEC, 'utf8');
+  const claude = readFileSync(CLAUDE, 'utf8');
+
+  it('helper flags a private npm org line not marked as superseded', () => {
+    expect(currentPrivateNpmOrgLines("Si usa l'org npm privata.")).toHaveLength(1);
+    expect(currentPrivateNpmOrgLines('org npm privata (superata il 2026-11-26)')).toEqual([]);
+  });
+
+  it('spec §2.4 states GitHub Packages with the date and the reason', () => {
+    const s24 = section24(spec);
+    expect(s24).toContain('GitHub Packages');
+    expect(s24).toContain('2026-11-26');
+    expect(s24).toMatch(/a pagamento/);
+    expect(s24).toMatch(/costi fissi/);
+  });
+
+  it('spec §2.4 and CLAUDE.md never present the private npm org as the current choice', () => {
+    expect(currentPrivateNpmOrgLines(section24(spec))).toEqual([]);
+    expect(currentPrivateNpmOrgLines(claude)).toEqual([]);
+  });
+
+  it('the whole spec has no current private npm org either', () => {
+    expect(currentPrivateNpmOrgLines(spec)).toEqual([]);
+  });
+
+  it('CLAUDE.md cites GitHub Packages with the date and the private flag condition', () => {
+    expect(claude).toContain('GitHub Packages');
+    expect(claude).toContain('2026-11-26');
+    expect(claude).toMatch(/"private": true` finché il pacchetto non è pubblicato su GitHub Packages/);
+  });
+});
