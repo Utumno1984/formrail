@@ -22,7 +22,6 @@ import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { Icon } from '../icon/Icon';
 import { Input, type InputSize } from '../input/Input';
-import { isDev } from '../internal/is-dev';
 import { overlayLayer } from '../overlay/layers';
 import { useReturnFocus } from '../overlay/use-return-focus';
 import { cn } from '../utils/cn';
@@ -128,7 +127,6 @@ const CALENDAR_ICON = (
   </svg>
 );
 
-const PREFIX = '[formrail] <DatePicker>';
 const invalidDate = (v: unknown) => v !== undefined && v !== null && !isIsoDate(v);
 
 function longDateFormatter(locale: string | undefined): (date: IsoDate) => string {
@@ -211,19 +209,19 @@ export const DatePicker = /* @__PURE__ */ forwardRef<HTMLInputElement, DatePicke
   const toText = (date: IsoDate | null) => (date ? formatDateText(date, format) : '');
 
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     if (controlled && invalidDate(valueProp)) {
-      console.error(`${PREFIX} \`value\` ${JSON.stringify(valueProp)} is not a valid ISO date (YYYY-MM-DD): the field is empty.`);
+      console.error(`[formrail] <DatePicker> \`value\` ${JSON.stringify(valueProp)} is not a valid ISO date (YYYY-MM-DD): the field is empty.`);
     }
   }, [controlled, valueProp]);
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     for (const [name, v] of [
       ['defaultValue', defaultValue],
       ['min', minProp],
       ['max', maxProp],
     ] as const) {
-      if (invalidDate(v)) console.error(`${PREFIX} \`${name}\` ${JSON.stringify(v)} is not a valid ISO date (YYYY-MM-DD): it is ignored.`);
+      if (invalidDate(v)) console.error(`[formrail] <DatePicker> \`${name}\` ${JSON.stringify(v)} is not a valid ISO date (YYYY-MM-DD): it is ignored.`);
     }
   }, [defaultValue, minProp, maxProp]);
 

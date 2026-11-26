@@ -4,9 +4,13 @@ import { useInsertionEffect, useMemo, useState, useSyncExternalStore } from 'rea
 // `react-hook-form` is an optional peer of `@formrail/pro`.
 import type { FieldValues, KeepStateOptions, UseFormReturn } from 'react-hook-form';
 import type { RebaseFormBinding } from '../../form-rebase/types';
-import { isDev } from '../../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../../internal/use-isomorphic-layout-effect';
 import { fieldErrorPaths, isPlainRecord, keepEditsSince, sameContent, samePathValue, snapshotOf } from './snapshot';
+
+// Module-scoped: the package compiles without Node types, and the literal `process.env.NODE_ENV` that the
+// bundlers replace stays in the output. Never a global declaration (it would clash with the consumer's
+// `@types/node`).
+declare const process: { env: { NODE_ENV?: string } };
 
 /** Options of {@link useReactHookFormBinding}. */
 export interface UseReactHookFormBindingOptions {
@@ -594,7 +598,7 @@ const warnedControls = new WeakSet<object>();
  * clear warning instead of a silent baseline `{}` where every field is listed as added.
  */
 function warnOnMissingInternals(control: unknown): void {
-  if (!isDev() || typeof control !== 'object' || control === null || warnedControls.has(control)) return;
+  if (process.env.NODE_ENV === 'production' || typeof control !== 'object' || control === null || warnedControls.has(control)) return;
   const { _defaultValues: defaults, _options: options } = control as { _defaultValues?: unknown; _options?: unknown };
   const problems: string[] = [];
   if (typeof defaults !== 'object' || defaults === null) problems.push('`control._defaultValues` is not an object');

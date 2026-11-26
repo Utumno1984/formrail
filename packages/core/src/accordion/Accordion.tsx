@@ -10,7 +10,6 @@ import {
   type ComponentPropsWithoutRef,
 } from 'react';
 import * as RadixAccordion from '@radix-ui/react-accordion';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import {
@@ -178,7 +177,7 @@ export const AccordionItem = /* @__PURE__ */ forwardRef<HTMLDivElement, Accordio
   // In `single`, `''` means "none open" (Radix reads it that way): an item can never be open with it.
   const open = Array.isArray(current) ? current.includes(value) : type === 'single' && current !== '' && current === value;
   useEffect(() => {
-    if (value === '' && type === 'single' && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && value === '' && type === 'single') {
       console.error('[formrail] <AccordionItem value=""> in a `type="single"` Accordion can never open: `""` means "none open". Use a non-empty value.');
     }
   }, [value, type]);

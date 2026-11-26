@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Per-import bundle budget. For every public export of each budgeted package (packages/core,
 // packages/pro) we bundle a stub that imports only that export from <package>/dist (esbuild,
-// minified, tree-shaken) and measure its gzip size, then compare it with the versioned baseline in
+// minified, tree-shaken, `NODE_ENV=production` like a consumer's build) and measure its gzip size, then compare it with the versioned baseline in
 // <package>/bundle-budget.json.
 // A package can also budget a subpath entry of its `exports` map (`@formrail/pro/engine`, ticket #489): measured
 // from the file that subpath resolves to, against its own baseline file (`bundle-budget.engine.json`).
@@ -191,6 +191,8 @@ export async function bundleExport(distEntry, name) {
     format: 'esm',
     platform: 'browser',
     target: 'es2022',
+    // The budget is what a consumer ships: a production build, without the development diagnostics.
+    define: { 'process.env.NODE_ENV': '"production"' },
     plugins: [sideEffectFreeExternals],
     write: false,
     logLevel: 'silent',
