@@ -382,7 +382,8 @@ test.describe('design partners (#697)', () => {
     expect(section).not.toMatch(/early access/i);
     // The email copy of Tally is disclosed, with Google and its transfer basis; the waitlist wording is not reused.
     expect(section).toContain('formrail.dev@gmail.com');
-    expect(section).toContain('Google');
+    expect(section).toContain('under its own terms and privacy policy');
+    expect(section).not.toMatch(/Google[^.]*as our processor/);
     expect(section).toContain('EU-US Data Privacy Framework');
     expect(section).toContain('both on Tally and from the mailbox');
     expect(section).not.toContain('not copied to email');
