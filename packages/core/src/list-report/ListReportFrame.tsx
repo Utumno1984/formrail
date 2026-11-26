@@ -140,15 +140,13 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    */
   clearSearchLabel?: string;
   /**
-   * Placeholder of the search box (see `ListReportFilterBar`).
-   * @default searchLabel
+   * Placeholder of the search box (see `ListReportFilterBar`). Without it, the placeholder is `searchLabel`.
    */
   searchPlaceholder?: string;
   /**
    * Accessible name of the `search` landmark of the bar: reaches `ListReportFilterBar` as `aria-label`
    * (on the report itself `aria-label` goes on the root). With `filterBarLabelledBy` and without this one
-   * the landmark has no `aria-label`.
-   * @default 'Filters and search'
+   * the landmark has no `aria-label`. Without both, the name is "Filters and search".
    */
   filterBarLabel?: string;
   /**
