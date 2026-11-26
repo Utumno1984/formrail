@@ -19,48 +19,48 @@
       "limit": 19617
     },
     "AppLauncher": {
-      "baseline": 35972,
-      "limit": 39570
+      "baseline": 35651,
+      "limit": 39217
     },
     "AppShell": {
-      "baseline": 11759,
-      "limit": 12935
+      "baseline": 11760,
+      "limit": 12937
     },
     "AppShellHeader": {
-      "baseline": 11087,
-      "limit": 12196
+      "baseline": 11086,
+      "limit": 12195
     },
     "AppShellMain": {
-      "baseline": 11217,
-      "limit": 12339
+      "baseline": 11216,
+      "limit": 12338
     },
     "AppShellNav": {
-      "baseline": 12038,
-      "limit": 13242
+      "baseline": 12039,
+      "limit": 13243
     },
     "AppShellNavLink": {
-      "baseline": 33028,
-      "limit": 36331
+      "baseline": 32897,
+      "limit": 36187
     },
     "AppShellNavTrigger": {
       "baseline": 30072,
       "limit": 33080
     },
     "AppSwitcher": {
-      "baseline": 51328,
-      "limit": 56461
+      "baseline": 51144,
+      "limit": 56259
     },
     "Avatar": {
-      "baseline": 11773,
-      "limit": 12951
+      "baseline": 11769,
+      "limit": 12946
     },
     "Breadcrumb": {
-      "baseline": 10925,
-      "limit": 12018
+      "baseline": 10924,
+      "limit": 12017
     },
     "BreadcrumbItem": {
-      "baseline": 11136,
-      "limit": 12250
+      "baseline": 11134,
+      "limit": 12248
     },
     "BreadcrumbLink": {
       "baseline": 32099,
@@ -79,28 +79,28 @@
       "limit": 20224
     },
     "Card": {
-      "baseline": 11051,
-      "limit": 12157
+      "baseline": 11052,
+      "limit": 12158
     },
     "CardBody": {
+      "baseline": 10818,
+      "limit": 11900
+    },
+    "CardDescription": {
       "baseline": 10819,
       "limit": 11901
     },
-    "CardDescription": {
-      "baseline": 10820,
-      "limit": 11903
-    },
     "CardFooter": {
-      "baseline": 10837,
-      "limit": 11921
+      "baseline": 10835,
+      "limit": 11919
     },
     "CardHeader": {
-      "baseline": 10832,
-      "limit": 11916
+      "baseline": 10831,
+      "limit": 11915
     },
     "CardTitle": {
-      "baseline": 11006,
-      "limit": 12107
+      "baseline": 11004,
+      "limit": 12105
     },
     "Checkbox": {
       "baseline": 12795,
@@ -131,12 +131,12 @@
       "limit": 48204
     },
     "DescriptionList": {
-      "baseline": 10967,
-      "limit": 12064
+      "baseline": 10966,
+      "limit": 12063
     },
     "DescriptionListItem": {
-      "baseline": 11302,
-      "limit": 12433
+      "baseline": 11300,
+      "limit": 12431
     },
     "DescriptionListStatus": {
       "baseline": 32027,
@@ -147,12 +147,12 @@
       "limit": 5460
     },
     "DialogBody": {
-      "baseline": 11102,
-      "limit": 12213
+      "baseline": 11101,
+      "limit": 12212
     },
     "DialogClose": {
-      "baseline": 15594,
-      "limit": 17154
+      "baseline": 15595,
+      "limit": 17155
     },
     "DialogContent": {
       "baseline": 24908,
@@ -163,12 +163,12 @@
       "limit": 14552
     },
     "DialogFooter": {
-      "baseline": 10866,
-      "limit": 11953
+      "baseline": 10865,
+      "limit": 11952
     },
     "DialogHeader": {
-      "baseline": 10870,
-      "limit": 11958
+      "baseline": 10869,
+      "limit": 11956
     },
     "DialogTitle": {
       "baseline": 13277,
@@ -179,28 +179,28 @@
       "limit": 3456
     },
     "Divider": {
-      "baseline": 10965,
-      "limit": 12062
+      "baseline": 10964,
+      "limit": 12061
     },
     "Field": {
       "baseline": 13173,
       "limit": 14491
     },
     "FieldMessage": {
-      "baseline": 11841,
-      "limit": 13026
+      "baseline": 11843,
+      "limit": 13028
     },
     "FileUpload": {
       "baseline": 36289,
       "limit": 39918
     },
     "Icon": {
-      "baseline": 11175,
-      "limit": 12293
+      "baseline": 11174,
+      "limit": 12292
     },
     "Input": {
-      "baseline": 11143,
-      "limit": 12258
+      "baseline": 11141,
+      "limit": 12256
     },
     "ListReport": {
       "baseline": 62008,
@@ -255,8 +255,8 @@
       "limit": 47675
     },
     "NumberInput": {
-      "baseline": 14007,
-      "limit": 15408
+      "baseline": 14008,
+      "limit": 15409
     },
     "ObjectPage": {
       "baseline": 15167,
@@ -267,12 +267,12 @@
       "limit": 36747
     },
     "ObjectPageHeader": {
-      "baseline": 11571,
-      "limit": 12729
+      "baseline": 11570,
+      "limit": 12728
     },
     "ObjectPageSection": {
-      "baseline": 11725,
-      "limit": 12898
+      "baseline": 11726,
+      "limit": 12899
     },
     "Pagination": {
       "baseline": 14849,
@@ -283,12 +283,12 @@
       "limit": 12578
     },
     "RadioGroup": {
-      "baseline": 11954,
-      "limit": 13150
+      "baseline": 11955,
+      "limit": 13151
     },
     "RadioGroupItem": {
-      "baseline": 11914,
-      "limit": 13106
+      "baseline": 11912,
+      "limit": 13104
     },
     "Select": {
       "baseline": 44663,
@@ -299,12 +299,12 @@
       "limit": 5460
     },
     "SheetBody": {
-      "baseline": 11102,
-      "limit": 12213
+      "baseline": 11101,
+      "limit": 12212
     },
     "SheetClose": {
-      "baseline": 15594,
-      "limit": 17154
+      "baseline": 15595,
+      "limit": 17155
     },
     "SheetContent": {
       "baseline": 24884,
@@ -315,12 +315,12 @@
       "limit": 14552
     },
     "SheetFooter": {
-      "baseline": 10866,
-      "limit": 11953
+      "baseline": 10865,
+      "limit": 11952
     },
     "SheetHeader": {
-      "baseline": 10870,
-      "limit": 11958
+      "baseline": 10869,
+      "limit": 11956
     },
     "SheetTitle": {
       "baseline": 13277,
@@ -331,16 +331,16 @@
       "limit": 3459
     },
     "Skeleton": {
-      "baseline": 11351,
-      "limit": 12487
+      "baseline": 11349,
+      "limit": 12484
     },
     "Spinner": {
-      "baseline": 11194,
-      "limit": 12314
+      "baseline": 11193,
+      "limit": 12313
     },
     "StatusBadge": {
-      "baseline": 11377,
-      "limit": 12515
+      "baseline": 11375,
+      "limit": 12513
     },
     "Switch": {
       "baseline": 12633,
@@ -363,16 +363,16 @@
       "limit": 20228
     },
     "Text": {
-      "baseline": 10883,
-      "limit": 11972
+      "baseline": 10882,
+      "limit": 11971
     },
     "Textarea": {
-      "baseline": 12223,
-      "limit": 13446
+      "baseline": 12224,
+      "limit": 13447
     },
     "Title": {
-      "baseline": 10836,
-      "limit": 11920
+      "baseline": 10835,
+      "limit": 11919
     },
     "ToastProvider": {
       "baseline": 17603,
@@ -395,8 +395,8 @@
       "limit": 184
     },
     "cn": {
-      "baseline": 10655,
-      "limit": 11721
+      "baseline": 10654,
+      "limit": 11720
     },
     "composeRefs": {
       "baseline": 201,

@@ -754,7 +754,10 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
     { href, onNavigate, onClick, active = false, disabled = false, icon, asChild = false, className, children, ...rest },
     ref,
   ) {
-    const problems = navLinkProblems({ href, asChild, disabled, hasOnNavigate: !!onNavigate }).join('\n');
+    const problems =
+      process.env.NODE_ENV !== 'production'
+        ? navLinkProblems({ href, asChild, disabled, hasOnNavigate: !!onNavigate }).join('\n')
+        : '';
     useEffect(() => {
       if (process.env.NODE_ENV === 'production' || !problems) return;
       for (const problem of problems.split('\n')) console.error(`[formrail] <AppShellNavLink>: ${problem}.`);

@@ -11,3 +11,5 @@ Behaviour changes in production builds (`NODE_ENV=production`); development and 
 - Invariant errors (`<MenuItem>` outside `<Menu>`, `useToast()` outside `<ToastProvider>`, `useFieldControl()` outside `<Field>`, and the other misuse errors) are still thrown, but their message loses the `[formrail] ` prefix. Do not match on that prefix in production code.
 
 The bundle budget now measures the production bundle, with baselines regenerated (every entry is lighter than, or within a few bytes of, the same measurement taken on the previous code).
+
+The package now relies on the consumer's bundler (or an environment that defines `process`) to replace `process.env.NODE_ENV`, as React does. Without a bundler or a `process` global, loading the package in a plain browser module is no longer supported.

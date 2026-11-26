@@ -243,7 +243,7 @@ export const AppSwitcher = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppSwit
   const isCurrent = (app: AppDescriptor) => current !== undefined && app.id === current.id;
   const hasOthers = apps.some((app) => !isCurrent(app));
 
-  const problems = appSwitcherProblems(apps, !!onNavigate).join('\n');
+  const problems = process.env.NODE_ENV !== 'production' ? appSwitcherProblems(apps, !!onNavigate).join('\n') : '';
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' || !problems) return;
     for (const problem of problems.split('\n')) console.error(`[formrail] <AppSwitcher>: ${problem}.`);

@@ -87,6 +87,32 @@ describe("production bundles of @formrail/core carry no diagnostics", () => {
   }
 });
 
+// The texts built by the problem-list builders (appSwitcherProblems, appLauncherProblems,
+// navLinkProblems) are not guarded by their own call site's `[formrail]` prefix, so they need an
+// explicit check: the whole computation must sit in the development branch.
+const BUILDER_TEXTS = [
+  "ids must be unique",
+  "has an empty label",
+  "opens nothing",
+  "onNavigate is not used",
+];
+
+describe("problem-list builders are tree-shaken from production bundles of @formrail/core", () => {
+  for (const [name, bundle] of Object.entries(bundlers)) {
+    it(`${name}: production bundle has none of the builder texts`, async () => {
+      const code = await bundle(namespaceEntry(dist("core", "index.js")));
+      for (const text of BUILDER_TEXTS) expect(code, text).not.toContain(text);
+    }, 60_000);
+
+    it(`${name}: development control has all of the builder texts`, async () => {
+      const code = await bundle(namespaceEntry(dist("core", "index.js")), {
+        nodeEnv: "development",
+      });
+      for (const text of BUILDER_TEXTS) expect(code, text).toContain(text);
+    }, 60_000);
+  }
+});
+
 describe("production bundles of @formrail/pro carry no diagnostics", () => {
   for (const [name, bundle] of Object.entries(bundlers)) {
     for (const entry of PRO_ENTRIES) {

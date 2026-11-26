@@ -415,7 +415,10 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
   const shownKeys = loading ? [] : [...keys, ...itemKeys.flat()];
 
   // Development errors, once per distinct list (not at every render).
-  const problems = appLauncherProblems(apps, !!onNavigate, extraGroups, !!onExtraItemActivate).join('\n');
+  const problems =
+    process.env.NODE_ENV !== 'production'
+      ? appLauncherProblems(apps, !!onNavigate, extraGroups, !!onExtraItemActivate).join('\n')
+      : '';
   useEffect(() => {
     if (process.env.NODE_ENV === 'production' || !problems) return;
     for (const problem of problems.split('\n')) console.error(`[formrail] <AppLauncher>: ${problem}.`);
