@@ -323,6 +323,117 @@ describe('<ListReport> filter bar', () => {
     expect(screen.getByRole('searchbox')).toBeVisible();
     expect(screen.queryByRole('radiogroup')).toBeNull();
   });
+
+  describe('texts of the bar (#688)', () => {
+    const typeIn = async (name: string, text = 'abc') => {
+      const user = userEvent.setup();
+      await user.type(screen.getByRole('searchbox', { name }), text);
+      return user;
+    };
+
+    it('clearSearchLabel names the clear button and "Clear search" is gone', async () => {
+      render(<Host clearSearchLabel="Cancella ricerca" searchLabel="Cerca" />);
+      await typeIn('Cerca');
+      expect(screen.getByRole('button', { name: 'Cancella ricerca' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
+    });
+
+    it('searchPlaceholder is the placeholder, searchLabel stays the name', () => {
+      render(<Host searchLabel="Cerca" searchPlaceholder="Cerca per numero o fornitore" />);
+      const input = screen.getByRole('searchbox', { name: 'Cerca' });
+      expect(input).toHaveAttribute('placeholder', 'Cerca per numero o fornitore');
+    });
+
+    it('without searchPlaceholder the placeholder is searchLabel', () => {
+      render(<Host searchLabel="Cerca" />);
+      expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveAttribute('placeholder', 'Cerca');
+    });
+
+    it('filterBarLabel names the search landmark', () => {
+      render(<Host filterBarLabel="Filtri e ricerca" />);
+      expect(screen.getByRole('search', { name: 'Filtri e ricerca' })).toBeVisible();
+      expect(screen.queryByRole('search', { name: 'Filters and search' })).toBeNull();
+    });
+
+    it('filterBarLabelledBy alone: aria-labelledby and no aria-label, named by the element', () => {
+      render(
+        <>
+          <h3 id="bar-title">Filtri della lista</h3>
+          <Host filterBarLabelledBy="bar-title" />
+        </>,
+      );
+      const bar = screen.getByRole('search', { name: 'Filtri della lista' });
+      expect(bar).toHaveAttribute('aria-labelledby', 'bar-title');
+      expect(bar).not.toHaveAttribute('aria-label');
+    });
+
+    it('filterBarLabelledBy to a missing id: no exception, stable render', () => {
+      render(<Host filterBarLabelledBy="missing" />);
+      const bar = screen.getByRole('search');
+      expect(bar).toHaveAttribute('aria-labelledby', 'missing');
+      expect(screen.getByRole('searchbox')).toBeVisible();
+    });
+
+    it('filterBarLabel and filterBarLabelledBy together are both forwarded', () => {
+      render(
+        <>
+          <h3 id="bar-title">Titolo</h3>
+          <Host filterBarLabel="Etichetta" filterBarLabelledBy="bar-title" />
+        </>,
+      );
+      const bar = screen.getByRole('search');
+      expect(bar).toHaveAttribute('aria-label', 'Etichetta');
+      expect(bar).toHaveAttribute('aria-labelledby', 'bar-title');
+    });
+
+    it('no new prop: the defaults are unchanged', async () => {
+      render(<Host searchLabel="Cerca" />);
+      expect(screen.getByRole('search', { name: 'Filters and search' })).toBeVisible();
+      expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveAttribute('placeholder', 'Cerca');
+      await typeIn('Cerca');
+      expect(screen.getByRole('button', { name: 'Clear search' })).toBeVisible();
+    });
+
+    it('empty strings are forwarded as is (undefined is the way to get the default)', async () => {
+      render(<Host clearSearchLabel="" filterBarLabel="" searchLabel="Cerca" />);
+      await typeIn('Cerca');
+      const bar = screen.getByRole('search');
+      expect(bar).toHaveAttribute('aria-label', '');
+      expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
+      expect(within(bar).getAllByRole('button').some((b) => b.getAttribute('aria-label') === '')).toBe(true);
+    });
+
+    it('showSearch={false}: no error, the landmark keeps the given name while there are pills', () => {
+      render(<Host showSearch={false} clearSearchLabel="X" searchPlaceholder="Y" filterBarLabel="Filtri" />);
+      expect(screen.queryByRole('searchbox')).toBeNull();
+      expect(screen.getByRole('search', { name: 'Filtri' })).toBeVisible();
+    });
+
+    it('showSearch={false} and no pills: no bar, the props are ignored', () => {
+      render(<Host showSearch={false} withFilters={false} clearSearchLabel="X" filterBarLabel="Filtri" />);
+      expect(screen.queryByRole('search')).toBeNull();
+    });
+
+    it('a change after the mount updates the names and keeps the typed text and the focus', async () => {
+      const { rerender } = render(<Host searchLabel="Cerca" clearSearchLabel="Cancella" />);
+      await typeIn('Cerca', 'abc');
+      const input = screen.getByRole('searchbox', { name: 'Cerca' });
+      expect(input).toHaveFocus();
+      rerender(<Host searchLabel="Cerca" clearSearchLabel="Clear it" filterBarLabel="Bar" />);
+      expect(screen.getByRole('button', { name: 'Clear it' })).toBeVisible();
+      expect(screen.getByRole('search', { name: 'Bar' })).toBeVisible();
+      expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveValue('abc');
+      expect(input).toHaveFocus();
+    });
+
+    it('"Clear filters" still moves the focus to the search box with clearSearchLabel set', async () => {
+      const user = userEvent.setup();
+      render(<Host clearSearchLabel="Cancella ricerca" searchLabel="Cerca" />);
+      await user.type(screen.getByRole('searchbox', { name: 'Cerca' }), 'zzz{Enter}');
+      await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+      expect(screen.getByRole('searchbox', { name: 'Cerca' })).toHaveFocus();
+    });
+  });
 });
 
 describe('<ListReport> root', () => {
@@ -359,6 +470,10 @@ describe('<ListReport> root', () => {
         labels={{ count: () => '(c)' }}
         filtersLabel="F"
         searchLabel="S"
+        clearSearchLabel="C"
+        searchPlaceholder="P"
+        filterBarLabel="L"
+        filterBarLabelledBy="B"
         showSearch
       />,
     );
@@ -376,6 +491,10 @@ describe('<ListReport> root', () => {
       'labels',
       'filterslabel',
       'searchlabel',
+      'clearsearchlabel',
+      'searchplaceholder',
+      'filterbarlabel',
+      'filterbarlabelledby',
       'showsearch',
     ]) {
       expect(root.hasAttribute(name), name).toBe(false);
