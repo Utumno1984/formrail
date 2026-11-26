@@ -47,7 +47,7 @@ export const PRIVACY_EMAIL = 'formrail.dev@gmail.com';
  * The indicative price, shown on the Pro page for teams exactly as written (decision of 2026-11-13).
  * '' removes the price block: no figure and no currency then appear anywhere on the site.
  */
-export const EXPECTED_PRICE_TEXT = 'Expected price: from \u20AC199 per developer/year';
+export const EXPECTED_PRICE_TEXT = 'Expected price: from \u20AC199 per developer, 12 months of updates included';
 
 /**
  * Target of the "Apply as a design partner" link on /teams/ (ticket #697): the design partner application

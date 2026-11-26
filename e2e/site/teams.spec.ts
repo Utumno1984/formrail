@@ -226,7 +226,7 @@ test.describe('price', () => {
         expect(text).not.toMatch(/[€$£]\s?\d|\d\s?(EUR|USD)|indicative/);
         return;
       }
-      expect(priceText).toBe('Expected price: from €199 per developer/year');
+      expect(priceText).toBe('Expected price: from €199 per developer, 12 months of updates included');
       await expect(page.locator('.price')).toHaveCount(1);
       await expect(page.locator('.price')).toHaveText(priceText);
       await expect(page.locator('#license')).toContainText('The price is indicative and not final.');
