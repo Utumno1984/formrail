@@ -11,7 +11,6 @@ import {
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CONTROL_INVALID, TEXT_CONTROL_BOX } from '../internal/field-control-styles';
 import { isLaidOut } from '../internal/focus';
-import { isDev } from '../internal/is-dev';
 import { composeRefs } from '../utils/compose-refs';
 import { cn } from '../utils/cn';
 import { computeAutoHeight, readLineHeight } from './auto-height';
@@ -61,7 +60,7 @@ export const Textarea = /* @__PURE__ */ forwardRef<HTMLTextAreaElement, Textarea
   const warned = useRef(false);
   const rowsConflict = autoResize && maxRows !== undefined && maxRows < rows;
   useEffect(() => {
-    if (!rowsConflict || warned.current || !isDev()) return;
+    if (process.env.NODE_ENV === 'production' || !rowsConflict || warned.current) return;
     warned.current = true;
     console.warn(`[formrail] Textarea: maxRows (${maxRows}) is below rows (${rows}); rows is used as the minimum and the maximum.`);
   }, [rowsConflict, maxRows, rows]);

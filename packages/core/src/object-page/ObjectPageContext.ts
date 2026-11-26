@@ -1,5 +1,4 @@
 import { createContext, useContext, type RefObject } from 'react';
-import { isDev } from '../internal/is-dev';
 import type { TitleLevel } from '../typography/Title';
 
 /** One entry of the section registry: what an Anchor Bar needs to list and reach a section. */
@@ -64,7 +63,7 @@ export const ObjectPageContext = /* @__PURE__ */ createContext<ObjectPageContext
  */
 export function useObjectPageContext(consumer: string): ObjectPageContextValue | null {
   const context = useContext(ObjectPageContext);
-  if (!context && isDev()) {
+  if (process.env.NODE_ENV !== 'production' && !context) {
     throw new Error(`${consumer} must be rendered inside an <ObjectPage>.`);
   }
   return context;

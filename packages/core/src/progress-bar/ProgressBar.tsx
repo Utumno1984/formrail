@@ -1,5 +1,4 @@
 import { forwardRef, useEffect, useId, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 
 export type ProgressBarTone = 'primary' | 'success' | 'error';
@@ -69,17 +68,17 @@ export const ProgressBar = /* @__PURE__ */ forwardRef<HTMLDivElement, ProgressBa
   const hasName = ariaLabel !== undefined || ariaLabelledby !== undefined || hasLabel;
 
   useEffect(() => {
-    if (isDev() && !hasName) {
+    if (process.env.NODE_ENV !== 'production' && !hasName) {
       console.error('[formrail] <ProgressBar> has no accessible name: pass aria-label, aria-labelledby or label.');
     }
   }, [hasName]);
   useEffect(() => {
-    if (isDev() && !validRange) {
+    if (process.env.NODE_ENV !== 'production' && !validRange) {
       console.error(`[formrail] <ProgressBar> needs max > min (got min=${min}, max=${max}): rendered indeterminate.`);
     }
   }, [validRange, min, max]);
   useEffect(() => {
-    if (isDev() && determinate && clamped !== value) {
+    if (process.env.NODE_ENV !== 'production' && determinate && clamped !== value) {
       console.warn(`[formrail] <ProgressBar> value ${value} is outside [${min}, ${max}]: clamped to ${clamped}.`);
     }
   }, [determinate, clamped, value, min, max]);

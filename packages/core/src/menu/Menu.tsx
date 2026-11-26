@@ -19,7 +19,6 @@ import {
 import { flushSync } from 'react-dom';
 import * as RadixMenu from '@radix-ui/react-dropdown-menu';
 import { adjacentTabbable } from '../internal/focus';
-import { isDev } from '../internal/is-dev';
 import { handleNavigationClick, hasNavigableHref } from '../internal/navigation';
 import { useTouchOutsideSwallow } from '../internal/outside-interaction';
 import { composeRefs } from '../utils/compose-refs';
@@ -45,7 +44,7 @@ const MenuContext = /* @__PURE__ */ createContext<MenuContextValue | null>(null)
 
 function useMenuContext(part: string): MenuContextValue {
   const context = useContext(MenuContext);
-  if (!context) throw new Error(`[formrail] <${part}> must be rendered inside <Menu>.`);
+  if (!context) throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<${part}> must be rendered inside <Menu>.`);
   return context;
 }
 
@@ -538,7 +537,7 @@ export const MenuLinkItem = /* @__PURE__ */ forwardRef<HTMLAnchorElement, MenuLi
     const activatedBySpace = useRef(false);
     const missingHref = !disabled && !hasNavigableHref(href);
     useEffect(() => {
-      if (missingHref && isDev()) {
+      if (process.env.NODE_ENV !== 'production' && missingHref) {
         console.error('[formrail] <MenuLinkItem>: an item without an `href` leads nowhere; use a <MenuItem> for an action.');
       }
     }, [missingHref]);

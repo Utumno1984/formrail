@@ -11,7 +11,7 @@
  * `no-restricted-imports` ESLint rule (`eslint.config.js`) enforces that.
  *
  * Unrelated to the `src/internal/` directory next to this file (plain implementation details of
- * the core package itself — icons, story fixtures, `is-dev`, …): that one predates this entry and
+ * the core package itself — icons, story fixtures, …): that one predates this entry and
  * stays private; this file is the single facade actually published at the `/internal` subpath.
  */
 

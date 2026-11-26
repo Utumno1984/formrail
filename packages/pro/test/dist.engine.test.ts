@@ -113,8 +113,8 @@ describe.each([
   ['CJS', 'cjs'],
 ])('dist (%s): one copy of each module', (_format, ext) => {
   const SHARED = ['src/change-summary/format-change-value.ts', 'src/change-summary/infer-label.ts', 'src/internal/use-isomorphic-layout-effect.ts'];
-  // A three-line `process.env.NODE_ENV` read kept in each entry (dist.smoke.test.ts pins the one of the main entry).
-  const PER_ENTRY = ['src/internal/is-dev.ts'];
+  // No module is meant to be bundled per entry any more (the `is-dev` helper is gone, #687).
+  const PER_ENTRY: string[] = [];
 
   it('the shared helpers are in shared.* only, and both entries import that file', () => {
     expect(modulesOf(`shared.${ext}`)).toEqual(expect.arrayContaining(SHARED));

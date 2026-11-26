@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { Button } from '../button/Button';
 import { isLaidOut } from '../internal/focus';
 import { moreIcon } from '../internal/icons';
-import { isDev } from '../internal/is-dev';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
 import { Tooltip } from '../tooltip/Tooltip';
 import { cn } from '../utils/cn';
@@ -243,7 +242,7 @@ function InlineRowAction({ action, label }: { action: ListReportRowAction; label
  */
 export function ListReportRowActionsCell({ actions, triggerLabel, inline = 0, rowActionLabel, rowLabel = '' }: ListReportRowActionsCellProps) {
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     const seen = new Set<string>();
     for (const action of actions) {
       if (seen.has(action.id)) {

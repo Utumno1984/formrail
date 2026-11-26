@@ -1,6 +1,10 @@
 import { inferSegmentLabel, itemLabel } from '../change-summary/infer-label';
 import type { ChangeEntry, ChangeKind, ChangeSummaryOptions, ItemLabelContext } from '../change-summary/types';
-import { isDev } from './is-dev';
+
+// Module-scoped: the package compiles without Node types, and the literal `process.env.NODE_ENV` that the
+// bundlers replace stays in the output. Never a global declaration (it would clash with the consumer's
+// `@types/node`).
+declare const process: { env: { NODE_ENV?: string } };
 
 // Structural diff engine shared by `computeChangeSummary` and `computeRebase`: path navigation,
 // array identity, labels, "no value" rules and the default leaf comparison documented on
@@ -40,7 +44,7 @@ const warned = new Set<string>();
 
 /** Development-only warning, deduplicated per message key (StrictMode double renders included). */
 export function warnOnce(key: string, message: string): void {
-  if (!isDev() || warned.has(key)) return;
+  if (process.env.NODE_ENV === 'production' || warned.has(key)) return;
   warned.add(key);
   console.warn(message);
 }
@@ -152,10 +156,12 @@ export function resolveItemLabel(
   const label: unknown = itemLabel(arrayPath, item, context);
   if (typeof label === 'string') return label.trim() === '' ? context.defaultLabel : label;
   if (label !== undefined) {
-    warnOnce(
-      `item-label:${source}:${arrayPath}`,
-      `[formrail/pro] ${source}: itemLabel returned a non-string for '${arrayPath}'; the default label is used.`,
-    );
+    if (process.env.NODE_ENV !== 'production') {
+      warnOnce(
+        `item-label:${source}:${arrayPath}`,
+        `[formrail/pro] ${source}: itemLabel returned a non-string for '${arrayPath}'; the default label is used.`,
+      );
+    }
   }
   return context.defaultLabel;
 }
@@ -340,24 +346,30 @@ export class Differ {
     const idKey = this.arrayIdKeys[node.schemaPath];
     if (typeof idKey !== 'string') return undefined;
     if (!sides.every((side) => isAbsent(side) || Array.isArray(side))) {
-      warnOnce(
-        `not-array:${this.source}:${node.schemaPath}`,
-        `[formrail/pro] ${this.source}: arrayIdKeys['${node.schemaPath}'] is declared but the value at '${node.path}' is not an array; the id key is ignored.`,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        warnOnce(
+          `not-array:${this.source}:${node.schemaPath}`,
+          `[formrail/pro] ${this.source}: arrayIdKeys['${node.schemaPath}'] is declared but the value at '${node.path}' is not an array; the id key is ignored.`,
+        );
+      }
       return undefined;
     }
     if (sides.some((side) => Array.isArray(side) && indexById(side, idKey) === null)) {
-      warnOnce(
-        `duplicate-id:${this.source}:${node.schemaPath}`,
-        `[formrail/pro] ${this.source}: duplicate '${idKey}' values in the array at '${node.path}'; it is diffed as a whole block instead of item by item.`,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        warnOnce(
+          `duplicate-id:${this.source}:${node.schemaPath}`,
+          `[formrail/pro] ${this.source}: duplicate '${idKey}' values in the array at '${node.path}'; it is diffed as a whole block instead of item by item.`,
+        );
+      }
       return undefined;
     }
     if (this.blockWithoutIds && sides.some((side) => Array.isArray(side) && side.some((item) => itemId(item, idKey) === NO_ID))) {
-      warnOnce(
-        `missing-id:${this.source}:${node.schemaPath}`,
-        `[formrail/pro] ${this.source}: an item without '${idKey}' in the array at '${node.path}'; it is merged as a whole block instead of item by item.`,
-      );
+      if (process.env.NODE_ENV !== 'production') {
+        warnOnce(
+          `missing-id:${this.source}:${node.schemaPath}`,
+          `[formrail/pro] ${this.source}: an item without '${idKey}' in the array at '${node.path}'; it is merged as a whole block instead of item by item.`,
+        );
+      }
       return undefined;
     }
     return idKey;

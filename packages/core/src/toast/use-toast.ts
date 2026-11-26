@@ -49,6 +49,6 @@ export const ToastContext = /* @__PURE__ */ createContext<UseToastReturn | null>
  */
 export function useToast(): UseToastReturn {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('[formrail] useToast() must be used inside <ToastProvider>.');
+  if (!ctx) throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}useToast() must be used inside <ToastProvider>.`);
   return ctx;
 }
