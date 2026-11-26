@@ -11,6 +11,7 @@ import {
   EARLY_ACCESS_URL,
   EXPECTED_PRICE_TEXT,
   PRIVACY_EMAIL,
+  PURCHASE_RETENTION_YEARS,
 } from './site-config.mjs';
 
 // Pro page for teams, privacy page and the placeholder guard (ticket #490).
@@ -44,9 +45,6 @@ function build(options) {
 const FINAL = {
   earlyAccessUrl: 'https://tally.so/r/abc123',
   privacyEmail: 'privacy@formrail.dev',
-  // The committed PURCHASE_RETENTION_YEARS is a deliberate placeholder until decision D8 (ticket #692): the
-  // strict builds below use a stand-in number, the placeholder itself is tested in site-refund.test.mjs.
-  purchaseRetentionYears: '10',
 };
 
 describe('assembled pages', () => {
@@ -359,11 +357,11 @@ describe('placeholder guard', () => {
       earlyAccessUrl: EARLY_ACCESS_URL,
       privacyEmail: PRIVACY_EMAIL,
       designPartnerUrl: DESIGN_PARTNER_URL,
-      purchaseRetentionYears: FINAL.purchaseRetentionYears, // D8 is open: see FINAL above
+      purchaseRetentionYears: PURCHASE_RETENTION_YEARS,
     };
     expect(findConfigProblems(config)).toEqual([]);
     expect(() => assertConfigPublishable(config)).not.toThrow();
-    expect(() => build({ strict: true, purchaseRetentionYears: FINAL.purchaseRetentionYears })).not.toThrow();
+    expect(() => build({ strict: true })).not.toThrow();
   });
 
   it.each([

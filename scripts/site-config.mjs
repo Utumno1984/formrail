@@ -89,8 +89,8 @@ export const REFUND_DAYS = 14;
  * Years for which the purchase data is kept after the license ends, because the applicable legal
  * obligations require it (ticket #692). Printed in the "Purchases" section of /privacy/.
  *
- * PLACEHOLDER: the value is decision D8 of Daniele and is still open. Until he decides it the page in
- * development shows 'TBD', and `scripts/check-site-config.mjs --strict` (the deploy) refuses the build.
- * Set it to the number of years, as a whole number from 1 to 99 (e.g. '10').
+ * Decision D8 of Daniele (2026-11-26): the duration of the license (12 months of updates) plus 7 years. It must stay a
+ * whole number from 1 to 99: `scripts/check-site-config.mjs --strict` (the deploy) refuses an empty, non numeric or
+ * placeholder value, and names this constant.
  */
-export const PURCHASE_RETENTION_YEARS = 'TBD';
+export const PURCHASE_RETENTION_YEARS = '7';

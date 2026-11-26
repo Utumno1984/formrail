@@ -267,8 +267,9 @@ describe('the Purchases section of the privacy notice', () => {
     const body = (options) => text(purchases(build(options).privacy));
     expect(body({ purchaseRetentionYears: '10' })).toContain('for as long as your license is in force, plus 10 years');
     expect(body({ purchaseRetentionYears: '7' })).toContain('plus 7 years');
-    // in development the page shows the placeholder, it does not invent a number
-    expect(body()).toContain(`plus ${PURCHASE_RETENTION_YEARS} years`);
+    // decision D8: the committed value is 7 years, and the default page prints it
+    expect(PURCHASE_RETENTION_YEARS).toBe('7');
+    expect(body()).toContain('plus 7 years');
     expect(readFileSync(path.join(ROOT, 'site-root', 'privacy.html'), 'utf8')).toContain('{{RETENTION_YEARS}}');
   });
 
@@ -307,7 +308,7 @@ describe('the Purchases section of the privacy notice', () => {
   });
 });
 
-describe('the retention guard (decision D8 open)', () => {
+describe('the retention guard (decision D8)', () => {
   const FINAL = { earlyAccessUrl: 'https://tally.so/r/abc123', privacyEmail: 'privacy@formrail.dev' };
 
   it('the stand-in is refused, naming the constant', () => {
@@ -325,6 +326,10 @@ describe('the retention guard (decision D8 open)', () => {
 
   it.each([['1'], ['10'], ['99'], [10], [' 10 ']])('accepts %j', (value) => {
     expect(findConfigProblems({ ...FINAL, purchaseRetentionYears: value })).toEqual([]);
+  });
+
+  it('the committed constant is publishable: the strict deploy guard lets it through', () => {
+    expect(findConfigProblems({ ...FINAL, purchaseRetentionYears: PURCHASE_RETENTION_YEARS })).toEqual([]);
   });
 
   it('a caller that does not pass it (an older call site) is not affected', () => {
