@@ -63,13 +63,14 @@ const TITLES = [
   'Early access status',
   'Support',
   'Refunds',
+  'Refund and termination',
   'Liability',
   'Governing law',
   'Changes to these terms',
 ];
 
 describe('the license page', () => {
-  it('has the fifteen sections, as h2, in order, and a dated "Last updated"', () => {
+  it('has the sixteen sections, as h2, in order, and a dated "Last updated"', () => {
     const { license } = build();
     const h2 = [...license.matchAll(/<h2 [^>]*>([^<]+)<\/h2>/g)].map((m) => m[1]);
     expect(h2).toEqual(TITLES);
@@ -114,6 +115,18 @@ describe('the license page', () => {
       // refund
       'within 14 days of the purchase, without giving a reason',
       'https://formrail.dev/refund/',
+      // covered versions include the ones available when access is granted
+      'any version of Formrail Pro that is available in the registry on the day access is granted to you, and any version that is published during your update period',
+      // refund and termination
+      'If you receive a refund, or the payment is reversed (a chargeback), the license and the registry access end, and you must stop using Formrail Pro and delete the copies you downloaded.',
+      'A serious violation of the section Restrictions ends the license in the same way',
+      'This applies to a license that has not ended under the section Refund and termination.',
+      // package name
+      'the package published on GitHub Packages as @formrail-dev/pro (installed with the npm alias @formrail/pro)',
+      // install-only access
+      'they may use a read-only access token of your team to install it, with no license of their own',
+      'You may not share registry access or access tokens outside your own organization',
+      'The read-only installation access described in the section Definitions is allowed.',
       // support, dates, status, distribution
       'on a best-effort basis',
       'within 2 business days',
@@ -131,6 +144,20 @@ describe('the license page', () => {
     const text = squash(LICENSE_FILE);
     expect(text).toContain('Developer means a person who writes or modifies code that imports Formrail Pro.');
     expect(text).toContain('Build systems, continuous integration and the end users of your application are not developers');
+  });
+
+  it('the datetime of the page is the "Last updated" date of the LICENSE file', () => {
+    const { license } = build();
+    const iso = license.match(/<time datetime="(\d{4}-\d{2}-\d{2})">/)[1];
+    const [y, m, d] = iso.split('-').map(Number);
+    const human = `${d} ${new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' })} ${y}`;
+    expect(LICENSE_FILE).toContain(`Last updated: ${human}\n`);
+  });
+
+  it('the old package name and the old definition-versus-restriction contradiction are gone', () => {
+    const text = squash(LICENSE_FILE);
+    expect(text).not.toContain('published as @formrail/pro');
+    expect(text).not.toContain('with people who are not licensed developers');
   });
 
   it('the Refunds section links the refund page (the page itself is another ticket)', () => {

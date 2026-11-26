@@ -144,7 +144,6 @@ export function renderPrivacyEmail(html, email) {
 }
 
 /**
-/**
  * The licensor's identification written into the license page (HTML-escaped). It never throws, so PR builds
  * stay green with a stand-in value: the deploy refuses an empty or placeholder one (--strict, see
  * scripts/check-site-config.mjs, which names the constant LICENSOR).

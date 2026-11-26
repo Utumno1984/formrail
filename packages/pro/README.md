@@ -1,6 +1,6 @@
 # @formrail/pro
 
-Pro tier of Formrail (commercial license, **to be defined**; see [LICENSE](./LICENSE)).
+Pro tier of Formrail (commercial license, see [LICENSE](./LICENSE)).
 
 Works with React Hook Form (`react-hook-form` ^7.92.0) and TanStack Form (`@tanstack/react-form`, tested on 1.33.x).
 

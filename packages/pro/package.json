@@ -2,7 +2,7 @@
   "name": "@formrail/pro",
   "version": "0.2.0",
   "private": true,
-  "description": "Pro tier of Formrail (commercial license, see LICENSE). Private until the private npm org exists.",
+  "description": "Pro tier of Formrail (commercial license, see LICENSE). Distributed through GitHub Packages as @formrail-dev/pro (installed with an npm alias); private in this workspace, published only by scripts/release-pro.mjs.",
   "homepage": "https://formrail.dev/pro/",
   "license": "SEE LICENSE IN LICENSE",
   "type": "module",

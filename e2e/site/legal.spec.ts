@@ -24,13 +24,14 @@ const TITLES = [
   'Early access status',
   'Support',
   'Refunds',
+  'Refund and termination',
   'Liability',
   'Governing law',
   'Changes to these terms',
 ];
 
 test.describe('license terms page', () => {
-  test('has one h1, the fifteen h2 sections in order and a machine-readable "Last updated" date', async ({ page }) => {
+  test('has one h1, the sixteen h2 sections in order and a machine-readable "Last updated" date', async ({ page }) => {
     await page.goto('license/');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Formrail Pro License Terms');
     await expect(page.getByRole('heading', { level: 2 })).toHaveText(TITLES);

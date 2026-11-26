@@ -4,7 +4,7 @@ Last updated: 26 November 2026
 
 Licensor
 
-Formrail Pro, the package published as @formrail/pro, is licensed by Daniele Ingusci, an individual (not a
+Formrail Pro, the package published on GitHub Packages as @formrail-dev/pro (installed with the npm alias @formrail/pro), is licensed by Daniele Ingusci, an individual (not a
 company), based in Italy. Contact: formrail.dev@gmail.com. In these terms, "the licensor", "we" and "us" mean
 this person, and "you" means the buyer and its team.
 
@@ -16,8 +16,7 @@ including @formrail/core, is licensed separately under the MIT license and is no
 Definitions
 
 Developer means a person who writes or modifies code that imports Formrail Pro. Build systems, continuous
-integration and the end users of your application are not developers for these terms and do not need a
-license.
+integration and the end users of your application are not developers for these terms and do not need a license. The same holds for the people and systems of your team that only install, build or test your application without writing code that imports Formrail Pro: they may use a read-only access token of your team to install it, with no license of their own.
 
 Licensed developer means a developer for whom you hold a license under these terms.
 
@@ -26,7 +25,7 @@ or for the day-to-day business of an organization. Development and evaluation ar
 
 Update period means the 12 months described in the section Term and updates.
 
-Covered version means any version of Formrail Pro that is published during your update period.
+Covered version means any version of Formrail Pro that is available in the registry on the day access is granted to you, and any version that is published during your update period.
 
 Registry means the private package registry on GitHub Packages from which Formrail Pro is distributed.
 
@@ -58,8 +57,7 @@ After the term
 
 When the 12 months end, your access to the registry ends, but your right to use what you already have does
 not. You may keep using every covered version, in development and in production, with no limit of time, and
-you may keep building and shipping applications with it. Ending the registry access is not a revocation of the
-license.
+you may keep building and shipping applications with it. Ending the registry access is not a revocation of the license. This applies to a license that has not ended under the section Refund and termination.
 
 Versions published after the end of your update period are not covered. To use them, you need to buy a new
 license. The number of licensed developers stays the number you bought, and the use of the covered versions
@@ -90,8 +88,7 @@ You may not sell, sublicense, rent, lend or give Formrail Pro, or a copy of it, 
 library or a set of components, whether modified or not. Shipping it built into your own application, as
 described in the section Grant, is allowed.
 
-You may not share registry access or access tokens with people who are not licensed developers, and you may
-not remove the copyright and license notices from Formrail Pro.
+You may not share registry access or access tokens outside your own organization, and you may not give them to people who write code that imports Formrail Pro without being licensed developers. The read-only installation access described in the section Definitions is allowed. You may not remove the copyright and license notices from Formrail Pro.
 
 Reading the source in the public repository does not grant any right beyond the ones in these terms.
 
@@ -114,6 +111,11 @@ Refunds
 
 You can ask for a refund within 14 days of the purchase, without giving a reason, whoever you are. The details
 are on the refund page: https://formrail.dev/refund/
+
+Refund and termination
+
+If you receive a refund, or the payment is reversed (a chargeback), the license and the registry access end, and you must stop using Formrail Pro and delete the copies you downloaded.
+A serious violation of the section Restrictions ends the license in the same way, from the moment the licensor tells you in writing.
 
 Liability
 
