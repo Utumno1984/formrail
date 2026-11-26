@@ -47,6 +47,12 @@ interface ShowcaseArgs {
   longCountLabel?: boolean;
   /** No parent height: the report lives in the normal flow of the page. */
   flow?: boolean;
+  /** Props of `ListReport` that reach `ListReportFilterBar` (undefined = the component's default). */
+  searchLabel?: string;
+  clearSearchLabel?: string;
+  searchPlaceholder?: string;
+  filterBarLabel?: string;
+  filterBarLabelledBy?: string;
 }
 
 const PAGE: CSSProperties = {
@@ -74,6 +80,11 @@ function Showcase({
   defaultSearchQuery,
   longCountLabel,
   flow,
+  searchLabel,
+  clearSearchLabel,
+  searchPlaceholder,
+  filterBarLabel,
+  filterBarLabelledBy,
 }: ShowcaseArgs) {
   const all = useMemo(() => makeRecords(dataset), [dataset]);
   const [simulating, setSimulating] = useState(false);
@@ -117,6 +128,12 @@ function Showcase({
           actions={<Button>New record</Button>}
           status={simulating ? 'loading' : status}
           onRetry={onRetry}
+          searchLabel={searchLabel}
+          clearSearchLabel={clearSearchLabel}
+          searchPlaceholder={searchPlaceholder}
+          filterBarLabel={filterBarLabel}
+          // An emptied text Control means "no reference", not `aria-labelledby=""`.
+          filterBarLabelledBy={filterBarLabelledBy || undefined}
           labels={longCountLabel ? { count: (shown, total) => `Showing ${shown} of ${total} records matching the filters` } : undefined}
         />
       </div>
@@ -144,7 +161,6 @@ const meta: Meta<ShowcaseArgs> = {
       'onClearFilters',
       'loadingRowCount',
       'filtersLabel',
-      'searchLabel',
       'showSearch',
       'scrollerRef',
       'bulkActions',
@@ -152,6 +168,12 @@ const meta: Meta<ShowcaseArgs> = {
       'rowActionsInline',
       'ref',
     ),
+    // Real props of `ListReport` (their row and TSDoc stay in the props table): a Control each, no description.
+    searchLabel: { control: 'text' },
+    clearSearchLabel: { control: 'text' },
+    searchPlaceholder: { control: 'text' },
+    filterBarLabel: { control: 'text' },
+    filterBarLabelledBy: { control: 'text' },
     dataset: storyControl({ control: 'select', options: [0, 3, 200, 1200], description: 'Rows given to `useListReport({ rows })`: none, 3, 200 or 1,200 records.' }),
     locale: storyControl({
       control: 'select',
@@ -286,6 +308,40 @@ export const LocaleCount: Story = {
     await expect(selectionText()).toBe(`${fmt.format(found)} selected (${fmt.format(1200 - found)} hidden by filters)`);
   },
 };
+
+/**
+ * Every text of the bar given from `ListReport` (here in Italian, fixed): `searchLabel`, `searchPlaceholder`,
+ * `clearSearchLabel` and `filterBarLabel` (the name of the `search` landmark). The play function types in the
+ * search box, checks the name of the landmark, the name and the placeholder of the box and the name of the clear
+ * button, then presses it and checks that the search is empty again and the focus is back on the box.
+ */
+export const LocalizedBar: Story = {
+  args: {
+    searchLabel: 'Cerca',
+    searchPlaceholder: 'Cerca per numero o fornitore',
+    clearSearchLabel: 'Cancella ricerca',
+    filterBarLabel: 'Filtri e ricerca',
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('search', { name: 'Filtri e ricerca' })).toBeVisible();
+    await expect(canvas.queryByRole('search', { name: 'Filters and search' })).toBeNull();
+    const box = canvas.getByRole('searchbox', { name: 'Cerca' });
+    await expect(box).toHaveAttribute('placeholder', 'Cerca per numero o fornitore');
+    // The search is committed on Enter (or after the debounce): only then `onSearchQueryChange` is called.
+    await userEvent.type(box, 'abc{Enter}');
+    await expect(box).toHaveValue('abc');
+    await waitFor(() => expect(args.onSearchQueryChange).toHaveBeenLastCalledWith('abc'));
+    await expect(canvas.queryByRole('button', { name: 'Clear search' })).toBeNull();
+    await userEvent.click(canvas.getByRole('button', { name: 'Cancella ricerca' }));
+    await expect(box).toHaveValue('');
+    await expect(box).toHaveFocus();
+    await waitFor(() => expect(args.onSearchQueryChange).toHaveBeenLastCalledWith(''));
+  },
+};
+
+/** Fixture of the e2e suite: `LocalizedBar` without the play function. */
+export const LocalizedBarNoPlay: Story = { ...LocalizedBar, tags: ['internal'], play: undefined };
 
 /** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: ['internal']`: hidden from the public sidebar, #296; it still inherits `autodocs`). */
 export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: ['internal'], play: undefined };

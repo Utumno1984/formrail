@@ -7,6 +7,8 @@
 //     tokens.css                the design tokens of the published theme, as plain :root variables
 //     teams/index.html          Pro for teams: license, price, waitlist CTA (ticket #490)
 //     privacy/index.html        privacy notice (GDPR art. 13), no cookies / no analytics
+//     articles/                 index, <slug>/ pages and feed.xml (Atom) built from site-root/articles/*.html
+//                               (ticket #698, see scripts/articles.mjs); absent when there is no published article
 //     iframe.html               redirects old story-renderer links to storybook/iframe.html
 //     404.html                  static, no script (cannot loop)
 //     CNAME                     the custom domain (formrail.dev); Pages ignores it on Actions deploys, it keeps the repo reproducible
@@ -21,6 +23,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertConfigPublishable } from './check-site-config.mjs';
+import { loadArticles, renderArticles, renderArticlesLinks } from './articles.mjs';
 import {
   DESIGN_PARTNER_SEATS,
   DESIGN_PARTNER_URL,
@@ -29,6 +32,7 @@ import {
   PRIVACY_EMAIL,
   SITE_BASE,
   SITE_DOMAIN,
+  SITE_ORIGIN,
   normalizeSiteBase,
 } from './site-config.mjs';
 
@@ -160,6 +164,10 @@ export function redirectScriptSource(siteRootDir) {
  * @param {string} [options.siteRootDir] the static root files (default `<repo>/site-root`)
  * @param {string} [options.outDir] where to write the site (default `<repo>/site`); emptied first
  * @param {string} [options.siteBase] path prefix, written into 404.html (default `SITE_BASE`)
+ * @param {string} [options.siteOrigin] origin of the canonical and feed URLs (default `SITE_ORIGIN`)
+ * @param {string} [options.articlesDir] the article sources (default `<siteRootDir>/articles`); none published = no section
+ * @param {Date} [options.now] the build day: an article dated after it is not published yet (default: now)
+ * @param {(message: string) => void} [options.log] where the build notes go (default `console.log`)
  * @param {string} [options.earlyAccessUrl] target of the landing's CTA; empty = no CTA (default `EARLY_ACCESS_URL`)
  * @param {string} [options.priceText] the indicative price shown on teams/; empty = no price block (default `EXPECTED_PRICE_TEXT`)
  * @param {string} [options.designPartnerUrl] design partner form; empty = no design partner section (default `DESIGN_PARTNER_URL`)
@@ -177,6 +185,10 @@ export function assembleSite({
   siteRootDir = path.join(REPO_ROOT, 'site-root'),
   outDir = path.join(REPO_ROOT, 'site'),
   siteBase = SITE_BASE,
+  siteOrigin = SITE_ORIGIN,
+  articlesDir = path.join(siteRootDir, 'articles'),
+  now = new Date(),
+  log = console.log,
   earlyAccessUrl = EARLY_ACCESS_URL,
   priceText = EXPECTED_PRICE_TEXT,
   privacyEmail = PRIVACY_EMAIL,
@@ -218,6 +230,19 @@ export function assembleSite({
     privacyEmail,
   );
   const notFound = readFileSync(path.join(siteRootDir, '404.html'), 'utf8').replaceAll('{{SITE_BASE}}', siteBase);
+  // Articles (ticket #698): every source is parsed and every template filled before the output is touched.
+  const { published, scheduled } = loadArticles(articlesDir, { now });
+  for (const a of scheduled) log(`Article ${a.file} is dated ${a.date}, after the build day: not published yet.`);
+  const hasArticles = published.length > 0;
+  const articleFiles = hasArticles
+    ? renderArticles(published, {
+        indexTemplate: readFileSync(path.join(siteRootDir, 'articles.html'), 'utf8'),
+        articleTemplate: readFileSync(path.join(siteRootDir, 'article.html'), 'utf8'),
+        origin: siteOrigin,
+        siteBase,
+      })
+    : {};
+  for (const file of Object.keys(pages)) pages[file] = renderArticlesLinks(pages[file], hasArticles);
   const assets = ['landing.css', 'copy.js'].map((file) => path.join(siteRootDir, file));
   for (const asset of [...assets, faviconPath]) {
     if (!existsSync(asset)) throw new Error(`Missing site asset (favicon/landing file): ${asset}`);
@@ -236,11 +261,15 @@ export function assembleSite({
   cpSync(faviconPath, path.join(outDir, 'favicon.svg'));
   for (const [file, html] of Object.entries(pages)) writeFileSync(path.join(outDir, file), html);
   for (const [dir, html] of [
-    ['teams', teams],
-    ['privacy', privacy],
+    ['teams', renderArticlesLinks(teams, hasArticles)],
+    ['privacy', renderArticlesLinks(privacy, hasArticles)],
   ]) {
     mkdirSync(path.join(outDir, dir));
     writeFileSync(path.join(outDir, dir, 'index.html'), html);
+  }
+  for (const [file, content] of Object.entries(articleFiles)) {
+    mkdirSync(path.dirname(path.join(outDir, file)), { recursive: true });
+    writeFileSync(path.join(outDir, file), content);
   }
   writeFileSync(path.join(outDir, '404.html'), notFound);
   return outDir;
