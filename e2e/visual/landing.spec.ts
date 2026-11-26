@@ -29,12 +29,13 @@ test.beforeAll(() => {
   }) as string;
 });
 
-// The public pages of the site: the landing (#382), the Pro page for teams and the privacy notice (#490), the license terms (#691).
+// The public pages of the site: the landing (#382), the Pro page for teams and the privacy notice (#490), the license terms (#691), the refund policy (#692).
 const PAGES = [
   { name: 'landing', path: '', heading: 'Formrail' },
   { name: 'teams', path: 'teams/', heading: 'Formrail Pro for teams' },
   { name: 'privacy', path: 'privacy/', heading: 'Privacy notice' },
   { name: 'license', path: 'license/', heading: 'Formrail Pro License Terms' },
+  { name: 'refund', path: 'refund/', heading: 'Refund policy' },
 ] as const;
 
 for (const { name, path: pagePath, heading } of PAGES) {

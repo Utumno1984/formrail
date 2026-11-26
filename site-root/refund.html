@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Refund policy · Formrail</title>
+    <meta
+      name="description"
+      content="Formrail Pro refund policy: ask within {{REFUND_DAYS}} days of the purchase, without giving a reason, whoever you are. How to ask, and what happens to your access."
+    />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../landing.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a class="brand" href="../">Formrail</a>
+        <nav aria-label="Main">
+          <ul class="nav-list">
+            <li><a href="../storybook/">Components</a></li>
+            <li><a href="../teams/">Pro for teams</a></li>
+            <!--ARTICLES_START--><li><a href="../articles/">Articles</a></li><!--ARTICLES_END-->
+            <li><a href="https://github.com/Utumno1984/formrail">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="wrap">
+          <h1 id="hero-title">Refund policy</h1>
+          <p class="lead">
+            You can ask for a refund of Formrail Pro within {{REFUND_DAYS}} days of the purchase, without giving a
+            reason, whoever you are. Last updated: <time datetime="2026-11-26">26 November 2026</time>
+          </p>
+        </div>
+      </section>
+
+      <section class="prose" aria-label="Refund policy">
+        <div class="wrap">
+          <h2 id="who-and-when-title">Who can ask, and until when</h2>
+          <p>
+            You can ask for a refund within {{REFUND_DAYS}} days of the purchase, without giving a reason. This is
+            true for everyone who buys Formrail Pro: companies and consumers alike. A request made on day
+            {{REFUND_DAYS}} after the purchase is still within the term.
+          </p>
+
+          <h2 id="how-to-ask-title">How to ask</h2>
+          <p>There are two ways, and you can use either one:</p>
+          <ul>
+            <li>
+              through Paddle, the seller of your purchase: open
+              <a href="https://paddle.net/" rel="noopener">Paddle's buyer support page</a> and use the details of your
+              receipt;
+            </li>
+            <li>
+              by email to <a href="mailto:{{LICENSOR_EMAIL}}">{{LICENSOR_EMAIL}}</a>: write the email address and the
+              company name you used to buy, and the transaction identifier of your receipt if you have it. You do not
+              have to say why.
+            </li>
+          </ul>
+          <p>
+            Paddle is the Merchant of Record: it sells to you, collects the payment and the taxes and issues the
+            invoice, so the money is returned by Paddle, to the payment method you used. The time the money takes to
+            arrive depends on Paddle and on your payment provider.
+          </p>
+
+          <h2 id="access-title">What happens to your access</h2>
+          <p>
+            A refund ends the license and the access to the private registry on GitHub Packages. You must stop using
+            Formrail Pro and delete the copies you downloaded. The same happens if the payment is reversed (a
+            chargeback): it is treated as a refund. The license text says it in the section
+            <a href="../license/#refund-and-termination-title">Refund and termination</a>.
+          </p>
+          <p>
+            If you were refunded, you can still use Formrail Core, which is free under the MIT license and is not
+            affected.
+          </p>
+
+          <h2 id="consumers-title">Consumers in the EU and the UK</h2>
+          <p>
+            This policy gives you more than the law requires of a seller, and it does not take away any right you have
+            as a consumer. The rights of consumers in the European Union and the United Kingdom, including the
+            right to withdraw from the purchase, are set out in
+            <a href="https://www.paddle.com/legal/buyer-terms" rel="noopener">Paddle's Buyer Terms</a>. They apply
+            to your purchase as they are written there, even if you have already started to use Formrail Pro.
+          </p>
+
+          <h2 id="seller-title">Who is behind the sale</h2>
+          <p>
+            Paddle is the seller towards you. Formrail Pro is licensed by {{LICENSOR_NAME}}, {{LICENSOR_STATUS}},
+            based in {{LICENSOR_COUNTRY}}, under the <a href="../license/">license terms</a>. How your purchase data
+            is handled is described in the <a href="../privacy/#purchases-title">privacy notice</a>.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <ul class="footer-list">
+          <li><a href="https://github.com/Utumno1984/formrail">Source on GitHub</a></li>
+          <li>Formrail Core: MIT license, free on npm.</li>
+          <li>Formrail Pro: One-time license per developer, 12 months of updates included.</li>
+          <!--ARTICLES_START--><li><a href="../articles/">Technical articles</a></li><!--ARTICLES_END-->
+          <li><a href="../privacy/">Privacy</a></li>
+          <li><a href="../license/">License terms</a></li>
+          <li><a href="./" aria-current="page">Refund policy</a></li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

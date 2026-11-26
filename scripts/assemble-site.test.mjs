@@ -115,6 +115,7 @@ describe('assembleSite', () => {
       'license',
       'privacy',
       'pro',
+      'refund',
       'storybook',
       'teams',
       'tokens.css',
@@ -166,7 +167,7 @@ describe('assembleSite', () => {
   });
 
   // The invariant: everything that can fail is read/validated before the previous output is touched.
-  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html'], ['teams.html'], ['privacy.html'], ['license.html']])(
+  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html'], ['teams.html'], ['privacy.html'], ['license.html'], ['refund.html']])(
     'missing site-root/%s',
     (missing) => {
       it('fails before outDir is touched (the previous site stays intact)', () => {
@@ -217,13 +218,14 @@ describe('assembleSite', () => {
       expect(html).toContain('href="/storybook/"');
       expect(html).toContain('href="/privacy/"');
       expect(html).toContain('href="/license/"');
+      expect(html).toContain('href="/refund/"');
       expect(html).not.toContain('/formrail/');
     });
 
     it('no static page carries the legacy /formrail/ prefix or github.io', () => {
       const { storybookDir, outDir } = setup();
       assembleSite({ storybookDir, outDir });
-      for (const file of ['index.html', 'iframe.html', '404.html', 'teams/index.html', 'privacy/index.html', 'license/index.html', 'landing.css', 'copy.js']) {
+      for (const file of ['index.html', 'iframe.html', '404.html', 'teams/index.html', 'privacy/index.html', 'license/index.html', 'refund/index.html', 'landing.css', 'copy.js']) {
         const text = readFileSync(path.join(outDir, file), 'utf8');
         expect(text, file).not.toMatch(/["'(=\s]\/formrail\//);
         expect(text, file).not.toContain('github.io');
@@ -233,7 +235,7 @@ describe('assembleSite', () => {
     it('internal links and assets of the static pages are never prefixed', () => {
       const { storybookDir, outDir } = setup();
       assembleSite({ storybookDir, outDir });
-      for (const file of ['index.html', 'teams/index.html', 'privacy/index.html', 'license/index.html']) {
+      for (const file of ['index.html', 'teams/index.html', 'privacy/index.html', 'license/index.html', 'refund/index.html']) {
         const html = readFileSync(path.join(outDir, file), 'utf8');
         const targets = [...html.matchAll(/(?:href|src)="([^"#]*)"/g)].map((m) => m[1]).filter((t) => t && !/^(https?:|mailto:)/.test(t));
         expect(targets.length, file).toBeGreaterThan(0);

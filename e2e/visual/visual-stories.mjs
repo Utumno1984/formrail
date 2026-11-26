@@ -23,4 +23,4 @@ export function visualEntries(entries) {
  * Baselines produced by tests that are not stories: the public pages photographed by `landing.spec.ts`
  * (`<name>.png`). Not orphans. `scripts/visual-orphans.test.mjs` checks the list against that spec.
  */
-export const PAGE_BASELINE_IDS = ['landing', 'teams', 'privacy', 'license'];
+export const PAGE_BASELINE_IDS = ['landing', 'teams', 'privacy', 'license', 'refund'];

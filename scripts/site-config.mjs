@@ -77,3 +77,20 @@ export const LICENSOR = {
   country: 'Italy',
   email: 'formrail.dev@gmail.com',
 };
+
+/**
+ * Days after the purchase within which anyone, companies included, can ask for a refund without giving a
+ * reason (ticket #692, decision of 2026-11-26). Written into /refund/. The license text (/license/ and
+ * packages/pro/LICENSE, one static text) says the same number: a test fails if the two ever differ.
+ */
+export const REFUND_DAYS = 14;
+
+/**
+ * Years for which the purchase data is kept after the license ends, because the applicable legal
+ * obligations require it (ticket #692). Printed in the "Purchases" section of /privacy/.
+ *
+ * PLACEHOLDER: the value is decision D8 of Daniele and is still open. Until he decides it the page in
+ * development shows 'TBD', and `scripts/check-site-config.mjs --strict` (the deploy) refuses the build.
+ * Set it to the number of years, as a whole number from 1 to 99 (e.g. '10').
+ */
+export const PURCHASE_RETENTION_YEARS = 'TBD';

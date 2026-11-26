@@ -7,6 +7,7 @@
 //     tokens.css                the design tokens of the published theme, as plain :root variables
 //     teams/index.html          Pro for teams: license, price, waitlist CTA (ticket #490)
 //     privacy/index.html        privacy notice (GDPR art. 13), no cookies / no analytics
+//     refund/index.html         the refund policy (ticket #692): 14 days, no reason, whoever you are
 //     license/index.html        the Formrail Pro license terms (ticket #691); same text as packages/pro/LICENSE
 //     articles/                 index, <slug>/ pages and feed.xml (Atom) built from site-root/articles/*.html
 //                               (ticket #698, see scripts/articles.mjs); absent when there is no published article
@@ -32,6 +33,8 @@ import {
   EXPECTED_PRICE_TEXT,
   LICENSOR,
   PRIVACY_EMAIL,
+  PURCHASE_RETENTION_YEARS,
+  REFUND_DAYS,
   SITE_BASE,
   SITE_DOMAIN,
   SITE_ORIGIN,
@@ -160,6 +163,17 @@ export function renderLicensor(html, licensor) {
   return out;
 }
 
+/**
+ * The purchase figures written into the refund and privacy pages (ticket #692): the refund window and the
+ * retention of the purchase data. Like the licensor it never throws, so a PR build shows the stand-in
+ * value ('TBD') and the deploy refuses it (--strict, scripts/check-site-config.mjs names the constant).
+ */
+export function renderPurchaseTerms(html, { refundDays, retentionYears }) {
+  return html
+    .replaceAll('{{REFUND_DAYS}}', () => String(refundDays))
+    .replaceAll('{{RETENTION_YEARS}}', () => String(retentionYears).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`));
+}
+
 /** Whether the command line asks for the deploy's strict mode (placeholder guard), see `assembleSite`. */
 export function isStrictRun(argv) {
   return argv.slice(2).includes('--strict');
@@ -188,6 +202,8 @@ export function redirectScriptSource(siteRootDir) {
  * @param {string} [options.designPartnerUrl] design partner form; empty = no design partner section (default `DESIGN_PARTNER_URL`)
  * @param {number} [options.designPartnerSeats] seats offered; 0 = exhausted, the section points to the waitlist (default `DESIGN_PARTNER_SEATS`)
  * @param {typeof LICENSOR} [options.licensor] who licenses Formrail Pro, written into license/ (default `LICENSOR`)
+ * @param {number} [options.refundDays] the refund window written into refund/ (default `REFUND_DAYS`)
+ * @param {string | number} [options.purchaseRetentionYears] retention of the purchase data written into privacy/ (default `PURCHASE_RETENTION_YEARS`)
  * @param {string} [options.privacyEmail] the controller's contact written into privacy/ (default `PRIVACY_EMAIL`)
  * @param {boolean} [options.strict] refuse to assemble while the form URL or the email is a placeholder (the
  *   deploy: `--strict` on the CLI, see scripts/check-site-config.mjs); PR builds leave it off
@@ -209,6 +225,8 @@ export function assembleSite({
   priceText = EXPECTED_PRICE_TEXT,
   privacyEmail = PRIVACY_EMAIL,
   licensor = LICENSOR,
+  refundDays = REFUND_DAYS,
+  purchaseRetentionYears = PURCHASE_RETENTION_YEARS,
   designPartnerUrl = DESIGN_PARTNER_URL,
   designPartnerSeats = DESIGN_PARTNER_SEATS,
   strict = false,
@@ -216,7 +234,7 @@ export function assembleSite({
   faviconPath = FAVICON,
 } = {}) {
   siteBase = normalizeSiteBase(siteBase);
-  if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail, designPartnerUrl, licensor });
+  if (strict) assertConfigPublishable({ earlyAccessUrl, privacyEmail, designPartnerUrl, licensor, purchaseRetentionYears });
   if (!existsSync(path.join(storybookDir, 'index.html'))) {
     throw new Error(`No built Storybook at ${storybookDir}: run \`npm run build-storybook\` first.`);
   }
@@ -242,9 +260,14 @@ export function assembleSite({
     priceText,
   );
   const privacySource = readFileSync(path.join(siteRootDir, 'privacy.html'), 'utf8');
-  const privacy = renderPrivacyEmail(
-    renderDesignPartners(privacySource, designPartnerUrl, designPartnerSeats),
-    privacyEmail,
+  const terms = { refundDays, retentionYears: purchaseRetentionYears };
+  const privacy = renderPurchaseTerms(
+    renderPrivacyEmail(renderDesignPartners(privacySource, designPartnerUrl, designPartnerSeats), privacyEmail),
+    terms,
+  );
+  const refund = renderPurchaseTerms(
+    renderLicensor(readFileSync(path.join(siteRootDir, 'refund.html'), 'utf8'), licensor),
+    terms,
   );
   const license = renderLicensor(readFileSync(path.join(siteRootDir, 'license.html'), 'utf8'), licensor);
   const notFound = readFileSync(path.join(siteRootDir, '404.html'), 'utf8').replaceAll('{{SITE_BASE}}', siteBase);
@@ -282,6 +305,7 @@ export function assembleSite({
     ['teams', renderArticlesLinks(teams, hasArticles)],
     ['privacy', renderArticlesLinks(privacy, hasArticles)],
     ['license', renderArticlesLinks(license, hasArticles)],
+    ['refund', renderArticlesLinks(refund, hasArticles)],
   ]) {
     mkdirSync(path.join(outDir, dir));
     writeFileSync(path.join(outDir, dir, 'index.html'), html);

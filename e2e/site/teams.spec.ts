@@ -359,7 +359,8 @@ test.describe('design partners (#697)', () => {
       'May we mention your company publicly as a design partner? (Yes or No);',
       'Consent, a box you check yourself that refers to this notice.',
     ]);
-    await expect(page.getByRole('heading', { level: 3 })).toHaveText(['Data we collect', 'Purpose and legal basis', 'Where the data goes and retention']);
+    // Only the h3 of this section (ids dp-*): the Purchases section (#692) has its own h3.
+    await expect(page.locator('h3[id^="dp-"]')).toHaveText(['Data we collect', 'Purpose and legal basis', 'Where the data goes and retention']);
     const main = page.locator('main');
     await expect(main).toContainText('all required');
     await expect(main).toContainText('art. 6(1)(a) GDPR');
@@ -413,6 +414,7 @@ test.describe('privacy page', () => {
       'Transfers outside the EEA',
       'Retention',
       ...(designPartnerUrl ? ['Design partner applications'] : []),
+      'Purchases',
       'Your rights',
       'No cookies, no analytics',
     ]);
