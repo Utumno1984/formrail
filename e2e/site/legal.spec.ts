@@ -140,7 +140,7 @@ test.describe('license terms from the other pages', () => {
     for (const url of ['', 'teams/', 'privacy/']) {
       await page.goto(url);
       const footer = page.getByRole('contentinfo');
-      await expect(footer, url).toContainText('Formrail Pro: Annual license per developer, 12 months of updates included.');
+      await expect(footer, url).toContainText('Formrail Pro: One-time license per developer, 12 months of updates included.');
       await expect(footer, url).not.toContainText('terms published before sales');
       await footer.getByRole('link', { name: 'License terms' }).click();
       await page.waitForURL(`**${base}license/`);
@@ -155,7 +155,7 @@ test.describe('license terms from the other pages', () => {
   test('the license page footer marks itself as the current page', async ({ page }) => {
     await page.goto('license/');
     await expect(page.getByRole('contentinfo').getByRole('link', { name: 'License terms' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('contentinfo')).toContainText('Formrail Pro: Annual license per developer, 12 months of updates included.');
+    await expect(page.getByRole('contentinfo')).toContainText('Formrail Pro: One-time license per developer, 12 months of updates included.');
   });
 
   test('/teams/#license points to the terms and still says nothing can be bought yet', async ({ page }) => {

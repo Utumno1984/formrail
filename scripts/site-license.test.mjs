@@ -127,6 +127,10 @@ describe('the license page', () => {
       'they may use a read-only access token of your team to install it, with no license of their own',
       'You may not share registry access or access tokens outside your own organization',
       'The read-only installation access described in the section Definitions is allowed.',
+      // decisions of 26 Nov 2026: access within 2 business days, narrow corrections, no cap for gross negligence
+      'Access to the registry is granted within 2 business days of the confirmation of your payment.',
+      'or if it only corrects a typo or an obvious clerical error',
+      'The limits in this section do not apply in case of wilful misconduct or gross negligence of the licensor',
       // support, dates, status, distribution
       'on a best-effort basis',
       'within 2 business days',
@@ -152,6 +156,12 @@ describe('the license page', () => {
     const [y, m, d] = iso.split('-').map(Number);
     const human = `${d} ${new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' })} ${y}`;
     expect(LICENSE_FILE).toContain(`Last updated: ${human}\n`);
+  });
+
+  it('no longer lets the licensor change the terms for a buyer with a generic "correction"', () => {
+    const text = squash(LICENSE_FILE);
+    expect(text).not.toContain('if it is a correction');
+    expect(text).not.toContain('Annual license');
   });
 
   it('the old package name and the old definition-versus-restriction contradiction are gone', () => {
@@ -206,7 +216,7 @@ describe('the license page', () => {
 });
 
 describe('footers and links', () => {
-  const SENTENCE = 'Formrail Pro: Annual license per developer, 12 months of updates included.';
+  const SENTENCE = 'Formrail Pro: One-time license per developer, 12 months of updates included.';
 
   it('every page has the same footer license sentence, letter for letter, and a "License terms" link', () => {
     const { license, home, teams, privacy } = build();

@@ -65,7 +65,7 @@ test.describe('Pro page for teams: content', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Free and Pro' })).toBeVisible();
     const license = page.locator('#license');
     await expect(license.getByRole('heading', { level: 2, name: 'License' })).toBeVisible();
-    await expect(license).toContainText('Annual license per developer, 12 months of updates included.');
+    await expect(license).toContainText('One-time license per developer, 12 months of updates included.');
     await expect(license).toContainText('not a binding offer');
     await expect(license).toContainText('no payment or pre-order is taken');
     await expect(page.getByRole('heading', { level: 2, name: 'Join the waitlist' })).toBeVisible();
@@ -497,7 +497,7 @@ test.describe('privacy page', () => {
     for (const url of ['', 'teams/', 'privacy/']) {
       await page.goto(url);
       await expect(page.getByRole('contentinfo'), url).toContainText(
-        'Formrail Pro: Annual license per developer, 12 months of updates included.',
+        'Formrail Pro: One-time license per developer, 12 months of updates included.',
       );
     }
   });
@@ -520,7 +520,7 @@ test.describe('public wording matches the privacy notice', () => {
     for (const url of ['', 'teams/', 'privacy/']) {
       await page.goto(url);
       const footer = (await page.getByRole('contentinfo').innerText()).replace(/\s+/g, ' ');
-      expect(footer, url).toContain('Annual license per developer, 12 months of updates included.');
+      expect(footer, url).toContain('One-time license per developer, 12 months of updates included.');
     }
   });
 });
