@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
-import { isDev } from '../internal/is-dev';
 import { deepEqual } from './equal';
 import { keepEditsSince } from './keep-edits';
 import { invalidPaths, withoutPaths } from './field-errors';
@@ -298,7 +297,7 @@ export function useObjectPageForm<Values extends object>(
   }, []);
 
   useEffect(() => {
-    if (warnedRef.current || baselineOption === initialBaselineRef.current || !isDev()) return;
+    if (process.env.NODE_ENV === 'production' || warnedRef.current || baselineOption === initialBaselineRef.current) return;
     if (isEqual(baselineOption, initialBaselineRef.current)) return;
     warnedRef.current = true;
     console.warn(
@@ -381,7 +380,7 @@ export function useObjectPageForm<Values extends object>(
             // Never awaited (v1 is synchronous); a later rejection must not surface as unhandled.
             (result as PromiseLike<unknown>).then(undefined, () => undefined);
             const error = new Error(ASYNC_SCHEMA_MESSAGE);
-            if (isDev()) console.error('[formrail] useObjectPageForm:', error);
+            if (process.env.NODE_ENV !== 'production') console.error('[formrail] useObjectPageForm:', error);
             throw error;
           }
           const issues = (result as StandardSchemaResult).issues;
@@ -446,7 +445,7 @@ export function useObjectPageForm<Values extends object>(
       let baseline = sent;
       if (result !== undefined) {
         if (typeof result === 'object' && result !== null && !Array.isArray(result)) baseline = result;
-        else if (isDev()) {
+        else if (process.env.NODE_ENV !== 'production') {
           console.warn('[formrail] useObjectPageForm: the save handler returned a non-object, the sent values are the new baseline.');
         }
       }

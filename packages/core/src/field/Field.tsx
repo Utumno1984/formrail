@@ -1,7 +1,6 @@
 import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type HTMLAttributes, type ReactNode, type RefObject } from 'react';
 import { FieldMessage } from '../field-message/FieldMessage';
 import { defineHidden } from '../internal/define-hidden';
-import { isDev } from '../internal/is-dev';
 import { KEYBOARD_INSET_EVENT } from '../internal/keyboard-inset';
 import { hasContent } from '../internal/react-nodes';
 import { errorAt } from '../object-page/field-errors';
@@ -185,7 +184,7 @@ export function Field(props: FieldProps) {
   const invalid = explicitError || providerError !== undefined;
   const emptyProviderError = providerError !== undefined && !hasError;
   useEffect(() => {
-    if (emptyProviderError && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && emptyProviderError) {
       console.error(
         `[formrail] Field "${name}": the ValidationProvider error for this path is empty or blank. The control is marked aria-invalid (the form treats the path as invalid), but no message is shown: give it a text.`,
       );

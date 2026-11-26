@@ -10,7 +10,6 @@ import {
   useState,
   type HTMLAttributes,
 } from 'react';
-import { isDev } from '../internal/is-dev';
 import { Title, type TitleProps } from '../typography/Title';
 import { cn } from '../utils/cn';
 
@@ -60,7 +59,7 @@ export const Card = /* @__PURE__ */ forwardRef<HTMLElement, CardProps>(function 
   const hasOwnName = labelledBy !== undefined || ariaLabel !== undefined;
 
   useEffect(() => {
-    if (named && !hasOwnName && !titleSeen.current && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && named && !hasOwnName && !titleSeen.current) {
       console.warn(
         `[formrail] <Card as="${as}"> has no <CardTitle>, aria-labelledby or aria-label: it has no accessible name, so it is not a landmark.`,
       );

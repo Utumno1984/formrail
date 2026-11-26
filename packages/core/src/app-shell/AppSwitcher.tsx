@@ -14,7 +14,6 @@ import {
 import { flushSync } from 'react-dom';
 import { Icon } from '../icon/Icon';
 import { internalIcons } from '../internal/icons';
-import { isDev } from '../internal/is-dev';
 import { ModalRoot } from '../internal/modal';
 import { handleNavigationClick, hasNavigableHref } from '../internal/navigation';
 import { Menu, MenuContent, MenuItem, MenuLinkItem, MenuTrigger } from '../menu/Menu';
@@ -246,7 +245,7 @@ export const AppSwitcher = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppSwit
 
   const problems = appSwitcherProblems(apps, !!onNavigate).join('\n');
   useEffect(() => {
-    if (!problems || !isDev()) return;
+    if (process.env.NODE_ENV === 'production' || !problems) return;
     for (const problem of problems.split('\n')) console.error(`[formrail] <AppSwitcher>: ${problem}.`);
   }, [problems]);
 

@@ -28,7 +28,6 @@ import {
 import { flushSync } from 'react-dom';
 import { Button } from '../button/Button';
 import { navMenuIcon } from '../internal/icons';
-import { isDev } from '../internal/is-dev';
 import { ModalRoot } from '../internal/modal';
 import { handleNavigationClick, hasNavigableHref, isAppNavigationClick, isModifiedClick } from '../internal/navigation';
 import { SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
@@ -512,7 +511,7 @@ export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, 
   useIsomorphicLayoutEffect(() => provideSheet?.(NavSheet), [provideSheet]);
   const registerTrigger = navSheet?.registerTrigger;
   useIsomorphicLayoutEffect(() => (buttonRef.current ? registerTrigger?.(buttonRef.current) : undefined), [registerTrigger]);
-  if (!shell || !navSheet) throw new Error('[formrail] <AppShellNavTrigger> must be rendered inside <AppShell>.');
+  if (!shell || !navSheet) throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<AppShellNavTrigger> must be rendered inside <AppShell>.`);
   const { open, hasNav, openFrom, sheetId } = navSheet;
   const onTriggerClick = (event: MouseEvent<HTMLButtonElement>) => {
     onClick?.(event);
@@ -757,7 +756,7 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
   ) {
     const problems = navLinkProblems({ href, asChild, disabled, hasOnNavigate: !!onNavigate }).join('\n');
     useEffect(() => {
-      if (!problems || !isDev()) return;
+      if (process.env.NODE_ENV === 'production' || !problems) return;
       for (const problem of problems.split('\n')) console.error(`[formrail] <AppShellNavLink>: ${problem}.`);
     }, [problems]);
 
@@ -831,7 +830,7 @@ export const AppShellNavLink = /* @__PURE__ */ forwardRef<AppShellNavLinkElement
       );
     } else if (asChild) {
       if (!isValidElement(children)) {
-        throw new Error('[formrail] <AppShellNavLink asChild> expects exactly one React element as its child.');
+        throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<AppShellNavLink asChild> expects exactly one React element as its child.`);
       }
       const child = children as ReactElement<{ className?: string; children?: ReactNode; href?: string }>;
       // The class merge is done here (Slot only concatenates): the child's own classes go last.
@@ -903,7 +902,7 @@ export const AppShellMain = /* @__PURE__ */ forwardRef<HTMLElement, AppShellMain
   const setMainId = shell?.setMainId;
   const borderKeys = mainBottomBorderKeys(style).join(', ');
   useEffect(() => {
-    if (!borderKeys || !isDev()) return;
+    if (process.env.NODE_ENV === 'production' || !borderKeys) return;
     console.error(
       `[formrail] <AppShellMain>: its bottom border holds the room of the virtual keyboard, so ${borderKeys} in its style ` +
         'is replaced there. Put a border on a child of AppShellMain, or use the other sides only (borderTop, borderLeft, borderRight).',

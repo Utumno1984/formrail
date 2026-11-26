@@ -93,9 +93,6 @@ const SIZE_CLASS: Record<SelectSize, string> = {
 };
 const VALUE = 'block min-w-0 flex-1 truncate';
 
-const DUPLICATES_WARNING =
-  '[formrail] <Select> options must have unique values; the first of each duplicate wins.';
-
 // Keys Radix's trigger reacts to while closed: the opening keys and the typeahead characters.
 function opensOrSearches(event: KeyboardEvent<HTMLElement>): boolean {
   if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp') return true;
@@ -156,9 +153,13 @@ export const Select = /* @__PURE__ */ forwardRef<HTMLButtonElement, SelectProps>
   };
   const content = useRef<HTMLDivElement>(null);
   const duplicatesWarned = useRef(false);
-  if (!duplicatesWarned.current && new Set(options.map((o) => o.value)).size !== options.length) {
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    !duplicatesWarned.current &&
+    new Set(options.map((o) => o.value)).size !== options.length
+  ) {
     duplicatesWarned.current = true;
-    console.warn(DUPLICATES_WARNING);
+    console.warn('[formrail] <Select> options must have unique values; the first of each duplicate wins.');
   }
   // Options that change under an open list: if the active option went away Radix leaves the
   // focus on the list container; put it on the first enabled option.

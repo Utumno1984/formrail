@@ -1,6 +1,5 @@
 // Internal: focus / tab-order helpers shared by the overlays and the form helpers. Not exported from the package.
 
-import { isDev } from './is-dev';
 
 const TABBABLE =
   'a[href],button,input:not([type="hidden"]),select,textarea,summary,[tabindex],[contenteditable=""],[contenteditable="true"]';
@@ -47,7 +46,7 @@ export function focusFirst(candidates: Iterable<HTMLElement>, options?: FocusOpt
  * `[formrail] <what>, nothing was focused.` (silent in production).
  */
 export function warnNoFocusTarget(what: string): void {
-  if (isDev()) console.error(`[formrail] ${what}, nothing was focused.`);
+  if (process.env.NODE_ENV !== 'production') console.error(`[formrail] ${what}, nothing was focused.`);
 }
 
 /**

@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from 'react';
 import { compareDocumentOrder } from '../internal/focus';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import { ObjectPageAnchorBar } from './ObjectPageAnchorBar';
@@ -100,7 +99,7 @@ export const ObjectPage = /* @__PURE__ */ forwardRef<HTMLDivElement, ObjectPageP
 
   // Warned once per change of the list, not at every render.
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     const seen = new Set<string>();
     for (const { id } of sections) {
       if (seen.has(id)) console.warn(`ObjectPageSection: duplicate id "${id}". Section ids must be unique within a page.`);

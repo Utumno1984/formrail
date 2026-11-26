@@ -273,6 +273,20 @@ describe('react externals measurement (#34)', () => {
     expect((await runUpdate({ packageDir: dir })).Uses).toBeLessThan(200);
   });
 
+  it('measures the production bundle: a branch guarded by NODE_ENV is not counted (#687)', async () => {
+    const diagnostics = Array.from({ length: 12 }, (_, i) => `console.error("dev-only-diagnostic-${i}", a, b);`).join(' ');
+    writeFileSync(
+      join(dir, 'dist/index.js'),
+      `export const Guarded = (a, b) => { if (process.env.NODE_ENV !== 'production') { ${diagnostics} } return a + b; };\n` +
+        'export const Plain = (a, b) => a + b;\n',
+    );
+    const out = await bundleExport(join(dir, 'dist/index.js'), 'Guarded');
+    expect(out).not.toContain('dev-only-diagnostic');
+    expect(out).not.toContain('console.error');
+    const measured = await runUpdate({ packageDir: dir });
+    expect(measured.Guarded).toBe(measured.Plain);
+  });
+
   it('still detects a real size increase of composeRefs against the committed baseline', async () => {
     writeFileSync(join(dir, 'dist/index.js'), entry());
     await runUpdate({ packageDir: dir });

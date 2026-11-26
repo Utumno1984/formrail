@@ -153,15 +153,6 @@ export type ListReportTableProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
 
 type BodyKind = 'loading' | 'error' | 'empty' | 'noResults' | 'data';
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 /** @internal What `ListReportTableShell` passes to `renderBody` for `view === 'rows'`. */
 export interface ListReportTableBodyContext<Row> {
   table: UseListReportReturn<Row>;
@@ -226,7 +217,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
   const invalidInline =
     rowActionsInlineProp !== undefined && !(Number.isInteger(rowActionsInlineProp) && rowActionsInlineProp >= 0);
   useEffect(() => {
-    if (invalidInline && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && invalidInline) {
       console.error(
         `[formrail] <ListReportTable> rowActionsInline must be a whole number ≥ 0; got ${String(rowActionsInlineProp)}, used ${inlineUsed}.`,
       );
@@ -335,7 +326,7 @@ function ListReportTableShellImpl<Row>(props: ListReportTableShellProps<Row>, re
 
   const named = !!ariaLabel?.trim() || !!ariaLabelledby?.trim() || hasContent(caption);
   useEffect(() => {
-    if (!named && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && !named) {
       console.warn('[formrail] <ListReportTable> needs an accessible name: pass `aria-label`, `aria-labelledby` or `caption`.');
     }
   }, [named]);

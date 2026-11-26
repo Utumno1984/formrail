@@ -3,32 +3,32 @@
   "version": 1,
   "exports": {
     "ChangeSummary": {
-      "baseline": 2052,
-      "limit": 2258
+      "baseline": 2237,
+      "limit": 2461
     },
     "RebaseNotice": {
-      "baseline": 4284,
-      "limit": 4713
+      "baseline": 4286,
+      "limit": 4715
     },
     "VirtualListReport": {
-      "baseline": 4840,
-      "limit": 5324
+      "baseline": 4764,
+      "limit": 5241
     },
     "VirtualListReportTable": {
-      "baseline": 3927,
-      "limit": 4320
+      "baseline": 3757,
+      "limit": 4133
     },
     "computeChangeSummary": {
-      "baseline": 2607,
-      "limit": 2868
+      "baseline": 2307,
+      "limit": 2538
     },
     "computeChangeSummaryResult": {
-      "baseline": 2593,
-      "limit": 2853
+      "baseline": 2295,
+      "limit": 2525
     },
     "computeRebase": {
-      "baseline": 3921,
-      "limit": 4314
+      "baseline": 3799,
+      "limit": 4179
     },
     "formatChangeValue": {
       "baseline": 1278,
@@ -39,12 +39,12 @@
       "limit": 271
     },
     "useChangeSummary": {
-      "baseline": 2780,
-      "limit": 3059
+      "baseline": 2482,
+      "limit": 2731
     },
     "useFormRebase": {
-      "baseline": 6364,
-      "limit": 7001
+      "baseline": 6131,
+      "limit": 6745
     }
   }
 }

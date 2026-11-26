@@ -26,11 +26,15 @@ import {
   type ListReportTableProps,
   type ListReportTableShellProps,
 } from '@formrail/core/internal';
-import { isDev } from '../internal/is-dev';
 import { useIsomorphicLayoutEffect } from '../internal/use-isomorphic-layout-effect';
 import { scrollTopForIndex } from '../internal/virtual-rows';
 import { applyRange, rangeIds } from './range-selection';
 import { useVirtualRows } from './use-virtual-rows';
+
+// Module-scoped: the package compiles without Node types, and the literal `process.env.NODE_ENV` that the
+// bundlers replace stays in the output. Never a global declaration (it would clash with the consumer's
+// `@types/node`).
+declare const process: { env: { NODE_ENV?: string } };
 
 export type { ScrollAlign } from '../internal/virtual-rows';
 
@@ -242,7 +246,7 @@ function VirtualListReportTableImpl<Row>(props: VirtualListReportTableProps<Row>
   // --- `truncate: false` cannot grow a fixed-pitch row --------------------------------------------
   const warned = useRef(new Set<string>());
   useEffect(() => {
-    if (!virtual || !isDev()) return;
+    if (process.env.NODE_ENV === 'production' || !virtual) return;
     for (const column of table.columns) {
       if (column.truncate === false && !warned.current.has(column.id)) {
         warned.current.add(column.id);

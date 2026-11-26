@@ -82,15 +82,6 @@ export interface UseComboboxReturn<T> {
   reset: () => void;
 }
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
-
 /**
  * Headless synchronous combobox (ARIA "combobox with listbox"): focus stays on the input, the
  * active option is exposed with `aria-activedescendant`. No markup, no style.
@@ -164,7 +155,7 @@ export function useCombobox<T>(options: UseComboboxOptions<T>): UseComboboxRetur
   const activeIndex = isOpen ? rawIndex : -1;
 
   useEffect(() => {
-    if (!isDev() || duplicatesWarned.current) return;
+    if (process.env.NODE_ENV === 'production' || duplicatesWarned.current) return;
     const keys = items.map(itemToKey);
     if (new Set(keys).size !== keys.length) {
       duplicatesWarned.current = true;

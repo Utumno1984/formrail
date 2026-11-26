@@ -12,7 +12,6 @@ import {
   type MouseEvent,
   type ReactNode,
 } from 'react';
-import { isDev } from '../internal/is-dev';
 import { handleNavigationClick, hasNavigableHref, isAppNavigationClick } from '../internal/navigation';
 import { Skeleton } from '../skeleton/Skeleton';
 import { StatusBadge } from '../status-badge/StatusBadge';
@@ -418,7 +417,7 @@ export const AppLauncher = /* @__PURE__ */ forwardRef<HTMLElement, AppLauncherPr
   // Development errors, once per distinct list (not at every render).
   const problems = appLauncherProblems(apps, !!onNavigate, extraGroups, !!onExtraItemActivate).join('\n');
   useEffect(() => {
-    if (!problems || !isDev()) return;
+    if (process.env.NODE_ENV === 'production' || !problems) return;
     for (const problem of problems.split('\n')) console.error(`[formrail] <AppLauncher>: ${problem}.`);
   }, [problems]);
 

@@ -17,7 +17,6 @@ import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { useFormResetSync } from '../internal/form-reset-sync';
-import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
@@ -89,9 +88,6 @@ const MARK =
   'not-forced-colors:peer-aria-readonly:text-rop-readonly-indicator forced-colors:text-[HighlightText]';
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 
-const BOTH_WARNING =
-  '[formrail] <Checkbox> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.';
-
 /**
  * Checkbox: a styled native `<input type="checkbox">` with an optional inline label. Inside a
  * `Field` it takes `id`, `name`, `aria-describedby` (merged with its own), `aria-invalid`,
@@ -118,9 +114,11 @@ export const Checkbox = /* @__PURE__ */ forwardRef<HTMLInputElement, CheckboxPro
   const warned = useRef(false);
 
   useEffect(() => {
-    if (controlled && defaultChecked !== undefined && !warned.current && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && controlled && defaultChecked !== undefined && !warned.current) {
       warned.current = true;
-      console.error(BOTH_WARNING);
+      console.error(
+        '[formrail] <Checkbox> received both `checked` and `defaultChecked`: `checked` wins and `defaultChecked` is ignored.',
+      );
     }
   }, [controlled, defaultChecked]);
 

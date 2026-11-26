@@ -18,7 +18,6 @@ import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
 import { CapIconSlot } from '../internal/CapIconSlot';
 import { useFormResetSync } from '../internal/form-reset-sync';
-import { isDev } from '../internal/is-dev';
 import { hasContent } from '../internal/react-nodes';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
@@ -122,11 +121,6 @@ const DOT =
 const TEXT = 'min-w-0 py-0.5 [overflow-wrap:anywhere]';
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
-const NO_NAME_WARNING =
-  '[formrail] <RadioGroup> has no accessible name: put it in a <Field label>, or pass `aria-label` or `aria-labelledby`.';
-const BOTH_WARNING =
-  '[formrail] <RadioGroup> received both `value` and `defaultValue`: `value` wins and `defaultValue` is ignored.';
-
 /**
  * RadioGroup: native `<input type="radio">` items (`RadioGroupItem`) sharing one `name` inside a
  * `role="radiogroup"` container, so Tab (one stop), arrows (move **and** select, skipping disabled
@@ -167,13 +161,18 @@ export const RadioGroup = /* @__PURE__ */ forwardRef<HTMLDivElement, RadioGroupP
   const hasName = Boolean(fieldProps['aria-labelledby'] ?? rest['aria-label']);
 
   useEffect(() => {
-    if (!isDev() || warned.current) return;
-    if (!hasName) {
-      warned.current = true;
-      console.error(NO_NAME_WARNING);
-    } else if (controlled && defaultValue !== undefined) {
-      warned.current = true;
-      console.error(BOTH_WARNING);
+    if (process.env.NODE_ENV !== 'production' && !warned.current) {
+      if (!hasName) {
+        warned.current = true;
+        console.error(
+          '[formrail] <RadioGroup> has no accessible name: put it in a <Field label>, or pass `aria-label` or `aria-labelledby`.',
+        );
+      } else if (controlled && defaultValue !== undefined) {
+        warned.current = true;
+        console.error(
+          '[formrail] <RadioGroup> received both `value` and `defaultValue`: `value` wins and `defaultValue` is ignored.',
+        );
+      }
     }
   }, [hasName, controlled, defaultValue]);
 
@@ -244,13 +243,13 @@ export const RadioGroupItem = /* @__PURE__ */ forwardRef<HTMLInputElement, Radio
 
   const unnamed = !hasContent(children) && !rest['aria-label'] && !rest['aria-labelledby'];
   useEffect(() => {
-    if (unnamed && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && unnamed) {
       console.error(`[formrail] <RadioGroupItem value="${value}"> has no accessible name: give it children, \`aria-label\` or \`aria-labelledby\`.`);
     }
   }, [unnamed, value]);
 
   if (!group) {
-    if (isDev()) console.error('[formrail] <RadioGroupItem> must be rendered inside a <RadioGroup>.');
+    if (process.env.NODE_ENV !== 'production') console.error('[formrail] <RadioGroupItem> must be rendered inside a <RadioGroup>.');
     return null;
   }
   const { blocked } = group;

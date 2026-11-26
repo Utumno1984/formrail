@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from 'react';
 import { Button } from '../button/Button';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import { getPaginationRange, toInt } from './pagination-range';
@@ -132,7 +131,7 @@ export const Pagination = /* @__PURE__ */ forwardRef<HTMLElement, PaginationProp
   );
 
   useEffect(() => {
-    if (isDev() && page !== pageProp) {
+    if (process.env.NODE_ENV !== 'production' && page !== pageProp) {
       console.error(
         `[formrail] <Pagination page={${String(pageProp)}}> is outside 1..${pageCount}: showing page ${page}. onPageChange is not called to correct it.`,
       );
