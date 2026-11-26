@@ -163,15 +163,6 @@ export type ButtonProps = ButtonBaseProps &
       } & AccessibleName)
   );
 
-// Bundlers replace `process.env.NODE_ENV` in consumer builds; without `process` assume development.
-// (`typeof process` is NOT replaced by bundlers, so it would keep the dev code in production.)
-const isDev = (): boolean => {
-  try {
-    return process.env.NODE_ENV !== 'production';
-  } catch {
-    return true;
-  }
-};
 const isBlank = (value: unknown): boolean => typeof value !== 'string' || value.trim() === '';
 
 const blockClick = (event: MouseEvent) => event.preventDefault();
@@ -204,7 +195,7 @@ export const Button = /* @__PURE__ */ forwardRef<HTMLElement, ButtonProps>(funct
   const iconOnly = size.startsWith('icon-');
   const named = !isBlank(rest['aria-label']) || !isBlank(rest['aria-labelledby']);
   useEffect(() => {
-    if (iconOnly && !named && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && iconOnly && !named) {
       console.error(
         `[formrail] <Button size="${size}"> has no visible text: it needs an accessible name (aria-label or aria-labelledby).`,
       );
@@ -220,10 +211,10 @@ export const Button = /* @__PURE__ */ forwardRef<HTMLElement, ButtonProps>(funct
 
   if (asChild) {
     if (!isValidElement(children) || children.type === Fragment) {
-      throw new Error('[formrail] <Button asChild> expects exactly one React element as its child.');
+      throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<Button asChild> expects exactly one React element as its child.`);
     }
     if (
-      isDev() &&
+      process.env.NODE_ENV !== 'production' &&
       Number.parseInt(version, 10) < 19 &&
       typeof children.type === 'function' &&
       !(children.type.prototype as { isReactComponent?: unknown } | undefined)?.isReactComponent

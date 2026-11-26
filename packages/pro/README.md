@@ -4,8 +4,9 @@ Pro tier of Formrail (commercial license, see [LICENSE](./LICENSE)).
 
 Works with React Hook Form (`react-hook-form` ^7.92.0) and TanStack Form (`@tanstack/react-form`, tested on 1.33.x).
 
-- `"private": true` on purpose: nothing is published from this workspace except by the release script (a guard test,
-  `scripts/pro-package.test.mjs`, fails if `private` is removed or the license becomes MIT). There is
+- `"private": true` on purpose in this workspace: a stray `npm publish` fails. The package is published to
+  GitHub Packages as `@formrail-dev/pro` only by `scripts/release-pro.mjs` (see [Release](#release-maintainers)); a guard test,
+  `scripts/pro-package.test.mjs`, fails if `private` is removed or the license becomes MIT. There is
   no runtime licensing mechanism: no network access, no keys (asserted on the built bundle).
 - The source is readable in this public monorepo; the Pro moat is the service/license, not code secrecy.
   The MIT license at the repository root covers `packages/core` only.
@@ -17,8 +18,83 @@ Works with React Hook Form (`react-hook-form` ^7.92.0) and TanStack Form (`@tans
 - The engine (`computeChangeSummary`, `useChangeSummary`) works with any form state that exposes the
   current values and the saved baseline (e.g. core's `useObjectPageForm`). The components
   (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as an **optional peer
-  dependency** and treated as external by the build. The peer range must be revisited when pro is
-  published.
+  dependency** and treated as external by the build. The peer is an **exact** version: see
+  [Install (licensed teams)](#install-licensed-teams).
+
+## Install (licensed teams)
+
+The Pro package is published on GitHub Packages, under the `formrail-dev` organization, as `@formrail-dev/pro`.
+You install it with an npm alias, so your imports stay `@formrail/pro`. `@formrail/core` keeps coming from the
+public npm registry: only the `@formrail-dev` scope points to GitHub.
+
+1. **Token**: a classic personal access token with the `read:packages` scope (only that), from the GitHub account
+   the licence was granted to. Keep it in an environment variable, never in a file you commit.
+2. **`.npmrc`** in your project root (committed: it holds no secret, the token comes from the environment):
+
+   ```ini
+   @formrail-dev:registry=https://npm.pkg.github.com
+   //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+   ```
+
+   Do **not** map the `@formrail` scope to GitHub: that would move `@formrail/core` too.
+3. **Alias** in your `package.json`, with **exact** versions (no `^`):
+
+   ```json
+   {
+     "dependencies": {
+       "@formrail/core": "0.2.0",
+       "@formrail/pro": "npm:@formrail-dev/pro@0.2.0"
+     }
+   }
+   ```
+
+   Each release of the Pro is built against one release of the core: it uses `@formrail/core/internal`, which
+   gives no compatibility promise between versions, so it declares that exact core version as its peer
+   dependency. Install the core at exactly that version (`npm view @formrail-dev/pro@<version> peerDependencies`
+   shows it), and upgrade the two together: with a newer or older core, `npm install` fails with `ERESOLVE`. The
+   core is needed for the main entry and the components only, see
+   [Entries](#entries-and-who-installs-formrailcore).
+
+4. **Install** with the variable set: `NODE_AUTH_TOKEN=<your token> npm install` (pnpm and yarn read the same
+   `.npmrc` and understand the `npm:` alias).
+5. **CI**: store the token as a secret of your CI and expose it as `NODE_AUTH_TOKEN`; for GitHub Actions:
+
+   ```yaml
+   - run: npm ci
+     env:
+       NODE_AUTH_TOKEN: ${{ secrets.FORMRAIL_PACKAGES_TOKEN }}
+   ```
+
+   (`FORMRAIL_PACKAGES_TOKEN` is the name of your own secret, holding the `read:packages` token.)
+
+Then `import { computeChangeSummary } from '@formrail/pro/engine'` works as in the rest of this document, with ESM and CJS.
+
+## Release (maintainers)
+
+The workspace keeps `"private": true`; the package is published only by `scripts/release-pro.mjs`, from a staging
+directory it creates under the system temp directory and always removes (also on an error, and on Ctrl-C or
+SIGTERM).
+
+1. `npm run build`. The script does not build: it refuses a `packages/pro/dist` older than the sources.
+2. `npm run release:pro`: a dry run. It checks that the `@formrail/core` versions the Pro asks for are on npm,
+   stages the published manifest (`@formrail-dev/pro`, no `private`, no `scripts` or `devDependencies`), checks
+   the tarball (only `dist/**`, `LICENSE`, `README.md`, `package.json`; no absolute path in the sourcemaps), runs
+   `npm publish --dry-run` and fails unless npm resolves the registry to `https://npm.pkg.github.com`.
+3. The real publish, only with the explicit go-ahead of the project owner:
+   `NODE_AUTH_TOKEN=<token with write:packages> npm run release:pro -- --publish`. It runs the whole dry run of
+   step 2 first and publishes only if it passes. The staging directory gets this `.npmrc`, the same as the
+   buyers' one above: npm reads the token from `NODE_AUTH_TOKEN` through it, and the token is never written to
+   disk.
+
+   ```ini
+   @formrail-dev:registry=https://npm.pkg.github.com
+   //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+   ```
+
+Note for the first publish: `repository` in `package.json` points to `Utumno1984/formrail`, while the package
+belongs to the `formrail-dev` organization. With two different owners the automatic link between the package and
+the repository may not happen: check it on the package page after the first publish, and decide then whether to
+change `repository` or link the package by hand.
 
 ## Entries, and who installs `@formrail/core`
 
@@ -76,7 +152,8 @@ npm install @formrail/pro react-hook-form
   not needed. `react-hook-form` is an **optional** peer dependency of `@formrail/pro`, used for the types
   only: nothing of the library is imported at runtime. The adapter calls the methods of your `form` and
   reads two **internal** fields of its `control` (see [Internals read](#internals-read)).
-- `@formrail/pro` is `"private": true` today: it is distributed through GitHub Packages (org `formrail-dev`) as `@formrail-dev/pro` and installed with the npm alias `@formrail/pro`.
+- `@formrail/pro` is `"private": true` in the workspace; licensed teams install it from GitHub Packages with an alias,
+  see [Install (licensed teams)](#install-licensed-teams).
 - The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
   `react-hook-form`; import the adapter from its subpath (`moduleResolution` `bundler`, `node16` or
   `nodenext`).
@@ -272,7 +349,8 @@ npm install @formrail/pro @tanstack/react-form
   types only: nothing of TanStack Form (`@tanstack/react-form`, `@tanstack/form-core`, `@tanstack/store`) is
   imported at runtime. The adapter calls the methods of your `form` (`form.store`, `form.baseStore`,
   `form.setFieldMeta`, `form.Subscribe`, see [What the adapter reads](#what-the-adapter-reads)).
-- `@formrail/pro` is `"private": true` today: it is distributed through GitHub Packages (org `formrail-dev`) as `@formrail-dev/pro` and installed with the npm alias `@formrail/pro`.
+- `@formrail/pro` is `"private": true` in the workspace; licensed teams install it from GitHub Packages with an alias,
+  see [Install (licensed teams)](#install-licensed-teams).
 - The main entry `@formrail/pro` does not re-export the adapter, so its declaration files never name
   `@tanstack/react-form`; import the adapter from its subpath (`moduleResolution` `bundler`, `node16` or
   `nodenext`).

@@ -41,8 +41,8 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'r
 // A function, not a module-level constant: no top-level work, so the module stays tree-shakable.
 const isReact19 = (): boolean => Number.parseInt(version, 10) >= 19;
 
-// Library code cannot tell dev from prod reliably (no `process` typing, bundler-dependent
-// replacement), so the misuse warning is emitted once per page load instead.
+// Development only (the call site is guarded by `process.env.NODE_ENV`, so a production bundle drops
+// the function with its text); emitted once per page load.
 let warned = false;
 function warnInvalidChild(): void {
   if (warned) return;
@@ -66,7 +66,7 @@ export const Icon = /* @__PURE__ */ forwardRef<SVGSVGElement, IconProps>(functio
     (typeof child.type === 'string' && child.type !== 'svg')
   ) {
     // Declared behaviour: nothing is rendered (never a half-sized, half-labelled foreign node).
-    warnInvalidChild();
+    if (process.env.NODE_ENV !== 'production') warnInvalidChild();
     return null;
   }
 

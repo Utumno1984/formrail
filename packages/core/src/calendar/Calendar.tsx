@@ -15,7 +15,6 @@ import {
 import { Button } from '../button/Button';
 import { FieldContext } from '../field/FieldContext';
 import { useFieldControlProps } from '../field/useFieldControlProps';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import {
@@ -177,7 +176,6 @@ function Arrow({ direction, rtl }: { direction: 'previous' | 'next'; rtl: boolea
   );
 }
 
-const PREFIX = '[formrail] <Calendar>';
 const isWeekday = (n: unknown): n is Weekday => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 6;
 /** `undefined`/`null` are "absent", never an error; any other non-ISO value is. */
 const invalidDate = (v: unknown) => v !== undefined && v !== null && !isIsoDate(v);
@@ -286,37 +284,37 @@ export const Calendar = /* @__PURE__ */ forwardRef<HTMLDivElement, CalendarProps
   }
 
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     if (valueControlled && invalidDate(valueProp)) {
-      console.error(`${PREFIX} \`value\` ${JSON.stringify(valueProp)} is not a valid ISO date (YYYY-MM-DD): nothing is selected.`);
+      console.error(`[formrail] <Calendar> \`value\` ${JSON.stringify(valueProp)} is not a valid ISO date (YYYY-MM-DD): nothing is selected.`);
     }
   }, [valueControlled, valueProp]);
   useEffect(() => {
-    if (!isDev()) return;
+    if (process.env.NODE_ENV === 'production') return;
     for (const [name, v] of [
       ['defaultValue', defaultValue],
       ['min', minProp],
       ['max', maxProp],
       ['today', todayProp],
     ] as const) {
-      if (invalidDate(v)) console.error(`${PREFIX} \`${name}\` ${JSON.stringify(v)} is not a valid ISO date (YYYY-MM-DD): it is ignored.`);
+      if (invalidDate(v)) console.error(`[formrail] <Calendar> \`${name}\` ${JSON.stringify(v)} is not a valid ISO date (YYYY-MM-DD): it is ignored.`);
     }
     for (const [name, v] of [
       ['month', monthProp],
       ['defaultMonth', defaultMonth],
     ] as const) {
-      if (v !== undefined && !isIsoMonth(v)) console.error(`${PREFIX} \`${name}\` ${JSON.stringify(v)} is not a valid ISO month (YYYY-MM): it is ignored.`);
+      if (v !== undefined && !isIsoMonth(v)) console.error(`[formrail] <Calendar> \`${name}\` ${JSON.stringify(v)} is not a valid ISO month (YYYY-MM): it is ignored.`);
     }
     if (weekStartsOnProp !== undefined && !isWeekday(weekStartsOnProp)) {
-      console.error(`${PREFIX} \`weekStartsOn\` ${JSON.stringify(weekStartsOnProp)} is not an integer 0-6: derived from the locale instead.`);
+      console.error(`[formrail] <Calendar> \`weekStartsOn\` ${JSON.stringify(weekStartsOnProp)} is not an integer 0-6: derived from the locale instead.`);
     }
     if (valueControlled && defaultValue !== undefined) {
-      console.error(`${PREFIX} received both \`value\` and \`defaultValue\`: \`value\` wins and \`defaultValue\` is ignored.`);
+      console.error(`[formrail] <Calendar> received both \`value\` and \`defaultValue\`: \`value\` wins and \`defaultValue\` is ignored.`);
     }
   }, [defaultValue, minProp, maxProp, todayProp, monthProp, defaultMonth, weekStartsOnProp, valueControlled]);
   useEffect(() => {
-    if (isDev() && limitsConflict({ min, max })) {
-      console.error(`${PREFIX} \`min\` (${min}) is after \`max\` (${max}): no date can be selected.`);
+    if (process.env.NODE_ENV !== 'production' && limitsConflict({ min, max })) {
+      console.error(`[formrail] <Calendar> \`min\` (${min}) is after \`max\` (${max}): no date can be selected.`);
     }
   }, [min, max]);
 

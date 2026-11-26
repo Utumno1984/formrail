@@ -17,7 +17,6 @@ import { useFieldControlProps } from '../field/useFieldControlProps';
 import { Icon } from '../icon/Icon';
 import { CONTROL_INVALID } from '../internal/field-control-styles';
 import { stepperIcons } from '../internal/icons';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
 import {
@@ -106,7 +105,7 @@ const STEPPER =
   'not-disabled:rop-hover:text-rop-text disabled:pointer-events-none disabled:opacity-50';
 
 const warn = (message: string) => {
-  if (isDev()) console.warn(`[formrail] <NumberInput> ${message}`);
+  if (process.env.NODE_ENV !== 'production') console.warn(`[formrail] <NumberInput> ${message}`);
 };
 
 /**

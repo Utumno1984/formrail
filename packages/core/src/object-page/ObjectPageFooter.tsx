@@ -16,7 +16,6 @@ import { hasContent } from '../internal/react-nodes';
 import { TruncatedText } from '../truncated-text/TruncatedText';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
-import { isDev } from '../internal/is-dev';
 import { useObjectPageContext } from './ObjectPageContext';
 import {
   footerActionsClass,
@@ -121,7 +120,7 @@ export const ObjectPageFooter = /* @__PURE__ */ forwardRef<HTMLDivElement, Objec
   useIsoLayoutEffect(() => claimFooter?.(key), [claimFooter, key]);
 
   useEffect(() => {
-    if (!isDev() || !claimed || first) return;
+    if (process.env.NODE_ENV === 'production' || !claimed || first) return;
     console.warn('ObjectPageFooter: a page can have only one footer; this one is not rendered.');
   }, [claimed, first]);
 

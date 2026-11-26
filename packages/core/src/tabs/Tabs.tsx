@@ -14,7 +14,6 @@ import {
   type RefObject,
 } from 'react';
 import * as RadixTabs from '@radix-ui/react-tabs';
-import { isDev } from '../internal/is-dev';
 import { scrollFromStart, towardsEndSign } from '../internal/rtl-scroll';
 import { cn } from '../utils/cn';
 import { composeRefs } from '../utils/compose-refs';
@@ -159,10 +158,6 @@ const EDGE_EPSILON = 1;
 const CONTENT =
   'min-w-0 flex-1 data-[state=inactive]:hidden focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:-outline-offset-2';
 
-const NO_NAME_WARNING = '[formrail] <TabsList> has no accessible name: pass `aria-label` or `aria-labelledby`.';
-const noMatchWarning = (value: string) =>
-  `[formrail] <Tabs value="${value}"> matches no tab: no panel is shown.`;
-
 /**
  * Tabs: tablist / tab / tabpanel pattern with roving tabindex and arrow keys (Home/End, wrap,
  * disabled tabs skipped, RTL and vertical aware), `automatic` or `manual` activation, and an
@@ -217,7 +212,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
   const noSelection = `\u0000rop-no-selection:${useId()}`;
 
   useEffect(() => {
-    if (!isDev() || value === undefined) return;
+    if (process.env.NODE_ENV === 'production' || value === undefined) return;
     const el = root.current;
     if (!el) return;
     const own = (node: Element) => node.closest('[data-rop-tabs]') === el;
@@ -225,7 +220,7 @@ export const Tabs = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsProps>(functi
     const check = () => {
       const tabs = Array.from(el.querySelectorAll('[role="tab"]')).filter(own);
       const unmatched = tabs.length > 0 && !tabs.some((t) => t.getAttribute('aria-selected') === 'true');
-      if (unmatched && !warned) console.error(noMatchWarning(value));
+      if (unmatched && !warned) console.error(`[formrail] <Tabs value="${value}"> matches no tab: no panel is shown.`);
       warned = unmatched;
     };
     check();
@@ -339,7 +334,7 @@ export const TabsList = /* @__PURE__ */ forwardRef<HTMLDivElement, TabsListProps
   const named = Boolean(rest['aria-label'] ?? rest['aria-labelledby']);
   const { orientation, dir } = useContext(TabsContext);
   useEffect(() => {
-    if (!named && isDev()) console.error(NO_NAME_WARNING);
+    if (process.env.NODE_ENV !== 'production' && !named) console.error('[formrail] <TabsList> has no accessible name: pass `aria-label` or `aria-labelledby`.');
   }, [named]);
   const horizontal = orientation === 'horizontal';
   const listEl = useRef<HTMLDivElement>(null);

@@ -60,18 +60,14 @@ describe('dist of @formrail/pro/react-hook-form', () => {
 
   it.each(['js', 'cjs'])('the .%s adapter bundles only its own modules: no second copy of an engine or of a shared helper', (ext) => {
     // (The CJS build also writes the comment of the entry file itself.)
-    // `internal/is-dev.ts` (the development check of the internals warning, QA #507 point 5) is the one module every
-    // entry bundles on purpose: tsup.config.ts keeps it out of `shared.*`, so each entry holds its own
-    // `process.env.NODE_ENV` read.
     expect(modulesOf(`react-hook-form.${ext}`).filter((module) => module !== 'src/react-hook-form.ts')).toEqual([
       'src/integrations/react-hook-form/snapshot.ts',
       'src/integrations/react-hook-form/use-react-hook-form-binding.ts',
-      'src/internal/is-dev.ts',
     ]);
     // The layout-effect helper comes from the shared file both other entries import.
     expect(distClosure(dist(`react-hook-form.${ext}`))).toContain(dist(`shared.${ext}`));
     const others = ['index', 'engine', 'shared'].flatMap((entry) => modulesOf(`${entry}.${ext}`));
-    expect(modulesOf(`react-hook-form.${ext}`).filter((module) => module !== 'src/internal/is-dev.ts' && others.includes(module))).toEqual([]);
+    expect(modulesOf(`react-hook-form.${ext}`).filter((module) => others.includes(module))).toEqual([]);
   });
 
   it.each(['react-hook-form.js', 'react-hook-form.cjs'])('%s and its files contain no runtime licensing / network mechanism', (file) => {

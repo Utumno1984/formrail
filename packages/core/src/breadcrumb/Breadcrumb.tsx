@@ -95,7 +95,7 @@ export const BreadcrumbLink = /* @__PURE__ */ forwardRef<HTMLAnchorElement, Brea
   function BreadcrumbLink({ asChild = false, className, children, ...rest }, ref) {
     if (asChild) {
       if (!isValidElement(children)) {
-        throw new Error('[formrail] <BreadcrumbLink asChild> expects exactly one React element as its child.');
+        throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<BreadcrumbLink asChild> expects exactly one React element as its child.`);
       }
       const child = children as ReactElement<{ className?: string; children?: ReactNode }>;
       // The class merge is done here (Slot only concatenates): the child's own classes go last.

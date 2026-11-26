@@ -1,5 +1,4 @@
 import { forwardRef, useEffect, useRef, type HTMLAttributes } from 'react';
-import { isDev } from '../internal/is-dev';
 import { cn } from '../utils/cn';
 
 export type SpinnerSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -51,7 +50,7 @@ export const Spinner = /* @__PURE__ */ forwardRef<HTMLSpanElement, SpinnerProps>
     if (decorative) return;
     // Same rule as Icon: empty, whitespace-only or non-string (a JS consumer's `null`) is "no label".
     const text = typeof label === 'string' && label.trim() !== '' ? label : '';
-    if (text === '' && isDev()) {
+    if (process.env.NODE_ENV !== 'production' && text === '') {
       console.error('[formrail] <Spinner> has an empty label: nothing is announced. Pass a label or use `decorative`.');
     }
     const frame = requestAnimationFrame(() => {
