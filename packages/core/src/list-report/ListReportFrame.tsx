@@ -134,6 +134,28 @@ export type ListReportFrameProps<Row> = Omit<HTMLAttributes<HTMLDivElement>, 'ch
    */
   searchLabel?: string;
   /**
+   * Name of the button that clears the search (see `ListReportFilterBar`). `undefined` keeps the default;
+   * an empty string is forwarded as is (a button without a name: up to the consumer).
+   * @default 'Clear search'
+   */
+  clearSearchLabel?: string;
+  /**
+   * Placeholder of the search box (see `ListReportFilterBar`).
+   * @default searchLabel
+   */
+  searchPlaceholder?: string;
+  /**
+   * Accessible name of the `search` landmark of the bar: reaches `ListReportFilterBar` as `aria-label`
+   * (on the report itself `aria-label` goes on the root). With `filterBarLabelledBy` and without this one
+   * the landmark has no `aria-label`.
+   * @default 'Filters and search'
+   */
+  filterBarLabel?: string;
+  /**
+   * Id of the element that names the `search` landmark: reaches `ListReportFilterBar` as `aria-labelledby`.
+   */
+  filterBarLabelledBy?: string;
+  /**
    * Renders the search box. Without it and without `filters` there is no bar at all.
    * @default true
    */
@@ -211,6 +233,10 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportF
     labels,
     filtersLabel,
     searchLabel,
+    clearSearchLabel,
+    searchPlaceholder,
+    filterBarLabel,
+    filterBarLabelledBy,
     showSearch = true,
     scrollerRef,
     bulkActions,
@@ -282,6 +308,10 @@ function ListReportFrameImpl<Row>(props: ListReportFrameProps<Row> & ListReportF
           table={table}
           filtersLabel={filtersLabel}
           searchLabel={searchLabel}
+          clearSearchLabel={clearSearchLabel}
+          searchPlaceholder={searchPlaceholder}
+          aria-label={filterBarLabel}
+          aria-labelledby={filterBarLabelledBy}
           showSearch={showSearch}
           className={filterBarClass}
         />
