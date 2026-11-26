@@ -18,8 +18,8 @@ Works with React Hook Form (`react-hook-form` ^7.92.0) and TanStack Form (`@tans
 - The engine (`computeChangeSummary`, `useChangeSummary`) works with any form state that exposes the
   current values and the saved baseline (e.g. core's `useObjectPageForm`). The components
   (`<ChangeSummary />`) use `@formrail/core` (`cn`, design tokens), declared as an **optional peer
-  dependency** and treated as external by the build. The peer range must be revisited when pro is
-  published.
+  dependency** and treated as external by the build. The peer is an **exact** version: see
+  [Install (licensed teams)](#install-licensed-teams).
 
 ## Install (licensed teams)
 
@@ -37,16 +37,23 @@ public npm registry: only the `@formrail-dev` scope points to GitHub.
    ```
 
    Do **not** map the `@formrail` scope to GitHub: that would move `@formrail/core` too.
-3. **Alias** in your `package.json` (use the current version):
+3. **Alias** in your `package.json`, with **exact** versions (no `^`):
 
    ```json
    {
      "dependencies": {
-       "@formrail/core": "^0.2.0",
-       "@formrail/pro": "npm:@formrail-dev/pro@^0.2.0"
+       "@formrail/core": "0.2.0",
+       "@formrail/pro": "npm:@formrail-dev/pro@0.2.0"
      }
    }
    ```
+
+   Each release of the Pro is built against one release of the core: it uses `@formrail/core/internal`, which
+   gives no compatibility promise between versions, so it declares that exact core version as its peer
+   dependency. Install the core at exactly that version (`npm view @formrail-dev/pro@<version> peerDependencies`
+   shows it), and upgrade the two together: with a newer or older core, `npm install` fails with `ERESOLVE`. The
+   core is needed for the main entry and the components only, see
+   [Entries](#entries-and-who-installs-formrailcore).
 
 4. **Install** with the variable set: `NODE_AUTH_TOKEN=<your token> npm install` (pnpm and yarn read the same
    `.npmrc` and understand the `npm:` alias).

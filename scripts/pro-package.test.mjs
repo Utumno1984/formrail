@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import semver from 'semver';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const readJson = (path) => JSON.parse(readFileSync(resolve(ROOT, path), 'utf8'));
@@ -261,9 +262,26 @@ describe('packages/pro GitHub Packages configuration (#693)', () => {
     expect(pkg.name).toBe('@formrail/pro');
   });
 
-  it('the description no longer says the package waits for a private npm org', () => {
-    expect(pkg.description).not.toMatch(/private npm org/i);
-    expect(pkg.description).toContain('GitHub Packages');
+  it('the description is for the buyer: the license and where the package comes from, no internal notes', () => {
+    expect(pkg.description).toBe('Pro tier of Formrail (commercial license, see LICENSE). Distributed through GitHub Packages as @formrail-dev/pro.');
+    expect(pkg.description).not.toMatch(/private npm org|to be defined|workspace|scripts\//i);
+  });
+
+  // The Pro uses `@formrail/core/internal`, with no compatibility promise between core versions: each Pro release
+  // asks for one exact core version, and the README makes the buyer install exactly that one (and the Pro exactly).
+  it('the @formrail/core peer is an exact version, and the README Install pins the core to it and the Pro to its own version', () => {
+    const peer = pkg.peerDependencies['@formrail/core'];
+    expect(semver.valid(peer), `peer "${peer}" must be an exact version`).toBe(peer);
+    const readme = readFileSync(resolve(ROOT, 'packages/pro/README.md'), 'utf8');
+    const section = readme.slice(readme.indexOf('## Install (licensed teams)'), readme.indexOf('## Release (maintainers)'));
+    const block = /```json\n([\s\S]*?)```/.exec(section)?.[1];
+    expect(block).toBeDefined();
+    const { dependencies } = JSON.parse(block);
+    expect(dependencies).toEqual({ '@formrail/core': peer, '@formrail/pro': `npm:@formrail-dev/pro@${pkg.version}` });
+    expect(section).toMatch(/exact/i);
+    expect(section).toContain('@formrail/core/internal');
+    expect(section).toContain('ERESOLVE');
+    expect(readme).not.toMatch(/peer range must be revisited/i);
   });
 
   it('the README "Install (licensed teams)" has the .npmrc, NODE_AUTH_TOKEN, read:packages, the alias and a CI example, and no real token', () => {
@@ -274,7 +292,7 @@ describe('packages/pro GitHub Packages configuration (#693)', () => {
       '@formrail-dev:registry=https://npm.pkg.github.com',
       '${NODE_AUTH_TOKEN}',
       '`read:packages`',
-      '"@formrail/pro": "npm:@formrail-dev/pro@^0.2.0"',
+      '"@formrail/pro": "npm:@formrail-dev/pro@',
       'secrets.',
       "import { computeChangeSummary } from '@formrail/pro/engine'",
     ]) {
