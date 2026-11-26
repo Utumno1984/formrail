@@ -36,7 +36,27 @@ interface ModalContextValue {
   open: boolean;
   /** Reported by the portal's content: true while the panel node exists, including its exit animation. */
   setPanelMounted: (mounted: boolean) => void;
+  /** Asks the root to close, as Radix's own dismissal does (`onOpenChange(false)`). Stable. */
+  requestClose: () => void;
 }
+
+/** What an open panel lends the others to receive an Escape that Radix delivered to them too early. */
+interface OpenPanel {
+  /** Handles the Escape as the panel's own Radix layer would: `dismissible`, `onEscapeKeyDown`, then close. */
+  escape: (event: KeyboardEvent) => void;
+}
+
+/**
+ * The open panels, in the order they opened (the last one is on top). Kept in a layout effect, so it
+ * is right from the commit that shows a panel. Radix's own count of its layers is not: the layer under
+ * a panel that just opened stops being "the highest" only after a re-render that React schedules as a
+ * task, one or two frames later on an idle page and longer on a busy one. An Escape in that gap reached
+ * the panel underneath, which closed, and with it the nested panel on top (#714).
+ */
+const openPanels: OpenPanel[] = [];
+
+/** Escapes already handled by a panel: one key press never runs two panels' Escape handling. */
+const handledEscapes = new WeakSet<KeyboardEvent>();
 
 /** True when the focus sits inside a modal that is open (not one that is exiting). */
 function focusIsInOpenModal(): boolean {
@@ -133,10 +153,16 @@ export function ModalRoot({ open, defaultOpen = false, onOpenChange, keepFocusWh
     },
     [open, onOpenChange],
   );
+  // Through a ref, so the context value does not change with an inline `onOpenChange`.
+  const handleOpenChangeRef = useRef(handleOpenChange);
+  useLayoutEffect(() => {
+    handleOpenChangeRef.current = handleOpenChange;
+  });
+  const requestClose = useCallback(() => handleOpenChangeRef.current(false), []);
 
   const ctx = useMemo(
-    () => ({ fallbackHolder, triggerHolder, open: current, setPanelMounted }),
-    [current],
+    () => ({ fallbackHolder, triggerHolder, open: current, setPanelMounted, requestClose }),
+    [current, requestClose],
   );
   return (
     <ModalContext.Provider value={ctx}>
@@ -333,10 +359,41 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     },
     forwardedRef,
   ) {
-    const { fallbackHolder, open, setPanelMounted } = useModalContext(part, root);
+    const { fallbackHolder, open, setPanelMounted, requestClose } = useModalContext(part, root);
     useLayoutEffect(() => {
       fallbackHolder.current = returnFocusRef;
     });
+
+    // The panel's part of an Escape, before Radix's dismissal (which closes unless it was prevented).
+    const ownEscape = (event: KeyboardEvent) => {
+      handledEscapes.add(event);
+      if (!dismissible) event.preventDefault();
+      onEscapeKeyDown?.(event);
+    };
+    const ownEscapeRef = useRef(ownEscape);
+    useLayoutEffect(() => {
+      ownEscapeRef.current = ownEscape;
+    });
+    // This panel in `openPanels` while it is open: the whole Escape, Radix's dismissal included.
+    const entry = useMemo<OpenPanel>(
+      () => ({
+        escape: (event) => {
+          ownEscapeRef.current(event);
+          if (event.defaultPrevented) return;
+          event.preventDefault();
+          requestClose();
+        },
+      }),
+      [requestClose],
+    );
+    useLayoutEffect(() => {
+      if (!open) return undefined;
+      openPanels.push(entry);
+      return () => {
+        const index = openPanels.indexOf(entry);
+        if (index !== -1) openPanels.splice(index, 1);
+      };
+    }, [open, entry]);
     // See `useBeganBeforeOpening`: a late outside dismissal of the tap that reopened the panel.
     const beganBeforeOpening = useBeganBeforeOpening(open);
 
@@ -445,8 +502,22 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               onCloseAutoFocus?.(event);
             }}
             onEscapeKeyDown={(event) => {
-              if (!dismissible) event.preventDefault();
-              onEscapeKeyDown?.(event);
+              // This press was already handled by a panel (the one on top, reached through this one
+              // below): Radix must not close this one too, nor call `onEscapeKeyDown` twice.
+              if (handledEscapes.has(event)) {
+                event.preventDefault();
+                return;
+              }
+              // Open, but not on top: Radix still counts this panel as its highest layer because the
+              // panel opened above it has not registered yet (see `openPanels`). The Escape is that
+              // panel's; this one stays open. (A panel that is exiting is not in the list: unchanged.)
+              const top = openPanels[openPanels.length - 1];
+              if (top && top !== entry && openPanels.includes(entry)) {
+                top.escape(event);
+                event.preventDefault();
+                return;
+              }
+              ownEscape(event);
             }}
             onPointerDownOutside={(event) => {
               if (!dismissible || beganBeforeOpening(event)) event.preventDefault();
