@@ -1,0 +1,180 @@
+---
+title: Async hydration without a false "modified" flag in a record editor
+date: 2026-11-26
+slug: async-hydration-without-false-modified
+description: A record editor opens empty, the data arrives half a second later and the form claims unsaved changes. Why it happens, and two ways to avoid it with useObjectPageForm.
+author: Daniele Ingusci
+---
+<p>You open a record in an editor. For half a second the fields are empty, then the data arrives and they fill in. You have not touched anything, yet the save bar slides in, and if you click "Back" the app asks whether you really want to discard your changes. It is a common small bug in record editors, and it erodes trust: a user who learns that the "unsaved changes" warning is sometimes wrong learns to ignore it, including the times it is right.</p>
+<p>This article explains where the false "modified" flag comes from and shows two ways to avoid it with <code>useObjectPageForm</code>, the form-state hook of <code>@formrail/core</code> (MIT). The code blocks are compiled against the current public API of the package, and the behaviours described are covered by unit tests in the repository.</p>
+
+<h2>Where the false flag comes from</h2>
+<p>There are two independent causes, which often appear together.</p>
+<h3>Cause one: the form compares against the wrong thing</h3>
+<p>The simplest way to track "modified" is to remember the state the form started with and compare. If the form starts empty and the data is poured in afterwards, the comparison does exactly what it was told: the values differ from the empty initial state.</p>
+<pre><code class="language-tsx">import { useEffect, useState } from 'react';
+
+interface Invoice {
+  customer: string;
+  reference: string;
+}
+
+const EMPTY: Invoice = { customer: '', reference: '' };
+
+// A stand-in for your data layer.
+declare function fetchInvoice(id: string): Promise&lt;Invoice&gt;;
+
+export function NaiveInvoiceEditor({ id }: { id: string }) {
+  const [values, setValues] = useState&lt;Invoice&gt;(EMPTY);
+
+  useEffect(() => {
+    void fetchInvoice(id).then(setValues); // the data arrives: values now differ from EMPTY
+  }, [id]);
+
+  const isModified = values.customer !== EMPTY.customer || values.reference !== EMPTY.reference;
+  return &lt;p&gt;{isModified ? 'Unsaved changes' : 'Saved'}&lt;/p&gt;;
+}</code></pre>
+<p>The flag is true as soon as the data arrives. The bug is not in the comparison but in the reference: the form should be compared with the record as it was last saved, and once the data has arrived, <em>that</em> is the record, not the empty placeholder shown while waiting.</p>
+<h3>Cause two: an echo that looks like a gesture</h3>
+<p>The second cause lives in the controls. A control may call its change handler when it is handed a new value from outside, not only when the user acts. If that handler marks the form as modified, the arrival of the data looks like the user typing. The same happens when a control normalizes what it receives (trims, reformats, rounds) and reports the normalized value back.</p>
+<p>A control that never does this is a control without "echo". The controls of <code>@formrail/core</code> are built that way: changing <code>value</code> from outside never calls the change handler, only the user does. For <code class="api">Input</code> you can watch it in <a href="../../storybook/?path=/story/forms-input--controlled-vs-uncontrolled">the controlled story</a>, whose play function sets a value from outside, checks that nothing was reported, then types and checks that the report arrives. <code class="api">Textarea</code>, <code class="api">Select</code>, <code class="api">Combobox</code>, <code class="api">MultiSelect</code>, <code class="api">NumberInput</code>, <code class="api">DatePicker</code>, <code class="api">Checkbox</code> and <code class="api">Switch</code> have unit tests for the same rule, all named "no echo". That is half of the answer. The other half is what the form does with the values it receives.</p>
+
+<h2>The flag is a comparison, not an event</h2>
+<p><code class="api">useObjectPageForm</code> takes a <code>baseline</code>, the last known saved state, and returns the current <code>values</code> and <code>isDirty</code>. The key design decision is that <code>isDirty</code> is a deep structural comparison of <code>values</code> against the real <code>baseline</code>, not a "touched" flag that something sets and something else has to clear. Two consequences, both tested:</p>
+<ul>
+  <li>Restoring the original value makes the form clean again: type a character, delete it, and <code>isDirty</code> is <code>false</code> again.</li>
+  <li>Setting a field to the value it already has is a no-op: nothing changes and the hook does not re-render.</li>
+</ul>
+<p>So a handler that fires "by mistake" with a value equal to the baseline is harmless. If a hydrated value equals the baseline there is nothing to explain; if it differs, the form is by definition modified, and the only way to avoid the false flag is to make the baseline the hydrated record. The two options below do that.</p>
+<p>Equality is strict: <code>''</code>, <code>null</code> and <code>undefined</code> are all different from each other, and a key set to <code>undefined</code> differs from a missing key. Dates compare by time, plain objects and arrays by content.</p>
+
+<h2>Option one: mount the editor already hydrated</h2>
+<p>The most robust fix is to avoid the problem. Do not render the editor until the record exists, and give <code>useObjectPageForm</code> the record as its baseline at mount. There is no empty state to leave and nothing to reset. While the record is in flight, the page shows a loading state with no editable field.</p>
+<pre><code class="language-tsx">import { useEffect, useState } from 'react';
+import { Field, Input, useObjectPageForm } from '@formrail/core';
+
+interface Invoice {
+  id: string;
+  customer: string;
+  reference: string;
+}
+
+declare function fetchInvoice(id: string): Promise&lt;Invoice&gt;;
+
+function InvoiceEditor({ invoice }: { invoice: Invoice }) {
+  // Read once, at mount: the record is the baseline, so `isDirty` is false until the user edits.
+  const form = useObjectPageForm({ baseline: invoice });
+  return (
+    &lt;form&gt;
+      &lt;Field label="Customer" name="customer"&gt;
+        &lt;Input value={form.values.customer} onChange={(event) =&gt; form.setValue('customer', event.target.value)} /&gt;
+      &lt;/Field&gt;
+      &lt;Field label="Reference" name="reference"&gt;
+        &lt;Input value={form.values.reference} onChange={(event) =&gt; form.setValue('reference', event.target.value)} /&gt;
+      &lt;/Field&gt;
+      &lt;p&gt;{form.isDirty ? 'Unsaved changes' : 'Saved'}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}
+
+export function InvoicePage({ id }: { id: string }) {
+  const [loaded, setLoaded] = useState&lt;Invoice | null&gt;(null);
+
+  useEffect(() => {
+    let ignore = false;
+    void fetchInvoice(id).then((invoice) => {
+      if (!ignore) setLoaded(invoice);
+    });
+    return () => {
+      ignore = true; // a response for an `id` we have already left is discarded
+    };
+  }, [id]);
+
+  if (loaded === null || loaded.id !== id) return &lt;p role="status"&gt;Loading invoice…&lt;/p&gt;;
+  // `key`: another record is another editor, mounted hydrated, never a reset of the old one.
+  return &lt;InvoiceEditor key={loaded.id} invoice={loaded} /&gt;;
+}</code></pre>
+<p>Three details do the work. The editor is a separate component, so the hook runs only once the record is available. The <code>key</code> makes a different record a different editor, with its own baseline. And the <code>loaded.id !== id</code> check keeps the old record off the screen while the new one loads.</p>
+<p>This is the pattern of the worked example in Storybook. <a href="../../storybook/?path=/story/showcase-record-editing--sales-order-record-page">Open the sales order page</a>, slow the load with the <code>loadDelayMs</code> control, and you see a loading state with no field, then the editor with the save bar hidden. Its play function changes a quantity (the bar appears) and puts the old one back (the bar goes away).</p>
+
+<h2>Option two: hydrate an existing form with reset</h2>
+<p>Sometimes the form has to exist before the data does: a page shell owns it, or one component handles both creation and editing. For that case the hook offers <code>reset(newBaseline)</code>. It replaces the baseline and the values at once, so the form is clean afterwards, and it is the explicit way to say "this is the saved state now" rather than an edit by the user. The hook has no change callback at all: nothing is reported to you when you hydrate it.</p>
+<pre><code class="language-tsx">import { useEffect } from 'react';
+import { Field, Input, useObjectPageForm } from '@formrail/core';
+
+interface Invoice {
+  customer: string;
+  reference: string;
+}
+
+// Module-level and stable: the `baseline` option is read once, at mount.
+const EMPTY: Invoice = { customer: '', reference: '' };
+
+declare function fetchInvoice(id: string): Promise&lt;Invoice&gt;;
+
+export function InvoicePage({ id }: { id: string }) {
+  const form = useObjectPageForm({ baseline: EMPTY });
+  const { reset } = form; // `reset` keeps its identity across renders
+  const loading = form.baseline === EMPTY;
+
+  useEffect(() => {
+    let ignore = false;
+    void fetchInvoice(id).then((invoice) => {
+      if (!ignore) reset(invoice); // baseline and values become the record; `isDirty` is false
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [id, reset]);
+
+  return (
+    &lt;form&gt;
+      &lt;Field label="Customer" name="customer"&gt;
+        &lt;Input
+          disabled={loading}
+          value={form.values.customer}
+          onChange={(event) =&gt; form.setValue('customer', event.target.value)}
+        /&gt;
+      &lt;/Field&gt;
+      &lt;p&gt;{form.isDirty ? 'Unsaved changes' : 'Saved'}&lt;/p&gt;
+    &lt;/form&gt;
+  );
+}</code></pre>
+<p>There are three traps, each a consequence of how the hook is specified.</p>
+<p><strong>The baseline option is not a subscription.</strong> It is read once, at mount. Passing a different baseline later changes neither <code>values</code> nor <code>baseline</code>, and in development the hook logs a single warning pointing to <code>reset(newBaseline)</code>. That is why the example passes a stable constant and hydrates through <code>reset</code>. An inline literal with the same content does not warn.</p>
+<p><strong>A late <code>reset</code> discards edits.</strong> It replaces the values, so anything typed between the first render and the arrival of the data is gone. This is the strongest argument for option one, and the reason the example keeps the control disabled until the record arrives. If the user can type before hydration, you have a product decision to make, not a library detail.</p>
+<p><strong>Responses can arrive out of order.</strong> Without the <code>ignore</code> flag, a slow response for the previous record could call <code>reset</code> after the current one and overwrite it.</p>
+
+<h2>What StrictMode does, and what it does not</h2>
+<p>In development, <code>StrictMode</code> mounts every component, unmounts it and mounts it again, so each effect runs twice. For the code above this has one visible consequence: <code>fetchInvoice</code> is called twice, and the response of the first call is dropped by the <code>ignore</code> flag, because its cleanup ran before it arrived. Only the second response reaches <code>setLoaded</code> or <code>reset</code>.</p>
+<p>It does not change the dirty state: in both options the form is clean after the data has arrived, with the double mount as without. Both are tests in the repository (<code>use-object-page-form.async-hydration.test.tsx</code>), run with the real <code>Input</code> and a deferred promise standing in for the network. In production there is no double mount, so the second request disappears.</p>
+
+<h2>When a control rewrites what it receives</h2>
+<p>If a control from another library normalizes its value and reports it, your handler receives a value that differs from the baseline and the form is dirty, correctly, by its own definition. Two remedies, in order of preference. First, normalize the data once when it arrives and use the normalized record as the baseline: the echo then equals the baseline and, as seen above, is harmless. Second, tell the form what "equal" means with the <code>isEqual</code> option, which replaces the comparison behind <code>isDirty</code>:</p>
+<pre><code class="language-tsx">import { useObjectPageForm } from '@formrail/core';
+
+interface Invoice {
+  customer: string;
+  reference: string;
+}
+
+export function useInvoiceForm(invoice: Invoice) {
+  return useObjectPageForm({
+    baseline: invoice,
+    // A reference is the same reference whatever its case or surrounding spaces.
+    isEqual: (a, b) => a.customer === b.customer && a.reference.trim().toUpperCase() === b.reference.trim().toUpperCase(),
+  });
+}</code></pre>
+<p>Use the second remedy sparingly: <code>isEqual</code> decides only <code>isDirty</code>, and the values still hold whatever the control reported.</p>
+
+<h2>If you use another form library</h2>
+<p>Everything above is about <code>useObjectPageForm</code>. If your forms are built with React Hook Form or TanStack Form, Formrail Pro, the commercial part of the project, has adapters for both, so that its Change Summary and Form Rebase engines work on those forms. They solve a different problem (showing what changed against the saved baseline, and reconciling edits when the record changes on the server). The principle carries over: whatever "unmodified" is compared against must be the saved record, not the placeholder shown while it loaded.</p>
+
+<h2>The checklist</h2>
+<ul>
+  <li>Compare with the baseline, not with a touched flag.</li>
+  <li>Prefer mounting the editor already hydrated, keyed by the record id.</li>
+  <li>If the form must exist first, hydrate with <code>reset(record)</code>, disable the controls until then and drop out-of-order responses.</li>
+  <li>For controls that echo, normalize the baseline or give the form an <code>isEqual</code>.</li>
+  <li>Test with <code>StrictMode</code> on.</li>
+</ul>
