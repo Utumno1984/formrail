@@ -212,14 +212,15 @@ test.describe('feed', () => {
     const feed = await readFeed(page);
     expect(feed.parseError).toBe(false);
     expect(feed.root).toBe('http://www.w3.org/2005/Atom|feed');
-    expect(feed.id).toBe(`${origin}${base}articles/`);
+    expect(feed.id).toBe('tag:formrail.dev,2026:articles');
     expect(feed.selfHref).toBe(`${origin}${base}articles/feed.xml`);
     expect(feed.title).toBeTruthy();
     expect(feed.updated).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
     expect(feed.entries).toHaveLength(SLUGS.length);
     for (const [i, entry] of feed.entries.entries()) {
       expect(entry.link).toBe(`${origin}${base}articles/${SLUGS[i]}/`);
-      expect(entry.id).toBe(entry.link);
+      // The id is permanent and independent of the hosting (RFC 4287 4.2.6), unlike the link.
+      expect(entry.id).toBe(`tag:formrail.dev,2026:articles/${SLUGS[i]}`);
       expect(entry.updated).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
       expect(entry.author).toBe('Test Author');
     }
@@ -296,6 +297,23 @@ test.describe('story links', () => {
 });
 
 test.describe('the assembled site', () => {
+  test('the articles published in site/ (if any) request nothing outside their origin, set no cookie and run no script', async ({ page, context, baseURL }) => {
+    const pages = htmlFilesUnder(`${SITE_DIR}articles`).map((f) => path.relative(SITE_DIR, f).split(path.sep).join('/').replace(/index\.html$/, ''));
+    const foreign: string[] = [];
+    page.on('request', (req) => {
+      const url = new URL(req.url());
+      if (url.protocol !== 'data:' && url.protocol !== 'blob:' && url.origin !== new URL(baseURL ?? '').origin) foreign.push(req.url());
+    });
+    for (const url of pages) {
+      await page.goto(url);
+      await page.waitForLoadState('networkidle');
+      await expect(page.locator('script, iframe, embed, object'), url).toHaveCount(0);
+    }
+    expect(foreign).toEqual([]);
+    expect(await context.cookies()).toEqual([]);
+  });
+
+
   // One contract, two states: the Articles link and the section exist together, or neither does.
   test('the Articles section and its links exist together (none published: no page, no link)', async ({ page, request }) => {
     const published = existsSync(`${SITE_DIR}articles/index.html`);
