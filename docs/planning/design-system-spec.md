@@ -605,8 +605,8 @@ variante avanzata basata sui pacchetti già esistenti react-virtual-tree-view/re
 
 Tre opzioni, da decidere (vedi §5):
 
-1. **Registry con accesso riservato a chi compra** (in origine "npm org privata a pagamento", superata)
-   (opzione superata il 2026-11-26, vedi sotto): semplice da implementare, ma lega l'accesso all'account del
+1. **Registry con accesso riservato a chi compra** (in origine "npm org privata a pagamento"; opzione
+   superata il 2026-11-26, vedi sotto): semplice da implementare, ma lega l'accesso all'account del
    cliente: serve gestione manuale degli accessi/revoche. **Scelta corrente: GitHub Packages**.
 2. **Licenza con chiave (license key) verificata a build-time**: il pacchetto Pro è pubblicabile
    anche su registry pubblico ma richiede una chiave valida per buildare/avviare (controllata
@@ -925,7 +925,7 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
    letta il 22/11/2026).
    **Da verificare prima di aprire l'account**: che Paddle consenta di collegare l'acquisto alla
    concessione e alla revoca dell'accesso al registry GitHub Packages (webhook o export degli
-   ordini), senza chiavi di licenza (vedi il punto 5 delle decisioni del 2026-11-26); che
+   ordini), senza chiavi di licenza (vedi il punto 10 delle decisioni del 2026-11-26, "Concessione dell'accesso al registry"); che
    accetti un venditore italiano (persona fisica o micro-attività); il trattamento fiscale, da
    concordare con un commercialista.
 

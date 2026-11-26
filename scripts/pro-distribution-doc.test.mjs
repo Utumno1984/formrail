@@ -10,12 +10,19 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SPEC = resolve(ROOT, 'docs/planning/design-system-spec.md');
 const CLAUDE = resolve(ROOT, 'CLAUDE.md');
 
-const PRIVATE_ORG = /org npm privata|npm org privata/i;
-const SUPERSEDED = /superat|non più/i;
+const PRIVATE_ORG = /org\s+npm\s+privata|npm\s+org\s+privata/i;
+const SUPERSEDED = /superat|non\s+più/i;
 
-/** Lines that present the private npm org without marking it as superseded (i.e. as the current choice). */
+/**
+ * Sentences (paragraph-wise, line breaks normalised with `\s+`) that present the private npm org without
+ * marking it as superseded within the same sentence, i.e. as the current choice.
+ */
 export const currentPrivateNpmOrgLines = (markdown) =>
-  markdown.split(/\r?\n/).filter((line) => PRIVATE_ORG.test(line) && !SUPERSEDED.test(line));
+  markdown
+    .split(/\r?\n\s*\r?\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, ' '))
+    .flatMap((paragraph) => paragraph.split(/(?<=[.!?])\s+(?=[A-Z*"`(])/))
+    .filter((sentence) => PRIVATE_ORG.test(sentence) && !SUPERSEDED.test(sentence));
 
 /** The text of §2.4 of the spec, up to the next `---` or `## ` heading. */
 export const section24 = (spec) => {
@@ -31,6 +38,11 @@ describe('Pro distribution docs (#690)', () => {
   it('helper flags a private npm org line not marked as superseded', () => {
     expect(currentPrivateNpmOrgLines("Si usa l'org npm privata.")).toHaveLength(1);
     expect(currentPrivateNpmOrgLines('org npm privata (superata il 2026-11-26)')).toEqual([]);
+    // phrase split across two lines
+    expect(currentPrivateNpmOrgLines("Si usa l'org npm\nprivata.")).toHaveLength(1);
+    expect(currentPrivateNpmOrgLines("al posto dell'org npm\nprivata, superata.")).toEqual([]);
+    // a "superata" in another sentence of the same paragraph does not excuse the mention
+    expect(currentPrivateNpmOrgLines("Si usa l'org npm privata. Altro è superato.")).toHaveLength(1);
   });
 
   it('spec §2.4 states GitHub Packages with the date and the reason', () => {
@@ -39,6 +51,8 @@ describe('Pro distribution docs (#690)', () => {
     expect(s24).toContain('2026-11-26');
     expect(s24).toMatch(/a pagamento/);
     expect(s24).toMatch(/costi fissi/);
+    expect(s24).toContain('Decisione di Daniele, 2026-11-26');
+    expect(s24).toContain('@formrail-dev/pro');
   });
 
   it('spec §2.4 and CLAUDE.md never present the private npm org as the current choice', () => {
@@ -60,5 +74,12 @@ describe('Pro distribution docs (#690)', () => {
     expect(spec).not.toMatch(/la crea Daniele/);
     expect(spec).not.toMatch(/finché l'org `formrail-dev` non è creata/);
     expect(spec).toMatch(/formrail-dev[^\n]*esiste dal 2026-11-26/);
+  });
+
+  it('the MoR paragraph cites the decision point on registry access, not another one', () => {
+    const m = spec.match(/vedi il punto (\d+) delle decisioni del 2026-11-26/);
+    expect(m).not.toBeNull();
+    const item = spec.match(new RegExp(`^${m[1]}\\. \\*\\*([^*]+)\\*\\*`, 'm'));
+    expect(item?.[1]).toMatch(/accesso|registry/i);
   });
 });
