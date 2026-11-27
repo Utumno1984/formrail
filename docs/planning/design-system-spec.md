@@ -624,7 +624,7 @@ qualcuno sia disposto a pagare, prima di investire in un sistema di licensing pi
 
 **Aggiornamento 2026-11-13**: Daniele non ha modificato questa scelta. L'opzione 1 (all'epoca "org
 npm privata", superata il 2026-11-26; nessun licensing a runtime) restava la raccomandazione,
-compatibile con la licenza annuale per sviluppatore venduta tramite un Merchant of Record (§8).
+compatibile con la licenza per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi, venduta tramite un Merchant of Record (§8).
 
 **Decisione di Daniele, 2026-11-26 (scelta corrente)**: il Pro si distribuisce tramite **GitHub
 Packages**, sotto un'**organizzazione GitHub dedicata** (gratuita), non più tramite un'org npm
@@ -720,8 +720,10 @@ per adozione/community, bassa difficoltà o ampiamente disponibile in altre libr
    continui + supporto si allinea meglio alla richiesta esplicita di reddito ricorrente, ed è anche
    il modello già scelto per l'altro filone di monetizzazione in corso, l'add-on Fatture in Cloud).
    **Decisa il 2026-11-13** (prende il posto dell'abbonamento ricorrente del 2026-11-03): licenza
-   annuale per sviluppatore con 12 mesi di aggiornamenti inclusi, tramite Merchant of Record. Cosa
-   succede alla scadenza (rinnovo, uso delle versioni già ricevute) non è deciso. Vedi §8.
+   per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi, tramite Merchant of Record. Alla
+   scadenza dei 12 mesi non c'è rinnovo automatico; le versioni ricevute restano utilizzabili senza limite di
+   tempo; per avere gli aggiornamenti successivi si acquista di nuovo (decisioni di Daniele del 2026-11-26,
+   testo in `/license/`). Vedi §8.
 5. **Target di clienti Pro**: freelance/piccoli team React che costruiscono backoffice/admin
    enterprise (stesso target implicito dei competitor noti in questo spazio: librerie di
    admin-template/dashboard Pro React). Da validare se è lo stesso target o diverso da quello della
@@ -916,8 +918,7 @@ Queste decisioni sostituiscono le parti corrispondenti di §2.4, §5 (punti 4 e 
 3. **Target: team aziendali** (ERP, gestionali, portali amministrativi). Hanno budget, sentono il
    dolore della concorrenza sui dati e accettano costi di licenza se risolvono un problema
    strutturale.
-4. **Modello commerciale: licenza annuale per sviluppatore, con 12 mesi di aggiornamenti
-   inclusi** (schema standard enterprise). La vendita passa da un **Merchant of Record**, che
+4. **Modello commerciale: licenza per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi e uso senza limite di tempo delle versioni ricevute (decisione di Daniele del 2026-11-26)** (schema standard enterprise). La vendita passa da un **Merchant of Record**, che
    gestisce IVA UE e fatturazione. MoR di riferimento: **Paddle** (decisione di Daniele del
    2026-11-26): nessun costo iniziale, commissione 5% + 0,50 $ a transazione secondo la pagina
    prezzi pubblica (letta il 26/11/2026). Lemon Squeezy, citato in precedenza come esempio, non
@@ -967,7 +968,7 @@ solo se Daniele la conferma.
   production-grade. La List Report virtualizzata resta nel Pro ma non è l'argomento di vendita
   principale.
 - **Requisiti di chi compra in azienda**, da coprire prima di vendere:
-  - condizioni di licenza scritte (oggi `packages/pro/LICENSE` dice "TO BE DEFINED");
+  - condizioni di licenza scritte (fatto nel ticket #691: `packages/pro/LICENSE` e la pagina `/license/`, stesso testo);
   - fattura (tramite il Merchant of Record);
   - descrizione del supporto;
   - nota di sicurezza: nessun accesso di rete e nessuna chiave. Il bundle buildato è già
@@ -986,7 +987,7 @@ state risolte il 2026-11-26 (vedi "Decisioni del 2026-11-26" sopra), così come 
 pacchetto Pro: `@formrail-dev/pro` (§2.4), con l'org GitHub `formrail-dev` già creata il 2026-11-26.
 Restano aperte:
 
-- **Identità e dati del licenziante** (chi vende e chi concede la licenza), da definire prima di
-  scrivere le condizioni di licenza.
+- ~~**Identità e dati del licenziante**~~: risolto nel ticket #691 (persona fisica, Italia, contatto email,
+  nelle condizioni di licenza).
 - **Strumento della lista d'attesa e privacy (GDPR)** e **uso di Formrail in vistato come prova
   reale** (§6 punto 3) restano come in precedenza, non decisi.

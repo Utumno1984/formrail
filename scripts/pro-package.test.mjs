@@ -31,6 +31,11 @@ describe('packages/pro publication guard', () => {
     expect(pkg.license).not.toMatch(/\bMIT\b/i);
   });
 
+  it('keeps "SEE LICENSE IN LICENSE" and no longer says the license is to be defined (ticket #691)', () => {
+    expect(pkg.license).toBe('SEE LICENSE IN LICENSE');
+    expect(pkg.description).not.toMatch(/to be defined/i);
+  });
+
   it('the changesets config would publish publicly: private is the only guard', () => {
     // If this ever changes (e.g. restricted access, ignore list), revisit the guard above.
     expect(readJson('.changeset/config.json').access).toBe('public');

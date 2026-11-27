@@ -1,6 +1,139 @@
-Copyright (c) 2026 Daniele Ingusci. All rights reserved.
+Formrail Pro License Terms
 
-@formrail/pro is proprietary software. The commercial license terms are TO BE DEFINED.
-Until they are published, no right to use, copy, modify, distribute or sublicense this package
-is granted, even though its source is readable in this public repository. The rest of the
-repository (packages/core) is MIT-licensed, see the LICENSE file at the repository root.
+Last updated: 26 November 2026
+
+Licensor
+
+Formrail Pro, the package published on GitHub Packages as @formrail-dev/pro (installed with the npm alias @formrail/pro), is licensed by Daniele Ingusci, an individual (not a
+company), based in Italy. Contact: formrail.dev@gmail.com. In these terms, "the licensor", "we" and "us" mean
+this person, and "you" means the buyer and its team.
+
+You buy the license from Paddle, which acts as Merchant of Record: Paddle sells to you, collects the payment
+and the taxes, and issues the invoice. These terms are the conditions on which the licensor supplies Formrail
+Pro to you. All rights that are not expressly granted here are reserved. The rest of the Formrail repository,
+including @formrail/core, is licensed separately under the MIT license and is not covered by these terms.
+
+Definitions
+
+Developer means a person who writes or modifies code that imports Formrail Pro. Build systems, continuous
+integration and the end users of your application are not developers for these terms and do not need a license. The same holds for the people and systems of your team that only install, build or test your application without writing code that imports Formrail Pro: they may use a read-only access token of your team to install it, with no license of their own.
+
+Licensed developer means a developer for whom you hold a license under these terms.
+
+Production use means running an application that includes Formrail Pro, or code built from it, for real users
+or for the day-to-day business of an organization. Development and evaluation are not production use.
+
+Update period means the 12 months described in the section Term and updates.
+
+Covered version means any version of Formrail Pro that is available in the registry on the day access is granted to you, and any version that is published during your update period.
+
+Registry means the private package registry on GitHub Packages from which Formrail Pro is distributed.
+
+Grant
+
+For each license you buy, the licensor grants you a non-exclusive, non-transferable, worldwide license for one
+licensed developer to use, copy and modify the covered versions of Formrail Pro, and to include them in the
+applications you build, on the terms of this document.
+
+The license is per developer. It is held by one named person at a time, and one license cannot be shared by
+several people at the same time. The number of developers who may work on code that imports Formrail Pro in
+production applications is the number of licenses you hold.
+
+You may use the covered versions in as many applications as you build, and you may ship those applications,
+with Formrail Pro built into them, to their end users. End users need no license of their own.
+
+Formrail Pro does not check for a license at runtime and needs no key. These terms are a legal agreement, not
+a technical lock.
+
+Term and updates
+
+You pay once. The payment gives you access to the registry, to the versions already available on the day access is granted, and to every version published during 12 months of updates. Access to the registry is granted within 2 business days of the confirmation of your payment. The 12 months start on the day access to the registry is granted to you, not on the day of the purchase.
+
+The license does not renew automatically, and you are not charged again unless you choose to buy again.
+
+After the term
+
+When the 12 months end, your access to the registry ends, but your right to use what you already have does
+not. You may keep using every covered version, in development and in production, with no limit of time, and
+you may keep building and shipping applications with it. Ending the registry access is not a revocation of the license. This applies to a license that has not ended under the section Refund and termination.
+
+Versions published after the end of your update period are not covered. To use them, you need to buy a new
+license. The number of licensed developers stays the number you bought, and the use of the covered versions
+stays subject to these terms, including the section Restrictions.
+
+Evaluation and development use
+
+You may use Formrail Pro freely, with no license and no payment, to evaluate it and to develop and test
+applications on development machines and in test environments that real users do not use. This includes
+reading the source in the public repository and exploring the Pro demo on formrail.dev. There is no fixed time
+limit, but evaluation and development are not production use.
+
+Production use
+
+A license is required for production use. For an application in production use, every developer who writes or
+modifies code that imports Formrail Pro in that application must be a licensed developer.
+
+Replacing a developer
+
+If a licensed developer leaves your team, you can replace them with another person. Write to
+formrail.dev@gmail.com, and the license and the registry access are moved to the new developer. The number of
+licensed developers does not change, the license cannot be held by two people at the same time, and the
+replacement receives only what is left of the update period: it does not start a new 12 months.
+
+Restrictions
+
+You may not sell, sublicense, rent, lend or give Formrail Pro, or a copy of it, to others, as a package, a
+library or a set of components, whether modified or not. Shipping it built into your own application, as
+described in the section Grant, is allowed.
+
+You may not share registry access or access tokens outside your own organization, and you may not give them to people who write code that imports Formrail Pro without being licensed developers. The read-only installation access described in the section Definitions is allowed. You may not remove the copyright and license notices from Formrail Pro.
+
+Reading the source in the public repository does not grant any right beyond the ones in these terms.
+
+Early access status
+
+Formrail Pro is in early access. Its versions are 0.x, and the API can change between versions, including in
+ways that require changes in your code.
+
+No release date, roadmap item or feature is promised. The licensor is not obliged to deliver any feature that
+is not in a version already published. During your update period you receive the versions that are published,
+whatever they contain.
+
+Support
+
+Support is given by email at formrail.dev@gmail.com, on a best-effort basis. We aim to reply within 2 business
+days. This is a target and not a guarantee, and it is not a time to fix a problem. Support covers the use of
+Formrail Pro during your update period.
+
+Refunds
+
+You can ask for a refund within 14 days of the purchase, without giving a reason, whoever you are. The details
+are on the refund page: https://formrail.dev/refund/
+
+Refund and termination
+
+If you receive a refund, or the payment is reversed (a chargeback), the license and the registry access end, and you must stop using Formrail Pro and delete the copies you downloaded.
+A serious violation of the section Restrictions ends the license in the same way, from the moment the licensor tells you in writing.
+
+Liability
+
+To the extent the law allows, Formrail Pro is provided as is, without warranty of any kind, including that it
+is free of errors or fit for a particular purpose. To the extent the law allows, the licensor is not liable
+for indirect or consequential damage, or for loss of data, profit or business, and the total liability of the
+licensor for all claims is limited to the amount you paid for the license.
+
+The limits in this section do not apply in case of wilful misconduct or gross negligence of the licensor, nor to any other liability that the law does not allow to limit. Nothing in these terms limits a liability that cannot be limited by law, or the rights that mandatory law gives you as a consumer.
+
+Governing law
+
+These terms are governed by the law of Italy. If you are a consumer, the mandatory consumer protection rules
+of the country where you live still apply to you. Disputes are for the competent courts of Italy, unless
+mandatory law lets a consumer go to the courts of their own country.
+
+Changes to these terms
+
+The licensor may change these terms. The terms in force when you bought remain the ones that apply to your
+license and to your covered versions. A change applies to them only if you agree to it, or if it only improves your position, or if it only corrects a typo or an obvious clerical error. Later purchases follow the terms in force at that time. The date
+at the top says when the terms were last updated.
+
+Copyright (c) Daniele Ingusci. All rights reserved.

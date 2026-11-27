@@ -57,6 +57,8 @@ describe('resolveRedirect', () => {
     ['the Pro page for teams (ticket #490)', `${B}teams/`],
     ['the Pro page for teams with foreign parameters', `${B}teams/?utm_source=x#license`],
     ['the privacy page', `${B}privacy/`],
+    ['the license terms page (ticket #691)', `${B}license/`],
+    ['the license terms page without the trailing slash', `${B}license`],
     ['foreign parameters', `${B}?utm_source=x`],
     ['custom domain without a prefix', `${O}/`],
     ['formrail.dev root', `${D}/`],
@@ -111,6 +113,7 @@ describe('assembleSite', () => {
       'iframe.html',
       'index.html',
       'landing.css',
+      'license',
       'privacy',
       'pro',
       'storybook',
@@ -164,7 +167,7 @@ describe('assembleSite', () => {
   });
 
   // The invariant: everything that can fail is read/validated before the previous output is touched.
-  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html'], ['teams.html'], ['privacy.html']])(
+  describe.each([['redirect.mjs'], ['landing.css'], ['copy.js'], ['404.html'], ['iframe.html'], ['teams.html'], ['privacy.html'], ['license.html']])(
     'missing site-root/%s',
     (missing) => {
       it('fails before outDir is touched (the previous site stays intact)', () => {
@@ -214,13 +217,14 @@ describe('assembleSite', () => {
       const html = readFileSync(path.join(outDir, '404.html'), 'utf8');
       expect(html).toContain('href="/storybook/"');
       expect(html).toContain('href="/privacy/"');
+      expect(html).toContain('href="/license/"');
       expect(html).not.toContain('/formrail/');
     });
 
     it('no static page carries the legacy /formrail/ prefix or github.io', () => {
       const { storybookDir, outDir } = setup();
       assembleSite({ storybookDir, outDir });
-      for (const file of ['index.html', 'iframe.html', '404.html', 'teams/index.html', 'privacy/index.html', 'landing.css', 'copy.js']) {
+      for (const file of ['index.html', 'iframe.html', '404.html', 'teams/index.html', 'privacy/index.html', 'license/index.html', 'landing.css', 'copy.js']) {
         const text = readFileSync(path.join(outDir, file), 'utf8');
         expect(text, file).not.toMatch(/["'(=\s]\/formrail\//);
         expect(text, file).not.toContain('github.io');
@@ -230,7 +234,7 @@ describe('assembleSite', () => {
     it('internal links and assets of the static pages are never prefixed', () => {
       const { storybookDir, outDir } = setup();
       assembleSite({ storybookDir, outDir });
-      for (const file of ['index.html', 'teams/index.html', 'privacy/index.html']) {
+      for (const file of ['index.html', 'teams/index.html', 'privacy/index.html', 'license/index.html']) {
         const html = readFileSync(path.join(outDir, file), 'utf8');
         const targets = [...html.matchAll(/(?:href|src)="([^"#]*)"/g)].map((m) => m[1]).filter((t) => t && !/^(https?:|mailto:)/.test(t));
         expect(targets.length, file).toBeGreaterThan(0);

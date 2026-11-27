@@ -17,8 +17,7 @@ liberamente implementabili, descritti in astratto (vedi `docs/planning/design-sy
   solo con ticket espliciti (roadmap MVP, §6). **Piano commerciale (decisioni di Daniele del
   2026-11-13, sostituiscono "abbonamento ricorrente"; non rinegoziabili senza nuova istruzione
   sua, dettaglio in `docs/planning/design-system-spec.md` §8)**: target team aziendali (ERP,
-  gestionali, portali amministrativi); licenza annuale per sviluppatore con 12 mesi di
-  aggiornamenti inclusi, venduta tramite un Merchant of Record, **Paddle** (decisione di Daniele del
+  gestionali, portali amministrativi); licenza per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi e uso senza limite di tempo delle versioni ricevute (decisione di Daniele del 2026-11-26), venduta tramite un Merchant of Record, **Paddle** (decisione di Daniele del
   2026-11-26: Lemon Squeezy non accetta nuove registrazioni e chiude il 31/03/2027; fonte in spec §8, punto 4), che gestisce
   IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
   d'attesa/pre-ordine (validazione della domanda), ticket #490. Ticket di studio/refactoring #489

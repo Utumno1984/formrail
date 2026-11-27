@@ -7,16 +7,16 @@
 // placeholders and stay green. A pure function is used instead of an environment variable that an
 // operator could forget to set: the default behaviour of the deploy job is to be strict.
 import { fileURLToPath } from 'node:url';
-import { DESIGN_PARTNER_URL, EARLY_ACCESS_URL, PRIVACY_EMAIL } from './site-config.mjs';
+import { DESIGN_PARTNER_URL, EARLY_ACCESS_URL, LICENSOR, PRIVACY_EMAIL } from './site-config.mjs';
 
 const PLACEHOLDER = /placeholder|example\.(invalid|com|org|net)|\.invalid\b|\btodo\b|\bxxx+\b/i;
 const EMAIL = /^[^\s@<>()"]+@[^\s@<>()"]+\.[^\s@<>()"]{2,}$/;
 
 /**
- * @param {{ earlyAccessUrl: string, privacyEmail: string, designPartnerUrl?: string }} config
+ * @param {{ earlyAccessUrl: string, privacyEmail: string, designPartnerUrl?: string, licensor?: { name: string, status: string, country: string, email: string } }} config
  * @returns {string[]} one message per problem; empty when the config can be published
  */
-export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartnerUrl = '' }) {
+export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartnerUrl = '', licensor }) {
   const problems = [];
   if (earlyAccessUrl === '') problems.push('EARLY_ACCESS_URL is empty: the waitlist form link is missing.');
   else {
@@ -45,6 +45,17 @@ export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartner
   if (privacyEmail === '') problems.push('PRIVACY_EMAIL is empty.');
   else if (!EMAIL.test(privacyEmail)) problems.push(`PRIVACY_EMAIL is not an email address: ${privacyEmail}`);
   else if (PLACEHOLDER.test(privacyEmail)) problems.push('PRIVACY_EMAIL is still a placeholder.');
+  // Ticket #691: who licenses Formrail Pro (printed in /license/). Callers that do not render that page omit it.
+  if (licensor !== undefined) {
+    for (const field of ['name', 'status', 'country', 'email']) {
+      const value = licensor[field];
+      if (typeof value !== 'string' || value.trim() === '')
+        problems.push(`LICENSOR.${field} is empty: the license page needs it.`);
+      else if (PLACEHOLDER.test(value)) problems.push(`LICENSOR.${field} is still a placeholder.`);
+    }
+    if (typeof licensor.email === 'string' && licensor.email.trim() !== '' && !EMAIL.test(licensor.email))
+      problems.push(`LICENSOR.email is not an email address: ${licensor.email}`);
+  }
   return problems;
 }
 
@@ -62,6 +73,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       earlyAccessUrl: EARLY_ACCESS_URL,
       privacyEmail: PRIVACY_EMAIL,
       designPartnerUrl: DESIGN_PARTNER_URL,
+      licensor: LICENSOR,
     });
     console.log('site-config: values are final.');
   } catch (error) {

@@ -48,7 +48,7 @@ const FINAL = {
 
 describe('assembled pages', () => {
   it('the committed price constant is the decided sentence, written in exactly once', () => {
-    expect(EXPECTED_PRICE_TEXT).toBe('Expected price: from €199 per developer/year');
+    expect(EXPECTED_PRICE_TEXT).toBe('Expected price: from €199 per developer, 12 months of updates included');
     const { teams } = build();
     expect(teams.split(EXPECTED_PRICE_TEXT).length - 1).toBe(1);
     expect(teams).toContain('The price is indicative and not final.');
@@ -63,7 +63,7 @@ describe('assembled pages', () => {
       expect(html).not.toContain('PRICE_');
     }
     expect(teams).toContain(
-      'Annual license per developer, 12 months of updates included, terms published before sales.',
+      'One-time license per developer, 12 months of updates included.',
     );
   });
 
@@ -126,7 +126,7 @@ describe('assembled pages', () => {
     const { teams, privacy, home } = build();
     for (const html of [teams, privacy, home]) {
       expect(html).toContain(
-        'Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.',
+        'Formrail Pro: One-time license per developer, 12 months of updates included.',
       );
     }
   });

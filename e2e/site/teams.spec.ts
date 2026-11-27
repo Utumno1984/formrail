@@ -65,7 +65,7 @@ test.describe('Pro page for teams: content', () => {
     await expect(page.getByRole('heading', { level: 2, name: 'Free and Pro' })).toBeVisible();
     const license = page.locator('#license');
     await expect(license.getByRole('heading', { level: 2, name: 'License' })).toBeVisible();
-    await expect(license).toContainText('Annual license per developer, 12 months of updates included, terms published before sales.');
+    await expect(license).toContainText('One-time license per developer, 12 months of updates included.');
     await expect(license).toContainText('not a binding offer');
     await expect(license).toContainText('no payment or pre-order is taken');
     await expect(page.getByRole('heading', { level: 2, name: 'Join the waitlist' })).toBeVisible();
@@ -226,7 +226,7 @@ test.describe('price', () => {
         expect(text).not.toMatch(/[€$£]\s?\d|\d\s?(EUR|USD)|indicative/);
         return;
       }
-      expect(priceText).toBe('Expected price: from €199 per developer/year');
+      expect(priceText).toBe('Expected price: from €199 per developer, 12 months of updates included');
       await expect(page.locator('.price')).toHaveCount(1);
       await expect(page.locator('.price')).toHaveText(priceText);
       await expect(page.locator('#license')).toContainText('The price is indicative and not final.');
@@ -497,7 +497,7 @@ test.describe('privacy page', () => {
     for (const url of ['', 'teams/', 'privacy/']) {
       await page.goto(url);
       await expect(page.getByRole('contentinfo'), url).toContainText(
-        'Formrail Pro: Annual license per developer, 12 months of updates included, terms published before sales.',
+        'Formrail Pro: One-time license per developer, 12 months of updates included.',
       );
     }
   });
@@ -520,7 +520,7 @@ test.describe('public wording matches the privacy notice', () => {
     for (const url of ['', 'teams/', 'privacy/']) {
       await page.goto(url);
       const footer = (await page.getByRole('contentinfo').innerText()).replace(/\s+/g, ' ');
-      expect(footer, url).toContain('Annual license per developer, 12 months of updates included, terms published before sales.');
+      expect(footer, url).toContain('One-time license per developer, 12 months of updates included.');
     }
   });
 });
