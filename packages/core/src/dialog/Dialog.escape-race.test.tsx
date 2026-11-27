@@ -724,3 +724,54 @@ describe("Dialog: a redirected Escape uses the top dialog's current props (#714)
     });
   }
 });
+
+describe('Dialog: sibling dialogs remounted together, Escape in the first frames (#714)', () => {
+  // A parent's `key` remounts open sibling dialogs in one commit. Until Radix's layers re-render, each
+  // new layer counts itself the highest and listens for Escape: the press reaches the lower ones too,
+  // which hand it to the dialog on top. That dialog handles it once.
+  function Siblings({ names, spies }: { names: string[]; spies: Record<string, { onOpenChange: (open: boolean) => void; onEscape: () => void }> }) {
+    const [generation, setGeneration] = useState(0);
+    const [open, setOpen] = useState<Record<string, boolean>>(() => Object.fromEntries(names.map((name) => [name, true])));
+    return (
+      <>
+        <button type="button" onClick={() => setGeneration((g) => g + 1)}>Remount</button>
+        <Fragment key={generation}>
+          {names.map((name) => (
+            <Panel
+              key={name}
+              name={name}
+              open={open[name] ?? false}
+              setOpen={(next) => setOpen((all) => ({ ...all, [name]: next }))}
+              onOpenChange={spies[name]!.onOpenChange}
+              onEscape={spies[name]!.onEscape}
+            />
+          ))}
+        </Fragment>
+      </>
+    );
+  }
+
+  for (const names of [['A', 'B'], ['A', 'B', 'C']]) {
+    for (const strict of [false, true]) {
+      const top = names[names.length - 1]!;
+      it(`${names.join(', ')}${strict ? ' (StrictMode)' : ''}: ${top} closes and its onEscapeKeyDown runs once`, async () => {
+        const spies = Object.fromEntries(names.map((name) => [name, { onOpenChange: vi.fn(), onEscape: vi.fn() }]));
+        const app = <Siblings names={names} spies={spies} />;
+        render(strict ? <StrictMode>{app}</StrictMode> : app);
+        await settle();
+        step('Remount');
+        await microtasks();
+        expect(openDialogNames()).toEqual(names);
+        pressEscape();
+        await settle();
+        expect(openDialogNames()).toEqual(names.slice(0, -1));
+        expect(spies[top]!.onEscape).toHaveBeenCalledTimes(1);
+        expect(spies[top]!.onOpenChange.mock.calls).toEqual([[false]]);
+        for (const name of names.slice(0, -1)) {
+          expect(spies[name]!.onEscape).not.toHaveBeenCalled();
+          expect(spies[name]!.onOpenChange).not.toHaveBeenCalled();
+        }
+      });
+    }
+  }
+});

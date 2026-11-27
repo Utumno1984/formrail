@@ -67,6 +67,14 @@ interface PanelLayer {
  */
 const layerOrder = new Map<HTMLElement, PanelLayer>();
 
+/**
+ * Escapes already handed to the panel on top in place of Radix's pick. In the same gap, several
+ * layers can be listening at once (panels remounted together, e.g. by a parent's `key`: each new layer
+ * counts itself the highest until the layers re-render), so the same press reaches the lower ones and
+ * the top one's own listener too. The panel on top handles it once.
+ */
+const redirectedEscapes = new WeakSet<Event>();
+
 /** True when the focus sits inside a modal that is open (not one that is exiting). */
 function focusIsInOpenModal(): boolean {
   const active = document.activeElement;
@@ -517,9 +525,12 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               // since registered a layer above it (see `layerOrder`), the layers have not re-rendered
               // yet: the Escape is that layer's, as it will be once Radix catches up (open or exiting,
               // as at rest), and this panel's own dismissal is prevented. Otherwise Radix's choice stands.
+              // A press already handed over is done (prevented then): see `redirectedEscapes`.
+              if (redirectedEscapes.has(event)) return;
               let top: [HTMLElement, PanelLayer] | undefined;
               for (const registered of layerOrder) top = registered;
               if (top && top[0] !== contentNode.current) {
+                redirectedEscapes.add(event);
                 top[1].escape(event);
                 event.preventDefault();
                 return;
