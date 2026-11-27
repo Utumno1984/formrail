@@ -86,10 +86,13 @@ export const LICENSOR = {
 export const REFUND_DAYS = 14;
 
 /**
- * Years for which the purchase data is kept after the license ends, because the applicable legal
- * obligations require it (ticket #692). Printed in the "Purchases" section of /privacy/.
+ * Years for which the purchase data received from Paddle is kept, counted from the end of the year in which the
+ * sale takes place: the period of the tax and accounting obligations on the records of the sale (ticket #692).
+ * Printed in the "Purchases" section of /privacy/. The GitHub user names are not records of the sale: they are
+ * deleted when the registry access ends, so this period does not apply to them.
  *
- * Decision D8 of Daniele (2026-11-26): the duration of the license (12 months of updates) plus 7 years. It must stay a
+ * Decision D8 of Daniele (2026-11-26), with its reference point decided on 2026-11-27: 7 years from the end of the
+ * year of the sale, no longer tied to the license (a perpetual license would make the period endless). It must stay a
  * whole number from 1 to 99: `scripts/check-site-config.mjs --strict` (the deploy) refuses an empty, non numeric or
  * placeholder value, and names this constant.
  */

@@ -82,6 +82,16 @@ describe('the refund page', () => {
     const body = text(build().refund);
     expect(body).toContain(`within ${REFUND_DAYS} days of the purchase, without giving a reason`);
     expect(body).toContain('companies and consumers alike');
+    // Decision of Daniele of 2026-11-27 (critic of PR #713, note 5): like point 1.3 of Paddle's Refund Policy, a
+    // refund can be refused in case of fraud or abuse; the exception is in the lead, the rule and the description.
+    const { refund } = build();
+    expect(text(refund.match(/<p class="lead">[\s\S]*?<\/p>/)[0])).toContain(
+      `within ${REFUND_DAYS} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`,
+    );
+    expect(body).toContain(
+      'This is true for everyone who buys Formrail Pro, companies and consumers alike, except in case of fraud or abuse.',
+    );
+    expect(refund).toMatch(/<meta\s+name="description"\s+content="[^"]*whoever you are, except in case of fraud or abuse\./);
     // the 14th day is inside the term
     expect(body).toContain(`A request made on day ${REFUND_DAYS} after the purchase is still within the term.`);
     // the number is never typed into the page: change the constant and the page follows
@@ -306,13 +316,29 @@ describe('the Purchases section of the privacy notice', () => {
     expect(privacy).toContain('(GDPR art. 13 and 14)');
   });
 
-  it('the retention period is the constant: duration of the license plus the number of years', () => {
+  it('the retention period is the constant, counted from the end of the year of the sale; GitHub user names end with the access', () => {
     const body = (options) => text(purchases(build(options).privacy));
-    expect(body({ purchaseRetentionYears: '10' })).toContain('for as long as your license is in force, plus 10 years');
-    expect(body({ purchaseRetentionYears: '7' })).toContain('plus 7 years');
+    // The expected text changed with the decision of Daniele of 2026-11-27 (critic of PR #713, point 1): the
+    // reference of D8 is the end of the year of the sale (tax and accounting records), no longer "as long as your
+    // license is in force", which for a perpetual license would never end.
+    const RULE = (years) =>
+      `We keep the purchase data received from Paddle for ${years} years from the end of the year in which the sale takes place: this is the period for which tax and accounting law requires the records of the sale to be kept.`;
+    expect(body({ purchaseRetentionYears: '10' })).toContain(RULE(10));
+    expect(body({ purchaseRetentionYears: '7' })).toContain(RULE(7));
     // decision D8: the committed value is 7 years, and the default page prints it
     expect(PURCHASE_RETENTION_YEARS).toBe('7');
-    expect(body()).toContain('plus 7 years');
+    expect(body()).toContain(RULE(7));
+    expect(body()).not.toMatch(/in force|plus \d+ years/);
+    // GitHub user names are not records of the sale: deleted when the registry access ends, in each of the cases
+    expect(body()).toContain(
+      'The GitHub user names are not records of the sale, and they are not kept for that period. The data controller deletes them when your access to the registry ends: when the 12 months of updates end and you do not buy again, when you receive a refund or the payment is reversed, or when the license ends for a serious violation, as described in the license terms.',
+    );
+    // those cases are the ones of the license: the registry access ends with the 12 months, a refund, a chargeback
+    // or a serious violation
+    const license = text(build().license);
+    expect(license).toContain('When the 12 months end, your access to the registry ends');
+    expect(license).toContain('If you receive a refund, or the payment is reversed (a chargeback), the license and the registry access end');
+    expect(license).toContain('A serious violation of the section Restrictions ends the license in the same way');
     expect(readFileSync(path.join(ROOT, 'site-root', 'privacy.html'), 'utf8')).toContain('{{RETENTION_YEARS}}');
   });
 

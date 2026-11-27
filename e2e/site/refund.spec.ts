@@ -29,10 +29,15 @@ test.describe('refund page', () => {
   test('in a few seconds: 14 days, no reason, anyone, and how to ask', async ({ page }) => {
     await page.goto('refund/');
     // the first screen already says it, before any scrolling
-    await expect(page.locator('.lead')).toContainText(`within ${days} days of the purchase, without giving a reason, whoever you are`);
+    // the exception for fraud or abuse: decision of Daniele of 2026-11-27, as in Paddle's Refund Policy (1.3)
+    await expect(page.locator('.lead')).toContainText(
+      `within ${days} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`,
+    );
     const main = page.locator('main');
     await expect(main).toContainText(`within ${days} days of the purchase, without giving a reason`);
-    await expect(main).toContainText('companies and consumers alike');
+    await expect(page.locator('#who-and-when-title + p')).toContainText(
+      'This is true for everyone who buys Formrail Pro, companies and consumers alike, except in case of fraud or abuse.',
+    );
     await expect(main).toContainText(`A request made on day ${days} after the purchase is still within the term.`);
     expect(days).toBe(14);
   });
@@ -191,7 +196,15 @@ test.describe('privacy notice: purchases', () => {
     await expect(main).toContainText('GitHub user names that you give us');
     await expect(main).toContainText('art. 6(1)(b) GDPR');
     await expect(main).toContainText('art. 6(1)(c) GDPR');
-    await expect(main).toContainText(`plus ${retention} years`);
+    // the expected text changed with the decision of Daniele of 2026-11-27 (critic of PR #713, point 1): the
+    // period is counted from the end of the year of the sale, not from the end of a license that may never end
+    await expect(page.locator('#purchase-retention-title + p')).toContainText(
+      `for ${retention} years from the end of the year in which the sale takes place`,
+    );
+    await expect(page.locator('#purchase-retention-title + p + p')).toContainText(
+      'The data controller deletes them when your access to the registry ends',
+    );
+    await expect(main).not.toContainText('in force');
     await expect(main).toContainText('Paddle may transfer data outside the EEA');
     await expect(page.locator('#purchase-transfers-title + p')).toContainText(
       'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision',
