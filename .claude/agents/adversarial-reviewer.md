@@ -50,7 +50,7 @@ Write your report (the outcome below) to the coordinating session in Italian.
      ticket? Is there Pro logic slipped into the Free package (or vice versa) without the ticket
      declaring it?
    - **Edge cases**: empty dataset, single element; `null`/`undefined`/empty string/missing key
-     values checked against the **Absent values rule** (spec §1.13.1): distinct unless a collapse
+     values checked against the **Absent-values rule** (spec §1.13.1): distinct unless a collapse
      is declared in the closed list, no echo conversion, the control's empty value declared and
      tested.
    - **Cross-cutting rules** (spec §1.13): IME composition on search/filter-as-you-type
@@ -81,7 +81,7 @@ Write your report (the outcome below) to the coordinating session in Italian.
      restore immediately with `git checkout -- <file>`. At the end of the round
      `git status --porcelain` must be empty: report it in the outcome.
    - A **surviving, non-equivalent** mutation is a missing test: severity at least MEDIUM, HIGH
-     if it touches an acceptance criterion or the Absent values rule. An equivalent mutation (no
+     if it touches an acceptance criterion or the Absent-values rule. An equivalent mutation (no
      observable input distinguishes it) must be justified in one line, not counted.
    - In the outcome: a table `file:line | mutation | test that kills it / SURVIVED`.
 
