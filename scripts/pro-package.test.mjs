@@ -60,7 +60,7 @@ describe('packages/pro engine entry and form libraries', () => {
     expect(pkg.devDependencies?.[name] ?? pkg.peerDependencies?.[name]).toBeDefined();
   });
 
-  it('@formrail/core is an OPTIONAL peer (decision 1a of Daniele, 14/11/2026): @formrail/pro/engine needs no core', () => {
+  it('@formrail/core is an OPTIONAL peer (maintainer decision 1a, 2026-11-14): @formrail/pro/engine needs no core', () => {
     expect(pkg.peerDependencies['@formrail/core']).toBeDefined();
     expect(pkg.peerDependenciesMeta?.['@formrail/core']).toEqual({ optional: true });
     // react and react-dom stay required peers: every entry uses them.
