@@ -182,6 +182,16 @@ describe('AppShell: an AppShellNav with no AppShellNavTrigger', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('a matchMedia that throws: the viewport is not known, nothing is logged', () => {
+    vi.stubGlobal('matchMedia', () => {
+      throw new Error('matchMedia is not available');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    render(<Shell />);
+    wait(NO_TRIGGER_SETTLE_MS * 2);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('a nav that unmounts and mounts again: still one warning per shell', () => {
     viewport(false);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
