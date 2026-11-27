@@ -238,6 +238,9 @@ describe('the Purchases section of the privacy notice', () => {
       'Retention',
       'Design partner applications',
       'Purchases',
+      // The expected list changed with the decision of Daniele of 2026-11-27 (critic of PR #713, note A): the rule
+      // on the emails holds for everyone who writes, not only for buyers, so it has its own section.
+      'Emails you send us',
       'Your rights',
       'No cookies, no analytics',
     ]);
@@ -262,7 +265,9 @@ describe('the Purchases section of the privacy notice', () => {
       'your country;',
       'your postal code or address and, for a business, the tax or VAT number, when you give them to Paddle at checkout;',
       'the number of developers the license is for;',
-      'the identifier of the transaction.',
+      // the date and the amount are among the records of the sale that are kept (decision of Daniele of
+      // 2026-11-27, minimisation), so the list names them
+      'the identifier, the date and the amount of the transaction.',
     ]);
     // The expected list changed (critic of PR #713, points 3 and 10): the Paddle Billing checkout can also collect
     // the postal code or address and, for a business, the tax number, and makes them available to the seller; a
@@ -277,6 +282,10 @@ describe('the Purchases section of the privacy notice', () => {
     expect(text(list)).toContain('Without your email address and the GitHub user names we cannot grant the access or manage the license');
     expect(text(list)).not.toContain('Without these data');
     expect(text(list)).toContain('(art. 13(2)(e) GDPR)');
+    // the whole sentence, critic of PR #713 round 3, problem 2: only email and GitHub names are needed
+    expect(text(list)).toContain(
+      'Without your email address and the GitHub user names we cannot grant the access or manage the license; the other data are optional or depend on what Paddle collects at checkout (art. 13(2)(e) GDPR).',
+    );
   });
 
   it('states the purposes and the legal bases: contract art. 6(1)(b) and legitimate interest art. 6(1)(f), no consent', () => {
@@ -288,6 +297,32 @@ describe('the Purchases section of the privacy notice', () => {
     expect(section).toContain('our legitimate interest in defending ourselves in case of checks or disputes, art. 6(1)(f) GDPR');
     expect(section).not.toContain('6(1)(c)');
     expect(section).toContain('Neither rests on consent');
+    // the whole purposes and the whole paragraph of the legal bases, with the right to object (critic of PR #713,
+    // round 3, problem 2)
+    expect(section).toContain(
+      'to keep the records of the sale for a period that covers the tax and accounting checks that can concern the sale, and to defend ourselves in case of a dispute.',
+    );
+    expect(section).toContain(
+      'The first purpose rests on the contract of sale, art. 6(1)(b) GDPR. The second rests on our legitimate interest in defending ourselves in case of checks or disputes, art. 6(1)(f) GDPR. Neither rests on consent, so there is no consent to withdraw for the purchase; the rights listed below still apply, including the right to object to the processing based on legitimate interest (art. 21 GDPR).',
+    );
+  });
+
+  it('"Your rights" states the right to object separately, with the wording of art. 21(1), and the purchase text points to it', () => {
+    const { privacy } = build();
+    const rights = privacy.slice(privacy.indexOf('id="rights-title"'), privacy.indexOf('id="cookies-title"'));
+    const OBJECT =
+      'Right to object. Where we keep data on the basis of our legitimate interest (the records of the sale described in the Purchases section), you can object to it (art. 21 GDPR); we will then stop, unless we need the data to establish, exercise or defend legal claims or have compelling legitimate grounds that override your interests.';
+    // its own paragraph (art. 21(4): clearly and separately from any other information), with a visible title
+    const paragraph = rights.match(/<p id="right-to-object">([\s\S]*?)<\/p>/);
+    expect(paragraph).not.toBeNull();
+    expect(text(paragraph[1])).toBe(OBJECT);
+    expect(paragraph[1]).toContain('<strong>Right to object.</strong>');
+    // the same with or without the design partner section
+    expect(text(build({ designPartnerUrl: '' }).privacy)).toContain(OBJECT);
+    // the retention paragraph points to it, and no discretionary weighing is left
+    const retention = text(privacy.slice(privacy.indexOf('id="purchase-retention-title"'), privacy.indexOf('id="emails-title"')));
+    expect(retention).toContain('Until then you can object to this keeping (art. 21 GDPR), as described in "Your rights" below.');
+    expect(text(privacy)).not.toMatch(/weigh/i);
   });
 
   it('names Paddle (reseller, independent controller) and GitHub (registry) with their official policy', () => {
@@ -302,6 +337,8 @@ describe('the Purchases section of the privacy notice', () => {
       expect(body).toContain(entity);
     }
     expect(body).toContain('Paddle is an independent controller of your data');
+    // outside the parenthesis since note 6 of round 2: asserted on its own (critic of PR #713, round 3, problem 2)
+    expect(body).toContain('is the reseller of Formrail Pro: it sells the license to you, takes the payment and issues the invoice. Your receipt names the company that sold to you.');
     expect(body).toContain('The registry is hosted by GitHub (GitHub Packages)');
     expect(body).toContain('as an independent controller');
     expect(external(section).sort()).toEqual([
@@ -340,9 +377,11 @@ describe('the Purchases section of the privacy notice', () => {
     const body = (options) => text(purchases(build(options).privacy));
     // The expected text changed with the decision of Daniele of 2026-11-27 (critic of PR #713, point 1): the
     // reference of D8 is the end of the year of the sale (tax and accounting records), no longer "as long as your
-    // license is in force", which for a perpetual license would never end.
+    // license is in force", which for a perpetual license would never end. It changed again with the decision of
+    // Daniele after round 3 (minimisation): the period covers the records of the sale only, kept to defend
+    // ourselves in case of checks or disputes; the minimisation itself is asserted in the next test.
     const RULE = (years) =>
-      `We keep the purchase data received from Paddle for ${years} years from the end of the year in which the sale takes place: this is a period that covers the tax and accounting checks that can concern the sale.`;
+      `We keep the records of the sale for ${years} years from the end of the year in which the sale takes place, to defend ourselves in case of checks or disputes: this is a period that covers the tax and accounting checks that can concern the sale.`;
     expect(body({ purchaseRetentionYears: '10' })).toContain(RULE(10));
     expect(body({ purchaseRetentionYears: '7' })).toContain(RULE(7));
     // decision D8: the committed value is 7 years, and the default page prints it
@@ -353,11 +392,12 @@ describe('the Purchases section of the privacy notice', () => {
     expect(body()).toContain(
       'The GitHub user names are not records of the sale, and they are not kept for that period. The data controller deletes them when your access to the registry ends: when the 12 months of updates end and you do not buy again, when you receive a refund or the payment is reversed, or when the license ends for a serious violation, as described in the license terms. When you replace a developer, the name of the replaced developer is deleted when the access moves to the replacement.',
     );
-    // Decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale, the others 2 years after the last reply
+    // Decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale. The expected text changed
+    // after round 3 (note A): the rule for the other emails moved to "Emails you send us", asserted below.
     expect(body()).toContain(
-      `The emails you send to formrail.dev@gmail.com about a purchase (a refund, the replacement of a developer, a problem with the license) are records of the sale: they are kept for the same period as the purchase data, ${PURCHASE_RETENTION_YEARS} years from the end of the year in which the sale takes place. The other emails are deleted 2 years after our last reply.`,
+      `The emails you send to formrail.dev@gmail.com about a purchase (a refund, the replacement of a developer, a problem with the license) are records of the sale: they are kept for the same period, ${PURCHASE_RETENTION_YEARS} years from the end of the year in which the sale takes place. The other emails follow the rule in "Emails you send us" below.`,
     );
-    expect(body({ purchaseRetentionYears: '10' })).toContain('kept for the same period as the purchase data, 10 years from the end');
+    expect(body({ purchaseRetentionYears: '10' })).toContain('they are kept for the same period, 10 years from the end');
     expect(body()).not.toContain('requires the records');
     // those cases are the ones of the license: the registry access ends with the 12 months, a refund, a chargeback
     // or a serious violation
@@ -368,6 +408,44 @@ describe('the Purchases section of the privacy notice', () => {
     // replacing a developer: the license and the registry access move to the new person (the old name is deleted then)
     expect(license).toContain('the license and the registry access are moved');
     expect(readFileSync(path.join(ROOT, 'site-root', 'privacy.html'), 'utf8')).toContain('{{RETENTION_YEARS}}');
+  });
+
+  it('minimisation: for the retention period only the records of the sale are kept, the other data go with the last updates', () => {
+    const retention = (options) => {
+      const { privacy } = build(options);
+      return text(privacy.slice(privacy.indexOf('id="purchase-retention-title"'), privacy.indexOf('id="emails-title"')));
+    };
+    // decision of Daniele of 2026-11-27, after round 3 of the critic of PR #713: the list of the data kept
+    expect(retention()).toContain(
+      'Of the purchase data received from Paddle, the records of the sale keep only the identifier of the transaction, the date, the amount, your country and your email address; the emails about a purchase, described below, are records of the sale too. After that the data controller deletes them.',
+    );
+    // and the moment the other data are deleted
+    expect(retention()).toContain(
+      'The other purchase data received from Paddle, such as your name, your company name, your address and your tax or VAT number, are not records of the sale, and they are not kept for that period. The data controller deletes them at the end of the last 12 months of updates of your license, renewals included, or earlier if the license ends: when you receive a refund or the payment is reversed, or for a serious violation, as described in the license terms.',
+    );
+    // the period is never printed into those sentences: only the first sentence carries the constant
+    expect(retention({ purchaseRetentionYears: '10' }).match(/\b10 years\b/g)).toHaveLength(2);
+  });
+
+  it('the rule on the other emails is a section of its own, for everyone, with the design partner copies on their own period', () => {
+    const emails = (options) => {
+      const { privacy } = build(options);
+      return text(privacy.slice(privacy.indexOf('<h2 id="emails-title"'), privacy.indexOf('<h2 id="rights-title"')));
+    };
+    const FOR_ALL =
+      'This applies to everyone who writes to formrail.dev@gmail.com, whether or not they have bought a license. The emails about a purchase are kept as described in the Retention part of the Purchases section above.';
+    const DP = 'The copies of the design partner applications follow the period of their section: no later than 24 months after the application.';
+    const OTHERS =
+      'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.';
+    expect(emails()).toBe(`Emails you send us ${FOR_ALL} ${DP} ${OTHERS}`);
+    // the design partner period is the one of its section
+    expect(text(build().privacy)).toContain('no later than 24 months after your application');
+    // without the design partner section the sentence on its copies goes with it, the rest stays
+    expect(emails({ designPartnerUrl: '' })).toBe(`Emails you send us ${FOR_ALL} ${OTHERS}`);
+    // the section is outside the Purchases section, which covers buyers only
+    const { privacy } = build();
+    expect(privacy.indexOf('id="emails-title"')).toBeGreaterThan(privacy.indexOf('id="purchase-retention-title"'));
+    expect(privacy).toContain('<h2 id="emails-title">Emails you send us</h2>');
   });
 
   it('every external link of the whole notice is on the allowed list, and the only address is PRIVACY_EMAIL', () => {

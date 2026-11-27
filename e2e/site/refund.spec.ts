@@ -193,8 +193,13 @@ test.describe('privacy notice: purchases', () => {
       'your country;',
       'your postal code or address and, for a business, the tax or VAT number, when you give them to Paddle at checkout;',
       'the number of developers the license is for;',
-      'the identifier of the transaction.',
+      // the date and the amount are among the records of the sale that are kept (decision of Daniele of 2026-11-27)
+      'the identifier, the date and the amount of the transaction.',
     ]);
+    // the whole 13(2)(e) sentence (critic of PR #713, round 3, problem 2)
+    await expect(page.locator('#purchase-data-title + p + ul + p')).toContainText(
+      'Without your email address and the GitHub user names we cannot grant the access or manage the license; the other data are optional or depend on what Paddle collects at checkout (art. 13(2)(e) GDPR).',
+    );
     const main = page.locator('main');
     await expect(main).toContainText('GitHub user names that you give us');
     await expect(main).toContainText('art. 6(1)(b) GDPR');
@@ -204,14 +209,27 @@ test.describe('privacy notice: purchases', () => {
     await expect(page.locator('#purchase-retention-title + p')).toContainText(
       `for ${retention} years from the end of the year in which the sale takes place`,
     );
+    // minimisation, decision of Daniele of 2026-11-27 after round 3 of the critic: the data kept for that period,
+    // and when the other data are deleted (a new second paragraph, so the paragraphs after it moved by one)
+    await expect(page.locator('#purchase-retention-title + p')).toContainText(
+      'Of the purchase data received from Paddle, the records of the sale keep only the identifier of the transaction, the date, the amount, your country and your email address;',
+    );
     await expect(page.locator('#purchase-retention-title + p + p')).toContainText(
+      'The other purchase data received from Paddle, such as your name, your company name, your address and your tax or VAT number, are not records of the sale, and they are not kept for that period. The data controller deletes them at the end of the last 12 months of updates of your license, renewals included, or earlier if the license ends',
+    );
+    await expect(page.locator('#purchase-retention-title + p + p + p')).toContainText(
       'The data controller deletes them when your access to the registry ends',
     );
     await expect(main).not.toContainText('in force');
-    // decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale, the others 2 years
-    await expect(page.locator('#purchase-retention-title + p + p + p')).toContainText(
-      `are records of the sale: they are kept for the same period as the purchase data, ${retention} years from the end of the year in which the sale takes place. The other emails are deleted 2 years after our last reply.`,
+    // decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale; the expected text changed
+    // after round 3 (note A): the other emails follow the general section "Emails you send us"
+    await expect(page.locator('#purchase-retention-title + p + p + p + p')).toContainText(
+      `are records of the sale: they are kept for the same period, ${retention} years from the end of the year in which the sale takes place. The other emails follow the rule in "Emails you send us" below.`,
     );
+    await expect(page.locator('#emails-title + p')).toContainText(
+      'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.',
+    );
+    await expect(page.locator('#emails-title + p')).toContainText('whether or not they have bought a license');
     await expect(page.locator('#purchase-data-title + p')).toContainText('as the licensor of the product');
     await expect(main).toContainText('Paddle may transfer data outside the EEA');
     await expect(page.locator('#purchase-transfers-title + p')).toContainText(
@@ -263,9 +281,39 @@ test.describe('privacy notice: purchases', () => {
       await expect(section).toContainText(entity);
     }
     await expect(section).toContainText('independent controller');
+    // asserted on its own since it moved out of the parenthesis (critic of PR #713, round 3, problem 2)
+    await expect(section).toContainText('Your receipt names the company that sold to you.');
     await expect(section).not.toContainText('What it passes to us');
     const text = await page.locator('#purchases-title ~ *').evaluateAll((els) => els.map((e) => e.textContent ?? '').join(' '));
     expect(text).not.toMatch(/processor/i);
+  });
+
+  test('the legal bases and the right to object: art. 21 in the Purchases section and, on its own, in "Your rights"', async ({
+    page,
+  }) => {
+    await page.goto('privacy/');
+    const bases = page.locator('#purchase-purpose-title + p + ul + p');
+    await expect(bases).toContainText(
+      'The second rests on our legitimate interest in defending ourselves in case of checks or disputes, art. 6(1)(f) GDPR.',
+    );
+    await expect(bases).toContainText(
+      'the rights listed below still apply, including the right to object to the processing based on legitimate interest (art. 21 GDPR).',
+    );
+    await expect(page.locator('#purchase-purpose-title + p + ul li').nth(1)).toHaveText(
+      'to keep the records of the sale for a period that covers the tax and accounting checks that can concern the sale, and to defend ourselves in case of a dispute.',
+    );
+    await expect(page.locator('#purchase-retention-title + p')).toContainText(
+      'Until then you can object to this keeping (art. 21 GDPR), as described in "Your rights" below.',
+    );
+    // art. 21(4): clearly and separately from any other information, in the section the Purchases text points to
+    const object = page.locator('#rights-title ~ p#right-to-object');
+    await expect(object).toBeVisible();
+    await expect(object).toHaveText(
+      'Right to object. Where we keep data on the basis of our legitimate interest (the records of the sale described in the Purchases section), you can object to it (art. 21 GDPR); we will then stop, unless we need the data to establish, exercise or defend legal claims or have compelling legitimate grounds that override your interests.',
+      { useInnerText: true },
+    );
+    await expect(object.locator('strong')).toHaveText('Right to object.');
+    await expect(page.locator('main')).not.toContainText(/weigh/i);
   });
 
   test('the waitlist description is unchanged and the Last updated date matches license and refund', async ({ page }) => {

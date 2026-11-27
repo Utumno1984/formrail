@@ -418,6 +418,8 @@ test.describe('privacy page', () => {
       'Retention',
       ...(designPartnerUrl ? ['Design partner applications'] : []),
       'Purchases',
+      // a general section on the emails, for everyone (decision of Daniele of 2026-11-27, PR #713)
+      'Emails you send us',
       'Your rights',
       'No cookies, no analytics',
     ]);
