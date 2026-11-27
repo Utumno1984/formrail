@@ -259,3 +259,65 @@ export function planUseCasesSection<T extends TaggedStory>(title: string, storie
   const { neutral, useCases } = splitUseCases(stories, pagePublic);
   return { neutral, section: useCases.length > 0 ? { heading: sectionHeadingOf(title), intro: USE_CASES_INTRO, stories: useCases } : null };
 }
+
+// ---------------------------------------------------------------------------------------------------------
+// Happy path first, edge cases last (ticket #723). Someone evaluating the library opens a floorplan's Docs page
+// and must meet the normal use (data, an edit, a save, a selection) right after the example and the Playground,
+// not after the stories that prove a guarantee in an uncommon situation.
+// ---------------------------------------------------------------------------------------------------------
+
+/**
+ * Tag of the story the Docs page template shows first in its "Stories" list, right after the example and the
+ * Playground: the normal use of the component, end to end. At most one per Docs page, on a page that opens with
+ * a copy-paste example. Storybook reads tags statically: write it literally in the story's `tags`.
+ */
+export const HAPPY_PATH_TAG = 'happy-path';
+
+/**
+ * Tag of a story that documents an uncommon situation or a guarantee at a limit (a narrow box, a right-to-left
+ * wrapper, a dataset of a thousand rows...). The template groups them under "Edge cases", after every other
+ * story of the component and before the domain examples ("Examples" stays last, #624). The id does not change.
+ */
+export const EDGE_CASE_TAG = 'edge-case';
+
+/** Heading of the section of the edge-case stories. */
+export const EDGE_CASES_HEADING = 'Edge cases';
+
+/** Sentence under the heading of the edge-case section, on every page. */
+export const EDGE_CASES_INTRO =
+  'Less common situations and limits: each story shows how the component behaves there. For the normal use, start from the stories above.';
+
+/** The happy path of a Docs page: the one story tagged {@link HAPPY_PATH_TAG}. Throws on two. */
+export function findHappyPath<T extends TaggedStory>(stories: readonly T[]): T | undefined {
+  const tagged = stories.filter((story) => story.tags?.includes(HAPPY_PATH_TAG));
+  if (tagged.length > 1) throw new Error(`More than one story tagged "${HAPPY_PATH_TAG}" on one page: ${tagged.map((s) => s.id).join(', ')}`);
+  return tagged[0];
+}
+
+/**
+ * Orders the neutral stories of a Docs page (after `planUseCasesSection`, without the Playground): the happy path
+ * first, then the other stories in their order, then the edge cases in their order. Pure, so the template
+ * (.storybook/docs-page.tsx) and the e2e of the order (e2e/docs-story-order.spec.ts) share the same rule. A story
+ * tagged both `happy-path` and `edge-case` is a contradiction: it throws.
+ */
+export function planEdgeCasesSection<T extends TaggedStory>(stories: readonly T[]): { main: T[]; edgeCases: T[] } {
+  const happy = findHappyPath(stories);
+  if (happy?.tags?.includes(EDGE_CASE_TAG)) throw new Error(`${happy.id}: tagged both "${HAPPY_PATH_TAG}" and "${EDGE_CASE_TAG}"`);
+  const isEdge = (story: T) => !!story.tags?.includes(EDGE_CASE_TAG);
+  const rest = stories.filter((story) => story !== happy && !isEdge(story));
+  return { main: happy ? [happy, ...rest] : rest, edgeCases: stories.filter(isEdge) };
+}
+
+/**
+ * The story ids of a Docs page that opens with a copy-paste example, in the order the template renders them: the
+ * example, the Playground, the "Stories" list (happy path first), the edge cases, then the use cases. Input: the
+ * page's stories in index order (`index.json`), with their tags. The e2e compares it with the rendered page.
+ */
+export function plannedDocsOrder<T extends TaggedStory>(stories: readonly T[], title: string): string[] {
+  const [primary, ...rest] = stories;
+  if (!primary) return [];
+  const { neutral, section } = planUseCasesSection(title, rest, !primary.tags?.includes('internal'));
+  const playground = findPlayground(neutral);
+  const { main, edgeCases } = planEdgeCasesSection(neutral.filter((story) => story !== playground));
+  return [primary, ...(playground ? [playground] : []), ...main, ...edgeCases, ...(section?.stories ?? [])].map((story) => story.id);
+}
