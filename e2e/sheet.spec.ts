@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations, settleMotion } from './helpers/a11y';
 import { expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass, gotoStory as openStory } from './helpers/story';
@@ -35,9 +35,27 @@ test.describe('Overlays/Sheet: stories play', () => {
     'over-a-dialog',
     'over-a-dialog-from-button',
     'with-form',
+    'full-width-on-mobile',
   ]) {
     test(`${name}: the play function passes`, async ({ page }) => {
       await expectPlayToPass(page, STORY(name));
+    });
+  }
+});
+
+// #721: the six "inside sheet" stories got a `SheetClose`, and each play now closes the sheet with it first (MultiSelect
+// and DatePicker had no play before): they must pass, not only settle.
+test.describe('the "inside sheet" stories of the other components: plays pass (#721)', () => {
+  for (const id of [
+    'forms-select--inside-sheet',
+    'forms-combobox--inside-sheet',
+    'forms-multiselect--inside-sheet',
+    'forms-datepicker--inside-sheet',
+    'overlays-toast--inside-sheet',
+    'overlays-menu--inside-sheet',
+  ]) {
+    test(`${id}: the play function passes`, async ({ page }) => {
+      await expectPlayToPass(page, id);
     });
   }
 });
@@ -404,3 +422,177 @@ test.describe('virtual keyboard', () => {
     await expect.poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height).toBeGreaterThan(limit);
   });
 });
+
+// #721: a sheet always has a way out by touch. A touch screen has no Escape key, and below 30rem a `md` panel takes
+// the whole width, so no backdrop is left to tap: a close button is the only exit a finger has. A phone profile
+// (`hover: none`, `pointer: coarse`, as interaction-affordance-touch.spec.ts): the "chromium-touch" project only adds
+// `hasTouch`, which does not make the pointer coarse, so the precondition is asserted in every test.
+// `defaultBrowserType` cannot be set inside a describe block, so it is dropped from the profile.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { defaultBrowserType: _ignored, ...phone } = devices['Pixel 5'];
+const PHONES = [
+  { width: 320, height: 568 },
+  { width: 375, height: 667 },
+] as const;
+const MOTIONS = ['reduce', 'no-preference'] as const;
+/** Minimum touch target (WCAG 2.5.5, the platforms' guidelines). */
+const TOUCH_TARGET = 44;
+
+async function expectCoarsePointer(page: Page): Promise<void> {
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), 'precondition: a coarse pointer').toBe(true);
+}
+
+/** At least 44 x 44 px, inside the viewport and on top at its centre (a tap there reaches it). */
+async function expectTappable(page: Page, button: Locator, viewport: { width: number; height: number }): Promise<void> {
+  const box = (await button.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(TOUCH_TARGET);
+  expect(box.height).toBeGreaterThanOrEqual(TOUCH_TARGET);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  expect(
+    await button.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    }),
+    'the button is on top at its centre',
+  ).toBe(true);
+}
+
+/**
+ * A tap on `close` closes the sheet and gives the focus back to `opener`. With the reduced-motion preference the
+ * panel leaves at once: no exit animation runs after the tap.
+ */
+async function tapToClose(page: Page, close: Locator, sheet: Locator, opener: Locator, motion: (typeof MOTIONS)[number]) {
+  await settleMotion(page);
+  await close.tap();
+  if (motion === 'reduce') expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+  await expect(sheet).toHaveCount(0);
+  await expect(opener).toBeFocused();
+}
+
+for (const viewport of PHONES) {
+  for (const motion of MOTIONS) {
+    test.describe(`touch exit at ${viewport.width}px, ${motion} (#721)`, () => {
+      test.use({ ...phone, viewport, reducedMotion: motion });
+
+      test('@touch no SheetClose: the sheet is as wide as the screen and draws its own close button; a tap closes it, the focus returns', async ({
+        page,
+      }) => {
+        // The play leaves the sheet open (it opened it, closed it with that button and opened it again).
+        await gotoStory(page, STORY('full-width-on-mobile'));
+        await expectCoarsePointer(page);
+        const sheet = page.getByRole('dialog', { name: 'Filters' });
+        const opener = page.getByRole('button', { name: 'Filters', exact: true });
+        await expect(sheet).toBeVisible();
+        await settleMotion(page);
+        const box = (await sheet.boundingBox())!;
+        expect(box.x).toBe(0);
+        expect(box.width).toBe(viewport.width);
+        const close = sheet.getByRole('button', { name: 'Close: Filters' });
+        await expect(sheet.getByRole('button')).toHaveCount(1);
+        await expectTappable(page, close, viewport);
+        await tapToClose(page, close, sheet, opener, motion);
+        // The whole cycle by touch: a tap on the opener, then on the close button.
+        await opener.tap();
+        await expect(sheet).toHaveAttribute('data-state', 'open');
+        // Measured where the panel is drawn at rest, not during its slide-in (no-preference).
+        await settleMotion(page);
+        await expectTappable(page, close, viewport);
+        await tapToClose(page, close, sheet, opener, motion);
+      });
+
+      test('@touch SheetClose in the header: 44 x 44 px, the sheet draws no second button; a tap closes it, the focus returns', async ({
+        page,
+      }) => {
+        await gotoStory(page, STORY('playground'));
+        await expectCoarsePointer(page);
+        const opener = page.getByRole('button', { name: 'Open' });
+        await opener.tap();
+        const sheet = sheetOf(page);
+        await expect(sheet).toHaveAttribute('data-state', 'open');
+        await settleMotion(page);
+        const close = sheet.getByRole('button', { name: 'Close: Supplier detail' });
+        await expect(close).toHaveCount(1);
+        await expect(sheet.locator('[data-rop-default-close]')).toHaveCount(0);
+        await expectTappable(page, close, viewport);
+        await tapToClose(page, close, sheet, opener, motion);
+      });
+    });
+  }
+}
+
+// The smoke tests of the ticket: the "inside sheet" stories, whose play leaves the sheet open (its popover closed).
+for (const [story, title, opener, viewport] of [
+  ['forms-select--inside-sheet', 'Edit supplier', 'Edit supplier', PHONES[1]],
+  ['overlays-menu--inside-sheet', 'Record', 'Open sheet', PHONES[0]],
+] as const) {
+  test.describe(`${story} at ${viewport.width}px (#721)`, () => {
+    test.use({ ...phone, viewport, reducedMotion: 'reduce' });
+
+    test('@touch a tap on SheetClose closes the sheet and the focus returns to its opener', async ({ page }) => {
+      await gotoStory(page, story);
+      await expectCoarsePointer(page);
+      const sheet = page.getByRole('dialog', { name: title });
+      await expect(sheet).toBeVisible();
+      await expect(page.getByRole('listbox')).toHaveCount(0);
+      await expect(page.getByRole('menu')).toHaveCount(0);
+      const close = sheet.getByRole('button', { name: `Close: ${title}` });
+      const openerButton = page.getByRole('button', { name: opener, exact: true });
+      await expectTappable(page, close, viewport);
+      await tapToClose(page, close, sheet, openerButton, 'reduce');
+      await openerButton.tap();
+      await expect(sheet).toHaveAttribute('data-state', 'open');
+      await tapToClose(page, close, sheet, openerButton, 'reduce');
+    });
+  });
+}
+
+// The virtual keyboard open on a field of the sheet: the close button stays on screen and tappable (same stand-in
+// for the keyboard as the "virtual keyboard" block above).
+for (const viewport of PHONES) {
+  test.describe(`touch exit with the virtual keyboard at ${viewport.width}px (#721)`, () => {
+    test.use({ ...phone, viewport, reducedMotion: 'reduce' });
+
+    test('@touch the focused field and the close button stay above the keyboard; a tap on it closes, the focus returns', async ({
+      page,
+    }) => {
+      await page.addInitScript(() => {
+        const target = new EventTarget();
+        let keyboard = 0;
+        const vv = Object.defineProperties(target, {
+          offsetTop: { value: 0 },
+          offsetLeft: { value: 0 },
+          pageTop: { value: 0 },
+          pageLeft: { value: 0 },
+          scale: { value: 1 },
+          height: { get: () => window.innerHeight - keyboard },
+          width: { get: () => window.innerWidth },
+        });
+        Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+        (window as unknown as { __setKeyboard: (px: number) => void }).__setKeyboard = (px) => {
+          keyboard = px;
+          target.dispatchEvent(new Event('resize'));
+        };
+      });
+      await gotoStory(page, STORY('full-width-on-mobile'));
+      await expectCoarsePointer(page);
+      const sheet = page.getByRole('dialog', { name: 'Filters' });
+      const input = sheet.getByRole('textbox', { name: 'Supplier name' });
+      await input.tap();
+      await expect(input).toBeFocused();
+      // 45% of the window, in whole px.
+      const keyboard = Math.round(viewport.height * 0.45);
+      await page.evaluate((px) => (window as unknown as { __setKeyboard: (n: number) => void }).__setKeyboard(px), keyboard);
+      const visible = { width: viewport.width, height: viewport.height - keyboard };
+      await expect.poll(async () => (await sheet.boundingBox())!.y + (await sheet.boundingBox())!.height).toBeLessThanOrEqual(visible.height);
+      const field = (await input.boundingBox())!;
+      expect(field.y).toBeGreaterThanOrEqual(0);
+      expect(field.y + field.height).toBeLessThanOrEqual(visible.height);
+      const close = sheet.getByRole('button', { name: 'Close: Filters' });
+      await expectTappable(page, close, visible);
+      await tapToClose(page, close, sheet, page.getByRole('button', { name: 'Filters', exact: true }), 'reduce');
+    });
+  });
+}
