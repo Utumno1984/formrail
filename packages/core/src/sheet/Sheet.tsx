@@ -82,6 +82,20 @@ export interface SheetContentProps extends ModalContentBaseProps {
    * `dismissible={false}` (the way out is an action of the panel, by contract) nor with `asChild` (the panel is your
    * element). `false`: never drawn; in development a sheet that was open with no `SheetClose` at all, dismissible,
    * logs a `console.warn` once, when it closes.
+   *
+   * Room: a `SheetHeader` keeps 64 px at its end for the button (`pe-16`); with no `SheetHeader` the panel keeps
+   * room above its first part, with an element of its own (a padding in `className` does not take it away).
+   * Focus: the opening focus goes, as always, to the first element of the panel that can take it; the button comes
+   * last, so that is your first field, and in a panel with nothing else to focus (a read-only view) the button
+   * itself, as it would be with a `SheetClose` of yours.
+   *
+   * Upgrading from a version without this prop, only these sheets change:
+   * - one closed by a button of yours that is not a `SheetClose` (`onClick={() => setOpen(false)}`) now shows this
+   *   button too: wrap yours in `<SheetClose asChild>`, which then takes this one's place. `closeButton={false}`
+   *   removes this one as well, but the sheet cannot see a button of yours that is not a `SheetClose`, so in
+   *   development it logs the warning above when it closes;
+   * - one with a header of your own instead of `SheetHeader`: the button sits at its top end corner, over the end of
+   *   that header, so give it `pe-16` (the room `SheetHeader` keeps), or render a `SheetClose` in it.
    * @default true
    */
   closeButton?: boolean;
@@ -94,7 +108,12 @@ export interface SheetContentProps extends ModalContentBaseProps {
 }
 
 export interface SheetLabels {
-  /** Accessible name of the sheet's own close button (`closeButton`). Default `Close: <title>`, from the `SheetTitle`. */
+  /**
+   * Accessible name of the sheet's own close button (`closeButton`). Default `Close: <title>`, from the `SheetTitle`.
+   * A given value is used as given, `''` included (rule of absent values: an empty text is not a missing key, so it
+   * never falls back to the default); a blank one leaves the button without a name and logs a `console.error` in
+   * development.
+   */
   close: string;
 }
 

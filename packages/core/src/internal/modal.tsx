@@ -2,6 +2,7 @@
 // The two public components only add what differs: the panel's position and size, and the names
 // of their parts (error messages, console warning).
 import {
+  cloneElement,
   createContext,
   forwardRef,
   useCallback,
@@ -21,7 +22,8 @@ import {
   type RefObject,
 } from 'react';
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { Button } from '../button/Button';
+import { Button, ghostIconXsButtonClass, ICON_XS_BUTTON_ICON_SIZE } from '../button/Button';
+import { iconClass } from '../icon/Icon';
 import { overlayLayer } from '../overlay/layers';
 import { useReturnFocus } from '../overlay/use-return-focus';
 import { cn } from '../utils/cn';
@@ -110,8 +112,9 @@ const DEFAULT_CLOSE_PLACE = 'absolute top-4 end-6 pointer-coarse:top-2 pointer-c
 // Room the header keeps at its end for that button (24 px from the edge + 24 px + a 12 px gap; 8 + 44 + 12 under a
 // coarse pointer: 64 px in both cases).
 const DEFAULT_CLOSE_HEADER_ROOM = 'pe-16';
-// With no header, the panel keeps that room above its first part instead.
-const DEFAULT_CLOSE_TOP_ROOM = 'pt-8 pointer-coarse:pt-10';
+// With no header, the panel keeps that room above its first part instead: an element of its own (first in the
+// panel), not a padding of the panel, which a `p-*` / `py-*` in the consumer's `className` would take away.
+const DEFAULT_CLOSE_TOP_ROOM = 'h-8 shrink-0 pointer-coarse:h-10';
 
 function useModalContext(part: string, root: string): ModalContextValue {
   const ctx = useContext(ModalContext);
@@ -619,7 +622,7 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
             aria-modal="true"
             {...rest}
             ref={setNode}
-            className={cn(defaultCloseShown && headerCount === 0 && DEFAULT_CLOSE_TOP_ROOM, panelClassName)}
+            className={panelClassName}
             // The return of the focus is `useReturnFocus`'s (opener-agnostic), not Radix's.
             onCloseAutoFocus={(event) => {
               event.preventDefault();
@@ -655,8 +658,13 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               children
             ) : (
               <>
+                {defaultCloseShown && headerCount === 0 ? (
+                  <div aria-hidden="true" data-rop-close-room="" className={DEFAULT_CLOSE_TOP_ROOM} />
+                ) : null}
                 {children}
-                {canDrawClose ? <CloseSlot show={defaultCloseShown} label={closeLabel} report={setSlotReady} /> : null}
+                {canDrawClose ? (
+                  <CloseSlot show={defaultCloseShown} label={closeLabel} part={part} report={setSlotReady} />
+                ) : null}
               </>
             )}
           </RadixDialog.Content>
@@ -671,8 +679,10 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
 export interface ModalOwnCloseProps {
   /** Whether the button is drawn (no `ModalClose` is mounted in the panel). */
   show: boolean;
-  /** Its accessible name; else "Close: `<title>`". */
+  /** Its accessible name, used as given (a blank one is an error in development); else "Close: `<title>`". */
   label: string | undefined;
+  /** The name of the panel's component, for the development error. */
+  part: string;
   /** Called with `true` once the slot's layout effect has run (after the children's), `false` when it unmounts. */
   report: (ready: boolean) => void;
 }
@@ -683,16 +693,47 @@ export interface ModalOwnCloseProps {
  * draws the button only if none did, in the same commit, before anything is painted. Passed as `closeSlot` by the
  * Sheet only.
  */
-export function ModalOwnClose({ show, label, report }: ModalOwnCloseProps) {
+export function ModalOwnClose({ show, label, part, report }: ModalOwnCloseProps) {
   useLayoutEffect(() => {
     report(true);
     return () => report(false);
   }, [report]);
-  if (!show) return null;
-  return label ? (
-    <DefaultClose aria-label={label} className={DEFAULT_CLOSE_PLACE} forwardedRef={null} data-rop-default-close="" />
-  ) : (
-    <DefaultClose className={DEFAULT_CLOSE_PLACE} forwardedRef={null} data-rop-default-close="" />
+  return show ? <OwnCloseButton label={label} part={part} /> : null;
+}
+
+/**
+ * The button itself: a plain Radix `Close` with the classes of a ghost `icon-xs` `Button` and of an `Icon` (the same
+ * helpers those components are drawn with), not the `Button` component, so that an isolated `SheetContent` import
+ * does not ship `Button` with its `asChild` branch and its label typography for one icon button. Named like the
+ * default `ModalClose`.
+ */
+function OwnCloseButton({ label, part }: { label: string | undefined; part: string }) {
+  const own = label !== undefined;
+  const { naming, closeId, setRef } = useCloseNaming(own, undefined, null);
+  // §1.13.1 (rule of absent values): `''` is not `undefined`. A given label is used as given, never replaced by the
+  // default; a blank one leaves the button without a name, which is reported in development.
+  const blank = own && label.trim() === '';
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' && blank) {
+      console.error(
+        `[formrail] <${part}> labels.close is blank: the sheet's own close button has no accessible name. Pass a text, or leave the key out for the default "Close: <title>".`,
+      );
+    }
+  }, [blank, part]);
+  return (
+    <RadixDialog.Close
+      {...(own ? { 'aria-label': label } : naming)}
+      id={closeId}
+      ref={setRef}
+      className={cn(ghostIconXsButtonClass(), TOUCH_CLOSE, DEFAULT_CLOSE_PLACE)}
+      data-rop-default-close=""
+    >
+      {cloneElement(internalIcons.close, {
+        className: iconClass(ICON_XS_BUTTON_ICON_SIZE),
+        'aria-hidden': true,
+        focusable: 'false',
+      })}
+    </RadixDialog.Close>
   );
 }
 
@@ -846,15 +887,14 @@ export const ModalClose = /* @__PURE__ */ forwardRef<HTMLButtonElement, ModalClo
   return <DefaultClose {...rest} forwardedRef={ref} />;
 });
 
-function DefaultClose({
-  forwardedRef,
-  className,
-  ...rest
-}: Omit<ModalCloseProps, 'asChild' | 'children'> & { forwardedRef: ForwardedRef<HTMLButtonElement> }) {
+/**
+ * The accessible name of a default close button, shared by `ModalClose` and the Sheet's own button: "Close: `<title>`"
+ * (the button's `id` and the title's, read from the panel and followed as the title registers), "Close" with no
+ * title, nothing of its own when the caller names the button (`ownName`).
+ */
+function useCloseNaming(ownName: boolean, id: string | undefined, forwardedRef: ForwardedRef<HTMLButtonElement>) {
   const node = useRef<HTMLButtonElement | null>(null);
-  const touchTargets = !!useContext(PanelPartsContext)?.touchTargets;
   const [titleId, setTitleId] = useState<string | null>(null);
-  const ownName = !!rest['aria-label']?.trim() || !!rest['aria-labelledby']?.trim();
   // The title's id belongs to Radix's context (not exposed) and is put on the panel node only
   // once the title has registered: read it from there and follow it.
   useLayoutEffect(() => {
@@ -867,7 +907,7 @@ function DefaultClose({
     return () => observer.disconnect();
   }, []);
   const generatedId = useId();
-  const closeId = rest.id ?? generatedId;
+  const closeId = id ?? generatedId;
   const setRef = useCallback(
     (el: HTMLButtonElement | null) => {
       node.current = el;
@@ -881,6 +921,17 @@ function DefaultClose({
     : titleId
       ? { 'aria-label': 'Close:', 'aria-labelledby': `${closeId} ${titleId}` }
       : { 'aria-label': 'Close' };
+  return { naming, closeId, setRef };
+}
+
+function DefaultClose({
+  forwardedRef,
+  className,
+  ...rest
+}: Omit<ModalCloseProps, 'asChild' | 'children'> & { forwardedRef: ForwardedRef<HTMLButtonElement> }) {
+  const touchTargets = !!useContext(PanelPartsContext)?.touchTargets;
+  const ownName = !!rest['aria-label']?.trim() || !!rest['aria-labelledby']?.trim();
+  const { naming, closeId, setRef } = useCloseNaming(ownName, rest.id, forwardedRef);
   return (
     <RadixDialog.Close asChild>
       <Button {...({ ...naming, ...rest } as { 'aria-label': string })} id={closeId} ref={setRef} variant="ghost" size="icon-xs" className={cn(touchTargets && TOUCH_CLOSE, className)}>

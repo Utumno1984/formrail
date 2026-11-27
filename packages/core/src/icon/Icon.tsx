@@ -23,6 +23,15 @@ const SIZE_CLASS: Record<IconSize, string> = {
   xl: 'size-(--icon-rop-xl)',
 };
 
+/**
+ * @internal Not public API. The classes `Icon` gives its SVG at `size`, before the SVG's own and the consumer's: for
+ * an icon of the system drawn without the component (the own close button of a Sheet, #721). `Icon` itself uses
+ * them, so the two cannot drift.
+ */
+export function iconClass(size: IconSize): string {
+  return `inline-block shrink-0 align-middle ${SIZE_CLASS[size]}`;
+}
+
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'ref' | 'size'> {
   /** Side of the square the SVG is forced into, whatever its own width/height. */
   size?: IconSize;
@@ -79,7 +88,7 @@ export const Icon = /* @__PURE__ */ forwardRef<SVGSVGElement, IconProps>(functio
     ...rest,
     ref: composeRefs(childRef, ref),
     // Default classes first, then the child's own, then the consumer's: the last one wins.
-    className: cn('inline-block shrink-0 align-middle', SIZE_CLASS[size], child.props.className, className),
+    className: cn(iconClass(size), child.props.className, className),
     // The semantics of `label` always win over whatever the child (or `rest`) declared. A name
     // given some other way (`aria-labelledby`) would take precedence over `aria-label`, and a
     // decorative icon must not be reachable by keyboard (`tabIndex`).

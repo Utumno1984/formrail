@@ -173,14 +173,78 @@ describe('SheetContent closeButton: the sheet draws its own close button when it
     render(<Bare content={{ labels: { close: 'Chiudi il pannello' } }} />);
     await user.click(screen.getByRole('button', { name: 'Open' }));
     expect(await screen.findByRole('button', { name: 'Chiudi il pannello' })).toBe(ownClose());
+    expect(ownClose()).not.toHaveAttribute('aria-labelledby');
   });
 
-  it('with no header the panel keeps room above its first part for it', async () => {
+  it("labels.close: '' is not a missing key (spec 1.13.1): used as given, never the default, and a development console.error", async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const user = userEvent.setup();
-    render(<Bare header={false} />);
+    for (const close of ['', '   ']) {
+      errors.mockClear();
+      const { unmount } = render(<Bare content={{ labels: { close } }} />);
+      await user.click(screen.getByRole('button', { name: 'Open' }));
+      await nextFrame();
+      const button = ownClose();
+      expect(button).not.toBeNull();
+      expect(button).toHaveAttribute('aria-label', close);
+      expect(button).not.toHaveAttribute('aria-labelledby');
+      expect(screen.queryByRole('button', { name: /^Close/ })).toBeNull();
+      expect(errors).toHaveBeenCalledTimes(1);
+      expect(String(errors.mock.calls[0]?.[0])).toMatch(/^\[formrail\] <SheetContent> labels\.close is blank: /);
+      unmount();
+    }
+    // A key left out is the default, and nothing is logged.
+    errors.mockClear();
+    render(<Bare content={{ labels: {} }} />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(await screen.findByRole('button', { name: 'Close: Edit supplier' })).toBe(ownClose());
+    expect(errors).not.toHaveBeenCalled();
+  });
+
+  it('looks like the default SheetClose: the same classes and icon (a ghost icon-xs Button), without the Button component', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(
+      <Bare>
+        <SheetClose className="absolute top-4 end-6 pointer-coarse:top-2 pointer-coarse:end-2" data-rop-default-close="" />
+      </Bare>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await nextFrame();
+    const reference = ownClose()!;
+    const classes = reference.className.split(' ').sort();
+    const icon = reference.innerHTML;
+    unmount();
+    render(<Bare />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await nextFrame();
+    const own = ownClose()!;
+    expect(own.className.split(' ').sort()).toEqual(classes);
+    expect(own.innerHTML).toBe(icon);
+    expect(own).toHaveAttribute('type', 'button');
+  });
+
+  it('with no header the panel keeps room above its first part for it: an element of its own, which a padding in className does not take away', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<Bare header={false} content={{ className: 'p-0 py-0' }} />);
     await user.click(screen.getByRole('button', { name: 'Open' }));
     await screen.findByRole('button', { name: 'Close: Edit supplier' });
-    expect(screen.getByRole('dialog')).toHaveClass('pt-8', 'pointer-coarse:pt-10');
+    const panel = screen.getByRole('dialog');
+    const room = panel.firstElementChild as HTMLElement;
+    expect(room).toHaveAttribute('data-rop-close-room');
+    expect(room).toHaveAttribute('aria-hidden', 'true');
+    expect(room).toHaveClass('h-8', 'shrink-0', 'pointer-coarse:h-10');
+    expect(room).toBeEmptyDOMElement();
+    expect(panel).toHaveClass('p-0');
+    unmount();
+    // With a header (it keeps the room at its end), with a SheetClose (no own button), with closeButton={false}: none.
+    const others: Parameters<typeof Bare>[0][] = [{}, { children: <SheetClose /> }, { content: { closeButton: false } }];
+    for (const props of others) {
+      const { unmount: next } = render(<Bare {...props} />);
+      await user.click(screen.getByRole('button', { name: 'Open' }));
+      await nextFrame();
+      expect(document.querySelector('[data-rop-close-room]')).toBeNull();
+      next();
+    }
   });
 
   it('in a Sheet opened over a Dialog it closes only the Sheet', async () => {
