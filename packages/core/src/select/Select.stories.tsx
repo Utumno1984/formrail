@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from '../dialog/Dialog';
 import { Field, type FieldStateProps } from '../field/Field';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
 import { storyControl, withoutControls } from '../internal/story-docs';
@@ -240,17 +240,24 @@ export const Forced: Story = {
   },
 };
 
-/** Same stacking as in a Dialog: the options are above the sheet and a pick leaves it open. */
+/**
+ * Same stacking as in a Dialog: the options are above the sheet and a pick leaves it open. The play function first
+ * closes the sheet with its close button (the focus goes back to the trigger) and opens it again.
+ */
 export const InsideSheet: Story = {
   parameters: NO_STATE,
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Suppliers</h1>
+        <h1 style={{ margin: '0 0 12px', fontSize: 20 }}>Suppliers</h1>
+        <SheetTrigger asChild>
+          <Button>Edit supplier</Button>
+        </SheetTrigger>
       </main>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>Edit supplier</SheetTitle>
+          <SheetClose />
         </SheetHeader>
         <SheetBody>
           <Field label="Country">
@@ -260,8 +267,15 @@ export const InsideSheet: Story = {
       </SheetContent>
     </Sheet>
   ),
-  play: async () => {
+  play: async ({ canvasElement }) => {
     const body = within(document.body);
+    // #721: the close button of the header closes the sheet (by touch it is the only way out: 44 x 44 px there) and
+    // the focus goes back to the trigger; the sheet is opened again for the rest.
+    await userEvent.click(await body.findByRole('button', { name: 'Close: Edit supplier' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    const opener = within(canvasElement).getByRole('button', { name: 'Edit supplier' });
+    await waitFor(() => expect(opener).toHaveFocus());
+    await userEvent.click(opener);
     const sheet = await body.findByRole('dialog', { name: 'Edit supplier' });
     await userEvent.click(within(sheet).getByRole('combobox', { name: 'Country' }));
     const list = await listbox();

@@ -29,6 +29,8 @@ interface DemoArgs {
   side: SheetSide;
   size: SheetSize;
   dismissible: boolean;
+  /** `closeButton` of `SheetContent`, used by the "Full width on mobile" story only. */
+  closeButton?: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -352,5 +354,63 @@ export const WithForm: Story = {
     const field = await within(document.body).findByRole('textbox', { name: 'Company name' });
     await userEvent.type(field, 'Acme Corp');
     await expect(field).toHaveValue('Acme Corp');
+  },
+};
+
+const SIZE_PX: Record<SheetSize, number> = { sm: 352, md: 480, lg: 672 };
+
+/**
+ * No `SheetClose` in the panel: below 30rem (`md`) the sheet takes the whole width, so no backdrop is left to tap, and
+ * a touch screen has no Escape key. With `closeButton` (the default) the sheet draws its own close button at the top
+ * end corner (44 x 44 px under a coarse pointer). The play function opens it, checks its width, closes it with that
+ * button and checks that the focus is back on the trigger. With `closeButton` off there is no button (and, in
+ * development, a warning when it closes).
+ */
+export const FullWidthOnMobile: Story = {
+  args: { closeButton: true },
+  argTypes: {
+    ...withoutControls('dismissible'),
+    closeButton: storyControl({
+      control: 'boolean',
+      description: 'Prop of `SheetContent` (see its tab): the sheet draws its own close button while it has no `SheetClose`.',
+    }),
+  },
+  render: ({ side, size, closeButton, onOpenChange }) => (
+    <Page>
+      <Sheet onOpenChange={onOpenChange}>
+        <SheetTrigger asChild>
+          <Button variant="primary">Filters</Button>
+        </SheetTrigger>
+        <SheetContent side={side} size={size} closeButton={closeButton}>
+          <SheetHeader>
+            <SheetTitle>Filters</SheetTitle>
+          </SheetHeader>
+          <SheetBody>
+            <Field label="Supplier name">
+              <Input />
+            </Field>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>
+    </Page>
+  ),
+  play: async ({ args, canvasElement }) => {
+    const opener = within(canvasElement).getByRole('button', { name: 'Filters' });
+    await userEvent.click(opener);
+    const body = within(document.body);
+    const sheet = await body.findByRole('dialog', { name: 'Filters' });
+    await expect(args.onOpenChange).toHaveBeenLastCalledWith(true);
+    await settleMotion();
+    await expect(Math.round(sheet.getBoundingClientRect().width)).toBe(Math.min(SIZE_PX[args.size], window.innerWidth));
+    if (!args.closeButton) {
+      await expect(within(sheet).queryByRole('button')).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+      return;
+    }
+    await userEvent.click(await within(sheet).findByRole('button', { name: 'Close: Filters' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(args.onOpenChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => expect(opener).toHaveFocus());
   },
 };
