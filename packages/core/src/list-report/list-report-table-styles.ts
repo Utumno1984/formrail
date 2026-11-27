@@ -157,9 +157,9 @@ export const edgeLayerClass =
   'pointer-events-none sticky start-0 bottom-0 z-rop-sticky h-0 ' +
   '[--rop-list-report-edge-color:color-mix(in_srgb,var(--color-rop-text)_24%,transparent)] ' +
   'not-supports-[color:color-mix(in_srgb,red,blue)]:[--rop-list-report-edge-color:var(--color-rop-text)]';
-// Each shade hangs from the layer, as tall as the scrollport (`--rop-list-report-edge-height`, measured)
-// and moved down past a table shorter than the scrollport (`--rop-list-report-edge-bottom`, 0 or
-// negative). Out of view and fully transparent until the scroller has the attribute of its edge; the
+// Each shade hangs from the layer, as tall as the scrollport, or as the table when it is shorter than
+// the scrollport so the shade ends where the last row ends (`--rop-list-report-edge-height`, measured;
+// `--rop-list-report-edge-bottom` is 0). Out of view and fully transparent until the scroller has the attribute of its edge; the
 // change fades with the feedback motion tokens, and at once under reduced motion. In forced colours the
 // gradient is dropped by the browser: a line in the text colour on the outer side carries the signal.
 // The end shade stops at the start of the sticky row actions column (`--rop-list-report-edge-end`,
