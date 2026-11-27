@@ -53,8 +53,9 @@ work); if the check must stay permanent, promote it to a real e2e test in `e2e/`
 Before opening or updating a PR:
 
 - `npm run check` green (lint + types + build + unit).
-- e2e suite green locally (not just "it should pass in CI"); if the component has a wide impact
-  (overlay, List Report, Object Page), the visual suite as well.
+- The e2e tests touched by the change green locally; the complete e2e suite is run by CI, which
+  must be green. If the component has a wide impact (overlay, List Report, Object Page), the
+  visual snapshot is updated and the complete visual suite is also left to CI.
 - No temporary debug file (ad-hoc scripts, trial screenshots, test branches/PRs) remains in the
   repository or on GitHub at the end of the work: clean up before delivering, consistent with the
   convention already used for live smoke tests in `CLAUDE.md`.

@@ -122,6 +122,12 @@ rigid rules:
   constraint is the hardware (CPU/Chromium in parallel), not the quota. Before launching heavy
   steps (e2e, visual, build) in parallel, check `uptime`: if the load is already high, queue the
   work or accept the slowdown knowingly, and never ignore an anomalous result.
+- **Maintainer decision (2026-11-27)**: machine load.
+  - Locally, run only the tests touched by the change. Do not run the complete e2e and visual
+    suites locally: CI is authoritative for them.
+  - Before a heavy step (Storybook build, e2e, visual, Docker), check `uptime`. If the load is
+    above 8, wait instead of adding more work.
+  - Every agent always shuts down the servers and background processes it has left running.
 
 **Priority and pace (maintainer decision, 2026-11-04, replacing "slow pace / not a
 priority")**: Formrail is now a **priority** project, no longer a slow-paced side project.
@@ -223,7 +229,8 @@ to ask the maintainer.
   (from ticket #6 onwards); the adversarial reviewer checks that it was not added "just because"
   (controls that control nothing, an empty or trivial `play`).
 - Tests: `npm run check` = lint + types + build + unit tests. Before every commit: `npm run
-  check`. Before a ready PR: the full e2e suite as well.
+  check`. Before a ready PR: the tests touched by the change locally, and green CI, which runs
+  the complete e2e suite.
 - Secrets: none expected in the core (no external API, no database). If a need for
   licensing/keys arises for Pro, it is an architectural decision to bring to the maintainer
   (through the coordinating session) before implementing it, not to be invented on the spot.

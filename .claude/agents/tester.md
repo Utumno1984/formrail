@@ -22,7 +22,7 @@ into an admin/back-office app).
 3. Run, in this order:
    - `npm run check` (lint, types, build, unit tests);
    - the static Storybook build (see the scripts in the `package.json` of the package touched);
-   - the **entire** e2e suite, not only the new tests;
+   - the e2e tests touched by the PR, not the complete suite (CI runs it and must be green);
    - a **manual/scripted smoke test specific to the component**: for a List Report — empty
      dataset, many rows, sorting, committed filter vs typing; for an Object Page — a value
      hydrated after mount (check that it does NOT mark the form as dirty), a save bar that

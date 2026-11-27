@@ -53,11 +53,16 @@ All green before going on.
 
 ## 4. e2e and visual
 
+The complete e2e and visual suites are run by CI, which must be green (`gh pr checks <N>`): do
+not run them in full locally (maintainer decision, 2026-11-27). Locally, run only the tests
+touched by the PR:
+
 ```bash
-npm run test:e2e     # in the background, wait for the notification
-npm run test:visual  # requires Docker; if Docker has just been started (manually or by a
-                     # local SessionStart hook), the actual start takes 30-60s — wait first
+npx playwright test <file> -g "<name>"   # only the e2e tests touched by the PR
 ```
+
+Visual snapshots need Docker; if Docker has just been started (manually or by a local
+SessionStart hook), the actual start takes 30-60s — wait first.
 
 **Before running them alongside other heavy work on the same machine**, check `uptime`: two
 complete Playwright suites (726 tests each) in parallel took ~7x the normal time out of pure
