@@ -257,8 +257,13 @@ describe('SheetContent closeButton: the sheet draws its own close button when it
     expect(room).toBeEmptyDOMElement();
     expect(panel).toHaveClass('p-0');
     unmount();
-    // With a header (it keeps the room at its end), with a SheetClose (no own button), with closeButton={false}: none.
-    const others: Parameters<typeof Bare>[0][] = [{}, { children: <SheetClose /> }, { content: { closeButton: false } }];
+    // With a header (it keeps the room at its end), and with no header but a SheetClose (no own button) or
+    // closeButton={false}: none.
+    const others: Parameters<typeof Bare>[0][] = [
+      {},
+      { header: false, children: <SheetClose /> },
+      { header: false, content: { closeButton: false } },
+    ];
     for (const props of others) {
       const { unmount: next } = render(<Bare {...props} />);
       await user.click(screen.getByRole('button', { name: 'Open' }));
@@ -266,6 +271,19 @@ describe('SheetContent closeButton: the sheet draws its own close button when it
       expect(document.querySelector('[data-rop-close-room]')).toBeNull();
       next();
     }
+  });
+
+  it('a DialogContent with no header has no room for the close button above its content', async () => {
+    render(
+      <Dialog defaultOpen>
+        <DialogContent>
+          <DialogTitle>Supplier</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    await screen.findByRole('dialog', { name: 'Supplier' });
+    await nextFrame();
+    expect(document.querySelector('[data-rop-close-room]')).toBeNull();
   });
 
   it('in a Sheet opened over a Dialog it closes only the Sheet', async () => {
