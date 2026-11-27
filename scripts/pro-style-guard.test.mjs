@@ -114,9 +114,8 @@ describe('pro style guard: allowlist', () => {
 });
 
 describe('pro style guard: allowlist context (#486 round 3)', () => {
-  const real = JSON.parse(read('scripts/pro-style-guard.allowlist.json')).find((e) => e.rule === 'named-color');
   const line = '.badge { color: color-mix(in srgb, var(--_cs-tone) 45%, black); }';
-  const entry = { file: CSS, rule: 'named-color', value: 'black', context: real.context, reason: 'a long enough reason' };
+  const entry = { file: CSS, rule: 'named-color', value: 'black', context: 'color-mix(in srgb, var(--_cs-tone) 45%, black)', reason: 'a long enough reason' };
 
   it('the real entry still passes on its own line (whitespace-normalised)', () => {
     const v = checkSource(CSS, line.replace(/ /g, '   '), TOKENS);

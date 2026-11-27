@@ -103,7 +103,8 @@
        1px contour and an icon in the tone. No literal colour: the same tokens as the badge. */
     background-color: color-mix(in srgb, var(--_cs-tone) 10%, var(--color-rop-surface));
     /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
-    outline: 1px solid var(--_cs-tone);
+    outline-style: solid;
+    outline-width: 1px;
     outline-offset: -1px;
 
     &::before {
@@ -122,16 +123,19 @@
 
   .rop-pro-change-summary__kind--added {
     --_cs-tone: var(--color-rop-success);
+    outline-color: var(--color-rop-success);
     --_cs-shape: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
   }
 
   .rop-pro-change-summary__kind--removed {
     --_cs-tone: var(--color-rop-error);
+    outline-color: var(--color-rop-error);
     --_cs-shape: polygon(0 35%, 100% 35%, 100% 65%, 0 65%);
   }
 
   .rop-pro-change-summary__kind--changed {
     --_cs-tone: var(--color-rop-info);
+    outline-color: var(--color-rop-info);
     --_cs-shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   }
 

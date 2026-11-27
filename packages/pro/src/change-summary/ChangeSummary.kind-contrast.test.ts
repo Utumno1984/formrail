@@ -149,7 +149,11 @@ describe('ChangeSummary kind badges: contrast (#485)', () => {
 
 describe('ChangeSummary kind badges: styles that must stay (#485)', () => {
   it('keeps a 1px outline in the tone (the badge must not vanish in forced-colors mode: the outline stays, in a system colour)', () => {
-    expect(declaration(ruleBody(BASE), 'outline')).toBe('1px solid var(--_cs-tone)');
+    const base = ruleBody(BASE);
+    expect(declaration(base, 'outline-style')).toBe('solid');
+    expect(declaration(base, 'outline-width')).toBe('1px');
+    // The contour colour is the tone of the kind, as `StatusBadge`.
+    for (const kind of KINDS) expect(declaration(ruleBody(`${BASE}--${kind}`), 'outline-color')).toBe(`var(${TONE_TOKEN[kind]})`);
   });
 
   it('draws a different shape per kind, and the icon is a pseudo-element (no DOM node to name)', () => {
