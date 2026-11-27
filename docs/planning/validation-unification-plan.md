@@ -1,313 +1,317 @@
-# Validazione uniforme (Zod) su form, campi e footer — ricognizione e piano
+# Uniform validation (Zod) across form, fields and footer: survey and plan
 
-> Documento di pianificazione. Nessuna implementazione. Stato: **decisioni di Daniele ricevute e
-> registrate in §5**; i ticket sono stati pubblicati su GitHub (numeri in §6).
-> Data ricognizione: 2026-11-01, su `main` @ `68ddd39`. Tutto ciò che è scritto in §1 è stato letto nel
-> codice (`packages/core/src`), non ricordato a memoria; dove un'affermazione è un'inferenza dalla
-> lettura del codice e non una prova eseguita, è detto.
+> Planning document. No implementation. Status: **maintainer decisions received and recorded in
+> §5**; the tickets have been published on GitHub (numbers in §6).
+> Survey date: 2026-11-01, on `main` @ `68ddd39`. Everything written in §1 was read in the code
+> (`packages/core/src`), not recalled from memory; where a statement is an inference from reading the
+> code and not an executed proof, it says so.
 
-## 0. Obiettivo e vincolo di metodo
+## 0. Goal and method constraint
 
-Introdurre la validazione a runtime con Zod su form e footer dell'Object Page (spec
-`design-system-spec.md` §1.5: "schema di validazione runtime condiviso tra form e chiamata API, fallisce
-rumorosamente su un campo mancante"). **Vincolo di Daniele, regola generale del progetto**: la
-soluzione è uniforme su *tutti* i punti che oggi gestiscono errori/stato di validazione, non un
-meccanismo aggiunto solo al footer. Quindi il piano ha due metà inseparabili: (a) allineare ciò che è
-già frammentato, (b) innestare Zod sul modello allineato — non sopra quello frammentato.
+Introduce runtime validation with Zod on the Object Page form and footer (spec
+`design-system-spec.md` §1.5: "runtime validation schema shared between form and API call, fails
+loudly on a missing field"). **Maintainer constraint, a general rule of the project**: the solution
+is uniform across *all* the points that today handle errors/validation state, not a mechanism added
+only to the footer. So the plan has two inseparable halves: (a) align what is already fragmented,
+(b) graft Zod onto the aligned model, not on top of the fragmented one.
 
-Punti ricognizione: `Field`, `useFieldControl`/`FieldContext`, `FieldMessage`, `Input`, `Select`,
-`Combobox`, `useObjectPageForm`, `useFocusFirstInvalidField`, `useDirtyGuard`, più `ObjectPageFooter`
-e le story che oggi fanno da "documentazione" del flusso.
+Survey points: `Field`, `useFieldControl`/`FieldContext`, `FieldMessage`, `Input`, `Select`,
+`Combobox`, `useObjectPageForm`, `useFocusFirstInvalidField`, `useDirtyGuard`, plus
+`ObjectPageFooter` and the stories that today serve as "documentation" of the flow.
 
-Stato del pacchetto: `@formrail/core` è `0.0.0`, mai pubblicato: un cambio di API pubblica
-oggi non è un breaking change verso utenti reali, ma resta una scelta di API che spetta a Daniele.
+State of the package: `@formrail/core` is `0.0.0`, never published: a public API change today is not
+a breaking change towards real users, but it is still an API choice that belongs to the maintainer.
 
 ---
 
-## 1. Ricognizione: com'è oggi (e dove è già frammentato)
+## 1. Survey: how it is today (and where it is already fragmented)
 
-### 1.1 Modello attuale in una pagina
+### 1.1 Current model on one page
 
-| Pezzo | Cosa produce/consuma | Tipo dell'errore |
+| Piece | What it produces/consumes | Error type |
 |---|---|---|
-| `useObjectPageForm` | `validate?: (values) => Partial<Record<keyof Values, string>>`; `fieldErrors` (stesso tipo); `saveError: unknown` | `string` per chiave **top-level** |
-| `Field` | prop `error?: ReactNode`; se non vuoto → `aria-invalid` sul controllo + `FieldMessage tone="error"` + id in `aria-describedby` | `ReactNode` |
-| `FieldContext`/`useFieldControl` | `FieldControlProps`: `id`, `aria-labelledby`, `aria-describedby`, `aria-invalid`, `aria-required`, `disabled`, `readOnly`, `aria-readonly`; `state`/`interactionBlocked` non enumerabili | — |
-| `Input`/`Select`/`Combobox` | leggono `FieldContext` e applicano gli attributi sopra | — |
-| `useFocusFirstInvalidField` | `fieldErrors: Partial<Record<string,string>>`; trova i controlli con `[name="<chiave>"]` nel contenitore | chiavi stringa |
-| `ObjectPageFooter` | `message?: ReactNode` + `messageTone`; `role="status"` `aria-live="polite"` sempre montato | `ReactNode` |
+| `useObjectPageForm` | `validate?: (values) => Partial<Record<keyof Values, string>>`; `fieldErrors` (same type); `saveError: unknown` | `string` per **top-level** key |
+| `Field` | prop `error?: ReactNode`; if non-empty → `aria-invalid` on the control + `FieldMessage tone="error"` + id in `aria-describedby` | `ReactNode` |
+| `FieldContext`/`useFieldControl` | `FieldControlProps`: `id`, `aria-labelledby`, `aria-describedby`, `aria-invalid`, `aria-required`, `disabled`, `readOnly`, `aria-readonly`; `state`/`interactionBlocked` non-enumerable | — |
+| `Input`/`Select`/`Combobox` | read `FieldContext` and apply the attributes above | — |
+| `useFocusFirstInvalidField` | `fieldErrors: Partial<Record<string,string>>`; finds the controls with `[name="<key>"]` in the container | string keys |
+| `ObjectPageFooter` | `message?: ReactNode` + `messageTone`; `role="status"` `aria-live="polite"` always mounted | `ReactNode` |
 | `useDirtyGuard` | `when: boolean` | — |
 
-**Nessun pezzo di codice collega il form al `Field`**: il consumatore scrive a mano
-`<Field error={form.fieldErrors.x}>` e `<Input name="x">` per ogni campo (lo si vede nella story
-`ObjectPageFooter` e nella fixture `UseObjectPageFormFixture`).
+**No piece of code connects the form to the `Field`**: the consumer writes by hand
+`<Field error={form.fieldErrors.x}>` and `<Input name="x">` for every field (visible in the
+`ObjectPageFooter` story and in the `UseObjectPageFormFixture` fixture).
 
-### 1.2 Frammentazioni e incoerenze trovate (già presenti, prima di Zod)
+### 1.2 Fragmentations and inconsistencies found (already present, before Zod)
 
-**F1 — Due "lingue" per lo stesso errore: `string` nel form, `ReactNode` nel Field.**
-`fieldErrors` è `Partial<Record<keyof Values, string>>` (`use-object-page-form.ts`), `Field.error` è
-`ReactNode` (`Field.tsx`). Funziona perché una `string` è un `ReactNode`, ma non esiste un tipo
-condiviso "errore di campo" né un posto dove stia più di un messaggio o un codice stabile (utile per
-i18n e per i test). Zod produce `issues[]` con `code`, `path`, `message`: oggi non c'è dove metterli.
+**F1 — Two "languages" for the same error: `string` in the form, `ReactNode` in the Field.**
+`fieldErrors` is `Partial<Record<keyof Values, string>>` (`use-object-page-form.ts`), `Field.error`
+is `ReactNode` (`Field.tsx`). It works because a `string` is a `ReactNode`, but there is no shared
+"field error" type and no place for more than one message or a stable code (useful for i18n and for
+tests). Zod produces `issues[]` with `code`, `path`, `message`: today there is nowhere to put them.
 
-**F2 — Il legame form→campo passa solo per un attributo DOM `name` che il `Field` non conosce.**
-`useFocusFirstInvalidField` cerca `[name]`. `Field` non ha prop `name` e non la propaga al controllo
-(`FieldControlProps` non la contiene): spetta al consumatore ricordarsi `name` su ogni controllo *e*
-la stessa chiave su `error=`. Due chiavi indipendenti da tenere allineate a mano.
+**F2 — The form→field link goes only through a DOM `name` attribute that the `Field` does not
+know.** `useFocusFirstInvalidField` looks for `[name]`. `Field` has no `name` prop and does not
+propagate it to the control (`FieldControlProps` does not contain it): the consumer must remember
+`name` on every control *and* the same key on `error=`. Two independent keys to keep aligned by hand.
 
-**F3 — `Select` non può essere raggiunto da `useFocusFirstInvalidField` (difetto reale, per lettura
-del codice).** `SelectProps` esclude `name` (`Omit<..., 'name' | 'form' ...>`, scelta voluta per
-non far passare l'eco del `<select>` nativo di Radix). Il trigger è un `<button>` senza `name`, quindi
-un errore su un campo `Select` non trova nessun elemento: nessun focus, e in dev un `console.error`.
-`Combobox` invece accetta `name` (estende `InputHTMLAttributes`); `Input` pure. Tre controlli, due
-comportamenti. Non verificato con un test eseguito: da riprodurre nel primo ticket che lo tocca.
+**F3 — `Select` cannot be reached by `useFocusFirstInvalidField` (a real defect, from reading the
+code).** `SelectProps` excludes `name` (`Omit<..., 'name' | 'form' ...>`, a deliberate choice so
+that the echo of Radix's native `<select>` is not passed through). The trigger is a `<button>`
+without `name`, so an error on a `Select` field finds no element: no focus, and in dev a
+`console.error`. `Combobox` instead accepts `name` (it extends `InputHTMLAttributes`); `Input` too.
+Three controls, two behaviours. Not verified with an executed test: to be reproduced in the first
+ticket that touches it.
 
-**F4 — Il cablaggio `FieldContext` è copiato tre volte.** `Input.tsx`, `Select.tsx`, `Combobox.tsx`
-ripetono lo stesso blocco (merge di `aria-describedby`, `control?.x ?? rest.x` per `id`,
-`aria-labelledby`, `aria-invalid`, `aria-required`, `aria-readonly`, `disabled`, `readOnly`). Ogni
-nuova proprietà di validazione (es. `name`, `aria-errormessage`, `data-*`) andrebbe aggiunta in tre
-punti: è il modo in cui le incoerenze nascono. Le classi di stile invalido sono pure triplicate
+**F4 — The `FieldContext` wiring is copied three times.** `Input.tsx`, `Select.tsx`, `Combobox.tsx`
+repeat the same block (merge of `aria-describedby`, `control?.x ?? rest.x` for `id`,
+`aria-labelledby`, `aria-invalid`, `aria-required`, `aria-readonly`, `disabled`, `readOnly`). Every
+new validation property (e.g. `name`, `aria-errormessage`, `data-*`) would have to be added in three
+places: this is how inconsistencies are born. The invalid-style classes are also tripled
 (`aria-invalid:border-rop-error` in `Input.tsx`, `Select.tsx`, `internal/combobox-styles.ts`).
 
-**F5 — Doppio produttore di `aria-invalid`.** Dentro un `Field` lo produce il `Field` (solo `true` o
-assente); fuori, o in una story, lo scrive il consumatore. La fixture `UseObjectPageFormFixture`
-usa `<input aria-invalid={k in form.fieldErrors}>` + `aria-describedby` scritto a mano: `k in` conta
-anche una chiave con valore `undefined`, mentre il form e l'hook trattano `undefined` come "nessun
-errore" (`invalidKeys`/filtro in `save`). Tre punti che definiscono "è invalido" con tre regole
-leggermente diverse (`hasContent(error)` nel Field, `!== undefined` nel form e nell'hook, `k in` nella
-fixture).
+**F5 — Two producers of `aria-invalid`.** Inside a `Field` it is produced by the `Field` (only
+`true` or absent); outside, or in a story, the consumer writes it. The fixture
+`UseObjectPageFormFixture` uses `<input aria-invalid={k in form.fieldErrors}>` + a hand-written
+`aria-describedby`: `k in` also counts a key with value `undefined`, while the form and the hook
+treat `undefined` as "no error" (`invalidKeys`/filter in `save`). Three places that define "is
+invalid" with three slightly different rules (`hasContent(error)` in the Field, `!== undefined` in
+the form and in the hook, `k in` in the fixture).
 
-**F6 — Due percorsi paralleli al medesimo stato di errore.** Lo story `ObjectPageFooter` ("Fornitore
-obbligatorio") tiene un proprio `useState` `fieldErrors` e un proprio controllo, ignorando
-`useObjectPageForm({ validate })`/`form.fieldErrors` introdotti dopo (#77/#81). Le story sono la
-documentazione de facto: mostrano due modi diversi di fare la stessa cosa.
+**F6 — Two parallel paths to the same error state.** The `ObjectPageFooter` story ("Supplier
+required", in Italian in the original story) keeps its own `useState` `fieldErrors` and its own
+check, ignoring `useObjectPageForm({ validate })`/`form.fieldErrors` introduced later (#77/#81).
+Stories are the de facto documentation: they show two different ways of doing the same thing.
 
-**F7 — Semantica di annuncio diversa per "errore", tre volte.** Errore di campo: `FieldMessage` non è
-live (annunciato tramite `aria-describedby` + `aria-invalid` quando il fuoco arriva sul campo).
-`MessageStrip` `tone="error"`: `role="alert"`. `ObjectPageFooter` con `messageTone="error"`:
-`role="status"` + `aria-live="polite"`. Non è per forza sbagliato (sono livelli diversi: campo,
-pagina, azione), ma non è scritto da nessuna parte *quale livello usa quale*, e Zod aggiunge un
-quarto caso ("validazione fallita, N campi invalidi") senza una regola di dove annunciarlo.
+**F7 — Different announcement semantics for "error", three times.** Field error: `FieldMessage` is
+not live (announced through `aria-describedby` + `aria-invalid` when focus reaches the field).
+`MessageStrip` `tone="error"`: `role="alert"`. `ObjectPageFooter` with `messageTone="error"`:
+`role="status"` + `aria-live="polite"`. It is not necessarily wrong (they are different levels:
+field, page, action), but it is written nowhere *which level uses which*, and Zod adds a fourth case
+("validation failed, N invalid fields") without a rule on where to announce it.
 
-**F8 — `validate` che lancia finisce in `saveError`, cioè nel footer, mischiando due categorie.**
-Contratto documentato (`use-object-page-form.ts`): se `validate` lancia, `saveError` è impostato.
-Con Zod il caso naturale è `schema.parse(values)`, che lancia una `ZodError` il cui `message` è un
-JSON di issues: finirebbe come testo nel footer invece che come errori di campo. Il contratto attuale
-spinge verso l'uso sbagliato (parse invece di safeParse).
+**F8 — A throwing `validate` ends up in `saveError`, that is in the footer, mixing two
+categories.** Documented contract (`use-object-page-form.ts`): if `validate` throws, `saveError` is
+set. With Zod the natural case is `schema.parse(values)`, which throws a `ZodError` whose `message`
+is a JSON of issues: it would end up as text in the footer instead of as field errors. The current
+contract pushes towards the wrong use (parse instead of safeParse).
 
-**F9 — `fieldErrors` solo a chiavi top-level; Zod produce percorsi.** `setValue`/`setValues` sono
-top-level (`keyof Values`), `fieldErrors` idem, l'hook cerca `[name="a"]`. Una issue Zod ha
-`path: ['address','city']` o `['lines', 0, 'qty']`. Manca una convenzione di serializzazione del
-percorso, condivisa da form, `Field`/`name` e hook.
+**F9 — `fieldErrors` only with top-level keys; Zod produces paths.** `setValue`/`setValues` are
+top-level (`keyof Values`), `fieldErrors` likewise, the hook looks for `[name="a"]`. A Zod issue has
+`path: ['address','city']` or `['lines', 0, 'qty']`. There is no path serialization convention shared
+by form, `Field`/`name` and hook.
 
-**F10 — Pulizia degli errori "tutto o niente".** Qualsiasi `setValue`/`setValues`/`reset` azzera *tutti*
-i `fieldErrors` (documentato, "per-field clearing is not supported", e coperto da una story-test
-"Typing after a failure clears every field error at once"). Scrivere in un campo fa sparire
-`aria-invalid` e il messaggio di tutti gli altri campi ancora invalidi. Con la validazione guidata da
-schema (dove un errore dipende da più campi) il comportamento tutto-o-niente diventa più visibile.
+**F10 — "All or nothing" clearing of errors.** Any `setValue`/`setValues`/`reset` clears *all* the
+`fieldErrors` (documented, "per-field clearing is not supported", and covered by a story-test "Typing
+after a failure clears every field error at once"). Writing in one field makes `aria-invalid` and the
+message of all the other still-invalid fields disappear. With schema-driven validation (where an
+error depends on several fields) the all-or-nothing behaviour becomes more visible.
 
-**F11 — Stato invalido sui campi bloccati/disabilitati non definito.** Un `Field` `forced`/`locked`
-con errore mostra messaggio e `aria-invalid`, ma l'hook salta i controlli non focalizzabili
-(`disabled`, inert) e, se sono gli unici invalidi, non fa nulla (solo `console.error` in dev). Nessuna
-regola dice se un valore forzato/bloccato va validato.
+**F11 — Invalid state on locked/disabled fields is undefined.** A `forced`/`locked` `Field` with an
+error shows the message and `aria-invalid`, but the hook skips non-focusable controls (`disabled`,
+inert) and, if they are the only invalid ones, does nothing (only a `console.error` in dev). No rule
+says whether a forced/locked value must be validated.
 
-**F12 — Testi di default italiani sparsi con meccanismi diversi.** `DirtyGuardLabels` (oggetto
-`labels`), `ObjectPageFooter` (`toneLabel`, `label` come prop piatte), `Select` (`emptyLabel`,
-`unknownValueLabel`). I messaggi Zod sono in inglese di default. Non esiste una politica: il
-consumatore passa i testi, la libreria non traduce errori di validazione (da dichiarare, non da
-costruire).
+**F12 — Default texts scattered with different mechanisms.** `DirtyGuardLabels` (`labels` object),
+`ObjectPageFooter` (`toneLabel`, `label` as flat props), `Select` (`emptyLabel`,
+`unknownValueLabel`). The Zod messages are in English by default. There is no policy: the consumer
+passes the texts, the library does not translate validation errors (to be declared, not to be
+built).
 
-**F13 — Piccola duplicazione tecnica:** `isDev()` è definito identico in
-`use-object-page-form.ts`, `use-focus-first-invalid-field.ts` e `object-page/ObjectPageContext.ts`.
+**F13 — Small technical duplication:** `isDev()` is defined identically in
+`use-object-page-form.ts`, `use-focus-first-invalid-field.ts` and
+`object-page/ObjectPageContext.ts`.
 
-**`useDirtyGuard`: nessuna frammentazione di errori trovata.** Dipende solo da `when: boolean` e non
-legge né `fieldErrors` né validità. Dirty e invalido sono ortogonali *per costruzione* (un form invalido
-è tipicamente sporco; `save` fallito per validazione non pulisce né sporca). Non serve cambiarlo; serve
-**fissare con un test e2e** che una validazione fallita non cambia `isDirty`, non rimuove il
-`beforeunload` e non apre il dialog del guard (vedi T9). L'unico punto di contatto con F12 è il
-meccanismo `labels`.
+**`useDirtyGuard`: no error fragmentation found.** It depends only on `when: boolean` and reads
+neither `fieldErrors` nor validity. Dirty and invalid are orthogonal *by construction* (an invalid
+form is typically dirty; a `save` that fails validation neither cleans nor dirties). It does not need
+changing; it needs **an e2e test pinning** that a failed validation does not change `isDirty`, does
+not remove `beforeunload` and does not open the guard's dialog (see T9). The only point of contact
+with F12 is the `labels` mechanism.
 
-### 1.3 Cosa è già buono e va conservato (non rifare)
+### 1.3 What is already good and must be kept (do not redo)
 
-- `FieldMessage`: un solo componente per help/errore, geometria identica (`tone`), niente live region,
-  id referenziato solo se il messaggio esiste.
-- Regola "una chiave `undefined` = nessun errore" nel form e nell'hook.
-- Identità nuova di `fieldErrors` a ogni `save` fallito (l'hook rifocalizza anche con errori uguali).
-- `Field` come unico posto che calcola `aria-describedby` (reason → error → help) e il contratto
-  `interactionBlocked`.
-- Validazione sincrona prima di ogni lavoro async: `isSaving` non viene toccato su fallimento.
+- `FieldMessage`: a single component for help/error, identical geometry (`tone`), no live region, id
+  referenced only if the message exists.
+- Rule "an `undefined` key = no error" in the form and in the hook.
+- New identity of `fieldErrors` on every failed `save` (the hook refocuses even with equal errors).
+- `Field` as the only place that computes `aria-describedby` (reason → error → help) and the
+  `interactionBlocked` contract.
+- Synchronous validation before any async work: `isSaving` is not touched on failure.
 
 ---
 
-## 2. Disegno unificato proposto
+## 2. Proposed unified design
 
-Principio: **un solo modello di "errore di campo", un solo produttore di stato invalido (il `Field`),
-un solo modo di collegare form e campo, un solo cablaggio dei controlli; Zod è un adattatore che
-produce quel modello, non un percorso parallelo.**
+Principle: **a single "field error" model, a single producer of invalid state (the `Field`), a
+single way to connect form and field, a single wiring of the controls; Zod is an adapter that
+produces that model, not a parallel path.**
 
-### 2.1 Modello dati condiviso
+### 2.1 Shared data model
 
-- Un tipo pubblico `FieldErrors` = mappa `percorso → messaggio (string)`; il percorso è una stringa
-  con notazione a punti (`supplier`, `address.city`, `lines.0.qty`). Valore `undefined` = nessun
-  errore (regola già in vigore, ora in un solo helper interno `invalidPaths()` usato da form, hook e
-  `Field`/fixture — chiude F5).
-- Per ogni percorso vale il **primo** messaggio di Zod (issue meno specifica ignorata in v1).
-  Estendibile in futuro a `{ message, code }` senza rompere (`string` resta valido) — non in v1.
-- `Field.error` resta `ReactNode` (può avere markup); il form produce `string`. Il legame è una prop
-  del Field, non una conversione manuale (§2.3). Chiude F1 senza forzare un tipo unico.
+- A public type `FieldErrors` = map `path → message (string)`; the path is a dot-notation string
+  (`supplier`, `address.city`, `lines.0.qty`). Value `undefined` = no error (rule already in force,
+  now in a single internal helper `invalidPaths()` used by form, hook and `Field`/fixture — closes
+  F5).
+- For each path the **first** Zod message applies (less specific issue ignored in v1). Extensible
+  in the future to `{ message, code }` without breaking (`string` remains valid) — not in v1.
+- `Field.error` stays `ReactNode` (it may have markup); the form produces `string`. The link is a
+  prop of the Field, not a manual conversion (§2.3). Closes F1 without forcing a single type.
 
-### 2.2 Cablaggio dei controlli (chiude F2, F3, F4, F5)
+### 2.2 Wiring of the controls (closes F2, F3, F4, F5)
 
-- Hook interno unico `useFieldControlProps(rest)` (non esportato) che restituisce gli attributi finali
-  da spargere sul controllo: merge di `aria-describedby`, precedenza del Field, `id`, `aria-*`,
-  `disabled`, `readOnly`, **`data-rop-name`**. `Input`, `Select`, `Combobox` lo usano; nessun
-  `control?.x ?? rest.x` rimane nei tre file.
-- Stile di invalido in un solo token/costante condivisa (oggi tripla).
-- `Field` guadagna `name?: string`: lo mette nei `FieldControlProps` come attributo `data-rop-name`
-  (non `name`, che per `Select` è escluso di proposito — F3) e anche come `name` nativo per i controlli
-  nativi dove è sicuro (`Input`, `Combobox`).
-- `useFocusFirstInvalidField` cerca prima `[data-rop-name]`, poi ricade su `[name]` (compatibilità: i
-  consumatori che usano controlli propri con `name` continuano a funzionare, e il comportamento
-  documentato oggi non cambia).
+- A single internal hook `useFieldControlProps(rest)` (not exported) that returns the final
+  attributes to spread on the control: merge of `aria-describedby`, precedence of the Field, `id`,
+  `aria-*`, `disabled`, `readOnly`, **`data-rop-name`**. `Input`, `Select`, `Combobox` use it; no
+  `control?.x ?? rest.x` remains in the three files.
+- Invalid style in a single shared token/constant (today tripled).
+- `Field` gains `name?: string`: it puts it into the `FieldControlProps` as the attribute
+  `data-rop-name` (not `name`, which for `Select` is excluded on purpose — F3) and also as the native
+  `name` for native controls where it is safe (`Input`, `Combobox`).
+- `useFocusFirstInvalidField` looks first for `[data-rop-name]`, then falls back on `[name]`
+  (compatibility: consumers who use their own controls with `name` keep working, and the behaviour
+  documented today does not change).
 
-### 2.3 Collegamento form → campo (§5 Q2)
+### 2.3 Form → field link (§5 Q2)
 
-**Deciso (Q2):** esplicito più contesto opzionale.
-1. Base: `<Field name="supplier" error={form.fieldErrors.supplier}>` — esplicito, headless, nessuna magia.
-2. In più, un contesto sottile `ValidationProvider fieldErrors={form.fieldErrors}` (o equivalente):
-   un `Field` con `name` legge da lì l'errore se `error` non è passato; `error` esplicito vince.
-   Elimina il doppio nome (F2) e le story divergenti (F6) senza imporre un provider a chi non lo vuole.
+**Decided (Q2):** explicit plus optional context.
+1. Base: `<Field name="supplier" error={form.fieldErrors.supplier}>` — explicit, headless, no magic.
+2. In addition, a thin context `ValidationProvider fieldErrors={form.fieldErrors}` (or equivalent):
+   a `Field` with `name` reads the error from there if `error` is not passed; an explicit `error`
+   wins. It removes the double name (F2) and the diverging stories (F6) without imposing a provider
+   on whoever does not want it.
 
 ### 2.4 Zod (§5 Q1, Q3)
 
-- Il core oggi "non dipende da nessuna libreria di schemi" (docstring di `validate`) e il bundle ha un
-  budget per-import: Zod **non** deve entrare nel bundle di chi non lo usa.
-- **Deciso (Q1):** opzione `schema` su `useObjectPageForm`, tipizzata sull'interfaccia **Standard
-  Schema** (`~standard.validate`), che Zod (≥ 3.24 / 4) implementa, più Valibot/ArkType, senza che il
-  core importi `zod`. Nessun adattatore `zodValidator` e nessun peer opzionale (scartati da Daniele).
-- Tradotto in errori: issue → percorso a punti → primo messaggio → stesso `fieldErrors` (nessun
-  percorso parallelo). Un fallimento di schema **non** lancia: chiude F8. `validate` manuale resta
-  supportato (stesso output), e `schema` + `validate` insieme: `schema` prima, `validate` per le regole
-  cross-field aggiuntive (da confermare, Q5).
-- Parsing: `save` passa al handler i valori *grezzi* come oggi, oppure l'output parsato dello schema
-  (trasformazioni/coerce)? Raccomandazione: i valori grezzi in v1 (nessun cambio di tipo `Values`),
-  output parsato come opzione futura — Q4.
-- Sincrono in v1: uno schema con `refine` async deve dare errore chiaro in dev. Mantiene la proprietà
-  "isSaving mai toccato su fallimento di validazione".
+- The core today "depends on no schema library" (docstring of `validate`) and the bundle has a
+  per-import budget: Zod must **not** enter the bundle of whoever does not use it.
+- **Decided (Q1):** a `schema` option on `useObjectPageForm`, typed on the **Standard Schema**
+  interface (`~standard.validate`), which Zod (≥ 3.24 / 4) implements, plus Valibot/ArkType, without
+  the core importing `zod`. No `zodValidator` adapter and no optional peer (set aside by the
+  maintainer).
+- Translated into errors: issue → dot path → first message → the same `fieldErrors` (no parallel
+  path). A schema failure does **not** throw: closes F8. A manual `validate` stays supported (same
+  output), and `schema` + `validate` together: `schema` first, `validate` for the additional
+  cross-field rules (to be confirmed, Q5).
+- Parsing: does `save` pass the handler the *raw* values as today, or the parsed output of the
+  schema (transforms/coerce)? Recommendation: raw values in v1 (no change to the `Values` type),
+  parsed output as a future option — Q4.
+- Synchronous in v1: a schema with an async `refine` must give a clear error in dev. It keeps the
+  property "isSaving never touched on validation failure".
 
-### 2.5 Footer e annunci (chiude F7)
+### 2.5 Footer and announcements (closes F7)
 
-Regola scritta una volta (nella doc del form e di `ObjectPageFooter`):
+A rule written once (in the docs of the form and of `ObjectPageFooter`):
 
-| Livello | Dove | Annuncio |
+| Level | Where | Announcement |
 |---|---|---|
-| Campo | `FieldMessage` + `aria-invalid` + `aria-describedby` | non live; dopo un save fallito il fuoco va al primo campo invalido (`useFocusFirstInvalidField`), quindi lo screen reader lo legge lì |
-| Riepilogo form | `ObjectPageFooter message` (tono `error`) | `role="status"` polite, una riga: "N campi non validi" (**solo il conteggio**, mai i messaggi per-campo, in linea con la doc attuale del footer) |
-| Errore di salvataggio (rete/server) | `ObjectPageFooter` `saveError` | idem, testo dell'errore |
-| Errore di pagina bloccante | `MessageStrip` | `alert` |
+| Field | `FieldMessage` + `aria-invalid` + `aria-describedby` | not live; after a failed save focus goes to the first invalid field (`useFocusFirstInvalidField`), so the screen reader reads it there |
+| Form summary | `ObjectPageFooter message` (tone `error`) | `role="status"` polite, one line: "N invalid fields" (**only the count**, never the per-field messages, in line with the current footer docs) |
+| Save error (network/server) | `ObjectPageFooter` `saveError` | same, the text of the error |
+| Blocking page error | `MessageStrip` | `alert` |
 
-Un helper (es. `formatFieldErrorsSummary`/`useObjectPageForm().summary`) fornisce la stringa del
-riepilogo, con testo sostituibile dal consumatore (nessuna traduzione nel core — chiude F12 per la
-parte validazione). Il footer **resta presentazionale** (non legge il form): riceve `message`.
+A helper (e.g. `formatFieldErrorsSummary`/`useObjectPageForm().summary`) provides the summary string,
+with text replaceable by the consumer (no translation in the core — closes F12 for the validation
+part). The footer **stays presentational** (it does not read the form): it receives `message`.
 
-### 2.6 Pulizia errori (§5 Q6, chiude F10)
+### 2.6 Error clearing (§5 Q6, closes F10)
 
-Raccomandazione: `setValue(name)` cancella solo l'errore del percorso toccato (e dei suoi
-discendenti/antenati); `reset` e `save` riuscito azzerano tutto; un nuovo `save` ricalcola tutto.
-*Implementato in #102 (ticket prevale sul piano):* solo il percorso e i **discendenti**, mai gli antenati
-(un errore su `address` resta finché non si scrive `address` o si ripete il `save`). Gli errori di
-radice dello schema (`formErrors`, #100) seguono `fieldErrors`: esempio con `fieldErrors` =
-`{ name, 'address.city' }` e `formErrors` = `['Root']`, `setValue('name', …)` toglie solo `name` e lascia
-`formErrors` invariato (un errore di radice non è legato a un campo); il successivo
-`setValue('address', …)` svuota `fieldErrors` (torna l'oggetto vuoto condiviso) e azzera anche
-`formErrors`. Con soli errori di radice, la prima modifica reale li azzera. `reset`, `reset(baseline)`
-e `save` riuscito azzerano entrambi; ogni `save` fallito (schema, anche con soli errori di radice, o
-`validate`) incrementa `validationAttempt`, il trigger esplicito del fuoco. Questo
-**cambia un comportamento documentato e una story-test esistente** ("clears every field error at
-once"): per la regola di regressione del progetto (nessun test indebolito) va approvato da Daniele e
-spiegato nella PR, non fatto di nascosto.
+Recommendation: `setValue(name)` clears only the error of the touched path (and of its
+descendants/ancestors); `reset` and a successful `save` clear everything; a new `save` recomputes
+everything. *Implemented in #102 (the ticket prevails over the plan):* only the path and its
+**descendants**, never the ancestors (an error on `address` stays until `address` is written or the
+`save` is repeated). The root errors of the schema (`formErrors`, #100) follow `fieldErrors`:
+example with `fieldErrors` = `{ name, 'address.city' }` and `formErrors` = `['Root']`,
+`setValue('name', …)` removes only `name` and leaves `formErrors` unchanged (a root error is not tied
+to a field); the following `setValue('address', …)` empties `fieldErrors` (the shared empty object
+returns) and also clears `formErrors`. With only root errors, the first real change clears them.
+`reset`, `reset(baseline)` and a successful `save` clear both; every failed `save` (schema, even with
+only root errors, or `validate`) increments `validationAttempt`, the explicit focus trigger. This
+**changes a documented behaviour and an existing story-test** ("clears every field error at once"):
+under the project's regression rule (no test weakened) it must be approved by the maintainer and
+explained in the PR, not done quietly.
 
-### 2.7 Campi bloccati (chiude F11, non bloccante)
+### 2.7 Locked fields (closes F11, non-blocking)
 
-Raccomandazione: un campo `forced`/`locked`/`disabled` **è validato come gli altri** (la regola di
-business che ha forzato il valore può produrre un valore invalido); il messaggio resta visibile sul
-Field; l'hook, se tutti gli invalidi sono non focalizzabili, non fa nulla (come oggi) ma il riepilogo nel
-footer ne dà comunque il conteggio. Documentato e coperto da test; nessuna decisione API.
+Recommendation: a `forced`/`locked`/`disabled` field **is validated like the others** (the business
+rule that forced the value can produce an invalid value); the message stays visible on the Field; the
+hook, if all the invalid ones are non-focusable, does nothing (as today) but the summary in the
+footer still counts them. Documented and covered by tests; no API decision.
 
 ### 2.8 `useDirtyGuard`
 
-Nessuna modifica di API. Test e2e di non-interferenza (T9) e un esempio nella doc del form che unisce
-`useObjectPageForm` + `useDirtyGuard` + validazione.
+No API change. An e2e non-interference test (T9) and an example in the form docs that combines
+`useObjectPageForm` + `useDirtyGuard` + validation.
 
 ---
 
-## 3. Impatto API pubblica (riepilogo)
+## 3. Public API impact (summary)
 
-Aggiunte: `Field.name`; tipo `FieldErrors`; `useObjectPageForm({ schema })`; opzionale
-`ValidationProvider`; helper riepilogo. Modifiche compatibili: lookup hook con fallback `[name]`.
-Possibile cambio di comportamento: pulizia per-campo (Q6). Possibile cambio di tipo:
-`fieldErrors` da `Partial<Record<keyof Values,string>>` a `FieldErrors` a percorsi (Q2/Q-percorsi: per i
-valori piatti i tipi restano compatibili, l'autocompletamento delle chiavi si perde su percorsi annidati).
+Additions: `Field.name`; type `FieldErrors`; `useObjectPageForm({ schema })`; optional
+`ValidationProvider`; summary helper. Compatible changes: hook lookup with `[name]` fallback.
+Possible behaviour change: per-field clearing (Q6). Possible type change: `fieldErrors` from
+`Partial<Record<keyof Values,string>>` to path-based `FieldErrors` (Q2/Q-paths: for flat values the
+types stay compatible, key autocompletion is lost on nested paths).
 
-## 4. Rischi
+## 4. Risks
 
-- **Bundle budget** (governance): ogni nuovo export va misurato; niente import di `zod` nel core.
-- **Regressione visiva**: lo stato invalido deve apparire identico su Input/Select/Combobox (oggi la
-  coerenza dipende da tre copie di classi); la matrice visiva va estesa (ticket #4 la copre per i
-  viewport).
-- **Tastiera virtuale** (`useKeyboardSafe` nel Field): il focus programmatico dell'hook su un campo
-  invalido deve rispettare lo stesso margine di scroll; da verificare nell'e2e mobile.
-- **Test esistenti** da non indebolire: `Field.test`, `use-object-page-form.validate.test`,
-  `use-focus-first-invalid-field.test`, e2e `field.spec` e `use-focus-first-invalid-field.spec`.
+- **Bundle budget** (governance): every new export must be measured; no `zod` import in the core.
+- **Visual regression**: the invalid state must look identical on Input/Select/Combobox (today the
+  consistency depends on three copies of classes); the visual matrix must be extended (ticket #4
+  covers it for the viewports).
+- **Virtual keyboard** (`useKeyboardSafe` in the Field): the hook's programmatic focus on an invalid
+  field must respect the same scroll margin; to be verified in the mobile e2e.
+- **Existing tests** not to be weakened: `Field.test`, `use-object-page-form.validate.test`,
+  `use-focus-first-invalid-field.test`, e2e `field.spec` and `use-focus-first-invalid-field.spec`.
 
-## 5. Decisioni di Daniele (ex domande aperte)
+## 5. Maintainer decisions (formerly open questions)
 
-Tutte confermate il 2026-11-01. Dove non c'era una risposta esplicita ("procedi con la tua
-raccomandazione") vale la raccomandazione del documento precedente.
+All confirmed on 2026-11-01. Where there was no explicit answer ("go with your recommendation"), the
+recommendation of the previous document applies.
 
-| # | Decisione | Risposta | Origine |
+| # | Decision | Answer | Origin |
 |---|---|---|---|
-| Q1 | Come entra Zod | **Interfaccia Standard Schema** nel core (solo tipi strutturali, nessun import di `zod`). **Non** dipendenza diretta, **non** peer opzionale + adattatore: l'adattatore `zodValidator` previsto come comodità nella versione precedente di questo piano è quindi **scartato** | esplicita |
-| Q2 | Legame form → Field | **Contesto opzionale `ValidationProvider`** (con `error` esplicito che vince, se ha contenuto). Non solo `name` + `error=` | esplicita |
-| Q3 | Convenzione dei percorsi | **Percorsi annidati a notazione puntata** (`a.b.0.c`). Costo accettato: tipizzazione stretta delle chiavi persa sui percorsi annidati | esplicita |
-| Q4 | `save`: valori grezzi o parsati | **Grezzi in v1**; parsati eventualmente più avanti | raccomandazione |
-| Q5 | `schema` e `validate` insieme | **Entrambi**. Dettaglio fissato in fase di ticket: lo schema gira per primo e, se fallisce, `validate` non viene chiamato (riceve solo valori già validi per lo schema) | raccomandazione |
-| Q6 | Pulizia errori | **Per campo/percorso al `setValue`**, non più tutto-o-niente; la story-test che documenta il vecchio comportamento si aggiorna e si rinomina | esplicita |
-| Q7 | Riepilogo nel footer | **Helper opzionale** col conteggio (`getErrorSummary`); il footer resta presentazionale | raccomandazione |
-| Q8 | Errori server mappati a campo | **Fuori scope**; ticket separato dopo (`setFieldErrors` pubblico). Non pubblicato ora | raccomandazione |
-| Q9 | Free o Pro | **Free** | esplicita |
+| Q1 | How Zod comes in | **Standard Schema interface** in the core (structural types only, no `zod` import). **Not** a direct dependency, **not** an optional peer + adapter: the `zodValidator` adapter foreseen as a convenience in the previous version of this plan is therefore **set aside** | explicit |
+| Q2 | Form → Field link | **Optional `ValidationProvider` context** (with an explicit `error` winning, if it has content). Not only `name` + `error=` | explicit |
+| Q3 | Path convention | **Nested dot-notation paths** (`a.b.0.c`). Accepted cost: strict key typing is lost on nested paths | explicit |
+| Q4 | `save`: raw or parsed values | **Raw in v1**; parsed possibly later | recommendation |
+| Q5 | `schema` and `validate` together | **Both**. Detail fixed at ticket time: the schema runs first and, if it fails, `validate` is not called (it receives only values already valid for the schema) | recommendation |
+| Q6 | Error clearing | **Per field/path on `setValue`**, no longer all-or-nothing; the story-test that documents the old behaviour is updated and renamed | explicit |
+| Q7 | Summary in the footer | **Optional helper** with the count (`getErrorSummary`); the footer stays presentational | recommendation |
+| Q8 | Server errors mapped to a field | **Out of scope**; separate ticket afterwards (public `setFieldErrors`). Not published now | recommendation |
+| Q9 | Free or Pro | **Free** | explicit |
 
-### Punti emersi scrivendo i ticket (non erano nel piano, nessuno richiede nuove decisioni)
+### Points that emerged while writing the tickets (not in the plan, none requires new decisions)
 
-- **Rischio di refocus con la pulizia per percorso.** `useFocusFirstInvalidField` si attiva
-  sull'identità di `fieldErrors`; una pulizia parziale produce un nuovo oggetto non vuoto, quindi
-  digitare in un campo sposterebbe il fuoco sul primo invalido. Il ticket #102 impone la correzione
-  (il trigger deve essere "un `save` fallito", non "un nuovo oggetto") e lascia allo sviluppatore la
-  forma minima, da segnalare in PR come aggiunta di API.
-- **Errori a livello di radice** (`refine` sull'intero oggetto, percorso vuoto) non hanno un campo:
-  il ticket #100 li espone come `formErrors` e li conta nel riepilogo (#103).
-- **Schema asincrono**: in v1 la validazione resta sincrona; uno schema asincrono dà un errore
-  esplicito (`saveError` + `console.error` in sviluppo), non attende.
+- **Refocus risk with per-path clearing.** `useFocusFirstInvalidField` fires on the identity of
+  `fieldErrors`; a partial clearing produces a new non-empty object, so typing in a field would move
+  focus to the first invalid one. Ticket #102 imposes the fix (the trigger must be "a failed
+  `save`", not "a new object") and leaves the minimal form to the developer, to be flagged in the PR
+  as an API addition.
+- **Root-level errors** (a `refine` on the whole object, empty path) have no field: ticket #100
+  exposes them as `formErrors` and counts them in the summary (#103).
+- **Async schema**: in v1 validation stays synchronous; an async schema gives an explicit error
+  (`saveError` + `console.error` in development), it does not wait.
 
-## 6. Ticket pubblicati
+## 6. Published tickets
 
-Ordine di dipendenza. Ogni ticket ha il formato standard (Contesto / Obiettivo / Criteri di
-accettazione / Smoke test / Note tecniche / Casi limite / Critico) e i requisiti Storybook di
-`CLAUDE.md` (Controls, Actions con `fn()`, `play` reale).
+Dependency order. Each ticket has the standard format (Context / Goal / Acceptance criteria / Smoke
+test / Technical notes / Edge cases / Critic) and the Storybook requirements of `CLAUDE.md`
+(Controls, Actions with `fn()`, real `play`).
 
-| Ordine | Issue | Titolo | Dipende da | Critico | Frammentazioni chiuse |
+| Order | Issue | Title | Depends on | Critic | Fragmentations closed |
 |---|---|---|---|---|---|
-| 1 | #97 | Controlli del Field: un solo cablaggio interno (`useFieldControlProps`), un solo stile invalido, un solo `isDev` — refactor senza cambi di comportamento | — | opus | F4, F5 (stile), F13 |
-| 2 | #98 | `Field name` → `data-rop-name`: `useFocusFirstInvalidField` raggiunge anche il `Select`; story/fixture migrate a `Field` | #97 | opus | F2, F3, F5, F6 (parz.) |
-| 3 | #99 | `FieldErrors` a percorsi con notazione puntata: tipo condiviso, `invalidPaths()` unico, form e hook allineati | #98 | opus | F1, F5, F9 |
-| 4 | #100 | `useObjectPageForm({ schema })`: validazione con Standard Schema (compatibile Zod), issue → `fieldErrors`, nessuna dipendenza nel core | #99 | opus | F8 |
-| 5 | #101 | `ValidationProvider`: il `Field` con `name` legge il proprio errore dal form (`error` esplicito vince), story del footer migrate | #99 | opus | F2, F6 |
-| 6 | #102 | `fieldErrors`: pulizia per percorso al `setValue`/`setValues`, senza spostare il fuoco (aggiorna la story-test del tutto-o-niente) | #99 | opus | F10 |
-| 7 | #103 | Regola degli annunci di errore (campo / riepilogo / save) e `getErrorSummary` per il footer, senza accoppiare il footer al form | #100, #101 (e #102 per un passo dell'e2e) | opus | F7, F12 |
-| 8 | #104 | Story ricetta, e2e di non-interferenza con `useDirtyGuard` e campi bloccati, matrice visiva degli stati invalidi | #100, #101, #102, #103 | sonnet (basso rischio: nessun codice di libreria) | F11 |
+| 1 | #97 | Field controls: a single internal wiring (`useFieldControlProps`), a single invalid style, a single `isDev` — refactor with no behaviour change | — | opus | F4, F5 (style), F13 |
+| 2 | #98 | `Field name` → `data-rop-name`: `useFocusFirstInvalidField` also reaches `Select`; stories/fixtures migrated to `Field` | #97 | opus | F2, F3, F5, F6 (part) |
+| 3 | #99 | Path-based `FieldErrors` with dot notation: shared type, single `invalidPaths()`, form and hook aligned | #98 | opus | F1, F5, F9 |
+| 4 | #100 | `useObjectPageForm({ schema })`: validation with Standard Schema (Zod-compatible), issues → `fieldErrors`, no dependency in the core | #99 | opus | F8 |
+| 5 | #101 | `ValidationProvider`: the `Field` with `name` reads its own error from the form (explicit `error` wins), footer stories migrated | #99 | opus | F2, F6 |
+| 6 | #102 | `fieldErrors`: per-path clearing on `setValue`/`setValues`, without moving focus (updates the all-or-nothing story-test) | #99 | opus | F10 |
+| 7 | #103 | Rule for error announcements (field / summary / save) and `getErrorSummary` for the footer, without coupling the footer to the form | #100, #101 (and #102 for one step of the e2e) | opus | F7, F12 |
+| 8 | #104 | Recipe story, non-interference e2e with `useDirtyGuard` and locked fields, visual matrix of the invalid states | #100, #101, #102, #103 | sonnet (low risk: no library code) | F11 |
 
-I ticket #100, #101 e #102 dipendono tutti da #99 e sono indipendenti tra loro: si sviluppano uno
-alla volta nell'ordine indicato (ritmo del progetto: lento, ticket per ticket).
+Tickets #100, #101 and #102 all depend on #99 and are independent of each other: they are developed
+one at a time in the order given (project pace: slow, ticket by ticket).
 
-**Non pubblicato, da pianificare dopo il blocco:** `setFieldErrors` pubblico nel form per mappare
-gli errori di validazione lato server su messaggi di campo (Q8, spec §1.5).
+**Not published, to plan after the block:** a public `setFieldErrors` in the form to map server-side
+validation errors to field messages (Q8, spec §1.5).
