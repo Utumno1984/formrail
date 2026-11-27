@@ -67,7 +67,7 @@ function Items({ items, side }: { items: readonly CatalogItem[]; side: 'free' | 
 export function FreeAndProTable() {
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by the keyboard (axe scrollable-region-focusable)
-    <div role="region" aria-label="Free and Pro table" tabIndex={0} data-testid="free-and-pro" style={{ overflowX: 'auto', maxWidth: '100%' }}>
+    <div role="region" aria-label="Free and Pro table" tabIndex={0} data-testid="free-and-pro" style={{ overflowX: 'auto', maxWidth: '100%', position: 'relative' }}>
       <table data-free-and-pro style={{ minWidth: 560, margin: 0 }}>
         <thead>
           <tr>
@@ -125,7 +125,7 @@ export function SizeTable() {
   return (
     <>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by the keyboard */}
-      <div role="region" aria-label="Size per entry" tabIndex={0} data-testid="size-summary" style={{ overflowX: 'auto', maxWidth: '100%' }}>
+      <div role="region" aria-label="Size per entry" tabIndex={0} data-testid="size-summary" style={{ overflowX: 'auto', maxWidth: '100%', position: 'relative' }}>
         <table style={{ minWidth: 560, margin: 0 }}>
           <thead>
             <tr>
@@ -156,7 +156,7 @@ export function SizeTable() {
       <details data-testid="size-every-import">
         <summary>Size of every import</summary>
         {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by the keyboard */}
-        <div role="region" aria-label="Size of every import" tabIndex={0} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div role="region" aria-label="Size of every import" tabIndex={0} style={{ overflowX: 'auto', maxWidth: '100%', position: 'relative' }}>
           <table style={{ minWidth: 420, margin: 0 }}>
             <thead>
               <tr>
