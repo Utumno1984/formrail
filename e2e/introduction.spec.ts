@@ -11,7 +11,8 @@ test.describe('Introduction page', () => {
   });
 
   test('List Report demo: a filter narrows the rows', async ({ page }) => {
-    const table = page.getByRole('table');
+    // Scoped to the demo since #723: the page has other tables now (Free and Pro, sizes).
+    const table = page.getByTestId('demo-frame-list-report').getByRole('table');
     await expect(table).toBeVisible();
     await expect(page.getByRole('row', { name: /INV-1001/ })).toBeVisible();
     await page.getByRole('radio', { name: 'Approved', exact: true }).click();
