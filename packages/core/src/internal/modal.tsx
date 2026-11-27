@@ -55,9 +55,6 @@ interface OpenPanel {
  */
 const openPanels: OpenPanel[] = [];
 
-/** Escapes already handled by a panel: one key press never runs two panels' Escape handling. */
-const handledEscapes = new WeakSet<KeyboardEvent>();
-
 /** True when the focus sits inside a modal that is open (not one that is exiting). */
 function focusIsInOpenModal(): boolean {
   const active = document.activeElement;
@@ -366,7 +363,6 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
 
     // The panel's part of an Escape, before Radix's dismissal (which closes unless it was prevented).
     const ownEscape = (event: KeyboardEvent) => {
-      handledEscapes.add(event);
       if (!dismissible) event.preventDefault();
       onEscapeKeyDown?.(event);
     };
@@ -502,12 +498,6 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               onCloseAutoFocus?.(event);
             }}
             onEscapeKeyDown={(event) => {
-              // This press was already handled by a panel (the one on top, reached through this one
-              // below): Radix must not close this one too, nor call `onEscapeKeyDown` twice.
-              if (handledEscapes.has(event)) {
-                event.preventDefault();
-                return;
-              }
               // Open, but not on top: Radix still counts this panel as its highest layer because the
               // panel opened above it has not registered yet (see `openPanels`). The Escape is that
               // panel's; this one stays open. (A panel that is exiting is not in the list: unchanged.)
