@@ -212,6 +212,9 @@ test.describe('privacy notice: purchases', () => {
     await expect(page.locator('#purchase-transfers-title + p')).toContainText(
       'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision',
     );
+    await expect(page.locator('#purchase-transfers-title + p')).toContainText(
+      'the seller is the local Paddle company (Paddle.com Inc. or Paddle.com (Canada) Ltd)',
+    );
     await expect(page.locator('.lead')).toContainText('it is also the information under art. 14 of the GDPR');
   });
 
@@ -249,8 +252,11 @@ test.describe('privacy notice: purchases', () => {
     await page.goto('privacy/');
     const section = page.locator('#purchase-recipients-title ~ p').first();
     await expect(section).toContainText(
-      'Paddle (Paddle.com Market Limited, UK, or the Paddle company named on your receipt, depending on where you buy) is the reseller of Formrail Pro',
+      'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd. Your receipt names the company that sold to you) is the reseller of Formrail Pro',
     );
+    for (const entity of ['Paddle.com Market Limited', 'Paddle.com Inc.', 'Paddle.com (Canada) Ltd']) {
+      await expect(section).toContainText(entity);
+    }
     await expect(section).toContainText('independent controller');
     await expect(section).not.toContainText('What it passes to us');
     const text = await page.locator('#purchases-title ~ *').evaluateAll((els) => els.map((e) => e.textContent ?? '').join(' '));

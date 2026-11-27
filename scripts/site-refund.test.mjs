@@ -293,8 +293,11 @@ describe('the Purchases section of the privacy notice', () => {
     // Paddle's Buyer Terms: the contracting entity depends on where the buyer purchases from (US: Paddle.com Inc.,
     // Canada: Paddle.com (Canada) Ltd, rest of world: Paddle.com Market Limited), critic of PR #713, point 2.
     expect(body).toContain(
-      'Paddle (Paddle.com Market Limited, UK, or the Paddle company named on your receipt, depending on where you buy) is the reseller of Formrail Pro',
+      'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd. Your receipt names the company that sold to you) is the reseller of Formrail Pro',
     );
+    for (const entity of ['Paddle.com Market Limited', 'Paddle.com Inc.', 'Paddle.com (Canada) Ltd']) {
+      expect(body).toContain(entity);
+    }
     expect(body).toContain('Paddle is an independent controller of your data');
     expect(body).toContain('The registry is hosted by GitHub (GitHub Packages)');
     expect(body).toContain('as an independent controller');
@@ -316,6 +319,9 @@ describe('the Purchases section of the privacy notice', () => {
       'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision, as giving an adequate level of protection to personal data.',
     );
     expect(body).toContain('its other companies, and the safeguards it uses, are described in the privacy notice linked above');
+    expect(body).toContain(
+      'If you buy from the United States or from Canada, the seller is the local Paddle company (Paddle.com Inc. or Paddle.com (Canada) Ltd), and its transfers are described in that same notice.',
+    );
   });
 
   it('the introduction cites art. 14 for the data received from Paddle, and art. 13 for the rest', () => {
