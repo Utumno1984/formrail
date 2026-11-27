@@ -23,6 +23,28 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+/**
+ * Gives the modal panels an exit animation that never ends, as in a browser without reduced motion: jsdom has no CSS,
+ * so a closed Sheet would leave the DOM at once. Radix's Presence reads `animationName` (an exit that differs from the
+ * entry keeps the nodes mounted); the panel's own safety net removes them after the animation's duration (0 here)
+ * plus 500ms. Same helper as in `AppShell.compact-nav.test.tsx`.
+ */
+function animateModalExit() {
+  const real = window.getComputedStyle.bind(window);
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    const style = real(element, pseudo);
+    const modal = element.matches('[role="dialog"]') || !!element.querySelector(':scope > [role="dialog"]');
+    if (!modal) return style;
+    return new Proxy(style, {
+      get(target, key) {
+        if (key === 'animationName') return element.getAttribute('data-state') === 'closed' ? 'rop-out' : 'rop-in';
+        const value = Reflect.get(target, key) as unknown;
+        return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+      },
+    });
+  });
+}
+
 const nextFrame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 const ownClose = () => document.querySelector<HTMLElement>('[data-rop-default-close]');
 const headerOf = (panel: HTMLElement) => panel.firstElementChild as HTMLElement;
@@ -121,6 +143,31 @@ describe('SheetContent closeButton: the sheet draws its own close button when it
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('a SheetClose unmounted while the sheet is open: its own button comes back (never a panel with no way out)', async () => {
+    const user = userEvent.setup();
+    function Host() {
+      const [shown, setShown] = useState(true);
+      return (
+        <Bare>
+          <button onClick={() => setShown(false)}>Remove close</button>
+          {shown ? <SheetClose /> : null}
+        </Bare>
+      );
+    }
+    render(<Host />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await nextFrame();
+    expect(ownClose()).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Close: Edit supplier' })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Remove close' }));
+    const close = ownClose();
+    expect(close).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Close: Edit supplier' })).toBe(close);
+    expect(headerOf(screen.getByRole('dialog'))).toHaveClass('pe-16');
+    await user.click(close!);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('labels.close names it', async () => {
     const user = userEvent.setup();
     render(<Bare content={{ labels: { close: 'Chiudi il pannello' } }} />);
@@ -214,6 +261,55 @@ describe('SheetContent: the development warning for a sheet with no close button
     await nextFrame();
     await user.click(screen.getByRole('button', { name: 'Load' }));
     await user.click(screen.getByRole('button', { name: 'Close: Edit supplier' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('closeButton={false}: a SheetClose at the first opening and none at the second, the warning is logged when the second closes', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    const { rerender } = render(<Bare content={{ closeButton: false }}>{<SheetClose />}</Bare>);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await nextFrame();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+    rerender(<Bare content={{ closeButton: false }} />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await nextFrame();
+    expect(screen.queryByRole('button', { name: /^Close/ })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('closeButton={false}: opened again during the exit animation, with its SheetClose still mounted, nothing is logged', async () => {
+    animateModalExit();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    function Host({ open }: { open: boolean }) {
+      return (
+        <Sheet open={open}>
+          <SheetContent closeButton={false}>
+            <SheetHeader>
+              <SheetTitle>Edit supplier</SheetTitle>
+              <SheetClose />
+            </SheetHeader>
+          </SheetContent>
+        </Sheet>
+      );
+    }
+    const { rerender } = render(<Host open />);
+    await nextFrame();
+    const panel = screen.getByRole('dialog');
+    rerender(<Host open={false} />);
+    // Still mounted: the exit animation runs.
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveAttribute('data-state', 'closed');
+    rerender(<Host open />);
+    await nextFrame();
+    expect(screen.getByRole('dialog')).toBe(panel);
+    rerender(<Host open={false} />);
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 600)));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(warn).not.toHaveBeenCalled();
   });

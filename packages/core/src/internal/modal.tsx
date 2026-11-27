@@ -471,10 +471,13 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     useLayoutEffect(() => {
       const wasOpen = wasOpenForExit.current;
       wasOpenForExit.current = open;
+      // Each opening starts its own record: with the closes mounted at that moment (the children's layout effects ran
+      // first, and a close still mounted from the exit animation of the previous opening counts), plus every one
+      // registered while it lasts. Not reset at the close: during the exit animation the closes are still mounted,
+      // and they would count for an opening that has none.
+      if (open && !wasOpen) closeSeen.current = mountedCloses.current > 0;
       if (open || !wasOpen) return;
       const seen = closeSeen.current;
-      // A close still mounted (the exit animation, or a reopening during it) belongs to the next opening too.
-      closeSeen.current = mountedCloses.current > 0;
       if (process.env.NODE_ENV === 'production' || !touchExit || !dismissible || canDrawClose || seen || warnedNoExit.current) return;
       warnedNoExit.current = true;
       console.warn(
