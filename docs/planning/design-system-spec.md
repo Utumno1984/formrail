@@ -424,7 +424,7 @@ punto dove un difetto costa di più e si vede di meno. Un test che non fallisce 
 sbagliato non protegge nulla. Finora è stato fatto solo per iniziativa del critico (#174).
 
 **Regola.** Ogni PR che aggiunge o modifica la logica di un **motore** passa da un giro di mutation
-testing **manuale e mirato**, fatto dal critico (procedura in `.claude/agents/critico-avversariale.md`):
+testing **manuale e mirato**, fatto dal critico (procedura in `.claude/agents/adversarial-reviewer.md`):
 muta a mano le condizioni e i confronti introdotti o toccati dal diff, una mutazione alla volta, e
 verifica che almeno un test esistente fallisca. Una mutazione sopravvissuta e non equivalente vale
 come test mancante: PR respinta.

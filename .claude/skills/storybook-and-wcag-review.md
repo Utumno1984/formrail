@@ -1,59 +1,60 @@
 ---
 name: storybook-and-wcag-review
-description: Checklist WCAG e QA per le story di Storybook (Primitives, Forms, Floorplans) — usala ogni volta che scrivi o modifichi una story, prima di aprire o aggiornare una PR.
+description: WCAG and QA checklist for Storybook stories (Primitives, Forms, Floorplans) — use it every time you write or modify a story, before opening or updating a PR.
 ---
 
 # Storybook and WCAG review
 
-Applicabile a ogni story in `Primitives/*`, `Forms/*`, `Floorplans/*` (non alle fixture interne di
-`Internal/Harness`, che non sono pubblicate e non seguono questa checklist).
+Applies to every story in `Primitives/*`, `Forms/*`, `Floorplans/*` (not to the internal
+fixtures of `Internal/Harness`, which are not published and do not follow this checklist).
 
-## Check WCAG
+## WCAG check
 
-Ogni volta che lavori su un componente o sulla sua story, verifica:
+Every time you work on a component or on its story, check:
 
-- **Regioni `aria-live`**: annunci di caricamento, errori e cambi di conteggio dinamici (es. il
-  conteggio risultati di `ListReportTable`) sono davvero dentro una regione live, con
-  `role`/`aria-live` coerenti con l'urgenza (`polite` per i conteggi, `assertive`/`alert` per gli
-  errori bloccanti) — e scattano una sola volta per cambiamento osservabile, non ad ogni render.
-- **`:focus-visible`**: ogni elemento interattivo nuovo ha un indicatore di fuoco visibile solo da
-  tastiera (mai al click, stessa convenzione `focus-visible:` già in uso su `Button`/`Field`), con
-  contrasto non-testuale ≥3:1 (WCAG 1.4.11) contro lo sfondo su cui può effettivamente cadere.
-- Nessuna violazione axe sulla story (il harness e2e la verifica già via
-  `expectNoA11yViolations`): una story nuova ci deve passare attraverso, non esserne esclusa.
+- **`aria-live` regions**: announcements of loading, errors and dynamic count changes (e.g. the
+  result count of `ListReportTable`) are really inside a live region, with `role`/`aria-live`
+  consistent with the urgency (`polite` for counts, `assertive`/`alert` for blocking errors) —
+  and they fire only once per observable change, not on every render.
+- **`:focus-visible`**: every new interactive element has a focus indicator visible only from
+  the keyboard (never on click, the same `focus-visible:` convention already used on
+  `Button`/`Field`), with non-text contrast ≥3:1 (WCAG 1.4.11) against the background it can
+  actually fall on.
+- No axe violation on the story (the e2e harness already checks it via
+  `expectNoA11yViolations`): a new story must go through it, not be excluded from it.
 
-## QA ottico
+## Optical QA
 
-Un controllo "a occhio" o una baseline visiva già verde non bastano a intercettare un difetto di
-rifinitura: la regressione visiva confronta solo con uno screenshot precedente, che può già
-contenere il difetto. Per ogni componente con testo in un box ad altezza fissa (bottoni, pillole/
-chip, badge, tab) o con elementi contigui (etichetta/controllo, bordo/contenuto, due controlli
-affiancati), misura con uno script Playwright contro Storybook (`getBoundingClientRect`, mai una
-lettura visiva o uno screenshot):
+A check "by eye" or an already green visual baseline is not enough to catch a polish defect:
+visual regression only compares against a previous screenshot, which may already contain the
+defect. For every component with text in a fixed-height box (buttons, pills/chips, badges, tabs)
+or with adjacent elements (label/control, border/content, two controls side by side), measure
+with a Playwright script against Storybook (`getBoundingClientRect`, never a visual reading or a
+screenshot):
 
-- **Centratura verticale del testo** nel suo box (scarto ≤ 1px tra lo spazio sopra e sotto il
-  testo misurato, salvo un valore diverso dichiarato nel design — non "sembra centrato").
-- **Distanza minima tra elementi contigui** rispetto a quella dichiarata nel design (nessun
-  overlap reale misurato) — l'anello di `:focus-visible` di un controllo conta come elemento che
-  può toccare quello sopra/accanto, verificalo anche a fuoco attivo.
+- **Vertical centring of the text** in its box (a gap ≤ 1px between the space above and below
+  the measured text, unless a different value is declared in the design — not "it looks
+  centred").
+- **Minimum distance between adjacent elements** compared with the one declared in the design
+  (no real overlap measured) — the `:focus-visible` ring of a control counts as an element that
+  can touch the one above/beside it, check it with focus active too.
 
-Tre casi reali che questa regola avrebbe dovuto intercettare prima che arrivassero a Daniele:
-cornice demo di una story senza padding che si accavalla al contenuto; il focus ring di `Input`
-che tocca l'etichetta sovrastante (gap misurato: 0px); il testo di una pillola di
-`ListReportFilterBar` non centrato otticamente, perché il trattamento già applicato a `Button`
-(wrapper `TextLabel`, line-height 1 + offset ottico di 1px, commit `5cb1df1`) non era stato esteso
-alla pillola.
+Three real cases that this rule should have caught before they reached the maintainer: a story's
+demo frame without padding overlapping the content; the focus ring of `Input` touching the label
+above it (measured gap: 0px); the text of a `ListReportFilterBar` pill not optically centred,
+because the treatment already applied to `Button` (`TextLabel` wrapper, line-height 1 + a 1px
+optical offset, commit `5cb1df1`) had not been extended to the pill.
 
-Lo script di misura può restare temporaneo (fuori dal repository, o cancellato a fine lavoro); se
-il controllo deve restare permanente, promuovilo a un test e2e vero in `e2e/`.
+The measurement script can stay temporary (outside the repository, or deleted at the end of the
+work); if the check must stay permanent, promote it to a real e2e test in `e2e/`.
 
-## Test e QA
+## Tests and QA
 
-Prima di aprire o aggiornare una PR:
+Before opening or updating a PR:
 
-- `npm run check` verde (lint + tipi + build + unit).
-- Suite e2e verde in locale (non solo "dovrebbe passare in CI"); se il componente è ad alto
-  raggio d'impatto (overlay, List Report, Object Page), anche la suite visiva.
-- Nessun file temporaneo di debug (script ad-hoc, screenshot di prova, branch/PR di test) resta
-  nel repo o su GitHub a fine lavoro: pulisci prima di consegnare, coerente con la convenzione già
-  in uso per gli smoke test dal vivo in `CLAUDE.md`.
+- `npm run check` green (lint + types + build + unit).
+- e2e suite green locally (not just "it should pass in CI"); if the component has a wide impact
+  (overlay, List Report, Object Page), the visual suite as well.
+- No temporary debug file (ad-hoc scripts, trial screenshots, test branches/PRs) remains in the
+  repository or on GitHub at the end of the work: clean up before delivering, consistent with the
+  convention already used for live smoke tests in `CLAUDE.md`.
