@@ -106,7 +106,7 @@ describe('dist of @formrail/pro/engine', () => {
 /** Source modules bundled into a built JS file, from the `// src/...` comment esbuild writes before each one. */
 const modulesOf = (file: string): string[] => [...new Set(readFileSync(dist(file), 'utf8').match(/^\/\/ src\/\S+$/gm) ?? [])].map((line) => line.slice(3)).sort();
 
-// The stateless helpers that the engines and the components of the main entry both use (critic round 1, point 2):
+// The stateless helpers that the engines and the components of the main entry both use (code review round 1, point 2):
 // one copy in `dist/shared.*`, imported by both entries, so an app that uses both does not bundle them twice.
 describe.each([
   ['ESM', 'js'],

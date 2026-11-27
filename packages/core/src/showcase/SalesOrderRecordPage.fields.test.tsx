@@ -6,7 +6,7 @@ import { SALES_ORDERS, sameValues } from './modules/sales-orders/sales-orders-mo
 import { RecordPage } from './RecordPageShell';
 import { createSalesOrderStore, type SalesOrderStore, type StoredSalesOrder } from './sales-order-store';
 
-// #520 (round 2 of the critic): the dirty-tracking of EVERY editable field, the number texts that are not valid, the
+// #520 (round 2 of the code review): the dirty-tracking of EVERY editable field, the number texts that are not valid, the
 // boundaries of the validation and the read-only state of a saved cancelled order. Same demo orders as
 // SalesOrderRecordPage.test.tsx: so-15 EUR confirmed with 2 lines, so-42 JPY confirmed.
 const CONFIRMED = 'so-15';

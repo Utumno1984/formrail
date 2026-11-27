@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { gotoStory } from './helpers/story';
 
-// #160: the critic's static-analysis worry was "a stacked error ends up closer to the next field than
+// #160: the reviewer's static-analysis worry was "a stacked error ends up closer to the next field than
 // to its own control". Measured live (Overview, f-error: help + error stacked): control→help 8,
 // help→error 8, error→next field 16. Rule pinned here: every gap INSIDE a field (mt-2 = 8px) is
 // strictly smaller than the gap BETWEEN fields (16px in the story column), so proximity grouping

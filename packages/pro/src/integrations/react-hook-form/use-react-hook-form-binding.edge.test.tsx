@@ -206,7 +206,7 @@ describe('StrictMode', () => {
     const setValue = vi.spyOn(form, 'setValue');
     const resetDefaultValues = vi.spyOn(form, 'resetDefaultValues');
     act(() => harness.current().rebase.rebase({ ...SAVED, supplier: 'Acme Corp Ltd' }));
-    // One rebase, written once (critic round 1, point 2: no `reset`): the changed field, then the new defaults.
+    // One rebase, written once (code review round 1, point 2: no `reset`): the changed field, then the new defaults.
     expect(reset).not.toHaveBeenCalled();
     expect(setValue.mock.calls).toEqual([['supplier', 'Acme Corp Ltd']]);
     expect(resetDefaultValues).toHaveBeenCalledTimes(1);

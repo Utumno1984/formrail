@@ -92,7 +92,7 @@ test.describe('useFocusFirstInvalidField: behavior in a real browser', () => {
   });
 
   // Until #102 this test was "typing after a failure clears every field error at once" (the
-  // all-or-nothing clearing). Decision of Daniele (validation plan, F10): typing clears the edited
+  // all-or-nothing clearing). Maintainer decision (validation plan, F10): typing clears the edited
   // field only, so the test now pins the per-field clearing and the absence of any refocus.
   test('typing after a failure clears only the edited field, the others stay invalid and the focus stays put', async ({ page }) => {
     await gotoStory(page, LONG_EMPTY);

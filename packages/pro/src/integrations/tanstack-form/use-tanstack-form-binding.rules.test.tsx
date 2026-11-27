@@ -1,4 +1,4 @@
-// `useTanStackFormBinding` (ticket #508, critic round 1 on PR #557): one rule of the binding per test, each written to
+// `useTanStackFormBinding` (ticket #508, code review round 1 on PR #557): one rule of the binding per test, each written to
 // fail when the line that keeps the rule is mutated (the mutation is named in the test). The rules: the open conflicts
 // of the recommended `saved` pattern stay open, a save in flight keeps what is typed meanwhile (only a discard or a
 // rehydration drops it), the errors a run removed are given back in that run only, a missing key is not `undefined`,

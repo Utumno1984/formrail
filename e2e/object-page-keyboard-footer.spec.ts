@@ -269,9 +269,9 @@ test.describe('Object Page whose document scrolls (no height on the parent), vir
 // the one the Field's scroll uses, or the save bar counts twice and the field lands a save bar's height too high
 // (it did: Field at 178 and 367 instead of 267 and 456).
 for (const { viewport, keyboard, push } of [
-  // The tester's D3: the Notes section alone (no header, no General, no Location) at 390x500.
+  // The QA review's D3: the Notes section alone (no header, no General, no Location) at 390x500.
   { viewport: { width: 390, height: 500 }, keyboard: 225, push: false },
-  // The tester's G: a short form at 390x844, its last field low in the page, but no overflow.
+  // The QA review's G: a short form at 390x844, its last field low in the page, but no overflow.
   { viewport: { width: 390, height: 844 }, keyboard: 380, push: true },
 ] as const) {
   test.describe(`Object Page with a height whose content fits, virtual keyboard of ${keyboard}px (${viewport.width}x${viewport.height}): the save bar is counted once on every focus (#498)`, () => {
