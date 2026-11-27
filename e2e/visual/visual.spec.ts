@@ -60,6 +60,12 @@ for (const story of visualStories) {
       await page.goto(`/iframe.html?id=${story.id}&viewMode=docs`);
       await page.waitForSelector('[data-testid="demo-frame-list-report"] table');
       await page.waitForSelector('[data-testid="demo-frame-field-states"] input');
+      // The code blocks are highlighted lazily: until then they are empty (height 0), and the page grows by
+      // several hundred px when the highlighter arrives. Photograph only once every block is highlighted.
+      await page.waitForFunction(() => {
+        const blocks = document.querySelectorAll('.sbdocs-content pre');
+        return blocks.length > 0 && [...blocks].every((pre) => pre.querySelector('.token') !== null);
+      });
     } else {
       await expectPlayToPass(page, story.id);
     }
