@@ -17,7 +17,7 @@ import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
 import { storyControl, withoutControls } from '../internal/story-docs';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { MultiSelect, type MultiSelectOption, type MultiSelectSize } from './MultiSelect';
 
 const SIZES: MultiSelectSize[] = ['sm', 'md'];
@@ -425,16 +425,23 @@ export const InsideDialog: Story = {
   },
 };
 
-/** Same stacking in a Sheet. */
+/**
+ * Same stacking in a Sheet. The play function closes the sheet with its close button (the focus goes back to the
+ * trigger), opens it again and checks that the field is there, with no list open and nothing reported.
+ */
 export const InsideSheet: Story = {
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Invoices</h1>
+        <h1 style={{ margin: '0 0 12px', fontSize: 20 }}>Invoices</h1>
+        <SheetTrigger asChild>
+          <Button>Split invoice</Button>
+        </SheetTrigger>
       </main>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>Split invoice</SheetTitle>
+          <SheetClose />
         </SheetHeader>
         <SheetBody>
           <Field label="Cost centers">
@@ -444,4 +451,18 @@ export const InsideSheet: Story = {
       </SheetContent>
     </Sheet>
   ),
+  play: async ({ args, canvasElement }) => {
+    const body = within(document.body);
+    // #721: the close button of the header closes the sheet (by touch it is the only way out: 44 x 44 px there) and
+    // the focus goes back to the trigger; the sheet is opened again for the rest.
+    await userEvent.click(await body.findByRole('button', { name: 'Close: Split invoice' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    const opener = within(canvasElement).getByRole('button', { name: 'Split invoice' });
+    await waitFor(() => expect(opener).toHaveFocus());
+    await userEvent.click(opener);
+    const sheet = await body.findByRole('dialog', { name: 'Split invoice' });
+    await expect(within(sheet).getByRole('combobox', { name: 'Cost centers' })).toHaveAttribute('aria-expanded', 'false');
+    await expect(body.queryByRole('listbox')).toBeNull();
+    await expect(args.onValueChange).not.toHaveBeenCalled();
+  },
 };

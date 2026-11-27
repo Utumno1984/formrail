@@ -15,7 +15,7 @@ import {
 import { internalIcons } from '../internal/icons';
 import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Tooltip, TooltipProvider, type TooltipAlign, type TooltipSide } from './Tooltip';
 
 const SIDES: TooltipSide[] = ['top', 'right', 'bottom', 'left'];
@@ -501,6 +501,7 @@ export const ClippedAndInSheet: Story = {
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Panel</SheetTitle>
+            <SheetClose />
           </SheetHeader>
           <SheetBody>
             <Tooltip content="Above the sheet" delayDuration={delayDuration} side="left">

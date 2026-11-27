@@ -78,7 +78,8 @@ function PlainPage({ title, blocks, headingRef }: { title: string; blocks: numbe
 
 /**
  * Identity at the start, the current context in the middle, the user at the end (all neutral). With `trigger`, the
- * trigger of the navigation Sheet comes first (displayed below 64rem only).
+ * trigger of the navigation Sheet comes first (displayed below 64rem only): every story with an `AppShellNav` has
+ * it (#721), or below 64rem its navigation could not be reached.
  */
 function headerSlots({ long = false, trigger = false }: { long?: boolean; trigger?: boolean }) {
   const name = <TruncatedText style={{ fontWeight: 600 }}>{long ? `App one ${LONG}` : 'App one'}</TruncatedText>;
@@ -116,7 +117,7 @@ interface DemoArgs extends Pick<AppShellProps, 'fill' | 'labels' | 'className'> 
 
 /** What the compact-navigation stories add to the demo (not story controls). */
 interface CompactOptions {
-  /** `AppShellNavTrigger` at the start of the header. */
+  /** `AppShellNavTrigger` at the start of the header. Default: whenever the demo has a navigation. */
   trigger?: boolean;
   /** Runs the navigation of a link (through a dirty guard, for example); by default it runs at once. */
   guard?: (navigate: () => void) => void;
@@ -146,7 +147,7 @@ function Demo({
   const run = compact.guard ?? ((navigate: () => void) => navigate());
   return (
     <AppShell {...shell}>
-      <AppShellHeader {...headerSlots({ long: longHeaderText, trigger: compact.trigger })} />
+      <AppShellHeader {...headerSlots({ long: longHeaderText, trigger: compact.trigger ?? items.length > 0 })} />
       {items.length > 0 ? (
         <AppShellNav>
           {items.map((item) => (
@@ -264,7 +265,7 @@ export const LongTexts: Story = {
   args: { longHeaderText: true, longContent: false },
   render: (args) => (
     <AppShell fill={args.fill}>
-      <AppShellHeader {...headerSlots({ long: true })} />
+      <AppShellHeader {...headerSlots({ long: true, trigger: true })} />
       <AppShellNav>
         <AppShellNavLink href="#a" active>
           Section A {LONG}
@@ -299,7 +300,7 @@ export const ManyLinks: Story = { args: { navCount: 20, longContent: false } };
 
 /**
  * The parts of the header arrive after the mount (the user is loaded asynchronously): the header keeps its
- * height, so the content does not move.
+ * height, so the content does not move. The trigger of the navigation is there from the first render.
  */
 export const HeaderLoadsLater: Story = {
   args: { longContent: false },
@@ -311,7 +312,8 @@ export const HeaderLoadsLater: Story = {
     }, []);
     return (
       <AppShell>
-        <AppShellHeader {...(loaded ? headerSlots({}) : {})} />
+        {/* Same structure before and after (a fragment: the trigger, then the name), so the trigger is not remounted. */}
+        <AppShellHeader {...(loaded ? headerSlots({ trigger: true }) : { start: <><AppShellNavTrigger />{null}</> })} />
         <AppShellNav>
           <AppShellNavLink href="#a" active>
             Section A
@@ -571,7 +573,7 @@ export const WithListReport: Story = {
     const [page, setPage] = useState<'a' | 'b'>('a');
     return (
       <AppShell>
-        <AppShellHeader {...headerSlots({})} />
+        <AppShellHeader {...headerSlots({ trigger: true })} />
         <AppShellNav>
           {(['a', 'b'] as const).map((id) => (
             <AppShellNavLink
@@ -605,7 +607,7 @@ export const WithObjectPage: Story = {
   tags: ['visual'],
   render: () => (
     <AppShell>
-      <AppShellHeader {...headerSlots({})} />
+      <AppShellHeader {...headerSlots({ trigger: true })} />
       <AppShellNav>
         <AppShellNavLink href="#a" active>
           Section A

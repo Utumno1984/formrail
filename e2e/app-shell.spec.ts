@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { devices, expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations } from './helpers/a11y';
 import { expectFocusRingVisible, expectNoHorizontalOverflow, expectSingleScroller } from './helpers/geometry';
 import { expectPlayToPass, gotoStory } from './helpers/story';
@@ -352,4 +352,55 @@ test.describe('Floorplans/App Shell: virtual keyboard', () => {
       expect(await fieldScrollMargin(input)).toBe('8px');
     }
   });
+});
+
+// #721: below 64rem the navigation column is not displayed, and only `AppShellNavTrigger` opens the navigation. Every
+// story with an `AppShellNav` has the trigger: on a portrait tablet (768px) it is displayed, a tap opens the Sheet,
+// and its close button (44 x 44 px under a coarse pointer) closes it and gives the focus back to the trigger. A phone
+// profile (`pointer: coarse`, as interaction-affordance-touch.spec.ts) at the width of a portrait tablet;
+// `defaultBrowserType` cannot be set inside a describe block, so it is dropped from the profile.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { defaultBrowserType: _ignored, ...touchProfile } = devices['Pixel 5'];
+const PORTRAIT_TABLET = { width: 768, height: 1024 };
+
+test.describe('Floorplans/App Shell: the navigation trigger at 768px (#721)', () => {
+  test.use({ ...touchProfile, viewport: PORTRAIT_TABLET, reducedMotion: 'reduce' });
+
+  const STORIES_WITH_NAV = [
+    'playground',
+    'long-page',
+    'long-texts',
+    'in-a-box',
+    'many-links',
+    'header-loads-later',
+    'with-list-report',
+    'with-object-page',
+  ];
+
+  for (const id of STORIES_WITH_NAV) {
+    test(`@touch ${id}: the trigger is displayed and a tap opens the navigation; a tap on its close button closes it`, async ({
+      page,
+    }) => {
+      await gotoStory(page, `${ID}${id}`);
+      expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches), 'precondition: a coarse pointer').toBe(true);
+      await expect(page.locator('[data-rop-app-shell-nav]')).toBeHidden();
+      const trigger = page.locator('[data-rop-app-shell-nav-trigger]');
+      await expect(trigger).toHaveCount(1);
+      await expect(trigger).toBeVisible();
+      await expect(trigger).toBeInViewport();
+      await expect(trigger).toBeEnabled();
+      expect(await trigger.evaluate((el) => (el as HTMLElement).tabIndex)).toBe(0);
+      await trigger.tap();
+      const sheet = page.getByRole('dialog', { name: 'Main' });
+      await expect(sheet).toHaveAttribute('data-state', 'open');
+      await expect(sheet.getByRole('navigation', { name: 'Main' }).getByRole('link').first()).toBeVisible();
+      const close = sheet.getByRole('button', { name: 'Close: Main' });
+      const box = (await close.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      await close.tap();
+      await expect(sheet).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+    });
+  }
 });

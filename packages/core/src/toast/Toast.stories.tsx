@@ -9,7 +9,7 @@ import { exampleStory } from '../internal/example-story';
 import { settleMotion } from '../internal/settle-motion';
 import { storyControls, withoutControls } from '../internal/story-docs';
 import { Select } from '../select/Select';
-import { Sheet,SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { ToastProvider } from './ToastProvider';
 import { useToast, type ToastOptions, type ToastTone } from './use-toast';
 
@@ -407,7 +407,10 @@ function TimerDemo({ args }: { args: DemoArgs }) {
   );
 }
 
-/** The same inside a Sheet. */
+/**
+ * The same inside a Sheet. The play function first closes the sheet with its close button (the focus goes back to the
+ * trigger) and opens it again.
+ */
 export const InsideSheet: Story = {
   decorators,
   parameters: { controls: { disable: true } },
@@ -420,6 +423,7 @@ export const InsideSheet: Story = {
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Filters</SheetTitle>
+            <SheetClose />
           </SheetHeader>
           <SheetBody>
             <SaveInOverlay label="Saved from the sheet" />
@@ -428,8 +432,15 @@ export const InsideSheet: Story = {
       </Sheet>
     </Page>
   ),
-  play: async () => {
+  play: async ({ canvasElement }) => {
     const body = within(document.body);
+    // #721: the close button of the header closes the sheet (by touch it is the only way out: 44 x 44 px there) and
+    // the focus goes back to the trigger; the sheet is opened again for the rest.
+    await userEvent.click(await body.findByRole('button', { name: 'Close: Filters' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    const opener = within(canvasElement).getByRole('button', { name: 'Open' });
+    await waitFor(() => expect(opener).toHaveFocus());
+    await userEvent.click(opener);
     const sheet = await body.findByRole('dialog', { name: 'Filters' });
     await settleMotion();
     const region = body.getByRole('status');
