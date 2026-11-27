@@ -948,12 +948,22 @@ privata, superata; nessun licensing a runtime).
 6. **Prova e valutazione**: uso libero in sviluppo e valutazione; licenza obbligatoria in produzione.
 7. **Rimborso** entro 14 giorni senza motivazione, per tutti, salvo frode o abuso (decisione di Daniele del 27/11/2026).
 8. **Supporto**: via email, best-effort, risposta entro 2 giorni lavorativi, nessuna data pubblica.
-9. **Checkout**: overlay Paddle, con Paddle.js caricato solo su azione dell'utente e solo nella
+9. **Checkout** — **SOSPESO dalla decisione di standby (sotto)**: overlay Paddle, con Paddle.js caricato solo su azione dell'utente e solo nella
    pagina di acquisto.
 10. **Concessione dell'accesso al registry**: a mano, entro 2 giorni lavorativi dall'acquisto.
 11. **Design partner**: sconto del 50%, candidatura con un modulo Tally separato.
 12. **Articoli tecnici** su `/articles/`.
-13. **Ordine**: prima design partner e articoli; il checkout solo dopo l'approvazione del dominio.
+13. **Ordine** — **parzialmente SOSPESO dalla decisione di standby (sotto)**: prima design partner e articoli; il checkout solo dopo l'approvazione del dominio.
+   (La parte sul checkout è sospesa; design partner e articoli restano.)
+
+### Decisione del 2026-11-26 (sera): vendita in standby
+
+Decisione di Daniele (ticket #715). Finché non ci sono incassi reali:
+
+- **nessun checkout, pulsante o link di pagamento** sul sito pubblico: né pagina di acquisto (`/teams/buy/` risponde 404), né Paddle.js, né richieste verso domini Paddle. Restano i soli link ai documenti legali di Paddle già presenti nelle pagine legali. Lo fa rispettare una guardia automatica (`scripts/site-no-checkout.test.mjs`, `e2e/site/no-checkout.spec.ts`), da rimuovere o allentare solo nel ticket che riapre la vendita, su istruzione di Daniele;
+- i ticket **#694, #695 (checkout Paddle su `/teams/buy/`) e #696 (apertura dell'early access a pagamento) sono sospesi** e si riprendono solo su istruzione di Daniele;
+- al posto del checkout: il **modulo Early Access / richiesta di contatto** (ticket dedicato);
+- i **punti 9 (checkout) e 13 (ordine: il checkout solo dopo l'approvazione del dominio) delle decisioni del 2026-11-26 qui sopra sono sospesi**, non cancellati: restano scritti per quando la vendita si riaprirà.
 
 ### Decisioni del 27/11/2026 (Daniele): rimborso e conservazione dei dati
 
