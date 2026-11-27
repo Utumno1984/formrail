@@ -493,8 +493,8 @@ describe('the Purchases section of the privacy notice', () => {
       'the number of developers who would need a license (required);',
       'what you would use Formrail Pro for, a description of the type of application, the industry and the problem you want to solve (required);',
       'the size of your team (required);',
-      'when you would need Formrail Pro (required);',
       'the form libraries you use today (optional, you can pick several);',
+      'when you would need Formrail Pro (required);',
       'your consent, a box you check yourself (required).',
     ]);
     const section = text(privacy.slice(privacy.indexOf('<h2 id="data-title">'), privacy.indexOf('<h2 id="transfers-title">')));
@@ -519,7 +519,7 @@ describe('the Purchases section of the privacy notice', () => {
     expect(where).toContain('Tally also sends a copy of every request by email to formrail.dev@gmail.com, a Gmail mailbox provided by Google.');
     expect(where).toContain('the transfer rests on the EU-US Data Privacy Framework, to which Google LLC adheres');
     expect(where).not.toMatch(/not copied/i);
-    const retention = text(privacy.slice(privacy.indexOf('<h2 id="retention-title">'), privacy.indexOf('<!--DESIGN_PARTNERS_START-->') === -1 ? privacy.indexOf('<h2 id="design-partners-title">') : privacy.indexOf('<h2 id="design-partners-title">')));
+    const retention = text(privacy.slice(privacy.indexOf('<h2 id="retention-title">'), privacy.indexOf('<h2 id="design-partners-title">')));
     expect(retention).toContain('both on Tally and from the mailbox, no later than 24 months after you send the request');
   });
 

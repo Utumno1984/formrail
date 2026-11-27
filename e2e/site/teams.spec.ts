@@ -271,7 +271,7 @@ test.describe('early access call-to-action', () => {
       await expect(note).toContainText('consent');
       // expected text changed on purpose (#716): the note also names replying to the request
       await expect(note).toContainText('your email and your answers to reply to your request, to contact you about Formrail Pro early access and to plan the product');
-      await expect(note).toContainText('your work email, your company or team, how many developers would need a license, what you would use Formrail Pro for, your team size, when you would need it');
+      await expect(note).toContainText('your work email, your company or team, how many developers would need a license, what you would use Formrail Pro for, your team size, optionally which form libraries you use, when you would need it');
       await expect(note).toContainText('which form libraries you use');
       await expect(note).toContainText('We reply by email. Nothing is sold through this form and no payment is taken.');
       await expect(note).not.toContainText(/waitlist/i);
@@ -437,8 +437,8 @@ test.describe('privacy page', () => {
       /number of developers who would need a license \(required\)/,
       /what you would use Formrail Pro for, .* \(required\)/,
       /size of your team \(required\)/,
-      /when you would need Formrail Pro \(required\)/,
       /form libraries you use today \(optional, you can pick several\)/,
+      /when you would need Formrail Pro \(required\)/,
       /your consent, a box you check yourself \(required\)/,
     ]);
     await expect(main).toContainText('Without the required fields the form cannot be submitted');
