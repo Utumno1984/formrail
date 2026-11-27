@@ -183,6 +183,7 @@ type Story = StoryObj<CancelOverlayArgs>;
  * on the backdrop, reduced motion and the mobile/tablet viewports.
  */
 export const CancelActionOverlay: Story = {
+  tags: ['edge-case'],
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
@@ -223,18 +224,20 @@ export const CancelActionOverlay: Story = {
 
 /** Fixture of the e2e suite: the same page without the play function. */
 export const CancelActionOverlayNoPlay: Story = {
-  tags: ['internal'],
+  tags: ['internal', 'edge-case'],
   parameters: { controls: { disable: true } },
 };
 
 /** Fixture of the e2e suite: the document is taller than the viewport, so the page has a scrollbar. */
 export const CancelActionOverlayTallPage: Story = {
+  tags: ['edge-case'],
   parameters: { controls: { disable: true } },
   args: { tallPage: true },
 };
 
 /** Fixture of the e2e suite: the rows arrive 1.5 s after mount (the report is loading until then). */
 export const CancelActionOverlayLoading: Story = {
+  tags: ['edge-case'],
   parameters: { controls: { disable: true } },
   args: { loadMs: 1500 },
 };

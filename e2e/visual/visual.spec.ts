@@ -60,6 +60,19 @@ for (const story of visualStories) {
       await page.goto(`/iframe.html?id=${story.id}&viewMode=docs`);
       await page.waitForSelector('[data-testid="demo-frame-list-report"] table');
       await page.waitForSelector('[data-testid="demo-frame-field-states"] input');
+      // The code blocks are highlighted lazily: until then they are empty (height 0), and the page grows by
+      // several hundred px when the highlighter arrives. Photograph only once every block is highlighted.
+      await page.waitForFunction(() => {
+        const blocks = document.querySelectorAll('.sbdocs-content pre');
+        return blocks.length > 0 && [...blocks].every((pre) => pre.querySelector('.token') !== null);
+      });
+      // The first full-page capture changes the layout of the page for good (the table columns of the Free and
+      // Pro table end up a few px different, one row wraps: the page goes from 5458 to 5483 px, because the
+      // faces of the font are dropped and reloaded by the capture). Take that capture here, unchecked, so the
+      // checked one starts from the layout that every following capture reproduces; otherwise Playwright's
+      // "two consecutive stable screenshots" compares the layout before and after it and never settles.
+      await page.screenshot({ fullPage: true });
+      await page.evaluate(() => Promise.all([...document.fonts].map((face) => face.load().catch(() => undefined))));
     } else {
       await expectPlayToPass(page, story.id);
     }

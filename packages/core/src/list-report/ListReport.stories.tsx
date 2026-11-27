@@ -290,6 +290,7 @@ export const Playground: Story = {
  * checks the selection text, also with most of the selection hidden by the search. Stories and baselines always use a fixed locale.
  */
 export const LocaleCount: Story = {
+  tags: ['edge-case'],
   args: { dataset: 1200, selectable: true },
   argTypes: { dataset: { control: false } },
   play: async ({ args, canvasElement }) => {
@@ -344,10 +345,10 @@ export const LocalizedBar: Story = {
 export const LocalizedBarNoPlay: Story = { ...LocalizedBar, tags: ['internal'], play: undefined };
 
 /** Fixture of the e2e suite: `LocaleCount` without the play function (`tags: ['internal']`: hidden from the public sidebar, #296; it still inherits `autodocs`). */
-export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: ['internal'], play: undefined };
+export const LocaleCountNoPlay: Story = { ...LocaleCount, tags: ['internal', 'edge-case'], play: undefined };
 
 /** Fixture of the e2e suite: `LocaleCountNoPlay` with a long custom `labels.count` (no `whitespace-nowrap`: it wraps). */
-export const LocaleCountLongLabel: Story = { ...LocaleCountNoPlay, tags: ['internal'], args: { ...LocaleCountNoPlay.args, longCountLabel: true } };
+export const LocaleCountLongLabel: Story = { ...LocaleCountNoPlay, tags: ['internal', 'edge-case'], args: { ...LocaleCountNoPlay.args, longCountLabel: true } };
 
 /** Active filter ("Pending"): the count says "n of 200". */
 export const WithActiveFilter: Story = {
@@ -425,6 +426,7 @@ export const ErrorState: Story = {
  * same cycle. With `prefers-reduced-motion` the tone does not change (see e2e): the number just appears.
  */
 export const CountPill: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -453,6 +455,7 @@ export const NoPlay: Story = {
 
 /** Fixture of the e2e suite: no parent height, the report is in the normal flow and the page scrolls. */
 export const FlowLayout: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   args: { flow: true },
 };
@@ -1167,6 +1170,8 @@ const allBox = (canvas: ReturnType<typeof within>) => canvas.getByRole('checkbox
  * still selected), selects all, then clears the selection and checks that the focus is on the header checkbox.
  */
 export const Selection: StoryObj<SelectionArgs> = {
+  // The first story of the page after the example and the Playground (#723): data, a selection, a bulk action.
+  tags: ['happy-path'],
   argTypes: SELECTION_ARG_TYPES,
   args: SELECTION_ARGS,
   render: (args) => <SelectionReport key={`${String(args.controlled)}-${args.preselected}`} {...args} />,
@@ -1209,7 +1214,7 @@ export const Selection: StoryObj<SelectionArgs> = {
  */
 export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
   ...Selection,
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   argTypes: {
     ...SELECTION_ARG_TYPES,
     withBulkActions: { control: 'boolean', description: 'Pass `bulkActions` to the frame (Approve, Export)' },
@@ -1248,7 +1253,7 @@ export const SelectionWithoutBulkActions: StoryObj<SelectionArgs> = {
 /** Fixture of the e2e suite: `SelectionWithoutBulkActions` without the play function. */
 export const SelectionWithoutBulkActionsNoPlay: StoryObj<SelectionArgs> = {
   ...SelectionWithoutBulkActions,
-  tags: ['internal'],
+  tags: ['internal', 'edge-case'],
   play: undefined,
 };
 
@@ -1262,7 +1267,7 @@ export const SelectionNoPlay: StoryObj<SelectionArgs> = {
 /** Selectable, nothing selected: the bar says so and the bulk actions are disabled. */
 export const SelectionNone: StoryObj<SelectionArgs> = {
   ...Selection,
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   parameters: NO_CONTROLS,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -1274,7 +1279,7 @@ export const SelectionNone: StoryObj<SelectionArgs> = {
 /** Three records selected: the header checkbox is indeterminate, the rows are tinted. */
 export const SelectionSome: StoryObj<SelectionArgs> = {
   ...Selection,
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   parameters: NO_CONTROLS,
   args: { ...SELECTION_ARGS, preselected: 'some' },
   play: async ({ canvasElement }) => {
@@ -1287,7 +1292,7 @@ export const SelectionSome: StoryObj<SelectionArgs> = {
 /** Every record selected. */
 export const SelectionAll: StoryObj<SelectionArgs> = {
   ...Selection,
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   parameters: NO_CONTROLS,
   args: { ...SELECTION_ARGS, preselected: 'all' },
   play: async ({ canvasElement }) => {
@@ -1327,6 +1332,7 @@ const DEFAULT_BLUE: [number, number, number] = [10, 110, 209]; // #0a6ed1
  */
 export const SelectionScopedPrimary: StoryObj<SelectionArgs> = {
   ...Selection,
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   args: { ...SELECTION_ARGS, preselected: 'some' },
   decorators: [
@@ -1371,14 +1377,14 @@ export const SelectionScopedPrimary: StoryObj<SelectionArgs> = {
 /** Fixture of the e2e suite: `SelectionScopedPrimary` without the play function. */
 export const SelectionScopedPrimaryNoPlay: StoryObj<SelectionArgs> = {
   ...SelectionScopedPrimary,
-  tags: ['internal'],
+  tags: ['internal', 'edge-case'],
   play: undefined,
 };
 
 /** The same three records on the "Pending" pill: one visible, two hidden by the filter. */
 export const SelectionHiddenByFilter: StoryObj<SelectionArgs> = {
   ...Selection,
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   parameters: NO_CONTROLS,
   args: { ...SELECTION_ARGS, preselected: 'some', defaultFilter: 'pending' },
   play: async ({ canvasElement }) => {
@@ -1833,7 +1839,7 @@ export const RowActionsMenuOpen: StoryObj<RowActionsArgs> = {
  */
 export const ColumnsHiddenSideways: StoryObj<RowActionsArgs> = {
   name: 'Columns hidden sideways',
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   argTypes: { ...ROW_ACTIONS_ARG_TYPES, onSelectedIdsChange: { control: false } },
   args: { ...ROW_ACTIONS_ARGS, selectable: true, containerWidth: 'narrow', onSelectedIdsChange: fn() },
   render: (args) => <RowActionsReport {...args} />,
@@ -1880,7 +1886,7 @@ export const ColumnsHiddenSideways: StoryObj<RowActionsArgs> = {
 export const ColumnsHiddenSidewaysRtl: StoryObj<RowActionsArgs> = {
   ...ColumnsHiddenSideways,
   name: 'Columns hidden sideways (rtl)',
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   render: (args) => (
     <div dir="rtl">
       <RowActionsReport {...args} />
@@ -1914,7 +1920,7 @@ function DirectionSwitch({ children }: { children: ReactNode }) {
 export const ColumnsHiddenSidewaysDirectionSwitch: StoryObj<RowActionsArgs> = {
   ...ColumnsHiddenSideways,
   name: 'Columns hidden sideways: direction switched after a scroll',
-  tags: [],
+  tags: ['edge-case'],
   render: (args) => (
     <DirectionSwitch>
       <RowActionsReport {...args} />

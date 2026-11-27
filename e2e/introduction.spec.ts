@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { BUDGET_FILES, FREE_AND_PRO, catalogHref, formatBytes, sizeSummary, type BudgetFile } from '../.storybook/free-and-pro';
 import { expectFocusRingVisible } from './helpers/geometry';
 
 // The Introduction page is dogfooded (ticket #275): the examples are real library components and must
@@ -11,7 +13,8 @@ test.describe('Introduction page', () => {
   });
 
   test('List Report demo: a filter narrows the rows', async ({ page }) => {
-    const table = page.getByRole('table');
+    // Scoped to the demo since #723: the page has other tables now (Free and Pro, sizes).
+    const table = page.getByTestId('demo-frame-list-report').getByRole('table');
     await expect(table).toBeVisible();
     await expect(page.getByRole('row', { name: /INV-1001/ })).toBeVisible();
     await page.getByRole('radio', { name: 'Approved', exact: true }).click();
@@ -230,6 +233,78 @@ test.describe('Introduction page', () => {
     const pro = docs.filter((e) => e.title.startsWith('Pro/') || e.title === 'Pro introduction');
     const free = docs.filter((e) => !pro.includes(e) && e.id !== 'introduction--docs');
     expect(free.filter((e) => !linked.has(e.id)).map((e) => e.id)).toEqual([]);
+  });
+
+  // Ticket #723: the "Free and Pro" table. Its content is checked against the exports by scripts/free-and-pro.test.mjs;
+  // here, on the build: it is on the page, every row and every link of the data is rendered, each link opens a page
+  // of this build (the complete one: a Pro link has no `../pro/` prefix, see `catalogHref`).
+  test('the Free and Pro table is visible, with every row and every link of the data, each one to a page of the index', async ({ page, request }) => {
+    const index = (await (await request.get('/index.json')).json()) as { entries: Record<string, { id: string; type?: string }> };
+    const docs = new Set(Object.values(index.entries).filter((e) => e.type === 'docs').map((e) => e.id));
+    const region = page.getByRole('region', { name: 'Free and Pro table' });
+    await expect(region).toBeVisible();
+    const table = region.getByRole('table');
+    await expect(table.getByRole('rowheader')).toHaveText(FREE_AND_PRO.map((row) => row.area));
+    for (const [index, row] of FREE_AND_PRO.entries()) {
+      const cells = table.locator('tbody tr').nth(index).getByRole('cell');
+      for (const [column, side] of [
+        [0, 'free'],
+        [1, 'pro'],
+      ] as const) {
+        const links = cells.nth(column).getByRole('link');
+        await expect(links).toHaveText(row[side].map((item) => item.label));
+        const hrefs = await links.evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''));
+        expect(hrefs).toEqual(row[side].map((item) => catalogHref(item, side, '')));
+        for (const href of hrefs) expect(docs.has(/\?path=\/docs\/([^&#]+)/.exec(href)?.[1] ?? '')).toBe(true);
+        // An empty cell says so to a screen reader, not only with a dash.
+        if (row[side].length === 0) await expect(cells.nth(column)).toContainText(side === 'pro' ? 'Not in Pro' : 'Not in Free');
+      }
+    }
+  });
+
+  // Ticket #723: the sizes are the committed baselines of the bundle budget, never the current build. The page
+  // imports the JSON files; this reads the same files from disk and formats them with the page's own rule.
+  test('Size and SSR: the sizes printed are the baselines of the bundle budget, formatted with formatBytes', async ({ page }) => {
+    const budget = (file: string) => JSON.parse(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')) as BudgetFile;
+    const summary = sizeSummary(BUDGET_FILES.map(({ specifier, file }) => ({ specifier, budget: budget(file) })));
+    const entries = page.getByRole('region', { name: 'Size per entry' });
+    await expect(entries).toBeVisible();
+    for (const entry of summary) {
+      const cells = entries.locator(`tr[data-entry="${entry.specifier}"] td`);
+      await expect(cells).toHaveText([
+        String(entry.count),
+        `${entry.smallest.name} ${formatBytes(entry.smallest.bytes)}`,
+        `${entry.largest.name} ${formatBytes(entry.largest.bytes)}`,
+      ]);
+    }
+    await page.getByTestId('size-every-import').getByText('Size of every import').click();
+    const every = page.getByRole('region', { name: 'Size of every import' });
+    await expect(every).toBeVisible();
+    const rows = summary.flatMap((entry) => entry.rows.map((row) => ({ key: `${entry.specifier} ${row.name}`, text: formatBytes(row.bytes) })));
+    await expect(every.locator('tr[data-import]')).toHaveCount(rows.length);
+    for (const row of rows) await expect(every.locator(`tr[data-import="${row.key}"] td`).last()).toHaveText(row.text);
+    // `cn`, named in the text: the core baseline's own entry.
+    const cn = budget('packages/core/bundle-budget.json').exports.cn!;
+    await expect(page.getByText(`the class merging (${formatBytes(cn.baseline)})`)).toBeVisible();
+  });
+
+  // Ticket #723, edge case: at 320px the tables keep a readable width and scroll inside their own frame; the page
+  // never scrolls sideways.
+  test('at 320px the Free and Pro table scrolls inside its frame and the page does not scroll sideways', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const name of ['Free and Pro table', 'Size per entry']) {
+      const region = page.getByRole('region', { name });
+      await region.scrollIntoViewIfNeeded();
+      const box = await region.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, right: el.getBoundingClientRect().right }));
+      expect(box.scroll, `${name} is wider than its frame`).toBeGreaterThan(box.client);
+      expect(box.right, `${name} frame ends inside the viewport`).toBeLessThanOrEqual(320);
+      // The frame scrolls, from the keyboard too (a focusable region).
+      await region.focus();
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => region.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+    }
+    const page_ = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, width: window.innerWidth }));
+    expect(page_.scroll).toBeLessThanOrEqual(page_.width);
   });
 
   test('links to the Tokens page and the floorplans are present', async ({ page }) => {
