@@ -547,6 +547,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
           {applied.length > NAMED_MAX ? (
             <details className={`${RN}__details`}>
               <summary className={`${RN}__summary`}>{appliedText}</summary>
+              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard */}
               <ul aria-label={labels.appliedList} className={`${RN}__applied`} tabIndex={0}>
                 {applied.map((entry) => {
                   const [beforeText, afterText] = renderValue ? ['', ''] : entryTexts(entry);
