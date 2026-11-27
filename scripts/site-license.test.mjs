@@ -114,8 +114,8 @@ describe('the license page', () => {
       'you can replace them with another person',
       'The number of licensed developers does not change',
       'the license cannot be held by two people at the same time',
-      // refund
-      'within 14 days of the purchase, without giving a reason',
+      // refund; the exception for fraud or abuse is the decision of Daniele of 2026-11-27 (PR #713), worded as on /refund/
+      'You can ask for a refund within 14 days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.',
       'https://formrail.dev/refund/',
       // covered versions include the ones available when access is granted
       'any version of Formrail Pro that is available in the registry on the day access is granted to you, and any version that is published during your update period',

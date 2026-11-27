@@ -101,10 +101,21 @@ describe('the refund page', () => {
     expect(readFileSync(path.join(ROOT, 'site-root', 'refund.html'), 'utf8')).not.toMatch(/\b14\b/);
   });
 
-  it('the license text says the same number of days', () => {
+  it('the license text says the same number of days, and the same exception for fraud or abuse', () => {
     const file = readFileSync(path.join(ROOT, 'packages', 'pro', 'LICENSE'), 'utf8').replace(/\s+/g, ' ');
     expect(file).toContain(`within ${REFUND_DAYS} days of the purchase, without giving a reason`);
     expect(text(build().license)).toContain(`within ${REFUND_DAYS} days of the purchase, without giving a reason`);
+    // Decision of Daniele of 2026-11-27 (PR #713): the license, the /license/ page and /refund/ carry the same
+    // exception, in the same words; a refund policy wider than the license (or the reverse) fails here.
+    const RULE = `within ${REFUND_DAYS} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`;
+    const { license, refund } = build();
+    expect(file).toContain(RULE);
+    expect(text(license)).toContain(RULE);
+    expect(text(refund.match(/<p class="lead">[\s\S]*?<\/p>/)[0])).toContain(RULE);
+    // "whoever you are" never appears without the exception, in any of the three texts
+    for (const t of [file, text(license), text(refund)]) {
+      expect(t.split('whoever you are').length - 1).toBe(t.split('whoever you are, except in case of fraud or abuse').length - 1);
+    }
   });
 
   it('says how to ask: through Paddle (official link) or by email to the contact address', () => {

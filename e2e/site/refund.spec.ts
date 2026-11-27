@@ -83,10 +83,13 @@ test.describe('refund page', () => {
 
   test('the license and the refund page agree on the number of days', async ({ page }) => {
     await page.goto('license/');
-    await expect(page.locator('#refunds-title + p')).toContainText(`within ${days} days of the purchase, without giving a reason`);
+    // same days and the same exception for fraud or abuse (decision of Daniele of 2026-11-27), in the same words
+    const rule = `within ${days} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`;
+    await expect(page.locator('#refunds-title + p')).toContainText(rule);
     await page.getByRole('link', { name: 'https://formrail.dev/refund/' }).click();
     await page.waitForURL(`**${base}refund/`);
     await expect(page.locator('main')).toContainText(`within ${days} days of the purchase`);
+    await expect(page.locator('.lead')).toContainText(rule);
   });
 
   test('passes axe', async ({ page }) => {
