@@ -98,6 +98,27 @@ describe('SheetContent closeButton: the sheet draws its own close button when it
     expect(trigger).toHaveFocus();
   });
 
+  it('with no focusable element in the panel (a read-only view), the opening focus goes to the sheet\'s own close button', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sheet>
+        <SheetTrigger>Open</SheetTrigger>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Supplier details</SheetTitle>
+          </SheetHeader>
+          <SheetBody>
+            <p>Read-only preview</p>
+          </SheetBody>
+        </SheetContent>
+      </Sheet>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    const close = await screen.findByRole('button', { name: 'Close: Supplier details' });
+    expect(close).toBe(ownClose());
+    expect(close).toHaveFocus();
+  });
+
   it('never two buttons: none next to a SheetClose, whether the default one, asChild or with children', async () => {
     const closes = [
       <SheetClose key="default" />,
