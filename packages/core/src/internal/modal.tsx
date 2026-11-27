@@ -40,37 +40,32 @@ interface ModalContextValue {
   requestClose: () => void;
 }
 
-/** What a panel lends the others to receive an Escape that Radix delivered to them too early. */
-interface OpenPanel {
-  /** When the panel's content node mounted (see `mountCount`); 0 while it is not mounted. */
-  mountOrder: () => number;
-  /** Handles the Escape as the panel's own Radix layer would: `dismissible`, `onEscapeKeyDown`, then close. */
+/** What a panel lends the others: the whole Escape, as its own Radix layer handles it. */
+interface PanelLayer {
+  /** `dismissible`, `onEscapeKeyDown`, then the close (`requestClose`) unless the default was prevented. */
   escape: (event: KeyboardEvent) => void;
 }
 
 /**
- * The open panels (an exiting one is not: it never takes an Escape from another panel), kept in a
- * layout effect, so the set is right from the commit that shows a panel. Radix's own idea of its
- * highest layer is not: the layer under a panel that just mounted keeps listening for Escape until a
- * re-render that React schedules as a task, one or two frames later on an idle page and longer on a
- * busy one. An Escape in that gap reached the panel underneath, which closed, and with it the nested
- * panel on top (#714).
+ * The layers of the modal panels (content node -> panel), in the order Radix's `DismissableLayer` keeps
+ * its own. It is not an order of ours: it changes on the same event as Radix's. Each panel holds its
+ * layer node in state, set by the same ref callback chain as Radix's own `node` state (Radix composes
+ * the panel's ref with its setter), so the two change in the same render; and an effect of the same
+ * form as the one that registers the layer (`[node]`, added on setup, removed on cleanup) runs in the
+ * same commit, right after Radix's (the layer is a descendant of the panel, effects run children
+ * first). A node joins at the end when its layer registers and leaves when it unregisters, so whatever
+ * makes Radix move a layer to the top moves it here too: a new node (a remount, a parent's `key`);
+ * effects that disconnect and reconnect on the same node (`<Activity>` hidden and shown again,
+ * StrictMode's double run); a ref detached and attached again (a `<Suspense>` that suspends its shown
+ * content). A panel reopened during its exit keeps its node and its registration, so it keeps its
+ * place, as in Radix. Restricted to modal panels, it is a subsequence of Radix's order.
+ *
+ * What lags is Radix's keydown listener: it sits on the layer that was the highest at its last
+ * render, and the other layers re-render after a registration only through an update React schedules
+ * as a task, one or two frames later on an idle page and longer on a busy one. An Escape in that gap
+ * reached the panel underneath, which closed, and with it the nested panel on top (#714).
  */
-const openPanels = new Set<OpenPanel>();
-
-/**
- * Counts the mounts of panel content nodes. Radix stacks its layers in the order their nodes mount,
- * so the same order says which panel is on top: a panel reopened during its exit keeps its nodes, and
- * its place, under a panel mounted after it. The focus plays no part in it (a panel may keep the focus
- * outside while it opens, and the target of the key press says nothing about the layers).
- */
-let mountCount = 0;
-/**
- * The mount order of each content node. Keyed by the node, as Radix keys its layers: a node keeps its
- * order if its ref is detached and attached again (React does so when the ref callback changes), and
- * Radix keeps its layer in place too. A defense: no test reaches it, Radix's ref chain stays stable.
- */
-const mountOrders = new WeakMap<HTMLElement, number>();
+const layerOrder = new Map<HTMLElement, PanelLayer>();
 
 /** True when the focus sits inside a modal that is open (not one that is exiting). */
 function focusIsInOpenModal(): boolean {
@@ -388,25 +383,28 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
       ownEscapeRef.current = ownEscape;
     });
     const contentNode = useRef<HTMLDivElement | null>(null);
-    // This panel in `openPanels` while it is open: the whole Escape, Radix's dismissal included.
-    const entry = useMemo<OpenPanel>(
-      () => ({
-        // Given when the node mounts (in `setNode`), as Radix registers its layer for that node.
-        mountOrder: () => (contentNode.current ? (mountOrders.get(contentNode.current) ?? 0) : 0),
-        escape: (event) => {
-          ownEscapeRef.current(event);
-          if (!event.defaultPrevented) requestClose();
-        },
-      }),
-      [requestClose],
-    );
+    // This panel's entry in `layerOrder`. Never replaced: a new entry would move the layer to the top.
+    const panelEscapeRef = useRef<(event: KeyboardEvent) => void>(() => {});
     useLayoutEffect(() => {
-      if (!open) return undefined;
-      openPanels.add(entry);
-      return () => {
-        openPanels.delete(entry);
+      panelEscapeRef.current = (event) => {
+        ownEscapeRef.current(event);
+        if (!event.defaultPrevented) requestClose();
       };
-    }, [open, entry]);
+    });
+    const [layer] = useState<PanelLayer>(() => ({ escape: (event) => panelEscapeRef.current(event) }));
+    // The layer node as Radix's `DismissableLayer` holds it: state, set by the same ref callback chain
+    // as Radix's own `node` state (this panel's `setNode` is the ref Radix composes with its setter), so
+    // both change in the same render; and an effect of the same form as the one that registers the
+    // layer (`[node]`, added on setup, removed on cleanup), which runs in the same commit, right after
+    // Radix's (the layer is a descendant of this panel). See `layerOrder`.
+    const [layerNode, setLayerNode] = useState<HTMLDivElement | null>(null);
+    useEffect(() => {
+      if (!layerNode) return undefined;
+      layerOrder.set(layerNode, layer);
+      return () => {
+        layerOrder.delete(layerNode);
+      };
+    }, [layerNode, layer]);
     // See `useBeganBeforeOpening`: a late outside dismissal of the tap that reopened the panel.
     const beganBeforeOpening = useBeganBeforeOpening(open);
 
@@ -414,7 +412,7 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     const setNode = useCallback(
       (node: HTMLDivElement | null) => {
         contentNode.current = node;
-        if (node && !mountOrders.has(node)) mountOrders.set(node, ++mountCount);
+        setLayerNode(node);
         cleanupRef.current?.();
         cleanupRef.current = null;
         if (typeof forwardedRef === 'function') forwardedRef(node);
@@ -515,16 +513,14 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               onCloseAutoFocus?.(event);
             }}
             onEscapeKeyDown={(event) => {
-              // Radix still counts this panel (open or exiting) as its highest layer, but an open panel
-              // mounted after it has not registered yet (see `openPanels`): the Escape is the newest
-              // one's, and this panel's own dismissal is prevented. Only a panel mounted later takes
-              // the press: one mounted earlier is underneath, as Radix says.
-              let top: OpenPanel | undefined;
-              for (const panel of openPanels) {
-                if (!top || panel.mountOrder() > top.mountOrder()) top = panel;
-              }
-              if (top && top.mountOrder() > entry.mountOrder()) {
-                top.escape(event);
+              // Radix's listener is on the layer that was the highest at its last render. If Radix has
+              // since registered a layer above it (see `layerOrder`), the layers have not re-rendered
+              // yet: the Escape is that layer's, as it will be once Radix catches up (open or exiting,
+              // as at rest), and this panel's own dismissal is prevented. Otherwise Radix's choice stands.
+              let top: [HTMLElement, PanelLayer] | undefined;
+              for (const registered of layerOrder) top = registered;
+              if (top && top[0] !== contentNode.current) {
+                top[1].escape(event);
                 event.preventDefault();
                 return;
               }

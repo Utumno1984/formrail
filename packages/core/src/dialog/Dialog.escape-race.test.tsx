@@ -4,7 +4,7 @@
 // `act()` (which flushes all the scheduled work at once): the clicks and the key are native events
 // dispatched by hand, as the browser would deliver them, and only microtasks run in between.
 import { cleanup, render, screen } from '@testing-library/react';
-import { StrictMode, useState } from 'react';
+import { Activity, Fragment, StrictMode, Suspense, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './Dialog';
 
@@ -415,5 +415,241 @@ describe('Dialog: Escape and panels that reopen, swap or exit (#714)', () => {
     await settle();
     expect(dialogNames()).toEqual([]);
     expect(first.mock.calls).toEqual([[true], [false]]);
+  });
+});
+
+/** A dialog never closes by itself here: `onOpenChange` reports to the spy and updates the state. */
+function Panel({
+  name,
+  open,
+  setOpen,
+  onOpenChange,
+  onEscape,
+}: {
+  name: string;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  onOpenChange: (open: boolean) => void;
+  onEscape: (event: KeyboardEvent) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(next) => { onOpenChange(next); setOpen(next); }}>
+      <DialogContent onEscapeKeyDown={onEscape}>
+        <DialogHeader>
+          <DialogTitle>{name}</DialogTitle>
+        </DialogHeader>
+        <DialogBody>{name}, a sibling of the other dialog.</DialogBody>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const neverSettles = new Promise<never>(() => {});
+/** Suspends its `<Suspense>` boundary while `when` is true (not in a transition: the content is hidden). */
+function SuspendWhen({ when }: { when: boolean }): null {
+  if (when) throw neverSettles;
+  return null;
+}
+
+/**
+ * Dialog A, open, inside a boundary that can hide it (or remount it) and show it again with the same
+ * dialog state; dialog B, a sibling outside that boundary, opened while A is hidden.
+ */
+function Boundaries({
+  boundary,
+  spies,
+}: {
+  boundary: 'activity' | 'suspense' | 'key';
+  spies: { onA: (open: boolean) => void; onB: (open: boolean) => void; escA: () => void; escB: () => void };
+}) {
+  const [hidden, setHidden] = useState(false);
+  const [generation, setGeneration] = useState(0);
+  const [a, setA] = useState(true);
+  const [b, setB] = useState(false);
+  const panelA = <Panel name="A" open={a} setOpen={setA} onOpenChange={spies.onA} onEscape={spies.escA} />;
+  return (
+    <>
+      <button type="button" onClick={() => setHidden(true)}>Hide</button>
+      <button type="button" onClick={() => setHidden(false)}>Show</button>
+      <button type="button" onClick={() => setB(true)}>Open B</button>
+      <button type="button" onClick={() => setGeneration((g) => g + 1)}>Remount A</button>
+      {boundary === 'activity' ? (
+        <Activity mode={hidden ? 'hidden' : 'visible'}>{panelA}</Activity>
+      ) : boundary === 'suspense' ? (
+        <Suspense fallback={null}>
+          <SuspendWhen when={hidden} />
+          {panelA}
+        </Suspense>
+      ) : (
+        <Fragment key={generation}>{panelA}</Fragment>
+      )}
+      <Panel name="B" open={b} setOpen={setB} onOpenChange={spies.onB} onEscape={spies.escB} />
+    </>
+  );
+}
+
+/** The dialog Radix counts as its highest layer at rest: the only one it leaves `pointer-events: auto`. */
+function radixHighest(): string | undefined {
+  return screen
+    .queryAllByRole('dialog', { hidden: true })
+    .filter((d) => d.getAttribute('data-state') === 'open' && d.style.pointerEvents === 'auto')
+    .map((d) => d.querySelector('h2')?.textContent ?? '')
+    .join(',');
+}
+
+describe('Dialog: Escape when Radix moves a layer to the top of an existing node (#714)', () => {
+  const spies = () => ({ onA: vi.fn(), onB: vi.fn(), escA: vi.fn(), escB: vi.fn() });
+
+  // A hidden and shown again (Activity, a re-suspended Suspense) re-runs Radix's effects on the same
+  // node: Radix unregisters A's layer and registers it again, on top of B. A remount (`key`) gives A
+  // new nodes, registered on top of B too. Either way A is Radix's highest layer and has the focus.
+  const cases = [
+    ['an <Activity> hidden and shown again', 'activity', 'Show'],
+    ['a <Suspense> that suspended and showed its content again', 'suspense', 'Show'],
+    ['a parent whose key changed', 'key', 'Remount A'],
+  ] as const;
+
+  for (const [label, boundary, reveal] of cases) {
+    for (const strict of [false, true]) {
+      const mode = strict ? ' (StrictMode)' : '';
+      const mount = (s: ReturnType<typeof spies>) =>
+        render(strict ? <StrictMode><Boundaries boundary={boundary} spies={s} /></StrictMode> : <Boundaries boundary={boundary} spies={s} />);
+
+      it(`${label}${mode}: a settled Escape closes A, the dialog Radix put on top, and not B`, async () => {
+        const s = spies();
+        mount(s);
+        await settle();
+        if (boundary !== 'key') step('Hide');
+        await settle();
+        step('Open B');
+        await settle();
+        step(reveal);
+        await settle();
+        // In DOM order (a remounted A comes after B in the body).
+        expect(openDialogNames()).toEqual(boundary === 'key' ? ['B', 'A'] : ['A', 'B']);
+        expect(radixHighest()).toBe('A');
+        expect(document.activeElement?.closest('[role="dialog"]')?.querySelector('h2')?.textContent).toBe('A');
+        pressEscape();
+        await settle();
+        expect(openDialogNames()).toEqual(['B']);
+        expect(s.onA.mock.calls).toEqual([[false]]);
+        expect(s.escA).toHaveBeenCalledTimes(1);
+        expect(s.onB.mock.calls).toEqual([]);
+        expect(s.escB).not.toHaveBeenCalled();
+        // B is the highest layer now: the next Escape is B's.
+        pressEscape();
+        await settle();
+        expect(openDialogNames()).toEqual([]);
+        expect(s.onB.mock.calls).toEqual([[false]]);
+        expect(s.escA).toHaveBeenCalledTimes(1);
+      });
+
+      it(`${label}${mode}: an Escape right after A is back closes A once, and not B`, async () => {
+        const s = spies();
+        mount(s);
+        await settle();
+        if (boundary !== 'key') step('Hide');
+        await settle();
+        step('Open B');
+        await settle();
+        step(reveal);
+        await microtasks();
+        pressEscape();
+        await settle();
+        expect(openDialogNames()).toEqual(['B']);
+        expect(s.onA.mock.calls).toEqual([[false]]);
+        expect(s.escA).toHaveBeenCalledTimes(1);
+        expect(s.onB.mock.calls).toEqual([]);
+        expect(s.escB).not.toHaveBeenCalled();
+      });
+    }
+  }
+});
+
+describe('Dialog: dialogs mounted open in the same commit (#714)', () => {
+  // Radix registers the layers of one commit in the order of its effects (children first, then
+  // siblings in order): a nested dialog above its parent, a later sibling above an earlier one. The
+  // Escape goes to the dialog Radix leaves `pointer-events: auto`.
+  function SameCommit({ nested, spies }: { nested: boolean; spies: { onA: (o: boolean) => void; onB: (o: boolean) => void } }) {
+    const [a, setA] = useState(true);
+    const [b, setB] = useState(true);
+    const panelB = <Panel name="B" open={b} setOpen={setB} onOpenChange={spies.onB} onEscape={() => {}} />;
+    return (
+      <>
+        <Dialog open={a} onOpenChange={(next) => { spies.onA(next); setA(next); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>A</DialogTitle>
+            </DialogHeader>
+            <DialogBody>{nested ? panelB : 'A, under B.'}</DialogBody>
+          </DialogContent>
+        </Dialog>
+        {nested ? null : panelB}
+      </>
+    );
+  }
+
+  for (const nested of [true, false]) {
+    it(`${nested ? 'B nested in A' : 'B a later sibling of A'}: Escape closes B first, then A`, async () => {
+      const s = { onA: vi.fn(), onB: vi.fn() };
+      render(<SameCommit nested={nested} spies={s} />);
+      await microtasks();
+      pressEscape();
+      await settle();
+      expect(openDialogNames()).toEqual(['A']);
+      expect(radixHighest()).toBe('A');
+      expect(s.onB.mock.calls).toEqual([[false]]);
+      expect(s.onA.mock.calls).toEqual([]);
+      pressEscape();
+      await settle();
+      expect(openDialogNames()).toEqual([]);
+      expect(s.onA.mock.calls).toEqual([[false]]);
+    });
+  }
+});
+
+describe('Dialog: Escape when the top dialog closed before Radix caught up (#714)', () => {
+  it('a dialog opened and closed at once, still exiting: an Escape in the race is not passed down to the one underneath', async () => {
+    simulateExitAnimations();
+    const onA = vi.fn();
+    const onB = vi.fn();
+    const escA = vi.fn();
+    const escB = vi.fn();
+    // B's state lives in its own component, so A never re-renders: only Radix's scheduled update
+    // would move its idea of the highest layer off A.
+    function BHost() {
+      const [b, setB] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setB(true)}>Open B</button>
+          <button type="button" onClick={() => setB(false)}>Close B</button>
+          <Panel name="B" open={b} setOpen={setB} onOpenChange={onB} onEscape={escB} />
+        </>
+      );
+    }
+    function App() {
+      const [a, setA] = useState(true);
+      return (
+        <>
+          <Panel name="A" open={a} setOpen={setA} onOpenChange={onA} onEscape={escA} />
+          <BHost />
+        </>
+      );
+    }
+    render(<App />);
+    await settle();
+    step('Open B');
+    await microtasks();
+    step('Close B');
+    await microtasks();
+    expect(openDialogNames()).toEqual(['A']);
+    expect(screen.getAllByRole('dialog', { hidden: true })).toHaveLength(2);
+    pressEscape();
+    await settle();
+    // As at rest (see "an Escape during the exit of the top dialog"): the exiting B takes the press.
+    expect(openDialogNames()).toEqual(['A']);
+    expect(onA).not.toHaveBeenCalled();
+    expect(escA).not.toHaveBeenCalled();
+    expect(escB).toHaveBeenCalledTimes(1);
   });
 });
