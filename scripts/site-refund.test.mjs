@@ -225,7 +225,7 @@ describe('dates', () => {
 });
 
 describe('the Purchases section of the privacy notice', () => {
-  const purchases = (privacy) => privacy.slice(privacy.indexOf('id="purchases-title"'), privacy.indexOf('id="rights-title"'));
+  const purchases = (privacy) => privacy.slice(privacy.indexOf('id="purchases-title"'), privacy.indexOf('id="emails-title"'));
 
   it('is its own h2, with the h3 items in order, before "Your rights"', () => {
     const { privacy } = build();
@@ -311,7 +311,7 @@ describe('the Purchases section of the privacy notice', () => {
     const { privacy } = build();
     const rights = privacy.slice(privacy.indexOf('id="rights-title"'), privacy.indexOf('id="cookies-title"'));
     const OBJECT =
-      'Right to object. Where we keep data on the basis of our legitimate interest (the records of the sale described in the Purchases section), you can object to it (art. 21 GDPR); we will then stop, unless we need the data to establish, exercise or defend legal claims or have compelling legitimate grounds that override your interests.';
+      'Right to object. Where we keep data on the basis of our legitimate interest (the records of the sale described in the Purchases section), you can object to this keeping (art. 21 GDPR); we will then stop, unless we need the data to establish, exercise or defend legal claims or have compelling legitimate grounds that override your interests.';
     // its own paragraph (art. 21(4): clearly and separately from any other information), with a visible title
     const paragraph = rights.match(/<p id="right-to-object">([\s\S]*?)<\/p>/);
     expect(paragraph).not.toBeNull();
@@ -368,6 +368,7 @@ describe('the Purchases section of the privacy notice', () => {
     const { privacy } = build();
     const lead = text(privacy.match(/<p class="lead">[\s\S]*?<\/p>/)[0]);
     expect(lead).toContain('Information under art. 13 of the GDPR');
+    expect(lead).toContain('and, in its own section, for the emails that anyone sends us; for the purchase data');
     expect(lead).toContain('for the purchase data that we receive from Paddle, it is also the information under art. 14 of the GDPR');
     expect(text(build({ designPartnerUrl: '' }).privacy)).toContain('information under art. 14 of the GDPR');
     expect(privacy).toContain('(GDPR art. 13 and 14)');
@@ -421,7 +422,7 @@ describe('the Purchases section of the privacy notice', () => {
     );
     // and the moment the other data are deleted
     expect(retention()).toContain(
-      'The other purchase data received from Paddle, such as your name, your company name, your address and your tax or VAT number, are not records of the sale, and they are not kept for that period. The data controller deletes them at the end of the last 12 months of updates of your license, renewals included, or earlier if the license ends: when you receive a refund or the payment is reversed, or for a serious violation, as described in the license terms.',
+      'The other purchase data received from Paddle, such as your name, your company name, your address and your tax or VAT number, are not records of the sale, and they are not kept for that period. The data controller deletes them at the end of the 12 months of updates of your license or, if you buy again, of the last license you buy, or earlier if the license ends: when you receive a refund or the payment is reversed, or for a serious violation, as described in the license terms.',
     );
     // the period is never printed into those sentences: only the first sentence carries the constant
     expect(retention({ purchaseRetentionYears: '10' }).match(/\b10 years\b/g)).toHaveLength(2);
@@ -437,11 +438,14 @@ describe('the Purchases section of the privacy notice', () => {
     const DP = 'The copies of the design partner applications follow the period of their section: no later than 24 months after the application.';
     const OTHERS =
       'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.';
-    expect(emails()).toBe(`Emails you send us ${FOR_ALL} ${DP} ${OTHERS}`);
+    // Daniele, 2026-11-27 (written confirmation): purpose, legal basis and provider of the mailbox
+    const PURPOSE =
+      'We use these emails to answer you. For privacy requests this rests on our obligations under the GDPR (art. 6(1)(c)); for the other emails, on our legitimate interest in answering (art. 6(1)(f)). The mailbox is Gmail, provided by Google under its own terms and privacy policy. Google LLC is based in the United States, and the transfer of the emails to it rests on the EU-US Data Privacy Framework, to which it adheres.';
+    expect(emails()).toBe(`Emails you send us ${FOR_ALL} ${DP} ${OTHERS} ${PURPOSE}`);
     // the design partner period is the one of its section
     expect(text(build().privacy)).toContain('no later than 24 months after your application');
     // without the design partner section the sentence on its copies goes with it, the rest stays
-    expect(emails({ designPartnerUrl: '' })).toBe(`Emails you send us ${FOR_ALL} ${OTHERS}`);
+    expect(emails({ designPartnerUrl: '' })).toBe(`Emails you send us ${FOR_ALL} ${OTHERS} ${PURPOSE}`);
     // the section is outside the Purchases section, which covers buyers only
     const { privacy } = build();
     expect(privacy.indexOf('id="emails-title"')).toBeGreaterThan(privacy.indexOf('id="purchase-retention-title"'));

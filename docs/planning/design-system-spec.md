@@ -957,15 +957,17 @@ privata, superata; nessun licensing a runtime).
 
 ### Decisioni del 27/11/2026 (Daniele): rimborso e conservazione dei dati
 
-Sono decisioni di Daniele, prese il 27/11/2026 (ticket #692). I punti 2, 4 e 5 nella forma qui sotto
-(minimizzazione, regola delle email, base giuridica con il diritto di opposizione) li ha confermati
-Daniele il 27/11/2026, dopo la terza respinta del critico sulla PR #713.
+Sono decisioni di Daniele, prese il 27/11/2026 (ticket #692). Il testo dell'informativa li ha confermato
+Daniele per iscritto il 27/11/2026, dopo l'approvazione del critico al giro 4, con tre ritocchi: nei dati
+di acquisto niente "rinnovi compresi" (si parla di riacquisto, come la licenza), la sezione "Emails you
+send us" dichiara finalità, base giuridica (art. 6(1)(c) per le richieste privacy, 6(1)(f) per le altre) e
+fornitore (Gmail, Google), e il diritto di opposizione parla di "this keeping".
 
 1. **Rimborso**: entro 14 giorni senza motivazione, per tutti, salvo frode o abuso (modifica del punto 7 sopra).
 2. **Dati d'acquisto, minimizzazione**: per 7 anni dalla fine dell'anno della vendita si conservano
    solo i dati della vendita: identificativo della transazione, data, importo, paese ed email.
    Indirizzo, partita IVA, nome dell'azienda e gli altri dati ricevuti da Paddle si cancellano alla
-   fine dell'ultimo periodo di 12 mesi di aggiornamenti della licenza, rinnovi compresi, o prima se la
+   fine dei 12 mesi di aggiornamenti della licenza o, se si riacquista, dell'ultima licenza acquistata, o prima se la
    licenza finisce (rimborso, storno del pagamento, violazione grave).
 3. **Nomi utente GitHub**: si cancellano alla fine dell'accesso al registry (fine dei 12 mesi di
    aggiornamenti senza riacquisto, rimborso o storno del pagamento, violazione grave, sostituzione

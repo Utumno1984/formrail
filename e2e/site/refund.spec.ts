@@ -215,7 +215,7 @@ test.describe('privacy notice: purchases', () => {
       'Of the purchase data received from Paddle, the records of the sale keep only the identifier of the transaction, the date, the amount, your country and your email address;',
     );
     await expect(page.locator('#purchase-retention-title + p + p')).toContainText(
-      'The other purchase data received from Paddle, such as your name, your company name, your address and your tax or VAT number, are not records of the sale, and they are not kept for that period. The data controller deletes them at the end of the last 12 months of updates of your license, renewals included, or earlier if the license ends',
+      'The other purchase data received from Paddle, such as your name, your company name, your address and your tax or VAT number, are not records of the sale, and they are not kept for that period. The data controller deletes them at the end of the 12 months of updates of your license or, if you buy again, of the last license you buy, or earlier if the license ends',
     );
     await expect(page.locator('#purchase-retention-title + p + p + p')).toContainText(
       'The data controller deletes them when your access to the registry ends',
@@ -230,6 +230,10 @@ test.describe('privacy notice: purchases', () => {
       'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.',
     );
     await expect(page.locator('#emails-title + p')).toContainText('whether or not they have bought a license');
+    await expect(page.locator('#emails-title + p + p')).toContainText(
+      'We use these emails to answer you. For privacy requests this rests on our obligations under the GDPR (art. 6(1)(c)); for the other emails, on our legitimate interest in answering (art. 6(1)(f)). The mailbox is Gmail, provided by Google under its own terms and privacy policy. Google LLC is based in the United States, and the transfer of the emails to it rests on the EU-US Data Privacy Framework, to which it adheres.',
+    );
+    await expect(page.locator('.lead')).toContainText('and, in its own section, for the emails that anyone sends us; for the purchase data');
     await expect(page.locator('#purchase-data-title + p')).toContainText('as the licensor of the product');
     await expect(main).toContainText('Paddle may transfer data outside the EEA');
     await expect(page.locator('#purchase-transfers-title + p')).toContainText(
@@ -309,7 +313,7 @@ test.describe('privacy notice: purchases', () => {
     const object = page.locator('#rights-title ~ p#right-to-object');
     await expect(object).toBeVisible();
     await expect(object).toHaveText(
-      'Right to object. Where we keep data on the basis of our legitimate interest (the records of the sale described in the Purchases section), you can object to it (art. 21 GDPR); we will then stop, unless we need the data to establish, exercise or defend legal claims or have compelling legitimate grounds that override your interests.',
+      'Right to object. Where we keep data on the basis of our legitimate interest (the records of the sale described in the Purchases section), you can object to this keeping (art. 21 GDPR); we will then stop, unless we need the data to establish, exercise or defend legal claims or have compelling legitimate grounds that override your interests.',
       { useInnerText: true },
     );
     await expect(object.locator('strong')).toHaveText('Right to object.');
