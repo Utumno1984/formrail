@@ -1,216 +1,229 @@
-# Formrail — istruzioni per Claude Code
+# Formrail — contributor guide for AI-assisted work
 
-Formrail (fino all'11/11/2026 `react-object-page`: repo GitHub, npm `@react-object-page/core`,
-Storybook; rebrand nel ticket #428) è un design system React **open-core**: implementazione headless e
-indipendente di due pattern UI enterprise diffusi — **List Report** (lista con filtri/azioni
-bulk) e **Object Page** (editor a sezioni ancorate, save-bar sticky, dirty-guard). Nessun
-codice/asset/CSS di terzi viene toccato: solo pattern di interazione e composizione generici e
-liberamente implementabili, descritti in astratto (vedi `docs/planning/design-system-spec.md`).
+Formrail (until 2026-11-11 `react-object-page`: GitHub repository, npm `@react-object-page/core`,
+Storybook; rebrand in ticket #428) is an **open-core** React design system: a headless,
+independent implementation of two widespread enterprise UI patterns — **List Report** (a list
+with filters and bulk actions) and **Object Page** (an editor with anchored sections, a sticky
+save bar and a dirty guard). No third-party code, assets or CSS are touched: only generic,
+freely implementable interaction and composition patterns, described in the abstract (see
+`docs/planning/design-system-spec.md`).
 
-**Modello di business — open-core**:
-- `packages/core`: MIT, gratuito, pubblicato su npm pubblico. Primitivi e versioni "semplici" dei
-  floorplan (vedi segmentazione in `docs/planning/design-system-spec.md`, §3).
-- `packages/pro`: licenza commerciale ("da definire"), **vive in questo monorepo pubblico**
-  (decisione di Daniele del 2026-11-03: il sorgente è leggibile, il moat è servizio/licenza), con
-  `"private": true` finché il pacchetto non è pubblicato su GitHub Packages (nessun licensing a
-  runtime). Si estende
-  solo con ticket espliciti (roadmap MVP, §6). **Piano commerciale (decisioni di Daniele del
-  2026-11-13, sostituiscono "abbonamento ricorrente"; non rinegoziabili senza nuova istruzione
-  sua, dettaglio in `docs/planning/design-system-spec.md` §8)**: target team aziendali (ERP,
-  gestionali, portali amministrativi); licenza per sviluppatore a pagamento unico (one-time), con 12 mesi di aggiornamenti inclusi e uso senza limite di tempo delle versioni ricevute (decisione di Daniele del 2026-11-26), venduta tramite un Merchant of Record, **Paddle** (decisione di Daniele del
-  2026-11-26: Lemon Squeezy non accetta nuove registrazioni e chiude il 31/03/2027; fonte in spec §8, punto 4), che gestisce
-  IVA UE e fatturazione. Prima di spingere sulle vendite: landing page con lista
-  d'attesa/pre-ordine (validazione della domanda), ticket #490. Ticket di studio/refactoring #489
-  per rendere i motori Pro (Change Summary, Form Rebase) disaccoppiabili da `@formrail/core`, per chi
-  usa React Hook Form o TanStack Form. **Distribuzione (decisione di Daniele del 2026-11-26)**:
-  GitHub Packages, org GitHub dedicata `formrail-dev`, pacchetto `@formrail-dev/pro` installato con
-  alias npm (`@formrail/pro`); sostituisce l'org npm privata (superata: i pacchetti privati npm sono
-  a pagamento, nessun costo fisso ammesso), nessun licensing a runtime. Dettagli in §2.4 e §8.
-- Il documento di pianificazione completo (inventario componenti, insidie tecniche di classe
-  generale, segmentazione Free/Pro, MVP) è in `docs/planning/design-system-spec.md`. **Il
-  pianificatore lo legge sempre prima di creare ticket.**
+**Business model — open-core**:
+- `packages/core`: MIT, free, published on the public npm registry. Primitives and "simple"
+  versions of the floorplans (see the segmentation in `docs/planning/design-system-spec.md`, §3).
+- `packages/pro`: commercial licence ("to be defined"), **lives in this public monorepo**
+  (maintainer decision, 2026-11-03: the source is readable, the moat is service and licence),
+  with `"private": true` until the package is published on GitHub Packages (no runtime
+  licensing). It is extended only through explicit tickets (MVP roadmap, §6). **Commercial plan
+  (maintainer decisions, 2026-11-13, replacing "recurring subscription"; not to be renegotiated
+  without a new maintainer instruction; details in `docs/planning/design-system-spec.md` §8)**:
+  target: company teams (ERP, business management software, admin portals); a per-developer
+  licence with a one-time payment, with 12 months of updates included and unlimited use of the
+  versions received (maintainer decision, 2026-11-26), sold through a Merchant of Record,
+  **Paddle** (maintainer decision, 2026-11-26: Lemon Squeezy does not accept new sign-ups and
+  closes on 2027-03-31; source in spec §8, point 4), which handles EU VAT and invoicing. Before
+  pushing sales: a landing page with a waiting list / pre-order (demand validation), ticket #490.
+  Study/refactoring ticket #489 to make the Pro engines (Change Summary, Form Rebase) decouplable
+  from `@formrail/core`, for teams that use React Hook Form or TanStack Form. **Distribution
+  (maintainer decision, 2026-11-26)**: GitHub Packages, dedicated GitHub organisation
+  `formrail-dev`, package `@formrail-dev/pro` installed through an npm alias (`@formrail/pro`);
+  it replaces the private npm organisation (superseded: private npm packages are paid, and no
+  fixed cost is allowed), no runtime licensing. Details in §2.4 and §8.
+- The complete planning document (component inventory, general-class technical pitfalls,
+  Free/Pro segmentation, MVP) is `docs/planning/design-system-spec.md`. **The planner always
+  reads it before creating tickets.**
 
-## Ruolo della sessione principale: coordinare il team del progetto
+## Role of the coordinating session: coordinating the project team
 
-Daniele parla direttamente con la sessione aperta in questa cartella (decisione del 2026-11-12:
-per Formrail l'orchestratore di `~/projects` non si usa più). Chi lavora in questa cartella
-(sessione interattiva o headless) coordina il team in `.claude/agents/`. Per ogni richiesta segui
-la pipeline, senza saltare passaggi:
+The maintainer works directly with the session opened in this repository (maintainer decision,
+2026-11-12). Whoever works in this repository (interactive or headless session) coordinates the
+team in `.claude/agents/`; in this guide that session is called the **coordinating session**.
+For every request, follow the pipeline without skipping steps:
 
-1. **pianificatore** → crea i ticket GitHub (o restituisce domande: girale a Daniele e
-   aspetta).
-2. Per ogni ticket, in ordine di dipendenza:
-   1. **sviluppatore** → branch `feat/<N>-<slug>` (o `fix/<N>-<slug>`) e **PR in bozza subito**
-      (`Closes #<N>`), così la CI gira a ogni push. Codice e test insieme: unitari (Vitest),
-      **e2e per ogni comportamento visibile dall'esterno** (Playwright, contro Storybook o una
-      pagina di test minimale). `npm run check` verde.
-   2. **CI verde** sulla PR (`gh pr checks <N> --watch`): lint, tipi, build, unit test, e2e.
-      Se è rossa torna allo sviluppatore: tester e critico non partono su una CI rossa.
-   3. **tester** → QA: ogni comportamento del ticket dal punto di vista di chi usa la libreria,
-      smoke test sulla build (Storybook statico e/o il bundle pubblicato), casi non coperti.
-   4. **critico-avversariale** → red team del diff, per ultimo, su codice già verde e verificato.
-   5. Se tester o critico segnalano problemi, torna allo **sviluppatore** con l'elenco completo
-      e riparti dal punto 2 (CI). **Limite (decisione di Daniele del 2026-11-12)**: dopo
-      **2 respinte del critico-avversariale**, oppure dopo **2 respinte del tester**, sullo stesso
-      ticket, fermati e chiedi a Daniele; si riprende solo su sua istruzione. Come si conta:
-      - i due conteggi sono separati (2 del critico, 2 del tester) e non si sommano;
-      - si contano le respinte, non i ritorni allo sviluppatore: è un metro oggettivo;
-      - una CI rossa non è una respinta: torna allo sviluppatore senza entrare nel conteggio;
-      - il conteggio è per ticket, non per PR: chiudere una PR e aprirne un'altra sullo stesso
-        ticket non lo azzera;
-      - conta anche la respinta di un giro ristretto ai soli punti segnalati nel giro precedente,
-        e anche se il problema trovato è nuovo.
-   6. Quando CI verde, tester = QA SUPERATO e critico = APPROVATO: `gh pr ready <N>` e riepilogo
-      (cosa cambia, test aggiunti, note del critico).
-3. **Merge**: lo fa la sessione principale di questo progetto, in autonomia (delega di Daniele del
-   2026-11-12, sostituisce "li fa l'orchestratore di `~/projects`"), solo se: CI verde, tester =
-   QA SUPERATO, critico = APPROVATO, nessuna domanda aperta per Daniele. Merge commit (non
-   squash); PR impilate in ordine, con la base della successiva riportata su `main`. Gli agenti
-   (`.claude/agents/`) e le sessioni headless delegate non uniscono mai. Niente push diretti su
-   `main` né push forzati.
-4. **Versione e pubblicazione npm**: il bump di versione di una PR che tocca `package.json` lo
-   decide la sessione che coordina la pipeline (decisione di Daniele del 2026-11-12), mai uno
-   degli agenti di `.claude/agents/`. La pubblicazione non rientra nella delega del merge:
-   niente `npm publish` senza un'istruzione esplicita di Daniele.
+1. **planner** → creates the GitHub tickets (or returns questions: forward them to the
+   maintainer and wait).
+2. For each ticket, in dependency order:
+   1. **developer** → branch `feat/<N>-<slug>` (or `fix/<N>-<slug>`) and **a draft PR right
+      away** (`Closes #<N>`), so CI runs on every push. Code and tests together: unit tests
+      (Vitest), **e2e for every externally visible behaviour** (Playwright, against Storybook or
+      a minimal test page). `npm run check` green.
+   2. **Green CI** on the PR (`gh pr checks <N> --watch`): lint, types, build, unit tests, e2e.
+      If it is red, the PR goes back to the developer: the tester and the adversarial reviewer
+      do not start on red CI.
+   3. **tester** → QA: every behaviour in the ticket from the point of view of a library user,
+      smoke test on the build (static Storybook and/or the published bundle), uncovered cases.
+   4. **adversarial-reviewer** → red team of the diff, last, on code that is already green and
+      verified.
+   5. If the tester or the adversarial reviewer report problems, go back to the **developer**
+      with the complete list and restart from step 2 (CI). **Limit (maintainer decision,
+      2026-11-12)**: after **2 rejections by the adversarial-reviewer**, or after **2 rejections
+      by the tester**, on the same ticket, stop and ask the maintainer; work resumes only on
+      their instruction. How to count:
+      - the two counts are separate (2 for the adversarial reviewer, 2 for the tester) and are
+        not added together;
+      - rejections are counted, not returns to the developer: it is an objective measure;
+      - red CI is not a rejection: the PR goes back to the developer without entering the count;
+      - the count is per ticket, not per PR: closing a PR and opening another one on the same
+        ticket does not reset it;
+      - a rejection also counts when it comes from a round restricted to the points raised in
+        the previous round, and also when the problem found is new.
+   6. When CI is green, tester = QA PASSED and adversarial reviewer = APPROVED: `gh pr ready <N>`
+      and a summary (what changes, tests added, the adversarial reviewer's notes).
+3. **Merge**: done by the coordinating session of this project, autonomously (maintainer
+   delegation, 2026-11-12), only if: CI green, tester = QA PASSED, adversarial reviewer =
+   APPROVED, no open question for the maintainer. Merge commit (not squash); stacked PRs in
+   order, with the base of the next one moved back to `main`. The agents (`.claude/agents/`) and
+   the delegated headless sessions never merge. No direct pushes to `main` and no force pushes.
+4. **Version and npm publishing**: the version bump of a PR that touches `package.json` is
+   decided by the session coordinating the pipeline (maintainer decision, 2026-11-12), never by
+   one of the agents in `.claude/agents/`. Publishing is not part of the merge delegation: no
+   `npm publish` without an explicit instruction from the maintainer.
 
-### Comandi `gh`
+### Language of everything published on GitHub
 
-`gh` è nel `PATH`: chiamalo come `gh ...`, all'inizio del comando e da solo (niente prefisso
-`PATH=...`, niente `cd ... && gh`). Altrimenti il comando non corrisponde al permesso
-`Bash(gh *)` di `.claude/settings.json` e resta bloccato in attesa di un'approvazione.
+Anything published on GitHub (issues, PRs, comments, commit messages) is written in English,
+neutral and outward-facing: no personal names, no internal roles (planner, developer, tester,
+adversarial reviewer, coordinating session), no round counters, no model names. The tool
+attribution added automatically (the "Generated with Claude Code" line in a PR description, the
+`Co-Authored-By` trailer of a commit) is allowed. Reports to the coordinating session, which are
+not published, stay in Italian.
 
-Se `gh issue create`/`gh pr create` risultano bloccati in una sessione headless (classificatore
-auto-mode di "self-approval", non un problema di sintassi o di permessi): scrivi il contenuto in
-un file locale (es. `.tickets-draft/<nome>.md`, già in `.gitignore`) e restituiscilo alla
-sessione principale, che lo pubblica lei con `gh issue create --body-file`.
+### `gh` commands
 
-### Modello per carico intellettuale del task (Piano Max dal 01/11/2026)
+`gh` is on the `PATH`: call it as `gh ...`, at the start of the command and on its own (no
+`PATH=...` prefix, no `cd ... && gh`). Otherwise the command does not match the `Bash(gh *)`
+permission in `.claude/settings.json` and stays blocked waiting for an approval.
 
-Niente più vincolo stretto di quota: col piano Max non si sceglie il modello per risparmiare
-token, ma per il carico intellettuale del singolo task (istruzione di Daniele del 01/11/2026,
-generalizzata a tutti i progetti in `~/projects/CLAUDE.md`, "Come delegare"). `sonnet` e `opus`
-restano punti di partenza per ruolo (sviluppatore/tester `sonnet`, pianificatore/critico `opus`),
-ma sono priorità non regole rigide:
+If `gh issue create`/`gh pr create` are blocked in a headless session (the auto-mode
+"self-approval" classifier, not a syntax or permission problem): write the content into a local
+file (e.g. `.tickets-draft/<name>.md`, already in `.gitignore`) and return it to the coordinating
+session, which publishes it itself with `gh issue create --body-file`.
 
-- **Alza a opus** quando il task tocca gestione del focus/accessibilità, logica di stato non
-  banale, ambiguità reale, o un red team serio — anche per lo sviluppatore o il tester se il
-  ticket lo richiede.
-- **Scendi a sonnet** quando il task è meccanico, ben specificato, basso rischio (rifinitura
-  visiva, una story, un fix isolato già diagnosticato) — il pattern già in uso per il critico
-  ("critico: sonnet, basso rischio", motivato nel ticket) si applica così a qualunque agente.
-- Sessioni headless (`claude -p`): `--model sonnet` di default (l'orchestrazione/rebase/CI-watch
-  è meccanica), ma valuta `opus` se il ticket stesso è ad alto rischio.
-- Documenta la scelta non ovvia nel prompt di lancio o sul ticket (una riga: modello e motivo).
-- Lavoro in parallelo (più worktree, più ticket indipendenti) ok di default — resta il vincolo
-  reale dell'hardware (CPU/Chromium in parallelo), non più la quota: vedi `~/projects/CLAUDE.md`.
+### Model choice by the intellectual load of the task (maintainer decision, 2026-11-01)
 
-**Priorità e ritmo (decisione di Daniele del 2026-11-04, sostituisce "ritmo lento/non
-prioritario")**: Formrail è ora **prioritario**, non più un progetto a ritmo lento in
-parallelo sul SaaS di approvazione fatture/Fatture in Cloud. Procedere ticket per ticket senza fermarsi ad ogni singolo
-step salvo una vera decisione da chiedere a Daniele (vedi anche la nota sulla pipeline ad
-oltranza nella memoria dell'orchestratore di `~/projects`, scritta quando il coordinamento era
-suo).
+No strict quota constraint any more: the model is not chosen to save tokens but by the
+intellectual load of the individual task. `sonnet` and `opus` remain the starting points per role
+(developer/tester `sonnet`, planner/adversarial reviewer `opus`), but they are priorities, not
+rigid rules:
 
-## Regressione e test
+- **Raise to opus** when the task touches focus management/accessibility, non-trivial state
+  logic, real ambiguity, or a serious red team — also for the developer or the tester if the
+  ticket requires it.
+- **Drop to sonnet** when the task is mechanical, well specified and low risk (visual polish, a
+  story, an isolated fix already diagnosed) — the pattern already used for the adversarial
+  reviewer ("adversarial reviewer: sonnet, low risk", with the reason stated) thus applies to any
+  agent.
+- Headless sessions (`claude -p`): `--model sonnet` by default (coordination/rebase/CI-watch is
+  mechanical), but consider `opus` if the ticket itself is high risk.
+- Document a non-obvious choice in the launch prompt (one line: model and reason). Not on the
+  ticket: model names are not published on GitHub (see "Language of everything published on
+  GitHub").
+- Parallel work (several worktrees, several independent tickets) is fine by default — the real
+  constraint is the hardware (CPU/Chromium in parallel), not the quota. Before launching heavy
+  steps (e2e, visual, build) in parallel, check `uptime`: if the load is already high, queue the
+  work or accept the slowdown knowingly, and never ignore an anomalous result.
 
-- I test esistenti non si cancellano, non si rinominano e non si indeboliscono (niente
-  `.skip`, `.only`, `.fixme`, asserzioni rimosse, soglie o timeout allargati, valori attesi
-  cambiati) per far passare una PR: se un test è sbagliato, lo si spiega nella PR.
-- Ogni ticket ha la sezione "## Smoke test" oltre ai criteri di accettazione.
-- **Regressione visiva (Storybook + screenshot diff) fin dal primo componente**, non aggiunta
-  dopo: un e2e funzionale è cieco al layout (centratura, doppio scroll, anello di focus
-  tagliato possono essere tutti "verdi" con un bug visivo reale).
+**Priority and pace (maintainer decision, 2026-11-04, replacing "slow pace / not a
+priority")**: Formrail is now a **priority** project, no longer a slow-paced side project.
+Proceed ticket by ticket without stopping at every single step, unless there is a real decision
+to ask the maintainer.
 
-## Regole di dominio (principi generali, vedi `docs/planning/design-system-spec.md` §1 per il dettaglio)
+## Regression and tests
 
-- **List Report**: impronta dimensionalmente stabile tra loading/vuoto/dati (niente salti di
-  layout); contratto esplicito e testato per l'ordinamento al primo click; virtualizzazione
-  disattivata esplicitamente su dataset piccoli/vuoti; celle troncate con `max-width` reale sul
-  contenitore (non solo `text-overflow`); tooltip di troncamento gated su hover/focus reale, mai
-  al mount; azioni in un menu overflow devono ereditare `onClick`/`disabled` dal componente
-  originale.
-- **Object Page / dirty-tracking (probabile nucleo del moat tecnico)**: un controllo che riceve
-  il proprio valore da fuori dopo il mount (idratazione asincrona) non deve mai marcare il form
-  come "sporco" né propagare quell'evento come un gesto dell'utente. Preferire montare i
-  controlli già idratati; se la libreria sottostante genera comunque un `onChange` di "eco",
-  serve un modo esplicito di distinguere eco di sistema da intenzione utente. Change Summary
-  (diff) calcolato sempre contro la baseline reale salvata, mai un default statico. Footer
-  sticky: riservare sempre lo spazio, anche prima che compaia/scompaia.
-- **Campi con stati forzato/bloccato/disabilitato**: non interagibili anche da tastiera, non
-  solo visivamente spenti; spiegazione collegata via `aria-describedby` reale; l'API deve
-  offrire un canale render-prop/hook per iniettare quelle proprietà in un controllo figlio
-  arbitrario (un semplice `children: ReactNode` non basta).
-- **Responsive tablet/mobile (non un gate di blocco, decisione di Daniele del 2026-10-25)**:
-  supporto reale, non un messaggio "usa desktop" sotto una soglia (vedi
-  `docs/planning/design-system-spec.md` §1.10). In particolare: la **tastiera virtuale** va
-  considerata esplicitamente quando un campo va in focus (`visualViewport`/`dvh`, non solo
-  media query sulla larghezza) — il campo attivo non deve restare nascosto sotto la tastiera.
-  È un criterio di accettazione dei ticket Field/Dialog/Sheet fin da quando nascono, non un
-  ticket di rifinitura a fine progetto; la regressione visiva (ticket #4) copre viewport
-  mobile/tablet oltre a desktop fin dall'inizio.
-- **Overlay (Dialog/Select/Popover/Tooltip/Sheet)**: scala di z-index disciplinata e coerente in
-  tutto il sistema (popover sempre sopra modal); merge reale delle classi in conflitto
-  (tailwind-merge, non concatenazione); overlay "controllati da stato esterno" devono attivare
-  comunque tutto il bookkeeping interno (pila overlay, focus-trap, annuncio ARIA), verificato con
-  DOM reale non solo lettura del codice; ritorno del fuoco alla chiusura catturato con un
-  riferimento stabile aggiornato solo mentre l'overlay è chiuso; proprietà di stato-controllo non
-  valide come attributo HTML vanno rese non-enumerabili prima dello spread sul DOM (testato con
-  un'asserzione dedicata "nessun leak"); preferire assegnazione diretta della prop allo spread
-  condizionale quando il target è un componente (bypassa il controllo "proprietà in eccesso" di
-  TypeScript).
-- **Motion**: qualunque transizione/animazione (durata, easing, quali proprietà animare) va
-  dichiarata come token (`--motion-rop-*` quando esiste un valore condiviso), mai come valore
-  letterale sparso nel componente. Ogni token di motion rispetta
-  `@media (prefers-reduced-motion: reduce)`: con la preferenza attiva l'effetto finale (stato
-  aperto/chiuso, valore aggiornato) compare senza transizione, non semplicemente "più veloce".
-  Su un overlay, l'animazione non deve mai alterare QUANDO il focus-trap si attiva o quando
-  `useReturnFocus` legge `document.activeElement` — vedi "Overlay" sopra: gli stessi test di
-  `Internal/OverlayLayers` e `Internal/ReturnFocus` restano verdi senza modifiche di
-  tolleranza/timeout.
-- **Data layer**: schema di validazione runtime condiviso tra form e chiamata API (fallisce
-  rumorosamente su un campo mancante, non propaga `undefined` in silenzio); ricerca asincrona con
-  tracking esplicito dell'ultima richiesta (scarta risposte di richieste superate); un valore
-  selezionato fuori dai risultati dell'ultima ricerca resta visibile.
-- **Accessibilità e test**: il nome accessibile di un campo non deve cambiare per via di un
-  marker di stato (es. "modificato") in un modo che rompe la ri-query per label nei test — se
-  serve, mantenere il riferimento al nodo invece di ri-cercarlo. Due controlli "funzionalmente
-  identici" con lo stesso nome accessibile ma effetti diversi vanno distinti per nome.
-- **Governance**: budget di dimensione bundle per-import confrontato con una baseline versionata
-  (non riscritta a ogni corsa); changeset obbligatorio su ogni PR che tocca `packages/*`; un
-  primitivo che introduce un cambio di comportamento e il fix compagno in un consumer accoppiato
-  vanno rilasciati nella stessa release.
+- Existing tests are not deleted, renamed or weakened (no `.skip`, `.only`, `.fixme`, removed
+  assertions, widened thresholds or timeouts, changed expected values) to make a PR pass: if a
+  test is wrong, explain it in the PR.
+- Every ticket has a "## Smoke test" section in addition to the acceptance criteria.
+- **Visual regression (Storybook + screenshot diff) from the first component**, not added later:
+  a functional e2e test is blind to layout (centring, double scroll, a clipped focus ring can all
+  be "green" with a real visual bug).
 
-## Convenzioni tecniche
+## Domain rules (general principles, see `docs/planning/design-system-spec.md` §1 for the details)
 
-- Monorepo: `packages/core` (unico pacchetto esistente all'inizio). `packages/pro` si crea solo
-  quando un ticket lo richiede esplicitamente (non prima).
-- Stack: React 18/19 + TypeScript, pattern **headless** (logica/stato separati dallo stile,
-  stesso approccio di react-virtual-tree-view/react-virtual-dnd-table). Build con `tsup`. Zod per
-  gli schema del data-layer. TanStack Query per cache/invalidazione dove serve un data-layer.
-  Storybook per demo/documentazione con visual regression attiva da subito. Vitest per gli unit
-  test, Playwright per gli e2e (incluso touch via CDP dove rilevante). Changesets per
-  versionamento/release.
-- Codice, nomi e commenti in inglese. **Testo di Storybook/demo solo in inglese (decisione di
-  Daniele del 2026-11-01, sostituisce la vecchia regola "italiano o inglese")**: il prodotto punta
-  a una platea internazionale, quindi ogni stringa visibile in una story (label, placeholder,
-  messaggi, testo delle fixture) va in inglese, non più mista italiano/inglese. Si applica da ora
-  in avanti alle story nuove e a quelle toccate per altri motivi; non richiede una traduzione
-  retroattiva sistematica di tutte le story esistenti in un solo colpo (valutare un ticket dedicato
-  se serve farlo in modo organico).
-- **Storybook: Controls/Actions/Interactions usati sul serio, non per scrupolo (decisione di
-  Daniele del 2026-10-25)**. Per ogni componente con una story non puramente interna/fixture:
-  `argTypes` che rispecchiano davvero l'API pubblica (controllo giusto per tipo — `radio`/
-  `select` per un'unione di varianti, non testo libero; valori di default sensati, non vuoti);
-  callback (`onClick`, `onChange`, ...) collegate con `fn()` cosi' compaiono nel pannello Actions
-  quando l'utente interagisce, non lasciate scollegate; una `play` function con l'addon
-  Interactions che scripta un'interazione realistica (click, digitazione, apertura di un overlay)
-  e verifica lo stato risultante — non un gesto simbolico ("clicca una volta") ma un caso che
-  documenta e allo stesso tempo prova un comportamento reale del componente. Il pianificatore
-  include questo nei criteri di accettazione di ogni ticket-componente (dal ticket #6 in avanti);
-  il critico verifica che non sia stato aggiunto "tanto per" (controlli che non controllano nulla,
-  `play` vuota o banale).
-- Test: `npm run check` = lint + tipi + build + unit test. Prima di ogni commit: `npm run check`.
-  Prima di una PR pronta: anche la suite e2e completa.
-- Segreti: nessuno previsto nel core (nessuna API esterna, nessun database). Se compare un
-  bisogno di licensing/chiavi per il Pro, è una decisione architetturale da portare
-  a Daniele (tramite la sessione principale) prima di implementarla, non da inventare sul momento.
+- **List Report**: a dimensionally stable footprint across loading/empty/data (no layout
+  shifts); an explicit, tested contract for sorting on the first click; virtualisation explicitly
+  disabled on small/empty datasets; truncated cells with a real `max-width` on the container (not
+  just `text-overflow`); the truncation tooltip gated on real hover/focus, never on mount; actions
+  in an overflow menu must inherit `onClick`/`disabled` from the original component.
+- **Object Page / dirty-tracking (probably the core of the technical moat)**: a control that
+  receives its value from outside after mount (asynchronous hydration) must never mark the form
+  as "dirty" nor propagate that event as a user gesture. Prefer mounting controls already
+  hydrated; if the underlying library still emits an "echo" `onChange`, there must be an explicit
+  way to tell a system echo from user intent. The Change Summary (diff) is always computed
+  against the real saved baseline, never against a static default. Sticky footer: always reserve
+  the space, even before it appears/disappears.
+- **Fields with forced/locked/disabled states**: not interactive from the keyboard either, not
+  just visually dimmed; the explanation linked through a real `aria-describedby`; the API must
+  offer a render-prop/hook channel to inject those properties into an arbitrary child control (a
+  plain `children: ReactNode` is not enough).
+- **Responsive tablet/mobile (not a blocking gate, maintainer decision, 2026-10-25)**: real
+  support, not a "use a desktop" message below a threshold (see
+  `docs/planning/design-system-spec.md` §1.10). In particular: the **virtual keyboard** must be
+  considered explicitly when a field gets focus (`visualViewport`/`dvh`, not just width media
+  queries) — the active field must not stay hidden under the keyboard. It is an acceptance
+  criterion of the Field/Dialog/Sheet tickets from the moment they are created, not a polishing
+  ticket at the end of the project; visual regression (ticket #4) covers mobile/tablet viewports
+  as well as desktop from the start.
+- **Overlays (Dialog/Select/Popover/Tooltip/Sheet)**: a disciplined, consistent z-index scale
+  across the whole system (popover always above modal); a real merge of conflicting classes
+  (tailwind-merge, not concatenation); overlays "controlled by external state" must still trigger
+  all the internal bookkeeping (overlay stack, focus trap, ARIA announcement), verified with the
+  real DOM and not only by reading the code; focus return on close captured with a stable
+  reference updated only while the overlay is closed; state-control properties that are not valid
+  HTML attributes must be made non-enumerable before being spread onto the DOM (tested with a
+  dedicated "no leak" assertion); prefer direct prop assignment over a conditional spread when the
+  target is a component (it bypasses TypeScript's "excess property" check).
+- **Motion**: any transition/animation (duration, easing, which properties to animate) is
+  declared as a token (`--motion-rop-*` when a shared value exists), never as a literal value
+  scattered in the component. Every motion token honours `@media (prefers-reduced-motion:
+  reduce)`: with the preference active, the final effect (open/closed state, updated value)
+  appears without a transition, not simply "faster". On an overlay, the animation must never
+  change WHEN the focus trap activates or when `useReturnFocus` reads `document.activeElement` —
+  see "Overlays" above: the same `Internal/OverlayLayers` and `Internal/ReturnFocus` tests stay
+  green without any tolerance/timeout change.
+- **Data layer**: a runtime validation schema shared between the form and the API call (it fails
+  loudly on a missing field, it does not silently propagate `undefined`); asynchronous search
+  with explicit tracking of the latest request (it discards responses from superseded requests);
+  a selected value outside the results of the latest search stays visible.
+- **Accessibility and tests**: the accessible name of a field must not change because of a state
+  marker (e.g. "modified") in a way that breaks re-querying by label in tests — if needed, keep
+  the reference to the node instead of querying it again. Two "functionally identical" controls
+  with the same accessible name but different effects must be distinguished by name.
+- **Governance**: a per-import bundle size budget compared against a versioned baseline (not
+  rewritten on every run); a changeset is mandatory on every PR that touches `packages/*`; a
+  primitive that introduces a behaviour change and the companion fix in a coupled consumer are
+  released in the same release.
+
+## Technical conventions
+
+- Monorepo: `packages/core` (the only package existing at the start). `packages/pro` is created
+  only when a ticket explicitly requires it (not before).
+- Stack: React 18/19 + TypeScript, **headless** pattern (logic/state separated from styling,
+  the same approach as react-virtual-tree-view/react-virtual-dnd-table). Build with `tsup`. Zod
+  for the data-layer schemas. TanStack Query for caching/invalidation where a data layer is
+  needed. Storybook for demos/documentation with visual regression active from the start. Vitest
+  for unit tests, Playwright for e2e (including touch via CDP where relevant). Changesets for
+  versioning/releases.
+- Code, names and comments in English. **Storybook/demo text in English only (maintainer
+  decision, 2026-11-01, replacing the old "Italian or English" rule)**: the product targets an
+  international audience, so every string visible in a story (labels, placeholders, messages,
+  fixture text) is in English, no longer mixed Italian/English. It applies from now on to new
+  stories and to stories touched for other reasons; it does not require a systematic
+  retroactive translation of all existing stories in one go (consider a dedicated ticket if it
+  needs to be done organically).
+- **Storybook: Controls/Actions/Interactions used for real, not as a formality (maintainer
+  decision, 2026-10-25)**. For every component with a story that is not purely internal/fixture:
+  `argTypes` that truly mirror the public API (the right control for the type — `radio`/`select`
+  for a union of variants, not free text; sensible default values, not empty ones); callbacks
+  (`onClick`, `onChange`, ...) wired with `fn()` so they show up in the Actions panel when the
+  user interacts, not left unwired; a `play` function with the Interactions addon that scripts a
+  realistic interaction (click, typing, opening an overlay) and checks the resulting state — not
+  a symbolic gesture ("click once") but a case that both documents and proves a real behaviour of
+  the component. The planner includes this in the acceptance criteria of every component ticket
+  (from ticket #6 onwards); the adversarial reviewer checks that it was not added "just because"
+  (controls that control nothing, an empty or trivial `play`).
+- Tests: `npm run check` = lint + types + build + unit tests. Before every commit: `npm run
+  check`. Before a ready PR: the full e2e suite as well.
+- Secrets: none expected in the core (no external API, no database). If a need for
+  licensing/keys arises for Pro, it is an architectural decision to bring to the maintainer
+  (through the coordinating session) before implementing it, not to be invented on the spot.
