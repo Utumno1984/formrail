@@ -36,7 +36,44 @@ interface ModalContextValue {
   open: boolean;
   /** Reported by the portal's content: true while the panel node exists, including its exit animation. */
   setPanelMounted: (mounted: boolean) => void;
+  /** Asks the root to close, as Radix's own dismissal does (`onOpenChange(false)`). Stable. */
+  requestClose: () => void;
 }
+
+/** What a panel lends the others: the whole Escape, as its own Radix layer handles it. */
+interface PanelLayer {
+  /** `dismissible`, `onEscapeKeyDown`, then the close (`requestClose`) unless the default was prevented. */
+  escape: (event: KeyboardEvent) => void;
+}
+
+/**
+ * The layers of the modal panels (content node -> panel), in the order Radix's `DismissableLayer` keeps
+ * its own. It is not an order of ours: it changes on the same event as Radix's. Each panel holds its
+ * layer node in state, set by the same ref callback chain as Radix's own `node` state (Radix composes
+ * the panel's ref with its setter), so the two change in the same render; and an effect of the same
+ * form as the one that registers the layer (`[node]`, added on setup, removed on cleanup) runs in the
+ * same commit, right after Radix's (the layer is a descendant of the panel, effects run children
+ * first). A node joins at the end when its layer registers and leaves when it unregisters, so whatever
+ * makes Radix move a layer to the top moves it here too: a new node (a remount, a parent's `key`);
+ * effects that disconnect and reconnect on the same node (`<Activity>` hidden and shown again,
+ * StrictMode's double run); a ref detached and attached again (a `<Suspense>` that suspends its shown
+ * content). A panel reopened during its exit keeps its node and its registration, so it keeps its
+ * place, as in Radix. Restricted to modal panels, it is a subsequence of Radix's order.
+ *
+ * What lags is Radix's keydown listener: it sits on the layer that was the highest at its last
+ * render, and the other layers re-render after a registration only through an update React schedules
+ * as a task, one or two frames later on an idle page and longer on a busy one. An Escape in that gap
+ * reached the panel underneath, which closed, and with it the nested panel on top (#714).
+ */
+const layerOrder = new Map<HTMLElement, PanelLayer>();
+
+/**
+ * Escapes already handed to the panel on top in place of Radix's pick. In the same gap, several
+ * layers can be listening at once (panels remounted together, e.g. by a parent's `key`: each new layer
+ * counts itself the highest until the layers re-render), so the same press reaches the lower ones and
+ * the top one's own listener too. The panel on top handles it once.
+ */
+const redirectedEscapes = new WeakSet<Event>();
 
 /** True when the focus sits inside a modal that is open (not one that is exiting). */
 function focusIsInOpenModal(): boolean {
@@ -133,10 +170,16 @@ export function ModalRoot({ open, defaultOpen = false, onOpenChange, keepFocusWh
     },
     [open, onOpenChange],
   );
+  // Through a ref, so the context value does not change with an inline `onOpenChange`.
+  const handleOpenChangeRef = useRef(handleOpenChange);
+  useLayoutEffect(() => {
+    handleOpenChangeRef.current = handleOpenChange;
+  });
+  const requestClose = useCallback(() => handleOpenChangeRef.current(false), []);
 
   const ctx = useMemo(
-    () => ({ fallbackHolder, triggerHolder, open: current, setPanelMounted }),
-    [current],
+    () => ({ fallbackHolder, triggerHolder, open: current, setPanelMounted, requestClose }),
+    [current, requestClose],
   );
   return (
     <ModalContext.Provider value={ctx}>
@@ -333,18 +376,51 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     },
     forwardedRef,
   ) {
-    const { fallbackHolder, open, setPanelMounted } = useModalContext(part, root);
+    const { fallbackHolder, open, setPanelMounted, requestClose } = useModalContext(part, root);
     useLayoutEffect(() => {
       fallbackHolder.current = returnFocusRef;
     });
+
+    // The panel's part of an Escape, before Radix's dismissal (which closes unless it was prevented).
+    const ownEscape = (event: KeyboardEvent) => {
+      if (!dismissible) event.preventDefault();
+      onEscapeKeyDown?.(event);
+    };
+    const ownEscapeRef = useRef(ownEscape);
+    useLayoutEffect(() => {
+      ownEscapeRef.current = ownEscape;
+    });
+    const contentNode = useRef<HTMLDivElement | null>(null);
+    // This panel's entry in `layerOrder`. Never replaced: a new entry would move the layer to the top.
+    const panelEscapeRef = useRef<(event: KeyboardEvent) => void>(() => {});
+    useLayoutEffect(() => {
+      panelEscapeRef.current = (event) => {
+        ownEscapeRef.current(event);
+        if (!event.defaultPrevented) requestClose();
+      };
+    });
+    const [layer] = useState<PanelLayer>(() => ({ escape: (event) => panelEscapeRef.current(event) }));
+    // The layer node as Radix's `DismissableLayer` holds it: state, set by the same ref callback chain
+    // as Radix's own `node` state (this panel's `setNode` is the ref Radix composes with its setter), so
+    // both change in the same render; and an effect of the same form as the one that registers the
+    // layer (`[node]`, added on setup, removed on cleanup), which runs in the same commit, right after
+    // Radix's (the layer is a descendant of this panel). See `layerOrder`.
+    const [layerNode, setLayerNode] = useState<HTMLDivElement | null>(null);
+    useEffect(() => {
+      if (!layerNode) return undefined;
+      layerOrder.set(layerNode, layer);
+      return () => {
+        layerOrder.delete(layerNode);
+      };
+    }, [layerNode, layer]);
     // See `useBeganBeforeOpening`: a late outside dismissal of the tap that reopened the panel.
     const beganBeforeOpening = useBeganBeforeOpening(open);
 
     const cleanupRef = useRef<(() => void) | null>(null);
-    const contentNode = useRef<HTMLDivElement | null>(null);
     const setNode = useCallback(
       (node: HTMLDivElement | null) => {
         contentNode.current = node;
+        setLayerNode(node);
         cleanupRef.current?.();
         cleanupRef.current = null;
         if (typeof forwardedRef === 'function') forwardedRef(node);
@@ -445,8 +521,21 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               onCloseAutoFocus?.(event);
             }}
             onEscapeKeyDown={(event) => {
-              if (!dismissible) event.preventDefault();
-              onEscapeKeyDown?.(event);
+              // Radix's listener is on the layer that was the highest at its last render. If Radix has
+              // since registered a layer above it (see `layerOrder`), the layers have not re-rendered
+              // yet: the Escape is that layer's, as it will be once Radix catches up (open or exiting,
+              // as at rest), and this panel's own dismissal is prevented. Otherwise Radix's choice stands.
+              // A press already handed over is done (prevented then): see `redirectedEscapes`.
+              if (redirectedEscapes.has(event)) return;
+              let top: [HTMLElement, PanelLayer] | undefined;
+              for (const registered of layerOrder) top = registered;
+              if (top && top[0] !== contentNode.current) {
+                redirectedEscapes.add(event);
+                top[1].escape(event);
+                event.preventDefault();
+                return;
+              }
+              ownEscape(event);
             }}
             onPointerDownOutside={(event) => {
               if (!dismissible || beganBeforeOpening(event)) event.preventDefault();

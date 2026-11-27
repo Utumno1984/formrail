@@ -318,6 +318,40 @@ test.describe('edge cases', () => {
     await expect(first).toHaveCount(0);
   });
 
+  for (const motion of ['reduce', 'no-preference'] as const) {
+    test(`nested, reduced motion ${motion}: an Escape right after the second opened closes only the second (#714)`, async ({
+      page,
+    }) => {
+      // Radix moves "the highest layer" off the first dialog in a re-render React schedules as a task, one
+      // or two frames after the second dialog is on screen (longer on a busy page). The Escape is
+      // dispatched in that gap on purpose: same task as the click, after the microtasks in which React
+      // renders the second dialog. Before the fix the first dialog took it and closed, the second with it.
+      await page.emulateMedia({ reducedMotion: motion });
+      await gotoStory(page, STORY('nested'));
+      const first = page.getByRole('dialog', { name: 'First dialog' });
+      const second = page.getByRole('dialog', { name: 'Second dialog' });
+      await expect(first).toBeVisible();
+      const openAtEscape = await page.evaluate(async () => {
+        const opener = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Open the second')!;
+        opener.click();
+        for (let i = 0; i < 20; i++) await Promise.resolve();
+        const open = [...document.querySelectorAll('[role="dialog"][data-state="open"]')].map((d) => d.querySelector('h2')?.textContent);
+        (document.activeElement ?? document.body).dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        );
+        return open;
+      });
+      // The second dialog was on screen when the key was pressed (else the test would prove nothing).
+      expect(openAtEscape).toEqual(['First dialog', 'Second dialog']);
+      await expect(second).toHaveCount(0);
+      await expect(first).toBeVisible();
+      await expect(first.getByRole('button', { name: 'Open the second' })).toBeFocused();
+      // And the first one still closes on the next Escape.
+      await page.keyboard.press('Escape');
+      await expect(first).toHaveCount(0);
+    });
+  }
+
   test('mounted open (no opener): modal semantics, Escape closes, nothing throws and no inert page is left', async ({
     page,
   }) => {
