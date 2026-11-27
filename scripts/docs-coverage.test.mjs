@@ -68,8 +68,16 @@ describe('docs coverage of the public API', () => {
     expect(brokenLinks(proPages, PRO_INTRO, 'Pro introduction')).toEqual([]);
   });
 
-  it('the Introduction has a Guides row and the Forms/Input page exists', () => {
-    expect(INTRO).toMatch(/\*\*Guides\*\*/);
+  // #723: no promise of guides "on their way". The Guides row lists the guides that exist (`Guides/...` pages) and is
+  // absent while there is none; the first one (#411, Getting started) brings the row back with its link.
+  it('the Introduction has a Guides row only when a guide exists, never "on their way", and the Forms/Input page exists', () => {
+    expect(INTRO).not.toMatch(/on their way/i);
+    const guides = corePages.filter((p) => p.title.startsWith('Guides/'));
+    if (guides.length === 0) expect(INTRO).not.toMatch(/\*\*Guides\*\*/);
+    else {
+      expect(INTRO).toMatch(/\*\*Guides\*\*/);
+      for (const guide of guides) expect(docsLinks(INTRO)).toContain(guide.id);
+    }
     expect(corePages.map((p) => p.id)).toContain('forms-input--docs');
   });
 
