@@ -73,7 +73,7 @@ describe('Pro distribution docs (#690)', () => {
   it('CLAUDE.md cites GitHub Packages with the date and the private flag condition', () => {
     expect(claude).toContain('GitHub Packages');
     expect(claude).toContain('2026-11-26');
-    expect(claude).toMatch(/"private": true` finché il pacchetto non è pubblicato su GitHub Packages/);
+    expect(claude).toMatch(/"private": true` (?:finché il pacchetto non è pubblicato su|until the package is published on) GitHub Packages/);
   });
 
   it('the formrail-dev org is no longer described as still to be created', () => {
