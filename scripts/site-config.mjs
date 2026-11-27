@@ -25,15 +25,15 @@ export const SITE_BASE = normalizeSiteBase(process.env.SITE_BASE ?? '/');
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
-// Final values (ticket #490): the waitlist form URL and the privacy contact below were supplied by Daniele.
+// Final values (ticket #490): the early access form URL and the privacy contact below were supplied by Daniele.
 // `scripts/check-site-config.mjs` (run by the `deploy-pages` job, and by `assemble-site.mjs --strict`)
 // still refuses to publish if any of them is ever replaced by a placeholder, an empty or a malformed value.
 
 /**
- * Target of the "Request early access" call-to-action (tickets #382, #490): the waitlist form, a Tally
- * form (EU servers) created by Daniele, opened from an external link (never embedded). It asks for the email,
- * three qualification questions (team size, form libraries in use, timing) and ends with an unchecked
- * consent checkbox.
+ * Target of the "Request early access" call-to-action (tickets #382, #490, #716): the early access request form, a Tally
+ * form (EU servers) created by Daniele, opened from an external link (never embedded). Field order: work email,
+ * company or team, number of developers who would need a license, use case, team size, form libraries in use
+ * (optional), timing, then an unchecked consent checkbox. No payment is taken through it.
  *
  * Must be an absolute `https://` URL. Setting it to '' makes the assembler leave every CTA out of the
  * pages (never a link to `#` or a broken one); the strict guard rejects '' too.
@@ -51,7 +51,7 @@ export const EXPECTED_PRICE_TEXT = 'Expected price: from \u20AC199 per developer
 
 /**
  * Target of the "Apply as a design partner" link on /teams/ (ticket #697): the design partner application
- * form, a Tally form (EU servers) created by Daniele, SEPARATE from the waitlist form and opened from an
+ * form, a Tally form (EU servers) created by Daniele, SEPARATE from the early access request form and opened from an
  * external link (never embedded). Its fields are listed one by one in site-root/privacy.html.
  *
  * Must be an absolute `https://` URL different from EARLY_ACCESS_URL. Setting it to '' switches the whole
@@ -61,7 +61,7 @@ export const DESIGN_PARTNER_URL = 'https://tally.so/r/xVYjMo';
 
 /**
  * Number of design partner seats (decision of 2026-11-26). 0 = seats exhausted: the section says so and
- * links to the waitlist instead of the form.
+ * links to the early access form instead of the form.
  */
 export const DESIGN_PARTNER_SEATS = 3;
 
