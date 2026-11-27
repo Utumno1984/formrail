@@ -71,19 +71,46 @@ export interface SheetContentProps extends ModalContentBaseProps {
   dismissible?: boolean;
   /** Receives the focus on close when the opener is gone or disabled (or there never was one). */
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * The sheet's own close button, for the panels that render no `SheetClose`. A touch screen has no Escape key, and
+   * below 30rem (`md`) the panel takes the whole width, so no backdrop is left to tap: without a close button a
+   * finger could not leave. While `true` and no `SheetClose` is mounted in the panel (the default button, or one
+   * with `asChild` / `children`, such as a Cancel in the footer), the sheet draws a close button at the top end
+   * corner, after the content in the Tab order, named like `SheetClose` (see `labels`). A `SheetClose` takes its
+   * place as soon as it mounts, also later (content loaded asynchronously): never two buttons. Not drawn with
+   * `dismissible={false}` (the way out is an action of the panel, by contract) nor with `asChild` (the panel is your
+   * element). `false`: never drawn; in development a sheet that was open with no `SheetClose` at all, dismissible,
+   * logs a `console.warn` once, when it closes.
+   * @default true
+   */
+  closeButton?: boolean;
+  /** Texts for localization; every key falls back to the English default. */
+  labels?: Partial<SheetLabels>;
   /** Header, body and footer of the panel. */
   children?: ReactNode;
   /** Renders your single child element as the panel instead of the default `<div>`, with the panel's props and behavior merged onto it. */
   asChild?: boolean;
 }
 
+export interface SheetLabels {
+  /** Accessible name of the sheet's own close button (`closeButton`). Default `Close: <title>`, from the `SheetTitle`. */
+  close: string;
+}
+
 /**
- * The sheet panel with its backdrop, rendered in a portal. `side`, `size`, `dismissible` and
- * `returnFocusRef` are consumed here and never reach the DOM. Without an accessible name (no
+ * The sheet panel with its backdrop, rendered in a portal. `side`, `size`, `dismissible`, `returnFocusRef`,
+ * `closeButton` and `labels` are consumed here and never reach the DOM. Without an accessible name (no
  * `SheetTitle`, no `aria-label`) a development `console.error` is logged.
+ *
+ * Always a way out by touch: the default close buttons of the sheet (`SheetClose`, and the one of `closeButton`) are
+ * 44 x 44 px under a coarse pointer (24 x 24 px with a mouse), and a sheet without a `SheetClose` draws its own close
+ * button (see `closeButton`).
  */
 export const SheetContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDialog.Content>, SheetContentProps>(
-  function SheetContent({ side = 'right', size = 'md', dismissible = true, returnFocusRef, className, ...rest }, ref) {
+  function SheetContent(
+    { side = 'right', size = 'md', dismissible = true, returnFocusRef, closeButton = true, labels, className, ...rest },
+    ref,
+  ) {
     return (
       <ModalPanel
         {...rest}
@@ -91,6 +118,8 @@ export const SheetContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDi
         names={NAMES}
         dismissible={dismissible}
         returnFocusRef={returnFocusRef}
+        closeButton={closeButton}
+        closeLabel={labels?.close}
         panelClassName={cn(BASE, SIDE_CLASS[side], SIZE_CLASS[size], overlayLayer.modal, className)}
       />
     );
@@ -116,5 +145,9 @@ export const SheetFooter = ModalFooter;
 
 export type SheetCloseProps = ModalCloseProps;
 
-/** Closes the sheet; same default button as `DialogClose`, named "Close: `<title>`". */
+/**
+ * Closes the sheet; same default button as `DialogClose`, named "Close: `<title>`", 44 x 44 px under a coarse
+ * pointer. While one is mounted in the panel (also with `asChild` / `children`), the sheet does not draw its own
+ * (`closeButton` of `SheetContent`).
+ */
 export const SheetClose = ModalClose;

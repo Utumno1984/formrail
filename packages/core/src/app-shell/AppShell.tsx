@@ -289,16 +289,35 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
     setNavSide(startSide(trigger));
     setNavOpen(true);
   }, []);
+  // How many triggers are mounted, for the development check below only (never read in production).
+  const [triggerCount, setTriggerCount] = useState(0);
   // Every mounted trigger, so that the focus has one to go back to when the one the Sheet opened from unmounts.
   const registerTrigger = useCallback((trigger: HTMLButtonElement) => {
     const list = triggers.current;
     list.push(trigger);
     triggerRef.current ??= trigger;
+    if (process.env.NODE_ENV !== 'production') setTriggerCount((count) => count + 1);
     return () => {
       list.splice(list.indexOf(trigger), 1);
       if (triggerRef.current === trigger) triggerRef.current = list[0] ?? null;
+      if (process.env.NODE_ENV !== 'production') setTriggerCount((count) => count - 1);
     };
   }, []);
+  // #721: below the breakpoint the column is not displayed, and only the trigger opens the navigation: a shell with
+  // an `AppShellNav` and no `AppShellNavTrigger` leaves it out of reach there. Reported once per shell in
+  // development, one frame after the mount (a trigger mounted in the meantime, by an effect, counts), not at all in
+  // production.
+  const warnedNoTrigger = useRef(false);
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || warnedNoTrigger.current || navCount === 0 || triggerCount > 0) return undefined;
+    const frame = requestAnimationFrame(() => {
+      warnedNoTrigger.current = true;
+      console.warn(
+        '[formrail] <AppShell> has an <AppShellNav> and no <AppShellNavTrigger>: below 64rem the navigation column is not displayed and nothing else opens it, so the navigation cannot be reached. Render an <AppShellNavTrigger> at the start of the AppShellHeader (it is not displayed from 64rem up).',
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [navCount, triggerCount]);
   // The Sheet is rendered by `AppShellNav`: a nav that leaves takes the Sheet with it, so it closes it too (else the
   // trigger would announce an open Sheet that is not there, and a nav mounted later would open it by itself).
   const registerNav = useCallback(() => {
@@ -497,6 +516,10 @@ export interface AppShellNavTriggerProps extends Omit<ButtonHTMLAttributes<HTMLB
  *
  * Declared limits: in a shell without an `AppShellNav` it opens nothing. When no trigger is mounted as the Sheet
  * closes, or the one the focus goes back to is disabled, the focus is not given back, and nothing else is focused.
+ *
+ * A shell with an `AppShellNav` and no trigger leaves the navigation out of reach below the breakpoint: in
+ * development it logs a `console.warn` once, one frame after the mount (render the trigger with the header, even
+ * when the rest of the header is loaded later).
  */
 export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppShellNavTriggerProps>(function AppShellNavTrigger(
   { onClick, className, 'aria-label': ariaLabel, ...rest },
@@ -585,7 +608,9 @@ function textOfIds(ids: string | undefined): string {
  * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.
  *
- * The Sheet's code comes with `AppShellNavTrigger`: a shell without one (an app for wide screens only) does not ship it.
+ * The Sheet's code comes with `AppShellNavTrigger`: a shell without one (an app for wide screens only) does not ship it,
+ * and in development it logs a `console.warn` (see `AppShellNavTrigger`): below the breakpoint its navigation could
+ * not be reached.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
   { className, style, children, onBlur, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },

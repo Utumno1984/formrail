@@ -83,6 +83,35 @@ function focusIsInOpenModal(): boolean {
 
 const ModalContext =/* @__PURE__ */ createContext<ModalContextValue | null>(null);
 
+/**
+ * What a panel tells the parts rendered inside it (#721). Given by `ModalPanel` around its children, so a part of a
+ * nested panel (a Dialog opened from a Sheet) talks to its own panel, never to the one underneath.
+ */
+interface PanelPartsValue {
+  /** Called by every `ModalClose` while it is mounted in the panel; returns the function that unregisters it. */
+  registerClose: () => () => void;
+  /** Called by every `ModalHeader` while it is mounted in the panel; returns the function that unregisters it. */
+  registerHeader: () => () => void;
+  /** Whether the panel draws its own close button over the end of the header (the header keeps room for it). */
+  defaultCloseShown: boolean;
+  /** Whether the default close buttons of the panel are 44 x 44 px under a coarse pointer (Sheet). */
+  touchTargets: boolean;
+}
+
+const PanelPartsContext = /* @__PURE__ */ createContext<PanelPartsValue | null>(null);
+
+// Under a coarse pointer (a phone, a tablet) the default close button of a Sheet is 44 x 44 px, the touch target of
+// WCAG 2.5.5 and of the platforms' guidelines; with a precise pointer it keeps the `icon-xs` size (24 x 24).
+const TOUCH_CLOSE = 'pointer-coarse:size-11';
+// The panel's own close button sits where a `SheetClose` at the end of the header would: at the top end corner.
+// After the children in the DOM, so it is the last Tab stop and never takes the opening focus from a field.
+const DEFAULT_CLOSE_PLACE = 'absolute top-4 end-6 pointer-coarse:top-2 pointer-coarse:end-2';
+// Room the header keeps at its end for that button (24 px from the edge + 24 px + a 12 px gap; 8 + 44 + 12 under a
+// coarse pointer: 64 px in both cases).
+const DEFAULT_CLOSE_HEADER_ROOM = 'pe-16';
+// With no header, the panel keeps that room above its first part instead.
+const DEFAULT_CLOSE_TOP_ROOM = 'pt-8 pointer-coarse:pt-10';
+
 function useModalContext(part: string, root: string): ModalContextValue {
   const ctx = useContext(ModalContext);
   if (!ctx) throw new Error(`${process.env.NODE_ENV !== 'production' ? '[formrail] ' : ''}<${part}> must be rendered inside <${root}>.`);
@@ -352,6 +381,15 @@ export interface ModalPanelProps extends ModalContentBaseProps {
   panelClassName: string;
   dismissible: boolean;
   returnFocusRef: RefObject<HTMLElement | null> | undefined;
+  /**
+   * The touch exit of #721 (Sheet only; `undefined` for a Dialog, which keeps none of it). `true`: while the panel
+   * has no `ModalClose` of its own, it draws one (named `closeLabel`, else "Close: `<title>`"). `false`: it never
+   * does. In both cases its default close buttons are 44 x 44 px under a coarse pointer, and in development a
+   * dismissible panel that was open with no close button at all is reported once, when it closes.
+   */
+  closeButton?: boolean;
+  /** Accessible name of the panel's own close button; else "Close: `<title>`" (see `ModalClose`). */
+  closeLabel?: string;
   children?: ReactNode;
 }
 
@@ -367,6 +405,8 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
       panelClassName,
       dismissible,
       returnFocusRef,
+      closeButton,
+      closeLabel,
       onCloseAutoFocus,
       onEscapeKeyDown,
       onPointerDownOutside,
@@ -380,6 +420,60 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
     useLayoutEffect(() => {
       fallbackHolder.current = returnFocusRef;
     });
+
+    // #721: the touch exit. A touch screen has no Escape key, and a panel as wide as the screen leaves no backdrop
+    // to tap, so a close button is the only way out a finger has. The panel counts the `ModalClose`s and headers
+    // rendered in it (in state, for what it draws; the closes in a ref too, for the check below, which must see
+    // the count of the commit it runs in, not of the last render).
+    const touchExit = closeButton !== undefined;
+    const [closeCount, setCloseCount] = useState(0);
+    const [headerCount, setHeaderCount] = useState(0);
+    const mountedCloses = useRef(0);
+    // Whether a `ModalClose` was mounted in the panel at some point since it opened: one that arrives later (the
+    // content is loaded asynchronously) counts as much as one rendered at once.
+    const closeSeen = useRef(false);
+    const registerClose = useCallback(() => {
+      mountedCloses.current += 1;
+      closeSeen.current = true;
+      setCloseCount((count) => count + 1);
+      return () => {
+        mountedCloses.current -= 1;
+        setCloseCount((count) => count - 1);
+      };
+    }, []);
+    const registerHeader = useCallback(() => {
+      setHeaderCount((count) => count + 1);
+      return () => setHeaderCount((count) => count - 1);
+    }, []);
+    // With `asChild` the panel is the consumer's element: nothing can be added to its children.
+    const canDrawClose = closeButton === true && dismissible && !rest.asChild;
+    // Set by the slot after the children once their own registrations have run (see `DefaultCloseSlot`), so a
+    // `ModalClose` rendered at once never shows the panel's button for a frame next to it.
+    const [slotReady, setSlotReady] = useState(false);
+    const defaultCloseShown = canDrawClose && slotReady && closeCount === 0;
+    const parts = useMemo<PanelPartsValue>(
+      () => ({ registerClose, registerHeader, defaultCloseShown, touchTargets: touchExit }),
+      [registerClose, registerHeader, defaultCloseShown, touchExit],
+    );
+    // In development: a dismissible panel that was open with no close button at all (`closeButton={false}`, or
+    // `asChild`, and no `ModalClose` mounted) is reported once per instance, when it closes. Not at the mount: a
+    // close button that comes with content loaded later would make any earlier moment a false report. Not with
+    // `dismissible={false}`: there the way out is an action of the panel, by contract.
+    const wasOpenForExit = useRef(open);
+    const warnedNoExit = useRef(false);
+    useLayoutEffect(() => {
+      const wasOpen = wasOpenForExit.current;
+      wasOpenForExit.current = open;
+      if (open || !wasOpen) return;
+      const seen = closeSeen.current;
+      // A close still mounted (the exit animation, or a reopening during it) belongs to the next opening too.
+      closeSeen.current = mountedCloses.current > 0;
+      if (process.env.NODE_ENV === 'production' || !touchExit || !dismissible || canDrawClose || seen || warnedNoExit.current) return;
+      warnedNoExit.current = true;
+      console.warn(
+        `[formrail] <${part}> was open with no close button: on a touch screen (no Escape key) only the backdrop could close it, and a panel as wide as the screen leaves none. Render a <${root}Close> (or wrap your own button in <${root}Close asChild>), keep closeButton on, or pass dismissible={false} if only an action of the panel may close it.`,
+      );
+    }, [open, touchExit, dismissible, canDrawClose, part, root]);
 
     // The panel's part of an Escape, before Radix's dismissal (which closes unless it was prevented).
     const ownEscape = (event: KeyboardEvent) => {
@@ -510,11 +604,12 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
         >
           <MountedReporter report={setPanelMounted} />
           <RadixDialog.Overlay className={cn(MODAL_BACKDROP, overlayLayer.backdrop)} />
+          <PanelPartsContext.Provider value={parts}>
           <RadixDialog.Content
             aria-modal="true"
             {...rest}
             ref={setNode}
-            className={panelClassName}
+            className={cn(defaultCloseShown && headerCount === 0 && DEFAULT_CLOSE_TOP_ROOM, panelClassName)}
             // The return of the focus is `useReturnFocus`'s (opener-agnostic), not Radix's.
             onCloseAutoFocus={(event) => {
               event.preventDefault();
@@ -546,24 +641,60 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
               onInteractOutside?.(event);
             }}
           >
-            {children}
+            {rest.asChild ? (
+              children
+            ) : (
+              <>
+                {children}
+                {canDrawClose ? <DefaultCloseSlot show={defaultCloseShown} label={closeLabel} report={setSlotReady} /> : null}
+              </>
+            )}
           </RadixDialog.Content>
+          </PanelPartsContext.Provider>
         </div>
       </RadixDialog.Portal>
     );
   },
 );
 
-/** Top row: title (and description) plus, typically, a close button. Never scrolls away. */
+/**
+ * The panel's own close button (#721), after the children. Its layout effect runs after theirs (siblings in order),
+ * so by then every `ModalClose` rendered with the content has registered: it reports itself ready, and the panel
+ * draws the button only if none did, in the same commit, before anything is painted.
+ */
+function DefaultCloseSlot({ show, label, report }: { show: boolean; label: string | undefined; report: (ready: boolean) => void }) {
+  useLayoutEffect(() => {
+    report(true);
+    return () => report(false);
+  }, [report]);
+  if (!show) return null;
+  return label ? (
+    <DefaultClose aria-label={label} className={DEFAULT_CLOSE_PLACE} forwardedRef={null} data-rop-default-close="" />
+  ) : (
+    <DefaultClose className={DEFAULT_CLOSE_PLACE} forwardedRef={null} data-rop-default-close="" />
+  );
+}
+
+/**
+ * Top row: title (and description) plus, typically, a close button. Never scrolls away. While the panel draws its
+ * own close button (#721, a Sheet with no `SheetClose`) it keeps room at its end for it.
+ */
 export const ModalHeader = /* @__PURE__ */ forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function ModalHeader(
   { className, ...rest },
   ref,
 ) {
+  const parts = useContext(PanelPartsContext);
+  const register = parts?.registerHeader;
+  useLayoutEffect(() => register?.(), [register]);
   return (
     <div
       {...rest}
       ref={ref}
-      className={cn('flex shrink-0 items-start justify-between gap-3 border-b border-rop-border px-6 py-4', className)}
+      className={cn(
+        'flex shrink-0 items-start justify-between gap-3 border-b border-rop-border px-6 py-4',
+        parts?.defaultCloseShown && DEFAULT_CLOSE_HEADER_ROOM,
+        className,
+      )}
     />
   );
 });
@@ -676,10 +807,14 @@ export interface ModalCloseProps extends ComponentPropsWithoutRef<typeof RadixDi
 /**
  * Closes the panel. With no children and no `asChild` it renders the default close button: a ghost
  * `icon-xs` `Button` with the close icon, named "Close: `<title>`" (from the panel's title) unless
- * you pass `aria-label` / `aria-labelledby`. With `children` / `asChild` it is Radix's plain Close.
+ * you pass `aria-label` / `aria-labelledby` (in a Sheet, 44 x 44 px under a coarse pointer). With `children` /
+ * `asChild` it is Radix's plain Close.
  */
 export const ModalClose = /* @__PURE__ */ forwardRef<HTMLButtonElement, ModalCloseProps>(function ModalClose(props, ref) {
   const { asChild, children, ...rest } = props;
+  // Every close of the panel, the default button and `asChild` / `children` alike, is a way out (#721).
+  const register = useContext(PanelPartsContext)?.registerClose;
+  useLayoutEffect(() => register?.(), [register]);
   if (asChild || children !== undefined) {
     return (
       <RadixDialog.Close {...rest} asChild={asChild} ref={ref}>
@@ -696,6 +831,7 @@ function DefaultClose({
   ...rest
 }: Omit<ModalCloseProps, 'asChild' | 'children'> & { forwardedRef: ForwardedRef<HTMLButtonElement> }) {
   const node = useRef<HTMLButtonElement | null>(null);
+  const touchTargets = !!useContext(PanelPartsContext)?.touchTargets;
   const [titleId, setTitleId] = useState<string | null>(null);
   const ownName = !!rest['aria-label']?.trim() || !!rest['aria-labelledby']?.trim();
   // The title's id belongs to Radix's context (not exposed) and is put on the panel node only
@@ -726,7 +862,7 @@ function DefaultClose({
       : { 'aria-label': 'Close' };
   return (
     <RadixDialog.Close asChild>
-      <Button {...({ ...naming, ...rest } as { 'aria-label': string })} id={closeId} ref={setRef} variant="ghost" size="icon-xs" className={className}>
+      <Button {...({ ...naming, ...rest } as { 'aria-label': string })} id={closeId} ref={setRef} variant="ghost" size="icon-xs" className={cn(touchTargets && TOUCH_CLOSE, className)}>
         {internalIcons.close}
       </Button>
     </RadixDialog.Close>
