@@ -77,3 +77,27 @@ export const LICENSOR = {
   country: 'Italy',
   email: 'formrail.dev@gmail.com',
 };
+
+/**
+ * Days after the purchase within which anyone, companies included, can ask for a refund without giving a
+ * reason (ticket #692, decision of 2026-11-26). Written into /refund/. The license text (/license/ and
+ * packages/pro/LICENSE, one static text) says the same number: a test fails if the two ever differ.
+ */
+export const REFUND_DAYS = 14;
+
+/**
+ * Years for which the records of the sale are kept, counted from the end of the year in which the sale takes place
+ * (ticket #692). It is a period chosen by Daniele to defend himself in case of tax or accounting checks or of
+ * disputes about the sale (legitimate interest, art. 6(1)(f) GDPR), not a period stated as required by law.
+ * Printed in the "Purchases" section of /privacy/. It governs the records of the sale (the identifier of the
+ * transaction, the date, the amount, the country and the email address) and also the emails about a purchase (a
+ * refund, the replacement of a developer, a problem with the license). It does not govern the other purchase data
+ * (name, company name, address, tax or VAT number), deleted at the end of the last 12 months of updates of the
+ * license, nor the GitHub user names, deleted when the registry access ends.
+ *
+ * Decision D8 of Daniele (2026-11-26), with its reference point decided on 2026-11-27: 7 years from the end of the
+ * year of the sale, no longer tied to the license (a perpetual license would make the period endless). It must stay a
+ * whole number from 1 to 99: `scripts/check-site-config.mjs --strict` (the deploy) refuses an empty, non numeric or
+ * placeholder value, and names this constant.
+ */
+export const PURCHASE_RETENTION_YEARS = '7';

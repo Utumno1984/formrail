@@ -11,6 +11,7 @@ import {
   EARLY_ACCESS_URL,
   EXPECTED_PRICE_TEXT,
   PRIVACY_EMAIL,
+  PURCHASE_RETENTION_YEARS,
 } from './site-config.mjs';
 
 // Pro page for teams, privacy page and the placeholder guard (ticket #490).
@@ -251,7 +252,7 @@ describe('design partner section (#697)', () => {
     const { privacy } = build();
     expect(privacy).toContain('<h2 id="design-partners-title">Design partner applications</h2>');
     const section = flat(
-      privacy.slice(privacy.indexOf('id="design-partners-title"'), privacy.indexOf('id="rights-title"')),
+      privacy.slice(privacy.indexOf('id="design-partners-title"'), privacy.indexOf('id="purchases-title"')),
     );
     const fields = privacy.slice(privacy.indexOf('id="dp-data-title"'), privacy.indexOf('id="dp-purpose-title"'));
     const items = [...fields.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => flat(m[1]).replace(/&ndash;/g, '-'));
@@ -297,7 +298,8 @@ describe('design partner section (#697)', () => {
   it('the privacy section adds no external link: the form is not linked from the notice', () => {
     const { privacy } = build();
     expect(privacy).not.toContain(FORM);
-    const section = privacy.slice(privacy.indexOf('id="design-partners-title"'), privacy.indexOf('id="rights-title"'));
+    // Up to the Purchases section (#692), which is a different notice and does link Paddle and GitHub.
+    const section = privacy.slice(privacy.indexOf('id="design-partners-title"'), privacy.indexOf('id="purchases-title"'));
     expect(section).not.toMatch(/https?:\/\//);
   });
 });
@@ -355,6 +357,7 @@ describe('placeholder guard', () => {
       earlyAccessUrl: EARLY_ACCESS_URL,
       privacyEmail: PRIVACY_EMAIL,
       designPartnerUrl: DESIGN_PARTNER_URL,
+      purchaseRetentionYears: PURCHASE_RETENTION_YEARS,
     };
     expect(findConfigProblems(config)).toEqual([]);
     expect(() => assertConfigPublishable(config)).not.toThrow();

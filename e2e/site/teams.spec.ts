@@ -33,6 +33,9 @@ const OFFICIAL_POLICIES = [
   'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
   'https://tally.so/help/gdpr',
   'https://tally.so/help/privacy-policy',
+  // Purchases section (#692): Paddle is an autonomous controller as Merchant of Record, so the notice
+  // must point to its privacy notice (art. 13). Exact URL, privacy page only; refund.spec.ts pins the link.
+  'https://www.paddle.com/legal/privacy',
 ];
 const THIRD_PARTY = [
   'sap',
@@ -359,7 +362,8 @@ test.describe('design partners (#697)', () => {
       'May we mention your company publicly as a design partner? (Yes or No);',
       'Consent, a box you check yourself that refers to this notice.',
     ]);
-    await expect(page.getByRole('heading', { level: 3 })).toHaveText(['Data we collect', 'Purpose and legal basis', 'Where the data goes and retention']);
+    // Only the h3 of this section (ids dp-*): the Purchases section (#692) has its own h3.
+    await expect(page.locator('h3[id^="dp-"]')).toHaveText(['Data we collect', 'Purpose and legal basis', 'Where the data goes and retention']);
     const main = page.locator('main');
     await expect(main).toContainText('all required');
     await expect(main).toContainText('art. 6(1)(a) GDPR');
@@ -413,6 +417,9 @@ test.describe('privacy page', () => {
       'Transfers outside the EEA',
       'Retention',
       ...(designPartnerUrl ? ['Design partner applications'] : []),
+      'Purchases',
+      // a general section on the emails, for everyone (decision of Daniele of 2026-11-27, PR #713)
+      'Emails you send us',
       'Your rights',
       'No cookies, no analytics',
     ]);
@@ -553,8 +560,10 @@ test.describe('network and weight', () => {
   test('the only absolute URLs are GitHub and, when set, the form (the email is a mailto)', () => {
     for (const file of ['teams/index.html', 'privacy/index.html']) {
       let html = readFileSync(`${SITE_DIR}${file}`, 'utf8').replace(earlyAccessUrl || '\0', '').replace(designPartnerUrl || '\0', '');
-      // Only the privacy page may carry the two official policy links (art. 13(1)(f)).
-      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replace(url, '');
+      // Only the privacy page may carry the official policy links (art. 13(1)(f)), removed one by one as a whole
+      // attribute, href="<url>": a link that only starts with an allowed URL (a longer path, a query) is not
+      // removed, so it still fails the check below (critic of PR #713, note 6).
+      if (file.startsWith('privacy')) for (const url of OFFICIAL_POLICIES) html = html.replaceAll(`href="${url}"`, '');
       expect(html, file).not.toMatch(/https?:\/\/(?!github\.com\/Utumno1984\/formrail)/);
     }
   });

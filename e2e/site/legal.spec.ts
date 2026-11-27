@@ -62,7 +62,8 @@ test.describe('license terms page', () => {
       'you can replace them with another person',
       'to evaluate it and to develop and test applications',
       'A license is required for production use.',
-      'within 14 days of the purchase, without giving a reason',
+      // the exception for fraud or abuse: decision of Daniele of 2026-11-27 (PR #713), worded as on /refund/
+      'You can ask for a refund within 14 days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.',
       'We aim to reply within 2 business days',
       'on a best-effort basis',
       'No release date, roadmap item or feature is promised.',

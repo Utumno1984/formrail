@@ -946,7 +946,7 @@ privata, superata; nessun licensing a runtime).
 5. **Dopo i 12 mesi**: le versioni ricevute nei 12 mesi restano utilizzabili; lo sviluppatore che
    lascia il team si può sostituire.
 6. **Prova e valutazione**: uso libero in sviluppo e valutazione; licenza obbligatoria in produzione.
-7. **Rimborso** entro 14 giorni senza motivazione, per tutti.
+7. **Rimborso** entro 14 giorni senza motivazione, per tutti, salvo frode o abuso (decisione di Daniele del 27/11/2026).
 8. **Supporto**: via email, best-effort, risposta entro 2 giorni lavorativi, nessuna data pubblica.
 9. **Checkout**: overlay Paddle, con Paddle.js caricato solo su azione dell'utente e solo nella
    pagina di acquisto.
@@ -954,6 +954,38 @@ privata, superata; nessun licensing a runtime).
 11. **Design partner**: sconto del 50%, candidatura con un modulo Tally separato.
 12. **Articoli tecnici** su `/articles/`.
 13. **Ordine**: prima design partner e articoli; il checkout solo dopo l'approvazione del dominio.
+
+### Decisioni del 27/11/2026 (Daniele): rimborso e conservazione dei dati
+
+Sono decisioni di Daniele, prese il 27/11/2026 (ticket #692). Il testo dell'informativa li ha confermato
+Daniele per iscritto il 27/11/2026, dopo l'approvazione del critico al giro 4, con tre ritocchi: nei dati
+di acquisto niente "rinnovi compresi" (si parla di riacquisto, come la licenza), la sezione "Emails you
+send us" dichiara finalità, base giuridica (art. 6(1)(c) per le richieste privacy, 6(1)(f) per le altre) e
+fornitore (Gmail, Google), e il diritto di opposizione parla di "this keeping".
+
+1. **Rimborso**: entro 14 giorni senza motivazione, per tutti, salvo frode o abuso (modifica del punto 7 sopra).
+2. **Dati d'acquisto, minimizzazione**: per 7 anni dalla fine dell'anno della vendita si conservano
+   solo i dati della vendita: identificativo della transazione, data, importo, paese ed email.
+   Indirizzo, partita IVA, nome dell'azienda e gli altri dati ricevuti da Paddle si cancellano alla
+   fine dei 12 mesi di aggiornamenti della licenza o, se si riacquista, dell'ultima licenza acquistata, o prima se la
+   licenza finisce (rimborso, storno del pagamento, violazione grave).
+3. **Nomi utente GitHub**: si cancellano alla fine dell'accesso al registry (fine dei 12 mesi di
+   aggiornamenti senza riacquisto, rimborso o storno del pagamento, violazione grave, sostituzione
+   dello sviluppatore per il nome sostituito).
+4. **Email**: quelle ricevute su formrail.dev@gmail.com che riguardano un acquisto (rimborso,
+   sostituzione di uno sviluppatore, problemi con la licenza) si conservano come i dati della vendita
+   (7 anni dalla fine dell'anno della vendita). Le altre, comprese le richieste privacy e anche di chi
+   non ha acquistato, si cancellano 2 anni dopo l'ultima risposta, o 2 anni dopo la ricezione se non
+   c'è risposta. Le copie delle candidature design partner seguono il periodo della loro sezione (24
+   mesi dalla candidatura). Nell'informativa la regola sta in una sezione generale, "Emails you send
+   us", valida per tutti.
+5. **Base giuridica**: la consegna e la gestione della licenza si basano sul contratto, art. 6(1)(b)
+   GDPR. La conservazione dei dati della vendita si basa sul legittimo interesse a difendersi in caso
+   di controlli o contestazioni, art. 6(1)(f) GDPR, senza affermare un obbligo di legge. Ne segue il
+   diritto di opposizione (art. 21 GDPR), scritto in "Your rights" in una frase separata con la
+   formula dell'art. 21(1): ci si ferma, salvo che i dati servano per accertare, esercitare o
+   difendere un diritto in giudizio o ci siano motivi legittimi cogenti che prevalgono sugli
+   interessi dell'interessato.
 
 **Dati demo di stories ed esempi** (epic #512, ticket #515): regola sul dominio e guard a cricchetto sui dati legacy in `CONTRIBUTING.md`, sezione "Demo data".
 
