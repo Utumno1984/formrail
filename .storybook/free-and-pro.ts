@@ -1,5 +1,5 @@
-// The data of the "Free and Pro" section of the Introduction (ticket #723). Pure: no JSON import, no Storybook
-// runtime, so the Vitest guard (scripts/free-and-pro.test.mjs) and the e2e
+// The data of the "Free and Pro" and "Size and SSR" sections of the Introduction (ticket #723). Pure: no JSON
+// import, no Storybook runtime, so the Vitest guard (scripts/free-and-pro.test.mjs) and the e2e
 // (e2e/introduction.spec.ts) read the same rules the page renders with (.storybook/free-and-pro-blocks.tsx).
 //
 // What keeps it honest:
@@ -7,7 +7,9 @@
 //   entry of `@formrail/pro` (`.`, `./engine`, `./react-hook-form`, `./tanstack-form`) in exactly one Pro item,
 //   and an item names only exports that exist: a new export left out of the table, or a Pro item with nothing
 //   built behind it (#491), fails the guard;
-// - every item links to a Docs page that exists, of its own package.
+// - every item links to a Docs page that exists, of its own package;
+// - the sizes are computed from the versioned baselines of the bundle budget (spec §1.11), never written here;
+// - the list of the server-rendering tests is compared with the `*.ssr.test.tsx` files on disk.
 import { toId } from 'storybook/internal/csf';
 
 /** One entry of a cell of the table: a link to a Docs page and the runtime exports that page documents. */
@@ -198,3 +200,103 @@ export function catalogProblems(rows: readonly CatalogRow[], side: 'free' | 'pro
   return problems;
 }
 
+// ---------------------------------------------------------------------------------------------------------
+// Size: the baselines of the bundle budget (scripts/bundle-budget.mjs), as committed.
+// ---------------------------------------------------------------------------------------------------------
+
+/** The shape of a `bundle-budget*.json` file. */
+export interface BudgetFile {
+  exports: Record<string, { baseline: number; limit: number }>;
+}
+
+/** One budgeted entry: the specifier a consumer imports and its baseline file. */
+export interface BudgetEntry {
+  specifier: string;
+  budget: BudgetFile;
+}
+
+/** The budgeted entries, in the order the section lists them, with the file each one is read from. */
+export const BUDGET_FILES: readonly { specifier: string; file: string }[] = [
+  { specifier: '@formrail/core', file: 'packages/core/bundle-budget.json' },
+  { specifier: '@formrail/pro', file: 'packages/pro/bundle-budget.json' },
+  { specifier: '@formrail/pro/engine', file: 'packages/pro/bundle-budget.engine.json' },
+  { specifier: '@formrail/pro/react-hook-form', file: 'packages/pro/bundle-budget.react-hook-form.json' },
+  { specifier: '@formrail/pro/tanstack-form', file: 'packages/pro/bundle-budget.tanstack-form.json' },
+];
+
+/** Bytes as the page prints them: `164 B` under 1,000, otherwise kilobytes (1 kB = 1,000 B) with one decimal. */
+export function formatBytes(bytes: number): string {
+  return bytes < 1000 ? `${bytes} B` : `${(bytes / 1000).toFixed(1)} kB`;
+}
+
+export interface SizeRow {
+  name: string;
+  bytes: number;
+}
+
+export interface EntrySummary {
+  specifier: string;
+  count: number;
+  smallest: SizeRow;
+  largest: SizeRow;
+  /** Every budgeted import of the entry, by name. */
+  rows: SizeRow[];
+}
+
+/** The summary of each entry, read from its baseline: the import count, the smallest and the largest import. */
+export function sizeSummary(entries: readonly BudgetEntry[]): EntrySummary[] {
+  return entries.map(({ specifier, budget }) => {
+    const rows = Object.entries(budget.exports)
+      .map(([name, { baseline }]) => ({ name, bytes: baseline }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    if (rows.length === 0) throw new Error(`${specifier}: the baseline lists no import`);
+    const bySize = [...rows].sort((a, b) => a.bytes - b.bytes || a.name.localeCompare(b.name, 'en'));
+    return { specifier, count: rows.length, smallest: bySize[0]!, largest: bySize[bySize.length - 1]!, rows };
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Server rendering: the modules a `*.ssr.test.tsx` renders with `renderToString` (most in Node, without a DOM).
+// ---------------------------------------------------------------------------------------------------------
+
+export interface SsrModule {
+  /** An export of the package, as the page prints it. */
+  name: string;
+  package: 'core' | 'pro';
+  /** The test files, relative to the repository root. */
+  files: readonly string[];
+}
+
+const core = (name: string, ...files: string[]): SsrModule => ({ name, package: 'core', files: files.map((f) => `packages/core/src/${f}`) });
+const pro = (name: string, ...files: string[]): SsrModule => ({ name, package: 'pro', files: files.map((f) => `packages/pro/src/${f}`) });
+
+/** Every `*.ssr.test.tsx` of the packages, by the module it renders on the server. Checked against the disk. */
+export const SSR_MODULES: readonly SsrModule[] = [
+  core('Combobox', 'combobox/Combobox.ssr.test.tsx'),
+  core('useCombobox', 'combobox/use-combobox.ssr.test.tsx'),
+  core('ConfirmDialog', 'confirm-dialog/ConfirmDialog.ssr.test.tsx'),
+  core('ValidationProvider', 'field/ValidationProvider.ssr.test.tsx'),
+  core('useListReport', 'list-report/use-list-report.ssr.test.tsx'),
+  core('useListReportScrollRestoration', 'list-report/use-list-report-scroll-restoration.ssr.test.tsx'),
+  core('useListReportUrlState', 'list-report/use-list-report-url-state.ssr.test.tsx'),
+  core('MultiSelect', 'multi-select/MultiSelect.ssr.test.tsx'),
+  core('NumberInput', 'number-input/NumberInput.ssr.test.tsx'),
+  core('ObjectPage', 'object-page/ObjectPage.ssr.test.tsx'),
+  core('useDirtyGuard', 'object-page/use-dirty-guard.ssr.test.tsx'),
+  core('useFocusFirstInvalidField', 'object-page/use-focus-first-invalid-field.ssr.test.tsx'),
+  core(
+    'useObjectPageForm',
+    'object-page/use-object-page-form.ssr.test.tsx',
+    'object-page/use-object-page-form.schema.ssr.test.tsx',
+    'object-page/use-object-page-form.validate.ssr.test.tsx',
+  ),
+  core('Textarea', 'textarea/Textarea.ssr.test.tsx'),
+  core('ToastProvider', 'toast/Toast.ssr.test.tsx'),
+  pro('useFormRebase', 'form-rebase/use-form-rebase.ssr.test.tsx'),
+  pro('useReactHookFormBinding', 'integrations/react-hook-form/use-react-hook-form-binding.ssr.test.tsx'),
+  pro('useTanStackFormBinding', 'integrations/tanstack-form/use-tanstack-form-binding.ssr.test.tsx'),
+  pro('VirtualListReportTable', 'list-report/VirtualListReportTable.ssr.test.tsx'),
+];
+
+/** The issue that tracks the `"use client"` directive and the page on server rendering and frameworks. */
+export const SSR_FRAMEWORKS_ISSUE = 'https://github.com/Utumno1984/formrail/issues/412';

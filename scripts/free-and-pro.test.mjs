@@ -1,10 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectPages, packageRuntimeExports } from './docs-coverage.mjs';
 import { proDocsBase } from '../.storybook/story-globs.mjs';
-import { FREE_AND_PRO, catalogExports, catalogHref, catalogProblems, docsPageId } from '../.storybook/free-and-pro.ts';
+import { BUDGETED_PACKAGES, BUDGETED_SUBPATHS, budgetFileName } from './bundle-budget.mjs';
+import {
+  BUDGET_FILES,
+  FREE_AND_PRO,
+  SSR_FRAMEWORKS_ISSUE,
+  SSR_MODULES,
+  catalogExports,
+  catalogHref,
+  catalogProblems,
+  docsPageId,
+  formatBytes,
+  sizeSummary,
+} from '../.storybook/free-and-pro.ts';
 
 // Ticket #723: the "Free and Pro" table of the Introduction against the real public API. The exports are read with
 // the helpers of the docs-coverage guard (every public entry: `index.ts` and the code subpaths of `exports`).
@@ -96,5 +108,112 @@ describe('Free and Pro table (#723)', () => {
       expect(assembler).toMatch(/storybook\/\s+the Free Storybook/);
       expect(assembler).toMatch(/pro\/\s+the Pro demo Storybook/);
     });
+  });
+});
+
+const readJson = (path) => JSON.parse(readFileSync(resolve(ROOT, path), 'utf8'));
+const INTRO = readFileSync(resolve(ROOT, '.storybook/Introduction.mdx'), 'utf8');
+const BLOCKS = readFileSync(resolve(ROOT, '.storybook/free-and-pro-blocks.tsx'), 'utf8');
+
+describe('Size and SSR: the sizes come from the committed baselines (#723)', () => {
+  it('BUDGET_FILES is every baseline the bundle budget checks, and nothing else', () => {
+    const expected = BUDGETED_PACKAGES.flatMap((dir) => ['.', ...(BUDGETED_SUBPATHS[dir] ?? [])].map((subpath) => relative(ROOT, join(dir, budgetFileName(subpath)))));
+    expect(BUDGET_FILES.map((entry) => entry.file).sort()).toEqual(expected.sort());
+    for (const { specifier, file } of BUDGET_FILES) {
+      const [, pkg, subpath] = /^@formrail\/(core|pro)(?:\/(.+))?$/.exec(specifier) ?? [];
+      expect(file, specifier).toBe(`packages/${pkg}/${budgetFileName(subpath ? `./${subpath}` : '.')}`);
+    }
+  });
+
+  it('the page imports exactly those files, each under its specifier, and nothing measured', () => {
+    const imported = [...BLOCKS.matchAll(/^import (\w+) from '\.\.\/(packages\/[^']+\.json)';$/gm)].map((m) => ({ name: m[1], file: m[2] }));
+    expect(imported.map((m) => m.file).sort()).toEqual(BUDGET_FILES.map((entry) => entry.file).sort());
+    for (const { specifier, file } of BUDGET_FILES) {
+      const name = imported.find((m) => m.file === file).name;
+      expect(BLOCKS, `${specifier} -> ${file}`).toContain(`'${specifier}': ${name},`);
+    }
+    // No dist/ or measuring code: the number follows the baseline, never the current build.
+    expect(BLOCKS).not.toMatch(/from '[^']*(\/dist\/|bundle-budget\.mjs|zlib|esbuild)/);
+  });
+
+  it('prints each baseline as it is, from every file', () => {
+    const summary = sizeSummary(BUDGET_FILES.map(({ specifier, file }) => ({ specifier, budget: readJson(file) })));
+    for (const [i, { file }] of BUDGET_FILES.entries()) {
+      const exportsOf = readJson(file).exports;
+      expect(summary[i].count).toBe(Object.keys(exportsOf).length);
+      expect(Object.fromEntries(summary[i].rows.map((row) => [row.name, row.bytes]))).toEqual(
+        Object.fromEntries(Object.entries(exportsOf).map(([name, { baseline }]) => [name, baseline])),
+      );
+      const sizes = Object.values(exportsOf).map((e) => e.baseline);
+      expect(summary[i].smallest.bytes).toBe(Math.min(...sizes));
+      expect(summary[i].largest.bytes).toBe(Math.max(...sizes));
+    }
+  });
+
+  it('a regenerated baseline changes the number on the page, the build does not', () => {
+    const before = { exports: { Button: { baseline: 13483, limit: 14832 }, cn: { baseline: 10654, limit: 11720 } } };
+    const after = { exports: { Button: { baseline: 14020, limit: 15422 }, cn: { baseline: 10654, limit: 11720 } } };
+    const [one] = sizeSummary([{ specifier: '@formrail/core', budget: before }]);
+    const [two] = sizeSummary([{ specifier: '@formrail/core', budget: after }]);
+    expect(formatBytes(one.largest.bytes)).toBe('13.5 kB');
+    expect(formatBytes(two.largest.bytes)).toBe('14.0 kB');
+    expect(two.rows.find((row) => row.name === 'Button').bytes).toBe(14020);
+  });
+
+  it('an empty baseline fails loudly instead of printing nothing', () => {
+    expect(() => sizeSummary([{ specifier: '@formrail/core', budget: { exports: {} } }])).toThrow(/lists no import/);
+  });
+
+  it('formats bytes: plain bytes under 1,000, kilobytes with one decimal above', () => {
+    expect(formatBytes(164)).toBe('164 B');
+    expect(formatBytes(999)).toBe('999 B');
+    expect(formatBytes(1000)).toBe('1.0 kB');
+    expect(formatBytes(62008)).toBe('62.0 kB');
+    expect(formatBytes(10654)).toBe('10.7 kB');
+  });
+});
+
+describe('Size and SSR: the server-rendering tests (#723)', () => {
+  const ssrFiles = (dir) => {
+    const out = [];
+    const walk = (path) => {
+      for (const name of readdirSync(path)) {
+        if (name === 'node_modules' || name === 'dist') continue;
+        const full = join(path, name);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (name.endsWith('.ssr.test.tsx')) out.push(relative(ROOT, full));
+      }
+    };
+    walk(resolve(ROOT, dir));
+    return out;
+  };
+
+  it('SSR_MODULES lists every *.ssr.test.tsx of the packages, and only files that exist', () => {
+    const onDisk = [...ssrFiles('packages/core/src'), ...ssrFiles('packages/pro/src')].sort();
+    expect(onDisk.length).toBeGreaterThan(0);
+    expect(SSR_MODULES.flatMap((module) => module.files).sort()).toEqual(onDisk);
+  });
+
+  it('each module is a runtime export of its package, listed once, and its tests render it on the server', () => {
+    const exportsOf = { core: new Set(coreExports), pro: new Set(proExports) };
+    const names = SSR_MODULES.map((module) => `${module.package}:${module.name}`);
+    expect(names).toEqual([...new Set(names)]);
+    for (const module of SSR_MODULES) {
+      expect(exportsOf[module.package].has(module.name), `${module.name} is an export of ${module.package}`).toBe(true);
+      for (const file of module.files) {
+        expect(file.startsWith(`packages/${module.package}/`)).toBe(true);
+        const source = readFileSync(resolve(ROOT, file), 'utf8');
+        expect(source, file).toMatch(/renderToString/);
+        expect(source, file).toContain(module.name);
+      }
+    }
+  });
+
+  it('the Introduction states the locale rule and the App Router status, with the link to #412', () => {
+    expect(INTRO).toMatch(/## Size and SSR/);
+    expect(INTRO).toMatch(/pass `locale`\s+and, where a component takes them, `timeZone` and `today`/);
+    expect(INTRO).toMatch(/\*\*Next\.js App Router\.\*\* Not supported out of the box yet/);
+    expect(INTRO).toContain(`(${SSR_FRAMEWORKS_ISSUE})`);
+    for (const block of ['<SizeTable />', '<CnSize />', '<SsrModules pkg="core" />', '<SsrModules pkg="pro" />']) expect(INTRO).toContain(block);
   });
 });

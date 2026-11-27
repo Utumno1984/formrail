@@ -1,8 +1,16 @@
-// The "Free and Pro" table of the Introduction (ticket #723), rendered from the data of ./free-and-pro.ts. The
-// rules (what each column lists, where a link points) live there, guarded by scripts/free-and-pro.test.mjs.
+// The "Free and Pro" table and the "Size and SSR" blocks of the Introduction (ticket #723), rendered from the data
+// of ./free-and-pro.ts. The rules (what each column lists, where a link points, how a size is printed) live there,
+// guarded by scripts/free-and-pro.test.mjs.
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { AnchorMdx } from '@storybook/addon-docs/blocks';
-import { FREE_AND_PRO, catalogHref, type CatalogItem } from './free-and-pro';
+// The committed baselines of the bundle budget (spec §1.11), imported as they are: the page prints what the
+// baseline says, never what the current build measures. The guard checks this list against BUDGET_FILES.
+import coreBudget from '../packages/core/bundle-budget.json';
+import proBudget from '../packages/pro/bundle-budget.json';
+import proEngineBudget from '../packages/pro/bundle-budget.engine.json';
+import proReactHookFormBudget from '../packages/pro/bundle-budget.react-hook-form.json';
+import proTanStackFormBudget from '../packages/pro/bundle-budget.tanstack-form.json';
+import { FREE_AND_PRO, SSR_MODULES, catalogHref, formatBytes, sizeSummary, type BudgetFile, type CatalogItem } from './free-and-pro';
 
 /** `''` in the complete build, `'../pro/'` in the public Free build (see `proDocsBase` in story-globs.mjs). */
 const PRO_BASE = __FORMRAIL_PRO_DOCS_BASE__;
@@ -87,5 +95,109 @@ export function FreeAndProTable() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+const BUDGETS: Record<string, BudgetFile> = {
+  '@formrail/core': coreBudget,
+  '@formrail/pro': proBudget,
+  '@formrail/pro/engine': proEngineBudget,
+  '@formrail/pro/react-hook-form': proReactHookFormBudget,
+  '@formrail/pro/tanstack-form': proTanStackFormBudget,
+};
+
+const SUMMARY = sizeSummary(Object.entries(BUDGETS).map(([specifier, budget]) => ({ specifier, budget })));
+
+const Size = ({ name, bytes }: { name: string; bytes: number }) => (
+  <>
+    <code>{name}</code> {formatBytes(bytes)}
+  </>
+);
+
+/** The size of `cn`, read from the core baseline: the class merging most styled components include. */
+export function CnSize() {
+  const cn = coreBudget.exports.cn;
+  return <>{formatBytes(cn.baseline)}</>;
+}
+
+/** One row per entry (smallest and largest import), then every import in a disclosure. */
+export function SizeTable() {
+  return (
+    <>
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by the keyboard */}
+      <div role="region" aria-label="Size per entry" tabIndex={0} data-testid="size-summary" style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <table style={{ minWidth: 560, margin: 0 }}>
+          <thead>
+            <tr>
+              <th scope="col">Entry</th>
+              <th scope="col">Imports</th>
+              <th scope="col">Smallest</th>
+              <th scope="col">Largest</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SUMMARY.map((entry) => (
+              <tr key={entry.specifier} data-entry={entry.specifier}>
+                <th scope="row">
+                  <code>{entry.specifier}</code>
+                </th>
+                <td>{entry.count}</td>
+                <td>
+                  <Size {...entry.smallest} />
+                </td>
+                <td>
+                  <Size {...entry.largest} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <details data-testid="size-every-import">
+        <summary>Size of every import</summary>
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrollable region must be reachable by the keyboard */}
+        <div role="region" aria-label="Size of every import" tabIndex={0} style={{ overflowX: 'auto', maxWidth: '100%' }}>
+          <table style={{ minWidth: 420, margin: 0 }}>
+            <thead>
+              <tr>
+                <th scope="col">Import</th>
+                <th scope="col">Entry</th>
+                <th scope="col">Minified + gzip</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SUMMARY.flatMap((entry) =>
+                entry.rows.map((row) => (
+                  <tr key={`${entry.specifier} ${row.name}`} data-import={`${entry.specifier} ${row.name}`}>
+                    <th scope="row">
+                      <code>{row.name}</code>
+                    </th>
+                    <td>
+                      <code>{entry.specifier}</code>
+                    </td>
+                    <td>{formatBytes(row.bytes)}</td>
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </>
+  );
+}
+
+/** The modules a `*.ssr.test.tsx` renders on the server (`renderToString`), per package, comma separated. */
+export function SsrModules({ pkg }: { pkg: 'core' | 'pro' }) {
+  const names = SSR_MODULES.filter((module) => module.package === pkg).map((module) => module.name);
+  return (
+    <span data-ssr-modules={pkg}>
+      {names.map((name, index) => (
+        <Fragment key={name}>
+          {index > 0 && ', '}
+          <code>{name}</code>
+        </Fragment>
+      ))}
+    </span>
   );
 }
