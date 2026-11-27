@@ -363,10 +363,11 @@ const SIZE_PX: Record<SheetSize, number> = { sm: 352, md: 480, lg: 672 };
  * No `SheetClose` in the panel: below 30rem (`md`) the sheet takes the whole width, so no backdrop is left to tap, and
  * a touch screen has no Escape key. With `closeButton` (the default) the sheet draws its own close button at the top
  * end corner (44 x 44 px under a coarse pointer). The play function opens it, checks its width, closes it with that
- * button and checks that the focus is back on the trigger. With `closeButton` off there is no button (and, in
- * development, a warning when it closes).
+ * button, checks that the focus is back on the trigger and opens it again (it is left open). With `closeButton` off
+ * there is no button (and, in development, a warning when it closes).
  */
 export const FullWidthOnMobile: Story = {
+  tags: ['visual'],
   args: { closeButton: true },
   argTypes: {
     ...withoutControls('dismissible'),
@@ -412,5 +413,9 @@ export const FullWidthOnMobile: Story = {
     await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
     await expect(args.onOpenChange).toHaveBeenLastCalledWith(false);
     await waitFor(() => expect(opener).toHaveFocus());
+    // Opened again and left open, so the picture (visual regression) shows the panel with its own close button.
+    await userEvent.click(opener);
+    await within(await body.findByRole('dialog', { name: 'Filters' })).findByRole('button', { name: 'Close: Filters' });
+    await settleMotion();
   },
 };
