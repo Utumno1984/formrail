@@ -5,7 +5,8 @@ import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../button/Button';
 import { Field } from '../field/Field';
 import { Input } from '../input/Input';
-import { RECORD_STATUS_LABEL, getRecordDetail } from '../internal/demo-data';
+import { RECORD_STATUS_LABEL, RECORD_STATUS_TONE, getRecordDetail } from '../internal/demo-data';
+import { StatusBadge } from '../status-badge/StatusBadge';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { ObjectPage } from './ObjectPage';
 import { ObjectPageFooter } from './ObjectPageFooter';
@@ -97,21 +98,7 @@ function Sections({ count }: { count: number }) {
 
 const RECORD_STATUS = RECORD_STATUS_LABEL[RECORD.status];
 
-const statusBadge = (
-  <span
-    style={{
-      display: 'inline-block',
-      padding: '2px 10px',
-      borderRadius: 999,
-      background: '#fdf0d5',
-      color: '#7a4b00',
-      fontSize: 12,
-      fontWeight: 600,
-    }}
-  >
-    {RECORD_STATUS}
-  </span>
-);
+const statusBadge = <StatusBadge tone={RECORD_STATUS_TONE[RECORD.status]}>{RECORD_STATUS}</StatusBadge>;
 
 /**
  * Copy-paste example: a read-only record page (header with status and actions, two sections) in a parent with a bounded height.

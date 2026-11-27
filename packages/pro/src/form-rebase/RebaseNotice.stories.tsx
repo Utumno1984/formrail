@@ -121,9 +121,40 @@ export const Playground: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Keep mine for Amount' }));
     await expect(args.onKeepMine).toHaveBeenCalledWith('amount');
     await waitFor(() => expect(canvas.queryByRole('list', { name: 'Conflicts' })).toBeNull());
-    await expect(canvasElement.querySelector('.rop-pro-rebase-notice')).toHaveTextContent('2 fields were updated.');
+    await expect(canvasElement.querySelector('.rop-pro-rebase-notice')).toHaveTextContent('Status and Supplier were updated.');
     await expect(canvasElement.querySelector('.rop-pro-rebase-notice')).toHaveFocus();
     await expect(args.onAcceptAllTheirs).not.toHaveBeenCalled();
+  },
+};
+
+const MANY_APPLIED: ChangeEntry[] = [
+  ...APPLIED,
+  applied('amount', 'Amount', 1200, 1350),
+  applied('dueDate', 'Due date', 'Jun 1, 2026', 'Jun 15, 2026'),
+  applied('notes', 'Notes', null, ''),
+  applied('lineItems.0.quantity', 'Line items > Item 1 > Quantity', 2, 3),
+];
+
+/**
+ * More than three server changes: the notice shows the count and a list of the fields with the value before and
+ * after, closed until opened. The play function opens it with the keyboard and checks that the focus stays on the
+ * summary and that `null` and an empty text read differently.
+ */
+export const ManyApplied: Story = {
+  tags: ['visual'],
+  args: { conflicts: [], applied: MANY_APPLIED },
+  play: async ({ canvasElement }) => {
+    const summary = within(canvasElement).getByText('6 fields were updated.');
+    const details = summary.closest('details')!;
+    await expect(details).not.toHaveAttribute('open');
+    summary.focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(details).toHaveAttribute('open');
+    await expect(summary).toHaveFocus();
+    const rows = within(within(canvasElement).getByRole('list', { name: 'Updated fields' })).getAllByRole('listitem');
+    await expect(rows).toHaveLength(6);
+    await expect(rows[0]).toHaveTextContent('Status Before: Open Now: Approved');
+    await expect(rows[5]).toHaveTextContent('Line items > Item 1 > Quantity Before: 2 Now: 3');
   },
 };
 

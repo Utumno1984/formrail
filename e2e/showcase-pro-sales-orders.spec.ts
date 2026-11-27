@@ -249,10 +249,10 @@ test.describe('Pro/Showcase/Record editing integrity: the review of a sales orde
 });
 
 test.describe('Pro/Showcase/Record editing integrity: server updates on a sales order', () => {
-  test('editor without edits: the fields take the update, the form stays clean, "2 fields were updated", no conflict', async ({ page }) => {
+  test('editor without edits: the fields take the update, the form stays clean, "Status and Requested delivery were updated", no conflict', async ({ page }) => {
     await openOrder(page);
     await simulate(page).click();
-    await expect(notice(page)).toContainText('This sales order was updated while you were editing.2 fields were updated.');
+    await expect(notice(page)).toContainText('This sales order was updated while you were editing.Status and Requested delivery were updated.');
     await expect(page.getByRole('combobox', { name: 'Status' })).toHaveText('Shipped');
     await expect(delivery(page)).toHaveValue('2026-06-17');
     await expect(footer(page)).toBeHidden();

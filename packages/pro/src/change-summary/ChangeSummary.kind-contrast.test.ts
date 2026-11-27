@@ -75,8 +75,10 @@ function declaration(body: string, property: string): string {
 }
 
 const BASE = '.rop-pro-change-summary__kind';
+/** `text-rop-text` in the `@apply` of a rule, as the token it reads. */
+const applyText = (body: string): string | null => (/\btext-rop-text\b/.test(body) ? 'var(--color-rop-text)' : null);
 const KINDS = ['added', 'removed', 'changed'] as const;
-const TONE_TOKEN = { added: '--color-rop-success', removed: '--color-rop-error', changed: '--color-rop-primary' } as const;
+const TONE_TOKEN = { added: '--color-rop-success', removed: '--color-rop-error', changed: '--color-rop-info' } as const;
 
 /** Text and background of one badge, with `overrides` replacing tokens (a consumer's theme). */
 function badge(kind: (typeof KINDS)[number], overrides: Record<string, string> = {}) {
@@ -85,7 +87,8 @@ function badge(kind: (typeof KINDS)[number], overrides: Record<string, string> =
   const scope = new Map<string, string>(Object.entries(overrides));
   scope.set('--_cs-tone', declaration(toneBody, '--_cs-tone'));
   return {
-    fg: resolve(declaration(base, 'color'), scope),
+    // The text is the dark text token, as in core's StatusBadge (`text-rop-text` in the rule's `@apply`).
+    fg: resolve(applyText(base) ?? declaration(base, 'color'), scope),
     bg: resolve(declaration(base, 'background-color'), scope),
     surface: resolve('var(--color-rop-surface)', scope),
   };
@@ -98,6 +101,8 @@ describe('ChangeSummary kind badges: contrast (#485)', () => {
     }
     const base = ruleBody(BASE);
     expect(base).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i);
+    // No mix with a literal `black`: the text is a token, as in core's StatusBadge.
+    expect(base).not.toMatch(/\bblack\b|\bwhite\b/);
   });
 
   it.each(KINDS)('%s, default tokens: text on its tint and on the box surface is at least 4.5:1', (kind) => {
@@ -109,17 +114,18 @@ describe('ChangeSummary kind badges: contrast (#485)', () => {
   });
 
   // The primaries already used by tokens.contrast.test.ts, plus the same idea for success / error.
+  // The text is the dark text token, not a mix of the tone, so the contrast does not depend on the tone (as StatusBadge).
   const PRIMARIES: Record<string, string> = {
     'default blue': '#0a6ed1',
     'light blue': '#7fb4ff',
     'dark violet': '#6b3fa0',
     'near black': '#10081c',
     'light yellow': '#ffd84d',
-    // Even a primary that is almost white stays readable: the text is the token mixed 45% with black.
+    // Even a primary that is almost white stays readable: the text is the dark text token, not a mix of the tone.
     'near white': '#fafafa',
   };
-  it.each(Object.entries(PRIMARIES))('changed with --color-rop-primary %s: at least 4.5:1', (_name, hex) => {
-    const { fg, bg, surface } = badge('changed', { '--color-rop-primary': hex });
+  it.each(Object.entries(PRIMARIES))('changed with --color-rop-info %s: at least 4.5:1', (_name, hex) => {
+    const { fg, bg, surface } = badge('changed', { '--color-rop-info': hex });
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(fg, surface)).toBeGreaterThanOrEqual(4.5);
   });
@@ -134,16 +140,16 @@ describe('ChangeSummary kind badges: contrast (#485)', () => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('measures what it claims: the tint is a 12% mix on the surface and the text a 45% mix with black', () => {
+  it('measures what it claims: the tint is a 10% mix of the tone on the surface and the text the dark text token', () => {
     const { fg, bg } = badge('changed');
-    expect(bg.map(Math.round)).toEqual([0.12 * 10 + 0.88 * 255, 0.12 * 110 + 0.88 * 255, 0.12 * 209 + 0.88 * 255].map(Math.round));
-    expect(fg.map(Math.round)).toEqual([0.45 * 10, 0.45 * 110, 0.45 * 209].map(Math.round));
+    expect(bg.map(Math.round)).toEqual([0.1 * 0 + 0.9 * 255, 0.1 * 112 + 0.9 * 255, 0.1 * 242 + 0.9 * 255].map(Math.round));
+    expect(fg.map(Math.round)).toEqual([0x1d, 0x2d, 0x3e]);
   });
 });
 
 describe('ChangeSummary kind badges: styles that must stay (#485)', () => {
-  it('keeps a 1px currentColor outline (the badge must not vanish in forced-colors mode)', () => {
-    expect(declaration(ruleBody(BASE), 'outline')).toBe('1px solid currentColor');
+  it('keeps a 1px outline in the tone (the badge must not vanish in forced-colors mode: the outline stays, in a system colour)', () => {
+    expect(declaration(ruleBody(BASE), 'outline')).toBe('1px solid var(--_cs-tone)');
   });
 
   it('draws a different shape per kind, and the icon is a pseudo-element (no DOM node to name)', () => {

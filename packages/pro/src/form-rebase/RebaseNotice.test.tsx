@@ -67,17 +67,17 @@ describe('<RebaseNotice />: rendering', () => {
     expect(live()).toHaveClass('rop-pro-rebase-notice__live');
   });
 
-  it('applied only: information tone, the count, no list of conflicts', () => {
+  it('applied only: information tone, the names of the fields, no list of conflicts', () => {
     render(<RebaseNotice {...props({ applied: [entry('status', 'Status'), entry('amount', 'Amount')] })} />);
     const node = strip()!;
-    expect(readText(node)).toBe('Information: This record was updated while you were editing.2 fields were updated.');
+    expect(readText(node)).toBe('Information: This record was updated while you were editing.Status and Amount were updated.');
     expect(within(node).queryByRole('list')).toBeNull();
     expect(node.querySelector('.text-rop-info')).not.toBeNull();
   });
 
-  it('one applied change is singular', () => {
+  it('one applied change names its field', () => {
     render(<RebaseNotice {...props({ applied: [entry('status', 'Status')] })} />);
-    expect(strip()).toHaveTextContent('1 field was updated.');
+    expect(strip()).toHaveTextContent('Status was updated.');
   });
 
   it('conflicts: warning tone, a named list, both values (formatted with locale/timeZone) and the two named choices', async () => {
@@ -186,6 +186,92 @@ describe('<RebaseNotice />: rendering', () => {
   });
 });
 
+describe('<RebaseNotice />: which fields were applied (#722)', () => {
+  const change = (path: string, label: string, before: unknown, after: unknown, missing: Partial<Pick<ChangeEntry, 'beforeMissing' | 'afterMissing'>> = {}): ChangeEntry => ({
+    ...entry(path, label),
+    before,
+    after,
+    beforeMissing: missing.beforeMissing ?? false,
+    afterMissing: missing.afterMissing ?? false,
+  });
+
+  it.each([
+    [['Price'], 'Price was updated.'],
+    [['Price', 'Stock'], 'Price and Stock were updated.'],
+    [['Price', 'Stock', 'Tax'], 'Price, Stock and Tax were updated.'],
+  ])('%j are named in the sentence, with no list', (names, sentence) => {
+    render(<RebaseNotice {...props({ applied: names.map((n) => entry(n, n)) })} />);
+    expect(readText(strip()!)).toBe(`Information: This record was updated while you were editing.${sentence}`);
+    expect(strip()!.querySelector('details')).toBeNull();
+    expect(live()).toHaveTextContent(`${sentence}`);
+  });
+
+  it('more than three: the count, and the fields in a list closed until opened, each with the value before and after', async () => {
+    const applied = [
+      change('a', 'Price', 10, 12),
+      change('b', 'Stock', 1, 2),
+      change('c', 'Tax', 'x', 'y'),
+      change('d', 'Note', null, ''),
+      change('e', 'Lines > Item 2 > Qty', 2, 3),
+    ];
+    render(<RebaseNotice {...props({ applied })} />);
+    const details = strip()!.querySelector('details')!;
+    expect(details).not.toHaveAttribute('open');
+    expect(within(details).getByText('5 fields were updated.').tagName).toBe('SUMMARY');
+    const rows = within(within(details).getByRole('list', { name: 'Updated fields', hidden: true })).getAllByRole('listitem', { hidden: true });
+    expect(rows).toHaveLength(5);
+    expect(rows[0]).toHaveTextContent('Price Before: 10 Now: 12');
+    // `null` and `''` stay two different texts.
+    const [before, after] = Array.from(rows[3]!.querySelectorAll('.rop-pro-rebase-notice__side'), (n) => n.textContent!.replace(/^\w+:\s*/, ''));
+    expect(before).not.toBe('');
+    expect(after).not.toBe('');
+    expect(before).not.toBe(after);
+    // An array path is a readable label, not a technical id.
+    expect(rows[4]).toHaveTextContent('Lines > Item 2 > Qty Before: 2 Now: 3');
+    await userEvent.click(within(details).getByText('5 fields were updated.'));
+    expect(details).toHaveAttribute('open');
+  });
+
+  it('a side with no value reads "Removed"', () => {
+    const applied = [change('a', 'A', 1, undefined, { afterMissing: true }), entry('b', 'B'), entry('c', 'C'), entry('d', 'D')];
+    render(<RebaseNotice {...props({ applied })} />);
+    expect(strip()!.querySelector('details')).toHaveTextContent('A Before: 1 Now: Removed');
+  });
+
+  it('opening the list does not move the focus, and the summary is the only new tab stop before the list', async () => {
+    const applied = ['A', 'B', 'C', 'D'].map((n) => entry(n, n));
+    render(
+      <>
+        <input aria-label="Price" />
+        <RebaseNotice {...props({ applied })} />
+      </>,
+    );
+    const input = screen.getByRole('textbox', { name: 'Price' });
+    input.focus();
+    strip()!.querySelector('details')!.open = true;
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('conflicts only: no "0 fields were updated" text', () => {
+    render(<RebaseNotice {...props({ conflicts: [NOTES] })} />);
+    expect(strip()).not.toHaveTextContent(/updated\./);
+    expect(strip()!.querySelector('details')).toBeNull();
+  });
+
+  it('an entry without a label falls back to the count', () => {
+    render(<RebaseNotice {...props({ applied: [entry('a', ''), entry('b', 'B')] })} />);
+    expect(strip()).toHaveTextContent('2 fields were updated.');
+  });
+
+  it('replacing `labels.applied` alone keeps counting (backward compatible); `appliedFields` brings the names back', () => {
+    const applied = [entry('a', 'Price'), entry('b', 'Stock')];
+    const view = render(<RebaseNotice {...props({ applied, labels: { applied: (n) => `${n} changes` } })} />);
+    expect(strip()).toHaveTextContent('2 changes');
+    view.rerender(<RebaseNotice {...props({ applied, labels: { applied: (n) => `${n} changes`, appliedFields: (l) => `Changed: ${l.join('+')}` } })} />);
+    expect(strip()).toHaveTextContent('Changed: Price+Stock');
+  });
+});
+
 describe('<RebaseNotice />: announcement', () => {
   /**
    * The texts the live region had, one per commit that changed it (a change of its text is what a screen reader
@@ -211,7 +297,7 @@ describe('<RebaseNotice />: announcement', () => {
     // The same element as before the update: never a region created together with its message.
     expect(live()).toBe(region);
     expect(texts).toEqual([
-      'This record was updated while you were editing. 1 field was updated. 2 fields you edited were also changed on the server.',
+      'This record was updated while you were editing. Status was updated. 2 fields you edited were also changed on the server.',
     ]);
     // A conflict resolved (same `applied`), a re-render with a new conflicts array: nothing more.
     view.rerender(<RebaseNotice {...props({ applied, conflicts: [NOTES] })} />);
@@ -255,7 +341,7 @@ describe('<RebaseNotice />: announcement', () => {
     take();
     expect(texts.map((t) => t.trim())).toEqual([
       'This record was updated while you were editing. Applying server update after saving…',
-      'This record was updated while you were editing. 1 field was updated.',
+      'This record was updated while you were editing. Status was updated.',
     ]);
     stop();
   });

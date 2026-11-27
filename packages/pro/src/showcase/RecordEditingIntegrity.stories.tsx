@@ -283,7 +283,7 @@ export const SalesOrderServerUpdate: Story = {
     await expect(args.onServerChange).toHaveBeenCalledTimes(1);
     await expect(within(conflicts).getAllByRole('listitem')).toHaveLength(1);
     await expect(within(conflicts).getByRole('listitem')).toHaveTextContent(/^Requested delivery Yours: Jul 1, 2026 Server: Jun 17, 2026/);
-    await expect(notice()).toHaveTextContent(`${NOTICE_TITLE}1 field was updated.`);
+    await expect(notice()).toHaveTextContent(`${NOTICE_TITLE}Status was updated.`);
     await expect(canvas.getByRole('combobox', { name: 'Status' })).toHaveTextContent('Shipped');
     await expect(delivery).toHaveValue('2026-07-01');
     await expect(delivery).toHaveAccessibleDescription('Changed on the server too.');

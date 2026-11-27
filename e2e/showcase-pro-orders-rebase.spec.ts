@@ -104,7 +104,7 @@ const readText = (locator: Locator): Promise<string> =>
 const top = (locator: Locator): Promise<number> => locator.evaluate((el) => el.getBoundingClientRect().top);
 
 test.describe('Pro/Showcase/Record editing integrity: server updates on a sales order (#526, from the invoices #384)', () => {
-  test('editor without edits: the exact notice, "2 fields were updated", the form stays clean, no conflict', async ({ page }) => {
+  test('editor without edits: the exact notice, "Status and Requested delivery were updated", the form stays clean, no conflict', async ({ page }) => {
     const order = await openOrder(page);
     const next = NEXT_STATUS[order.status];
     await serverPatch(page, order.id, { status: next, requestedDeliveryDate: laterBy(order.requestedDeliveryDate, 7) });
@@ -112,7 +112,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await expect(status(page)).toHaveText(STATUS_LABEL[next]);
     await expect(delivery(page)).toHaveValue(laterBy(order.requestedDeliveryDate, 7));
     await expect(footer(page)).toBeHidden();
-    expect(await readText(notice(page))).toBe('Information: This sales order was updated while you were editing.2 fields were updated.');
+    expect(await readText(notice(page))).toBe('Information: This sales order was updated while you were editing.Status and Requested delivery were updated.');
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
   });
 
@@ -123,7 +123,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await expect(status(page)).toHaveText(STATUS_LABEL[NEXT_STATUS[order.status]]);
     await expect(notes(page)).toHaveValue('Checked by sales.');
     await expect(footer(page)).toBeVisible();
-    expect(await readText(notice(page))).toBe('Information: This sales order was updated while you were editing.1 field was updated.');
+    expect(await readText(notice(page))).toBe('Information: This sales order was updated while you were editing.Status was updated.');
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
   });
 
@@ -201,7 +201,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await expect(status(page)).toHaveText(STATUS_LABEL[next]);
     await expect(notes(page)).toHaveValue('Saved note');
     await expect(notice(page)).not.toContainText('Applying');
-    expect(await readText(notice(page))).toBe('Information: This sales order was updated while you were editing.1 field was updated.');
+    expect(await readText(notice(page))).toBe('Information: This sales order was updated while you were editing.Status was updated.');
     expect(await stored(page)).toMatchObject({ notes: 'Saved note', status: next });
   });
 
@@ -227,7 +227,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await serverSetsQuantity(page, order.id, 0, 7);
     await expect(quantity(page, 1)).toHaveValue('7');
     await expect(quantity(page, 2)).toHaveValue('9');
-    await expect(notice(page)).toHaveText(/1 field was updated\./);
+    await expect(notice(page)).toHaveText(/Lines > Item 1 > Quantity was updated\./);
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(footer(page)).toBeVisible();
     expect(order.lines[0]!.quantity).not.toBe(7);
@@ -441,7 +441,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await delivery(page).fill('2026-07-01');
     await serverPatch(page, order.id, { requestedDeliveryDate: '2026-07-08', status: NEXT_STATUS[order.status] });
     await expect(region).toHaveText(
-      'This sales order was updated while you were editing. 1 field was updated. 1 field you edited was also changed on the server.',
+      'This sales order was updated while you were editing. Status was updated. 1 field you edited was also changed on the server.',
     );
     // The strip that holds the choices is not a live region (no double announcement).
     await expect(notice(page)).not.toHaveAttribute('role');
@@ -885,7 +885,7 @@ test.describe('Pro showcase, sales orders, at 390x500: the notice leaves the edi
       lines: order.lines.map((line, i) => (i === 0 ? { ...line, quantity: 8 } : line)),
     });
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
-    await expect(notice(page)).toContainText('1 field was updated.');
+    await expect(notice(page)).toContainText('Status was updated.');
     expect(await heightOf(noticeRow(page))).toBeLessThan(rowBefore - 1);
     expect(expectFieldsStill(before, await fieldSpots(page))).toBeGreaterThanOrEqual(1);
   });

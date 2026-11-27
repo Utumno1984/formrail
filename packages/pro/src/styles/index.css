@@ -98,17 +98,18 @@
      (`box-decoration-break: clone` would also repeat the icon space and the outline).
      Logical properties (ms/pe/ps/start): the icon follows the reading direction (right in RTL). */
   .rop-pro-change-summary__kind {
-    @apply relative ms-2 rounded-rop-sm pe-1 ps-[calc(0.5rem+0.75em)] text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
-    background-color: color-mix(in srgb, var(--_cs-tone) 12%, var(--color-rop-surface));
-    color: color-mix(in srgb, var(--_cs-tone) 45%, black);
+    @apply relative ms-2 rounded-rop-sm pe-1 ps-[calc(0.5rem+0.75em)] text-rop-caption font-[500] capitalize text-rop-text [overflow-wrap:anywhere];
+    /* The language of core's `StatusBadge`: the tone token at 10% on the surface, the dark text token, a
+       1px contour and an icon in the tone. No literal colour: the same tokens as the badge. */
+    background-color: color-mix(in srgb, var(--_cs-tone) 10%, var(--color-rop-surface));
     /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
-    outline: 1px solid currentColor;
+    outline: 1px solid var(--_cs-tone);
     outline-offset: -1px;
 
     &::before {
       @apply absolute top-[0.2em] start-1 size-[0.75em];
       content: '';
-      background-color: currentColor;
+      background-color: var(--_cs-tone);
       clip-path: var(--_cs-shape);
     }
   }
@@ -130,7 +131,7 @@
   }
 
   .rop-pro-change-summary__kind--changed {
-    --_cs-tone: var(--color-rop-primary);
+    --_cs-tone: var(--color-rop-info);
     --_cs-shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   }
 
@@ -217,6 +218,29 @@
 
   .rop-pro-rebase-notice__side-label {
     @apply text-rop-text-muted;
+  }
+
+  /* More than three applied fields: the list is closed until opened, capped in height with its own scroll. */
+  .rop-pro-rebase-notice__details {
+    @apply m-0 min-w-0;
+  }
+
+  .rop-pro-rebase-notice__summary {
+    @apply cursor-pointer rounded-rop-sm;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  .rop-pro-rebase-notice__applied {
+    @apply m-0 mt-2 flex max-h-48 list-none flex-col gap-3 overflow-y-auto p-0;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: 2px;
+    }
   }
 
   .rop-pro-rebase-notice__actions {
