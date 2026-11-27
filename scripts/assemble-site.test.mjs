@@ -105,6 +105,7 @@ describe('assembleSite', () => {
       '.nojekyll',
       '404.html',
       'CNAME',
+      'articles',
       'copy.js',
       'favicon.svg',
       'iframe.html',
