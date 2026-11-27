@@ -6,6 +6,7 @@ import {
   ModalDescription,
   ModalFooter,
   ModalHeader,
+  ModalOwnClose,
   ModalPanel,
   ModalRoot,
   ModalTitle,
@@ -120,6 +121,7 @@ export const SheetContent = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDi
         returnFocusRef={returnFocusRef}
         closeButton={closeButton}
         closeLabel={labels?.close}
+        closeSlot={ModalOwnClose}
         panelClassName={cn(BASE, SIDE_CLASS[side], SIZE_CLASS[size], overlayLayer.modal, className)}
       />
     );

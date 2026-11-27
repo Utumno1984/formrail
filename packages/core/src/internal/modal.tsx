@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
   type ComponentPropsWithoutRef,
+  type ComponentType,
   type ElementRef,
   type ForwardedRef,
   type HTMLAttributes,
@@ -390,6 +391,11 @@ export interface ModalPanelProps extends ModalContentBaseProps {
   closeButton?: boolean;
   /** Accessible name of the panel's own close button; else "Close: `<title>`" (see `ModalClose`). */
   closeLabel?: string;
+  /**
+   * What draws the panel's own close button (`ModalOwnClose`), given by the Sheet. A prop rather than a direct
+   * reference, so a Dialog (which never draws one) does not ship that button and its `Button` in its bundle.
+   */
+  closeSlot?: ComponentType<ModalOwnCloseProps>;
   children?: ReactNode;
 }
 
@@ -407,6 +413,7 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
       returnFocusRef,
       closeButton,
       closeLabel,
+      closeSlot: CloseSlot,
       onCloseAutoFocus,
       onEscapeKeyDown,
       onPointerDownOutside,
@@ -446,8 +453,8 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
       return () => setHeaderCount((count) => count - 1);
     }, []);
     // With `asChild` the panel is the consumer's element: nothing can be added to its children.
-    const canDrawClose = closeButton === true && dismissible && !rest.asChild;
-    // Set by the slot after the children once their own registrations have run (see `DefaultCloseSlot`), so a
+    const canDrawClose = closeButton === true && dismissible && !rest.asChild && CloseSlot !== undefined;
+    // Set by the slot after the children once their own registrations have run (see `ModalOwnClose`), so a
     // `ModalClose` rendered at once never shows the panel's button for a frame next to it.
     const [slotReady, setSlotReady] = useState(false);
     const defaultCloseShown = canDrawClose && slotReady && closeCount === 0;
@@ -646,7 +653,7 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
             ) : (
               <>
                 {children}
-                {canDrawClose ? <DefaultCloseSlot show={defaultCloseShown} label={closeLabel} report={setSlotReady} /> : null}
+                {canDrawClose ? <CloseSlot show={defaultCloseShown} label={closeLabel} report={setSlotReady} /> : null}
               </>
             )}
           </RadixDialog.Content>
@@ -657,12 +664,23 @@ export const ModalPanel = /* @__PURE__ */ forwardRef<ElementRef<typeof RadixDial
   },
 );
 
+/** Props `ModalPanel` gives its `closeSlot`. */
+export interface ModalOwnCloseProps {
+  /** Whether the button is drawn (no `ModalClose` is mounted in the panel). */
+  show: boolean;
+  /** Its accessible name; else "Close: `<title>`". */
+  label: string | undefined;
+  /** Called with `true` once the slot's layout effect has run (after the children's), `false` when it unmounts. */
+  report: (ready: boolean) => void;
+}
+
 /**
  * The panel's own close button (#721), after the children. Its layout effect runs after theirs (siblings in order),
  * so by then every `ModalClose` rendered with the content has registered: it reports itself ready, and the panel
- * draws the button only if none did, in the same commit, before anything is painted.
+ * draws the button only if none did, in the same commit, before anything is painted. Passed as `closeSlot` by the
+ * Sheet only.
  */
-function DefaultCloseSlot({ show, label, report }: { show: boolean; label: string | undefined; report: (ready: boolean) => void }) {
+export function ModalOwnClose({ show, label, report }: ModalOwnCloseProps) {
   useLayoutEffect(() => {
     report(true);
     return () => report(false);
