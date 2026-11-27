@@ -432,14 +432,14 @@ test.describe('privacy page', () => {
     await expect(main).toContainText('Daniele Ingusci');
     const fields = main.locator('#data-title + p + ul li');
     await expect(fields).toHaveText([
-      /work email address \(required\)/,
-      /company or team \(required\)/,
-      /number of developers who would need a license \(required\)/,
-      /what you would use Formrail Pro for, .* \(required\)/,
-      /size of your team \(required\)/,
-      /form libraries you use today \(optional, you can pick several\)/,
-      /when you would need Formrail Pro \(required\)/,
-      /your consent, a box you check yourself \(required\)/,
+      /^Work email \(required\)/,
+      /^Company or team \(required\)/,
+      /^How many developers would need a license\? \(required\)/,
+      /^What would you use Formrail Pro for\? \(.*required\)/,
+      /^Team size \(required\)/,
+      /^Which form library do you use\? \(optional, you can pick several\)/,
+      /^When would you need it\? \(required\)/,
+      /^Consent, a box you check yourself, with the text quoted below \(required\)/,
     ]);
     await expect(main).toContainText('Without the required fields the form cannot be submitted');
     await expect(main).not.toContainText('Giving it is optional');
@@ -453,7 +453,7 @@ test.describe('privacy page', () => {
       'I agree that Formrail may use my email address and my answers to reply to my early access request, to contact me about Formrail Pro early access and to plan the product, as described in the privacy notice.',
     );
     // requests sent before the change: their fields, their consent text, their purposes
-    await expect(main).toContainText('Requests sent before 27 November 2026 contain only the fields of that time');
+    await expect(main).toContainText('Requests sent before the form changed on 27 November 2026 contain only the fields of that time');
     await expect(main).toContainText('as described in the privacy notice above.');
     await expect(main).toContainText('For those requests the purposes of that time apply');
     await expect(main).toContainText('withdraw your consent at any time');
@@ -468,6 +468,8 @@ test.describe('privacy page', () => {
     await expect(transfers.nth(1)).toContainText('stores the responses in the European Union');
     await expect(transfers.nth(1)).toContainText('outside the EEA');
     await expect(transfers.nth(1)).not.toContainText(/standard contractual clauses/i);
+    await expect(transfers.nth(2)).toContainText('provided by Google LLC (USA)');
+    await expect(transfers.nth(2)).toContainText('EU-US Data Privacy Framework');
     const githubPolicy = main.getByRole('link', { name: 'privacy statement' });
     const tallyPolicy = main.getByRole('link', { name: 'privacy policy' });
     await expect(githubPolicy).toHaveAttribute(

@@ -435,7 +435,7 @@ describe('the Purchases section of the privacy notice', () => {
     };
     const FOR_ALL =
       'This applies to everyone who writes to formrail.dev@gmail.com, whether or not they have bought a license. The emails about a purchase are kept as described in the Retention part of the Purchases section above.';
-    const EA = 'The copies of the early access requests follow the period of their section: no later than 24 months after the request.';
+    const EA = 'The copies of the early access requests follow the period and the legal basis of their section: no later than 24 months after the request, and on the same consent as the request.';
     const DP = 'The copies of the design partner applications follow the period of their section: no later than 24 months after the application.';
     const OTHERS =
       'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.';
@@ -488,14 +488,14 @@ describe('the Purchases section of the privacy notice', () => {
     const fields = privacy.slice(privacy.indexOf('<h2 id="data-title">'), privacy.indexOf('<h2 id="purpose-title">'));
     const items = [...fields.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => text(m[1]));
     expect(items).toEqual([
-      'your work email address (required);',
-      'your company or team (required);',
-      'the number of developers who would need a license (required);',
-      'what you would use Formrail Pro for, a description of the type of application, the industry and the problem you want to solve (required);',
-      'the size of your team (required);',
-      'the form libraries you use today (optional, you can pick several);',
-      'when you would need Formrail Pro (required);',
-      'your consent, a box you check yourself (required).',
+      'Work email (required);',
+      'Company or team (required);',
+      'How many developers would need a license? (required);',
+      'What would you use Formrail Pro for? (a description of the type of application, the industry and the problem you want to solve; required);',
+      'Team size (required);',
+      'Which form library do you use? (optional, you can pick several);',
+      'When would you need it? (required);',
+      'Consent, a box you check yourself, with the text quoted below (required).',
     ]);
     const section = text(privacy.slice(privacy.indexOf('<h2 id="data-title">'), privacy.indexOf('<h2 id="transfers-title">')));
     expect(section).toContain(
@@ -503,7 +503,7 @@ describe('the Purchases section of the privacy notice', () => {
     );
     // requests of before the change keep their own fields, consent text and purposes
     expect(section).toContain(
-      'Requests sent before 27 November 2026 contain only the fields of that time: email address, team size, timing, form libraries and consent.',
+      'Requests sent before the form changed on 27 November 2026 contain only the fields of that time: email address, team size, timing, form libraries and consent.',
     );
     expect(section).toContain(
       '"I agree that Formrail may use my email address to contact me about Formrail Pro early access, and my answers to plan the product, as described in the privacy notice above."',
@@ -520,6 +520,10 @@ describe('the Purchases section of the privacy notice', () => {
     expect(where).toContain('the transfer rests on the EU-US Data Privacy Framework, to which Google LLC adheres');
     expect(where).not.toMatch(/not copied/i);
     const retention = text(privacy.slice(privacy.indexOf('<h2 id="retention-title">'), privacy.indexOf('<h2 id="design-partners-title">')));
+    const transfers = text(privacy.slice(privacy.indexOf('<h2 id="transfers-title">'), privacy.indexOf('<h2 id="retention-title">')));
+    expect(transfers).toContain(
+      'The Gmail mailbox that receives the copies of the requests is provided by Google LLC (USA). The transfer to the United States rests on the EU-US Data Privacy Framework, to which Google LLC adheres.',
+    );
     expect(retention).toContain('both on Tally and from the mailbox, no later than 24 months after you send the request');
   });
 
