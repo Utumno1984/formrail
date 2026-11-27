@@ -268,22 +268,25 @@ describe('the Purchases section of the privacy notice', () => {
     // the postal code or address and, for a business, the tax number, and makes them available to the seller; a
     // consumer has no company. The list is introduced as what the data "can include", not as a closed list.
     expect(text(list)).toContain(
-      'We receive from Paddle the data of your purchase that Paddle makes available to us as the seller of the product. Depending on what you give to Paddle at checkout, it can include:',
+      'We receive from Paddle the data of your purchase that Paddle makes available to us as the licensor of the product. Depending on what you give to Paddle at checkout, it can include:',
     );
     expect(text(section)).not.toContain('What it passes to us');
     expect(text(section)).not.toContain('the data listed above');
     expect(text(list)).toContain('GitHub user names that you give us');
     expect(text(list)).toContain('We do not receive your payment card or your bank details');
+    expect(text(list)).toContain('Without your email address and the GitHub user names we cannot grant the access or manage the license');
+    expect(text(list)).not.toContain('Without these data');
     expect(text(list)).toContain('(art. 13(2)(e) GDPR)');
   });
 
-  it('states the purposes and the legal bases: contract art. 6(1)(b) and legal obligation art. 6(1)(c), no consent', () => {
+  it('states the purposes and the legal bases: contract art. 6(1)(b) and legitimate interest art. 6(1)(f), no consent', () => {
     const section = text(purchases(build().privacy));
     expect(section).toContain('to deliver and manage the license');
     expect(section).toContain('to grant, check and end the access to the registry');
-    expect(section).toContain('to comply with the legal obligations that apply to a sale');
+    expect(section).toContain('to keep the records of the sale for a period that covers the tax and accounting checks');
     expect(section).toContain('the contract of sale, art. 6(1)(b) GDPR');
-    expect(section).toContain('a legal obligation, art. 6(1)(c) GDPR');
+    expect(section).toContain('our legitimate interest in defending ourselves in case of checks or disputes, art. 6(1)(f) GDPR');
+    expect(section).not.toContain('6(1)(c)');
     expect(section).toContain('Neither rests on consent');
   });
 
@@ -293,7 +296,7 @@ describe('the Purchases section of the privacy notice', () => {
     // Paddle's Buyer Terms: the contracting entity depends on where the buyer purchases from (US: Paddle.com Inc.,
     // Canada: Paddle.com (Canada) Ltd, rest of world: Paddle.com Market Limited), critic of PR #713, point 2.
     expect(body).toContain(
-      'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd. Your receipt names the company that sold to you) is the reseller of Formrail Pro',
+      'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd) is the reseller of Formrail Pro',
     );
     for (const entity of ['Paddle.com Market Limited', 'Paddle.com Inc.', 'Paddle.com (Canada) Ltd']) {
       expect(body).toContain(entity);
@@ -339,7 +342,7 @@ describe('the Purchases section of the privacy notice', () => {
     // reference of D8 is the end of the year of the sale (tax and accounting records), no longer "as long as your
     // license is in force", which for a perpetual license would never end.
     const RULE = (years) =>
-      `We keep the purchase data received from Paddle for ${years} years from the end of the year in which the sale takes place: this is the period for which tax and accounting law requires the records of the sale to be kept.`;
+      `We keep the purchase data received from Paddle for ${years} years from the end of the year in which the sale takes place: this is a period that covers the tax and accounting checks that can concern the sale.`;
     expect(body({ purchaseRetentionYears: '10' })).toContain(RULE(10));
     expect(body({ purchaseRetentionYears: '7' })).toContain(RULE(7));
     // decision D8: the committed value is 7 years, and the default page prints it
@@ -348,14 +351,22 @@ describe('the Purchases section of the privacy notice', () => {
     expect(body()).not.toMatch(/in force|plus \d+ years/);
     // GitHub user names are not records of the sale: deleted when the registry access ends, in each of the cases
     expect(body()).toContain(
-      'The GitHub user names are not records of the sale, and they are not kept for that period. The data controller deletes them when your access to the registry ends: when the 12 months of updates end and you do not buy again, when you receive a refund or the payment is reversed, or when the license ends for a serious violation, as described in the license terms.',
+      'The GitHub user names are not records of the sale, and they are not kept for that period. The data controller deletes them when your access to the registry ends: when the 12 months of updates end and you do not buy again, when you receive a refund or the payment is reversed, or when the license ends for a serious violation, as described in the license terms. When you replace a developer, the name of the replaced developer is deleted when the access moves to the replacement.',
     );
+    // Decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale, the others 2 years after the last reply
+    expect(body()).toContain(
+      `The emails you send to formrail.dev@gmail.com about a purchase (a refund, the replacement of a developer, a problem with the license) are records of the sale: they are kept for the same period as the purchase data, ${PURCHASE_RETENTION_YEARS} years from the end of the year in which the sale takes place. The other emails are deleted 2 years after our last reply.`,
+    );
+    expect(body({ purchaseRetentionYears: '10' })).toContain('kept for the same period as the purchase data, 10 years from the end');
+    expect(body()).not.toContain('requires the records');
     // those cases are the ones of the license: the registry access ends with the 12 months, a refund, a chargeback
     // or a serious violation
     const license = text(build().license);
     expect(license).toContain('When the 12 months end, your access to the registry ends');
     expect(license).toContain('If you receive a refund, or the payment is reversed (a chargeback), the license and the registry access end');
     expect(license).toContain('A serious violation of the section Restrictions ends the license in the same way');
+    // replacing a developer: the license and the registry access move to the new person (the old name is deleted then)
+    expect(license).toContain('the license and the registry access are moved');
     expect(readFileSync(path.join(ROOT, 'site-root', 'privacy.html'), 'utf8')).toContain('{{RETENTION_YEARS}}');
   });
 

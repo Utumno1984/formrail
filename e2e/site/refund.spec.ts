@@ -198,7 +198,7 @@ test.describe('privacy notice: purchases', () => {
     const main = page.locator('main');
     await expect(main).toContainText('GitHub user names that you give us');
     await expect(main).toContainText('art. 6(1)(b) GDPR');
-    await expect(main).toContainText('art. 6(1)(c) GDPR');
+    await expect(main).toContainText('art. 6(1)(f) GDPR');
     // the expected text changed with the decision of Daniele of 2026-11-27 (critic of PR #713, point 1): the
     // period is counted from the end of the year of the sale, not from the end of a license that may never end
     await expect(page.locator('#purchase-retention-title + p')).toContainText(
@@ -208,6 +208,11 @@ test.describe('privacy notice: purchases', () => {
       'The data controller deletes them when your access to the registry ends',
     );
     await expect(main).not.toContainText('in force');
+    // decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale, the others 2 years
+    await expect(page.locator('#purchase-retention-title + p + p + p')).toContainText(
+      `are records of the sale: they are kept for the same period as the purchase data, ${retention} years from the end of the year in which the sale takes place. The other emails are deleted 2 years after our last reply.`,
+    );
+    await expect(page.locator('#purchase-data-title + p')).toContainText('as the licensor of the product');
     await expect(main).toContainText('Paddle may transfer data outside the EEA');
     await expect(page.locator('#purchase-transfers-title + p')).toContainText(
       'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision',
@@ -252,7 +257,7 @@ test.describe('privacy notice: purchases', () => {
     await page.goto('privacy/');
     const section = page.locator('#purchase-recipients-title ~ p').first();
     await expect(section).toContainText(
-      'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd. Your receipt names the company that sold to you) is the reseller of Formrail Pro',
+      'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd) is the reseller of Formrail Pro',
     );
     for (const entity of ['Paddle.com Market Limited', 'Paddle.com Inc.', 'Paddle.com (Canada) Ltd']) {
       await expect(section).toContainText(entity);
