@@ -653,3 +653,74 @@ describe('Dialog: Escape when the top dialog closed before Radix caught up (#714
     expect(escB).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("Dialog: a redirected Escape uses the top dialog's current props (#714)", () => {
+  type Item = { id: string; locked: boolean };
+  // A list page in dialog A: "Edit" opens the editor B (nested in A) for that item. B's props depend on
+  // the item being edited, a state set after B's root and panel mounted (closed).
+  function Editor({ item, closed, escaped }: { item: Item; closed: (id?: string) => void; escaped: (id?: string) => void }) {
+    const [editing, setEditing] = useState<Item | null>(null);
+    return (
+      <Dialog defaultOpen>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>A</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <button type="button" onClick={() => setEditing(item)}>Edit</button>
+            <Dialog
+              open={editing !== null}
+              onOpenChange={(open) => {
+                if (!open) {
+                  closed(editing?.id);
+                  setEditing(null);
+                }
+              }}
+            >
+              <DialogContent size="sm" dismissible={!editing?.locked} onEscapeKeyDown={() => escaped(editing?.id)}>
+                <DialogHeader>
+                  <DialogTitle>B</DialogTitle>
+                </DialogHeader>
+                <DialogBody>Editing {editing?.id}</DialogBody>
+              </DialogContent>
+            </Dialog>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  for (const race of [true, false]) {
+    const when = race ? 'an Escape right after it opened' : 'a settled Escape';
+    const open = async () => {
+      await settle();
+      step('Edit');
+      await (race ? microtasks() : settle());
+      expect(openDialogNames()).toEqual(['A', 'B']);
+    };
+
+    it(`${when}: the editor's onEscapeKeyDown and onOpenChange see the item being edited`, async () => {
+      const closed = vi.fn();
+      const escaped = vi.fn();
+      render(<Editor item={{ id: 'item-7', locked: false }} closed={closed} escaped={escaped} />);
+      await open();
+      pressEscape();
+      await settle();
+      expect(openDialogNames()).toEqual(['A']);
+      expect(escaped.mock.calls).toEqual([['item-7']]);
+      expect(closed.mock.calls).toEqual([['item-7']]);
+    });
+
+    it(`${when}: an editor opened on a locked item (dismissible={false}) stays open`, async () => {
+      const closed = vi.fn();
+      const escaped = vi.fn();
+      render(<Editor item={{ id: 'item-8', locked: true }} closed={closed} escaped={escaped} />);
+      await open();
+      pressEscape();
+      await settle();
+      expect(openDialogNames()).toEqual(['A', 'B']);
+      expect(escaped.mock.calls).toEqual([['item-8']]);
+      expect(closed).not.toHaveBeenCalled();
+    });
+  }
+});
