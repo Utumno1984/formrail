@@ -142,6 +142,13 @@ const NavInSheetContext = /* @__PURE__ */ createContext<((then: () => void) => v
 const noop = () => undefined;
 
 /**
+ * @internal Not public API (exported for the unit test). How long a shell below the breakpoint, with an
+ * `AppShellNav`, may go without an `AppShellNavTrigger` before the development warning of #721: room for a header
+ * whose content (and trigger) arrives after the mount, with a fetch.
+ */
+export const NO_TRIGGER_SETTLE_MS = 2000;
+
+/**
  * @internal Not public API (exported for the unit test). Whether the viewport is at or above the breakpoint of the
  * navigation column. Without `matchMedia`, or with one that throws (a restricted embed), it is not known: `false`, and
  * the CSS alone decides what is displayed.
@@ -304,20 +311,42 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
     };
   }, []);
   // #721: below the breakpoint the column is not displayed, and only the trigger opens the navigation: a shell with
-  // an `AppShellNav` and no `AppShellNavTrigger` leaves it out of reach there. Reported once per shell in
-  // development, one frame after the mount (a trigger mounted in the meantime, by an effect, counts), not at all in
+  // an `AppShellNav` and no `AppShellNavTrigger` leaves it out of reach there. Reported in development only when that
+  // is the case now: the viewport is below the breakpoint (`matchMedia`, followed as it changes) and, with a nav
+  // mounted, no trigger has been mounted for `NO_TRIGGER_SETTLE_MS` (a header filled after a fetch has the time to
+  // bring its trigger). A shell for wide screens only, in a wide viewport, logs nothing; without `matchMedia` (or
+  // with one that throws) the viewport is not known, and nothing is logged either. Once per shell, never in
   // production.
+  const hasNav = navCount > 0;
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || !hasNav) return undefined;
+    const view = typeof window === 'undefined' ? null : window;
+    if (!view || typeof view.matchMedia !== 'function') return undefined;
+    let list: MediaQueryList;
+    try {
+      list = view.matchMedia(APP_SHELL_WIDE_QUERY);
+    } catch {
+      return undefined;
+    }
+    setNarrow(!list.matches);
+    const listener = (event: MediaQueryListEvent) => setNarrow(!event.matches);
+    list.addEventListener('change', listener);
+    return () => list.removeEventListener('change', listener);
+  }, [hasNav]);
   const warnedNoTrigger = useRef(false);
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production' || warnedNoTrigger.current || navCount === 0 || triggerCount > 0) return undefined;
-    const frame = requestAnimationFrame(() => {
+    if (process.env.NODE_ENV === 'production' || warnedNoTrigger.current || !hasNav || !narrow || triggerCount > 0) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
       warnedNoTrigger.current = true;
       console.warn(
-        '[formrail] <AppShell> has an <AppShellNav> and no <AppShellNavTrigger>: below 64rem the navigation column is not displayed and nothing else opens it, so the navigation cannot be reached. Render an <AppShellNavTrigger> at the start of the AppShellHeader (it is not displayed from 64rem up).',
+        '[formrail] <AppShell> has an <AppShellNav> and no <AppShellNavTrigger>: below 64rem (the viewport now) the navigation column is not displayed and nothing else opens it, so the navigation cannot be reached. Render an <AppShellNavTrigger> at the start of the AppShellHeader (it is not displayed from 64rem up).',
       );
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [navCount, triggerCount]);
+    }, NO_TRIGGER_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [hasNav, narrow, triggerCount]);
   // The Sheet is rendered by `AppShellNav`: a nav that leaves takes the Sheet with it, so it closes it too (else the
   // trigger would announce an open Sheet that is not there, and a nav mounted later would open it by itself).
   const registerNav = useCallback(() => {
@@ -518,8 +547,9 @@ export interface AppShellNavTriggerProps extends Omit<ButtonHTMLAttributes<HTMLB
  * closes, or the one the focus goes back to is disabled, the focus is not given back, and nothing else is focused.
  *
  * A shell with an `AppShellNav` and no trigger leaves the navigation out of reach below the breakpoint: in
- * development it logs a `console.warn` once, one frame after the mount (render the trigger with the header, even
- * when the rest of the header is loaded later).
+ * development, while the viewport is below it and no trigger has been mounted for 2 seconds (a header loaded later
+ * has that time to bring its trigger), it logs a `console.warn`, once per shell. A shell for wide screens only, used
+ * in a wide viewport, logs nothing.
  */
 export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppShellNavTriggerProps>(function AppShellNavTrigger(
   { onClick, className, 'aria-label': ariaLabel, ...rest },
@@ -609,8 +639,8 @@ function textOfIds(ids: string | undefined): string {
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.
  *
  * The Sheet's code comes with `AppShellNavTrigger`: a shell without one (an app for wide screens only) does not ship it,
- * and in development it logs a `console.warn` (see `AppShellNavTrigger`): below the breakpoint its navigation could
- * not be reached.
+ * and in development, while the viewport is below the breakpoint, it logs a `console.warn` (see `AppShellNavTrigger`):
+ * there its navigation could not be reached.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
   { className, style, children, onBlur, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
