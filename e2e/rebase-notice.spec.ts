@@ -85,4 +85,53 @@ test.describe('Pro/RebaseNotice', () => {
     await expect(list).not.toHaveAttribute('data-more');
     await expect(list).toHaveAttribute('tabindex', '0');
   });
+  test('the focus ring of the scrolling list is visible while rows are hidden (the fade mask must not clip it)', async ({ page }) => {
+    await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
+    const list = page.getByRole('list', { name: 'Updated fields' });
+    await expect(list).toHaveAttribute('data-more', '');
+    const ring = page.locator('.rop-pro-rebase-notice__applied-ring');
+    const box = (await ring.boundingBox())!;
+    // The strip just outside the left edge of the list, where the 2px ring (offset 2px) is drawn.
+    const clip = { x: box.x - 5, y: box.y + 40, width: 4, height: 200 };
+    const before = await page.screenshot({ clip });
+    await list.focus();
+    await expect(list).toBeFocused();
+    await expect(list).toHaveAttribute('data-more', '');
+    const after = await page.screenshot({ clip });
+    expect(after.equals(before)).toBe(false);
+    expect(await list.evaluate((el) => getComputedStyle(el).maskImage)).toContain('linear-gradient');
+    expect(await ring.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('solid');
+    expect(await list.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');
+  });
+
+  test('the fade is tall enough to cover the gap between two rows', async ({ page }) => {
+    await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
+    const list = page.getByRole('list', { name: 'Updated fields' });
+    const fade = await list.evaluate((el) => {
+      const mask = getComputedStyle(el).maskImage;
+      const probe = document.createElement('div');
+      probe.style.width = 'var(--rop-pro-rebase-applied-fade, 3.5rem)';
+      el.appendChild(probe);
+      const px = probe.getBoundingClientRect().width;
+      probe.remove();
+      return { mask, px };
+    });
+    expect(fade.mask).toContain('linear-gradient');
+    expect(fade.px).toBeGreaterThanOrEqual(56);
+  });
+
+  test.describe('coarse pointer', () => {
+    test.use({ hasTouch: true, isMobile: true });
+    test('the summary takes the touch over its whole 44px box', async ({ page }) => {
+      await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
+      const summary = page.locator('.rop-pro-rebase-notice summary');
+      expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+      const box = (await summary.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      for (const y of [box.y + 2, box.y + box.height - 2]) {
+        const hit = await page.evaluate(([x, yy]) => !!document.elementFromPoint(x!, yy!)?.closest('summary'), [box.x + 20, y]);
+        expect(hit).toBe(true);
+      }
+    });
+  });
 });

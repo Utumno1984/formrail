@@ -189,18 +189,21 @@ function AppliedList({ label, count, children }: { label: string; count: number;
       observer?.disconnect();
     };
   }, [measure, count]);
+  // The wrapper draws the focus ring: the fade is a mask on the list, and a mask would clip an outline drawn on the list itself.
   return (
-    <ul
-      ref={ref}
-      aria-label={label}
-      className={cn(`${RN}__applied`, capped && `${RN}__applied--capped`)}
-      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard
-      tabIndex={state.scrolls ? 0 : undefined}
-      data-more={state.more ? '' : undefined}
-      onScroll={measure}
-    >
-      {children}
-    </ul>
+    <div className={`${RN}__applied-ring`}>
+      <ul
+        ref={ref}
+        aria-label={label}
+        className={cn(`${RN}__applied`, capped && `${RN}__applied--capped`)}
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard
+        tabIndex={state.scrolls ? 0 : undefined}
+        data-more={state.more ? '' : undefined}
+        onScroll={measure}
+      >
+        {children}
+      </ul>
+    </div>
   );
 }
 
