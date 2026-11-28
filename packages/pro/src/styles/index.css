@@ -234,12 +234,10 @@
   .rop-pro-rebase-notice__summary {
     @apply cursor-pointer rounded-rop-sm;
 
-    /* Touch target of 44px (a 20px line today) without moving the layout: padding inside, the same margin outside. */
+    /* Touch target of 44px (a 20px line today): padding inside the box, so it takes room of its own and covers
+       neither the title above nor the list below (a negative margin would make it overlap its neighbours). */
     @media (pointer: coarse) {
-      position: relative;
-      z-index: 1; /* above the neighbours the negative margin overlaps, so the whole 44px box takes the touch */
       padding-block: 0.75rem;
-      margin-block: -0.75rem;
     }
 
     &:focus-visible {
@@ -259,8 +257,13 @@
     }
   }
 
+  /* The height is always capped, whatever the number of fields: about 12 rows, never more than 70% of the viewport
+     (on a short viewport the viewport limit wins and fewer rows show). A list shorter than the cap is not affected;
+     one that exceeds it scrolls on its own, with a fade while rows are hidden. `none` is not valid inside min():
+     to lift the cap, set `--rop-pro-rebase-applied-max-height` to a large value. */
   .rop-pro-rebase-notice__applied {
-    @apply m-0 flex list-none flex-col gap-3 p-0;
+    @apply m-0 flex list-none flex-col gap-3 overflow-y-auto p-0;
+    max-height: min(var(--rop-pro-rebase-applied-max-height, 50rem), 70dvh);
 
     &:focus-visible {
       outline: none;
@@ -274,14 +277,6 @@
       outline: 2px solid var(--color-rop-primary);
       outline-offset: -2px;
     }
-  }
-
-  /* Beyond APPLIED_SCROLL_THRESHOLD fields (RebaseNotice.tsx) the list is capped and scrolls; below it every row shows. */
-  .rop-pro-rebase-notice__applied--capped {
-    @apply overflow-y-auto;
-    /* About the height of APPLIED_SCROLL_THRESHOLD (12) rows, but never more than 70% of the viewport: on a short
-       viewport (below about 1140px of viewport height) the viewport limit wins and fewer rows show. */
-    max-height: min(var(--rop-pro-rebase-applied-max-height, 50rem), 70dvh);
   }
 
   /* Rows still hidden below: fade the bottom edge so the cut is visible (a mask only reads the alpha, any opaque token does). */

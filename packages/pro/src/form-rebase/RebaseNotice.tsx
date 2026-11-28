@@ -155,21 +155,23 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
 const RN = 'rop-pro-rebase-notice';
 const NO_BREAK_SPACE = '\u00a0';
 /**
- * Up to this many applied fields the list shows every row in full, without a scroll of its own (a record rebase
- * touching a dozen fields is already a lot to read; hiding half of a short list behind a scroll hid exactly the
- * values the user came to check). Beyond it the list is capped in height (`--rop-pro-rebase-applied-max-height`) and
- * scrolls, with a fade at the bottom while rows are hidden: a cut is never silent.
- */
-export const APPLIED_SCROLL_THRESHOLD = 12;
-
-/**
- * The list of applied fields. It is a tab stop only while it really scrolls (a keyboard user must be able to read
- * the hidden rows), and marks with `data-more` that rows are still hidden below (the stylesheet fades the bottom).
+ * The list of applied fields. Its height is always capped by the stylesheet (the smaller of
+ * `--rop-pro-rebase-applied-max-height` and 70% of the viewport height), whatever the number of fields: a short
+ * list is never cut, a long one (or any list on a short viewport) scrolls on its own. It is a tab stop only while it
+ * really scrolls, measured (`scrollHeight > clientHeight`, kept current with a `ResizeObserver` and on scroll), never
+ * inferred from the number of fields: a keyboard user must be able to read the hidden rows, and a list that fits is
+ * not a tab stop. Before the first measure, and on the server, it is not a tab stop. `data-more` marks that rows are
+ * still hidden below (the stylesheet fades the bottom).
+ *
+ * Custom properties (set them on the notice or any ancestor):
+ * - `--rop-pro-rebase-applied-max-height` (default `50rem`, about 12 rows): the height cap, itself limited to 70dvh.
+ *   `none` is not valid inside `min()`: to lift the cap use a large value, such as `1000rem`.
+ * - `--rop-pro-rebase-applied-fade` (default `4.5rem`): the height of the fade at the bottom while rows are hidden.
+ *   `0` without a unit invalidates the whole mask: write `0px` to switch the fade off.
  */
 function AppliedList({ label, count, children }: { label: string; count: number; children: ReactNode }) {
   const ref = useRef<HTMLUListElement>(null);
   const [state, setState] = useState({ scrolls: false, more: false });
-  const capped = count > APPLIED_SCROLL_THRESHOLD;
   const measure = useCallback(() => {
     const el = ref.current;
     if (el === null) return;
@@ -195,7 +197,7 @@ function AppliedList({ label, count, children }: { label: string; count: number;
       <ul
         ref={ref}
         aria-label={label}
-        className={cn(`${RN}__applied`, capped && `${RN}__applied--capped`)}
+        className={`${RN}__applied`}
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard
         tabIndex={state.scrolls ? 0 : undefined}
         data-more={state.more ? '' : undefined}

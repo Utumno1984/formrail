@@ -60,7 +60,8 @@ test.describe('Pro/RebaseNotice', () => {
     for (let i = 0; i < 6; i++) await expect(rows.nth(i)).toBeInViewport();
     const metrics = await list.evaluate((el) => ({ scrolls: el.scrollHeight > el.clientHeight + 1, overflowY: getComputedStyle(el).overflowY }));
     expect(metrics.scrolls).toBe(false);
-    expect(metrics.overflowY).toBe('visible');
+    // The cap now always applies (overflow auto): a list that fits simply has nothing to scroll.
+    expect(metrics.overflowY).toBe('auto');
     await expect(list).not.toHaveAttribute('tabindex');
     await expect(list).not.toHaveAttribute('data-more');
   });
@@ -85,6 +86,27 @@ test.describe('Pro/RebaseNotice', () => {
     await expect(list).not.toHaveAttribute('data-more');
     await expect(list).toHaveAttribute('tabindex', '0');
   });
+  test('twelve fields on a short viewport (375x667): the height cap applies, the list is a tab stop and signals hidden rows', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
+    await gotoStory(page, 'pro-rebasenotice--twelve-applied');
+    const list = page.getByRole('list', { name: 'Updated fields' });
+    await expect(list.getByRole('listitem')).toHaveCount(12);
+    await expect(list).toHaveAttribute('tabindex', '0');
+    await expect(list).toHaveAttribute('data-more', '');
+    const { shown, scroll } = await list.evaluate((el) => ({ shown: el.clientHeight, scroll: el.scrollHeight }));
+    expect(scroll).toBeGreaterThan(shown);
+    expect(shown).toBeLessThanOrEqual(667 * 0.7 + 1);
+  });
+
+  test('four fields on a wide viewport (1440): nothing is cut, the list is not a tab stop', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoStory(page, 'pro-rebasenotice--four-applied');
+    const list = page.getByRole('list', { name: 'Updated fields' });
+    expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight + 1)).toBe(false);
+    await expect(list).not.toHaveAttribute('tabindex');
+    await expect(list).not.toHaveAttribute('data-more');
+  });
+
   test('the focus ring of the scrolling list is visible while rows are hidden (the fade mask must not clip it)', async ({ page }) => {
     await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
     const list = page.getByRole('list', { name: 'Updated fields' });
@@ -126,6 +148,21 @@ test.describe('Pro/RebaseNotice', () => {
         const hit = await page.evaluate(([x, yy]) => !!document.elementFromPoint(x!, yy!)?.closest('summary'), [box.x + 20, y]);
         expect(hit).toBe(true);
       }
+    });
+
+    test('the 44px box overlaps nothing: the title above and the first row below are not taken by the summary', async ({ page }) => {
+      await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
+      const summary = page.locator('.rop-pro-rebase-notice summary');
+      const box = (await summary.boundingBox())!;
+      const firstRow = (await page.locator('.rop-pro-rebase-notice__applied li').first().boundingBox())!;
+      const title = (await page.getByText('This invoice was updated while you were editing.').first().boundingBox())!;
+      const hits = await page.evaluate(
+        ([x, yRow, yTitle]) => [yRow, yTitle].map((y) => !!document.elementFromPoint(x!, y!)?.closest('summary')),
+        [box.x + 20, firstRow.y + 1, title.y + title.height - 1],
+      );
+      expect(hits).toEqual([false, false]);
+      expect(box.y + box.height).toBeLessThanOrEqual(firstRow.y);
+      expect(box.y).toBeGreaterThanOrEqual(title.y + title.height);
     });
   });
 });

@@ -5,7 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChangeEntry } from '../change-summary/types';
-import { APPLIED_SCROLL_THRESHOLD, RebaseNotice, type RebaseNoticeProps } from './RebaseNotice';
+import { RebaseNotice, type RebaseNoticeProps } from './RebaseNotice';
 import type { RebaseConflict } from './types';
 
 afterEach(cleanup);
@@ -195,17 +195,16 @@ describe('<RebaseNotice />: which fields were applied (#722)', () => {
     afterMissing: missing.afterMissing ?? false,
   });
 
-  it('the list of applied fields is capped (and may scroll) only beyond the documented threshold; below it is a plain list, not a tab stop', () => {
-    expect(APPLIED_SCROLL_THRESHOLD).toBeGreaterThan(6);
-    const at = Array.from({ length: APPLIED_SCROLL_THRESHOLD }, (_, i) => entry(`f${i}`, `F${i}`));
-    const view = render(<RebaseNotice {...props({ applied: at })} />);
-    let list = view.container.querySelector('ul.rop-pro-rebase-notice__applied')!;
-    expect(list.querySelectorAll('li')).toHaveLength(APPLIED_SCROLL_THRESHOLD);
-    expect(list.classList.contains('rop-pro-rebase-notice__applied--capped')).toBe(false);
-    expect(list.hasAttribute('tabindex')).toBe(false);
-    view.rerender(<RebaseNotice {...props({ applied: [...at, entry('extra', 'Extra')] })} />);
-    list = view.container.querySelector('ul.rop-pro-rebase-notice__applied')!;
-    expect(list.classList.contains('rop-pro-rebase-notice__applied--capped')).toBe(true);
+  it('the list of applied fields is a tab stop only when it measurably scrolls, never by the number of fields (no layout here: never)', () => {
+    for (const n of [4, 12, 13, 40]) {
+      const list = Array.from({ length: n }, (_, i) => entry(`f${i}`, `F${i}`));
+      const view = render(<RebaseNotice {...props({ applied: list })} />);
+      const ul = view.container.querySelector('ul.rop-pro-rebase-notice__applied')!;
+      expect(ul.querySelectorAll('li')).toHaveLength(n);
+      expect(ul.hasAttribute('tabindex')).toBe(false);
+      expect(ul.hasAttribute('data-more')).toBe(false);
+      view.unmount();
+    }
   });
 
   it.each([

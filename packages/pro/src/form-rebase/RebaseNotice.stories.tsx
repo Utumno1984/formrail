@@ -160,7 +160,31 @@ export const ManyApplied: Story = {
   },
 };
 
-/** Beyond the scroll threshold (12 fields): the list is capped and scrolls, with a fade while rows are hidden. */
+/** Four fields: the smallest list behind the disclosure. It fits whatever the viewport, so nothing is cut and it is not a tab stop. */
+export const FourApplied: Story = {
+  args: {
+    conflicts: [],
+    applied: Array.from({ length: 4 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText('4 fields were updated.'));
+    await expect(within(canvasElement).getByRole('list', { name: 'Updated fields' })).toBeVisible();
+  },
+};
+
+/** Twelve fields (the old threshold): the height cap applies whatever the number of fields, so on a short viewport the list scrolls. */
+export const TwelveApplied: Story = {
+  args: {
+    conflicts: [],
+    applied: Array.from({ length: 12 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText('12 fields were updated.'));
+    await expect(within(canvasElement).getByRole('list', { name: 'Updated fields' })).toBeVisible();
+  },
+};
+
+/** Sixteen fields: the list is capped and scrolls, with a fade while rows are hidden. */
 export const BeyondScrollThreshold: Story = {
   tags: ['visual'],
   args: {
