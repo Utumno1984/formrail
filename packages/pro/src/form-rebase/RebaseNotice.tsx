@@ -154,6 +154,56 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
 
 const RN = 'rop-pro-rebase-notice';
 const NO_BREAK_SPACE = '\u00a0';
+/**
+ * Up to this many applied fields the list shows every row in full, without a scroll of its own (a record rebase
+ * touching a dozen fields is already a lot to read; hiding half of a short list behind a scroll hid exactly the
+ * values the user came to check). Beyond it the list is capped in height (`--rop-pro-rebase-applied-max-height`) and
+ * scrolls, with a fade at the bottom while rows are hidden: a cut is never silent.
+ */
+export const APPLIED_SCROLL_THRESHOLD = 12;
+
+/**
+ * The list of applied fields. It is a tab stop only while it really scrolls (a keyboard user must be able to read
+ * the hidden rows), and marks with `data-more` that rows are still hidden below (the stylesheet fades the bottom).
+ */
+function AppliedList({ label, count, children }: { label: string; count: number; children: ReactNode }) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [state, setState] = useState({ scrolls: false, more: false });
+  const capped = count > APPLIED_SCROLL_THRESHOLD;
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (el === null) return;
+    const scrolls = el.scrollHeight > el.clientHeight + 1;
+    const more = scrolls && el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setState((prev) => (prev.scrolls === scrolls && prev.more === more ? prev : { scrolls, more }));
+  }, []);
+  useIsomorphicLayoutEffect(() => {
+    measure();
+    const el = ref.current;
+    const details = el?.closest('details');
+    details?.addEventListener('toggle', measure);
+    const observer = typeof ResizeObserver === 'undefined' || el === null ? null : new ResizeObserver(measure);
+    if (el !== null) observer?.observe(el);
+    return () => {
+      details?.removeEventListener('toggle', measure);
+      observer?.disconnect();
+    };
+  }, [measure, count]);
+  return (
+    <ul
+      ref={ref}
+      aria-label={label}
+      className={cn(`${RN}__applied`, capped && `${RN}__applied--capped`)}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard
+      tabIndex={state.scrolls ? 0 : undefined}
+      data-more={state.more ? '' : undefined}
+      onScroll={measure}
+    >
+      {children}
+    </ul>
+  );
+}
+
 /** Up to this many applied fields are named in the sentence; more go in the list. */
 const NAMED_MAX = 3;
 type Action = 'theirs' | 'mine' | 'all';
@@ -547,8 +597,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
           {applied.length > NAMED_MAX ? (
             <details className={`${RN}__details`}>
               <summary className={`${RN}__summary`}>{appliedText}</summary>
-              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard */}
-              <ul aria-label={labels.appliedList} className={`${RN}__applied`} tabIndex={0}>
+              <AppliedList label={labels.appliedList} count={applied.length}>
                 {applied.map((entry) => {
                   const [beforeText, afterText] = renderValue ? ['', ''] : entryTexts(entry);
                   return (
@@ -567,7 +616,7 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
                     </li>
                   );
                 })}
-              </ul>
+              </AppliedList>
             </details>
           ) : null}
           {conflicts.length > 0 ? (

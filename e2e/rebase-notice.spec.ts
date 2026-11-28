@@ -51,4 +51,31 @@ test.describe('Pro/RebaseNotice', () => {
     await expect(summary).toBeFocused();
     await expect(page.getByRole('list', { name: 'Updated fields' }).getByRole('listitem')).toHaveCount(6);
   });
+
+  test('six applied fields: all rows are visible, nothing scrolls, and the list is not a tab stop', async ({ page }) => {
+    await expectPlayToPass(page, 'pro-rebasenotice--many-applied');
+    const list = page.getByRole('list', { name: 'Updated fields' });
+    const rows = list.getByRole('listitem');
+    await expect(rows).toHaveCount(6);
+    for (let i = 0; i < 6; i++) await expect(rows.nth(i)).toBeInViewport();
+    const metrics = await list.evaluate((el) => ({ scrolls: el.scrollHeight > el.clientHeight + 1, overflowY: getComputedStyle(el).overflowY }));
+    expect(metrics.scrolls).toBe(false);
+    expect(metrics.overflowY).toBe('visible');
+    await expect(list).not.toHaveAttribute('tabindex');
+    await expect(list).not.toHaveAttribute('data-more');
+  });
+
+  test('beyond the threshold the list scrolls, signals the hidden rows, and is a tab stop only while it scrolls', async ({ page }) => {
+    await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
+    await page.locator('.rop-pro-rebase-notice summary').click();
+    const list = page.getByRole('list', { name: 'Updated fields' });
+    await expect(list.getByRole('listitem')).toHaveCount(16);
+    await expect(list).toHaveAttribute('tabindex', '0');
+    await expect(list).toHaveAttribute('data-more', '');
+    expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight + 1)).toBe(true);
+    expect(await list.evaluate((el) => getComputedStyle(el).maskImage)).toContain('linear-gradient');
+    await list.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await expect(list).not.toHaveAttribute('data-more');
+    await expect(list).toHaveAttribute('tabindex', '0');
+  });
 });

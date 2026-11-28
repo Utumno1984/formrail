@@ -224,7 +224,7 @@
     @apply text-rop-text-muted;
   }
 
-  /* More than three applied fields: the list is closed until opened, capped in height with its own scroll. */
+  /* More than three applied fields: the list is closed until opened, capped in height with its own scroll only beyond a large number of fields. */
   .rop-pro-rebase-notice__details {
     @apply m-0 min-w-0;
   }
@@ -239,12 +239,23 @@
   }
 
   .rop-pro-rebase-notice__applied {
-    @apply m-0 mt-2 flex max-h-48 list-none flex-col gap-3 overflow-y-auto p-0;
+    @apply m-0 mt-2 flex list-none flex-col gap-3 p-0;
 
     &:focus-visible {
       outline: 2px solid var(--color-rop-primary);
       outline-offset: 2px;
     }
+  }
+
+  /* Beyond APPLIED_SCROLL_THRESHOLD fields (RebaseNotice.tsx) the list is capped and scrolls; below it every row shows. */
+  .rop-pro-rebase-notice__applied--capped {
+    @apply overflow-y-auto;
+    max-height: var(--rop-pro-rebase-applied-max-height, 24rem);
+  }
+
+  /* Rows still hidden below: fade the bottom edge so the cut is visible. */
+  .rop-pro-rebase-notice__applied[data-more] {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--rop-pro-rebase-applied-fade, 2rem)), transparent);
   }
 
   .rop-pro-rebase-notice__actions {

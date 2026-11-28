@@ -5,7 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChangeEntry } from '../change-summary/types';
-import { RebaseNotice, type RebaseNoticeProps } from './RebaseNotice';
+import { APPLIED_SCROLL_THRESHOLD, RebaseNotice, type RebaseNoticeProps } from './RebaseNotice';
 import type { RebaseConflict } from './types';
 
 afterEach(cleanup);
@@ -193,6 +193,19 @@ describe('<RebaseNotice />: which fields were applied (#722)', () => {
     after,
     beforeMissing: missing.beforeMissing ?? false,
     afterMissing: missing.afterMissing ?? false,
+  });
+
+  it('the list of applied fields is capped (and may scroll) only beyond the documented threshold; below it is a plain list, not a tab stop', () => {
+    expect(APPLIED_SCROLL_THRESHOLD).toBeGreaterThan(6);
+    const at = Array.from({ length: APPLIED_SCROLL_THRESHOLD }, (_, i) => entry(`f${i}`, `F${i}`));
+    const view = render(<RebaseNotice {...props({ applied: at })} />);
+    let list = view.container.querySelector('ul.rop-pro-rebase-notice__applied')!;
+    expect(list.querySelectorAll('li')).toHaveLength(APPLIED_SCROLL_THRESHOLD);
+    expect(list.classList.contains('rop-pro-rebase-notice__applied--capped')).toBe(false);
+    expect(list.hasAttribute('tabindex')).toBe(false);
+    view.rerender(<RebaseNotice {...props({ applied: [...at, entry('extra', 'Extra')] })} />);
+    list = view.container.querySelector('ul.rop-pro-rebase-notice__applied')!;
+    expect(list.classList.contains('rop-pro-rebase-notice__applied--capped')).toBe(true);
   });
 
   it.each([

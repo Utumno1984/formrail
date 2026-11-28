@@ -154,6 +154,17 @@ export const ManyApplied: Story = {
     await expect(rows).toHaveLength(6);
     await expect(rows[0]).toHaveTextContent('Status Before: Open Now: Approved');
     await expect(rows[5]).toHaveTextContent('Line items > Item 1 > Quantity Before: 2 Now: 3');
+    // The baseline is taken at rest: no focus ring on the summary.
+    (document.activeElement as HTMLElement | null)?.blur();
+    await expect(details).toHaveAttribute('open');
+  },
+};
+
+/** Beyond the scroll threshold (12 fields): the list is capped and scrolls, with a fade while rows are hidden. */
+export const BeyondScrollThreshold: Story = {
+  args: {
+    conflicts: [],
+    applied: Array.from({ length: 16 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
   },
 };
 
