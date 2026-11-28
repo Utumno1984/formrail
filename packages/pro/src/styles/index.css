@@ -286,7 +286,7 @@
 
   /* Rows still hidden below: fade the bottom edge so the cut is visible (a mask only reads the alpha, any opaque token does). */
   .rop-pro-rebase-notice__applied[data-more] {
-    mask-image: linear-gradient(to bottom, var(--color-rop-primary) calc(100% - var(--rop-pro-rebase-applied-fade, 3.5rem)), transparent);
+    mask-image: linear-gradient(to bottom, var(--color-rop-primary) calc(100% - var(--rop-pro-rebase-applied-fade, 4.5rem)), transparent);
   }
 
   .rop-pro-rebase-notice__actions {

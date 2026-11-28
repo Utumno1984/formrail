@@ -107,11 +107,11 @@ test.describe('Pro/RebaseNotice', () => {
   test('the fade is tall enough to cover the gap between two rows', async ({ page }) => {
     await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
     const list = page.getByRole('list', { name: 'Updated fields' });
-    // The fade as the browser computes it from the mask of the list: `calc(100% - 56px)` for 3.5rem.
+    // The fade as the browser computes it from the mask of the list: `calc(100% - 72px)` for 4.5rem.
     const mask = await list.evaluate((el) => getComputedStyle(el).maskImage);
     expect(mask).toContain('linear-gradient');
     const px = Number(/calc\(100% - ([\d.]+)px\)/.exec(mask)?.[1]);
-    expect(px).toBeGreaterThanOrEqual(56);
+    expect(px).toBeGreaterThanOrEqual(72);
   });
 
   test.describe('coarse pointer', () => {
