@@ -55,7 +55,7 @@ const THIRD_PARTY = [
 ];
 
 test.describe('Pro page for teams: content', () => {
-  test('shows the message, Free vs Pro, the license scheme and the waitlist CTA, in one h1', async ({ page }) => {
+  test('shows the message, Free vs Pro, the license scheme and the early access CTA, in one h1', async ({ page }) => {
     await page.goto('teams/');
     await expect(page.getByRole('heading', { level: 1, name: 'Formrail Pro for teams' })).toBeVisible();
     await expect(page.locator('.lead')).toContainText('Record-edit integrity');
@@ -71,7 +71,7 @@ test.describe('Pro page for teams: content', () => {
     await expect(license).toContainText('One-time license per developer, 12 months of updates included.');
     await expect(license).toContainText('not a binding offer');
     await expect(license).toContainText('no payment or pre-order is taken');
-    await expect(page.getByRole('heading', { level: 2, name: 'Join the waitlist' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Request early access' })).toBeVisible();
   });
 
   test('the wording names no third-party product; React Hook Form / TanStack are named only on teams/, in the tested-version claim (#563)', async ({ page }) => {
@@ -208,7 +208,7 @@ test.describe('Pro page for teams: content', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     for (const [hash, heading] of [
       ['#license', 'License'],
-      ['#waitlist', 'Join the waitlist'],
+      ['#waitlist', 'Request early access'],
     ] as const) {
       await page.goto(`teams/${hash}`);
       const top = await page.evaluate((id) => document.getElementById(id)!.getBoundingClientRect().top, hash.slice(1));
@@ -245,7 +245,7 @@ test.describe('price', () => {
   });
 });
 
-test.describe('waitlist call-to-action', () => {
+test.describe('early access call-to-action', () => {
   test(
     earlyAccessUrl
       ? 'the CTA is an external rel=noopener link to the form, with the data note and the privacy link'
@@ -255,7 +255,7 @@ test.describe('waitlist call-to-action', () => {
       const cta = page.getByRole('link', { name: 'Request early access' });
       if (!earlyAccessUrl) {
         await expect(cta).toHaveCount(0);
-        await expect(page.getByRole('link', { name: 'Join the waitlist' })).toHaveCount(0);
+        await expect(page.getByRole('link', { name: 'Go to the early access form' })).toHaveCount(0);
         expect(await page.locator('body').innerText()).not.toMatch(/early access|waitlist|external form/i);
         await expect(page.locator('a[href=""], a[href="#"], a[href="#waitlist"]')).toHaveCount(0);
         return;
@@ -269,9 +269,13 @@ test.describe('waitlist call-to-action', () => {
       await expect(note).toContainText('nothing is embedded');
       await expect(note.getByRole('link', { name: 'privacy page' })).toHaveAttribute('href', '../privacy/');
       await expect(note).toContainText('consent');
-    await expect(note).toContainText('your email to contact you about Formrail Pro early access and your answers to plan the product');
-      await expect(note).toContainText('its size');
-      await expect(page.getByRole('link', { name: 'Join the waitlist' })).toHaveAttribute('href', '#waitlist');
+      // expected text changed on purpose (#716): the note also names replying to the request
+      await expect(note).toContainText('your email and your answers to reply to your request, to contact you about Formrail Pro early access and to plan the product');
+      await expect(note).toContainText('your work email, your company or team, how many developers would need a license, what you would use Formrail Pro for, your team size, optionally which form libraries you use, when you would need it');
+      await expect(note).toContainText('which form libraries you use');
+      await expect(note).toContainText('We reply by email. Nothing is sold through this form and no payment is taken.');
+      await expect(note).not.toContainText(/waitlist/i);
+      await expect(page.getByRole('link', { name: 'Go to the early access form' })).toHaveAttribute('href', '#waitlist');
     },
   );
 
@@ -319,13 +323,13 @@ test.describe('design partners (#697)', () => {
         await expect(apply).toHaveAttribute('rel', /\bnoopener\b/);
         const note = section.locator('.cta .muted');
         await expect(note).toContainText('Opens an external form (Tally, servers in the EU) in a new tab; nothing is embedded in this page.');
-        await expect(note).toContainText('different form from the waitlist one');
+        await expect(note).toContainText('different form from the early access request one');
         await expect(note.getByRole('link', { name: 'privacy page' })).toHaveAttribute('href', '../privacy/');
       } else {
         await expect(section).toContainText('All design partner seats are taken for now.');
         await expect(section.getByRole('link', { name: 'Apply as a design partner' })).toHaveCount(0);
         await expect(section.locator(`a[href="${designPartnerUrl}"]`)).toHaveCount(0);
-        if (earlyAccessUrl) await expect(section.getByRole('link', { name: 'Go to the waitlist form' })).toHaveAttribute('href', '#waitlist');
+        if (earlyAccessUrl) await expect(section.getByRole('link', { name: 'Go to the early access form' })).toHaveAttribute('href', '#waitlist');
       }
       // Nothing is promised: no date, no obligation, the discount is a percentage.
       const text = await section.innerText();
@@ -347,7 +351,7 @@ test.describe('design partners (#697)', () => {
     await expect(page.locator('#design-partners-title')).toBeInViewport();
   });
 
-  test('the privacy page lists the fields of the form one by one, in a section separate from the waitlist one', async ({ page }) => {
+  test('the privacy page lists the fields of the form one by one, in a section separate from the early access request one', async ({ page }) => {
     test.skip(!designPartnerUrl, 'no section without a URL');
     await page.goto('privacy/');
     await expect(page.getByRole('heading', { level: 2, name: 'Design partner applications' })).toBeVisible();
@@ -369,10 +373,10 @@ test.describe('design partners (#697)', () => {
     await expect(main).toContainText('art. 6(1)(a) GDPR');
     await expect(main).toContainText('no later than 24 months after your application');
     await expect(main).toContainText('servers in the European Union');
-    // The waitlist notice is unchanged: its own fields, its own purposes.
-    await expect(main.locator('#data-title + p + ul li')).toHaveCount(5);
-    await expect(main.locator('#purpose-title + p + ul li')).toHaveCount(2);
-    // The new section never links the form and never speaks of the waitlist offer.
+    // The early access request notice has its own fields and purposes (#716).
+    await expect(main.locator('#data-title + p + ul li')).toHaveCount(8);
+    await expect(main.locator('#purpose-title + p + ul li')).toHaveCount(3);
+    // The new section never links the form and never speaks of the early access offer.
     await expect(main.locator('a[href*="tally.so/r/"]')).toHaveCount(0);
     const section = await main.locator('#design-partners-title ~ *').evaluateAll((els) => {
       const out: string[] = [];
@@ -382,9 +386,10 @@ test.describe('design partners (#697)', () => {
       }
       return out.join(' ');
     });
-    expect(section).not.toMatch(/waitlist form (asks|is hosted)/i);
-    expect(section).not.toMatch(/early access/i);
-    // The email copy of Tally is disclosed, with Google and its transfer basis; the waitlist wording is not reused.
+    expect(section).not.toMatch(/early access request form (asks|is hosted)/i);
+    // the only mention left is the name of the other form (#716: "waitlist" became "early access request")
+    expect(section.replace(/early access request( one| form)?/gi, '')).not.toMatch(/early access/i);
+    // The email copy of Tally is disclosed, with Google and its transfer basis; the design partner section says it in its own words.
     expect(section).toContain('formrail.dev@gmail.com');
     expect(section).toContain('under its own terms and privacy policy');
     expect(section).not.toMatch(/Google[^.]*as our processor/);
@@ -427,24 +432,33 @@ test.describe('privacy page', () => {
     await expect(main).toContainText('Daniele Ingusci');
     const fields = main.locator('#data-title + p + ul li');
     await expect(fields).toHaveText([
-      /email address \(required\)/,
-      /size of your team \(required\)/,
-      /when you would need Formrail Pro \(required\)/,
-      /form libraries you use today \(optional, you can pick several\)/,
-      /your consent .* \(required\)/,
+      /^Work email \(required\)/,
+      /^Company or team \(required\)/,
+      /^How many developers would need a license\? \(required\)/,
+      /^What would you use Formrail Pro for\? \(.*required\)/,
+      /^Team size \(required\)/,
+      /^Which form library do you use\? \(optional, you can pick several\)/,
+      /^When would you need it\? \(required\)/,
+      /^Consent, a box you check yourself, with the text quoted below \(required\)/,
     ]);
     await expect(main).toContainText('Without the required fields the form cannot be submitted');
     await expect(main).not.toContainText('Giving it is optional');
     await expect(main).toContainText('art. 6(1)(a)');
     await expect(main.locator('#purpose-title + p + ul li')).toHaveText([
+      /reply to your early access request/,
       /contact you.*Formrail Pro early access/,
-      /answers \(team size, form libraries, timing\) to plan the product/,
+      /answers \(company or team, number of developers, use case, team size, form libraries, timing\) to plan the product/,
     ]);
     await expect(main).toContainText(
-      'I agree that Formrail may use my email address to contact me about Formrail Pro early access, and my answers to plan the product, as described in the privacy notice above.',
+      'I agree that Formrail may use my email address and my answers to reply to my early access request, to contact me about Formrail Pro early access and to plan the product, as described in the privacy notice.',
     );
+    // requests sent before the change: their fields, their consent text, their purposes
+    await expect(main).toContainText('Requests sent before the form changed on 27 November 2026 contain only the fields of that time');
+    await expect(main).toContainText('as described in the privacy notice above.');
+    await expect(main).toContainText('For those requests the purposes of that time apply');
     await expect(main).toContainText('withdraw your consent at any time');
-    await expect(main).toContainText('not copied to email or to any other service');
+    await expect(main).toContainText('Tally also sends a copy of every request by email to formrail.dev@gmail.com');
+    await expect(main).not.toContainText(/waitlist/i);
     await expect(main).toContainText('GitHub Pages');
     const transfers = main.locator('#transfers-title ~ p');
     await expect(transfers.nth(0)).toContainText('GitHub Inc., USA');
@@ -454,6 +468,8 @@ test.describe('privacy page', () => {
     await expect(transfers.nth(1)).toContainText('stores the responses in the European Union');
     await expect(transfers.nth(1)).toContainText('outside the EEA');
     await expect(transfers.nth(1)).not.toContainText(/standard contractual clauses/i);
+    await expect(transfers.nth(2)).toContainText('provided by Google LLC (USA)');
+    await expect(transfers.nth(2)).toContainText('EU-US Data Privacy Framework');
     const githubPolicy = main.getByRole('link', { name: 'privacy statement' });
     const tallyPolicy = main.getByRole('link', { name: 'privacy policy' });
     await expect(githubPolicy).toHaveAttribute(
@@ -471,7 +487,7 @@ test.describe('privacy page', () => {
     await expect(tallyPolicy).toHaveAttribute('rel', /noopener/);
     // No postal address: the contact is the email only.
     await expect(main).not.toContainText(/postal address/i);
-    await expect(main).toContainText('no later than 24 months after sign-up, or earlier if you withdraw your consent');
+    await expect(main).toContainText('no later than 24 months after you send the request, or earlier if you withdraw your consent');
     await expect(main).not.toContainText('once a year');
     await expect(main).toContainText('Formrail is a project by Daniele Ingusci');
     await expect(main).not.toContainText('12 months after');
@@ -519,7 +535,7 @@ test.describe('public wording matches the privacy notice', () => {
     }
     test.skip(!earlyAccessUrl, 'no CTA note without a URL');
     await page.goto('');
-    await expect(page.locator('#pro .cta')).toContainText('your answers to plan the product');
+    await expect(page.locator('#pro .cta')).toContainText('your answers to reply to your request, to contact you about Pro early access and to plan the product');
     await expect(page.locator('#pro .cta')).toContainText('privacy page');
   });
 
@@ -823,7 +839,7 @@ test.describe('JavaScript disabled', () => {
     await expect(page.getByRole('table')).toBeVisible();
     if (earlyAccessUrl) {
       await expect(page.getByRole('link', { name: 'Request early access' })).toHaveAttribute('href', earlyAccessUrl);
-      await page.getByRole('link', { name: 'Join the waitlist' }).click();
+      await page.getByRole('link', { name: 'Go to the early access form' }).click();
       await expect(page).toHaveURL(/#waitlist$/);
     }
     await page.getByRole('link', { name: 'privacy page' }).first().click();
