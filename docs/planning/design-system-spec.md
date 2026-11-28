@@ -415,7 +415,7 @@ nothing. So far this was done only at a reviewer's initiative (#174).
 
 **Rule.** Every PR that adds or modifies the logic of an **engine** goes through a round of **manual,
 targeted** mutation testing, done during code review (procedure in
-the code review guidelines): mutate by hand the conditions and comparisons introduced
+`.claude/agents/adversarial-reviewer.md`): mutate by hand the conditions and comparisons introduced
 or touched by the diff, one mutation at a time, and verify that at least one existing test fails. A
 surviving, non-equivalent mutation counts as a missing test: PR rejected.
 

@@ -1,46 +1,46 @@
 ---
 name: test-harness-spec
-description: Come scrivere una fixture in Internal/Harness su Storybook per validare stati asincroni e contesti controllati di un hook — usala quando aggiungi o rivedi una fixture in packages/core/src/internal/*.stories.tsx.
+description: How to write an Internal/Harness fixture in Storybook to validate asynchronous states and controlled contexts of a hook — use it when you add or review a fixture in packages/core/src/internal/*.stories.tsx.
 ---
 
-# Test harness: fixture in Internal/*
+# Test harness: fixtures in Internal/*
 
-Riferimento: `UseObjectPageFormFixture.stories.tsx`, `UseListReportFixture.stories.tsx`,
+Reference: `UseObjectPageFormFixture.stories.tsx`, `UseListReportFixture.stories.tsx`,
 `UseComboboxFixture.stories.tsx`, `ReturnFocus.stories.tsx`, `OverlayLayers.stories.tsx`,
-`GeometryFixtures.stories.tsx`, `Harness.stories.tsx` sono i precedenti da seguire.
+`GeometryFixtures.stories.tsx`, `Harness.stories.tsx` are the precedents to follow.
 
-## Cosa sono (e cosa non sono)
+## What they are (and what they are not)
 
-Una fixture `Internal/*` è un componente minimale, **senza styling di produzione**, che monta un
-hook (mai un intero componente pubblico) ed espone il suo stato interno via `data-testid`, per
-poterlo leggere da un test e2e senza dipendere dal markup di un componente reale (che può cambiare
-per ragioni visive non legate all'hook). Non è mai esportata dal pacchetto (`src/index.ts` non la
-tocca) e non va mai ri-esportata da lì.
+An `Internal/*` fixture is a minimal component, **without production styling**, that mounts a
+hook (never a whole public component) and exposes its internal state through `data-testid`, so
+that an e2e test can read it without depending on the markup of a real component (which can
+change for visual reasons unrelated to the hook). It is never exported by the package
+(`src/index.ts` does not touch it) and must never be re-exported from there.
 
-## Stati asincroni
+## Asynchronous states
 
-Simula il ritardo con `setTimeout`/una Promise esplicita, mai un valore già pronto al mount: il
-bug più comune nei consumer di un hook di stato (dirty-tracking, ricerca, filtro) è distinguere
-un valore che arriva **dopo** il mount da uno presente fin dall'inizio. Esempio dal pattern già in
-uso (`UseObjectPageFormFixture`): un bottone "Carica dati" che dopo 500ms chiama `reset(valore)`,
-così un test può verificare che il form NON diventi sporco quando l'idratazione arriva da un gesto
-esplicito, e CHE lo diventi quando l'utente modifica un campo dopo.
+Simulate the delay with `setTimeout`/an explicit Promise, never a value already available on
+mount: the most common bug in the consumers of a state hook (dirty-tracking, search, filter) is
+telling a value that arrives **after** mount from one present from the start. An example from
+the pattern already in use (`UseObjectPageFormFixture`): a "Load data" button that calls
+`reset(value)` after 500ms, so a test can check that the form does NOT become dirty when the
+hydration comes from an explicit gesture, and THAT it does when the user then edits a field.
 
-## Contesti controllati
+## Controlled contexts
 
-Esponi sia il percorso felice sia quello di errore come azioni separate (es. due bottoni "Salva
-(ok)" / "Salva (errore)" che chiamano la stessa funzione del hook con un risultato diverso), non
-solo il caso che funziona. Lo stato interno che un test deve poter leggere (dirty, saving, errore,
-conteggio, ecc.) è un `data-testid` dedicato con il valore reso in testo semplice (`sì`/`no`,
-messaggio di errore) — non dedurlo da una classe CSS o da un attributo ARIA pensato per
-l'accessibilità, che può cambiare indipendentemente dallo stato che il test vuole verificare.
+Expose both the happy path and the error path as separate actions (e.g. two buttons "Save
+(ok)" / "Save (error)" that call the same hook function with a different result), not only the
+case that works. The internal state that a test must be able to read (dirty, saving, error,
+count, etc.) is a dedicated `data-testid` with the value rendered as plain text (`yes`/`no`, an
+error message) — do not infer it from a CSS class or from an ARIA attribute meant for
+accessibility, which can change independently of the state the test wants to check.
 
-## Cosa verificare da un test contro questa fixture
+## What to check from a test against this fixture
 
-- Lo stato cambia nell'ordine giusto (es. `saving: true` compare prima del risultato, sparisce
-  dopo, indipendentemente da successo o errore).
-- Un'azione ripetuta mentre un'operazione è già in corso (secondo click su "Salva" prima che la
-  prima finisca) ha il comportamento dichiarato dal ticket (ignorata, in coda, ecc.), non quello
-  che capita per come React ha schedulato gli effetti.
-- Smontare il componente a metà di un'operazione asincrona non lascia un `setState` su un
-  componente smontato (nessun warning React in console) né un listener/timer orfano.
+- The state changes in the right order (e.g. `saving: true` appears before the result and
+  disappears after it, regardless of success or error).
+- An action repeated while an operation is already in progress (a second click on "Save" before
+  the first one finishes) has the behaviour declared by the ticket (ignored, queued, etc.), not
+  whatever happens because of how React scheduled the effects.
+- Unmounting the component in the middle of an asynchronous operation leaves no `setState` on an
+  unmounted component (no React warning in the console) nor an orphan listener/timer.

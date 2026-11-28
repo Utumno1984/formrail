@@ -1,55 +1,56 @@
 ---
 name: dnd-virtual-table
-description: Sincronizzazione indici dataset/DOM per liste virtualizzate con drag-and-drop — usala quando progetti o implementi un componente che combina virtualizzazione e riordino (nessuno ancora in Formrail; prerequisito prima del primo ticket che li introduce, vedi design-system-spec.md §6 Pro "tabelle avanzate").
+description: Dataset/DOM index synchronisation for virtualised lists with drag-and-drop — use it when you design or implement a component that combines virtualisation and reordering (none yet in Formrail; a prerequisite before the first ticket that introduces them, see design-system-spec.md §6 Pro "advanced tables").
 ---
 
-# Drag-and-drop su liste virtualizzate
+# Drag-and-drop on virtualised lists
 
-Non esiste ancora un componente così in `packages/core` (nessun `ListReportTable` attuale è
-virtualizzato o riordinabile). Questa skill fissa i vincoli **prima** che il primo ticket li
-introduca, perché sono facili da sbagliare al primo giro e costosi da correggere dopo.
+No such component exists yet in `packages/core` (no current `ListReportTable` is virtualised or
+reorderable). This skill sets the constraints **before** the first ticket introduces them,
+because they are easy to get wrong on the first round and expensive to fix later.
 
-## Il problema di fondo
+## The underlying problem
 
-Una lista virtualizzata renderizza solo le righe visibili e **ricicla** i nodi DOM quando si
-scorre: lo stesso elemento DOM rappresenta una riga di dataset diversa in momenti diversi. Il
-drag-and-drop introduce un secondo asse di cambiamento (l'ordine logico del dataset cambia durante
-il drag, prima che il commit finale avvenga). I due assi combinati rompono qualunque assunzione
-che leghi "indice visivo nel DOM" a "indice nel dataset".
+A virtualised list renders only the visible rows and **recycles** the DOM nodes while scrolling:
+the same DOM element represents a different dataset row at different times. Drag-and-drop adds a
+second axis of change (the logical order of the dataset changes during the drag, before the
+final commit happens). The two axes combined break any assumption that ties "visual index in the
+DOM" to "index in the dataset".
 
-## Regole
+## Rules
 
-- **Identità stabile, mai indice**: ogni riga trascinabile porta una chiave stabile (id del
-  dato), non l'indice di render. Un handler di drag che cattura l'indice al mount e lo riusa dopo
-  uno scroll/riciclo del nodo sposta la riga sbagliata — bug silenzioso, non un errore a runtime.
-- **Indice visivo ≠ indice dataset durante il drag**: il punto di drop si calcola dalla posizione
-  reale nel viewport (coordinate, non indice renderizzato), convertita nell'indice del dataset
-  *corrente* (che può differere dall'indice al momento del `dragstart` se il dataset è cambiato
-  sotto il drag, es. un fetch in corso). Non assumere mai che l'ordine di render coincida con
-  l'ordine finale.
-- **Nessuna closure stale sul nodo riciclato**: un handler di drag/drop registrato per riga non
-  deve catturare `props`/stato per valore in una closure che sopravvive al riciclo del nodo
-  virtualizzato — usare un ref aggiornato ad ogni render o passare l'id esplicitamente
-  nell'evento, mai leggere una variabile catturata al mount.
-- **Scroll durante il drag**: se il drag vicino al bordo del viewport autoscrolla, il calcolo del
-  drop target deve ricampionare la posizione ad ogni frame di scroll, non una volta sola
-  all'inizio del drag.
-- **Test e2e**: non basta un `dragstart`/`dragover`/`drop` sintetico su un indice fisso — il test
-  deve scorrere la lista a metà drag e verificare che il drop finisca sulla riga di dataset
-  corretta (per id, non per posizione), riusando gli helper geometrici già in `e2e/helpers/
-  geometry.ts` (`expectSingleScroller`, `expectNoHorizontalOverflow`) per la parte di layout.
+- **Stable identity, never an index**: every draggable row carries a stable key (the id of the
+  data), not the render index. A drag handler that captures the index on mount and reuses it
+  after a scroll/recycling of the node moves the wrong row — a silent bug, not a runtime error.
+- **Visual index ≠ dataset index during the drag**: the drop point is computed from the real
+  position in the viewport (coordinates, not the rendered index), converted into the index of
+  the *current* dataset (which may differ from the index at `dragstart` time if the dataset
+  changed under the drag, e.g. a fetch in progress). Never assume that the render order matches
+  the final order.
+- **No stale closure on the recycled node**: a drag/drop handler registered per row must not
+  capture `props`/state by value in a closure that survives the recycling of the virtualised
+  node — use a ref updated on every render or pass the id explicitly in the event, never read a
+  variable captured on mount.
+- **Scrolling during the drag**: if dragging near the edge of the viewport auto-scrolls, the
+  computation of the drop target must resample the position on every scroll frame, not just once
+  at the start of the drag.
+- **e2e tests**: a synthetic `dragstart`/`dragover`/`drop` on a fixed index is not enough — the
+  test must scroll the list halfway through the drag and check that the drop lands on the
+  correct dataset row (by id, not by position), reusing the geometric helpers already in
+  `e2e/helpers/geometry.ts` (`expectSingleScroller`, `expectNoHorizontalOverflow`) for the layout
+  part.
 
-## Feedback visivo durante il drag (specifica, non ancora implementata)
+## Visual feedback during the drag (specification, not yet implemented)
 
-Quando il componente nascerà, la riga trascinata e il punto di inserimento seguono la stessa
-disciplina di elevazione già in uso per gli altri overlay (`overlayLayer` in `src/overlay/
-layers.ts`):
+When the component is created, the dragged row and the insertion point follow the same
+elevation discipline already used for the other overlays (`overlayLayer` in
+`src/overlay/layers.ts`):
 
-- **Riga trascinata**: elevata sopra le altre righe (un livello dedicato, non riusare
-  `overlayLayer.popover`/`.modal`: il drag non è un overlay portato fuori dal flusso, resta
-  dentro la tabella) con un'ombra più marcata della riga a riposo — stessa famiglia di token
-  ombra già in uso su `Dialog`/`Tooltip`, un gradino sopra quella del `Tooltip`.
-- **Linea di inserimento**: 2px, colore `--color-rop-blue-600` (il token primario, scala in
-  `tokens.css`), non un colore hardcoded — così segue un eventuale override del tema del
-  consumer. Visibile solo mentre un drag è attivo, mai renderizzata a riposo (niente `opacity:0`
-  sempre nel DOM: un elemento invisibile ma presente può comunque intercettare un hit-test).
+- **Dragged row**: raised above the other rows (a dedicated level, do not reuse
+  `overlayLayer.popover`/`.modal`: the drag is not an overlay taken out of the flow, it stays
+  inside the table) with a stronger shadow than the row at rest — the same family of shadow
+  tokens already used on `Dialog`/`Tooltip`, one step above the `Tooltip` one.
+- **Insertion line**: 2px, colour `--color-rop-blue-600` (the primary token, scale in
+  `tokens.css`), not a hard-coded colour — so it follows any theme override by the consumer.
+  Visible only while a drag is active, never rendered at rest (no `opacity:0` always in the DOM:
+  an invisible but present element can still intercept a hit test).
