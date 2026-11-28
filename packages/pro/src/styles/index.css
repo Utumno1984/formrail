@@ -253,9 +253,9 @@
     max-height: var(--rop-pro-rebase-applied-max-height, 24rem);
   }
 
-  /* Rows still hidden below: fade the bottom edge so the cut is visible. */
+  /* Rows still hidden below: fade the bottom edge so the cut is visible (a mask only reads the alpha, any opaque token does). */
   .rop-pro-rebase-notice__applied[data-more] {
-    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--rop-pro-rebase-applied-fade, 2rem)), transparent);
+    mask-image: linear-gradient(to bottom, var(--color-rop-primary) calc(100% - var(--rop-pro-rebase-applied-fade, 2rem)), transparent);
   }
 
   .rop-pro-rebase-notice__actions {
