@@ -10,7 +10,7 @@ import { settleMotion } from '../internal/settle-motion';
 import { storyControl, withoutControls } from '../internal/story-docs';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '../menu/Menu';
 import { MessageStrip } from '../message-strip/MessageStrip';
-import { Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { ConfirmDialog, type ConfirmDialogTone } from './ConfirmDialog';
 import { useConfirmDialog } from './use-confirm-dialog';
 
@@ -524,7 +524,10 @@ export const WithUseConfirmDialog: Story = {
 
 /**
  * An editor in a `Sheet` asks "Discard changes?" before closing: the confirmation is above the
- * sheet, Escape closes only the confirmation, and the focus goes back into the sheet.
+ * sheet, Escape closes only the confirmation, and the focus goes back into the sheet. Every way out
+ * of the sheet asks: the close is intercepted in the sheet's `onOpenChange` (its `false` opens the
+ * confirmation; only confirming closes the sheet), and "Close editor" is a `SheetClose`, so the
+ * sheet draws no close button of its own beside it. Escape and the backdrop ask too.
  */
 export const InsideASheet: Story = {
   args: {
@@ -539,7 +542,7 @@ export const InsideASheet: Story = {
       const [ask, setAsk] = useState(false);
       return (
         <Page>
-          <Sheet open={sheet} onOpenChange={setSheet}>
+          <Sheet open={sheet} onOpenChange={(next) => (next ? setSheet(true) : setAsk(true))}>
             <SheetTrigger asChild>
               <Button variant="primary">Edit supplier</Button>
             </SheetTrigger>
@@ -553,7 +556,9 @@ export const InsideASheet: Story = {
                 </Field>
               </SheetBody>
               <SheetFooter>
-                <Button onClick={() => setAsk(true)}>Close editor</Button>
+                <SheetClose asChild>
+                  <Button>Close editor</Button>
+                </SheetClose>
               </SheetFooter>
             </SheetContent>
           </Sheet>
@@ -590,6 +595,16 @@ export const InsideASheet: Story = {
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(body.queryByRole('dialog', { name: args.title })).toBeNull());
     await expect(body.getByRole('dialog', { name: 'Edit supplier' })).toBeInTheDocument();
+    await waitFor(() => expect(close).toHaveFocus());
+    // The only close of the sheet is "Close editor": no second button that would skip the question.
+    await expect(within(sheet).getAllByRole('button')).toEqual([close]);
+    // Escape on the sheet asks too; keeping the edits leaves the sheet open.
+    await userEvent.keyboard('{Escape}');
+    const again = await body.findByRole('dialog', { name: args.title });
+    await userEvent.click(within(again).getByRole('button', { name: args.cancelLabel }));
+    await waitFor(() => expect(body.queryByRole('dialog', { name: args.title })).toBeNull());
+    await expect(body.getByRole('dialog', { name: 'Edit supplier' })).toBeInTheDocument();
+    await expect(args.onConfirm).not.toHaveBeenCalled();
     await waitFor(() => expect(close).toHaveFocus());
   },
 };

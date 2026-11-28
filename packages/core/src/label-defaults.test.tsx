@@ -21,6 +21,7 @@ import { DEFAULT_LABELS as MULTI_SELECT_DEFAULT_LABELS } from './multi-select/Mu
 import { DEFAULT_LABELS as NUMBER_INPUT_DEFAULT_LABELS, NumberInput } from './number-input/NumberInput';
 import { useDirtyGuard } from './object-page/use-dirty-guard';
 import { DEFAULT_LABELS as PAGINATION_DEFAULT_LABELS, Pagination } from './pagination/Pagination';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from './sheet/Sheet';
 import { DEFAULT_DISMISS_LABEL, TONE_LABEL } from './toast/ToastProvider';
 
 // #540: the default of a label key is written in the prose of the key ("Default `Previous page`."), the only
@@ -270,8 +271,32 @@ async function dirtyGuardRendering(): Promise<Record<string, string>> {
   return values;
 }
 
+/**
+ * `SheetLabels`: `close` names the sheet's own close button (#721), drawn when the panel has no `SheetClose`; without
+ * the key it is named from the title like `SheetClose`, so the sheet is opened and the name is read from it.
+ */
+async function sheetRendering(): Promise<{ title: string; values: Record<string, string> }> {
+  const title = 'Edit supplier';
+  const { unmount } = render(
+    <Sheet defaultOpen>
+      <SheetContent>
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+        </SheetHeader>
+      </SheetContent>
+    </Sheet>,
+  );
+  const dialog = await screen.findByRole('dialog');
+  // The button takes the title's id once the title has registered (a MutationObserver): wait for its final name.
+  await waitFor(() => expect(within(dialog).getByRole('button').getAttribute('aria-labelledby')).toBeTruthy());
+  const values = { close: accessibleName(within(dialog).getByRole('button'), 'button') };
+  unmount();
+  return { title, values };
+}
+
 async function labelSources(): Promise<LabelSource[]> {
   const guard = await dirtyGuardRendering();
+  const sheet = await sheetRendering();
   const frame = frameRendering();
   // `resultCount` of the constant is not the table's default (see `announcedResultCount`): compared from the rendering.
   const tableTexts: Partial<typeof TABLE_DEFAULT_LABELS> = { ...TABLE_DEFAULT_LABELS };
@@ -318,6 +343,12 @@ async function labelSources(): Promise<LabelSource[]> {
     },
     { iface: 'NumberInputLabels', from: 'DEFAULT_LABELS of number-input/NumberInput.tsx', values: NUMBER_INPUT_DEFAULT_LABELS },
     { iface: 'PaginationLabels', from: 'DEFAULT_LABELS of pagination/Pagination.tsx', values: PAGINATION_DEFAULT_LABELS },
+    {
+      iface: 'SheetLabels',
+      from: 'rendering of a SheetContent with no SheetClose',
+      values: sheet.values,
+      examples: { close: { fill: { '<title>': sheet.title } } },
+    },
     {
       iface: 'ToastLabels',
       // `tones` is an object: its four members, in order, against the four tones the prose lists.

@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import type { StorybookConfig } from '@storybook/react-vite';
 import { docgenCompilerOptions, docgenExclude, docgenInclude, docgenPropFilter, docgenRelativePaths } from './docgen.ts';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
-import { introductionPages, legacyRedirectFixtures, previewAnnotations, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
+import { introductionPages, legacyRedirectFixtures, previewAnnotations, proDocsBase, referenceFixtures, referencePages, storyGlobs } from './story-globs.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
 import { withTypeReference } from './type-reference-plugin.mjs';
 // @ts-expect-error plain .mjs helper (unit-tested from scripts/), no type declarations
@@ -86,6 +86,8 @@ const config: StorybookConfig = {
   // the e2e/visual jobs): resolve it to the sources instead, like the Free stories do.
   viteFinal: (viteConfig) => ({
     ...viteConfig,
+    // Where the Introduction's links to a Pro page point (#723): see `proDocsBase` in story-globs.mjs.
+    define: { ...viteConfig.define, __FORMRAIL_PRO_DOCS_BASE__: JSON.stringify(proDocsBase()) },
     // `exampleSourcesPlugin`: the copy-paste examples of the packages this build includes (#447).
     plugins: [...(viteConfig.plugins ?? []), tailwindcss(), docgenRelativePaths(), exampleSourcesPlugin()],
     resolve: {

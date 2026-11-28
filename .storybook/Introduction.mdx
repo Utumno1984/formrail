@@ -6,6 +6,7 @@ import {
   ListReportDemo,
   ThemeOverrideDemo,
 } from './introduction-demos';
+import { CnSize, FreeAndProTable, SizeTable, SsrModules } from './free-and-pro-blocks';
 
 <Meta title="Introduction" tags={['visual-docs']} />
 
@@ -15,6 +16,37 @@ An open-core React design system built around two enterprise UI patterns: the **
 with filters and bulk actions) and the **Object Page** (a sectioned editor with an anchor bar, a sticky
 save bar and a dirty-guard). Everything below is rendered by the library itself, not pasted as a
 screenshot or a code snippet: try it.
+
+## Free and Pro
+
+Everything in `@formrail/core` is free and MIT licensed. `@formrail/pro` adds a List Report for very large
+datasets and the engines that keep a record edit consistent: a review of the changes before saving, and a server
+update merged into the draft. Its license is not on sale yet: the Pro pages are a preview, free to explore and not
+for production use. The table lists only what exists today.
+
+<FreeAndProTable />
+
+## Size and SSR
+
+**Size.** Minified and gzipped JavaScript of each import, measured alone as an app's production build bundles
+it, without React (and without `@formrail/core` for a Pro import) and without the stylesheet. The numbers are the
+committed baseline of the bundle budget: CI fails when an import grows past its limit (the baseline plus 10 %, at
+least 20 bytes).
+Most styled components include `cn`, the class merging (<CnSize />): measured alone it is counted in each import,
+in an app it ships once.
+
+<SizeTable />
+
+**Server rendering.** These modules have a dedicated server-rendering test (`renderToString`):
+<SsrModules pkg="core" /> in `@formrail/core`; <SsrModules pkg="pro" /> in `@formrail/pro`. The library
+never reads `navigator.language`: without an explicit `locale` the server formats with its own locale and the
+browser with the user's, and React can report a hydration mismatch. When you render on the server, pass `locale`
+and, where a component takes them, `timeZone` and `today`.
+
+**Next.js App Router.** Not supported out of the box yet: the published files have no `"use client"` directive, so
+a component cannot be imported straight into a Server Component. Use the components inside your own Client
+Components (files that start with `"use client"`). Tracked in
+[#412](https://github.com/Utumno1984/formrail/issues/412).
 
 ## What makes it different
 
@@ -114,8 +146,6 @@ design tokens (`--color-rop-*`, `--text-rop-*`, `--radius-rop-*`, `--motion-rop-
 - Use the **Controls** panel to try the props live and the **Actions** panel to see the callbacks fire.
 
 ## Index
-
-**Guides**: step-by-step walkthroughs. The first ones are on their way and will be listed here.
 
 **Reference**: every option, return value and type of the hooks, generated from the TypeScript sources.
 [List Report](?path=/docs/reference-list-report--docs)

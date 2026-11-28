@@ -130,6 +130,11 @@ export const Playground: Story = {
   play: async ({ args, canvasElement }) => {
     if (args.locale !== 'en-US' || args.max !== '2026-04-20' || args.disabled || args.readOnly || args.today !== TODAY) return;
     const canvas = within(canvasElement);
+    // Whatever the viewport (320px included): the calendar sits inside it and every day cell is a 40px target.
+    const root = canvas.getByRole('grid').closest('div')!.parentElement!;
+    await expect(root.getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth);
+    await expect(root.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
+    await expect(canvas.getAllByRole('gridcell')[0]!.getBoundingClientRect().width).toBeGreaterThanOrEqual(40);
     await userEvent.tab(); // previous month
     await userEvent.tab(); // next month
     await userEvent.tab(); // the grid

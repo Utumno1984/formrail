@@ -14,7 +14,7 @@ import {
 } from '../dialog/Dialog';
 import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Menu, MenuContent, MenuGroup, MenuItem, MenuLabel, MenuLinkItem, MenuSeparator, MenuTrigger } from './Menu';
 
 type Side = 'top' | 'right' | 'bottom' | 'left';
@@ -414,7 +414,10 @@ export const InsideDialogOpen: Story = {
   },
 };
 
-/** The menu inside a Sheet: above the panel; Escape closes only the menu. */
+/**
+ * The menu inside a Sheet: above the panel; Escape closes only the menu. The play function first closes the sheet with
+ * its close button (the focus goes back to the trigger) and opens it again.
+ */
 export const InsideSheet: Story = {
   render: (args) => (
     <Page>
@@ -425,6 +428,7 @@ export const InsideSheet: Story = {
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Record</SheetTitle>
+            <SheetClose />
           </SheetHeader>
           <SheetBody>
             <BasicMenu args={args} />
@@ -436,6 +440,14 @@ export const InsideSheet: Story = {
   play: async ({ args, canvasElement }) => {
     const body = within(canvasElement.ownerDocument.body);
     await userEvent.click(within(canvasElement).getByRole('button', { name: 'Open sheet' }));
+    await body.findByRole('dialog', { name: 'Record' });
+    // #721: the close button of the header closes the sheet (by touch it is the only way out: 44 x 44 px there) and
+    // the focus goes back to the trigger; the sheet is opened again for the rest.
+    await userEvent.click(await body.findByRole('button', { name: 'Close: Record' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    const opener = within(canvasElement).getByRole('button', { name: 'Open sheet' });
+    await waitFor(() => expect(opener).toHaveFocus());
+    await userEvent.click(opener);
     const sheet = await body.findByRole('dialog', { name: 'Record' });
     const trigger = within(sheet).getByRole('button', { name: 'More actions' });
     trigger.focus();

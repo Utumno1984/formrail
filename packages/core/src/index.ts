@@ -65,6 +65,7 @@ export type {
   SheetSize,
   SheetTriggerProps,
   SheetContentProps,
+  SheetLabels,
   SheetTitleProps,
   SheetCloseProps,
 } from './sheet/Sheet';

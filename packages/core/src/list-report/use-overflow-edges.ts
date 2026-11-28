@@ -9,9 +9,10 @@ export const OVERFLOW_END_ATTR = 'data-rop-overflow-end';
 
 /**
  * Where the edge layer must draw its shades, in px, or `null` when nothing overflows sideways (no
- * layer at all). `height` is the scrollport's (`clientHeight`); `bottom` moves the shades down from
- * the layer, which sits right after the table: a table shorter than the scrollport leaves room below
- * it that the shades cover too (0 when the table fills it). Nothing about the direction: the shades
+ * layer at all). `height` is the scrollport's (`clientHeight`), or the table's when the table is
+ * shorter than the scrollport: the shades end where the last row ends and never cover the empty room
+ * below it. `bottom` is how far the shades are moved down from the layer, which sits right after the
+ * table (always 0 now: kept so the layer's custom property stays one place to tune). Nothing about the direction: the shades
  * follow the resolved direction in CSS alone (see `edgeShadowStartClass`): the geometry itself holds
  * nothing about it. (A `dir` changed after the mount still measures once, in `useOverflowEdges`: Firefox
  * moves `scrollLeft` back to the start without a `scroll` event, and which shade shows depends on it.)
@@ -90,8 +91,10 @@ export function useOverflowEdges(containerRef: RefObject<HTMLElement | null>, si
       const height = el.clientHeight;
       const table = el.firstElementChild;
       const tableHeight = table ? table.getBoundingClientRect().height : height;
-      // Floored: the shades must never reach past the scrollport and make it scroll.
-      return { height, bottom: -Math.max(0, Math.floor(height - tableHeight)) };
+      // The shades are as tall as the table when it is shorter than the scrollport (they end where the
+      // last row ends) and as tall as the scrollport otherwise. Floored: they must never reach past the
+      // scrollport and make it scroll.
+      return { height: Math.min(height, Math.floor(tableHeight)), bottom: 0 };
     };
     const publish = (next: OverflowEdgesGeometry | null) => {
       if (next === geometry || (next && geometry && next.height === geometry.height && next.bottom === geometry.bottom)) return;

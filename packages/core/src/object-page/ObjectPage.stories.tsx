@@ -215,6 +215,7 @@ export const Overview: Story = {
 
 /** Many and long action labels: the actions wrap below the title instead of being clipped (e2e covers 640-900px). */
 export const ManyActions: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
@@ -240,7 +241,7 @@ export const ManyActions: Story = {
 
 /** The same page scrolled to the end: the last section and its field, under the header that has scrolled away. */
 export const ScrolledToEnd: Story = {
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   parameters: NO_CONTROLS,
   render: Overview.render,
   play: async ({ canvasElement }) => {
@@ -252,7 +253,7 @@ export const ScrolledToEnd: Story = {
 
 /** The field of the last section with the keyboard focus: its ring must not be cut by the section body (visual regression). */
 export const FocusedField: Story = {
-  tags: ['visual'],
+  tags: ['visual', 'edge-case'],
   parameters: NO_CONTROLS,
   render: Overview.render,
   play: async ({ canvasElement }) => {
@@ -266,6 +267,7 @@ export const FocusedField: Story = {
 
 /** Header only: no sections, no crash, still one scroller. */
 export const HeaderOnly: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
@@ -282,6 +284,7 @@ export const HeaderOnly: Story = {
  * `--rop-keyboard-inset`, scrolls the focused field above the keyboard.
  */
 export const KeyboardSafe: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
@@ -302,6 +305,7 @@ export const KeyboardSafe: Story = {
 
 /** A section of text only (the scroller is reached with Tab) and a table wider than the page (it scrolls inside its section). */
 export const TextAndWideContent: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   render: () => (
     <div style={FRAME}>
@@ -436,6 +440,7 @@ export const LongForm: Story = {
 
 /** No height on the parent: the page grows with its content and the document is the only scroller. */
 export const NoParentHeight: Story = {
+  tags: ['edge-case'],
   parameters: NO_CONTROLS,
   render: () => (
     <ObjectPage>

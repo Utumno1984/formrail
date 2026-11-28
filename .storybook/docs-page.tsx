@@ -24,8 +24,11 @@ import {
   SHOWCASE_SOURCE_TAG,
   USE_CASES_INTRO,
   USE_CASE_TAG,
+  EDGE_CASES_HEADING,
+  EDGE_CASES_INTRO,
   controlsStory,
   exampleStylesheets,
+  planEdgeCasesSection,
   githubSource,
   isSingleNeutralStory,
   selectPageStories,
@@ -86,6 +89,24 @@ function UseCases({ stories, title }: { stories: PreparedStory[]; title: string 
     <section data-use-cases aria-labelledby={headingId}>
       <HeadingWithId id={headingId}>{heading}</HeadingWithId>
       <p data-use-cases-intro>{USE_CASES_INTRO}</p>
+      {stories.map((story) => (
+        <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
+      ))}
+    </section>
+  );
+}
+
+/**
+ * The section of the edge-case stories (ticket #723): after the component's other stories, before the domain
+ * examples, which stay last (#624). Only on a page that opens with a copy-paste example: the guard of the order
+ * (e2e/docs-story-order.spec.ts) fails on an `edge-case` or `happy-path` tag anywhere else.
+ */
+function EdgeCases({ stories }: { stories: PreparedStory[] }) {
+  if (stories.length === 0) return null;
+  return (
+    <section data-edge-cases aria-labelledby="edge-cases">
+      <HeadingWithId id="edge-cases">{EDGE_CASES_HEADING}</HeadingWithId>
+      <p data-edge-cases-intro>{EDGE_CASES_INTRO}</p>
       {stories.map((story) => (
         <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
       ))}
@@ -155,7 +176,8 @@ export function FormrailDocsPage() {
   // The Controls' story: the Playground after an example (the same rule the props-table guard reads).
   const target = controlsStory([primary, ...neutral]);
   const playground = target !== primary ? target : undefined;
-  const others = neutral.filter((s) => s !== playground);
+  // Ticket #723: the happy path heads the "Stories" list, the edge cases leave it for their own section.
+  const { main: others, edgeCases } = planEdgeCasesSection(neutral.filter((s) => s !== playground));
   const files = (primary.parameters?.docs as { sourceFiles?: SourceFile[] } | undefined)?.sourceFiles ?? [];
   return (
     <>
@@ -188,6 +210,7 @@ export function FormrailDocsPage() {
       {others.map((story) => (
         <DocsStory key={story.id} of={story.moduleExport} expanded __forceInitialArgs />
       ))}
+      <EdgeCases stories={edgeCases} />
       {files.length > 0 && <SourceFiles files={files} />}
       <UseCases stories={useCases} title={primary.title} />
     </>

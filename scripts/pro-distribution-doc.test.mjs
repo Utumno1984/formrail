@@ -1,6 +1,6 @@
 // Ticket #690: the Pro is distributed through GitHub Packages (decision of 2026-11-26). The spec (§2.4) and
-// CLAUDE.md must say so, and the superseded "org npm privata" may only appear as history, on a line that
-// marks it as superseded.
+// CLAUDE.md must say so, and the superseded private npm org may only appear as history, on a line that
+// marks it as superseded. The spec is in English; CLAUDE.md is still in Italian, so both wordings are matched.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -10,8 +10,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SPEC = resolve(ROOT, 'docs/planning/design-system-spec.md');
 const CLAUDE = resolve(ROOT, 'CLAUDE.md');
 
-const PRIVATE_ORG = /org\s+npm\s+privata|npm\s+org\s+privata/i;
-const SUPERSEDED = /superat|non\s+più/i;
+const PRIVATE_ORG = /private\s+npm\s+org|npm\s+private\s+org|org\s+npm\s+privata|npm\s+org\s+privata/i;
+const SUPERSEDED = /supersed|no\s+longer|superat|non\s+più/i;
 
 /**
  * Sentences (paragraph-wise, line breaks normalised with `\s+`) that present the private npm org without
@@ -36,12 +36,18 @@ describe('Pro distribution docs (#690)', () => {
   const claude = readFileSync(CLAUDE, 'utf8');
 
   it('helper flags a private npm org line not marked as superseded', () => {
+    expect(currentPrivateNpmOrgLines('The private npm org is used.')).toHaveLength(1);
+    expect(currentPrivateNpmOrgLines('private npm org (superseded on 2026-11-26)')).toEqual([]);
+    // phrase split across two lines
+    expect(currentPrivateNpmOrgLines('The private npm\norg is used.')).toHaveLength(1);
+    expect(currentPrivateNpmOrgLines('instead of the private npm\norg, superseded.')).toEqual([]);
+    // a "superseded" in another sentence of the same paragraph does not excuse the mention
+    expect(currentPrivateNpmOrgLines('The private npm org is used. Something else is superseded.')).toHaveLength(1);
+    // the Italian wording, still used by CLAUDE.md, is matched too
     expect(currentPrivateNpmOrgLines("Si usa l'org npm privata.")).toHaveLength(1);
     expect(currentPrivateNpmOrgLines('org npm privata (superata il 2026-11-26)')).toEqual([]);
-    // phrase split across two lines
     expect(currentPrivateNpmOrgLines("Si usa l'org npm\nprivata.")).toHaveLength(1);
     expect(currentPrivateNpmOrgLines("al posto dell'org npm\nprivata, superata.")).toEqual([]);
-    // a "superata" in another sentence of the same paragraph does not excuse the mention
     expect(currentPrivateNpmOrgLines("Si usa l'org npm privata. Altro è superato.")).toHaveLength(1);
   });
 
@@ -49,9 +55,9 @@ describe('Pro distribution docs (#690)', () => {
     const s24 = section24(spec);
     expect(s24).toContain('GitHub Packages');
     expect(s24).toContain('2026-11-26');
-    expect(s24).toMatch(/a pagamento/);
-    expect(s24).toMatch(/costi fissi/);
-    expect(s24).toContain('Decisione di Daniele, 2026-11-26');
+    expect(s24).toMatch(/paid/);
+    expect(s24).toMatch(/fixed costs/);
+    expect(s24).toContain('Maintainer decision, 2026-11-26');
     expect(s24).toContain('@formrail-dev/pro');
   });
 
@@ -67,19 +73,19 @@ describe('Pro distribution docs (#690)', () => {
   it('CLAUDE.md cites GitHub Packages with the date and the private flag condition', () => {
     expect(claude).toContain('GitHub Packages');
     expect(claude).toContain('2026-11-26');
-    expect(claude).toMatch(/"private": true` finché il pacchetto non è pubblicato su GitHub Packages/);
+    expect(claude).toMatch(/"private": true` (?:finché il pacchetto non è pubblicato su|until the package is published on) GitHub Packages/);
   });
 
   it('the formrail-dev org is no longer described as still to be created', () => {
-    expect(spec).not.toMatch(/la crea Daniele/);
-    expect(spec).not.toMatch(/finché l'org `formrail-dev` non è creata/);
-    expect(spec).toMatch(/formrail-dev[^\n]*esiste dal 2026-11-26/);
+    expect(spec).not.toMatch(/to be created by the maintainer/);
+    expect(spec).not.toMatch(/until the `formrail-dev` org is created/);
+    expect(spec).toMatch(/formrail-dev[^\n]*has existed since 2026-11-26/);
   });
 
   it('the MoR paragraph cites the decision point on registry access, not another one', () => {
-    const m = spec.match(/vedi il punto (\d+) delle decisioni del 2026-11-26/);
+    const m = spec.match(/see point (\d+) of the 2026-11-26 decisions/);
     expect(m).not.toBeNull();
     const item = spec.match(new RegExp(`^${m[1]}\\. \\*\\*([^*]+)\\*\\*`, 'm'));
-    expect(item?.[1]).toMatch(/accesso|registry/i);
+    expect(item?.[1]).toMatch(/access|registry/i);
   });
 });

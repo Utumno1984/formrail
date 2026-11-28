@@ -18,7 +18,7 @@ import { Field, type FieldStateProps } from '../field/Field';
 import type { FieldState } from '../field/FieldContext';
 import { repositionAfterMotion } from '../internal/settle-motion';
 import { storyControl, withoutControls } from '../internal/story-docs';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { DatePicker, type DatePickerInvalidReason, type DatePickerSize } from './DatePicker';
 
 // Every story passes a fixed `today` and locale: the baselines never change with the real date.
@@ -297,17 +297,25 @@ export const InsideDialog: Story = {
   },
 };
 
-/** Same stacking inside a Sheet. For the e2e. */
+/**
+ * Same stacking inside a Sheet. For the e2e. The play function closes the sheet with its close button (the focus goes
+ * back to the trigger), opens it again and checks that the field is there with its value, no popover open and nothing
+ * reported.
+ */
 export const InsideSheet: Story = {
   parameters: NO_CONTROLS,
   render: (args) => (
     <Sheet defaultOpen>
       <main style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-        <h1 style={{ margin: 0, fontSize: 20 }}>Invoices</h1>
+        <h1 style={{ margin: '0 0 12px', fontSize: 20 }}>Invoices</h1>
+        <SheetTrigger asChild>
+          <Button>Edit invoice</Button>
+        </SheetTrigger>
       </main>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>Edit invoice</SheetTitle>
+          <SheetClose />
         </SheetHeader>
         <SheetBody>
           <Field label="Due date">
@@ -317,6 +325,20 @@ export const InsideSheet: Story = {
       </SheetContent>
     </Sheet>
   ),
+  play: async ({ args, canvasElement }) => {
+    const body = within(document.body);
+    // #721: the close button of the header closes the sheet (by touch it is the only way out: 44 x 44 px there) and
+    // the focus goes back to the trigger; the sheet is opened again for the rest.
+    await userEvent.click(await body.findByRole('button', { name: 'Close: Edit invoice' }));
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    const opener = within(canvasElement).getByRole('button', { name: 'Edit invoice' });
+    await waitFor(() => expect(opener).toHaveFocus());
+    await userEvent.click(opener);
+    const sheet = await body.findByRole('dialog', { name: 'Edit invoice' });
+    await expect(within(sheet).getByRole('textbox', { name: 'Due date' })).toHaveValue('03/05/2026');
+    await expect(body.queryByRole('dialog', { name: 'Choose date' })).toBeNull();
+    await expect(args.onValueChange).not.toHaveBeenCalled();
+  },
 };
 
 /** The field low on a tall page, for the virtual keyboard e2e (spec §1.10). */

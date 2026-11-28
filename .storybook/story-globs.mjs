@@ -14,6 +14,15 @@ export function excludePro(env = process.env) {
   return isSet(env.STORYBOOK_EXCLUDE_PRO);
 }
 
+/**
+ * Prefix of the links of the Introduction to a Pro Docs page (ticket #723, the "Free and Pro" table): none in the
+ * complete build, which has the Pro pages; `../pro/` in the Free build (`/storybook/`), whose Pro pages are the
+ * Pro demo published next to it (`/pro/`, see scripts/assemble-site.mjs). Injected by main.ts as a constant.
+ */
+export function proDocsBase(env = process.env) {
+  return excludePro(env) ? '../pro/' : '';
+}
+
 /** True for the Pro-only demo build (STORYBOOK_EDITION=pro). Contradicts STORYBOOK_EXCLUDE_PRO. */
 export function proEdition(env = process.env) {
   const pro = env.STORYBOOK_EDITION === 'pro';

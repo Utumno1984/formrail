@@ -5,7 +5,7 @@
 //     index.html                the landing page (ticket #382); it also forwards old Storybook links to storybook/
 //     landing.css, copy.js, favicon.svg   the landing's own assets (copy.js: optional "Copy command" button)
 //     tokens.css                the design tokens of the published theme, as plain :root variables
-//     teams/index.html          Pro for teams: license, price, waitlist CTA (ticket #490)
+//     teams/index.html          Pro for teams: license, price, early access CTA (ticket #490)
 //     privacy/index.html        privacy notice (GDPR art. 13), no cookies / no analytics
 //     refund/index.html         the refund policy (ticket #692): 14 days, no reason, whoever you are
 //     license/index.html        the Formrail Pro license terms (ticket #691); same text as packages/pro/LICENSE
@@ -19,7 +19,7 @@
 //     pro/                      the Pro demo Storybook (storybook-static-pro/, ticket #381)
 //
 // Usage: node scripts/assemble-site.mjs [--strict]   (after `npm run build`, `npm run build-storybook` and
-// `npm run build-storybook:pro`). --strict, used by the deploy, fails while the waitlist form URL or the
+// `npm run build-storybook:pro`). --strict, used by the deploy, fails while the early access form URL or the
 // privacy email in scripts/site-config.mjs is still a placeholder.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -200,7 +200,7 @@ export function redirectScriptSource(siteRootDir) {
  * @param {string} [options.earlyAccessUrl] target of the landing's CTA; empty = no CTA (default `EARLY_ACCESS_URL`)
  * @param {string} [options.priceText] the indicative price shown on teams/; empty = no price block (default `EXPECTED_PRICE_TEXT`)
  * @param {string} [options.designPartnerUrl] design partner form; empty = no design partner section (default `DESIGN_PARTNER_URL`)
- * @param {number} [options.designPartnerSeats] seats offered; 0 = exhausted, the section points to the waitlist (default `DESIGN_PARTNER_SEATS`)
+ * @param {number} [options.designPartnerSeats] seats offered; 0 = exhausted, the section points to the early access form (default `DESIGN_PARTNER_SEATS`)
  * @param {typeof LICENSOR} [options.licensor] who licenses Formrail Pro, written into license/ (default `LICENSOR`)
  * @param {number} [options.refundDays] the refund window written into refund/ (default `REFUND_DAYS`)
  * @param {string | number} [options.purchaseRetentionYears] retention of the purchase data written into privacy/ (default `PURCHASE_RETENTION_YEARS`)
