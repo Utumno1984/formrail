@@ -174,7 +174,7 @@ test.describe('Pro/RebaseNotice example', () => {
     await expect(field(page, 'Supplier')).toHaveValue('Rossi Construction Ltd');
     await expect(field(page, 'Amount')).toHaveValue('1250');
     await expect(page.getByRole('status')).toHaveText(
-      'This invoice was updated while you were editing. 1 field was updated. 1 field you edited was also changed on the server.',
+      'This invoice was updated while you were editing. Supplier was updated. 1 field you edited was also changed on the server.',
     );
     await expect(page.getByRole('list', { name: 'Conflicts' }).getByRole('listitem')).toHaveText(['Amount Yours: 1250 Server: 1350 Use server value Keep mine']);
     await expect(field(page, 'Amount')).toHaveAccessibleDescription('Changed on the server too.');

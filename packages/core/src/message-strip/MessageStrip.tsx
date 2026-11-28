@@ -8,12 +8,12 @@ import { cn } from '../utils/cn';
 
 export type MessageStripTone = 'info' | 'success' | 'warning' | 'error';
 
-// Full literals (Tailwind scan). Background = the tone colour at 10% opacity.
+// Full literals (Tailwind scan). Background = the tone colour at 4% opacity (lighter, so the secondary text keeps its contrast).
 const TONE_CLASS: Record<MessageStripTone, { box: string; icon: string }> = {
-  info: { box: 'border-rop-info bg-rop-info/10', icon: 'text-rop-info' },
-  success: { box: 'border-rop-success bg-rop-success/10', icon: 'text-rop-success' },
-  warning: { box: 'border-rop-warning bg-rop-warning/10', icon: 'text-rop-warning' },
-  error: { box: 'border-rop-error bg-rop-error/10', icon: 'text-rop-error' },
+  info: { box: 'border-rop-info bg-rop-info/4', icon: 'text-rop-info' },
+  success: { box: 'border-rop-success bg-rop-success/4', icon: 'text-rop-success' },
+  warning: { box: 'border-rop-warning bg-rop-warning/4', icon: 'text-rop-warning' },
+  error: { box: 'border-rop-error bg-rop-error/4', icon: 'text-rop-error' },
 };
 
 const TONE_LABEL: Record<MessageStripTone, string> = {

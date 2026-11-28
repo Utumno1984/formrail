@@ -121,9 +121,81 @@ export const Playground: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Keep mine for Amount' }));
     await expect(args.onKeepMine).toHaveBeenCalledWith('amount');
     await waitFor(() => expect(canvas.queryByRole('list', { name: 'Conflicts' })).toBeNull());
-    await expect(canvasElement.querySelector('.rop-pro-rebase-notice')).toHaveTextContent('2 fields were updated.');
+    await expect(canvasElement.querySelector('.rop-pro-rebase-notice')).toHaveTextContent('Status and Supplier were updated.');
     await expect(canvasElement.querySelector('.rop-pro-rebase-notice')).toHaveFocus();
     await expect(args.onAcceptAllTheirs).not.toHaveBeenCalled();
+  },
+};
+
+const MANY_APPLIED: ChangeEntry[] = [
+  ...APPLIED,
+  applied('amount', 'Amount', 1200, 1350),
+  applied('dueDate', 'Due date', 'Jun 1, 2026', 'Jun 15, 2026'),
+  applied('notes', 'Notes', null, ''),
+  applied('lineItems.0.quantity', 'Line items > Item 1 > Quantity', 2, 3),
+];
+
+/**
+ * More than three server changes: the notice shows the count and a list of the fields with the value before and
+ * after, closed until opened. The play function opens it and checks that the focus stays on the summary and that the
+ * rows read as expected (the keyboard path, with a real Enter key, is covered by the e2e).
+ */
+export const ManyApplied: Story = {
+  tags: ['visual'],
+  args: { conflicts: [], applied: MANY_APPLIED },
+  play: async ({ canvasElement }) => {
+    const summary = within(canvasElement).getByText('6 fields were updated.');
+    const details = summary.closest('details')!;
+    await expect(details).not.toHaveAttribute('open');
+    await userEvent.click(summary);
+    await expect(details).toHaveAttribute('open');
+    await expect(summary).toHaveFocus();
+    const rows = within(within(canvasElement).getByRole('list', { name: 'Updated fields' })).getAllByRole('listitem');
+    await expect(rows).toHaveLength(6);
+    await expect(rows[0]).toHaveTextContent('Status Before: Open Now: Approved');
+    await expect(rows[5]).toHaveTextContent('Line items > Item 1 > Quantity Before: 2 Now: 3');
+    // The baseline is taken at rest: no focus ring on the summary.
+    (document.activeElement as HTMLElement | null)?.blur();
+    await expect(details).toHaveAttribute('open');
+  },
+};
+
+/** Four fields: the smallest list behind the disclosure. It fits whatever the viewport, so nothing is cut and it is not a tab stop. */
+export const FourApplied: Story = {
+  args: {
+    conflicts: [],
+    applied: Array.from({ length: 4 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText('4 fields were updated.'));
+    await expect(within(canvasElement).getByRole('list', { name: 'Updated fields' })).toBeVisible();
+  },
+};
+
+/** Twelve fields (the old threshold): the height cap applies whatever the number of fields, so on a short viewport the list scrolls. */
+export const TwelveApplied: Story = {
+  args: {
+    conflicts: [],
+    applied: Array.from({ length: 12 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText('12 fields were updated.'));
+    await expect(within(canvasElement).getByRole('list', { name: 'Updated fields' })).toBeVisible();
+  },
+};
+
+/** Sixteen fields: the list is capped and scrolls, with a fade while rows are hidden. */
+export const BeyondScrollThreshold: Story = {
+  tags: ['visual'],
+  args: {
+    conflicts: [],
+    applied: Array.from({ length: 16 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText('16 fields were updated.'));
+    await expect(within(canvasElement).getByRole('list', { name: 'Updated fields' })).toHaveAttribute('data-more', '');
+    // The baseline is taken at rest: no focus ring on the summary.
+    (document.activeElement as HTMLElement | null)?.blur();
   },
 };
 

@@ -120,13 +120,13 @@ describe('Record editing integrity, customers: no echo of a server update (#524)
     expect(notice()).toBeNull();
   }, 30_000);
 
-  it('the account manager set to null by the server: the field empty, no echo (the form stays clean), "1 field was updated."', async () => {
+  it('the account manager set to null by the server: the field empty, no echo (the form stays clean), "Account manager was updated."', async () => {
     const { store } = renderCustomer();
     await opened();
     await serverUpdate(store, (c) => ({ ...c, accountManagerId: null as unknown as string }));
     expect(combobox('Account manager')).toHaveValue('');
     expect(footer()).toBeNull();
-    expect(notice()).toHaveTextContent(`${NOTICE_TITLE}1 field was updated.`);
+    expect(notice()).toHaveTextContent(`${NOTICE_TITLE}Account manager was updated.`);
     // An edit afterwards: the review lists only it.
     await retype(textbox('City'), 'Modena');
     await userEvent.click(await saveButton());
@@ -146,7 +146,7 @@ describe('Record editing integrity, customers: merging into an edited customer (
     expect(textbox('Postal code').value).toBe('40121');
     expect(textbox('City').value).toBe(seed().billingAddress.city);
     expect(screen.queryByRole('list', { name: 'Conflicts' })).toBeNull();
-    expect(notice()).toHaveTextContent('1 field was updated.');
+    expect(notice()).toHaveTextContent('Account manager was updated.');
     await userEvent.click(await saveButton());
     expect(changesIn(await reviewDialog())).toEqual([
       'Billing address > Street, changed, from Via dell\'Industria 21 to Via del Lavoro 3',
@@ -474,7 +474,7 @@ describe('Record editing integrity, customers: "archived on the server" only whe
     const { store } = renderCustomer(ARCHIVED);
     await screen.findByRole('button', { name: 'Restore' });
     await serverUpdate(store, serverChangeOf('account-manager'), ARCHIVED);
-    await waitFor(() => expect(notice()).toHaveTextContent('1 field was updated.'));
+    await waitFor(() => expect(notice()).toHaveTextContent('Account manager was updated.'));
     expect(screen.queryByText(ARCHIVED_TITLE)).toBeNull();
   }, 30_000);
 
@@ -486,7 +486,7 @@ describe('Record editing integrity, customers: "archived on the server" only whe
     await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(textbox('City')).toBeDisabled());
     await serverUpdate(store, serverChangeOf('account-manager'));
-    await waitFor(() => expect(notice()).toHaveTextContent('1 field was updated.'));
+    await waitFor(() => expect(notice()).toHaveTextContent('Account manager was updated.'));
     expect(screen.queryByText(ARCHIVED_TITLE)).toBeNull();
   }, 30_000);
 
@@ -504,7 +504,7 @@ describe('Record editing integrity, customers: "archived on the server" only whe
       held.release();
       await held.promise;
     });
-    await waitFor(() => expect(notice()).toHaveTextContent('1 field was updated.'));
+    await waitFor(() => expect(notice()).toHaveTextContent('Account manager was updated.'));
     expect(stored(store, CUSTOMER)).toMatchObject({ status: 'archived', accountManagerId: nextAccountManager(seed().accountManagerId) });
     expect(textbox('City')).toBeDisabled();
     expect(screen.queryByText(ARCHIVED_TITLE)).toBeNull();
@@ -551,7 +551,7 @@ describe('Record editing integrity, customers: a conflict open when the server a
       `Contacts > Contact 1 (Matteo Gatti) > E-mail, changed, from ${theirs} to ${MINE}`,
     ]);
     // The notice still says what the server changed (the status): only the choices are gone.
-    expect(notice()).toHaveTextContent('1 field was updated.');
+    expect(notice()).toHaveTextContent('Status was updated.');
   }, 30_000);
 
   it('two conflicts open: "Use all server values" is not offered either', async () => {

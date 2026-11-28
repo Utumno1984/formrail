@@ -25,8 +25,24 @@ import type { RebaseConflict } from './types';
 export interface RebaseNoticeLabels {
   /** Title of the notice, first sentence of the announcement. Default "This record was updated while you were editing." */
   title: string;
-  /** The count of server changes applied. Default `1 field was updated.` / `N fields were updated.` */
+  /**
+   * The count of server changes applied. Default `1 field was updated.` / `N fields were updated.` Also the
+   * summary of the expandable list of fields (more than three), and the whole text when `labels.applied` is
+   * overridden without `labels.appliedFields` (the notice then keeps counting, as before).
+   */
   applied: (count: number) => string;
+  /**
+   * Names the applied fields, from one up to three of them, with the label of each. Default `Price was updated.` /
+   * `Price and Stock were updated.` / `Price, Stock and Tax were updated.` Beyond three the notice shows `applied(count)`
+   * and a list of the fields with the value before and after, closed until the user opens it.
+   */
+  appliedFields: (labels: string[]) => string;
+  /** Accessible name of the list of applied fields. Default `Updated fields`. */
+  appliedList: string;
+  /** Before the value the field had in the previous version. Default `Before`. */
+  appliedBefore: string;
+  /** Before the value the field has in the new version. Default `Now`. */
+  appliedAfter: string;
   /** Above the conflicts. Default `1 field you edited was also changed on the server.` / `N fields you edited were also changed on the server.` */
   conflicts: (count: number) => string;
   /** Accessible name of the list of conflicts. Default `Conflicts`. */
@@ -64,6 +80,11 @@ export interface RebaseNoticeLabels {
 export const DEFAULT_REBASE_NOTICE_LABELS: RebaseNoticeLabels = {
   title: 'This record was updated while you were editing.',
   applied: (count) => (count === 1 ? '1 field was updated.' : `${count} fields were updated.`),
+  appliedFields: (names) =>
+    names.length < 2 ? `${names.join('')} was updated.` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} were updated.`,
+  appliedList: 'Updated fields',
+  appliedBefore: 'Before',
+  appliedAfter: 'Now',
   conflicts: (count) =>
     count === 1
       ? '1 field you edited was also changed on the server.'
@@ -133,6 +154,63 @@ export interface RebaseNoticeProps extends Omit<HTMLAttributes<HTMLDivElement>, 
 
 const RN = 'rop-pro-rebase-notice';
 const NO_BREAK_SPACE = '\u00a0';
+/**
+ * The list of applied fields. Its height is always capped by the stylesheet (the smaller of
+ * `--rop-pro-rebase-applied-max-height` and 70% of the viewport height), whatever the number of fields: a short
+ * list is never cut, a long one (or any list on a short viewport) scrolls on its own. It is a tab stop only while it
+ * really scrolls, measured (`scrollHeight > clientHeight`, kept current with a `ResizeObserver` and on scroll), never
+ * inferred from the number of fields: a keyboard user must be able to read the hidden rows, and a list that fits is
+ * not a tab stop. Before the first measure, and on the server, it is not a tab stop. `data-more` marks that rows are
+ * still hidden below (the stylesheet fades the bottom).
+ *
+ * Custom properties (set them on the notice or any ancestor):
+ * - `--rop-pro-rebase-applied-max-height` (default `50rem`, about 12 rows): the height cap, itself limited to 70dvh.
+ *   `none` is not valid inside `min()`: to lift the cap use a large value, such as `1000rem`.
+ * - `--rop-pro-rebase-applied-fade` (default `4.5rem`): the height of the fade at the bottom while rows are hidden.
+ *   `0` without a unit invalidates the whole mask: write `0px` to switch the fade off.
+ */
+function AppliedList({ label, count, children }: { label: string; count: number; children: ReactNode }) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [state, setState] = useState({ scrolls: false, more: false });
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (el === null) return;
+    const scrolls = el.scrollHeight > el.clientHeight + 1;
+    const more = scrolls && el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    setState((prev) => (prev.scrolls === scrolls && prev.more === more ? prev : { scrolls, more }));
+  }, []);
+  useIsomorphicLayoutEffect(() => {
+    measure();
+    const el = ref.current;
+    const details = el?.closest('details');
+    details?.addEventListener('toggle', measure);
+    const observer = typeof ResizeObserver === 'undefined' || el === null ? null : new ResizeObserver(measure);
+    if (el !== null) observer?.observe(el);
+    return () => {
+      details?.removeEventListener('toggle', measure);
+      observer?.disconnect();
+    };
+  }, [measure, count]);
+  // The wrapper draws the focus ring: the fade is a mask on the list, and a mask would clip an outline drawn on the list itself.
+  return (
+    <div className={`${RN}__applied-ring`}>
+      <ul
+        ref={ref}
+        aria-label={label}
+        className={`${RN}__applied`}
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a region that scrolls on its own must be reachable by keyboard
+        tabIndex={state.scrolls ? 0 : undefined}
+        data-more={state.more ? '' : undefined}
+        onScroll={measure}
+      >
+        {children}
+      </ul>
+    </div>
+  );
+}
+
+/** Up to this many applied fields are named in the sentence; more go in the list. */
+const NAMED_MAX = 3;
 type Action = 'theirs' | 'mine' | 'all';
 
 /** The element focused inside the notice, and where it was (to find its heir once it is gone). */
@@ -303,7 +381,14 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     pending: false,
     count: 0,
   });
-  const message = [labels.title, applied.length > 0 ? labels.applied(applied.length) : '', conflicts.length > 0 ? labels.conflicts(conflicts.length) : '']
+  // Names when each applied field has a label and `labels.applied` was not replaced on its own (backward compatible).
+  const named =
+    applied.length > 0 &&
+    applied.length <= NAMED_MAX &&
+    (labelsProp?.applied === undefined || labelsProp.appliedFields !== undefined) &&
+    applied.every((entry) => entry.label.length > 0);
+  const appliedText = applied.length === 0 ? '' : named ? labels.appliedFields(applied.map((entry) => entry.label)) : labels.applied(applied.length);
+  const message = [labels.title, appliedText, conflicts.length > 0 ? labels.conflicts(conflicts.length) : '']
     .filter(Boolean)
     .join(' ');
   useEffect(() => {
@@ -477,6 +562,14 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
     );
   };
 
+  const entryTexts = (entry: ChangeEntry): [string, string] => {
+    const one = (value: unknown, missing: boolean, level: 0 | 1 | 2 | 3) => (missing ? labels.missing : formatChangeValueAt(value, format, level));
+    return distinctValueTexts(
+      (which, level) => (which === 0 ? one(entry.before, entry.beforeMissing, level) : one(entry.after, entry.afterMissing, level)),
+      labels.contentsDiffer,
+    );
+  };
+
   // Keys: the path, plus its occurrence when two conflicts share one (an item removed by each side).
   const seen = new Map<string, number>();
   const keyOf = (path: string) => {
@@ -505,7 +598,32 @@ export const RebaseNotice = /* @__PURE__ */ forwardRef<HTMLDivElement, RebaseNot
           className={cn(RN, className)}
         >
           {pending ? <p className={`${RN}__text`}>{labels.pending}</p> : null}
-          {applied.length > 0 ? <p className={`${RN}__text`}>{labels.applied(applied.length)}</p> : null}
+          {applied.length > 0 && applied.length <= NAMED_MAX ? <p className={`${RN}__text`}>{appliedText}</p> : null}
+          {applied.length > NAMED_MAX ? (
+            <details className={`${RN}__details`}>
+              <summary className={`${RN}__summary`}>{appliedText}</summary>
+              <AppliedList label={labels.appliedList} count={applied.length}>
+                {applied.map((entry) => {
+                  const [beforeText, afterText] = renderValue ? ['', ''] : entryTexts(entry);
+                  return (
+                    <li key={entry.path} className={`${RN}__item`}>
+                      <span className={`${RN}__label`}>{entry.label}</span>{' '}
+                      <span className={`${RN}__values`}>
+                        <span className={`${RN}__side`}>
+                          <span className={`${RN}__side-label`}>{`${labels.appliedBefore}:`}</span>{' '}
+                          {entry.beforeMissing ? <span className="rop-pro-change-summary__value rop-pro-change-summary__value--muted">{labels.missing}</span> : valueNode(entry.before, entry, beforeText)}
+                        </span>{' '}
+                        <span className={`${RN}__side`}>
+                          <span className={`${RN}__side-label`}>{`${labels.appliedAfter}:`}</span>{' '}
+                          {entry.afterMissing ? <span className="rop-pro-change-summary__value rop-pro-change-summary__value--muted">{labels.missing}</span> : valueNode(entry.after, entry, afterText)}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </AppliedList>
+            </details>
+          ) : null}
           {conflicts.length > 0 ? (
             <>
               <p className={`${RN}__text`}>{labels.conflicts(conflicts.length)}</p>

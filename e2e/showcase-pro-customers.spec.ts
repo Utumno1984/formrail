@@ -250,11 +250,11 @@ test.describe('Pro/Showcase/Record editing integrity: the review of a customer',
 });
 
 test.describe('Pro/Showcase/Record editing integrity: server updates on a customer', () => {
-  test('editor without edits: the account manager changes, the form stays clean, "1 field was updated", no conflict', async ({ page }) => {
+  test('editor without edits: the account manager changes, the form stays clean, "Account manager was updated", no conflict', async ({ page }) => {
     await openCustomer(page);
     const before = await page.getByRole('combobox', { name: 'Account manager' }).inputValue();
     await simulate(page).click();
-    await expect(notice(page)).toContainText('This customer was updated while you were editing.1 field was updated.');
+    await expect(notice(page)).toContainText('This customer was updated while you were editing.Account manager was updated.');
     await expect(page.getByRole('combobox', { name: 'Account manager' })).not.toHaveValue(before);
     await expect(footer(page)).toBeHidden();
     await expect(conflicts(page)).toHaveCount(0);
@@ -328,7 +328,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a custom
   test('the account manager set to null by the server: the field empty, the form clean; my change of it afterwards reads "from Null"', async ({ page }) => {
     await openCustomer(page);
     await serverSets(page, 'no-account-manager');
-    await expect(notice(page)).toContainText('1 field was updated.');
+    await expect(notice(page)).toContainText('Account manager was updated.');
     await expect(page.getByRole('combobox', { name: 'Account manager' })).toHaveValue('');
     await expect(footer(page)).toBeHidden();
     await page.getByRole('combobox', { name: 'Account manager' }).click();
@@ -447,7 +447,7 @@ test.describe('Pro/Showcase/Record editing integrity: a customer archived on the
     await expect(textbox(page, 'City')).toBeDisabled();
     await expect.poll(async () => (await stored(page))?.status).toBe('archived');
     await simulate(page).click();
-    await expect(notice(page)).toContainText('1 field was updated.');
+    await expect(notice(page)).toContainText('Account manager was updated.');
     await expect(page.getByText(ARCHIVED_TITLE)).toHaveCount(0);
   });
 

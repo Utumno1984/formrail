@@ -65,7 +65,7 @@ describe('Record editing integrity, sales orders: no echo of a server update (#5
     const { store } = renderOrder();
     await opened();
     await serverUpdate(store, statusAndDelivery);
-    expect(notice()).toHaveTextContent(`${NOTICE_TITLE}2 fields were updated.`);
+    expect(notice()).toHaveTextContent(`${NOTICE_TITLE}Status and Requested delivery were updated.`);
     await userEvent.type(textbox('Notes'), '!');
     await userEvent.click(await saveButton());
     const dialog = await reviewDialog();

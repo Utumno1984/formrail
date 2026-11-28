@@ -83,10 +83,12 @@
     @apply sr-only;
   }
 
-  /* The badge of the kind of change: a tint of the kind's token (12% on the box surface) behind text
-     mixed 45% with black, so the contrast stays above 4.5:1 for the default tokens and for a
-     redeclared `--color-rop-primary` (measured by ChangeSummary.kind-contrast.test.ts), plus a
-     decorative shape drawn in CSS (no node, no extra JS): `+` added, `-` removed, a diamond changed.
+  /* The badge of the kind of change, in the language of core's `StatusBadge`: the tone token at 10% on the
+     box surface behind the dark text token (4.5:1 for the default tokens, measured by
+     ChangeSummary.kind-contrast.test.ts), a 1px contour and a decorative icon in the tone. Contract: a
+     redefined tone token must keep at least 3:1 against both the surface and its own tint (the icon and
+     the contour are non-text contrast, WCAG 1.4.11). The icon is a shape drawn in CSS (no node, no extra JS):
+     `+` added, `-` removed, a diamond changed.
      Left `inline` on purpose: an inline-block makes Chromium put a space around it in the accessible
      name (`Amount, changed , from`). A one-word kind moves to the next line whole; a long custom text
      wraps between words, and anywhere as a last resort, so it never leaves the box.
@@ -98,17 +100,19 @@
      (`box-decoration-break: clone` would also repeat the icon space and the outline).
      Logical properties (ms/pe/ps/start): the icon follows the reading direction (right in RTL). */
   .rop-pro-change-summary__kind {
-    @apply relative ms-2 rounded-rop-sm pe-1 ps-[calc(0.5rem+0.75em)] text-rop-caption font-[600] capitalize [overflow-wrap:anywhere];
-    background-color: color-mix(in srgb, var(--_cs-tone) 12%, var(--color-rop-surface));
-    color: color-mix(in srgb, var(--_cs-tone) 45%, black);
+    @apply relative ms-2 rounded-rop-sm pe-1 ps-[calc(0.5rem+0.75em)] text-rop-caption font-[500] capitalize text-rop-text [overflow-wrap:anywhere];
+    /* The language of core's `StatusBadge`: the tone token at 10% on the surface, the dark text token, a
+       1px contour and an icon in the tone. No literal colour: the same tokens as the badge. */
+    background-color: color-mix(in srgb, var(--_cs-tone) 10%, var(--color-rop-surface));
     /* Kept in forced-colors mode too (a background is dropped there, an outline is not). */
-    outline: 1px solid currentColor;
+    outline-style: solid;
+    outline-width: 1px;
     outline-offset: -1px;
 
     &::before {
       @apply absolute top-[0.2em] start-1 size-[0.75em];
       content: '';
-      background-color: currentColor;
+      background-color: var(--_cs-tone);
       clip-path: var(--_cs-shape);
     }
   }
@@ -121,16 +125,19 @@
 
   .rop-pro-change-summary__kind--added {
     --_cs-tone: var(--color-rop-success);
+    outline-color: var(--color-rop-success);
     --_cs-shape: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
   }
 
   .rop-pro-change-summary__kind--removed {
     --_cs-tone: var(--color-rop-error);
+    outline-color: var(--color-rop-error);
     --_cs-shape: polygon(0 35%, 100% 35%, 100% 65%, 0 65%);
   }
 
   .rop-pro-change-summary__kind--changed {
-    --_cs-tone: var(--color-rop-primary);
+    --_cs-tone: var(--color-rop-info);
+    outline-color: var(--color-rop-info);
     --_cs-shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   }
 
@@ -217,6 +224,64 @@
 
   .rop-pro-rebase-notice__side-label {
     @apply text-rop-text-muted;
+  }
+
+  /* More than three applied fields: the list is closed until opened, capped in height with its own scroll only beyond a large number of fields. */
+  .rop-pro-rebase-notice__details {
+    @apply m-0 mt-1 min-w-0;
+  }
+
+  .rop-pro-rebase-notice__summary {
+    @apply cursor-pointer rounded-rop-sm;
+
+    /* Touch target of 44px (a 20px line today): padding inside the box, so it takes room of its own and covers
+       neither the title above nor the list below (a negative margin would make it overlap its neighbours). */
+    @media (pointer: coarse) {
+      padding-block: 0.75rem;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  /* The focus ring of the list sits on this wrapper, not on the list: the list carries the fade mask, which clips
+     anything drawn outside its border box (WCAG 2.4.7). */
+  .rop-pro-rebase-notice__applied-ring {
+    @apply mt-2 min-w-0;
+
+    &:has(> .rop-pro-rebase-notice__applied:focus-visible) {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  /* The height is always capped, whatever the number of fields: about 12 rows, never more than 70% of the viewport
+     (on a short viewport the viewport limit wins and fewer rows show). A list shorter than the cap is not affected;
+     one that exceeds it scrolls on its own, with a fade while rows are hidden. `none` is not valid inside min():
+     to lift the cap, set `--rop-pro-rebase-applied-max-height` to a large value. */
+  .rop-pro-rebase-notice__applied {
+    @apply m-0 flex list-none flex-col gap-3 overflow-y-auto p-0;
+    max-height: min(var(--rop-pro-rebase-applied-max-height, 50rem), 70dvh);
+
+    &:focus-visible {
+      outline: none;
+    }
+  }
+
+  /* Without :has() the wrapper cannot draw the ring: put it back on the list (the fade mask may clip part of it, but
+     a keyboard user is never left without an indicator). */
+  @supports not selector(:has(*)) {
+    .rop-pro-rebase-notice__applied:focus-visible {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  /* Rows still hidden below: fade the bottom edge so the cut is visible (a mask only reads the alpha, any opaque token does). */
+  .rop-pro-rebase-notice__applied[data-more] {
+    mask-image: linear-gradient(to bottom, var(--color-rop-primary) calc(100% - var(--rop-pro-rebase-applied-fade, 4.5rem)), transparent);
   }
 
   .rop-pro-rebase-notice__actions {

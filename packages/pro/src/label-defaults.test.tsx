@@ -70,7 +70,12 @@ function labelSources(): LabelSource[] {
       from: 'DEFAULT_REBASE_NOTICE_LABELS of form-rebase/RebaseNotice.tsx',
       values: DEFAULT_REBASE_NOTICE_LABELS,
       // "`1 field was updated.` / `N fields were updated.`", and the same two forms for `conflicts`.
-      examples: { applied: [{ args: [1] }, { args: ['N'] }], conflicts: [{ args: [1] }, { args: ['N'] }] },
+      examples: {
+        applied: [{ args: [1] }, { args: ['N'] }],
+        // "`Price was updated.` / `Price and Stock were updated.` / `Price, Stock and Tax were updated.`"
+        appliedFields: [{ args: [['Price']] }, { args: [['Price', 'Stock']] }, { args: [['Price', 'Stock', 'Tax']] }],
+        conflicts: [{ args: [1] }, { args: ['N'] }],
+      },
     },
     {
       iface: 'VirtualListReportLabels',
