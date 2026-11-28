@@ -87,7 +87,7 @@ describe('useObjectPageForm: validate / fieldErrors', () => {
   });
 
   // Until #102 `setValue`/`setValues` were rows of the "clears fieldErrors as a whole" table below
-  // (all-or-nothing clearing). Decision of Daniele (validation plan, F10): they now clear only the
+  // (all-or-nothing clearing). Maintainer decision (validation plan, F10): they now clear only the
   // paths they write, so those rows became the per-path tests that follow; `reset` is unchanged.
   it.each<[string, (r: Result) => void]>([
     ['setValue', (r) => r.current.setValue('amount', 11)],

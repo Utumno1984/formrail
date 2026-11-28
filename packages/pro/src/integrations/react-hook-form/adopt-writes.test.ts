@@ -1,4 +1,4 @@
-// `adoptWrites` (ticket #507, critic round 6): it runs at each value event of the app while a write of the binding
+// `adoptWrites` (ticket #507, code review round 6): it runs at each value event of the app while a write of the binding
 // waits, so its cost must stay linear in the rows of an array, with `arrayIdKeys` too, whether the binding kept the
 // rows or changed their shape. Measured by counting the reads of the id key on the rows (deterministic: no timing).
 import { adoptWrites } from './use-react-hook-form-binding';
@@ -47,7 +47,7 @@ function readsFor(n: number, extra: number): { all: number; mine: number } {
   return { all: reads.base + reads.theirs + reads.mine, mine: reads.mine };
 }
 
-describe('adoptWrites: linear in the rows of an array with arrayIdKeys (critic round 6)', () => {
+describe('adoptWrites: linear in the rows of an array with arrayIdKeys (code review round 6)', () => {
   it('the binding kept the rows (same ids, same order): the reads of the id grow linearly with the rows', () => {
     const small = readsFor(400, 0);
     const large = readsFor(800, 0);

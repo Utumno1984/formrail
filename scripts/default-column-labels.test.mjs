@@ -96,7 +96,7 @@ describe('label interfaces: the guard (#540)', { timeout: 60_000 }, () => {
     expect(kinds('export interface FooLabels {\n  /** Name. The default theme is dark. */\n  a: string;\n}')).toEqual(['FooLabels.a:label-no-default']);
   });
 
-  // Medium finding of the critic of #548: the `ts.isTypeLiteralNode(owner)` branch of `measureLabels` had no test.
+  // Medium finding of the code review of #548: the `ts.isTypeLiteralNode(owner)` branch of `measureLabels` had no test.
   describe('label types that are not an `interface` (type literal, Partial, intersection)', () => {
     it('`type FooLabels = { a: string }` is read, and without a default it is reported', () => {
       expect(kinds('export type FooLabels = {\n  /** Name. */\n  a: string;\n};')).toEqual(['FooLabels.a:label-no-default']);

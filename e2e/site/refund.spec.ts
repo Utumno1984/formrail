@@ -29,7 +29,7 @@ test.describe('refund page', () => {
   test('in a few seconds: 14 days, no reason, anyone, and how to ask', async ({ page }) => {
     await page.goto('refund/');
     // the first screen already says it, before any scrolling
-    // the exception for fraud or abuse: decision of Daniele of 2026-11-27, as in Paddle's Refund Policy (1.3)
+    // the exception for fraud or abuse: maintainer decision of 2026-11-27, as in Paddle's Refund Policy (1.3)
     await expect(page.locator('.lead')).toContainText(
       `within ${days} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`,
     );
@@ -73,7 +73,7 @@ test.describe('refund page', () => {
     await expect(link).toHaveAttribute('rel', /noopener/);
     const section = page.locator('#consumers-title ~ p').first();
     await expect(section).toContainText('does not take away any right you have as a consumer');
-    // the expected text changed (critic of PR #713, note 4): using the product does not shorten the policy,
+    // the expected text changed (code review of PR #713, note 4): using the product does not shorten the policy,
     // and the Buyer Terms apply on top of it (they make the statutory withdrawal end once you start using it)
     await expect(section).toContainText(
       `Starting to use Formrail Pro does not shorten the ${days} days of this policy; your rights under Paddle's Buyer Terms apply in addition.`,
@@ -83,7 +83,7 @@ test.describe('refund page', () => {
 
   test('the license and the refund page agree on the number of days', async ({ page }) => {
     await page.goto('license/');
-    // same days and the same exception for fraud or abuse (decision of Daniele of 2026-11-27), in the same words
+    // same days and the same exception for fraud or abuse (maintainer decision of 2026-11-27), in the same words
     const rule = `within ${days} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`;
     await expect(page.locator('#refunds-title + p')).toContainText(rule);
     await page.getByRole('link', { name: 'https://formrail.dev/refund/' }).click();
@@ -180,7 +180,7 @@ test.describe('privacy notice: purchases', () => {
       'Transfers outside the EEA',
       'Retention',
     ]);
-    // The expected list changed (critic of PR #713, points 3 and 10): the Paddle Billing checkout can also
+    // The expected list changed (code review of PR #713, points 3 and 10): the Paddle Billing checkout can also
     // collect the postal code or address and, for a business, the tax number, and makes them available to the
     // seller; a consumer has no company. The list says what the data "can include", it is not a closed list.
     await expect(page.locator('#purchase-data-title + p')).toContainText(
@@ -193,10 +193,10 @@ test.describe('privacy notice: purchases', () => {
       'your country;',
       'your postal code or address and, for a business, the tax or VAT number, when you give them to Paddle at checkout;',
       'the number of developers the license is for;',
-      // the date and the amount are among the records of the sale that are kept (decision of Daniele of 2026-11-27)
+      // the date and the amount are among the records of the sale that are kept (maintainer decision of 2026-11-27)
       'the identifier, the date and the amount of the transaction.',
     ]);
-    // the whole 13(2)(e) sentence (critic of PR #713, round 3, problem 2)
+    // the whole 13(2)(e) sentence (code review of PR #713, round 3, problem 2)
     await expect(page.locator('#purchase-data-title + p + ul + p')).toContainText(
       'Without your email address and the GitHub user names we cannot grant the access or manage the license; the other data are optional or depend on what Paddle collects at checkout (art. 13(2)(e) GDPR).',
     );
@@ -204,12 +204,12 @@ test.describe('privacy notice: purchases', () => {
     await expect(main).toContainText('GitHub user names that you give us');
     await expect(main).toContainText('art. 6(1)(b) GDPR');
     await expect(main).toContainText('art. 6(1)(f) GDPR');
-    // the expected text changed with the decision of Daniele of 2026-11-27 (critic of PR #713, point 1): the
+    // the expected text changed with the maintainer decision of 2026-11-27 (code review of PR #713, point 1): the
     // period is counted from the end of the year of the sale, not from the end of a license that may never end
     await expect(page.locator('#purchase-retention-title + p')).toContainText(
       `for ${retention} years from the end of the year in which the sale takes place`,
     );
-    // minimisation, decision of Daniele of 2026-11-27 after round 3 of the critic: the data kept for that period,
+    // minimisation, maintainer decision of 2026-11-27 after code review round 3: the data kept for that period,
     // and when the other data are deleted (a new second paragraph, so the paragraphs after it moved by one)
     await expect(page.locator('#purchase-retention-title + p')).toContainText(
       'Of the purchase data received from Paddle, the records of the sale keep only the identifier of the transaction, the date, the amount, your country and your email address;',
@@ -221,7 +221,7 @@ test.describe('privacy notice: purchases', () => {
       'The data controller deletes them when your access to the registry ends',
     );
     await expect(main).not.toContainText('in force');
-    // decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale; the expected text changed
+    // maintainer decision of 2026-11-27: emails about a purchase are kept like the sale; the expected text changed
     // after round 3 (note A): the other emails follow the general section "Emails you send us"
     await expect(page.locator('#purchase-retention-title + p + p + p + p')).toContainText(
       `are records of the sale: they are kept for the same period, ${retention} years from the end of the year in which the sale takes place. The other emails follow the rule in "Emails you send us" below.`,
@@ -285,7 +285,7 @@ test.describe('privacy notice: purchases', () => {
       await expect(section).toContainText(entity);
     }
     await expect(section).toContainText('independent controller');
-    // asserted on its own since it moved out of the parenthesis (critic of PR #713, round 3, problem 2)
+    // asserted on its own since it moved out of the parenthesis (code review of PR #713, round 3, problem 2)
     await expect(section).toContainText('Your receipt names the company that sold to you.');
     await expect(section).not.toContainText('What it passes to us');
     const text = await page.locator('#purchases-title ~ *').evaluateAll((els) => els.map((e) => e.textContent ?? '').join(' '));
@@ -320,11 +320,11 @@ test.describe('privacy notice: purchases', () => {
     await expect(page.locator('main')).not.toContainText(/weigh/i);
   });
 
-  test('the waitlist description is unchanged and the Last updated date matches license and refund', async ({ page }) => {
+  test('the early access request description follows #716 and the Last updated date matches license and refund', async ({ page }) => {
     await page.goto('privacy/');
     const main = page.locator('main');
-    await expect(main).toContainText('no later than 24 months after sign-up, or earlier if you withdraw your consent');
-    await expect(main).toContainText('The waitlist form asks for these fields:');
+    await expect(main).toContainText('no later than 24 months after you send the request, or earlier if you withdraw your consent');
+    await expect(main).toContainText('The early access request form asks for these fields:');
     const dates: string[] = [];
     for (const url of ['privacy/', 'license/', 'refund/']) {
       await page.goto(url);
@@ -360,7 +360,7 @@ test.describe('privacy notice: purchases', () => {
     for (const word of [/Paddle\.js/i, /\bBuy\b/i, /purchase page/i, /exception/i]) {
       await expect(cookies.nth(1)).not.toContainText(word);
     }
-    // neither paragraph mentions Paddle at all (critic of PR #713, note 7)
+    // neither paragraph mentions Paddle at all (code review of PR #713, note 7)
     for (const i of [0, 1]) await expect(cookies.nth(i)).not.toContainText(/Paddle/);
     // the other pages of the site load nothing from Paddle
     for (const url of ['', 'teams/', 'license/', 'refund/']) {

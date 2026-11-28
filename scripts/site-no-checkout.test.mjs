@@ -6,10 +6,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { assembleSite } from './assemble-site.mjs';
 import { SITE_ORIGIN } from './site-config.mjs';
 
-// "No checkout" guard (ticket #715). Decision of Daniele of 2026-11-26 (evening): the sale is on standby, so
+// "No checkout" guard (ticket #715). Maintainer decision of 2026-11-26 (evening): the sale is on standby, so
 // no page of the published site may contain a payment link, button or script. This test fails the CI if one
 // appears. It is to be REMOVED OR LOOSENED ONLY in the ticket that reopens the sale, on explicit instruction
-// of Daniele (see "Decisione del 2026-11-26 (sera): vendita in standby" in docs/planning/design-system-spec.md,
+// of the maintainer (see "Decision of 2026-11-26 (evening): sale on standby" in docs/planning/design-system-spec.md,
 // section 8). Do not add exceptions to make a page pass.
 //
 // It reads the assembled site (in a temporary folder, as the other site tests do): every HTML page except the

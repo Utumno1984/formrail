@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-// Sale on standby (ticket #715, decision of Daniele of 2026-11-26, evening): no page of the published site
+// Sale on standby (ticket #715, maintainer decision of 2026-11-26, evening): no page of the published site
 // loads anything from Paddle or offers a way to pay. To be removed or loosened ONLY in the ticket that
-// reopens the sale, on explicit instruction of Daniele. The unit guard on the assembled HTML is
+// reopens the sale, on explicit instruction of the maintainer. The unit guard on the assembled HTML is
 // scripts/site-no-checkout.test.mjs. Runs against the assembled `site/` (playwright.site.config.ts).
 
 const PAYMENT = /\b(buy|purchase|checkout|pre-?order)\b/i;

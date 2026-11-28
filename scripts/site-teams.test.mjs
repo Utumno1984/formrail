@@ -83,7 +83,7 @@ describe('assembled pages', () => {
     expect(() => build({ privacyEmail: '' })).toThrow(/PRIVACY_EMAIL/);
   });
 
-  it('with an empty form URL the teams page has neither CTA, waitlist section nor hero button', () => {
+  it('with an empty form URL the teams page has neither CTA, early access section nor hero button', () => {
     // The design partner section is switched off too: it legitimately says "early access" (ticket #697).
     const { teams } = build({ earlyAccessUrl: '', designPartnerUrl: '' });
     expect(teams).not.toMatch(/early access|waitlist|href="#waitlist"|EARLY_ACCESS|\{\{/i);
@@ -118,8 +118,12 @@ describe('assembled pages', () => {
     for (const html of [teams, privacy, home, notFound]) {
       expect(html.replace(/\s+/g, ' ')).not.toMatch(/only to contact|only use your answers/i);
     }
+    // expected text changed on purpose (#716): the note now also names replying to the request
     for (const html of [teams, home]) {
-      expect(html.replace(/\s+/g, ' ')).toContain('your answers to plan the product');
+      expect(html.replace(/\s+/g, ' ')).toContain(
+        'your email and your answers to reply to your request, to contact you about',
+      );
+      expect(html.replace(/\s+/g, ' ')).toContain('to plan the product');
     }
   });
 
@@ -182,7 +186,7 @@ describe('design partner section (#697)', () => {
     expect(text).toContain(
       'Opens an external form (Tally, servers in the EU) in a new tab; nothing is embedded in this page.',
     );
-    expect(text).toContain('It is a different form from the waitlist one.');
+    expect(text).toContain('It is a different form from the early access request one.');
     expect(teams).toMatch(/design-partners-title[\s\S]*href="\.\.\/privacy\/"/);
     expect(teams).not.toMatch(/DESIGN_PARTNER|DP_(OPEN|FULL)|\{\{/);
     expect(teams).not.toContain('All design partner seats are taken');
@@ -210,10 +214,10 @@ describe('design partner section (#697)', () => {
     expect(teams).toContain(`href="${FORM}"`);
   });
 
-  it('0 seats: seats exhausted, the link goes to the waitlist and the form is not linked anywhere', () => {
+  it('0 seats: seats exhausted, the link goes to the early access form and the form is not linked anywhere', () => {
     const { teams, privacy } = build({ designPartnerSeats: 0 });
     expect(teams).toContain('All design partner seats are taken for now.');
-    expect(teams).toContain('<a class="btn btn-primary" href="#waitlist">Go to the waitlist form</a>');
+    expect(teams).toContain('<a class="btn btn-primary" href="#waitlist">Go to the early access form</a>');
     expect(teams).not.toContain(FORM);
     expect(teams).not.toContain('Apply as a design partner');
     expect(teams).not.toMatch(/Up to \d+ teams?/);
@@ -248,7 +252,7 @@ describe('design partner section (#697)', () => {
     expect(renderDesignPartners(html, '', 3)).toBe('');
   });
 
-  it('the privacy notice has a separate section with every field of the form, one by one; the waitlist section is untouched', () => {
+  it('the privacy notice has a separate section with every field of the form, one by one; the early access request section is its own', () => {
     const { privacy } = build();
     expect(privacy).toContain('<h2 id="design-partners-title">Design partner applications</h2>');
     const section = flat(
@@ -277,21 +281,21 @@ describe('design partner section (#697)', () => {
       'servers in the European Union',
       'processor',
       'transfers outside the EEA described above',
-      'It is a different form from the waitlist one',
+      'It is a different form from the early access request one',
     ]) {
       expect(section, phrase).toContain(phrase);
     }
-    // Tally's email copy is disclosed in the design partner section only (the waitlist wording stays as is).
+    // Tally's email copy is disclosed in the design partner section too (and, since #716, in the early access one).
     for (const phrase of ['formrail.dev@gmail.com', 'under its own terms and privacy policy', 'EU-US Data Privacy Framework', 'both on Tally and from the mailbox'])
       expect(section, phrase).toContain(phrase);
     expect(section).not.toContain('not copied to email');
     expect(section).not.toMatch(/Google[^.]*as our processor/);
-    // The waitlist notice is unchanged and never mentions the other form.
+    // The early access request notice never mentions the other form (expected texts changed on purpose, #716).
     const waitlist = flat(
       privacy.slice(privacy.indexOf('id="data-title"'), privacy.indexOf('id="design-partners-title"')),
     );
-    expect(waitlist).toContain('The waitlist form asks for these fields:');
-    expect(waitlist).toContain('no later than 24 months after sign-up');
+    expect(waitlist).toContain('The early access request form asks for these fields:');
+    expect(waitlist).toContain('no later than 24 months after you send the request');
     expect(waitlist).not.toMatch(/design[- ]partner/i);
   });
 

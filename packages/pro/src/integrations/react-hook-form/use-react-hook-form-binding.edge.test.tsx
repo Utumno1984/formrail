@@ -206,7 +206,7 @@ describe('StrictMode', () => {
     const setValue = vi.spyOn(form, 'setValue');
     const resetDefaultValues = vi.spyOn(form, 'resetDefaultValues');
     act(() => harness.current().rebase.rebase({ ...SAVED, supplier: 'Acme Corp Ltd' }));
-    // One rebase, written once (critic round 1, point 2: no `reset`): the changed field, then the new defaults.
+    // One rebase, written once (code review round 1, point 2: no `reset`): the changed field, then the new defaults.
     expect(reset).not.toHaveBeenCalled();
     expect(setValue.mock.calls).toEqual([['supplier', 'Acme Corp Ltd']]);
     expect(resetDefaultValues).toHaveBeenCalledTimes(1);
@@ -355,7 +355,7 @@ describe('a save that settles while the user edited a row and the server reorder
   });
 });
 
-describe('a rebase written with a reset (a top-level key to remove) on a shouldUnregister form (critic round 1, point 3)', () => {
+describe('a rebase written with a reset (a top-level key to remove) on a shouldUnregister form (code review round 1, point 3)', () => {
   it("the user's edit stays in React Hook Form and in the DOM: the mounted fields are kept (keepFieldsRef)", () => {
     const harness = setupInvoiceForm({ useFormProps: { defaultValues: SAVED, shouldUnregister: true } });
     harness.type('Amount', '120');

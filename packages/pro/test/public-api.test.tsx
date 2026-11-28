@@ -215,7 +215,7 @@ describe('@formrail/pro/engine: useFormRebase on a form that is not core', () =>
 });
 
 /**
- * The identity rules of `RebaseFormBinding` (critic round 1, point 4): what the hook reads from `values === baseline`
+ * The identity rules of `RebaseFormBinding` (code review round 1, point 4): what the hook reads from `values === baseline`
  * and from a new `baseline` object, so that a binding of another form library (#507, #508) cannot get them wrong
  * unnoticed. `handsBackBaseline` breaks the first rule (values equal in content handed back as `baseline`);
  * `recreateBaseline` breaks the second (a new baseline object with the same content).

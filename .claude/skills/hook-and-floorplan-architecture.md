@@ -1,41 +1,41 @@
 ---
 name: hook-and-floorplan-architecture
-description: Separazione hook/UI per Floorplans (ListReport), Forms (Object Page) e Internal/Harness — usala quando scrivi o rivedi logica di stato complessa (dirty-tracking, dirty-guard, reset asincroni, gestione filtro) in questi componenti.
+description: Hook/UI separation for Floorplans (ListReport), Forms (Object Page) and Internal/Harness — use it when you write or review complex state logic (dirty-tracking, dirty guard, asynchronous resets, filter handling) in these components.
 ---
 
 # Hook and floorplan architecture
 
-Applicabile a: `src/list-report/` (Floorplans, es. `ListReportTable`, `ListReportFilterBar`),
-`src/object-page/` (Forms, es. `useObjectPageForm`, `useDirtyGuard`), e alle fixture di
+Applies to: `src/list-report/` (Floorplans, e.g. `ListReportTable`, `ListReportFilterBar`),
+`src/object-page/` (Forms, e.g. `useObjectPageForm`, `useDirtyGuard`), and the fixtures of
 `Internal/Harness`.
 
-## Separazione delle responsabilità
+## Separation of responsibilities
 
-Tutta la logica di stato complessa vive nell'hook correlato, mai nel componente di presentazione:
+All complex state logic lives in the related hook, never in the presentation component:
 
-- **Dirty-tracking / dirty-guard** (confronto con la baseline reale, distinzione tra un'eco di
-  sistema dopo un'idratazione asincrona e un gesto dell'utente) → `useObjectPageForm`,
-  `useDirtyGuard`. Vedi "Object Page / dirty-tracking" in `CLAUDE.md`: un valore che arriva da
-  fuori dopo il mount non deve mai marcare il form come sporco.
-- **Reset asincroni / idratazione post-mount** → gestiti nell'hook, non in un `useEffect` dentro
-  il componente UI.
-- **Gestione del filtro** (bozza vs committed, tracking dell'ultima richiesta valida, scarto delle
-  risposte superate) → `use-list-report`, non `ListReportFilterBar`/`ListReportTable`.
+- **Dirty-tracking / dirty guard** (comparison with the real baseline, telling a system echo
+  after an asynchronous hydration from a user gesture) → `useObjectPageForm`, `useDirtyGuard`.
+  See "Object Page / dirty-tracking" in `CLAUDE.md`: a value that arrives from outside after
+  mount must never mark the form as dirty.
+- **Asynchronous resets / post-mount hydration** → handled in the hook, not in a `useEffect`
+  inside the UI component.
+- **Filter handling** (draft vs committed, tracking of the latest valid request, discarding
+  superseded responses) → `use-list-report`, not `ListReportFilterBar`/`ListReportTable`.
 
-Un componente di presentazione (il `.tsx` che renderizza markup) riceve stato e callback già
-pronti dall'hook; non contiene `useState`/`useReducer` per stato che un consumer esterno deve
-poter osservare o guidare dall'esterno.
+A presentation component (the `.tsx` that renders markup) receives ready-made state and callbacks
+from the hook; it contains no `useState`/`useReducer` for state that an external consumer must be
+able to observe or drive from outside.
 
-## TypeScript: tipi estensibili per le interfacce dei form
+## TypeScript: extensible types for form interfaces
 
-Il vincolo generico sui valori di un form (`useObjectPageForm<Values>`, `useDirtyGuard` e simili)
-deve essere `extends object`, non `Record<string, unknown>`:
+The generic constraint on a form's values (`useObjectPageForm<Values>`, `useDirtyGuard` and
+similar) must be `extends object`, not `Record<string, unknown>`:
 
 ```ts
 function useObjectPageForm<Values extends object>(/* ... */) {}
 ```
 
-`Record<string, unknown>` non è assegnabile da un'`interface` dichiarata dal consumer (le
-interfacce non hanno un'index signature implicita), quindi rifiuta il caso d'uso più comune — un
-consumer che passa la propria `interface FormValues { ... }`. `extends object` accetta sia
-un'interfaccia sia un literal type, senza perdere il controllo dei tipi sulle chiavi.
+`Record<string, unknown>` is not assignable from an `interface` declared by the consumer
+(interfaces have no implicit index signature), so it rejects the most common use case — a
+consumer passing its own `interface FormValues { ... }`. `extends object` accepts both an
+interface and a literal type, without losing type checking on the keys.

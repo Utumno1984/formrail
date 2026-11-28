@@ -328,19 +328,21 @@ describe('ListReportTable: shades on the inline edges that hide columns', () => 
     expect(scroller()).toBe(el);
   });
 
-  it('geometry: as tall as the scrollport; a table shorter than it moves the shades down to its bottom', () => {
+  it('geometry: as tall as the scrollport; a table shorter than it makes the shades end where the table ends (#724)', () => {
     mock = mockLayout(WIDE);
     render(<Host />);
     expect(layer()!.style.getPropertyValue('--rop-list-report-edge-height')).toBe('400px');
     expect(layer()!.style.getPropertyValue('--rop-list-report-edge-bottom')).toBe('0px');
     mock.layout.tableHeight = 282.6;
     ro.trigger();
-    // Floored: the shades never reach past the scrollport.
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-bottom')).toBe('-117px');
-    mock.layout.clientHeight = 350;
+    // Floored: the shades never reach past the table (nor the scrollport).
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-height')).toBe('282px');
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-bottom')).toBe('0px');
+    mock.layout.clientHeight = 250;
     ro.trigger();
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-height')).toBe('350px');
-    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-bottom')).toBe('-67px');
+    // A table taller than the scrollport: back to the scrollport's height.
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-height')).toBe('250px');
+    expect(layer()!.style.getPropertyValue('--rop-list-report-edge-bottom')).toBe('0px');
   });
 
   it('without row actions the end shade reaches the edge; with them it stops at the actions column (both forms)', () => {

@@ -265,7 +265,7 @@ describe('checkLabelDefaults: stale sources, examples and exceptions fail', () =
   });
 });
 
-// Round 2 (critic of PR #551): a prose that lists several values is compared value by value, in order and in number,
+// Round 2 (code review of PR #551): a prose that lists several values is compared value by value, in order and in number,
 // never on its first value alone.
 describe('checkLabelDefaults: a prose that lists several values', () => {
   const listRow = (iface: string, key: string, values: string[]): LabelRow => ({ ...row(iface, key, values[0]), proseValues: values });

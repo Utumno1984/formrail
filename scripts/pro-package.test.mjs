@@ -60,7 +60,7 @@ describe('packages/pro engine entry and form libraries', () => {
     expect(pkg.devDependencies?.[name] ?? pkg.peerDependencies?.[name]).toBeDefined();
   });
 
-  it('@formrail/core is an OPTIONAL peer (decision 1a of Daniele, 14/11/2026): @formrail/pro/engine needs no core', () => {
+  it('@formrail/core is an OPTIONAL peer (maintainer decision 1a, 2026-11-14): @formrail/pro/engine needs no core', () => {
     expect(pkg.peerDependencies['@formrail/core']).toBeDefined();
     expect(pkg.peerDependenciesMeta?.['@formrail/core']).toEqual({ optional: true });
     // react and react-dom stay required peers: every entry uses them.
@@ -236,7 +236,7 @@ describe('packages/pro tanstack-form entry', () => {
     }
   });
 
-  // Critic round 1 on PR #557: the adapter reads internals of TanStack Form that are not public API, so the peer accepts
+  // Code review round 1 on PR #557: the adapter reads internals of TanStack Form that are not public API, so the peer accepts
   // the tested minor only (`~1.33.5`: >=1.33.5 <1.34.0). A newer minor gives a peer conflict, not a silent false dirty;
   // widening it is a ticket of its own, with the suite run on that version.
   it('the peer range is the tested minor only (~): the devDependency range, whose floor is the version the lockfile installs', () => {

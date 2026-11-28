@@ -285,7 +285,7 @@ describe('Record editing integrity, sales orders: a save in flight, a deleted or
     expect(store.snapshot().some((o) => o.id === ORDER)).toBe(false);
     await userEvent.click(await saveButton());
     await userEvent.click(within(await reviewDialog()).getByRole('button', { name: 'Save changes' }));
-    // #583, decision of Daniele (option A): "Save changes" is there but unavailable, described by the reason; no save.
+    // #583, maintainer decision (option A): "Save changes" is there but unavailable, described by the reason; no save.
     const confirmButton = within(await reviewDialog()).getByRole('button', { name: 'Save changes' });
     expect(confirmButton).toHaveAttribute('aria-disabled', 'true');
     expect(confirmButton).toHaveAccessibleDescription(DELETED_SAVE_REASON);

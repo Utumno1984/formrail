@@ -1,4 +1,4 @@
-// `useReactHookFormBinding` (ticket #507, critic round 1, point 2) with the rows of a real `useFieldArray`: a rebase or
+// `useReactHookFormBinding` (ticket #507, code review round 1, point 2) with the rows of a real `useFieldArray`: a rebase or
 // an `acceptTheirs` must never remount the rows. React Hook Form regenerates the ids of every row (new React keys,
 // new input nodes, the focus lost) each time the array itself is written (`reset`, or a write of `lines`): the binding
 // writes only the changed leaves.
