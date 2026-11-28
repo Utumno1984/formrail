@@ -115,10 +115,12 @@ export interface CalendarProps
 }
 
 // Full literals (Tailwind scan). Logical properties only (spec §1.13.4).
+// `max-[22rem]:p-[3px]`: 7 cells of 40px, the 1px borders and 3px of padding are 288px, the room a 320px
+// screen leaves inside 16px page margins; the room comes from the padding, never from the cells.
 // `self-start`: keeps its intrinsic width inside a stretching flex column (a Field), so the columns
 // stay 40px wide.
 const ROOT =
-  'inline-flex max-w-full self-start flex-col gap-2 rounded-rop-md border border-rop-border bg-rop-surface p-3 ' +
+  'inline-flex max-w-full self-start flex-col gap-2 rounded-rop-md border border-rop-border bg-rop-surface p-3 max-[22rem]:p-[3px] ' +
   'font-rop-sans text-rop-body text-rop-text';
 const HEADER = 'flex items-center gap-2';
 const HEADING = 'min-w-0 flex-1 text-center text-rop-title-sm font-[600] [overflow-wrap:anywhere]';

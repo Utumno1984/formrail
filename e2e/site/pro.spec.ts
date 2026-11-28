@@ -115,6 +115,20 @@ test.describe('Pro demo: manager and index', () => {
     await expect(page.locator('#storybook-root > *').first()).toBeAttached({ timeout: 30_000 });
     await expect(page.locator('.rop-pro-banner')).toHaveCount(0);
   });
+
+  // Ticket #723 (smoke 2): the Free Storybook has no Pro page, so a link of the Pro column of the "Free and Pro"
+  // table leaves it for the Pro demo published next to it, in the whole window (not inside the preview frame).
+  test('the Free Introduction: "Virtual List Report" in the Pro column opens the Pro demo on its page', async ({ page }) => {
+    await page.goto('storybook/?path=/docs/introduction--docs');
+    const preview = page.frameLocator('#storybook-preview-iframe');
+    const table = preview.getByRole('region', { name: 'Free and Pro table' });
+    await expect(table).toBeVisible({ timeout: 30_000 });
+    await table.getByRole('link', { name: 'Virtual List Report', exact: true }).click();
+    await page.waitForURL((url) => url.pathname === `${base}pro/`);
+    expect(new URL(page.url()).searchParams.get('path')).toBe('/docs/pro-floorplans-virtual-list-report--docs');
+    await expect(page.locator('#storybook-preview-iframe')).toHaveAttribute('src', /iframe\.html\?id=pro-floorplans-virtual-list-report--docs&viewMode=docs/, { timeout: 30_000 });
+    await expect(preview.getByRole('heading', { level: 1, name: 'Virtual List Report' })).toBeVisible({ timeout: 30_000 });
+  });
 });
 
 test.describe('Pro demo: banner', () => {

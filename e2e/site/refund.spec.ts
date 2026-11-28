@@ -320,11 +320,11 @@ test.describe('privacy notice: purchases', () => {
     await expect(page.locator('main')).not.toContainText(/weigh/i);
   });
 
-  test('the waitlist description is unchanged and the Last updated date matches license and refund', async ({ page }) => {
+  test('the early access request description follows #716 and the Last updated date matches license and refund', async ({ page }) => {
     await page.goto('privacy/');
     const main = page.locator('main');
-    await expect(main).toContainText('no later than 24 months after sign-up, or earlier if you withdraw your consent');
-    await expect(main).toContainText('The waitlist form asks for these fields:');
+    await expect(main).toContainText('no later than 24 months after you send the request, or earlier if you withdraw your consent');
+    await expect(main).toContainText('The early access request form asks for these fields:');
     const dates: string[] = [];
     for (const url of ['privacy/', 'license/', 'refund/']) {
       await page.goto(url);

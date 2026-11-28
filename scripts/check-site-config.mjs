@@ -24,7 +24,7 @@ const EMAIL = /^[^\s@<>()"]+@[^\s@<>()"]+\.[^\s@<>()"]{2,}$/;
  */
 export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartnerUrl = '', purchaseRetentionYears, licensor }) {
   const problems = [];
-  if (earlyAccessUrl === '') problems.push('EARLY_ACCESS_URL is empty: the waitlist form link is missing.');
+  if (earlyAccessUrl === '') problems.push('EARLY_ACCESS_URL is empty: the early access form link is missing.');
   else {
     let url = null;
     try {
@@ -35,7 +35,7 @@ export function findConfigProblems({ earlyAccessUrl, privacyEmail, designPartner
     if (url && url.protocol !== 'https:') problems.push('EARLY_ACCESS_URL must be an https:// URL.');
     if (PLACEHOLDER.test(earlyAccessUrl)) problems.push('EARLY_ACCESS_URL is still a placeholder.');
   }
-  // Empty = design partner section switched off (ticket #697): allowed, unlike the waitlist URL.
+  // Empty = design partner section switched off (ticket #697): allowed, unlike the early access URL.
   if (designPartnerUrl !== '') {
     let url = null;
     try {

@@ -6,6 +6,7 @@ import { Button } from '../button/Button';
 import {
   Sheet,
   SheetBody,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -305,6 +306,7 @@ export const InNarrowSheet: Story = {
         <SheetHeader>
           <SheetTitle>Supplier details</SheetTitle>
           <SheetDescription>Read-only preview</SheetDescription>
+          <SheetClose />
         </SheetHeader>
         <SheetBody>
           <DescriptionList data-testid="sheet-list">

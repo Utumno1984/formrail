@@ -32,14 +32,19 @@ const BASE =
   'focus-visible:[outline:2px_solid_var(--color-rop-primary)] focus-visible:outline-offset-2 ' +
   'disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
 
+// The ghost variant and the `icon-xs` size are also read on their own, by `ghostIconXsButtonClass`.
+const GHOST =
+  'bg-transparent text-rop-primary not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle not-disabled:not-aria-disabled:active:bg-rop-surface-pressed not-disabled:not-aria-disabled:active:text-rop-primary-active';
+const ICON_XS = 'size-6 p-0';
+const ICON_XS_ICON: IconSize = 'sm';
+
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
   // Hover/active only on an enabled control; primary/danger darken (keeps the white text AA).
   primary:
     'bg-rop-primary text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-primary-hover not-disabled:not-aria-disabled:active:bg-rop-primary-active',
   secondary:
     'border-rop-border bg-rop-surface text-rop-text not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle not-disabled:not-aria-disabled:active:bg-rop-surface-pressed',
-  ghost:
-    'bg-transparent text-rop-primary not-disabled:not-aria-disabled:rop-hover:bg-rop-surface-subtle not-disabled:not-aria-disabled:active:bg-rop-surface-pressed not-disabled:not-aria-disabled:active:text-rop-primary-active',
+  ghost: GHOST,
   danger:
     'bg-rop-error text-rop-primary-contrast not-disabled:not-aria-disabled:rop-hover:bg-rop-error-hover not-disabled:not-aria-disabled:active:bg-rop-error-active',
 };
@@ -62,7 +67,7 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
   // text-decoration, so a leading/trailing icon is unaffected.
   inline:
     'h-[1lh] whitespace-nowrap justify-start px-1 align-baseline text-[length:inherit] leading-[inherit] underline underline-offset-2',
-  'icon-xs': 'size-6 p-0',
+  'icon-xs': ICON_XS,
   'icon-sm': 'size-8 p-0',
   'icon-md': 'size-9 p-0',
 };
@@ -84,12 +89,25 @@ const ICON_SIZE: Record<ButtonSize, IconSize> = {
   sm: 'sm',
   md: 'sm',
   lg: 'md',
-  'icon-xs': 'sm',
+  'icon-xs': ICON_XS_ICON,
   'icon-sm': 'md',
   'icon-md': 'lg',
 };
 
 type IconElement = ReactElement<SVGProps<SVGSVGElement>>;
+
+/**
+ * @internal Not public API. The classes of a ghost `icon-xs` `Button` (the default close button of the panels),
+ * before its consumer's `className`: for a control of the system that must look exactly like that `Button` without
+ * shipping the component (the own close button of a Sheet, #721). Read from the same constants as `Button`, and only
+ * those, so a bundle that needs just this button does not carry every variant and size.
+ */
+export function ghostIconXsButtonClass(): string {
+  return `${BASE} ${GHOST} ${ICON_XS}`;
+}
+
+/** @internal Not public API. The icon size of a `Button` of size `icon-xs` (see `ghostIconXsButtonClass`). */
+export const ICON_XS_BUTTON_ICON_SIZE: IconSize = ICON_XS_ICON;
 
 // `aria-label` / `aria-labelledby` are left out here and declared by every size branch below, with
 // the same TSDoc: an HTML declaration would add its generic text to theirs in the props table.

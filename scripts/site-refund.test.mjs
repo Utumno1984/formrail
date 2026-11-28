@@ -435,17 +435,18 @@ describe('the Purchases section of the privacy notice', () => {
     };
     const FOR_ALL =
       'This applies to everyone who writes to formrail.dev@gmail.com, whether or not they have bought a license. The emails about a purchase are kept as described in the Retention part of the Purchases section above.';
+    const EA = 'The copies of the early access requests follow the period and the legal basis of their section: no later than 24 months after the request, and on the same consent as the request.';
     const DP = 'The copies of the design partner applications follow the period of their section: no later than 24 months after the application.';
     const OTHERS =
       'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.';
     // Maintainer, 2026-11-27 (written confirmation): purpose, legal basis and provider of the mailbox
     const PURPOSE =
       'We use these emails to answer you. For privacy requests this rests on our obligations under the GDPR (art. 6(1)(c)); for the other emails, on our legitimate interest in answering (art. 6(1)(f)). The mailbox is Gmail, provided by Google under its own terms and privacy policy. Google LLC is based in the United States, and the transfer of the emails to it rests on the EU-US Data Privacy Framework, to which it adheres.';
-    expect(emails()).toBe(`Emails you send us ${FOR_ALL} ${DP} ${OTHERS} ${PURPOSE}`);
+    expect(emails()).toBe(`Emails you send us ${FOR_ALL} ${EA} ${DP} ${OTHERS} ${PURPOSE}`);
     // the design partner period is the one of its section
     expect(text(build().privacy)).toContain('no later than 24 months after your application');
     // without the design partner section the sentence on its copies goes with it, the rest stays
-    expect(emails({ designPartnerUrl: '' })).toBe(`Emails you send us ${FOR_ALL} ${OTHERS} ${PURPOSE}`);
+    expect(emails({ designPartnerUrl: '' })).toBe(`Emails you send us ${FOR_ALL} ${EA} ${OTHERS} ${PURPOSE}`);
     // the section is outside the Purchases section, which covers buyers only
     const { privacy } = build();
     expect(privacy.indexOf('id="emails-title"')).toBeGreaterThan(privacy.indexOf('id="purchase-retention-title"'));
@@ -466,12 +467,77 @@ describe('the Purchases section of the privacy notice', () => {
     expect(OFFICIAL_PRIVACY).not.toContain('https://www.paddle.com/legal/other');
   });
 
-  it('the waitlist description is the one it was before, word for word', () => {
+  it('the early access request description is the one of #716, word for word (fixture)', () => {
     const fixture = readFileSync(path.join(import.meta.dirname, 'fixtures', 'privacy-waitlist-section.txt'), 'utf8').trim();
     const waitlist = (privacy, end) => text(privacy.slice(privacy.indexOf('<h2 id="data-title">'), privacy.indexOf(end)));
     // with the design partner section and without it
     expect(waitlist(build().privacy, '<h2 id="design-partners-title">')).toBe(fixture);
     expect(waitlist(build({ designPartnerUrl: '' }).privacy, '<h2 id="purchases-title">')).toBe(fixture);
+  });
+
+  it('the Purchases section is the one it was before, word for word, except the name of the other form (#716)', () => {
+    const fixture = readFileSync(path.join(import.meta.dirname, 'fixtures', 'privacy-purchases-section.txt'), 'utf8').trim();
+    const purchases = (privacy) => text(privacy.slice(privacy.indexOf('<h2 id="purchases-title">'), privacy.indexOf('<h2 id="emails-title">')));
+    expect(purchases(build().privacy)).toBe(fixture);
+    expect(purchases(build({ designPartnerUrl: '' }).privacy)).toBe(fixture);
+    expect(fixture).toContain('The sections above describe the early access request form only, and they do not change.');
+  });
+
+  it('the early access request section lists the eight fields in the order of the form, with the real consent text (#716)', () => {
+    const { privacy } = build();
+    const fields = privacy.slice(privacy.indexOf('<h2 id="data-title">'), privacy.indexOf('<h2 id="purpose-title">'));
+    const items = [...fields.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => text(m[1]));
+    expect(items).toEqual([
+      'Work email (required);',
+      'Company or team (required);',
+      'How many developers would need a license? (required);',
+      'What would you use Formrail Pro for? (a description of the type of application, the industry and the problem you want to solve; required);',
+      'Team size (required);',
+      'Which form library do you use? (optional, you can pick several);',
+      'When would you need it? (required);',
+      'Consent, a box you check yourself, with the text quoted below (required).',
+    ]);
+    const section = text(privacy.slice(privacy.indexOf('<h2 id="data-title">'), privacy.indexOf('<h2 id="transfers-title">')));
+    expect(section).toContain(
+      '"I agree that Formrail may use my email address and my answers to reply to my early access request, to contact me about Formrail Pro early access and to plan the product, as described in the privacy notice."',
+    );
+    // requests of before the change keep their own fields, consent text and purposes
+    expect(section).toContain(
+      'Requests sent before the form changed on 27 November 2026 contain only the fields of that time: email address, team size, timing, form libraries and consent.',
+    );
+    expect(section).toContain(
+      '"I agree that Formrail may use my email address to contact me about Formrail Pro early access, and my answers to plan the product, as described in the privacy notice above."',
+    );
+    expect(section).toContain('For those requests the purposes of that time apply');
+    expect(section).toContain('art. 6(1)(a) GDPR');
+    expect(section).toContain('The form collects no payment data and does not lead to a purchase');
+  });
+
+  it('the notifications are on: Tally and the Gmail copy are named, the "not copied" wording is gone (#716)', () => {
+    const { privacy } = build();
+    const where = text(privacy.slice(privacy.indexOf('<h2 id="tool-title">'), privacy.indexOf('<h2 id="transfers-title">')));
+    expect(where).toContain('Tally also sends a copy of every request by email to formrail.dev@gmail.com, a Gmail mailbox provided by Google.');
+    expect(where).toContain('the transfer rests on the EU-US Data Privacy Framework, to which Google LLC adheres');
+    expect(where).not.toMatch(/not copied/i);
+    const retention = text(privacy.slice(privacy.indexOf('<h2 id="retention-title">'), privacy.indexOf('<h2 id="design-partners-title">')));
+    const transfers = text(privacy.slice(privacy.indexOf('<h2 id="transfers-title">'), privacy.indexOf('<h2 id="retention-title">')));
+    expect(transfers).toContain(
+      'The Gmail mailbox that receives the copies of the requests is provided by Google LLC (USA). The transfer to the United States rests on the EU-US Data Privacy Framework, to which Google LLC adheres.',
+    );
+    expect(retention).toContain('both on Tally and from the mailbox, no later than 24 months after you send the request');
+  });
+
+  it('the word "waitlist" is gone from every page of the site (#716)', () => {
+    for (const options of [undefined, { designPartnerUrl: '' }, { designPartnerSeats: 0 }]) {
+      for (const [name, page] of Object.entries(build(options))) {
+        expect(text(page), name).not.toMatch(/wait[- ]?list/i);
+      }
+    }
+    const { privacy } = build();
+    expect(privacy).toMatch(/<meta\s+name="description"\s+content="[^"]*early access request[^"]*"/);
+    expect(text(privacy.slice(privacy.indexOf('id="hero-title"'), privacy.indexOf('Last updated')))).toContain(
+      'for people who send a Formrail Pro early access request',
+    );
   });
 
   it('keeps the promise: no cookies, no analytics, no exception announced (sale on standby)', () => {

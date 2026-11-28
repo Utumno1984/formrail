@@ -114,6 +114,12 @@ interface AppShellNavSheetValue {
   /** Called by `AppShellNav` when it mounts; returns the function to call when it unmounts (which closes the Sheet). */
   registerNav: () => () => void;
   /**
+   * Called by `AppShellNav`, in development only, with whether the viewport of its document is known to be below the
+   * breakpoint: when it mounts, then at every crossing (from the listener it already has for them), for the warning
+   * of #721.
+   */
+  reportNarrow: (narrow: boolean) => void;
+  /**
    * The Sheet `AppShellNav` renders its children in, given by `AppShellNavTrigger` when it mounts (`null` until then):
    * only the trigger imports it, so a shell without one (an app for wide screens only) does not ship the Sheet.
    */
@@ -142,6 +148,13 @@ const NavInSheetContext = /* @__PURE__ */ createContext<((then: () => void) => v
 const noop = () => undefined;
 
 /**
+ * @internal Not public API (exported for the unit test). How long a shell below the breakpoint, with an
+ * `AppShellNav`, may go without an `AppShellNavTrigger` before the development warning of #721: room for a header
+ * whose content (and trigger) arrives after the mount, with a fetch.
+ */
+export const NO_TRIGGER_SETTLE_MS = 2000;
+
+/**
  * @internal Not public API (exported for the unit test). Whether the viewport is at or above the breakpoint of the
  * navigation column. Without `matchMedia`, or with one that throws (a restricted embed), it is not known: `false`, and
  * the CSS alone decides what is displayed.
@@ -150,6 +163,19 @@ export function wideViewport(view: Window | null | undefined): boolean {
   if (!view || typeof view.matchMedia !== 'function') return false;
   try {
     return view.matchMedia(APP_SHELL_WIDE_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the viewport is known to be below the breakpoint of the navigation column: `false` when it is wide, and
+ * when it is not known (no `matchMedia`, or one that throws).
+ */
+function knownNarrowViewport(view: Window | null | undefined): boolean {
+  if (!view || typeof view.matchMedia !== 'function') return false;
+  try {
+    return !view.matchMedia(APP_SHELL_WIDE_QUERY).matches;
   } catch {
     return false;
   }
@@ -289,16 +315,44 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
     setNavSide(startSide(trigger));
     setNavOpen(true);
   }, []);
+  // How many triggers are mounted, for the development check below only (never read in production).
+  const [triggerCount, setTriggerCount] = useState(0);
   // Every mounted trigger, so that the focus has one to go back to when the one the Sheet opened from unmounts.
   const registerTrigger = useCallback((trigger: HTMLButtonElement) => {
     const list = triggers.current;
     list.push(trigger);
     triggerRef.current ??= trigger;
+    if (process.env.NODE_ENV !== 'production') setTriggerCount((count) => count + 1);
     return () => {
       list.splice(list.indexOf(trigger), 1);
       if (triggerRef.current === trigger) triggerRef.current = list[0] ?? null;
+      if (process.env.NODE_ENV !== 'production') setTriggerCount((count) => count - 1);
     };
   }, []);
+  // #721: below the breakpoint the column is not displayed, and only the trigger opens the navigation: a shell with
+  // an `AppShellNav` and no `AppShellNavTrigger` leaves it out of reach there. Reported in development only when that
+  // is the case now: the viewport is below the breakpoint (`matchMedia` of the nav's document, followed as it
+  // changes) and, with a nav
+  // mounted, no trigger has been mounted for `NO_TRIGGER_SETTLE_MS` (a header filled after a fetch has the time to
+  // bring its trigger). A shell for wide screens only, in a wide viewport, logs nothing; without `matchMedia` (or
+  // with one that throws) the viewport is not known, and nothing is logged either. Once per shell, never in
+  // production.
+  const hasNav = navCount > 0;
+  // Reported by the nav (`reportNarrow`), from the document it is in and its own listener for the crossings.
+  const [narrow, setNarrow] = useState(false);
+  const warnedNoTrigger = useRef(false);
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || warnedNoTrigger.current || !hasNav || !narrow || triggerCount > 0) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      warnedNoTrigger.current = true;
+      console.warn(
+        '[formrail] <AppShell> has an <AppShellNav> and no <AppShellNavTrigger>: below 64rem (the viewport now) the navigation column is not displayed and nothing else opens it, so the navigation cannot be reached. Render an <AppShellNavTrigger> at the start of the AppShellHeader (it is not displayed from 64rem up).',
+      );
+    }, NO_TRIGGER_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [hasNav, narrow, triggerCount]);
   // The Sheet is rendered by `AppShellNav`: a nav that leaves takes the Sheet with it, so it closes it too (else the
   // trigger would announce an open Sheet that is not there, and a nav mounted later would open it by itself).
   const registerNav = useCallback(() => {
@@ -322,6 +376,7 @@ export const AppShell = /* @__PURE__ */ forwardRef<HTMLDivElement, AppShellProps
       registerTrigger,
       hasNav: navCount > 0,
       registerNav,
+      reportNarrow: setNarrow,
       Sheet,
       provideSheet,
     }),
@@ -497,6 +552,11 @@ export interface AppShellNavTriggerProps extends Omit<ButtonHTMLAttributes<HTMLB
  *
  * Declared limits: in a shell without an `AppShellNav` it opens nothing. When no trigger is mounted as the Sheet
  * closes, or the one the focus goes back to is disabled, the focus is not given back, and nothing else is focused.
+ *
+ * A shell with an `AppShellNav` and no trigger leaves the navigation out of reach below the breakpoint: in
+ * development, while the viewport is below it and no trigger has been mounted for 2 seconds (a header loaded later
+ * has that time to bring its trigger), it logs a `console.warn`, once per shell. A shell for wide screens only, used
+ * in a wide viewport, logs nothing.
  */
 export const AppShellNavTrigger = /* @__PURE__ */ forwardRef<HTMLButtonElement, AppShellNavTriggerProps>(function AppShellNavTrigger(
   { onClick, className, 'aria-label': ariaLabel, ...rest },
@@ -585,7 +645,9 @@ function textOfIds(ids: string | undefined): string {
  * The landmark is named by `labels.nav` of the `AppShell` (`Main` by default); its own `aria-label` or
  * `aria-labelledby` takes the place of that name, in the Sheet's title too.
  *
- * The Sheet's code comes with `AppShellNavTrigger`: a shell without one (an app for wide screens only) does not ship it.
+ * The Sheet's code comes with `AppShellNavTrigger`: a shell without one (an app for wide screens only) does not ship it,
+ * and in development, while the viewport is below the breakpoint, it logs a `console.warn` (see `AppShellNavTrigger`):
+ * there its navigation could not be reached.
  */
 export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavProps>(function AppShellNav(
   { className, style, children, onBlur, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, ...rest },
@@ -603,6 +665,7 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
   const open = !!navSheet?.open;
   const setOpen = navSheet?.setOpen;
   const triggerRef = navSheet?.triggerRef;
+  const reportNarrow = navSheet?.reportNarrow;
   const openRef = useRef(open);
   openRef.current = open;
   // Whether the Sheet's panel is on screen (open, or in its exit animation): set by the panel's own ref.
@@ -636,7 +699,10 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
     const column = columnRef.current;
     if (!setOpen || !triggerRef || !column) return undefined;
     const doc = column.ownerDocument;
+    // For the development warning of #721 (a nav without a trigger), from this same listener: never a second one.
+    if (process.env.NODE_ENV !== 'production') reportNarrow?.(knownNarrowViewport(doc.defaultView));
     return watchWideViewport(doc.defaultView, (wide) => {
+      if (process.env.NODE_ENV !== 'production') reportNarrow?.(!wide);
       const lost = focusLostWithColumn.current;
       focusLostWithColumn.current = false;
       if (!wide) {
@@ -649,7 +715,7 @@ export const AppShellNav = /* @__PURE__ */ forwardRef<HTMLElement, AppShellNavPr
       setLeaving(true);
       setOpen(false);
     });
-  }, [setOpen, triggerRef]);
+  }, [setOpen, triggerRef, reportNarrow]);
   useEffect(() => {
     if (!focusColumn.current) return;
     focusColumn.current = false;

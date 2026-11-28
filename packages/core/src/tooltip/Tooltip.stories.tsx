@@ -15,7 +15,7 @@ import {
 import { internalIcons } from '../internal/icons';
 import { exampleStory } from '../internal/example-story';
 import { storyControl, withoutControls } from '../internal/story-docs';
-import { Sheet, SheetBody, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
+import { Sheet, SheetBody, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../sheet/Sheet';
 import { Tooltip, TooltipProvider, type TooltipAlign, type TooltipSide } from './Tooltip';
 
 const SIDES: TooltipSide[] = ['top', 'right', 'bottom', 'left'];
@@ -219,7 +219,9 @@ export const LongText: Story = {
   play: async ({ canvasElement }) => {
     await userEvent.hover(within(canvasElement).getByRole('button', { name: 'Detail' }));
     const tooltip = await within(document.body).findByRole('tooltip');
-    await expect(tooltip.getBoundingClientRect().width).toBeLessThanOrEqual(320 + 1);
+    // 20rem at most, and never wider than the room the viewport leaves inside the 8px collision padding.
+    const room = Math.min(320, window.innerWidth - 16);
+    await expect(tooltip.getBoundingClientRect().width).toBeLessThanOrEqual(room + 1);
     await expect(tooltip.getBoundingClientRect().height).toBeGreaterThan(40);
   },
 };
@@ -244,8 +246,8 @@ export const ViewportEdge: Story = {
     const tooltip = await within(document.body).findByRole('tooltip');
     await waitFor(() => {
       const box = tooltip.getBoundingClientRect();
-      expect(box.left).toBeGreaterThanOrEqual(0);
-      expect(box.right).toBeLessThanOrEqual(window.innerWidth);
+      expect(box.left).toBeGreaterThanOrEqual(8 - 1);
+      expect(box.right).toBeLessThanOrEqual(window.innerWidth - 8 + 1);
     });
   },
 };
@@ -501,6 +503,7 @@ export const ClippedAndInSheet: Story = {
         <SheetContent>
           <SheetHeader>
             <SheetTitle>Panel</SheetTitle>
+            <SheetClose />
           </SheetHeader>
           <SheetBody>
             <Tooltip content="Above the sheet" delayDuration={delayDuration} side="left">
