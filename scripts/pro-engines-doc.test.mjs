@@ -12,16 +12,16 @@ const SPEC = resolve(ROOT, 'docs/planning/design-system-spec.md');
 
 /** One heading per question of the ticket, plus the sections the ticket asks for. */
 export const REQUIRED_HEADINGS = [
-  '## 1. Confine',
-  "## 2. Cosa entra nell'entry dei motori",
-  '## 3. `useFormRebase` generico',
-  '## 4. Adattatori vs guida',
+  '## 1. Boundary',
+  '## 2. What goes into the engines entry',
+  '## 3. Generic `useFormRebase`',
+  '## 4. Adapters vs guide',
   '## 5. Baseline',
-  '## 6. Applicare il rebase senza falsi dirty',
-  '## 7. Semantica di "dirty"',
-  '## Casi limite del ticket: stato',
-  '## Ticket figli proposti',
-  '## Decisioni di Daniele',
+  '## 6. Applying the rebase without false dirty',
+  '## 7. Semantics of "dirty"',
+  '## Edge cases of the ticket: status',
+  '## Proposed child tickets',
+  '## Maintainer decisions',
 ];
 
 /** The headings of `REQUIRED_HEADINGS` missing from `markdown` (a heading must be a whole line). */
@@ -39,12 +39,12 @@ describe('study of the Pro engines boundary (#489)', () => {
     expect(missingHeadings(readFileSync(STUDY, 'utf8'))).toEqual([]);
   });
 
-  it('records the three decisions of Daniele (14/11/2026: 1a, 2a, 3a) with the options set aside', () => {
-    const decisions = readFileSync(STUDY, 'utf8').split('## Decisioni di Daniele')[1] ?? '';
-    expect(decisions).toContain('14/11/2026');
-    for (const chosen of ['1a', '2a', '3a']) expect(decisions).toContain(`**${chosen} (scelta)**`);
-    for (const discarded of ['1b', '2b', '3b']) expect(decisions).toContain(`**${discarded} (scartata)**`);
-    expect(readFileSync(STUDY, 'utf8')).not.toMatch(/\*\*Aperto/);
+  it('records the three maintainer decisions (2026-11-14: 1a, 2a, 3a) with the options set aside', () => {
+    const decisions = readFileSync(STUDY, 'utf8').split('## Maintainer decisions')[1] ?? '';
+    expect(decisions).toContain('2026-11-14');
+    for (const chosen of ['1a', '2a', '3a']) expect(decisions).toContain(`**${chosen} (chosen)**`);
+    for (const discarded of ['1b', '2b', '3b']) expect(decisions).toContain(`**${discarded} (discarded)**`);
+    expect(readFileSync(STUDY, 'utf8')).not.toMatch(/\*\*Open/);
   });
 
   it('cites the real code (file:line)', () => {
