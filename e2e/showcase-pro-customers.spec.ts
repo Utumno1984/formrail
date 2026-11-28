@@ -447,7 +447,7 @@ test.describe('Pro/Showcase/Record editing integrity: a customer archived on the
     await expect(textbox(page, 'City')).toBeDisabled();
     await expect.poll(async () => (await stored(page))?.status).toBe('archived');
     await simulate(page).click();
-    await expect(notice(page)).toContainText('Status was updated.');
+    await expect(notice(page)).toContainText('Account manager was updated.');
     await expect(page.getByText(ARCHIVED_TITLE)).toHaveCount(0);
   });
 

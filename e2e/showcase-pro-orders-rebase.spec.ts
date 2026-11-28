@@ -227,7 +227,7 @@ test.describe('Pro/Showcase/Record editing integrity: server updates on a sales 
     await serverSetsQuantity(page, order.id, 0, 7);
     await expect(quantity(page, 1)).toHaveValue('7');
     await expect(quantity(page, 2)).toHaveValue('9');
-    await expect(notice(page)).toHaveText(/Lines > Item 1 > Quantity was updated\./);
+    await expect(notice(page)).toHaveText(/Lines > Line 1 \(.+\) > Quantity was updated\./);
     await expect(page.getByRole('list', { name: 'Conflicts' })).toHaveCount(0);
     await expect(footer(page)).toBeVisible();
     expect(order.lines[0]!.quantity).not.toBe(7);

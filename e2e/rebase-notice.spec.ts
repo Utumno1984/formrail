@@ -35,4 +35,20 @@ test.describe('Pro/RebaseNotice', () => {
     await gotoStory(page, 'pro-rebasenotice--one-conflict');
     await expect(page.locator('.rop-pro-rebase-notice')).toContainText('Warning:');
   });
+
+  test('more than three applied fields: a real Enter on the summary closes and reopens the list, the focus stays', async ({ page }) => {
+    // The play function leaves the list open (it opened it with a click).
+    await expectPlayToPass(page, 'pro-rebasenotice--many-applied');
+    const summary = page.locator('.rop-pro-rebase-notice summary');
+    const details = page.locator('.rop-pro-rebase-notice details');
+    await expect(details).toHaveAttribute('open');
+    await summary.focus();
+    await page.keyboard.press('Enter');
+    await expect(details).not.toHaveAttribute('open');
+    await expect(summary).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(details).toHaveAttribute('open');
+    await expect(summary).toBeFocused();
+    await expect(page.getByRole('list', { name: 'Updated fields' }).getByRole('listitem')).toHaveCount(6);
+  });
 });
