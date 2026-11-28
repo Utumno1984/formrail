@@ -83,10 +83,12 @@
     @apply sr-only;
   }
 
-  /* The badge of the kind of change: a tint of the kind's token (12% on the box surface) behind text
-     mixed 45% with black, so the contrast stays above 4.5:1 for the default tokens and for a
-     redeclared `--color-rop-primary` (measured by ChangeSummary.kind-contrast.test.ts), plus a
-     decorative shape drawn in CSS (no node, no extra JS): `+` added, `-` removed, a diamond changed.
+  /* The badge of the kind of change, in the language of core's `StatusBadge`: the tone token at 10% on the
+     box surface behind the dark text token (4.5:1 for the default tokens, measured by
+     ChangeSummary.kind-contrast.test.ts), a 1px contour and a decorative icon in the tone. Contract: a
+     redefined tone token must keep at least 3:1 against both the surface and its own tint (the icon and
+     the contour are non-text contrast, WCAG 1.4.11). The icon is a shape drawn in CSS (no node, no extra JS):
+     `+` added, `-` removed, a diamond changed.
      Left `inline` on purpose: an inline-block makes Chromium put a space around it in the accessible
      name (`Amount, changed , from`). A one-word kind moves to the next line whole; a long custom text
      wraps between words, and anywhere as a last resort, so it never leaves the box.

@@ -115,7 +115,7 @@ describe('ChangeSummary kind badges: contrast (#485)', () => {
 
   // The primaries already used by tokens.contrast.test.ts, plus the same idea for success / error.
   // The text is the dark text token, not a mix of the tone, so the contrast does not depend on the tone (as StatusBadge).
-  const PRIMARIES: Record<string, string> = {
+  const INFO_TONES: Record<string, string> = {
     'default blue': '#0a6ed1',
     'light blue': '#7fb4ff',
     'dark violet': '#6b3fa0',
@@ -124,10 +124,19 @@ describe('ChangeSummary kind badges: contrast (#485)', () => {
     // Even a primary that is almost white stays readable: the text is the dark text token, not a mix of the tone.
     'near white': '#fafafa',
   };
-  it.each(Object.entries(PRIMARIES))('changed with --color-rop-info %s: at least 4.5:1', (_name, hex) => {
+  it.each(Object.entries(INFO_TONES))('changed with --color-rop-info %s: at least 4.5:1', (_name, hex) => {
     const { fg, bg, surface } = badge('changed', { '--color-rop-info': hex });
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(fg, surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Icon and contour are non-text: at least 3:1 (WCAG 1.4.11) against the tint and the surface. Contract for
+  // whoever redefines a tone token: it must keep this ratio against the surface (the tint follows the tone).
+  it.each(KINDS)('%s, default tokens: the icon and contour (the tone) are at least 3:1 on the tint and on the surface', (kind) => {
+    const { bg, surface } = badge(kind);
+    const tone = resolve(`var(${TONE_TOKEN[kind]})`, new Map());
+    expect(contrast(tone, bg)).toBeGreaterThanOrEqual(3);
+    expect(contrast(tone, surface)).toBeGreaterThanOrEqual(3);
   });
 
   it.each([
