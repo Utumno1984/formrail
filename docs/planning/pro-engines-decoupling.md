@@ -107,13 +107,13 @@ because the existing test `dist.smoke.test.ts` ("no runtime licensing") wants th
 `dist/index.*`. `dist.engine.test.ts` ("one copy of each module") checks, in ESM and in CJS, that no
 other module appears in two files of the `dist`.
 
-Measurement, critic round 3: esbuild with minify and external peers, on a consumer that imports
+Measurement (code review): esbuild with minify and external peers, on a consumer that imports
 `ChangeSummary`, `useChangeSummary`, `RebaseNotice`, `useFormRebase`, `computeRebase` and
 `formatChangeValue` from `@formrail/pro`:
 
 | Build | raw | gzip |
 |---|---|---|
-| main before #489 (critic's measurement) | 27,696 B | 10,013 B |
+| main before #489 (code review measurement) | 27,696 B | 10,013 B |
 | #489 with duplicated helpers (d0fca20) | 30,595 B | 10,285 B |
 | #489 with `dist/shared.*` | 27,732 B | 10,052 B |
 
@@ -165,7 +165,7 @@ The documented contract:
 Alternative set aside: widening the signature of the main entry. It would be compatible for callers,
 but the existing test `packages/pro/test/scaffold.test.ts:103` pins the exact type with
 `toEqualTypeOf`, and the ticket asks that existing tests stay unchanged. Moreover it would change the
-public shape of an existing API, a decision that does not belong to the developer. The TSDoc of the
+public shape of an existing API, a decision that does not belong to the implementer of a single ticket. The TSDoc of the
 two signatures is the same text, kept aligned by a test.
 
 Two constraints of the contract come from the hook's code and are the reason an adapter is not
@@ -184,7 +184,7 @@ trivial:
 - The two rules are in the TSDoc of `RebaseFormBinding` and pinned by
   `packages/pro/test/public-api.test.tsx` ("identity rules of RebaseFormBinding"), with a `useState`
   binding that respects them as a control. The field registered after mount with an open conflict
-  (critic's observation, round 1) is closed in #507 with an adapter rule, without a channel in the
+  (code review observation) is closed in #507 with an adapter rule, without a channel in the
   contract: the RHF binding's baseline changes only when RHF replaces the defaults object, never for
   a registration, so the conflicts stay open. A field without a default enters only the values and is
   "added" (Pro README, section "React Hook Form"; test with real RHF in
@@ -319,8 +319,8 @@ divergences:
 
 ## Proposed child tickets
 
-Decided with Q3 = 3a (maintainer decision, 2026-11-14); the child tickets A3 and A4 are created by
-the planner:
+Decided with Q3 = 3a (maintainer decision, 2026-11-14); the child tickets A3 and A4 are created during
+planning:
 - **A1 + A2 (this PR)**: engines entry, source and dist guards, subpath budget
   (`packages/pro/bundle-budget.engine.json`, `scripts/bundle-budget.mjs`), `RebaseFormBinding`
   contract, fixture without core, `@formrail/core` optional peer.
@@ -351,5 +351,5 @@ Taken on 2026-11-14 on the options proposed by the study, recorded on ticket #48
   - **2b (discarded)**: only a copyable recipe, with no new peers.
 - **Q3, split of the work: decided 3a.**
   - **3a (chosen)**: this PR carries the study + A1 + A2 + the optional peer; A3 and A4 become child
-    tickets, created by the planner.
+    tickets, created during planning.
   - **3b (discarded)**: everything in a single PR.

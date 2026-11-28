@@ -254,7 +254,7 @@ the project as a whole.
   when they are coupled — a "breaking" primitive published without the companion fix creates a
   "poisoned" version window that consumers can install by mistake.
 - **Targeted mutation testing on the engines** (diff, parsing, validation, equality): a manual round
-  by the critic on every PR that touches their logic, without additional dependencies (§1.13.2).
+  during code review of every PR that touches their logic, without additional dependencies (§1.13.2).
 
 ### 1.12 Free completion primitives (gaps compared with general-purpose open source libraries) — **difficulty: low-medium, DatePicker medium-high**
 
@@ -321,8 +321,8 @@ API.
 ### 1.13 Cross-cutting robustness rules — **difficulty: low to apply, high to retrofit**
 
 **Maintainer decision (2026-11-03).** Five rules that apply to several components, each with a
-citable name. The planner recalls them **by name** in the acceptance criteria of the tickets
-concerned and the critic verifies them. The sections of the individual components refer here instead
+citable name. Tickets recall them **by name** in their acceptance criteria
+and code review verifies them. The sections of the individual components refer here instead
 of repeating them (one source, no copied text that then diverges).
 
 #### 1.13.1 Absent-values rule
@@ -411,11 +411,11 @@ RadioGroup #189, Switch #190, Calendar #194, DatePicker #195, Zod tickets):
 **Problem.** On pure-logic modules (diff, parsing, validation, equality, sorting) a green and
 "exhaustive" suite can pass anyway with an inverted comparison or a removed guard: it is the point
 where a defect costs most and shows least. A test that does not fail when the code is wrong protects
-nothing. So far this was done only on the critic's initiative (#174).
+nothing. So far this was done only at a reviewer's initiative (#174).
 
 **Rule.** Every PR that adds or modifies the logic of an **engine** goes through a round of **manual,
-targeted** mutation testing, done by the critic (procedure in
-`.claude/agents/critico-avversariale.md`): mutate by hand the conditions and comparisons introduced
+targeted** mutation testing, done during code review (procedure in
+the code review guidelines): mutate by hand the conditions and comparisons introduced
 or touched by the diff, one mutation at a time, and verify that at least one existing test fails. A
 surviving, non-equivalent mutation counts as a missing test: PR rejected.
 
@@ -437,7 +437,7 @@ runner) would add a heavy development dependency and run the file's suite for ev
 engines with parametric matrices (the 36 cases of #174) that is minutes per file, a fixed cost on
 every PR on a shared CI with the already known hardware constraint, plus much noise from equivalent
 mutants on defensive code. The mutations that matter are few and predictable (boundaries, comparison
-operators, guards, swapped sides) and the critic reads the diff line by line anyway. To be reviewed
+operators, guards, swapped sides) and code review reads the diff line by line anyway. To be reviewed
 if a defect that reached `main` proves catchable by a mutation that the manual round had skipped, or
 when the engines become too many for a manual round per PR.
 
@@ -869,8 +869,8 @@ function ChangeSummary(props: {
 
 ## 8. Pro commercial plan — maintainer decisions (2026-11-13)
 
-It comes from a critical review of the Pro plan with respect to sellability, done by the main session
-on 13/11. The points that emerged are **assessments of the session, not maintainer decisions**; the
+It comes from a critical review of the Pro plan with respect to sellability, done during planning
+on 2026-11-13. The points that emerged are **planning assessments, not maintainer decisions**; the
 maintainer shared the analysis and took the decisions listed below.
 - The value of the Pro is concentrated in a few thousand lines of logic (about 3,600-4,100 non-test
   lines in `packages/pro/src`, depending on how they are counted), with public source and rules: a
@@ -961,7 +961,7 @@ Maintainer decision (ticket #715). While there is no real revenue:
 ### Decisions of 2026-11-27 (maintainer): refund and data retention
 
 These are maintainer decisions, taken on 2026-11-27 (ticket #692). The text of the privacy notice was
-confirmed by the maintainer in writing on 2026-11-27, after the critic's approval at round 4, with
+confirmed by the maintainer in writing on 2026-11-27, after the code review approval, with
 three adjustments: in the purchase data no "renewals included" (we speak of repurchase, like the
 licence), the "Emails you send us" section declares purpose, legal basis (art. 6(1)(c) for privacy
 requests, 6(1)(f) for the others) and provider (Gmail, Google), and the right to object speaks of
@@ -994,9 +994,9 @@ requests, 6(1)(f) for the others) and provider (Gmail, Google), and the right to
 **Demo data of stories and examples** (epic #512, ticket #515): domain rule and ratchet guard on legacy
 data in `CONTRIBUTING.md`, section "Demo data".
 
-### Proposals of the planning session (not decided by the maintainer)
+### Planning proposals (not decided by the maintainer)
 
-The planner can use them as guidance, but not as constraints. A proposal becomes binding only if the
+Planning can use them as guidance, but not as constraints. A proposal becomes binding only if the
 maintainer confirms it.
 
 - **Pro positioning**: "record-editing integrity", that is never losing the user's edits, showing

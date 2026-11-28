@@ -286,7 +286,7 @@ recommendation of the previous document applies.
 - **Refocus risk with per-path clearing.** `useFocusFirstInvalidField` fires on the identity of
   `fieldErrors`; a partial clearing produces a new non-empty object, so typing in a field would move
   focus to the first invalid one. Ticket #102 imposes the fix (the trigger must be "a failed
-  `save`", not "a new object") and leaves the minimal form to the developer, to be flagged in the PR
+  `save`", not "a new object") and leaves the minimal form to the implementer, to be flagged in the PR
   as an API addition.
 - **Root-level errors** (a `refine` on the whole object, empty path) have no field: ticket #100
   exposes them as `formErrors` and counts them in the summary (#103).
@@ -296,19 +296,19 @@ recommendation of the previous document applies.
 ## 6. Published tickets
 
 Dependency order. Each ticket has the standard format (Context / Goal / Acceptance criteria / Smoke
-test / Technical notes / Edge cases / Critic) and the Storybook requirements of `CLAUDE.md`
+test / Technical notes / Edge cases / Review) and the Storybook requirements of `CLAUDE.md`
 (Controls, Actions with `fn()`, real `play`).
 
-| Order | Issue | Title | Depends on | Critic | Fragmentations closed |
-|---|---|---|---|---|---|
-| 1 | #97 | Field controls: a single internal wiring (`useFieldControlProps`), a single invalid style, a single `isDev` — refactor with no behaviour change | — | opus | F4, F5 (style), F13 |
-| 2 | #98 | `Field name` → `data-rop-name`: `useFocusFirstInvalidField` also reaches `Select`; stories/fixtures migrated to `Field` | #97 | opus | F2, F3, F5, F6 (part) |
-| 3 | #99 | Path-based `FieldErrors` with dot notation: shared type, single `invalidPaths()`, form and hook aligned | #98 | opus | F1, F5, F9 |
-| 4 | #100 | `useObjectPageForm({ schema })`: validation with Standard Schema (Zod-compatible), issues → `fieldErrors`, no dependency in the core | #99 | opus | F8 |
-| 5 | #101 | `ValidationProvider`: the `Field` with `name` reads its own error from the form (explicit `error` wins), footer stories migrated | #99 | opus | F2, F6 |
-| 6 | #102 | `fieldErrors`: per-path clearing on `setValue`/`setValues`, without moving focus (updates the all-or-nothing story-test) | #99 | opus | F10 |
-| 7 | #103 | Rule for error announcements (field / summary / save) and `getErrorSummary` for the footer, without coupling the footer to the form | #100, #101 (and #102 for one step of the e2e) | opus | F7, F12 |
-| 8 | #104 | Recipe story, non-interference e2e with `useDirtyGuard` and locked fields, visual matrix of the invalid states | #100, #101, #102, #103 | sonnet (low risk: no library code) | F11 |
+| Order | Issue | Title | Depends on | Fragmentations closed |
+|---|---|---|---|---|
+| 1 | #97 | Field controls: a single internal wiring (`useFieldControlProps`), a single invalid style, a single `isDev` — refactor with no behaviour change | — | F4, F5 (style), F13 |
+| 2 | #98 | `Field name` → `data-rop-name`: `useFocusFirstInvalidField` also reaches `Select`; stories/fixtures migrated to `Field` | #97 | F2, F3, F5, F6 (part) |
+| 3 | #99 | Path-based `FieldErrors` with dot notation: shared type, single `invalidPaths()`, form and hook aligned | #98 | F1, F5, F9 |
+| 4 | #100 | `useObjectPageForm({ schema })`: validation with Standard Schema (Zod-compatible), issues → `fieldErrors`, no dependency in the core | #99 | F8 |
+| 5 | #101 | `ValidationProvider`: the `Field` with `name` reads its own error from the form (explicit `error` wins), footer stories migrated | #99 | F2, F6 |
+| 6 | #102 | `fieldErrors`: per-path clearing on `setValue`/`setValues`, without moving focus (updates the all-or-nothing story-test) | #99 | F10 |
+| 7 | #103 | Rule for error announcements (field / summary / save) and `getErrorSummary` for the footer, without coupling the footer to the form | #100, #101 (and #102 for one step of the e2e) | F7, F12 |
+| 8 | #104 | Recipe story, non-interference e2e with `useDirtyGuard` and locked fields, visual matrix of the invalid states | #100, #101, #102, #103 | F11 |
 
 Tickets #100, #101 and #102 all depend on #99 and are independent of each other: they are developed
 one at a time in the order given (project pace: slow, ticket by ticket).
