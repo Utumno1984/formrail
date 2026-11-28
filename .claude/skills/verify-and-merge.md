@@ -55,7 +55,10 @@ All green before going on.
 
 The complete e2e and visual suites are run by CI, which must be green (`gh pr checks <N>`): do
 not run them in full locally (maintainer decision, 2026-11-27). Locally, run only the tests
-touched by the PR:
+touched by the PR (`npm run check` stays mandatory before every commit). The only local visual
+run allowed is `npm run test:visual:update`, solely when there are new or changed baselines to
+generate, with `uptime` below 8, shutting the containers down at the end; the comparison stays
+in CI:
 
 ```bash
 npx playwright test <file> -g "<name>"   # only the e2e tests touched by the PR
@@ -67,7 +70,7 @@ SessionStart hook), the actual start takes 30-60s — wait first.
 **Before running them alongside other heavy work on the same machine**, check `uptime`: two
 complete Playwright suites (726 tests each) in parallel took ~7x the normal time out of pure
 CPU/Chromium contention, not because of a code problem. Load well above the number of cores →
-wait for it to drop or accept the slowdown knowingly, and never discard an anomalous result (too
+wait for it to drop (above 8, always wait, no exceptions), and never discard an anomalous result (too
 slow, a number of tests much lower than usual) without checking the load.
 
 **A single failed timing/animation test** (e.g. a CSS transition with a short-timeout

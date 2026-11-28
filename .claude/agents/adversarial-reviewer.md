@@ -105,3 +105,8 @@ or strengthened test.
   mutation table) and any LOW problems as notes.
 
 Do not approve out of fatigue or courtesy. A false "approved" costs more than one more round.
+
+## Machine load
+
+- Before a heavy step (Storybook build, e2e, visual, Docker) check `uptime` and wait if the load
+  is above 8; always shut down servers, processes and containers left running in the background.

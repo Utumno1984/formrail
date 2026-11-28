@@ -53,3 +53,8 @@ Return one of these two outcomes:
 If Playwright does not start because of the environment (missing browser), say so explicitly and
 keep it separate from real defects: for the e2e part CI is authoritative, without faking a local
 outcome.
+
+## Machine load
+
+- Before a heavy step (Storybook build, e2e, visual, Docker) check `uptime` and wait if the load
+  is above 8; always shut down servers, processes and containers left running in the background.

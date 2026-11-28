@@ -1,6 +1,6 @@
 // Ticket #690: the Pro is distributed through GitHub Packages (decision of 2026-11-26). The spec (§2.4) and
 // CLAUDE.md must say so, and the superseded private npm org may only appear as history, on a line that
-// marks it as superseded. The spec is in English; CLAUDE.md is still in Italian, so both wordings are matched.
+// marks it as superseded. The spec and CLAUDE.md are both in English; the Italian wording is still matched for older text.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -43,7 +43,7 @@ describe('Pro distribution docs (#690)', () => {
     expect(currentPrivateNpmOrgLines('instead of the private npm\norg, superseded.')).toEqual([]);
     // a "superseded" in another sentence of the same paragraph does not excuse the mention
     expect(currentPrivateNpmOrgLines('The private npm org is used. Something else is superseded.')).toHaveLength(1);
-    // the Italian wording, still used by CLAUDE.md, is matched too
+    // the Italian wording is still matched too (older text)
     expect(currentPrivateNpmOrgLines("Si usa l'org npm privata.")).toHaveLength(1);
     expect(currentPrivateNpmOrgLines('org npm privata (superata il 2026-11-26)')).toEqual([]);
     expect(currentPrivateNpmOrgLines("Si usa l'org npm\nprivata.")).toHaveLength(1);

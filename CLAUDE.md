@@ -18,8 +18,8 @@ freely implementable interaction and composition patterns, described in the abst
   (maintainer decisions, 2026-11-13, replacing "recurring subscription"; not to be renegotiated
   without a new maintainer instruction; details in `docs/planning/design-system-spec.md` §8)**:
   target: company teams (ERP, business management software, admin portals); a per-developer
-  licence with a one-time payment, with 12 months of updates included and unlimited use of the
-  versions received (maintainer decision, 2026-11-26), sold through a Merchant of Record,
+  licence with a one-time payment, with 12 months of updates included and use with no time limit of the
+  versions received (perpetual licence for the versions received) (maintainer decision, 2026-11-26), sold through a Merchant of Record,
   **Paddle** (maintainer decision, 2026-11-26: Lemon Squeezy does not accept new sign-ups and
   closes on 2027-03-31; source in spec §8, point 4), which handles EU VAT and invoicing. Before
   pushing sales: a landing page with a waiting list / pre-order (demand validation), ticket #490.
@@ -121,10 +121,14 @@ rigid rules:
 - Parallel work (several worktrees, several independent tickets) is fine by default — the real
   constraint is the hardware (CPU/Chromium in parallel), not the quota. Before launching heavy
   steps (e2e, visual, build) in parallel, check `uptime`: if the load is already high, queue the
-  work or accept the slowdown knowingly, and never ignore an anomalous result.
+  work (above 8, always wait), and never ignore an anomalous result.
 - **Maintainer decision (2026-11-27)**: machine load.
   - Locally, run only the tests touched by the change. Do not run the complete e2e and visual
-    suites locally: CI is authoritative for them.
+    suites locally: CI is authoritative for them. The only exception is
+    `npm run test:visual:update`, which may run locally solely when there are new or changed
+    baselines to generate, with `uptime` below 8, shutting the containers down at the end; the
+    visual comparison itself stays in CI. This does not relax `npm run check`, which stays
+    mandatory before every commit.
   - Before a heavy step (Storybook build, e2e, visual, Docker), check `uptime`. If the load is
     above 8, wait instead of adding more work.
   - Every agent always shuts down the servers and background processes it has left running.

@@ -55,5 +55,7 @@ run `npm run check` again and reply point by point on the PR (`gh pr comment`).
 - Language on GitHub (`CLAUDE.md`, "Language of everything published on GitHub"): commit
   messages, PR titles and descriptions and PR comments are in English, neutral and
   outward-facing — no personal names, no internal roles, no round counters, no model names.
+- Before a heavy step (Storybook build, e2e, visual, Docker) check `uptime` and wait if the load
+  is above 8; always shut down servers, processes and containers left running in the background.
 - Return to the coordinating session, in Italian: the PR number, the branch, the outcome of
   `npm run check`.
