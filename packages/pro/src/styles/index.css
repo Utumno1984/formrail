@@ -267,11 +267,20 @@
     }
   }
 
+  /* Without :has() the wrapper cannot draw the ring: put it back on the list (the fade mask may clip part of it, but
+     a keyboard user is never left without an indicator). */
+  @supports not selector(:has(*)) {
+    .rop-pro-rebase-notice__applied:focus-visible {
+      outline: 2px solid var(--color-rop-primary);
+      outline-offset: -2px;
+    }
+  }
+
   /* Beyond APPLIED_SCROLL_THRESHOLD fields (RebaseNotice.tsx) the list is capped and scrolls; below it every row shows. */
   .rop-pro-rebase-notice__applied--capped {
     @apply overflow-y-auto;
     /* About the height of APPLIED_SCROLL_THRESHOLD (12) rows, but never more than 70% of the viewport: on a short
-       viewport (below about 1170px of height on desktop) the viewport limit wins and fewer rows show. */
+       viewport (below about 1140px of viewport height) the viewport limit wins and fewer rows show. */
     max-height: min(var(--rop-pro-rebase-applied-max-height, 50rem), 70dvh);
   }
 
