@@ -1,6 +1,6 @@
 // Ticket #489: the study of the Pro engines boundary exists, answers every question of the ticket under its own
-// heading, records the maintainer decisions, and is linked from §8 of the spec. The content is reviewed by
-// the critic; this guards against the file or a section disappearing.
+// heading, records the maintainer decisions, and is linked from §8 of the spec. The content is reviewed in
+// code review; this guards against the file or a section disappearing.
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

@@ -262,7 +262,7 @@ test.describe('Docs props tables', () => {
       expect.stringContaining('"fakeDemoArg" is not a prop in the docgen of ListReportTable'),
     ]);
     // An inherited HTML attribute (a real key of the props type) shown as a prop without being listed:
-    // the demo `title` of the critic's case (C1).
+    // the demo `title` of the reviewer's case (C1).
     expect(auditDocsPage(withRow({ name: 'title', category: null, disabled: false, description: 'Demo title.' }), options)).toEqual([
       expect.stringContaining('"title" is not a prop in the docgen of ListReportTable'),
     ]);
@@ -417,7 +417,7 @@ test.describe('Docs props tables', () => {
   });
 
   test('negative: a Radix prop the wrapper intercepts, shown with the Radix text, fails the guard', async ({ page }) => {
-    // The critic's case (round 2): Radix says "Can be prevented." of `onCloseAutoFocus`, but the overlays
+    // The reviewer's case (round 2): Radix says "Can be prevented." of `onCloseAutoFocus`, but the overlays
     // call `preventDefault()` themselves and return the focus through `useReturnFocus`.
     const { facts: dialog, options } = await realPage(page, 'Overlays/Dialog');
     const { facts: menu } = await realPage(page, 'Overlays/Menu');

@@ -701,7 +701,7 @@ describe('check: the guard on fixture packages (#474)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------
-// #474, second round (critic of PR #496): tags the docgen does not read, defaults written as fallbacks in the
+// #474, second round (code review of PR #496): tags the docgen does not read, defaults written as fallbacks in the
 // body, defaults with no readable source (allowlist), prose without backticks, partial spreads and overrides,
 // `props.a` / `useX({ a })` / `<X.Y />`, the resolved value in the mismatch message.
 
@@ -1025,8 +1025,8 @@ describe('the guard, second round, on fixture packages (#474)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------
-// #474, third round (critic, 2nd rejection): "`x` (default)" prose, the default of a named key, and one fixture per
-// mutation that survived round 2 (N2, N5, N8, N12, N13 of the critic's script).
+// #474, third round (code review, 2nd rejection): "`x` (default)" prose, the default of a named key, and one fixture per
+// mutation that survived round 2 (N2, N5, N8, N12, N13 of the reviewer's script).
 
 describe('prose, round 3: "`x` (default)" and named keys (#474)', () => {
   it.each([
@@ -1050,7 +1050,7 @@ describe('prose, round 3: "`x` (default)" and named keys (#474)', () => {
   });
 });
 
-// #476: the cases the critic of #474 found untested in `proseDefaultOf` (R2, R11, R4, B1). Each one kills a mutation
+// #476: the cases the code review of #474 found untested in `proseDefaultOf` (R2, R11, R4, B1). Each one kills a mutation
 // of the script (listed in the PR).
 describe('proseDefaultOf: R2, R11, R4, B1 (#476)', () => {
   it('R2: a default inside a clause with a named key does not stop the search, the next sentence is read', () => {
@@ -1288,7 +1288,7 @@ describe('--check on the repository (#474)', { timeout: 120_000 }, () => {
     expect(rowIn(result, 'DialogContent', 'asChild')).toBeUndefined();
   });
   // Round 3: this assertion was "ObjectPage.labels is prose-only" in round 2 (a test of this PR, never merged): the
-  // critic showed it is the default of the `anchorBar` key, so the expectation is inverted, not dropped.
+  // code review showed it is the default of the `anchorBar` key, so the expectation is inverted, not dropped.
   it('round 3: the default of a named key ("`anchorBar`: ... (default "Sections")") is not a default of the prop', () => {
     expect(rowIn(result, 'ObjectPage', 'labels')).toBeUndefined();
     expect(rowIn(result, 'Skeleton', 'width')).toBeUndefined();

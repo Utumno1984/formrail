@@ -183,7 +183,7 @@ function valueLeaves(sf, node, out = { literals: [], identifiers: [] }, bare = t
     // `color: 'red'.trim()`: the receiver of a method call is a value (its literals only); the method name is not.
     const callee = node.expression;
     if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) walk(callee.expression, false);
-    // `color: (() => 'red')()`: an IIFE callee is a function written in place, its literals are values (#614, critic
+    // `color: (() => 'red')()`: an IIFE callee is a function written in place, its literals are values (#614, code review
     // round 1); a callee that is a name (`pick(tone)`, `(red)()`) stays unjudged.
     let fn = callee;
     while (isTransparent(fn)) fn = fn.expression;

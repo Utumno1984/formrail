@@ -25,13 +25,13 @@ export const SITE_BASE = normalizeSiteBase(process.env.SITE_BASE ?? '/');
 /** Port of the local server used by the pre-deploy smoke (override for parallel worktrees). */
 export const SITE_PORT = Number(process.env.SITE_PORT) || 6008;
 
-// Final values (ticket #490): the early access form URL and the privacy contact below were supplied by Daniele.
+// Final values (ticket #490): the early access form URL and the privacy contact below were supplied by the maintainer.
 // `scripts/check-site-config.mjs` (run by the `deploy-pages` job, and by `assemble-site.mjs --strict`)
 // still refuses to publish if any of them is ever replaced by a placeholder, an empty or a malformed value.
 
 /**
  * Target of the "Request early access" call-to-action (tickets #382, #490, #716): the early access request form, a Tally
- * form (EU servers) created by Daniele, opened from an external link (never embedded). Field order: work email,
+ * form (EU servers) created by the maintainer, opened from an external link (never embedded). Field order: work email,
  * company or team, number of developers who would need a license, use case, team size, form libraries in use
  * (optional), timing, then an unchecked consent checkbox. No payment is taken through it.
  *
@@ -51,7 +51,7 @@ export const EXPECTED_PRICE_TEXT = 'Expected price: from \u20AC199 per developer
 
 /**
  * Target of the "Apply as a design partner" link on /teams/ (ticket #697): the design partner application
- * form, a Tally form (EU servers) created by Daniele, SEPARATE from the early access request form and opened from an
+ * form, a Tally form (EU servers) created by the maintainer, SEPARATE from the early access request form and opened from an
  * external link (never embedded). Its fields are listed one by one in site-root/privacy.html.
  *
  * Must be an absolute `https://` URL different from EARLY_ACCESS_URL. Setting it to '' switches the whole
@@ -87,15 +87,15 @@ export const REFUND_DAYS = 14;
 
 /**
  * Years for which the records of the sale are kept, counted from the end of the year in which the sale takes place
- * (ticket #692). It is a period chosen by Daniele to defend himself in case of tax or accounting checks or of
- * disputes about the sale (legitimate interest, art. 6(1)(f) GDPR), not a period stated as required by law.
+ * (ticket #692). It is a period chosen by the maintainer to defend the business in case of tax or accounting checks
+ * or of disputes about the sale (legitimate interest, art. 6(1)(f) GDPR), not a period stated as required by law.
  * Printed in the "Purchases" section of /privacy/. It governs the records of the sale (the identifier of the
  * transaction, the date, the amount, the country and the email address) and also the emails about a purchase (a
  * refund, the replacement of a developer, a problem with the license). It does not govern the other purchase data
  * (name, company name, address, tax or VAT number), deleted at the end of the last 12 months of updates of the
  * license, nor the GitHub user names, deleted when the registry access ends.
  *
- * Decision D8 of Daniele (2026-11-26), with its reference point decided on 2026-11-27: 7 years from the end of the
+ * Maintainer decision D8 (2026-11-26), with its reference point decided on 2026-11-27: 7 years from the end of the
  * year of the sale, no longer tied to the license (a perpetual license would make the period endless). It must stay a
  * whole number from 1 to 99: `scripts/check-site-config.mjs --strict` (the deploy) refuses an empty, non numeric or
  * placeholder value, and names this constant.

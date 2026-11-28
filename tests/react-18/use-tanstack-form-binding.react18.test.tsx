@@ -160,7 +160,7 @@ describe('useTanStackFormBinding on React 18', () => {
     act(() => legacyUnmount(container));
   });
 
-  // Critic round 1 on PR #557, point 2: the hydration goes through `rederive` (a write of the base store after a
+  // Code review round 1 on PR #557, point 2: the hydration goes through `rederive` (a write of the base store after a
   // change of content of the defaults). Its `busy` guard must be balanced, or the guard of a later write is off.
   it('legacy render, hydration through defaultValues then binding.reset(x) outside any batch: no commit shows a row', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined); // legacy render notice, update outside act

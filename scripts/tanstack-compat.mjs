@@ -1,4 +1,4 @@
-// Weekly compatibility run of the TanStack Form binding (ticket #563, decision B of Daniele, 16/11/2026): installs
+// Weekly compatibility run of the TanStack Form binding (ticket #563, maintainer decision B, 16/11/2026): installs
 // the requested `@tanstack/react-form` WITHOUT saving it (package.json and the lockfile stay as they are) and runs
 // the suite of the binding against it. The adapter reads non-public internals, so this is what tells us when a new
 // 1.x minor breaks it, before anybody widens the peer range `~1.33.5`.

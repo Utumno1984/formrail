@@ -82,7 +82,7 @@ describe('the refund page', () => {
     const body = text(build().refund);
     expect(body).toContain(`within ${REFUND_DAYS} days of the purchase, without giving a reason`);
     expect(body).toContain('companies and consumers alike');
-    // Decision of Daniele of 2026-11-27 (critic of PR #713, note 5): like point 1.3 of Paddle's Refund Policy, a
+    // Maintainer decision of 2026-11-27 (code review of PR #713, note 5): like point 1.3 of Paddle's Refund Policy, a
     // refund can be refused in case of fraud or abuse; the exception is in the lead, the rule and the description.
     const { refund } = build();
     expect(text(refund.match(/<p class="lead">[\s\S]*?<\/p>/)[0])).toContain(
@@ -105,7 +105,7 @@ describe('the refund page', () => {
     const file = readFileSync(path.join(ROOT, 'packages', 'pro', 'LICENSE'), 'utf8').replace(/\s+/g, ' ');
     expect(file).toContain(`within ${REFUND_DAYS} days of the purchase, without giving a reason`);
     expect(text(build().license)).toContain(`within ${REFUND_DAYS} days of the purchase, without giving a reason`);
-    // Decision of Daniele of 2026-11-27 (PR #713): the license, the /license/ page and /refund/ carry the same
+    // Maintainer decision of 2026-11-27 (PR #713): the license, the /license/ page and /refund/ carry the same
     // exception, in the same words; a refund policy wider than the license (or the reverse) fails here.
     const RULE = `within ${REFUND_DAYS} days of the purchase, without giving a reason, whoever you are, except in case of fraud or abuse.`;
     const { license, refund } = build();
@@ -153,7 +153,7 @@ describe('the refund page', () => {
     const section = consumers();
     expect(external(section)).toEqual(['https://www.paddle.com/legal/buyer-terms']);
     expect(text(section)).toContain('does not take away any right you have as a consumer');
-    // The expected text changed (critic of PR #713, note 4): the Buyer Terms say that the statutory right of
+    // The expected text changed (code review of PR #713, note 4): the Buyer Terms say that the statutory right of
     // withdrawal is lost once you start to use the product, so the page no longer says that those terms apply
     // "even if you have already started to use" it. Using it does not shorten the policy, and the Buyer Terms
     // apply on top of it.
@@ -238,7 +238,7 @@ describe('the Purchases section of the privacy notice', () => {
       'Retention',
       'Design partner applications',
       'Purchases',
-      // The expected list changed with the decision of Daniele of 2026-11-27 (critic of PR #713, note A): the rule
+      // The expected list changed with the maintainer decision of 2026-11-27 (code review of PR #713, note A): the rule
       // on the emails holds for everyone who writes, not only for buyers, so it has its own section.
       'Emails you send us',
       'Your rights',
@@ -265,11 +265,11 @@ describe('the Purchases section of the privacy notice', () => {
       'your country;',
       'your postal code or address and, for a business, the tax or VAT number, when you give them to Paddle at checkout;',
       'the number of developers the license is for;',
-      // the date and the amount are among the records of the sale that are kept (decision of Daniele of
+      // the date and the amount are among the records of the sale that are kept (maintainer decision of
       // 2026-11-27, minimisation), so the list names them
       'the identifier, the date and the amount of the transaction.',
     ]);
-    // The expected list changed (critic of PR #713, points 3 and 10): the Paddle Billing checkout can also collect
+    // The expected list changed (code review of PR #713, points 3 and 10): the Paddle Billing checkout can also collect
     // the postal code or address and, for a business, the tax number, and makes them available to the seller; a
     // consumer has no company. The list is introduced as what the data "can include", not as a closed list.
     expect(text(list)).toContain(
@@ -282,7 +282,7 @@ describe('the Purchases section of the privacy notice', () => {
     expect(text(list)).toContain('Without your email address and the GitHub user names we cannot grant the access or manage the license');
     expect(text(list)).not.toContain('Without these data');
     expect(text(list)).toContain('(art. 13(2)(e) GDPR)');
-    // the whole sentence, critic of PR #713 round 3, problem 2: only email and GitHub names are needed
+    // the whole sentence, code review of PR #713 round 3, problem 2: only email and GitHub names are needed
     expect(text(list)).toContain(
       'Without your email address and the GitHub user names we cannot grant the access or manage the license; the other data are optional or depend on what Paddle collects at checkout (art. 13(2)(e) GDPR).',
     );
@@ -297,7 +297,7 @@ describe('the Purchases section of the privacy notice', () => {
     expect(section).toContain('our legitimate interest in defending ourselves in case of checks or disputes, art. 6(1)(f) GDPR');
     expect(section).not.toContain('6(1)(c)');
     expect(section).toContain('Neither rests on consent');
-    // the whole purposes and the whole paragraph of the legal bases, with the right to object (critic of PR #713,
+    // the whole purposes and the whole paragraph of the legal bases, with the right to object (code review of PR #713,
     // round 3, problem 2)
     expect(section).toContain(
       'to keep the records of the sale for a period that covers the tax and accounting checks that can concern the sale, and to defend ourselves in case of a dispute.',
@@ -329,7 +329,7 @@ describe('the Purchases section of the privacy notice', () => {
     const section = purchases(build().privacy);
     const body = text(section);
     // Paddle's Buyer Terms: the contracting entity depends on where the buyer purchases from (US: Paddle.com Inc.,
-    // Canada: Paddle.com (Canada) Ltd, rest of world: Paddle.com Market Limited), critic of PR #713, point 2.
+    // Canada: Paddle.com (Canada) Ltd, rest of world: Paddle.com Market Limited), code review of PR #713, point 2.
     expect(body).toContain(
       'Paddle (Paddle.com Market Limited, based in the United Kingdom; if you buy from the United States, Paddle.com Inc.; if you buy from Canada, Paddle.com (Canada) Ltd) is the reseller of Formrail Pro',
     );
@@ -337,7 +337,7 @@ describe('the Purchases section of the privacy notice', () => {
       expect(body).toContain(entity);
     }
     expect(body).toContain('Paddle is an independent controller of your data');
-    // outside the parenthesis since note 6 of round 2: asserted on its own (critic of PR #713, round 3, problem 2)
+    // outside the parenthesis since note 6 of round 2: asserted on its own (code review of PR #713, round 3, problem 2)
     expect(body).toContain('is the reseller of Formrail Pro: it sells the license to you, takes the payment and issues the invoice. Your receipt names the company that sold to you.');
     expect(body).toContain('The registry is hosted by GitHub (GitHub Packages)');
     expect(body).toContain('as an independent controller');
@@ -354,7 +354,7 @@ describe('the Purchases section of the privacy notice', () => {
     const body = text(purchases(build().privacy));
     expect(body).toContain('Paddle may transfer data outside the EEA');
     expect(body).toContain('EU-US Data Privacy Framework');
-    // Paddle itself is outside the EEA: the UK, covered by an adequacy decision (critic of PR #713, point 2)
+    // Paddle itself is outside the EEA: the UK, covered by an adequacy decision (code review of PR #713, point 2)
     expect(body).toContain(
       'Paddle.com Market Limited is based in the United Kingdom, which the European Commission recognises, with an adequacy decision, as giving an adequate level of protection to personal data.',
     );
@@ -376,10 +376,10 @@ describe('the Purchases section of the privacy notice', () => {
 
   it('the retention period is the constant, counted from the end of the year of the sale; GitHub user names end with the access', () => {
     const body = (options) => text(purchases(build(options).privacy));
-    // The expected text changed with the decision of Daniele of 2026-11-27 (critic of PR #713, point 1): the
+    // The expected text changed with the maintainer decision of 2026-11-27 (code review of PR #713, point 1): the
     // reference of D8 is the end of the year of the sale (tax and accounting records), no longer "as long as your
     // license is in force", which for a perpetual license would never end. It changed again with the decision of
-    // Daniele after round 3 (minimisation): the period covers the records of the sale only, kept to defend
+    // the maintainer after code review round 3 (minimisation): the period covers the records of the sale only, kept to defend
     // ourselves in case of checks or disputes; the minimisation itself is asserted in the next test.
     const RULE = (years) =>
       `We keep the records of the sale for ${years} years from the end of the year in which the sale takes place, to defend ourselves in case of checks or disputes: this is a period that covers the tax and accounting checks that can concern the sale.`;
@@ -393,7 +393,7 @@ describe('the Purchases section of the privacy notice', () => {
     expect(body()).toContain(
       'The GitHub user names are not records of the sale, and they are not kept for that period. The data controller deletes them when your access to the registry ends: when the 12 months of updates end and you do not buy again, when you receive a refund or the payment is reversed, or when the license ends for a serious violation, as described in the license terms. When you replace a developer, the name of the replaced developer is deleted when the access moves to the replacement.',
     );
-    // Decision of Daniele of 2026-11-27: emails about a purchase are kept like the sale. The expected text changed
+    // Maintainer decision of 2026-11-27: emails about a purchase are kept like the sale. The expected text changed
     // after round 3 (note A): the rule for the other emails moved to "Emails you send us", asserted below.
     expect(body()).toContain(
       `The emails you send to formrail.dev@gmail.com about a purchase (a refund, the replacement of a developer, a problem with the license) are records of the sale: they are kept for the same period, ${PURCHASE_RETENTION_YEARS} years from the end of the year in which the sale takes place. The other emails follow the rule in "Emails you send us" below.`,
@@ -416,7 +416,7 @@ describe('the Purchases section of the privacy notice', () => {
       const { privacy } = build(options);
       return text(privacy.slice(privacy.indexOf('id="purchase-retention-title"'), privacy.indexOf('id="emails-title"')));
     };
-    // decision of Daniele of 2026-11-27, after round 3 of the critic of PR #713: the list of the data kept
+    // maintainer decision of 2026-11-27, after code review round 3 of PR #713: the list of the data kept
     expect(retention()).toContain(
       'Of the purchase data received from Paddle, the records of the sale keep only the identifier of the transaction, the date, the amount, your country and your email address; the emails about a purchase, described below, are records of the sale too. After that the data controller deletes them.',
     );
@@ -439,7 +439,7 @@ describe('the Purchases section of the privacy notice', () => {
     const DP = 'The copies of the design partner applications follow the period of their section: no later than 24 months after the application.';
     const OTHERS =
       'The other emails, including privacy requests, are deleted 2 years after our last reply, or 2 years after we receive them if we do not reply.';
-    // Daniele, 2026-11-27 (written confirmation): purpose, legal basis and provider of the mailbox
+    // Maintainer, 2026-11-27 (written confirmation): purpose, legal basis and provider of the mailbox
     const PURPOSE =
       'We use these emails to answer you. For privacy requests this rests on our obligations under the GDPR (art. 6(1)(c)); for the other emails, on our legitimate interest in answering (art. 6(1)(f)). The mailbox is Gmail, provided by Google under its own terms and privacy policy. Google LLC is based in the United States, and the transfer of the emails to it rests on the EU-US Data Privacy Framework, to which it adheres.';
     expect(emails()).toBe(`Emails you send us ${FOR_ALL} ${EA} ${DP} ${OTHERS} ${PURPOSE}`);
@@ -590,7 +590,7 @@ describe('the retention guard (decision D8)', () => {
 
   // The CLI (`node scripts/check-site-config.mjs`, first step of the deploy job) builds the config from the
   // constants itself. It is run here from a temporary copy whose `site-config.mjs` re-exports the real one and
-  // overrides one constant, so that forgetting to pass it to the guard makes this test fail (critic of PR #713,
+  // overrides one constant, so that forgetting to pass it to the guard makes this test fail (code review of PR #713,
   // note 8).
   function runCli(overrides) {
     const tmp = mkdtempSync(path.join(tmpdir(), 'check-site-config-'));

@@ -1,4 +1,4 @@
-// #583, decision of Daniele (option A): a sales order deleted on the server, BEFORE the review opens or WHILE it is
+// #583, maintainer decision (option A): a sales order deleted on the server, BEFORE the review opens or WHILE it is
 // open, gives the same review: "Save changes" is there, `aria-disabled` (still focusable, never `disabled`), described
 // by its reason through a real `aria-describedby`, and a click, Enter or Space on it saves nothing. Never a "not found"
 // from a save sent to an order that no longer exists.

@@ -1,4 +1,4 @@
-// Story-only (ticket #624). The rules that keep the Docs pages in the shape Daniele asked for: the neutral
+// Story-only (ticket #624). The rules that keep the Docs pages in the shape the maintainer asked for: the neutral
 // component first, then the domain examples (`use-case` stories) in their own section. Pure functions over the
 // stories of `index.json` (and, for the Pro description rule, over the stories' loaded descriptions), so they
 // are unit-tested with fixtures that violate each rule; e2e/docs-use-cases.spec.ts runs them on the real index.

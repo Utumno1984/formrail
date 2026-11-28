@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoA11yViolations, settleMotion } from './helpers/a11y';
 
-// #583, decision of Daniele (option A): Pro/Showcase/Record editing integrity, a sales order deleted on the server
+// #583, maintainer decision (option A): Pro/Showcase/Record editing integrity, a sales order deleted on the server
 // BEFORE the review opens or WHILE it is open. Same review in both cases: "Save changes" is there, `aria-disabled`
 // (still focusable), described by its reason (`aria-describedby`), and real Enter, Space and clicks on it save nothing.
 // Never a "not found" from a save sent to an order that no longer exists.

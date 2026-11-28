@@ -1,4 +1,4 @@
-// `useReactHookFormBinding` (ticket #507, critic round 5): the merge of the binding's deferred write with the writes of
+// `useReactHookFormBinding` (ticket #507, code review round 5): the merge of the binding's deferred write with the writes of
 // the app made in the same synchronous run (`adoptWrites`), on the shape of an array and on keys that come and go, and
 // the cases of the round that no other test pinned (each one fails if the line it guards is changed).
 import { useState } from 'react';

@@ -1,4 +1,4 @@
-// `useFormRebase` of the main entry `@formrail/pro` with its `options` (#489, critic round 1): a wrapper typed for
+// `useFormRebase` of the main entry `@formrail/pro` with its `options` (#489, code review round 1): a wrapper typed for
 // core's form around the engine hook, so dropping `options` on the way would break `arrayIdKeys`, `isEqual` and
 // `labels` for every consumer of the main entry. Shared by `public-api.test.tsx` (sources) and
 // `dist.main-rebase.test.tsx` (built files, ESM and CJS), each with its own `useObjectPageForm`.
