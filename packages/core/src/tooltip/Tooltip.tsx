@@ -27,9 +27,11 @@ export type TooltipAlign = 'start' | 'center' | 'end';
 // wraps (`[overflow-wrap:anywhere]`, also for a single long word). Pointer events stay on (the
 // tooltip is hoverable, see `Tooltip`) but it can never take the focus: it has no `tabindex`.
 // The library ships no box-sizing reset (boxes are content-box): the 19rem maximum plus the 1rem of
-// horizontal padding is exactly the 20rem outer width.
+// horizontal padding is exactly the 20rem outer width. On a narrow screen the maximum shrinks to the
+// room Radix measures for the content (viewport minus the collision padding, or the room beside the
+// trigger on the left/right sides), minus the padding, so the box always fits and the text wraps.
 const CONTENT =
-  'max-w-[19rem] rounded-rop-md bg-rop-text px-2 py-1 font-rop-sans text-rop-label text-rop-surface ' +
+  'max-w-[min(19rem,calc(var(--radix-tooltip-content-available-width,100vw)-1rem))] rounded-rop-md bg-rop-text px-2 py-1 font-rop-sans text-rop-label text-rop-surface ' +
   '[overflow-wrap:anywhere] [box-shadow:0_2px_8px_rgb(0_0_0/0.25)]';
 
 // Lets a `Tooltip` know whether it sits inside a `TooltipProvider`, to supply a local one if not.
