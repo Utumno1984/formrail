@@ -116,6 +116,14 @@ describe('contrast', () => {
     expect(contrast(token('text'), badgeBackgrounds[tone]!)).toBeGreaterThanOrEqual(4.5);
   });
 
+  // MessageStrip: the tone colour at 4% over the white surface (`bg-rop-<tone>/4`). The muted secondary text must
+  // keep at least 5:1 and the normal text 7:1 on it (a heavier tint, 10%, left the muted text near 4.6:1).
+  it.each(['info', 'success', 'warning', 'error'])('MessageStrip %s: muted text is at least 5:1 and normal text at least 7:1 on the 4%% background', (tone) => {
+    const bg = token(tone).map((c, i) => c * 0.04 + token('surface')[i]! * 0.96) as Rgb;
+    expect(contrast(token('text-muted'), bg)).toBeGreaterThanOrEqual(5);
+    expect(contrast(token('text'), bg)).toBeGreaterThanOrEqual(7);
+  });
+
   // The tone is also the icon / contour of a badge (non-text, WCAG 1.4.11). Contract: a redefined tone token
   // must keep at least 3:1 against the surface and against its own 10% tint.
   it.each(['info', 'success', 'warning', 'error'])('StatusBadge %s: the tone on the surface and on its tint is at least 3:1 (WCAG 1.4.11)', (tone) => {
