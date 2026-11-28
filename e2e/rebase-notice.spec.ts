@@ -66,14 +66,21 @@ test.describe('Pro/RebaseNotice', () => {
   });
 
   test('beyond the threshold the list scrolls, signals the hidden rows, and is a tab stop only while it scrolls', async ({ page }) => {
-    await gotoStory(page, 'pro-rebasenotice--beyond-scroll-threshold');
-    await page.locator('.rop-pro-rebase-notice summary').click();
+    await expectPlayToPass(page, 'pro-rebasenotice--beyond-scroll-threshold');
     const list = page.getByRole('list', { name: 'Updated fields' });
     await expect(list.getByRole('listitem')).toHaveCount(16);
     await expect(list).toHaveAttribute('tabindex', '0');
     await expect(list).toHaveAttribute('data-more', '');
     expect(await list.evaluate((el) => el.scrollHeight > el.clientHeight + 1)).toBe(true);
     expect(await list.evaluate((el) => getComputedStyle(el).maskImage)).toContain('linear-gradient');
+    // The cut is at about 12 rows (the threshold), or 70% of the viewport when that is lower: never fewer rows than a list that does not scroll.
+    const cut = await list.evaluate((el) => {
+      const items = el.querySelectorAll('li');
+      const twelve = items[11]!.getBoundingClientRect().bottom - items[0]!.getBoundingClientRect().top;
+      return { shown: el.clientHeight, twelve, viewport: window.innerHeight };
+    });
+    expect(cut.shown).toBeGreaterThanOrEqual(Math.min(cut.twelve, cut.viewport * 0.7) - 2);
+    expect(cut.shown).toBeLessThanOrEqual(cut.viewport * 0.7 + 1);
     await list.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     await expect(list).not.toHaveAttribute('data-more');
     await expect(list).toHaveAttribute('tabindex', '0');

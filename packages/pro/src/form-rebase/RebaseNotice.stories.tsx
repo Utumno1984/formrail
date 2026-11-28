@@ -162,9 +162,16 @@ export const ManyApplied: Story = {
 
 /** Beyond the scroll threshold (12 fields): the list is capped and scrolls, with a fade while rows are hidden. */
 export const BeyondScrollThreshold: Story = {
+  tags: ['visual'],
   args: {
     conflicts: [],
     applied: Array.from({ length: 16 }, (_, i) => applied(`field${i + 1}`, `Field ${i + 1}`, i, i + 1)),
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByText('16 fields were updated.'));
+    await expect(within(canvasElement).getByRole('list', { name: 'Updated fields' })).toHaveAttribute('data-more', '');
+    // The baseline is taken at rest: no focus ring on the summary.
+    (document.activeElement as HTMLElement | null)?.blur();
   },
 };
 

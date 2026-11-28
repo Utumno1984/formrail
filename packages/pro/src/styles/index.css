@@ -228,11 +228,17 @@
 
   /* More than three applied fields: the list is closed until opened, capped in height with its own scroll only beyond a large number of fields. */
   .rop-pro-rebase-notice__details {
-    @apply m-0 min-w-0;
+    @apply m-0 mt-1 min-w-0;
   }
 
   .rop-pro-rebase-notice__summary {
     @apply cursor-pointer rounded-rop-sm;
+
+    /* Touch target of 44px (a 20px line today) without moving the layout: padding inside, the same margin outside. */
+    @media (pointer: coarse) {
+      padding-block: 0.75rem;
+      margin-block: -0.75rem;
+    }
 
     &:focus-visible {
       outline: 2px solid var(--color-rop-primary);
@@ -252,7 +258,9 @@
   /* Beyond APPLIED_SCROLL_THRESHOLD fields (RebaseNotice.tsx) the list is capped and scrolls; below it every row shows. */
   .rop-pro-rebase-notice__applied--capped {
     @apply overflow-y-auto;
-    max-height: var(--rop-pro-rebase-applied-max-height, 24rem);
+    /* About the height of APPLIED_SCROLL_THRESHOLD (12) rows, never more than the viewport allows: the cut beyond the
+       threshold does not show fewer rows than the last list that never scrolled. */
+    max-height: min(var(--rop-pro-rebase-applied-max-height, 50rem), 70dvh);
   }
 
   /* Rows still hidden below: fade the bottom edge so the cut is visible (a mask only reads the alpha, any opaque token does). */
