@@ -87,8 +87,8 @@ export const REFUND_DAYS = 14;
 
 /**
  * Years for which the records of the sale are kept, counted from the end of the year in which the sale takes place
- * (ticket #692). It is a period chosen by the maintainer to meet record-keeping obligations and defend itself in case of tax or accounting checks or of
- * disputes about the sale (legitimate interest, art. 6(1)(f) GDPR), not a period stated as required by law.
+ * (ticket #692). It is a period chosen by the maintainer to defend the business in case of tax or accounting checks
+ * or of disputes about the sale (legitimate interest, art. 6(1)(f) GDPR), not a period stated as required by law.
  * Printed in the "Purchases" section of /privacy/. It governs the records of the sale (the identifier of the
  * transaction, the date, the amount, the country and the email address) and also the emails about a purchase (a
  * refund, the replacement of a developer, a problem with the license). It does not govern the other purchase data
