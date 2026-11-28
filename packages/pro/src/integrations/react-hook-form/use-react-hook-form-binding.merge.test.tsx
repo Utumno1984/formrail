@@ -80,7 +80,7 @@ function expectEverywhere(order: Setup, expected: Order) {
 }
 
 describe('useReactHookFormBinding: the binding changes the shape of an array, the app writes fields of its rows in the same run', () => {
-  it("the critic's case: the binding adds a row, the app writes a field of row 1: three rows, the app's value on row 1", () => {
+  it("the reviewed case: the binding adds a row, the app writes a field of row 1: three rows, the app's value on row 1", () => {
     const order = setupOrder();
     act(() => {
       order.current().binding.setValues({ lines: [L1, L2, L3] });
@@ -181,7 +181,7 @@ describe('useReactHookFormBinding: the binding changes the shape of an array, th
 });
 
 describe('useReactHookFormBinding: a useFieldArray operation of the app before a write of the binding, in the same run', () => {
-  it("append, then binding.setValues on another field: the appended row stays (the critic's note)", () => {
+  it("append, then binding.setValues on another field: the appended row stays (a review note)", () => {
     const order = setupOrder();
     act(() => {
       order.current().append(L3);
@@ -275,7 +275,7 @@ describe('useReactHookFormBinding: a useFieldArray operation of the app before a
   });
 });
 
-describe('useReactHookFormBinding: keys that come and go while a write of the binding waits (critic round 5, M17 M18 M26)', () => {
+describe('useReactHookFormBinding: keys that come and go while a write of the binding waits (code review round 5, M17 M18 M26)', () => {
   it('binding.reset(a record without a key) then form.setValue on another field: the key is gone, not left undefined', () => {
     const order = setupOrder({ defaults: { ...ORDER, extra: 'e' } });
     act(() => {
@@ -318,7 +318,7 @@ describe('useReactHookFormBinding: keys that come and go while a write of the bi
   });
 });
 
-describe('useReactHookFormBinding: rows without arrayIdKeys (critic round 5, M24)', () => {
+describe('useReactHookFormBinding: rows without arrayIdKeys (code review round 5, M24)', () => {
   it('the binding writes a field of row 1 while the user types in row 2: the rows keep their nodes and the focus stays', () => {
     const order = setupOrder({ idKeys: false });
     const qty2 = order.input('Qty 2');
@@ -337,7 +337,7 @@ describe('useReactHookFormBinding: rows without arrayIdKeys (critic round 5, M24
   });
 });
 
-describe('useReactHookFormBinding: several writes of the binding and of the app in one run (critic round 5, M29 M09)', () => {
+describe('useReactHookFormBinding: several writes of the binding and of the app in one run (code review round 5, M29 M09)', () => {
   it('two binding.reset in the same run: React Hook Form ends with the defaults of the second (dirtyFields against it)', () => {
     const harness = setupInvoiceForm();
     const first = { ...SAVED, supplier: 'First' };

@@ -200,7 +200,7 @@ describe('useReactHookFormBinding: typing while a handleSubmit save is in flight
 });
 
 describe('useReactHookFormBinding: writes of the binding during a handleSubmit save (QA #507 round 2, point 1)', () => {
-  it("acceptTheirs during the save (the tester's case B): the save stays in flight to its real end, the accepted value and the edit typed after it stay", async () => {
+  it("acceptTheirs during the save (QA case B): the save stays in flight to its real end, the accepted value and the edit typed after it stay", async () => {
     const harness = setupInvoiceForm();
     harness.type('Amount', '999');
     act(() => harness.current().rebase.rebase({ ...SAVED, amount: '200' }));
@@ -320,7 +320,7 @@ describe('useReactHookFormBinding: writes of the binding during a handleSubmit s
   });
 });
 
-describe('useReactHookFormBinding: saveError of a save that succeeded while a validation error appeared (critic round 1, point 1)', () => {
+describe('useReactHookFormBinding: saveError of a save that succeeded while a validation error appeared (code review round 1, point 1)', () => {
   const required = { notes: { required: 'Notes are required' } };
 
   it('default mode, second save: the user empties a required field during it, the server stores: saveError null, the error stays on the field', async () => {
@@ -621,7 +621,7 @@ describe('useReactHookFormBinding: saveError after a reset of React Hook Form th
     harness.unmount();
   });
 
-  it("after the reset, a save ended by reset(saved) while a validation error appears is still a success (the critic's case)", async () => {
+  it("after the reset, a save ended by reset(saved) while a validation error appears is still a success (the reviewed case)", async () => {
     // `mode: 'onChange'`: after the reset (`isSubmitted` false) the field is validated as the user types.
     const harness = setupInvoiceForm({ rules: required, useFormProps: { defaultValues: { ...SAVED, notes: 'n' }, mode: 'onChange' } });
     await savedThenReset(harness, (form) => form.reset());
@@ -664,7 +664,7 @@ async function startSaveWithoutReset(harness: Harness) {
   };
 }
 
-describe('useReactHookFormBinding: a discard of the binding during a handleSubmit save (critic round 5, M05)', () => {
+describe('useReactHookFormBinding: a discard of the binding during a handleSubmit save (code review round 5, M05)', () => {
   it('binding.reset() (no record) while the submit is in flight, then the handler fails: the save is reported as failed', async () => {
     const harness = setupInvoiceForm();
     harness.type('Amount', '120');

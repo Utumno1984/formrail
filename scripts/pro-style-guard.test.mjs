@@ -488,7 +488,7 @@ describe('pro style guard: #614 round 3 (casts in a computed key, unrecognised v
   });
 });
 
-describe('pro style guard: #614 critic round 1 (real JSX, +, comma, outline templates, IIFE)', () => {
+describe('pro style guard: #614 code review round 1 (real JSX, +, comma, outline templates, IIFE)', () => {
   const named = (file, source) => checkSource(file, source, TOKENS).filter((v) => v.rule === 'named-color').map((v) => [v.value, v.line]);
   const outline = (source) => checkSource(TSX, source, TOKENS).filter((v) => v.rule === 'outline-color').map((v) => [v.value, v.line]);
 

@@ -113,7 +113,7 @@ test.describe('Pro/Integrations/React Hook Form', () => {
 
   // The two tests below start where the play ends: Supplier "Acme Corp (updated)", Description 1 "Cable (updated)",
   // Quantity 2 "500" (an unsaved change).
-  test('Line items: a server update while typing in a row keeps that input node, its focus and the keystrokes (critic #507, point 2)', async ({ page }) => {
+  test('Line items: a server update while typing in a row keeps that input node, its focus and the keystrokes (code review of #507, point 2)', async ({ page }) => {
     await expectPlayToPass(page, LINE_ITEMS);
     const quantity = field(page, 'Quantity 2');
     await quantity.fill('5');
